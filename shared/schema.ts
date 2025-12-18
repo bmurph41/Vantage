@@ -2137,6 +2137,24 @@ export const crmProperties = pgTable("crm_properties", {
   images: jsonb("images").default([]),
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
   listingAgentId: varchar("listing_agent_id").references(() => crmContacts.id),
+  
+  // Property Status Toggles (Upgrade G)
+  isSelling: boolean("is_selling").default(false),
+  isOnMarket: boolean("is_on_market").default(false),
+  pipelineStage: text("pipeline_stage").default('lead'), // lead, deal, under_contract, owned
+  
+  // Listing Fields (when selling/on market)
+  brokerContactId: varchar("broker_contact_id").references(() => crmContacts.id),
+  brokerName: text("broker_name"), // Free text fallback if no CRM contact
+  listPrice: decimal("list_price", { precision: 12, scale: 2 }),
+  listCapRate: decimal("list_cap_rate", { precision: 6, scale: 4 }), // e.g., 0.0725 = 7.25%
+  listingDate: date("listing_date"),
+  listingUrl: text("listing_url"),
+  listingNotes: text("listing_notes"),
+  
+  // Owner Company link
+  ownerCompanyId: varchar("owner_company_id").references(() => crmCompanies.id),
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -15363,6 +15381,394 @@ export const insertOmAssetSchema = createInsertSchema(omAssets).omit({
 });
 export type OmAsset = typeof omAssets.$inferSelect;
 export type InsertOmAsset = z.infer<typeof insertOmAssetSchema>;
+
+// ============================================================================
+// MODELING SCENARIOS / CASES SYSTEM
+// User-defined N cases with separate assumptions and lease-up data
+// ============================================================================
+
+// Enum for addback period types
+export const addbackPeriodTypeEnum = pgEnum("addback_period_type", ["monthly", "yearly"]);
+
+// Modeling Cases - Individual case definitions for a modeling project
+export const modelingCases = pgTable("modeling_cases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  
+  name: text("name").notNull(), // e.g., "Base Case", "Aggressive", "Conservative"
+  description: text("description"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isDefault: boolean("is_default").notNull().default(false), // One case per project is the default
+  isEnabled: boolean("is_enabled").notNull().default(true),
+  
+  // Core assumptions stored directly on the case for quick access
+  revenueGrowthRate: decimal("revenue_growth_rate", { precision: 8, scale: 4 }), // e.g., 0.03 = 3%
+  expenseGrowthRate: decimal("expense_growth_rate", { precision: 8, scale: 4 }),
+  exitCapRate: decimal("exit_cap_rate", { precision: 8, scale: 4 }),
+  occupancyRate: decimal("occupancy_rate", { precision: 8, scale: 4 }),
+  discountRate: decimal("discount_rate", { precision: 8, scale: 4 }),
+  holdPeriodYears: integer("hold_period_years"),
+  
+  // Lease-up assumptions (stored as JSON for flexibility)
+  leaseUpSchedule: jsonb("lease_up_schedule").default(sql`'[]'`), // Array of { month: number, occupancy: number }
+  
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  projectIdx: index("modeling_cases_project_idx").on(table.projectId),
+  orgIdx: index("modeling_cases_org_idx").on(table.orgId),
+  sortOrderIdx: index("modeling_cases_sort_order_idx").on(table.projectId, table.sortOrder),
+}));
+
+// Case Assumptions - Extended key-value pairs for additional assumptions per case
+export const modelingCaseAssumptions = pgTable("modeling_case_assumptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id").notNull().references(() => modelingCases.id, { onDelete: 'cascade' }),
+  projectId: varchar("project_id").notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  
+  key: text("key").notNull(), // e.g., "vacancy_rate", "expense_ratio", etc.
+  value: text("value").notNull(),
+  valueType: text("value_type").notNull().default("number"), // "number", "percentage", "currency", "text"
+  category: text("category"), // Group assumptions by category
+  
+  // Period-specific values (for monthly/yearly overrides)
+  period: text("period"), // "monthly" or "yearly" or null for global
+  month: integer("month"), // 1-12 if monthly
+  year: integer("year"), // Year number if yearly
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  caseIdx: index("modeling_case_assumptions_case_idx").on(table.caseId),
+  projectIdx: index("modeling_case_assumptions_project_idx").on(table.projectId),
+  keyIdx: index("modeling_case_assumptions_key_idx").on(table.caseId, table.key),
+}));
+
+// ============================================================================
+// ADDBACKS SYSTEM
+// Per-line-item addback flags and values
+// ============================================================================
+
+// Modeling Addbacks - Addback flags per line item
+export const modelingAddbacks = pgTable("modeling_addbacks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  caseId: varchar("case_id").references(() => modelingCases.id, { onDelete: 'cascade' }), // Nullable if applies to all cases
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  
+  lineItemKey: text("line_item_key").notNull(), // Identifier for the P&L line item
+  lineItemLabel: text("line_item_label").notNull(), // Display label for the line item
+  category: text("category"), // Revenue/Expense/Other
+  
+  periodType: addbackPeriodTypeEnum("period_type").notNull().default("yearly"), // "monthly" or "yearly"
+  isActive: boolean("is_active").notNull().default(true),
+  notes: text("notes"),
+  
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  projectIdx: index("modeling_addbacks_project_idx").on(table.projectId),
+  caseIdx: index("modeling_addbacks_case_idx").on(table.caseId),
+  orgIdx: index("modeling_addbacks_org_idx").on(table.orgId),
+  lineItemIdx: index("modeling_addbacks_line_item_idx").on(table.projectId, table.lineItemKey),
+}));
+
+// Addback Values - Period-specific addback amounts
+export const modelingAddbackValues = pgTable("modeling_addback_values", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  addbackId: varchar("addback_id").notNull().references(() => modelingAddbacks.id, { onDelete: 'cascade' }),
+  
+  year: integer("year").notNull(), // Year number (1-based for projection years, or actual year)
+  month: integer("month"), // 1-12 for monthly, null for yearly
+  amount: decimal("amount", { precision: 18, scale: 2 }).notNull().default("0"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  addbackIdx: index("modeling_addback_values_addback_idx").on(table.addbackId),
+  periodIdx: index("modeling_addback_values_period_idx").on(table.addbackId, table.year, table.month),
+}));
+
+// ============================================================================
+// DUE DILIGENCE FEES TRACKING
+// Track fees paid to third-parties and deal team members
+// ============================================================================
+
+// DD Fee category enum
+export const ddFeeCategoryEnum = pgEnum("dd_fee_category", [
+  "legal", "accounting", "consulting", "inspection", "appraisal", 
+  "environmental", "survey", "title", "lender", "broker", "other"
+]);
+
+// Due Diligence Fees - Track fees paid to contacts/companies
+export const ddFees = pgTable("dd_fees", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  
+  // Link to CRM entities (at least one should be set)
+  contactId: varchar("contact_id").references(() => crmContacts.id),
+  companyId: varchar("company_id").references(() => crmCompanies.id),
+  
+  // Optional link to DD task
+  taskId: varchar("task_id").references(() => tasks.id, { onDelete: 'set null' }),
+  
+  // Fee details
+  category: ddFeeCategoryEnum("category").notNull().default("other"),
+  description: text("description"),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  dateIncurred: date("date_incurred"),
+  datePaid: date("date_paid"),
+  isPaid: boolean("is_paid").notNull().default(false),
+  
+  // Invoice/payment tracking
+  invoiceNumber: text("invoice_number"),
+  paymentMethod: text("payment_method"),
+  notes: text("notes"),
+  
+  // Allocation (optional DD phase)
+  phase: text("phase"), // e.g., "Initial DD", "Extended DD", "Closing"
+  
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  projectIdx: index("dd_fees_project_idx").on(table.projectId),
+  orgIdx: index("dd_fees_org_idx").on(table.orgId),
+  contactIdx: index("dd_fees_contact_idx").on(table.contactId),
+  companyIdx: index("dd_fees_company_idx").on(table.companyId),
+  taskIdx: index("dd_fees_task_idx").on(table.taskId),
+  categoryIdx: index("dd_fees_category_idx").on(table.projectId, table.category),
+}));
+
+// DD Fees Relations
+export const ddFeesRelations = relations(ddFees, ({ one }) => ({
+  project: one(projects, {
+    fields: [ddFees.projectId],
+    references: [projects.id],
+  }),
+  organization: one(organizations, {
+    fields: [ddFees.orgId],
+    references: [organizations.id],
+  }),
+  contact: one(crmContacts, {
+    fields: [ddFees.contactId],
+    references: [crmContacts.id],
+  }),
+  company: one(crmCompanies, {
+    fields: [ddFees.companyId],
+    references: [crmCompanies.id],
+  }),
+  task: one(tasks, {
+    fields: [ddFees.taskId],
+    references: [tasks.id],
+  }),
+  creator: one(users, {
+    fields: [ddFees.createdBy],
+    references: [users.id],
+  }),
+}));
+
+// DD Fees Insert/Select schemas
+export const insertDdFeeSchema = createInsertSchema(ddFees).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateDdFeeSchema = insertDdFeeSchema.partial();
+export type DdFee = typeof ddFees.$inferSelect;
+export type InsertDdFee = z.infer<typeof insertDdFeeSchema>;
+
+// ============================================================================
+// CRM LISTS FEATURE
+// User-defined lists for Contacts, Companies, Properties
+// ============================================================================
+
+// CRM List entity type enum
+export const crmListEntityTypeEnum = pgEnum("crm_list_entity_type", ["contact", "company", "property"]);
+
+// CRM Lists - User-defined list definitions
+export const crmLists = pgTable("crm_lists", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  
+  name: text("name").notNull(),
+  description: text("description"),
+  color: text("color"), // Optional color for visual identification
+  icon: text("icon"), // Optional icon name
+  
+  // Which entity types can be added to this list
+  allowedEntityTypes: text("allowed_entity_types").array().default(sql`ARRAY['contact', 'company', 'property']::text[]`),
+  
+  isArchived: boolean("is_archived").notNull().default(false),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("crm_lists_org_idx").on(table.orgId),
+  createdByIdx: index("crm_lists_created_by_idx").on(table.createdBy),
+  nameIdx: index("crm_lists_name_idx").on(table.orgId, table.name),
+}));
+
+// CRM List Items - Entity membership in lists
+export const crmListItems = pgTable("crm_list_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  listId: varchar("list_id").notNull().references(() => crmLists.id, { onDelete: 'cascade' }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  
+  entityType: crmListEntityTypeEnum("entity_type").notNull(),
+  entityId: varchar("entity_id").notNull(), // ID of the contact/company/property
+  
+  addedBy: varchar("added_by").notNull().references(() => users.id),
+  addedAt: timestamp("added_at").defaultNow().notNull(),
+  notes: text("notes"),
+}, (table) => ({
+  listIdx: index("crm_list_items_list_idx").on(table.listId),
+  orgIdx: index("crm_list_items_org_idx").on(table.orgId),
+  entityIdx: index("crm_list_items_entity_idx").on(table.entityType, table.entityId),
+  uniqueListEntity: index("crm_list_items_unique").on(table.listId, table.entityType, table.entityId),
+}));
+
+// ============================================================================
+// MODELING CASES - RELATIONS
+// ============================================================================
+
+export const modelingCasesRelations = relations(modelingCases, ({ one, many }) => ({
+  project: one(modelingProjects, {
+    fields: [modelingCases.projectId],
+    references: [modelingProjects.id],
+  }),
+  organization: one(organizations, {
+    fields: [modelingCases.orgId],
+    references: [organizations.id],
+  }),
+  creator: one(users, {
+    fields: [modelingCases.createdBy],
+    references: [users.id],
+  }),
+  assumptions: many(modelingCaseAssumptions),
+  addbacks: many(modelingAddbacks),
+}));
+
+export const modelingCaseAssumptionsRelations = relations(modelingCaseAssumptions, ({ one }) => ({
+  case: one(modelingCases, {
+    fields: [modelingCaseAssumptions.caseId],
+    references: [modelingCases.id],
+  }),
+  project: one(modelingProjects, {
+    fields: [modelingCaseAssumptions.projectId],
+    references: [modelingProjects.id],
+  }),
+}));
+
+export const modelingAddbacksRelations = relations(modelingAddbacks, ({ one, many }) => ({
+  project: one(modelingProjects, {
+    fields: [modelingAddbacks.projectId],
+    references: [modelingProjects.id],
+  }),
+  case: one(modelingCases, {
+    fields: [modelingAddbacks.caseId],
+    references: [modelingCases.id],
+  }),
+  organization: one(organizations, {
+    fields: [modelingAddbacks.orgId],
+    references: [organizations.id],
+  }),
+  values: many(modelingAddbackValues),
+}));
+
+export const modelingAddbackValuesRelations = relations(modelingAddbackValues, ({ one }) => ({
+  addback: one(modelingAddbacks, {
+    fields: [modelingAddbackValues.addbackId],
+    references: [modelingAddbacks.id],
+  }),
+}));
+
+export const crmListsRelations = relations(crmLists, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [crmLists.orgId],
+    references: [organizations.id],
+  }),
+  creator: one(users, {
+    fields: [crmLists.createdBy],
+    references: [users.id],
+  }),
+  items: many(crmListItems),
+}));
+
+export const crmListItemsRelations = relations(crmListItems, ({ one }) => ({
+  list: one(crmLists, {
+    fields: [crmListItems.listId],
+    references: [crmLists.id],
+  }),
+  organization: one(organizations, {
+    fields: [crmListItems.orgId],
+    references: [organizations.id],
+  }),
+  addedByUser: one(users, {
+    fields: [crmListItems.addedBy],
+    references: [users.id],
+  }),
+}));
+
+// ============================================================================
+// MODELING CASES - INSERT/SELECT SCHEMAS
+// ============================================================================
+
+export const insertModelingCaseSchema = createInsertSchema(modelingCases).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateModelingCaseSchema = insertModelingCaseSchema.partial();
+export type ModelingCase = typeof modelingCases.$inferSelect;
+export type InsertModelingCase = z.infer<typeof insertModelingCaseSchema>;
+
+export const insertModelingCaseAssumptionSchema = createInsertSchema(modelingCaseAssumptions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type ModelingCaseAssumption = typeof modelingCaseAssumptions.$inferSelect;
+export type InsertModelingCaseAssumption = z.infer<typeof insertModelingCaseAssumptionSchema>;
+
+export const insertModelingAddbackSchema = createInsertSchema(modelingAddbacks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateModelingAddbackSchema = insertModelingAddbackSchema.partial();
+export type ModelingAddback = typeof modelingAddbacks.$inferSelect;
+export type InsertModelingAddback = z.infer<typeof insertModelingAddbackSchema>;
+
+export const insertModelingAddbackValueSchema = createInsertSchema(modelingAddbackValues).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type ModelingAddbackValue = typeof modelingAddbackValues.$inferSelect;
+export type InsertModelingAddbackValue = z.infer<typeof insertModelingAddbackValueSchema>;
+
+export const insertCrmListSchema = createInsertSchema(crmLists).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateCrmListSchema = insertCrmListSchema.partial();
+export type CrmList = typeof crmLists.$inferSelect;
+export type InsertCrmList = z.infer<typeof insertCrmListSchema>;
+
+export const insertCrmListItemSchema = createInsertSchema(crmListItems).omit({
+  id: true,
+  addedAt: true,
+});
+export type CrmListItem = typeof crmListItems.$inferSelect;
+export type InsertCrmListItem = z.infer<typeof insertCrmListItemSchema>;
 
 // ============================================================================
 // DockTalk 2.0 Schema Integration

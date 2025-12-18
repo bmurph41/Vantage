@@ -1012,6 +1012,225 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================================================
+  // DD FEES - Track fees paid to contacts/companies during due diligence
+  // ============================================================================
+
+  // Get all fees for a project
+  app.get("/api/dd/projects/:projectId/fees", authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getProject(projectId);
+      if (!project || project.orgId !== orgId) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+      
+      const { ddFees, crmContacts, crmCompanies, tasks } = await import('@shared/schema');
+      const { eq } = await import('drizzle-orm');
+      
+      const fees = await db.select({
+        id: ddFees.id,
+        projectId: ddFees.projectId,
+        orgId: ddFees.orgId,
+        contactId: ddFees.contactId,
+        companyId: ddFees.companyId,
+        taskId: ddFees.taskId,
+        category: ddFees.category,
+        description: ddFees.description,
+        amount: ddFees.amount,
+        dateIncurred: ddFees.dateIncurred,
+        datePaid: ddFees.datePaid,
+        isPaid: ddFees.isPaid,
+        invoiceNumber: ddFees.invoiceNumber,
+        paymentMethod: ddFees.paymentMethod,
+        notes: ddFees.notes,
+        phase: ddFees.phase,
+        createdBy: ddFees.createdBy,
+        createdAt: ddFees.createdAt,
+        updatedAt: ddFees.updatedAt,
+        contactName: crmContacts.name,
+        companyName: crmCompanies.name,
+        taskName: tasks.name,
+      })
+        .from(ddFees)
+        .leftJoin(crmContacts, eq(ddFees.contactId, crmContacts.id))
+        .leftJoin(crmCompanies, eq(ddFees.companyId, crmCompanies.id))
+        .leftJoin(tasks, eq(ddFees.taskId, tasks.id))
+        .where(eq(ddFees.projectId, projectId));
+      
+      res.json(fees);
+    } catch (error) {
+      console.error("Failed to fetch DD fees:", error);
+      res.status(500).json({ error: "Failed to retrieve fees" });
+    }
+  });
+
+  // Get fee summary by category for a project
+  app.get("/api/dd/projects/:projectId/fees/summary", authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getProject(projectId);
+      if (!project || project.orgId !== orgId) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+      
+      const { ddFees } = await import('@shared/schema');
+      const { eq, sum, count } = await import('drizzle-orm');
+      
+      const summary = await db.select({
+        category: ddFees.category,
+        totalAmount: sum(ddFees.amount),
+        count: count(ddFees.id),
+      })
+        .from(ddFees)
+        .where(eq(ddFees.projectId, projectId))
+        .groupBy(ddFees.category);
+      
+      // Calculate totals
+      const allFees = await db.select({
+        amount: ddFees.amount,
+        isPaid: ddFees.isPaid,
+      })
+        .from(ddFees)
+        .where(eq(ddFees.projectId, projectId));
+      
+      const totalFees = allFees.reduce((sum, f) => sum + Number(f.amount || 0), 0);
+      const paidFees = allFees.filter(f => f.isPaid).reduce((sum, f) => sum + Number(f.amount || 0), 0);
+      const unpaidFees = totalFees - paidFees;
+      
+      res.json({
+        byCategory: summary,
+        totalFees,
+        paidFees,
+        unpaidFees,
+      });
+    } catch (error) {
+      console.error("Failed to fetch DD fees summary:", error);
+      res.status(500).json({ error: "Failed to retrieve fees summary" });
+    }
+  });
+
+  // Create a fee
+  app.post("/api/dd/projects/:projectId/fees", authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      
+      const project = await storage.getProject(projectId);
+      if (!project || project.orgId !== orgId) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+      
+      const { ddFees, insertDdFeeSchema } = await import('@shared/schema');
+      
+      const validated = insertDdFeeSchema.parse({
+        ...req.body,
+        projectId,
+        orgId,
+        createdBy: userId,
+      });
+      
+      const [newFee] = await db.insert(ddFees).values(validated).returning();
+      res.status(201).json(newFee);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error("Failed to create DD fee:", error);
+      res.status(500).json({ error: "Failed to create fee" });
+    }
+  });
+
+  // Update a fee
+  app.patch("/api/dd/fees/:feeId", authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { feeId } = req.params;
+      
+      const { ddFees, updateDdFeeSchema } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      const validated = updateDdFeeSchema.parse(req.body);
+      
+      const [updated] = await db.update(ddFees)
+        .set({ ...validated, updatedAt: new Date() })
+        .where(and(eq(ddFees.id, feeId), eq(ddFees.orgId, orgId)))
+        .returning();
+      
+      if (!updated) {
+        return res.status(404).json({ error: "Fee not found" });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error("Failed to update DD fee:", error);
+      res.status(500).json({ error: "Failed to update fee" });
+    }
+  });
+
+  // Delete a fee
+  app.delete("/api/dd/fees/:feeId", authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { feeId } = req.params;
+      
+      const { ddFees } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      const [deleted] = await db.delete(ddFees)
+        .where(and(eq(ddFees.id, feeId), eq(ddFees.orgId, orgId)))
+        .returning();
+      
+      if (!deleted) {
+        return res.status(404).json({ error: "Fee not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete DD fee:", error);
+      res.status(500).json({ error: "Failed to delete fee" });
+    }
+  });
+
+  // Mark fee as paid
+  app.post("/api/dd/fees/:feeId/mark-paid", authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { feeId } = req.params;
+      const { datePaid, paymentMethod } = req.body;
+      
+      const { ddFees } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      const [updated] = await db.update(ddFees)
+        .set({
+          isPaid: true,
+          datePaid: datePaid || new Date().toISOString().split('T')[0],
+          paymentMethod: paymentMethod || null,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(ddFees.id, feeId), eq(ddFees.orgId, orgId)))
+        .returning();
+      
+      if (!updated) {
+        return res.status(404).json({ error: "Fee not found" });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Failed to mark fee as paid:", error);
+      res.status(500).json({ error: "Failed to mark fee as paid" });
+    }
+  });
+
   // Public shared project access (no authentication required)
   app.get("/api/shared/:token", async (req: any, res) => {
     try {
@@ -6354,6 +6573,209 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ============================================================================
+  // CRM LISTS - User-defined lists for contacts, companies, properties
+  // ============================================================================
+
+  // Get all lists for org
+  app.get("/api/crm/lists", authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { entityType } = req.query;
+      
+      const { crmLists } = await import('@shared/schema');
+      const { eq, and, desc } = await import('drizzle-orm');
+      
+      let query = db.select().from(crmLists).where(eq(crmLists.orgId, orgId));
+      
+      if (entityType) {
+        query = db.select().from(crmLists).where(
+          and(eq(crmLists.orgId, orgId), eq(crmLists.entityType, entityType))
+        );
+      }
+      
+      const lists = await query.orderBy(desc(crmLists.updatedAt));
+      res.json(lists);
+    } catch (error) {
+      console.error("Failed to get CRM lists:", error);
+      res.status(500).json({ error: "Failed to retrieve lists" });
+    }
+  });
+
+  // Get a single list with its members
+  app.get("/api/crm/lists/:listId", authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { listId } = req.params;
+      
+      const { crmLists, crmListMembers, crmContacts, crmCompanies, crmProperties } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      const [list] = await db.select().from(crmLists)
+        .where(and(eq(crmLists.id, listId), eq(crmLists.orgId, orgId)));
+      
+      if (!list) {
+        return res.status(404).json({ error: "List not found" });
+      }
+      
+      const members = await db.select().from(crmListMembers)
+        .where(eq(crmListMembers.listId, listId));
+      
+      res.json({ ...list, members });
+    } catch (error) {
+      console.error("Failed to get CRM list:", error);
+      res.status(500).json({ error: "Failed to retrieve list" });
+    }
+  });
+
+  // Create a new list
+  app.post("/api/crm/lists", authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      
+      const { crmLists, insertCrmListSchema } = await import('@shared/schema');
+      
+      const validated = insertCrmListSchema.parse({
+        ...req.body,
+        orgId,
+        createdBy: userId,
+      });
+      
+      const [newList] = await db.insert(crmLists).values(validated).returning();
+      res.status(201).json(newList);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error("Failed to create CRM list:", error);
+      res.status(500).json({ error: "Failed to create list" });
+    }
+  });
+
+  // Update a list
+  app.patch("/api/crm/lists/:listId", authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { listId } = req.params;
+      
+      const { crmLists, updateCrmListSchema } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      const validated = updateCrmListSchema.parse(req.body);
+      
+      const [updated] = await db.update(crmLists)
+        .set({ ...validated, updatedAt: new Date() })
+        .where(and(eq(crmLists.id, listId), eq(crmLists.orgId, orgId)))
+        .returning();
+      
+      if (!updated) {
+        return res.status(404).json({ error: "List not found" });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error("Failed to update CRM list:", error);
+      res.status(500).json({ error: "Failed to update list" });
+    }
+  });
+
+  // Delete a list
+  app.delete("/api/crm/lists/:listId", authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { listId } = req.params;
+      
+      const { crmLists } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      const [deleted] = await db.delete(crmLists)
+        .where(and(eq(crmLists.id, listId), eq(crmLists.orgId, orgId)))
+        .returning();
+      
+      if (!deleted) {
+        return res.status(404).json({ error: "List not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete CRM list:", error);
+      res.status(500).json({ error: "Failed to delete list" });
+    }
+  });
+
+  // Add members to a list
+  app.post("/api/crm/lists/:listId/members", authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { listId } = req.params;
+      const { entityIds } = req.body; // Array of entity IDs to add
+      
+      if (!entityIds || !Array.isArray(entityIds) || entityIds.length === 0) {
+        return res.status(400).json({ error: "entityIds array is required" });
+      }
+      
+      const { crmLists, crmListMembers } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      // Verify list exists and belongs to org
+      const [list] = await db.select().from(crmLists)
+        .where(and(eq(crmLists.id, listId), eq(crmLists.orgId, orgId)));
+      
+      if (!list) {
+        return res.status(404).json({ error: "List not found" });
+      }
+      
+      // Insert members (ignoring duplicates)
+      const newMembers = await Promise.all(entityIds.map(async (entityId: string) => {
+        try {
+          const [member] = await db.insert(crmListMembers)
+            .values({ listId, entityId })
+            .onConflictDoNothing()
+            .returning();
+          return member;
+        } catch {
+          return null;
+        }
+      }));
+      
+      res.json({ added: newMembers.filter(Boolean).length });
+    } catch (error) {
+      console.error("Failed to add list members:", error);
+      res.status(500).json({ error: "Failed to add members to list" });
+    }
+  });
+
+  // Remove a member from a list
+  app.delete("/api/crm/lists/:listId/members/:entityId", authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { listId, entityId } = req.params;
+      
+      const { crmLists, crmListMembers } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      // Verify list exists and belongs to org
+      const [list] = await db.select().from(crmLists)
+        .where(and(eq(crmLists.id, listId), eq(crmLists.orgId, orgId)));
+      
+      if (!list) {
+        return res.status(404).json({ error: "List not found" });
+      }
+      
+      await db.delete(crmListMembers)
+        .where(and(eq(crmListMembers.listId, listId), eq(crmListMembers.entityId, entityId)));
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to remove list member:", error);
+      res.status(500).json({ error: "Failed to remove member from list" });
+    }
+  });
+
   // CRM Pipelines
   app.get("/api/crm/pipelines", async (req: any, res) => {
     try {
@@ -11658,6 +12080,188 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ============================================================================
+  // PROPERTY STATUS MANAGEMENT - Selling/on-market toggles & pipeline stages
+  // ============================================================================
+
+  // Update property status fields (selling, on-market, pipeline stage, broker, listing)
+  app.patch('/api/crm/properties/:propertyId/status', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { propertyId } = req.params;
+      const updates = req.body;
+      
+      const { crmProperties } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      // Validate updates - only allow status-related fields
+      const allowedFields = [
+        'isSelling', 'isOnMarket', 'pipelineStage', 
+        'brokerContactId', 'brokerName', 'listPrice', 'listCapRate',
+        'listingDate', 'listingUrl', 'listingNotes', 'ownerCompanyId', 'status'
+      ];
+      
+      const filteredUpdates: Record<string, any> = {};
+      for (const key of Object.keys(updates)) {
+        if (allowedFields.includes(key)) {
+          filteredUpdates[key] = updates[key];
+        }
+      }
+      
+      if (Object.keys(filteredUpdates).length === 0) {
+        return res.status(400).json({ error: "No valid status fields provided" });
+      }
+      
+      const [updated] = await db.update(crmProperties)
+        .set({ ...filteredUpdates, updatedAt: new Date() })
+        .where(and(eq(crmProperties.id, propertyId), eq(crmProperties.ownerId, orgId)))
+        .returning();
+      
+      if (!updated) {
+        return res.status(404).json({ error: "Property not found" });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating property status:", error);
+      res.status(500).json({ error: "Failed to update property status" });
+    }
+  });
+
+  // Get properties by pipeline stage
+  app.get('/api/crm/properties/by-stage/:stage', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { stage } = req.params;
+      
+      const { crmProperties } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      const properties = await db.select()
+        .from(crmProperties)
+        .where(and(eq(crmProperties.ownerId, orgId), eq(crmProperties.pipelineStage, stage)));
+      
+      res.json(properties);
+    } catch (error) {
+      console.error("Error fetching properties by stage:", error);
+      res.status(500).json({ error: "Failed to fetch properties by stage" });
+    }
+  });
+
+  // Get properties that are on market (for sales comps integration)
+  app.get('/api/crm/properties/on-market', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      
+      const { crmProperties, crmContacts } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      const properties = await db.select({
+        id: crmProperties.id,
+        title: crmProperties.title,
+        address: crmProperties.address,
+        type: crmProperties.type,
+        status: crmProperties.status,
+        pipelineStage: crmProperties.pipelineStage,
+        isSelling: crmProperties.isSelling,
+        isOnMarket: crmProperties.isOnMarket,
+        listPrice: crmProperties.listPrice,
+        listCapRate: crmProperties.listCapRate,
+        listingDate: crmProperties.listingDate,
+        listingUrl: crmProperties.listingUrl,
+        listingNotes: crmProperties.listingNotes,
+        brokerContactId: crmProperties.brokerContactId,
+        brokerName: crmProperties.brokerName,
+        brokerContactName: crmContacts.name,
+        coordinates: crmProperties.coordinates,
+        specifications: crmProperties.specifications,
+      })
+        .from(crmProperties)
+        .leftJoin(crmContacts, eq(crmProperties.brokerContactId, crmContacts.id))
+        .where(and(
+          eq(crmProperties.ownerId, orgId),
+          eq(crmProperties.isOnMarket, true)
+        ));
+      
+      res.json(properties);
+    } catch (error) {
+      console.error("Error fetching on-market properties:", error);
+      res.status(500).json({ error: "Failed to fetch on-market properties" });
+    }
+  });
+
+  // Close a property sale and optionally create a sales comp
+  app.post('/api/crm/properties/:propertyId/close-sale', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { propertyId } = req.params;
+      const { salePrice, saleDate, createComp, compData } = req.body;
+      
+      const { crmProperties, salesComps, insertSalesCompSchema } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      // Get the property
+      const [property] = await db.select()
+        .from(crmProperties)
+        .where(and(eq(crmProperties.id, propertyId), eq(crmProperties.ownerId, orgId)));
+      
+      if (!property) {
+        return res.status(404).json({ error: "Property not found" });
+      }
+      
+      // Update property status to sold
+      const [updated] = await db.update(crmProperties)
+        .set({
+          status: 'sold',
+          pipelineStage: 'owned',
+          isSelling: false,
+          isOnMarket: false,
+          updatedAt: new Date(),
+        })
+        .where(eq(crmProperties.id, propertyId))
+        .returning();
+      
+      let createdComp = null;
+      
+      // Optionally create a sales comp
+      if (createComp) {
+        const coords = property.coordinates as { lat?: number; lng?: number } | null;
+        const specs = property.specifications as Record<string, any> | null;
+        
+        const compInsert = insertSalesCompSchema.parse({
+          orgId,
+          marinaName: property.title,
+          address: property.address,
+          city: specs?.city || '',
+          state: specs?.state || '',
+          salePrice: salePrice || property.listPrice,
+          saleDate: saleDate || new Date().toISOString().split('T')[0],
+          wetSlips: specs?.wetSlips,
+          drySlips: specs?.drySlips,
+          latitude: coords?.lat,
+          longitude: coords?.lng,
+          source: 'Internal - Property Close',
+          notes: `Auto-generated from property close: ${property.title}`,
+          ...compData,
+        });
+        
+        [createdComp] = await db.insert(salesComps).values(compInsert).returning();
+      }
+      
+      res.json({
+        property: updated,
+        salesComp: createdComp,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error("Error closing property sale:", error);
+      res.status(500).json({ error: "Failed to close property sale" });
+    }
+  });
+
   // Duplicate detection endpoints using rule-based matching service
   app.post('/api/pending/:entityType/:id/detect-duplicates', async (req: any, res) => {
     try {
@@ -12925,6 +13529,493 @@ Current context: Project ${req.params.projectId}`;
     } catch (error) {
       console.error('Failed to delete modeling project:', error);
       res.status(500).json({ error: 'Failed to delete modeling project' });
+    }
+  });
+
+  // ============================================================================
+  // MODELING CASES - User-defined scenarios (e.g., Base, Conservative, Aggressive)
+  // ============================================================================
+
+  // Get all cases for a project
+  app.get('/api/modeling/projects/:projectId/cases', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const { modelingCases } = await import('@shared/schema');
+      const { eq, and, asc } = await import('drizzle-orm');
+      const cases = await db.select()
+        .from(modelingCases)
+        .where(and(eq(modelingCases.projectId, projectId), eq(modelingCases.orgId, orgId)))
+        .orderBy(asc(modelingCases.displayOrder));
+      res.json(cases);
+    } catch (error) {
+      console.error('Failed to fetch modeling cases:', error);
+      res.status(500).json({ error: 'Failed to fetch modeling cases' });
+    }
+  });
+
+  // Get a single case by ID
+  app.get('/api/modeling/cases/:caseId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { caseId } = req.params;
+      
+      const { modelingCases } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      const [modelCase] = await db.select()
+        .from(modelingCases)
+        .where(and(eq(modelingCases.id, caseId), eq(modelingCases.orgId, orgId)));
+      
+      if (!modelCase) {
+        return res.status(404).json({ error: 'Case not found' });
+      }
+      
+      res.json(modelCase);
+    } catch (error) {
+      console.error('Failed to fetch modeling case:', error);
+      res.status(500).json({ error: 'Failed to fetch modeling case' });
+    }
+  });
+
+  // Create a new case
+  app.post('/api/modeling/projects/:projectId/cases', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const { modelingCases, insertModelingCaseSchema } = await import('@shared/schema');
+      const { eq, and, count } = await import('drizzle-orm');
+      
+      // Get current case count for display order
+      const [{ value: caseCount }] = await db.select({ value: count() })
+        .from(modelingCases)
+        .where(and(eq(modelingCases.projectId, projectId), eq(modelingCases.orgId, orgId)));
+      
+      const validated = insertModelingCaseSchema.parse({
+        ...req.body,
+        projectId,
+        orgId,
+        createdBy: userId,
+        displayOrder: Number(caseCount),
+      });
+      
+      const [newCase] = await db.insert(modelingCases).values(validated).returning();
+      res.status(201).json(newCase);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to create modeling case:', error);
+      res.status(500).json({ error: 'Failed to create modeling case' });
+    }
+  });
+
+  // Update a case
+  app.patch('/api/modeling/cases/:caseId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { caseId } = req.params;
+      
+      const { modelingCases, updateModelingCaseSchema } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      const validated = updateModelingCaseSchema.parse(req.body);
+      
+      const [updated] = await db.update(modelingCases)
+        .set({ ...validated, updatedAt: new Date() })
+        .where(and(eq(modelingCases.id, caseId), eq(modelingCases.orgId, orgId)))
+        .returning();
+      
+      if (!updated) {
+        return res.status(404).json({ error: 'Case not found' });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to update modeling case:', error);
+      res.status(500).json({ error: 'Failed to update modeling case' });
+    }
+  });
+
+  // Delete a case
+  app.delete('/api/modeling/cases/:caseId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { caseId } = req.params;
+      
+      const { modelingCases } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      // Prevent deletion of base case
+      const [modelCase] = await db.select()
+        .from(modelingCases)
+        .where(and(eq(modelingCases.id, caseId), eq(modelingCases.orgId, orgId)));
+      
+      if (!modelCase) {
+        return res.status(404).json({ error: 'Case not found' });
+      }
+      
+      if (modelCase.isDefault) {
+        return res.status(400).json({ error: 'Cannot delete the default case' });
+      }
+      
+      await db.delete(modelingCases)
+        .where(and(eq(modelingCases.id, caseId), eq(modelingCases.orgId, orgId)));
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete modeling case:', error);
+      res.status(500).json({ error: 'Failed to delete modeling case' });
+    }
+  });
+
+  // Set a case as default (unsets previous default)
+  app.post('/api/modeling/cases/:caseId/set-default', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { caseId } = req.params;
+      
+      const { modelingCases } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      const [modelCase] = await db.select()
+        .from(modelingCases)
+        .where(and(eq(modelingCases.id, caseId), eq(modelingCases.orgId, orgId)));
+      
+      if (!modelCase) {
+        return res.status(404).json({ error: 'Case not found' });
+      }
+      
+      // Unset all other defaults for this project
+      await db.update(modelingCases)
+        .set({ isDefault: false })
+        .where(and(
+          eq(modelingCases.projectId, modelCase.projectId),
+          eq(modelingCases.orgId, orgId)
+        ));
+      
+      // Set this one as default
+      const [updated] = await db.update(modelingCases)
+        .set({ isDefault: true, updatedAt: new Date() })
+        .where(eq(modelingCases.id, caseId))
+        .returning();
+      
+      res.json(updated);
+    } catch (error) {
+      console.error('Failed to set default case:', error);
+      res.status(500).json({ error: 'Failed to set default case' });
+    }
+  });
+
+  // Clone a case (copy assumptions to a new case)
+  app.post('/api/modeling/cases/:caseId/clone', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { caseId } = req.params;
+      const { name, description } = req.body;
+      
+      const { modelingCases, modelingCaseAssumptions, modelingCaseLeaseUpData } = await import('@shared/schema');
+      const { eq, and, count } = await import('drizzle-orm');
+      
+      // Get source case
+      const [sourceCase] = await db.select()
+        .from(modelingCases)
+        .where(and(eq(modelingCases.id, caseId), eq(modelingCases.orgId, orgId)));
+      
+      if (!sourceCase) {
+        return res.status(404).json({ error: 'Source case not found' });
+      }
+      
+      // Get case count for display order
+      const [{ value: caseCount }] = await db.select({ value: count() })
+        .from(modelingCases)
+        .where(and(eq(modelingCases.projectId, sourceCase.projectId), eq(modelingCases.orgId, orgId)));
+      
+      // Create new case
+      const [newCase] = await db.insert(modelingCases).values({
+        projectId: sourceCase.projectId,
+        orgId,
+        name: name || `${sourceCase.name} (Copy)`,
+        description: description || sourceCase.description,
+        displayOrder: Number(caseCount),
+        isDefault: false,
+        createdBy: userId,
+      }).returning();
+      
+      // Copy assumptions
+      const sourceAssumptions = await db.select()
+        .from(modelingCaseAssumptions)
+        .where(eq(modelingCaseAssumptions.caseId, caseId));
+      
+      if (sourceAssumptions.length > 0) {
+        await db.insert(modelingCaseAssumptions).values(
+          sourceAssumptions.map(a => ({
+            caseId: newCase.id,
+            category: a.category,
+            key: a.key,
+            value: a.value,
+            label: a.label,
+            notes: a.notes,
+          }))
+        );
+      }
+      
+      // Copy lease-up data
+      const sourceLeaseUp = await db.select()
+        .from(modelingCaseLeaseUpData)
+        .where(eq(modelingCaseLeaseUpData.caseId, caseId));
+      
+      if (sourceLeaseUp.length > 0) {
+        await db.insert(modelingCaseLeaseUpData).values(
+          sourceLeaseUp.map(l => ({
+            caseId: newCase.id,
+            unitType: l.unitType,
+            year: l.year,
+            month: l.month,
+            occupancy: l.occupancy,
+            rate: l.rate,
+            notes: l.notes,
+          }))
+        );
+      }
+      
+      res.status(201).json(newCase);
+    } catch (error) {
+      console.error('Failed to clone case:', error);
+      res.status(500).json({ error: 'Failed to clone case' });
+    }
+  });
+
+  // ============================================================================
+  // MODELING CASE ASSUMPTIONS - Case-specific assumptions
+  // ============================================================================
+
+  // Get all assumptions for a case
+  app.get('/api/modeling/cases/:caseId/assumptions', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { caseId } = req.params;
+      
+      const { modelingCases, modelingCaseAssumptions } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      // Verify case belongs to org
+      const [modelCase] = await db.select()
+        .from(modelingCases)
+        .where(and(eq(modelingCases.id, caseId), eq(modelingCases.orgId, orgId)));
+      
+      if (!modelCase) {
+        return res.status(404).json({ error: 'Case not found' });
+      }
+      
+      const assumptions = await db.select()
+        .from(modelingCaseAssumptions)
+        .where(eq(modelingCaseAssumptions.caseId, caseId));
+      
+      res.json(assumptions);
+    } catch (error) {
+      console.error('Failed to fetch case assumptions:', error);
+      res.status(500).json({ error: 'Failed to fetch case assumptions' });
+    }
+  });
+
+  // Upsert assumptions for a case
+  app.put('/api/modeling/cases/:caseId/assumptions', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { caseId } = req.params;
+      const { assumptions } = req.body; // Array of { category, key, value, label?, notes? }
+      
+      const { modelingCases, modelingCaseAssumptions } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      // Verify case belongs to org
+      const [modelCase] = await db.select()
+        .from(modelingCases)
+        .where(and(eq(modelingCases.id, caseId), eq(modelingCases.orgId, orgId)));
+      
+      if (!modelCase) {
+        return res.status(404).json({ error: 'Case not found' });
+      }
+      
+      // Delete existing and insert new
+      await db.delete(modelingCaseAssumptions).where(eq(modelingCaseAssumptions.caseId, caseId));
+      
+      if (assumptions && assumptions.length > 0) {
+        await db.insert(modelingCaseAssumptions).values(
+          assumptions.map((a: any) => ({
+            caseId,
+            category: a.category,
+            key: a.key,
+            value: a.value,
+            label: a.label,
+            notes: a.notes,
+          }))
+        );
+      }
+      
+      const updated = await db.select()
+        .from(modelingCaseAssumptions)
+        .where(eq(modelingCaseAssumptions.caseId, caseId));
+      
+      res.json(updated);
+    } catch (error) {
+      console.error('Failed to upsert case assumptions:', error);
+      res.status(500).json({ error: 'Failed to upsert case assumptions' });
+    }
+  });
+
+  // ============================================================================
+  // MODELING ADDBACKS - Line item addback flags and values
+  // ============================================================================
+
+  // Get all addbacks for a project
+  app.get('/api/modeling/projects/:projectId/addbacks', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const { modelingAddbacks, modelingAddbackValues } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      const addbacks = await db.select()
+        .from(modelingAddbacks)
+        .where(and(eq(modelingAddbacks.projectId, projectId), eq(modelingAddbacks.orgId, orgId)));
+      
+      // Get values for each addback
+      const addbacksWithValues = await Promise.all(addbacks.map(async (addback) => {
+        const values = await db.select()
+          .from(modelingAddbackValues)
+          .where(eq(modelingAddbackValues.addbackId, addback.id));
+        return { ...addback, values };
+      }));
+      
+      res.json(addbacksWithValues);
+    } catch (error) {
+      console.error('Failed to fetch addbacks:', error);
+      res.status(500).json({ error: 'Failed to fetch addbacks' });
+    }
+  });
+
+  // Create or update addback for a line item
+  app.post('/api/modeling/projects/:projectId/addbacks', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const { lineItemId, reason, notes, periodType, values } = req.body;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const { modelingAddbacks, modelingAddbackValues, insertModelingAddbackSchema } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      // Check if addback already exists for this line item
+      const [existing] = await db.select()
+        .from(modelingAddbacks)
+        .where(and(
+          eq(modelingAddbacks.projectId, projectId),
+          eq(modelingAddbacks.lineItemId, lineItemId),
+          eq(modelingAddbacks.orgId, orgId)
+        ));
+      
+      let addback;
+      if (existing) {
+        // Update existing
+        [addback] = await db.update(modelingAddbacks)
+          .set({ reason, notes, periodType, updatedAt: new Date() })
+          .where(eq(modelingAddbacks.id, existing.id))
+          .returning();
+        
+        // Delete and recreate values
+        await db.delete(modelingAddbackValues).where(eq(modelingAddbackValues.addbackId, existing.id));
+      } else {
+        // Create new
+        const validated = insertModelingAddbackSchema.parse({
+          projectId,
+          orgId,
+          lineItemId,
+          reason,
+          notes,
+          periodType: periodType || 'yearly',
+          createdBy: userId,
+        });
+        
+        [addback] = await db.insert(modelingAddbacks).values(validated).returning();
+      }
+      
+      // Insert values
+      if (values && values.length > 0) {
+        await db.insert(modelingAddbackValues).values(
+          values.map((v: any) => ({
+            addbackId: addback.id,
+            year: v.year,
+            month: v.month,
+            amount: v.amount,
+          }))
+        );
+      }
+      
+      // Fetch values for response
+      const addbackValues = await db.select()
+        .from(modelingAddbackValues)
+        .where(eq(modelingAddbackValues.addbackId, addback.id));
+      
+      res.json({ ...addback, values: addbackValues });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to create/update addback:', error);
+      res.status(500).json({ error: 'Failed to create/update addback' });
+    }
+  });
+
+  // Delete an addback
+  app.delete('/api/modeling/addbacks/:addbackId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { addbackId } = req.params;
+      
+      const { modelingAddbacks } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      const [deleted] = await db.delete(modelingAddbacks)
+        .where(and(eq(modelingAddbacks.id, addbackId), eq(modelingAddbacks.orgId, orgId)))
+        .returning();
+      
+      if (!deleted) {
+        return res.status(404).json({ error: 'Addback not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to delete addback:', error);
+      res.status(500).json({ error: 'Failed to delete addback' });
     }
   });
 
