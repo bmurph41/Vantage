@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 
 export interface AddressComponents {
   street?: string;
+  streetAddress?: string; // Alias for street
   city?: string;
   state?: string;
   zipCode?: string;
@@ -162,6 +163,9 @@ export function AddressInput({
         components.country = component.long_name;
       }
     });
+
+    // Set streetAddress as alias for street
+    components.streetAddress = components.street;
 
     // Update the input value with the full address
     if (inputRef.current && components.fullAddress) {

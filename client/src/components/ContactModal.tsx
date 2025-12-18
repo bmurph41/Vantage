@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { User, Phone, Upload } from "lucide-react";
-import { AddressInput } from "@/components/address-input";
+import { AddressInput, type AddressComponents } from "@/components/address-input";
 
 /**
  * ContactModal — Add/Edit Contact (business-focused)
@@ -364,6 +364,9 @@ export default function ContactModal({ open, onClose, onSave, initialData }: {
                 <AddressInput
                   value={address}
                   onChange={(value) => setAddress(value)}
+                  onAddressSelect={(components: AddressComponents) => {
+                    setAddress(components.fullAddress || components.street || '');
+                  }}
                   label="Address"
                   placeholder="Start typing an address..."
                   testId={isEdit ? "input-edit-address" : "input-address"}

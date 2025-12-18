@@ -15,7 +15,7 @@ import { useState, useEffect, useRef } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
-import { AddressInput } from "@/components/address-input";
+import { AddressInput, type AddressComponents } from "@/components/address-input";
 import type { Company, Contact, Deal, Property } from "@shared/schema";
 
 interface CompanyDetailModalProps {
@@ -390,6 +390,9 @@ export default function CompanyDetailModal({ isOpen, onClose, company }: Company
                               <AddressInput
                                 value={field.value || ""}
                                 onChange={(value) => field.onChange(value)}
+                                onAddressSelect={(components: AddressComponents) => {
+                                  field.onChange(components.fullAddress || components.street || '');
+                                }}
                                 label="Address"
                                 placeholder="Start typing an address..."
                                 disabled={!isEditing}

@@ -22,7 +22,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
-import { AddressInput } from "@/components/address-input";
+import { AddressInput, type AddressComponents } from "@/components/address-input";
 import type { Property, Contact, Company, Deal, Activity as ActivityType, Note, SalesComp, RateComp } from "@shared/schema";
 import PropertyIntegrationPanel from "@/components/crm/PropertyIntegrationPanel";
 
@@ -553,6 +553,9 @@ export default function PropertyDetailModal({ isOpen, onClose, property }: Prope
                       <AddressInput
                         value={form.watch('address') || ""}
                         onChange={(value) => form.setValue('address', value, { shouldDirty: true })}
+                        onAddressSelect={(components: AddressComponents) => {
+                          form.setValue('address', components.fullAddress || components.street || '', { shouldDirty: true });
+                        }}
                         label="Address"
                         placeholder="Start typing an address..."
                         testId="input-address"
