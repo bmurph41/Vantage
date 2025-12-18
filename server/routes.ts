@@ -16300,6 +16300,63 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ==================== MODELING EXCEL EXPORT ROUTES ====================
+
+  // Export modeling project to Excel with multiple sheets
+  app.get('/api/modeling/projects/:projectId/export-excel', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { caseId, includeAllCases, includeAddbacks, includeLeaseUp } = req.query;
+      
+      const { exportModelingProjectToExcel } = await import('./services/modeling-export');
+      
+      const buffer = await exportModelingProjectToExcel(projectId, orgId, {
+        caseId: caseId as string | undefined,
+        includeAllCases: includeAllCases !== 'false',
+        includeAddbacks: includeAddbacks !== 'false',
+        includeLeaseUp: includeLeaseUp !== 'false',
+      });
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      const filename = `${(project?.name || 'model').replace(/[^a-zA-Z0-9]/g, '_')}_export.xlsx`;
+
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.send(buffer);
+    } catch (error) {
+      console.error('Failed to export modeling project to Excel:', error);
+      res.status(500).json({ error: 'Failed to export modeling project' });
+    }
+  });
+
+  // Export case comparison to Excel
+  app.post('/api/modeling/projects/:projectId/export-case-comparison', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { caseIds } = req.body;
+      
+      if (!Array.isArray(caseIds) || caseIds.length < 2) {
+        return res.status(400).json({ error: 'At least 2 case IDs required for comparison' });
+      }
+
+      const { exportCaseComparisonToExcel } = await import('./services/modeling-export');
+      
+      const buffer = await exportCaseComparisonToExcel(projectId, orgId, caseIds);
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      const filename = `${(project?.name || 'model').replace(/[^a-zA-Z0-9]/g, '_')}_case_comparison.xlsx`;
+
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.send(buffer);
+    } catch (error) {
+      console.error('Failed to export case comparison to Excel:', error);
+      res.status(500).json({ error: 'Failed to export case comparison' });
+    }
+  });
+
   // ==================== DEBT SENSITIVITY ROUTES ====================
 
   // Analyze debt sensitivity across lender structures
