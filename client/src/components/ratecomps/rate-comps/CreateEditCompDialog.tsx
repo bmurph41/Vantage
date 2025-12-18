@@ -1588,31 +1588,31 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                       })()}
                     </div>
                   </div>
-                </div>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
+                </CardContent>
+              </Card>
 
-        {/* Rate Tiers Section */}
-        <Card className="border shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <DollarSign className="h-5 w-5" />
-              Rate Tiers
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <RateTiersDataTable
-              rateCompId={comp?.id}
-              localTiers={!comp ? pendingRateTiers : undefined}
-              onLocalTiersChange={!comp ? setPendingRateTiers : undefined}
-            />
-          </CardContent>
-        </Card>
-      </div>
+              {/* Rate Tiers Section */}
+              <Card className="border shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <DollarSign className="h-5 w-5" />
+                    Rate Tiers
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <RateTiersDataTable
+                    rateCompId={comp?.id}
+                    localTiers={!comp ? pendingRateTiers : undefined}
+                    onLocalTiersChange={!comp ? setPendingRateTiers : undefined}
+                  />
+                </CardContent>
+              </Card>
+            </form>
+          </Form>
+          )}
+        </div>
 
-      <DialogFooter className="flex gap-2 sticky bottom-0 bg-background pt-4 border-t mt-4">
+        <DialogFooter className="flex gap-2 sticky bottom-0 bg-background pt-4 border-t mt-4">
         <Button
           type="button"
           variant="outline"
@@ -1637,50 +1637,50 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
             isEdit ? 'Update' : 'Create'
           )}
         </Button>
-      </DialogFooter>
-    </DialogContent>
-
-    {/* New Portfolio Dialog */}
-    <Dialog open={showNewPortfolioDialog} onOpenChange={setShowNewPortfolioDialog}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Create New Portfolio</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="new-portfolio-name">Portfolio Name</Label>
-            <Input
-              id="new-portfolio-name"
-              value={newPortfolioName}
-              onChange={(e) => setNewPortfolioName(e.target.value)}
-              placeholder="Enter portfolio name"
-              data-testid="input-new-portfolio-name"
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => setShowNewPortfolioDialog(false)}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleCreatePortfolio}
-            disabled={!newPortfolioName.trim() || createPortfolioMutation.isPending}
-          >
-            {createPortfolioMutation.isPending ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Creating...
-              </>
-            ) : (
-              'Create Portfolio'
-            )}
-          </Button>
         </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  </Dialog>
+      </Card>
+
+      {/* New Portfolio Dialog */}
+      <Dialog open={showNewPortfolioDialog} onOpenChange={setShowNewPortfolioDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create New Portfolio</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-portfolio-name">Portfolio Name</Label>
+              <Input
+                id="new-portfolio-name"
+                value={newPortfolioName}
+                onChange={(e) => setNewPortfolioName(e.target.value)}
+                placeholder="Enter portfolio name"
+                data-testid="input-new-portfolio-name"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowNewPortfolioDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreatePortfolio}
+              disabled={!newPortfolioName.trim() || createPortfolioMutation.isPending}
+            >
+              {createPortfolioMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Creating...
+                </>
+              ) : (
+                'Create Portfolio'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
