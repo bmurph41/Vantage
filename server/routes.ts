@@ -5892,6 +5892,317 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+
+  // ==================== DEAL WORKSPACE ROUTES ====================
+
+  // Get all deal workspaces for the organization
+  app.get('/api/workspaces', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { status, role } = req.query;
+      
+      const { dealWorkspaces, crmDeals, modelingProjects, projects } = await import('@shared/schema');
+      const { eq, and, isNull, desc } = await import('drizzle-orm');
+      
+      let query = db.select().from(dealWorkspaces).where(
+        and(
+          eq(dealWorkspaces.orgId, orgId),
+          isNull(dealWorkspaces.archivedAt)
+        )
+      );
+      
+      const workspaces = await db.query.dealWorkspaces.findMany({
+        where: and(
+          eq(dealWorkspaces.orgId, orgId),
+          isNull(dealWorkspaces.archivedAt),
+          status ? eq(dealWorkspaces.status, status as any) : undefined,
+          role ? eq(dealWorkspaces.role, role as any) : undefined
+        ),
+        with: {
+          deal: true,
+          modelingProject: true,
+          ddProject: true,
+          property: true,
+          creator: { columns: { id: true, name: true } },
+        },
+        orderBy: (ws, { desc }) => [desc(ws.updatedAt)],
+      });
+      
+      res.json(workspaces);
+    } catch (error) {
+      console.error('Failed to get workspaces:', error);
+      res.status(500).json({ error: 'Failed to get workspaces' });
+    }
+  });
+
+  // Get single workspace with full details
+  app.get('/api/workspaces/:workspaceId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { workspaceId } = req.params;
+      
+      const { dealWorkspaces } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      const workspace = await db.query.dealWorkspaces.findFirst({
+        where: and(
+          eq(dealWorkspaces.id, workspaceId),
+          eq(dealWorkspaces.orgId, orgId)
+        ),
+        with: {
+          deal: true,
+          modelingProject: true,
+          ddProject: true,
+          property: true,
+          creator: { columns: { id: true, name: true } },
+        },
+      });
+      
+      if (!workspace) {
+        return res.status(404).json({ error: 'Workspace not found' });
+      }
+      
+      res.json(workspace);
+    } catch (error) {
+      console.error('Failed to get workspace:', error);
+      res.status(500).json({ error: 'Failed to get workspace' });
+    }
+  });
+
+  // Get workspace overview with aggregated data
+  app.get('/api/workspaces/:workspaceId/overview', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { workspaceId } = req.params;
+      
+      const { dealWorkspaces, tasks, vdrDocuments, vdrFolders } = await import('@shared/schema');
+      const { eq, and, sql } = await import('drizzle-orm');
+      
+      const workspace = await db.query.dealWorkspaces.findFirst({
+        where: and(
+          eq(dealWorkspaces.id, workspaceId),
+          eq(dealWorkspaces.orgId, orgId)
+        ),
+        with: {
+          deal: true,
+          modelingProject: true,
+          ddProject: true,
+          property: true,
+        },
+      });
+      
+      if (!workspace) {
+        return res.status(404).json({ error: 'Workspace not found' });
+      }
+      
+      // Get DD task stats if ddProject is linked
+      let ddStats = { total: 0, completed: 0, pending: 0, overdue: 0 };
+      if (workspace.ddProjectId) {
+        const taskData = await db.select({
+          total: sql<number>`count(*)`,
+          completed: sql<number>`count(*) filter (where status = 'completed')`,
+          pending: sql<number>`count(*) filter (where status != 'completed')`,
+        }).from(tasks).where(eq(tasks.projectId, workspace.ddProjectId));
+        if (taskData[0]) {
+          ddStats = { ...taskData[0], overdue: 0 };
+        }
+      }
+      
+      // Get VDR document stats if ddProject is linked (VDR uses DD project ID)
+      let vdrStats = { folders: 0, documents: 0, pendingRequests: 0 };
+      if (workspace.ddProjectId) {
+        const [folderCount] = await db.select({
+          count: sql<number>`count(*)`
+        }).from(vdrFolders).where(eq(vdrFolders.projectId, workspace.ddProjectId));
+        
+        const [docCount] = await db.select({
+          count: sql<number>`count(*)`
+        }).from(vdrDocuments).where(eq(vdrDocuments.projectId, workspace.ddProjectId));
+        
+        vdrStats = {
+          folders: folderCount?.count || 0,
+          documents: docCount?.count || 0,
+          pendingRequests: 0,
+        };
+      }
+      
+      res.json({
+        workspace,
+        stats: {
+          dd: ddStats,
+          vdr: vdrStats,
+          modeling: {
+            hasProject: !!workspace.modelingProjectId,
+          },
+        },
+      });
+    } catch (error) {
+      console.error('Failed to get workspace overview:', error);
+      res.status(500).json({ error: 'Failed to get workspace overview' });
+    }
+  });
+
+  // Create a new workspace
+  app.post('/api/workspaces', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      
+      const { dealWorkspaces, insertDealWorkspaceSchema } = await import('@shared/schema');
+      
+      const validated = insertDealWorkspaceSchema.parse({
+        ...req.body,
+        orgId,
+        createdBy: userId,
+      });
+      
+      const [workspace] = await db.insert(dealWorkspaces).values(validated).returning();
+      
+      res.status(201).json(workspace);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to create workspace:', error);
+      res.status(500).json({ error: 'Failed to create workspace' });
+    }
+  });
+
+  // Update a workspace
+  app.patch('/api/workspaces/:workspaceId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { workspaceId } = req.params;
+      
+      const { dealWorkspaces, updateDealWorkspaceSchema } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      const validated = updateDealWorkspaceSchema.parse(req.body);
+      
+      const [updated] = await db.update(dealWorkspaces)
+        .set({ ...validated, updatedAt: new Date() })
+        .where(and(
+          eq(dealWorkspaces.id, workspaceId),
+          eq(dealWorkspaces.orgId, orgId)
+        ))
+        .returning();
+      
+      if (!updated) {
+        return res.status(404).json({ error: 'Workspace not found' });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to update workspace:', error);
+      res.status(500).json({ error: 'Failed to update workspace' });
+    }
+  });
+
+  // Archive a workspace (soft delete)
+  app.delete('/api/workspaces/:workspaceId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { workspaceId } = req.params;
+      
+      const { dealWorkspaces } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      const [archived] = await db.update(dealWorkspaces)
+        .set({ archivedAt: new Date(), updatedAt: new Date() })
+        .where(and(
+          eq(dealWorkspaces.id, workspaceId),
+          eq(dealWorkspaces.orgId, orgId)
+        ))
+        .returning();
+      
+      if (!archived) {
+        return res.status(404).json({ error: 'Workspace not found' });
+      }
+      
+      res.json({ success: true, archived });
+    } catch (error) {
+      console.error('Failed to archive workspace:', error);
+      res.status(500).json({ error: 'Failed to archive workspace' });
+    }
+  });
+
+  // Link entities to workspace
+  app.post('/api/workspaces/:workspaceId/link', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { workspaceId } = req.params;
+      const { dealId, modelingProjectId, ddProjectId, propertyId } = req.body;
+      
+      const { dealWorkspaces } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      const updates: Record<string, any> = { updatedAt: new Date() };
+      if (dealId !== undefined) updates.dealId = dealId;
+      if (modelingProjectId !== undefined) updates.modelingProjectId = modelingProjectId;
+      if (ddProjectId !== undefined) updates.ddProjectId = ddProjectId;
+      if (propertyId !== undefined) updates.propertyId = propertyId;
+      
+      const [updated] = await db.update(dealWorkspaces)
+        .set(updates)
+        .where(and(
+          eq(dealWorkspaces.id, workspaceId),
+          eq(dealWorkspaces.orgId, orgId)
+        ))
+        .returning();
+      
+      if (!updated) {
+        return res.status(404).json({ error: 'Workspace not found' });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error('Failed to link entities to workspace:', error);
+      res.status(500).json({ error: 'Failed to link entities' });
+    }
+  });
+
+  // Create workspace from existing deal
+  app.post('/api/workspaces/from-deal/:dealId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { dealId } = req.params;
+      const { role } = req.body;
+      
+      const { dealWorkspaces, crmDeals } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      // Get the deal
+      const [deal] = await db.select().from(crmDeals)
+        .where(and(eq(crmDeals.id, dealId), eq(crmDeals.orgId, orgId)));
+      
+      if (!deal) {
+        return res.status(404).json({ error: 'Deal not found' });
+      }
+      
+      // Create workspace linked to deal
+      const [workspace] = await db.insert(dealWorkspaces).values({
+        orgId,
+        name: deal.title || 'Untitled Workspace',
+        description: deal.description,
+        role: role || 'buyer',
+        status: 'active',
+        dealId: deal.id,
+        targetPrice: deal.value,
+        expectedCloseDate: deal.expectedCloseDate?.toISOString().split('T')[0],
+        createdBy: userId,
+      }).returning();
+      
+      res.status(201).json(workspace);
+    } catch (error) {
+      console.error('Failed to create workspace from deal:', error);
+      res.status(500).json({ error: 'Failed to create workspace' });
+    }
+  });
+
   // ==================== CRM ROUTES ====================
 
   // CRM Deals
