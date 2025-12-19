@@ -424,6 +424,12 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
     },
   });
 
+  const handleCreatePortfolio = () => {
+    if (newPortfolioName.trim()) {
+      createPortfolioMutation.mutate(newPortfolioName.trim());
+    }
+  };
+
   const onSubmit = (data: CompFormData) => {
     // Convert empty strings to undefined for backend Zod schema compatibility
     const processedData = {
