@@ -6205,6 +6205,35 @@ export class DatabaseStorage implements IStorage {
       .limit(pageSize)
       .offset((page - 1) * pageSize);
 
+    // Fetch tiers for all comps in this page
+    if (comps.length > 0) {
+      const compIds = comps.map(c => c.id);
+      const allTiers = await db.select()
+        .from(rateTiers)
+        .where(and(
+          inArray(rateTiers.rateCompId, compIds),
+          eq(rateTiers.orgId, orgId)
+        ))
+        .orderBy(asc(rateTiers.displayOrder), asc(rateTiers.createdAt));
+
+      // Group tiers by comp ID
+      const tiersByCompId = new Map<string, typeof allTiers>();
+      for (const tier of allTiers) {
+        const existing = tiersByCompId.get(tier.rateCompId) || [];
+        existing.push(tier);
+        tiersByCompId.set(tier.rateCompId, existing);
+      }
+
+      // Attach tiers to each comp
+      const compsWithTiers = comps.map(comp => ({
+        ...comp,
+        tiers: tiersByCompId.get(comp.id) || [],
+        tierCount: (tiersByCompId.get(comp.id) || []).length,
+      }));
+
+      return { comps: compsWithTiers as any, total };
+    }
+
     return { comps, total };
   }
 

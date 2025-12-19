@@ -97,16 +97,27 @@ export default function CompsDataGrid({
     },
   });
 
-  const formatCellValue = (comp: RateComp, column: string) => {
+  const formatCellValue = (comp: RateComp & { tiers?: any[]; tierCount?: number }, column: string) => {
+    const tiers = (comp as any).tiers || [];
+    const tierCount = (comp as any).tierCount || 0;
+    const firstTier = tiers[0];
+
     switch (column) {
       case 'marina':
         return (
-          <span 
-            className="truncate font-medium text-primary cursor-pointer hover:underline"
-            onClick={() => onCompClick?.(comp)}
-          >
-            {comp.marina || '—'}
-          </span>
+          <div className="flex items-center gap-2">
+            <span 
+              className="truncate font-medium text-primary cursor-pointer hover:underline"
+              onClick={() => onCompClick?.(comp)}
+            >
+              {comp.marina || '—'}
+            </span>
+            {tierCount > 1 && (
+              <Badge variant="outline" className="text-xs shrink-0">
+                {tierCount} rates
+              </Badge>
+            )}
+          </div>
         );
 
       case 'location':
@@ -116,54 +127,90 @@ export default function CompsDataGrid({
         return <span className="truncate">{location || '—'}</span>;
 
       case 'storageType':
-        const storageLabel = STORAGE_TYPE_LABELS[comp.storageType as string] || comp.storageType;
-        return <span className="truncate">{storageLabel || '—'}</span>;
+        if (firstTier?.storageType) {
+          const storageLabel = STORAGE_TYPE_LABELS[firstTier.storageType as string] || firstTier.storageType;
+          if (tierCount > 1) {
+            const uniqueTypes = [...new Set(tiers.map((t: any) => t.storageType))];
+            if (uniqueTypes.length > 1) {
+              return <span className="truncate">{storageLabel} +{uniqueTypes.length - 1}</span>;
+            }
+          }
+          return <span className="truncate">{storageLabel}</span>;
+        }
+        const legacyStorageLabel = STORAGE_TYPE_LABELS[comp.storageType as string] || comp.storageType;
+        return <span className="truncate">{legacyStorageLabel || '—'}</span>;
 
       case 'boatSize':
-        const minSize = comp.boatLengthMin;
-        const maxSize = comp.boatLengthMax;
-        if (minSize && maxSize) {
-          return <span>{minSize}-{maxSize} ft</span>;
-        } else if (minSize) {
-          return <span>{minSize}+ ft</span>;
-        } else if (maxSize) {
-          return <span>≤{maxSize} ft</span>;
+        if (firstTier) {
+          const minSize = firstTier.loaMin;
+          const maxSize = firstTier.loaMax;
+          if (minSize && maxSize) {
+            return <span>{minSize}-{maxSize} ft</span>;
+          } else if (minSize) {
+            return <span>{minSize}+ ft</span>;
+          } else if (maxSize) {
+            return <span>≤{maxSize} ft</span>;
+          }
+        }
+        const legacyMinSize = comp.boatLengthMin;
+        const legacyMaxSize = comp.boatLengthMax;
+        if (legacyMinSize && legacyMaxSize) {
+          return <span>{legacyMinSize}-{legacyMaxSize} ft</span>;
+        } else if (legacyMinSize) {
+          return <span>{legacyMinSize}+ ft</span>;
+        } else if (legacyMaxSize) {
+          return <span>≤{legacyMaxSize} ft</span>;
         }
         return '—';
 
       case 'rateAmount':
+        if (firstTier?.amountCents) {
+          return formatCurrency(Number(firstTier.amountCents) / 100);
+        }
         if (!comp.rateAmount) return '—';
         return formatCurrency(Number(comp.rateAmount) / 100);
 
       case 'rateType':
-        const rateTypeLabel = RATE_UNIT_LABELS[comp.rateType as string] || comp.rateType;
-        return <span>{rateTypeLabel || '—'}</span>;
+        if (firstTier?.rateUnit) {
+          const rateTypeLabel = RATE_UNIT_LABELS[firstTier.rateUnit as string] || firstTier.rateUnit;
+          return <span>{rateTypeLabel}</span>;
+        }
+        const legacyRateTypeLabel = RATE_UNIT_LABELS[comp.rateType as string] || comp.rateType;
+        return <span>{legacyRateTypeLabel || '—'}</span>;
 
       case 'ratePeriod':
-        const periodLabel = RATE_PERIOD_LABELS[comp.ratePeriod as string] || comp.ratePeriod;
-        return <span>{periodLabel || '—'}</span>;
+        if (firstTier?.ratePeriod) {
+          const periodLabel = RATE_PERIOD_LABELS[firstTier.ratePeriod as string] || firstTier.ratePeriod;
+          return <span>{periodLabel}</span>;
+        }
+        const legacyPeriodLabel = RATE_PERIOD_LABELS[comp.ratePeriod as string] || comp.ratePeriod;
+        return <span>{legacyPeriodLabel || '—'}</span>;
 
       case 'seasonality':
-        if (!comp.seasonality) return '—';
+        const seasonality = firstTier?.seasonality || comp.seasonality;
+        if (!seasonality) return '—';
         return (
-          <Badge variant={comp.seasonality === 'annual' ? 'default' : 'secondary'}>
-            {comp.seasonality === 'annual' ? 'Annual' : comp.seasonality === 'seasonal' ? 'Seasonal' : comp.seasonality}
+          <Badge variant={seasonality === 'annual' ? 'default' : 'secondary'}>
+            {seasonality === 'annual' ? 'Annual' : seasonality === 'seasonal' ? 'Seasonal' : seasonality}
           </Badge>
         );
 
       case 'electricIncluded':
-        return comp.electricIncluded ? (
+        const electricIncluded = firstTier?.electricIncluded ?? comp.electricIncluded;
+        return electricIncluded ? (
           <Check className="h-4 w-4 text-green-600 dark:text-green-400 mx-auto" />
         ) : (
           <X className="h-4 w-4 text-muted-foreground mx-auto" />
         );
 
       case 'protectionLevel':
-        const protectionLabel = PROTECTION_LEVEL_LABELS[comp.protectionLevel as string] || comp.protectionLevel;
+        const protectionLevel = firstTier?.protectionLevel || comp.protectionLevel;
+        const protectionLabel = PROTECTION_LEVEL_LABELS[protectionLevel as string] || protectionLevel;
         return <span className="truncate">{protectionLabel || '—'}</span>;
 
       case 'effectiveDate':
-        return <span>{comp.effectiveDate || '—'}</span>;
+        const effectiveDate = firstTier?.effectiveDate || comp.effectiveDate;
+        return <span>{effectiveDate || '—'}</span>;
       
       default:
         return '—';
