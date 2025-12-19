@@ -21,14 +21,11 @@ const crmNav = [
   { name: "Properties", href: "/crm/properties", icon: Home },
 ];
 
-// Deal Management Navigation
-const dealManagementNav = [
-  { name: "Deal Workspaces", href: "/workspaces", icon: Briefcase },
+// Pipeline Navigation (formerly Deal Management - now a subgroup under CRM)
+const pipelineNav = [
   { name: "Deal Board", href: "/deal-workspace", icon: Handshake },
   { name: "Activity Log", href: "/crm/activity", icon: History },
   { name: "Follow-Ups", href: "/crm/tasks", icon: ListTodo },
-  { name: "Marketing", href: "/crm/marketing-automation", icon: Send },
-  { name: "Analytics", href: "/crm/analytics", icon: PieChart },
   { name: "Forecast", href: "/crm/forecast", icon: TrendingUp },
 ];
 
@@ -130,7 +127,7 @@ export default function UnifiedSidebar() {
   const [location] = useLocation();
   const [operationsExpanded, setOperationsExpanded] = useState(false); // Default collapsed for Operations
   const [crmExpanded, setCrmExpanded] = useState(false);
-  const [dealManagementExpanded, setDealManagementExpanded] = useState(false);
+  const [pipelineExpanded, setPipelineExpanded] = useState(false); // Pipeline subgroup under CRM
   const [prospectingExpanded, setProspectingExpanded] = useState(false);
   const [crmToolsExpanded, setCrmToolsExpanded] = useState(false);
   const [dealWorkspaceExpanded, setDealWorkspaceExpanded] = useState(false); // Consolidated DD, VDR, Modeling
@@ -180,8 +177,7 @@ export default function UnifiedSidebar() {
     const personas = [persona, secondaryPersona].filter(Boolean);
     
     const sectionAccess: Record<string, string[]> = {
-      crm: ['pe_investor', 'broker', 'operator', 'advisor'], // CRM - ALL users
-      deal_management: ['pe_investor', 'broker', 'operator', 'advisor'], // Deal Management - ALL users
+      crm: ['pe_investor', 'broker', 'operator', 'advisor'], // CRM & Pipeline - ALL users
       prospecting: ['pe_investor', 'broker'], // Prospecting & Outreach - Broker add-on only
       operations: ['pe_investor', 'operator'],
       deal_workspace: ['pe_investor', 'broker', 'operator', 'advisor'], // Consolidated DD, VDR, Modeling - ALL users who had access to any of these
@@ -196,12 +192,12 @@ export default function UnifiedSidebar() {
   useEffect(() => {
     // Determine which section the current page belongs to
     const isOperationsPage = location.startsWith('/operations/');
-    // CRM: contacts, companies, properties (core entity management)
-    const isCrmPage = ['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location) || location.startsWith('/import-') || location === '/calendar-settings';
+    // Pipeline pages (Deal Board, Activity, Tasks, Forecast) - part of CRM section now
+    const isPipelinePage = ['/deal-workspace', '/crm/activity', '/crm/tasks', '/crm/forecast'].includes(location) || location.startsWith('/deal-workspace');
+    // CRM: contacts, companies, properties (core entity management) + pipeline pages
+    const isCrmPage = ['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties', '/crm/marketing-automation', '/crm/analytics'].includes(location) || location.startsWith('/import-') || location === '/calendar-settings' || isPipelinePage;
     const isCrmToolsPage = location === '/calendar-settings' || location.startsWith('/import-');
     const isPendingPage = location.includes('/pending-');
-    // Deal Management: deal-workspace, activity, tasks, marketing-automation, analytics, forecast
-    const isDealManagementPage = ['/deal-workspace', '/crm/activity', '/crm/tasks', '/crm/marketing-automation', '/crm/analytics', '/crm/forecast'].includes(location) || location.startsWith('/deal-workspace');
     // Prospecting: prospecting pages (leads are now in Deal Workspace)
     const isProspectingPage = location.startsWith('/prospecting/') || location === '/prospecting';
     // Deal Workspace: consolidated DD, VDR, and Modeling project pages
@@ -215,7 +211,7 @@ export default function UnifiedSidebar() {
       setOperationsExpanded(true);
     }
     setCrmExpanded(isCrmPage);
-    setDealManagementExpanded(isDealManagementPage);
+    setPipelineExpanded(isPipelinePage);
     setProspectingExpanded(isProspectingPage);
     setCrmToolsExpanded(isCrmToolsPage);
     setPendingExpanded(isPendingPage);
@@ -428,14 +424,14 @@ export default function UnifiedSidebar() {
           </div>
         )}
         
-        {/* CRM Section (Core CRM - All Users) */}
+        {/* CRM & Pipeline Section (Merged CRM + Deal Management) */}
         {canViewSection('crm') && (
           <div className="mb-2">
             <SectionHeader 
-              title="CRM" 
+              title="CRM & Pipeline" 
               expanded={crmExpanded} 
               onToggle={() => setCrmExpanded(!crmExpanded)}
-              isActive={['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location) || location.startsWith('/import-') || location === '/calendar-settings'}
+              isActive={['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties', '/deal-workspace', '/crm/activity', '/crm/tasks', '/crm/forecast', '/crm/marketing-automation', '/crm/analytics'].includes(location) || location.startsWith('/import-') || location === '/calendar-settings'}
             />
             {crmExpanded && crmNav.map((item) => (
               <NavLink key={item.name} item={item} />
@@ -446,6 +442,31 @@ export default function UnifiedSidebar() {
             )}
             {crmExpanded && (
               <>
+                {/* Pipeline Subgroup (formerly Deal Management) */}
+                <div className="ml-4 mt-1 mb-2">
+                  <button
+                    onClick={() => setPipelineExpanded(!pipelineExpanded)}
+                    className={cn(
+                      "flex items-center justify-between w-full px-4 py-1.5 text-xs font-medium transition-colors rounded-lg",
+                      ['/deal-workspace', '/crm/activity', '/crm/tasks', '/crm/forecast'].includes(location)
+                        ? "bg-blue-600 text-white hover:bg-blue-700"
+                        : "text-gray-500 hover:text-gray-700"
+                    )}
+                    data-testid="toggle-pipeline"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Handshake className="w-3.5 h-3.5" />
+                      <span>Pipeline</span>
+                    </div>
+                    {pipelineExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                  </button>
+                  {pipelineExpanded && pipelineNav.map((item) => (
+                    <NavLink key={item.name} item={item} />
+                  ))}
+                </div>
+                {/* Marketing & Analytics */}
+                <NavLink item={{ name: "Marketing", href: "/crm/marketing-automation", icon: Send }} />
+                <NavLink item={{ name: "Analytics", href: "/crm/analytics", icon: PieChart }} />
                 {/* Pending Section - Only visible when there are pending items */}
                 {hasPendingItems && (
                   <div className="ml-4 mt-1 mb-2">
@@ -494,21 +515,6 @@ export default function UnifiedSidebar() {
                 </div>
               </>
             )}
-          </div>
-        )}
-        
-        {/* Deal Management Section */}
-        {canViewSection('deal_management') && (
-          <div className="mb-2">
-            <SectionHeader 
-              title="Deal Management" 
-              expanded={dealManagementExpanded} 
-              onToggle={() => setDealManagementExpanded(!dealManagementExpanded)}
-              isActive={['/crm/deals', '/crm/pipeline', '/crm/activity', '/crm/tasks', '/crm/marketing-automation', '/crm/analytics', '/crm/forecast'].includes(location)}
-            />
-            {dealManagementExpanded && dealManagementNav.map((item) => (
-              <NavLink key={item.name} item={item} />
-            ))}
           </div>
         )}
         
