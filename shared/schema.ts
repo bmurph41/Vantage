@@ -15790,3 +15790,93 @@ export * from "./finance-kernel-schema";
 // This provides multi-asset class performance metrics and benchmarking
 // ============================================================================
 export * from "./analytics-schema";
+
+// ============================================================================
+// DEAL WORKSPACES - UNIFIED HUB FOR MODELING, DD, AND VDR
+// ============================================================================
+
+export const workspaceRoleEnum = pgEnum('workspace_role', ['buyer', 'seller', 'broker', 'lender', 'consultant']);
+export const workspaceStatusEnum = pgEnum('workspace_status', ['active', 'pending', 'under_contract', 'due_diligence', 'closing', 'closed', 'dead', 'on_hold']);
+
+export const dealWorkspaces = pgTable('deal_workspaces', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  // Core workspace info
+  name: text('name').notNull(),
+  description: text('description'),
+  
+  // Role/persona for this workspace
+  role: workspaceRoleEnum('role').notNull().default('buyer'),
+  status: workspaceStatusEnum('status').notNull().default('active'),
+  
+  // Linked entities - the unified hub
+  dealId: varchar('deal_id').references(() => crmDeals.id),
+  modelingProjectId: varchar('modeling_project_id').references(() => modelingProjects.id),
+  ddProjectId: varchar('dd_project_id').references(() => projects.id),
+  propertyId: varchar('property_id').references(() => crmProperties.id),
+  
+  // Key metrics for dashboard display
+  targetPrice: decimal('target_price', { precision: 15, scale: 2 }),
+  expectedCloseDate: date('expected_close_date'),
+  priority: text('priority').default('medium'),
+  
+  // Activity tracking
+  lastActivityAt: timestamp('last_activity_at'),
+  lastActivityType: text('last_activity_type'),
+  lastActivityDescription: text('last_activity_description'),
+  
+  // Counters for quick reference
+  openDdTasks: integer('open_dd_tasks').default(0),
+  totalDdTasks: integer('total_dd_tasks').default(0),
+  pendingDocuments: integer('pending_documents').default(0),
+  
+  // Metadata
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  archivedAt: timestamp('archived_at'),
+}, (table) => ({
+  orgIdx: index('deal_workspaces_org_idx').on(table.orgId),
+  statusIdx: index('deal_workspaces_status_idx').on(table.status),
+  roleIdx: index('deal_workspaces_role_idx').on(table.role),
+  dealIdx: index('deal_workspaces_deal_idx').on(table.dealId),
+  modelingIdx: index('deal_workspaces_modeling_idx').on(table.modelingProjectId),
+  ddProjectIdx: index('deal_workspaces_dd_project_idx').on(table.ddProjectId),
+}));
+
+export const dealWorkspacesRelations = relations(dealWorkspaces, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [dealWorkspaces.orgId],
+    references: [organizations.id],
+  }),
+  creator: one(users, {
+    fields: [dealWorkspaces.createdBy],
+    references: [users.id],
+  }),
+  deal: one(crmDeals, {
+    fields: [dealWorkspaces.dealId],
+    references: [crmDeals.id],
+  }),
+  modelingProject: one(modelingProjects, {
+    fields: [dealWorkspaces.modelingProjectId],
+    references: [modelingProjects.id],
+  }),
+  ddProject: one(projects, {
+    fields: [dealWorkspaces.ddProjectId],
+    references: [projects.id],
+  }),
+  property: one(crmProperties, {
+    fields: [dealWorkspaces.propertyId],
+    references: [crmProperties.id],
+  }),
+}));
+
+export const insertDealWorkspaceSchema = createInsertSchema(dealWorkspaces).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateDealWorkspaceSchema = insertDealWorkspaceSchema.partial();
+export type DealWorkspace = typeof dealWorkspaces.$inferSelect;
+export type InsertDealWorkspace = z.infer<typeof insertDealWorkspaceSchema>;
