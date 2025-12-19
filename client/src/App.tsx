@@ -75,6 +75,8 @@ const RentRollProjects = lazy(() => import("@/pages/operations/rent-roll/Project
 const FuelSalesTabbed = lazy(() => import("@/pages/operations/FuelSalesTabbed"));
 const ShipStoreTabbed = lazy(() => import("@/pages/operations/ShipStoreTabbed"));
 const DockitTabbed = lazy(() => import("@/pages/operations/DockitTabbed"));
+const WorkspacesList = lazy(() => import("@/pages/workspaces/index"));
+const WorkspaceDetail = lazy(() => import("@/pages/workspaces/[workspaceId]"));
 const RentRollTabbed = lazy(() => import("@/pages/operations/RentRollTabbed"));
 const MarketingTabbed = lazy(() => import("@/pages/operations/MarketingTabbed"));
 const ServiceTabbed = lazy(() => import("@/pages/operations/ServiceTabbed"));
@@ -598,6 +600,22 @@ function Router() {
       </Route>
       
       {/* Unified Deal Workspace - consolidates Pipeline, Deals, and Leads */}
+      {/* Unified Deal Workspaces - Hub for Modeling, DD, and VDR */}
+      <Route path="/workspaces">
+        {() => (
+          <UnifiedLayout>
+            <WorkspacesList />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/workspaces/:workspaceId">
+        {() => (
+          <UnifiedLayout>
+            <WorkspaceDetail />
+          </UnifiedLayout>
+        )}
+      </Route>
+
       <Route path="/deal-workspace">
         {() => (
           <UnifiedLayout>

@@ -23,7 +23,8 @@ const crmNav = [
 
 // Deal Management Navigation
 const dealManagementNav = [
-  { name: "Deal Workspace", href: "/deal-workspace", icon: Handshake },
+  { name: "Deal Workspaces", href: "/workspaces", icon: Briefcase },
+  { name: "Deal Board", href: "/deal-workspace", icon: Handshake },
   { name: "Activity Log", href: "/crm/activity", icon: History },
   { name: "Follow-Ups", href: "/crm/tasks", icon: ListTodo },
   { name: "Marketing", href: "/crm/marketing-automation", icon: Send },
