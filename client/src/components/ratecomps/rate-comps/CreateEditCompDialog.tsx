@@ -998,7 +998,8 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                     </CardContent>
                   </Card>
 
-                  {/* Physical Characteristics */}
+                  {/* Physical Characteristics - Only show in edit mode */}
+                  {isEdit && (
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-lg">Physical Characteristics</CardTitle>
@@ -1198,11 +1199,13 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                       />
                     </CardContent>
                   </Card>
+                  )}
                 </div>
 
                 {/* Right Column */}
                 <div className="space-y-6">
-                  {/* Rate Information */}
+                  {/* Rate Information - Only show in edit mode */}
+                  {isEdit && (
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-lg">Rate Information</CardTitle>
@@ -1365,6 +1368,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                       />
                     </CardContent>
                   </Card>
+                  )}
 
                   {/* Rate Tiers - Inline for Edit Mode */}
                   {isEdit && comp && (
@@ -1415,7 +1419,8 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                 </div>
               </div>
 
-              {/* Profit Centers & Location */}
+              {/* Profit Centers & Location - Only show in edit mode */}
+              {isEdit && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Profit Centers & Location</CardTitle>
@@ -1596,6 +1601,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                   </div>
                 </CardContent>
               </Card>
+              )}
 
               {/* Rate Tiers Section */}
               <Card className="border shadow-sm">
