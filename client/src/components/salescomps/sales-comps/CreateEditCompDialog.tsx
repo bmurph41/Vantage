@@ -4,6 +4,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
+import { PercentageInput } from "@/components/ui/percentage-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -1155,14 +1157,16 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                               <FormItem>
                                 <FormLabel>Sale Price</FormLabel>
                                 <FormControl>
-                                  <Input 
-                                    {...field}
-                                    value={isPriceUndisclosed ? "N/A" : field.value}
-                                    type="text"
-                                    placeholder="12500000"
-                                    disabled={isPriceUndisclosed}
-                                    data-testid="input-sale-price"
-                                  />
+                                  {isPriceUndisclosed ? (
+                                    <Input value="N/A" disabled data-testid="input-sale-price" />
+                                  ) : (
+                                    <CurrencyInput
+                                      value={field.value}
+                                      onValueChange={(val) => field.onChange(val ?? "")}
+                                      placeholder="12,500,000"
+                                      data-testid="input-sale-price"
+                                    />
+                                  )}
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -1177,10 +1181,10 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                             <FormItem>
                               <FormLabel>List Price</FormLabel>
                               <FormControl>
-                                <Input 
-                                  {...field} 
-                                  type="text"
-                                  placeholder="13750000"
+                                <CurrencyInput
+                                  value={field.value}
+                                  onValueChange={(val) => field.onChange(val ?? "")}
+                                  placeholder="13,750,000"
                                   data-testid="input-list-price"
                                 />
                               </FormControl>
@@ -1198,10 +1202,10 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                             <FormItem>
                               <FormLabel>Estimated Purchase Price</FormLabel>
                               <FormControl>
-                                <Input 
-                                  {...field} 
-                                  type="text"
-                                  placeholder="12000000"
+                                <CurrencyInput
+                                  value={field.value}
+                                  onValueChange={(val) => field.onChange(val ?? "")}
+                                  placeholder="12,000,000"
                                   data-testid="input-estimated-purchase-price"
                                 />
                               </FormControl>
@@ -1223,14 +1227,16 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                               <FormItem>
                                 <FormLabel>NOI</FormLabel>
                                 <FormControl>
-                                  <Input 
-                                    {...field}
-                                    value={isNoiUndisclosed ? "N/A" : field.value}
-                                    type="text"
-                                    placeholder="900000"
-                                    disabled={isNoiUndisclosed}
-                                    data-testid="input-noi"
-                                  />
+                                  {isNoiUndisclosed ? (
+                                    <Input value="N/A" disabled data-testid="input-noi" />
+                                  ) : (
+                                    <CurrencyInput
+                                      value={field.value}
+                                      onValueChange={(val) => field.onChange(val ?? "")}
+                                      placeholder="900,000"
+                                      data-testid="input-noi"
+                                    />
+                                  )}
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -1245,16 +1251,18 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                             const isCapRateUndisclosed = !form.watch("isCapRateDisclosed");
                             return (
                               <FormItem>
-                                <FormLabel>Cap Rate (%)</FormLabel>
+                                <FormLabel>Cap Rate</FormLabel>
                                 <FormControl>
-                                  <Input 
-                                    {...field}
-                                    value={isCapRateUndisclosed ? "N/A" : field.value}
-                                    type="text"
-                                    placeholder="7.2"
-                                    disabled={isCapRateUndisclosed}
-                                    data-testid="input-cap-rate"
-                                  />
+                                  {isCapRateUndisclosed ? (
+                                    <Input value="N/A" disabled data-testid="input-cap-rate" />
+                                  ) : (
+                                    <PercentageInput
+                                      value={field.value}
+                                      onValueChange={(val) => field.onChange(val ?? "")}
+                                      placeholder="7.20"
+                                      data-testid="input-cap-rate"
+                                    />
+                                  )}
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -1269,12 +1277,12 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                           name="occupancy"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Occupancy (%)</FormLabel>
+                              <FormLabel>Occupancy</FormLabel>
                               <FormControl>
-                                <Input 
-                                  {...field} 
-                                  type="text"
-                                  placeholder="94.2"
+                                <PercentageInput
+                                  value={field.value}
+                                  onValueChange={(val) => field.onChange(val ?? "")}
+                                  placeholder="94.20"
                                   data-testid="input-occupancy"
                                 />
                               </FormControl>

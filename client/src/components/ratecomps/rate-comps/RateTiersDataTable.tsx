@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -116,10 +117,7 @@ export default function RateTiersDataTable({
   }, [tiers, isLocalMode]);
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => apiRequest(`/api/rate-comps/${rateCompId}/tiers`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
+    mutationFn: (data: any) => apiRequest('POST', `/api/rate-comps/${rateCompId}/tiers`, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [`/api/rate-comps/${rateCompId}/tiers`] });
       onTiersUpdated?.();
@@ -132,10 +130,7 @@ export default function RateTiersDataTable({
 
   const updateMutation = useMutation({
     mutationFn: ({ tierId, data }: { tierId: string; data: any }) => 
-      apiRequest(`/api/rate-comps/${rateCompId}/tiers/${tierId}`, {
-        method: 'PATCH',
-        body: JSON.stringify(data),
-      }),
+      apiRequest('PATCH', `/api/rate-comps/${rateCompId}/tiers/${tierId}`, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [`/api/rate-comps/${rateCompId}/tiers`] });
       onTiersUpdated?.();
@@ -148,7 +143,7 @@ export default function RateTiersDataTable({
 
   const deleteMutation = useMutation({
     mutationFn: (tierId: string) => 
-      apiRequest(`/api/rate-comps/${rateCompId}/tiers/${tierId}`, { method: 'DELETE' }),
+      apiRequest('DELETE', `/api/rate-comps/${rateCompId}/tiers/${tierId}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [`/api/rate-comps/${rateCompId}/tiers`] });
       onTiersUpdated?.();
@@ -325,12 +320,10 @@ export default function RateTiersDataTable({
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground">Rate ($)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
+                  <Label className="text-xs font-medium text-muted-foreground">Rate</Label>
+                  <CurrencyInput
                     value={row.amountCents}
-                    onChange={(e) => handleRowChange(index, 'amountCents', e.target.value)}
+                    onValueChange={(val) => handleRowChange(index, 'amountCents', val?.toString() ?? '')}
                     placeholder="0.00"
                     data-testid={`input-amount-${index}`}
                   />
