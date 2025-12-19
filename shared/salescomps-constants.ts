@@ -30,11 +30,23 @@ export type CoastalType = WaterType;
 export const STORAGE_TYPES = [
   'Wet Slips',
   'Lift Slips',
-  'Indoor Dry Racks', 
-  'Outdoor Dry Racks',
   'Moorings',
+  'Dinghies/Small Boats',
   'Jet Skis',
-  'Land Storage'
+  'Dry Racks - Indoor',
+  'Dry Racks - Outdoor',
+  'Land Storage',
+  'Trailered Boats',
+  'Trailers',
+  'Carports',
+  'Houseboats',
+  'RV Sites',
+  'Cabins',
+  'Sales',
+  'Service',
+  'Commercial',
+  'Rental Boats',
+  'Boat Club'
 ] as const;
 export type StorageType = typeof STORAGE_TYPES[number];
 

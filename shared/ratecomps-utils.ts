@@ -153,15 +153,25 @@ export function formatSizeRange(
 }
 
 export const STORAGE_TYPE_LABELS: Record<string, string> = {
-  wet_slip: 'Wet Slip',
-  dry_rack: 'Dry Rack',
-  mooring: 'Mooring',
-  trailer: 'Trailer Storage',
-  rack_storage: 'Rack Storage',
-  lift_storage: 'Lift Storage',
-  kayak_sup: 'Kayak/SUP',
-  jet_ski: 'Jet Ski',
-  rv_space: 'RV Space',
+  wet_slip: 'Wet Slips',
+  lift_slip: 'Lift Slips',
+  mooring: 'Moorings',
+  dinghy_small_boat: 'Dinghies/Small Boats',
+  jet_ski: 'Jet Skis',
+  dry_rack_indoor: 'Dry Racks - Indoor',
+  dry_rack_outdoor: 'Dry Racks - Outdoor',
+  land_storage: 'Land Storage',
+  trailered_boat: 'Trailered Boats',
+  trailer: 'Trailers',
+  carport: 'Carports',
+  houseboat: 'Houseboats',
+  rv_site: 'RV Sites',
+  cabin: 'Cabins',
+  sales: 'Sales',
+  service: 'Service',
+  commercial: 'Commercial',
+  rental_boat: 'Rental Boats',
+  boat_club: 'Boat Club',
 };
 
 export const RATE_PERIOD_LABELS: Record<string, string> = {
