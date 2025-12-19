@@ -666,10 +666,20 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
             /* Regular Comp Creation/Edit Mode */
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                {/* Edit Mode: Clean header with marina name and address */}
+                {isEdit && comp && (
+                  <div className="pb-2 border-b">
+                    <h2 className="text-xl font-semibold">{comp.marina}</h2>
+                    <p className="text-sm text-muted-foreground">
+                      {[comp.address, comp.city, comp.state, comp.zip].filter(Boolean).join(', ')}
+                    </p>
+                  </div>
+                )}
+
+                {/* Create Mode: Full Property Section */}
+                {!isEdit && (
                 <div className="space-y-6">
-                  {/* Left Column (or full width in create mode) */}
                   <div className="space-y-6">
-                    {/* Property Section */}
                     <Card>
                       <CardHeader>
                         <CardTitle className="text-lg">Property</CardTitle>
@@ -999,6 +1009,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                   </Card>
                 </div>
               </div>
+                )}
 
               {/* Rate Tiers Section */}
               <Card className="border shadow-sm">
