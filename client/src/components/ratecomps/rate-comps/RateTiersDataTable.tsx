@@ -271,15 +271,12 @@ export default function RateTiersDataTable({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">Rate Tiers</h3>
-          <p className="text-sm text-muted-foreground">
-            {isLocalMode 
-              ? "Add pricing tiers (will be saved with the rate comp)"
-              : `Manage pricing tiers for ${marinaName}`
-            }
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          {isLocalMode 
+            ? "Add pricing tiers (will be saved with the rate comp)"
+            : `Manage pricing tiers for ${marinaName}`
+          }
+        </p>
         <Button onClick={handleAddRow} size="sm" data-testid="button-add-tier">
           <Plus className="h-4 w-4 mr-1" />
           Add Rate

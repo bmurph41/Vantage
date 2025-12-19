@@ -666,13 +666,13 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
             /* Regular Comp Creation/Edit Mode */
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <div className="grid grid-cols-2 gap-6">
-                  {/* Left Column */}
+                <div className={isEdit ? "grid grid-cols-2 gap-6" : "space-y-6"}>
+                  {/* Left Column (or full width in create mode) */}
                   <div className="space-y-6">
-                    {/* Identity Section */}
+                    {/* Property Section */}
                     <Card>
                       <CardHeader>
-                        <CardTitle className="text-lg">Identity</CardTitle>
+                        <CardTitle className="text-lg">Property</CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-4">
                         <FormField
@@ -1202,10 +1202,10 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                   )}
                 </div>
 
-                {/* Right Column */}
+                {/* Right Column - Only show in edit mode */}
+                {isEdit && (
                 <div className="space-y-6">
-                  {/* Rate Information - Only show in edit mode */}
-                  {isEdit && (
+                  {/* Rate Information */}
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-lg">Rate Information</CardTitle>
@@ -1368,10 +1368,9 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                       />
                     </CardContent>
                   </Card>
-                  )}
 
                   {/* Rate Tiers - Inline for Edit Mode */}
-                  {isEdit && comp && (
+                  {comp && (
                     <Card>
                       <CardHeader>
                         <CardTitle className="text-lg flex items-center gap-2">
@@ -1396,27 +1395,8 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                       </CardContent>
                     </Card>
                   )}
-                  
-                  {!isEdit && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg flex items-center gap-2">
-                          <DollarSign className="h-5 w-5" />
-                          Rate Tiers
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-6">
-                        <div className="max-h-[400px] overflow-auto">
-                          <RateTiersDataTable
-                            marinaName={form.watch("marina") || "New Marina"}
-                            localTiers={pendingRateTiers}
-                            onLocalTiersChange={setPendingRateTiers}
-                          />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
                 </div>
+                )}
               </div>
 
               {/* Profit Centers & Location - Only show in edit mode */}
