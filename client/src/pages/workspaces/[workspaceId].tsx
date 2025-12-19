@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useLocation, Link } from 'wouter';
 import { useWorkspaceOverview, useUpdateWorkspace, useLinkWorkspaceEntities } from '@/hooks/useDealWorkspaces';
 import { Button } from '@/components/ui/button';
@@ -51,9 +51,28 @@ const ROLE_LABELS: Record<string, string> = {
 
 export default function WorkspaceDetailPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState('overview');
+  
+  // Extract tab from query parameter (e.g., /workspaces/123?tab=financials)
+  const urlParams = new URLSearchParams(location.split('?')[1] || '');
+  const tabFromUrl = urlParams.get('tab') || 'overview';
+  const [activeTab, setActiveTab] = useState(tabFromUrl);
+  
+  // Sync tab state when URL changes
+  useEffect(() => {
+    setActiveTab(tabFromUrl);
+  }, [tabFromUrl]);
+  
+  // Handle tab change - update both state and URL for deep linking
+  const handleTabChange = (newTab: string) => {
+    setActiveTab(newTab);
+    // Update URL without full navigation (maintains scroll position)
+    const newUrl = newTab === 'overview' 
+      ? `/workspaces/${workspaceId}`
+      : `/workspaces/${workspaceId}?tab=${newTab}`;
+    window.history.replaceState(null, '', newUrl);
+  };
 
   const { data, isLoading, error } = useWorkspaceOverview(workspaceId);
 
@@ -137,7 +156,7 @@ export default function WorkspaceDetailPage() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:grid-cols-none lg:flex">
           <TabsTrigger value="overview" className="gap-2" data-testid="tab-overview">
             <LayoutDashboard className="h-4 w-4" />

@@ -26,6 +26,7 @@ The platform utilizes React 18 with TypeScript and Wouter for routing. UI is bui
 - **Addbacks System**: Line-item adjustments for EBITDA normalization with monthly/yearly period support and predefined reasons.
 - **OM Builder**: Professional offering memorandum creation with a 3-panel layout, block types (text, KPI, chart, table, image), data binding, theme system, and PDF export.
 - **Operations Modules**: Flattened 2-level navigation with tab-based sub-navigation using `TabbedModuleLayout` for consistent UX across Fuel Sales, Ship Store, Dockit, Rent Roll, and Marketing.
+- **Deal Workspace (Consolidated Navigation)**: Sidebar consolidates Due Diligence, Data Room, and Modeling into a single "Deal Workspace" section. Sub-navigation shows workspace-specific tabs (Overview, Financials, Diligence, Documents, Team) when viewing a specific workspace. Standalone modeling tools (OM Builder, Funds, Debt Scenarios, Exit Strategies) remain in a separate "Modeling Tools" section.
 - **Financial Kernel (Feature-Flagged)**: Enterprise-grade canonical financial data model with Intacct-inspired ledger tables, marina-native dimensions, account mapping layer, and QuickBooks integration.
 
 ### Feature Specifications

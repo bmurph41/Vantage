@@ -68,20 +68,25 @@ const operationsModulesNav = [
   { name: "Marketing", href: "/operations/marketing", icon: Megaphone },
 ];
 
-// Due Diligence Navigation
-const ddNav = [
-  { name: "All Projects", href: "/projects", icon: LayoutDashboard },
-  { name: "Progress Report", href: "/progress-report", icon: ClipboardList },
-];
-
-// VDR Navigation
-const vdrNav = [
+// Deal Workspace Navigation - Consolidated DD, VDR, and Modeling
+const dealWorkspaceNav = [
+  { name: "All Workspaces", href: "/workspaces", icon: Briefcase },
+  { name: "DD Projects", href: "/projects", icon: ClipboardList },
   { name: "Data Room", href: "/vdr", icon: FolderLock },
+  { name: "Modeling Projects", href: "/modeling/projects", icon: Calculator },
 ];
 
-// Modeling Navigation
-const modelingNav = [
-  { name: "Projects", href: "/modeling/projects", icon: TrendingUp },
+// Deal Workspace sub-nav (shown when inside a workspace)
+const getWorkspaceSubNav = (workspaceId: string) => [
+  { name: "Overview", href: `/workspaces/${workspaceId}`, icon: LayoutDashboard },
+  { name: "Financials", href: `/workspaces/${workspaceId}?tab=financials`, icon: Calculator },
+  { name: "Diligence", href: `/workspaces/${workspaceId}?tab=diligence`, icon: ClipboardList },
+  { name: "Documents", href: `/workspaces/${workspaceId}?tab=documents`, icon: FolderLock },
+  { name: "Team", href: `/workspaces/${workspaceId}?tab=team`, icon: Users },
+];
+
+// Modeling Tools Navigation (standalone tools not tied to a specific deal)
+const modelingToolsNav = [
   { name: "OM Builder", href: "/om", icon: FileText },
   { name: "Fund Management", href: "/modeling/funds", icon: Briefcase },
   { name: "LP Portal", href: "/modeling/lp-portal", icon: Users },
@@ -128,15 +133,18 @@ export default function UnifiedSidebar() {
   const [dealManagementExpanded, setDealManagementExpanded] = useState(false);
   const [prospectingExpanded, setProspectingExpanded] = useState(false);
   const [crmToolsExpanded, setCrmToolsExpanded] = useState(false);
-  const [ddExpanded, setDdExpanded] = useState(false);
-  const [vdrExpanded, setVdrExpanded] = useState(false);
-  const [modelingExpanded, setModelingExpanded] = useState(false);
+  const [dealWorkspaceExpanded, setDealWorkspaceExpanded] = useState(false); // Consolidated DD, VDR, Modeling
+  const [modelingToolsExpanded, setModelingToolsExpanded] = useState(false);
   const [analysisExpanded, setAnalysisExpanded] = useState(false);
   const [pendingExpanded, setPendingExpanded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
+  
+  // Extract workspace ID from URL if viewing a specific workspace
+  const workspaceMatch = location.match(/\/workspaces\/([^/?]+)/);
+  const activeWorkspaceId = workspaceMatch ? workspaceMatch[1] : null;
 
   // Single consolidated bootstrap query - replaces 5 separate API calls
   const { data: bootstrapData } = useQuery<BootstrapData>({
@@ -176,9 +184,8 @@ export default function UnifiedSidebar() {
       deal_management: ['pe_investor', 'broker', 'operator', 'advisor'], // Deal Management - ALL users
       prospecting: ['pe_investor', 'broker'], // Prospecting & Outreach - Broker add-on only
       operations: ['pe_investor', 'operator'],
-      due_diligence: ['pe_investor', 'broker'],
-      vdr: ['pe_investor', 'broker'],
-      modeling: ['pe_investor', 'advisor'],
+      deal_workspace: ['pe_investor', 'broker', 'operator', 'advisor'], // Consolidated DD, VDR, Modeling - ALL users who had access to any of these
+      modeling_tools: ['pe_investor', 'broker', 'advisor'], // Standalone modeling tools (broader access)
       analysis: ['pe_investor', 'broker', 'advisor'],
     };
     
@@ -197,9 +204,10 @@ export default function UnifiedSidebar() {
     const isDealManagementPage = ['/deal-workspace', '/crm/activity', '/crm/tasks', '/crm/marketing-automation', '/crm/analytics', '/crm/forecast'].includes(location) || location.startsWith('/deal-workspace');
     // Prospecting: prospecting pages (leads are now in Deal Workspace)
     const isProspectingPage = location.startsWith('/prospecting/') || location === '/prospecting';
-    const isDdPage = location === '/' || location === '/progress-report';
-    const isVdrPage = location.startsWith('/vdr');
-    const isModelingPage = location.startsWith('/modeling/') || location.startsWith('/om');
+    // Deal Workspace: consolidated DD, VDR, and Modeling project pages
+    const isDealWorkspacePage = location.startsWith('/workspaces') || location === '/projects' || location === '/progress-report' || location.startsWith('/vdr') || location.startsWith('/modeling/projects');
+    // Modeling Tools: standalone tools (OM Builder, Funds, etc.) not tied to specific deals
+    const isModelingToolsPage = location.startsWith('/om') || location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit');
     const isAnalysisPage = location.startsWith('/analysis/') || location.startsWith('/docktalk');
 
     // Set expanded states - Operations stays expanded by default, others expand when active
@@ -211,9 +219,8 @@ export default function UnifiedSidebar() {
     setProspectingExpanded(isProspectingPage);
     setCrmToolsExpanded(isCrmToolsPage);
     setPendingExpanded(isPendingPage);
-    setDdExpanded(isDdPage);
-    setVdrExpanded(isVdrPage);
-    setModelingExpanded(isModelingPage);
+    setDealWorkspaceExpanded(isDealWorkspacePage);
+    setModelingToolsExpanded(isModelingToolsPage);
     setAnalysisExpanded(isAnalysisPage);
   }, [location]);
 
@@ -523,46 +530,44 @@ export default function UnifiedSidebar() {
           </Link>
         </div>
         
-        {/* Due Diligence Section */}
-        {canViewSection('due_diligence') && (
+        {/* Deal Workspace Section - Consolidated DD, VDR, and Modeling */}
+        {canViewSection('deal_workspace') && (
           <div className="mb-2">
             <SectionHeader 
-              title="Due Diligence" 
-              expanded={ddExpanded} 
-              onToggle={() => setDdExpanded(!ddExpanded)}
-              isActive={location === '/' || location === '/progress-report'}
+              title="Deal Workspace" 
+              expanded={dealWorkspaceExpanded} 
+              onToggle={() => setDealWorkspaceExpanded(!dealWorkspaceExpanded)}
+              isActive={location.startsWith('/workspaces') || location === '/projects' || location === '/progress-report' || location.startsWith('/vdr') || location.startsWith('/modeling/projects')}
             />
-            {ddExpanded && ddNav.map((item) => (
-              <NavLink key={item.name} item={item} />
-            ))}
+            {dealWorkspaceExpanded && (
+              <>
+                {dealWorkspaceNav.map((item) => (
+                  <NavLink key={item.name} item={item} />
+                ))}
+                {/* Active Workspace Sub-navigation - shown when inside a specific workspace */}
+                {activeWorkspaceId && (
+                  <div className="ml-4 mt-2 border-l-2 border-blue-200 pl-2">
+                    <div className="text-xs font-medium text-blue-600 mb-1 px-2">Active Workspace</div>
+                    {getWorkspaceSubNav(activeWorkspaceId).map((item) => (
+                      <NavLink key={item.name} item={item} />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
         
-        {/* VDR Section */}
-        {canViewSection('vdr') && (
+        {/* Modeling Tools Section - Standalone tools not tied to specific deals */}
+        {canViewSection('modeling_tools') && (
           <div className="mb-2">
             <SectionHeader 
-              title="Data Room" 
-              expanded={vdrExpanded} 
-              onToggle={() => setVdrExpanded(!vdrExpanded)}
-              isActive={location.startsWith('/vdr')}
+              title="Modeling Tools" 
+              expanded={modelingToolsExpanded} 
+              onToggle={() => setModelingToolsExpanded(!modelingToolsExpanded)}
+              isActive={location.startsWith('/om') || location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit')}
             />
-            {vdrExpanded && vdrNav.map((item) => (
-              <NavLink key={item.name} item={item} />
-            ))}
-          </div>
-        )}
-        
-        {/* Modeling Section */}
-        {canViewSection('modeling') && (
-          <div className="mb-2">
-            <SectionHeader 
-              title="Modeling" 
-              expanded={modelingExpanded} 
-              onToggle={() => setModelingExpanded(!modelingExpanded)}
-              isActive={location.startsWith('/modeling/') || location.startsWith('/om')}
-            />
-            {modelingExpanded && modelingNav
+            {modelingToolsExpanded && modelingToolsNav
               .filter((item) => {
                 if (item.href === '/modeling/funds') return hasPack('fund_management');
                 if (item.href === '/modeling/lp-portal') return hasPack('fund_management') && hasPack('lp_portal');
