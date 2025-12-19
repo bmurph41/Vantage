@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { X, Save, Plus, Trash2, DollarSign, Search, Link, Unlink, ToggleLeft } from "lucide-react";
+import { X, Save, Plus, Trash2, DollarSign, Search, Link, Unlink, ToggleLeft, Loader2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { rateCompsApi } from '@/lib/ratecomps/api';
 import { queryKeys } from '@/lib/ratecomps/queryKeys';

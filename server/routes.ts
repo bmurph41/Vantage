@@ -26079,7 +26079,7 @@ Current context: Project ${req.params.projectId}`;
 
   // Google Maps API key endpoint
   app.get("/api/config/google-maps-key", (req, res) => {
-    res.json({ apiKey: process.env.GOOGLE_MAPS_API_KEY || "" });
+    res.json({ apiKey: process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || "" });
   });
 
   // ==================== OPERATIONS - FUEL SALES ROUTES ====================
