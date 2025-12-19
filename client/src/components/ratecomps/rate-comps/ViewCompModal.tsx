@@ -1,10 +1,18 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Edit, 
   MapPin, 
@@ -20,7 +28,9 @@ import {
   ChevronRight,
   Info,
   Check,
-  X
+  X,
+  Plus,
+  Loader2
 } from "lucide-react";
 import type { RateComp, RateTier } from "@shared/schema";
 import { formatCurrency } from "@/lib/ratecomps/format";
@@ -31,9 +41,38 @@ interface ViewCompModalProps {
   onClose: () => void;
   comp: (RateComp & { tiers?: RateTier[]; tierCount?: number }) | null;
   onEdit?: (comp: RateComp) => void;
+  onRateAdded?: () => void;
 }
 
-export default function ViewCompModal({ open, onClose, comp, onEdit }: ViewCompModalProps) {
+interface AddRateFormData {
+  storageType: string;
+  loaMin: string;
+  loaMax: string;
+  rateUnit: string;
+  ratePeriod: string;
+  amountDollars: string;
+  seasonality: string;
+  electricIncluded: boolean;
+  waterIncluded: boolean;
+}
+
+const INITIAL_RATE_FORM: AddRateFormData = {
+  storageType: 'wet_slip',
+  loaMin: '',
+  loaMax: '',
+  rateUnit: 'per_foot',
+  ratePeriod: 'monthly',
+  amountDollars: '',
+  seasonality: 'annual',
+  electricIncluded: false,
+  waterIncluded: true,
+};
+
+export default function ViewCompModal({ open, onClose, comp, onEdit, onRateAdded }: ViewCompModalProps) {
+  const { toast } = useToast();
+  const [showAddRateDialog, setShowAddRateDialog] = useState(false);
+  const [rateForm, setRateForm] = useState<AddRateFormData>(INITIAL_RATE_FORM);
+
   if (!comp) return null;
 
   const tiers = (comp as any).tiers || [];
@@ -250,10 +289,23 @@ export default function ViewCompModal({ open, onClose, comp, onEdit }: ViewCompM
                   </div>
                 )}
               </div>
-              <Button onClick={() => onEdit?.(comp)} data-testid="button-edit-comp">
-                <Edit className="h-4 w-4 mr-2" />
-                Edit
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setRateForm(INITIAL_RATE_FORM);
+                    setShowAddRateDialog(true);
+                  }} 
+                  data-testid="button-add-rate"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Rate
+                </Button>
+                <Button onClick={() => onEdit?.(comp)} data-testid="button-edit-comp">
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit
+                </Button>
+              </div>
             </div>
           </DialogHeader>
         </div>
@@ -546,6 +598,244 @@ export default function ViewCompModal({ open, onClose, comp, onEdit }: ViewCompM
             </TabsContent>
           </Tabs>
         </ScrollArea>
+      </DialogContent>
+
+      <AddRateDialog
+        open={showAddRateDialog}
+        onClose={() => setShowAddRateDialog(false)}
+        rateCompId={comp.id}
+        marinaName={comp.marina || 'Marina'}
+        formData={rateForm}
+        setFormData={setRateForm}
+        onSuccess={() => {
+          setShowAddRateDialog(false);
+          setRateForm(INITIAL_RATE_FORM);
+          onRateAdded?.();
+          queryClient.invalidateQueries({ queryKey: ['/api/rate-comps'] });
+        }}
+      />
+    </Dialog>
+  );
+}
+
+interface AddRateDialogProps {
+  open: boolean;
+  onClose: () => void;
+  rateCompId: string;
+  marinaName: string;
+  formData: AddRateFormData;
+  setFormData: (data: AddRateFormData) => void;
+  onSuccess: () => void;
+}
+
+function AddRateDialog({ open, onClose, rateCompId, marinaName, formData, setFormData, onSuccess }: AddRateDialogProps) {
+  const { toast } = useToast();
+
+  const createTierMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return apiRequest('POST', `/api/rate-comps/${rateCompId}/tiers`, data);
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Rate tier added successfully" });
+      onSuccess();
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to add rate tier",
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const handleSubmit = () => {
+    if (!formData.amountDollars || parseFloat(formData.amountDollars) <= 0) {
+      toast({ 
+        title: "Validation Error", 
+        description: "Please enter a valid rate amount",
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    const tierData = {
+      storageType: formData.storageType,
+      loaMin: formData.loaMin ? parseInt(formData.loaMin) : null,
+      loaMax: formData.loaMax ? parseInt(formData.loaMax) : null,
+      rateUnit: formData.rateUnit,
+      ratePeriod: formData.ratePeriod,
+      amountCents: Math.round(parseFloat(formData.amountDollars) * 100),
+      seasonality: formData.seasonality,
+      electricIncluded: formData.electricIncluded,
+      waterIncluded: formData.waterIncluded,
+      isCurrentRate: true,
+    };
+
+    createTierMutation.mutate(tierData);
+  };
+
+  const updateField = (field: keyof AddRateFormData, value: any) => {
+    setFormData({ ...formData, [field]: value });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Add Rate Tier</DialogTitle>
+          <DialogDescription>
+            Add a new rate tier for {marinaName}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="storageType">Storage Type</Label>
+              <Select value={formData.storageType} onValueChange={(v) => updateField('storageType', v)}>
+                <SelectTrigger id="storageType" data-testid="select-storage-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(STORAGE_TYPE_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="seasonality">Seasonality</Label>
+              <Select value={formData.seasonality} onValueChange={(v) => updateField('seasonality', v)}>
+                <SelectTrigger id="seasonality" data-testid="select-seasonality">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="annual">Annual</SelectItem>
+                  <SelectItem value="seasonal">Seasonal</SelectItem>
+                  <SelectItem value="winter">Winter</SelectItem>
+                  <SelectItem value="summer">Summer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="loaMin">Min LOA (ft)</Label>
+              <Input
+                id="loaMin"
+                type="number"
+                placeholder="e.g., 20"
+                value={formData.loaMin}
+                onChange={(e) => updateField('loaMin', e.target.value)}
+                data-testid="input-loa-min"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="loaMax">Max LOA (ft)</Label>
+              <Input
+                id="loaMax"
+                type="number"
+                placeholder="e.g., 40"
+                value={formData.loaMax}
+                onChange={(e) => updateField('loaMax', e.target.value)}
+                data-testid="input-loa-max"
+              />
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="amountDollars">Rate Amount ($)</Label>
+              <Input
+                id="amountDollars"
+                type="number"
+                step="0.01"
+                placeholder="e.g., 25.00"
+                value={formData.amountDollars}
+                onChange={(e) => updateField('amountDollars', e.target.value)}
+                data-testid="input-rate-amount"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="rateUnit">Rate Unit</Label>
+              <Select value={formData.rateUnit} onValueChange={(v) => updateField('rateUnit', v)}>
+                <SelectTrigger id="rateUnit" data-testid="select-rate-unit">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(RATE_UNIT_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="ratePeriod">Rate Period</Label>
+              <Select value={formData.ratePeriod} onValueChange={(v) => updateField('ratePeriod', v)}>
+                <SelectTrigger id="ratePeriod" data-testid="select-rate-period">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(RATE_PERIOD_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="electricIncluded">Electric Included</Label>
+              <Switch
+                id="electricIncluded"
+                checked={formData.electricIncluded}
+                onCheckedChange={(v) => updateField('electricIncluded', v)}
+                data-testid="switch-electric"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="waterIncluded">Water Included</Label>
+              <Switch
+                id="waterIncluded"
+                checked={formData.waterIncluded}
+                onCheckedChange={(v) => updateField('waterIncluded', v)}
+                data-testid="switch-water"
+              />
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} data-testid="button-cancel-add-rate">
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSubmit} 
+            disabled={createTierMutation.isPending}
+            data-testid="button-save-rate"
+          >
+            {createTierMutation.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Adding...
+              </>
+            ) : (
+              <>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Rate
+              </>
+            )}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

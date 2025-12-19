@@ -101,7 +101,7 @@ export default function RateCompsIndex() {
   const [showUpload, setShowUpload] = useState(false);
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [showProjectAssignment, setShowProjectAssignment] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
