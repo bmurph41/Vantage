@@ -2,17 +2,17 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Loader2, Plus, Trash2, Save, X, Edit2 } from "lucide-react";
+import { Loader2, Plus, Trash2, Save, X, Edit2, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { STORAGE_TYPE_LABELS, RATE_PERIOD_LABELS, RATE_UNIT_LABELS, formatRateDisplay } from "@shared/ratecomps-utils";
 import type { RateTier } from "@shared/schema";
 
-// TierRowData interface - exported for parent components
 export interface TierRowData {
   id?: string;
   storageType: string;
@@ -57,10 +57,9 @@ export function rowDataToTier(data: TierRowData): any {
 }
 
 interface RateTiersDataTableProps {
-  rateCompId?: string; // Optional - if not provided, works in local-only mode
+  rateCompId?: string;
   marinaName: string;
   onTiersUpdated?: () => void;
-  // For local mode (creation):
   localTiers?: TierRowData[];
   onLocalTiersChange?: (tiers: TierRowData[]) => void;
 }
@@ -92,14 +91,11 @@ export default function RateTiersDataTable({
   const { toast } = useToast();
   const qc = useQueryClient();
   
-  // Determine if we're in local mode (no rateCompId) or API mode
   const isLocalMode = !rateCompId;
   
-  // Internal state for API mode
   const [apiRows, setApiRows] = useState<TierRowData[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Use localTiers if in local mode, otherwise use apiRows
   const rows = isLocalMode ? (localTiers || []) : apiRows;
   const setRows = isLocalMode 
     ? (newRows: TierRowData[] | ((prev: TierRowData[]) => TierRowData[])) => {
@@ -108,10 +104,9 @@ export default function RateTiersDataTable({
       }
     : setApiRows;
 
-  // Only fetch tiers from API when we have a rateCompId
   const { data: tiers, isLoading } = useQuery<RateTier[]>({
     queryKey: [`/api/rate-comps/${rateCompId}/tiers`],
-    enabled: !!rateCompId, // Only run query when rateCompId exists
+    enabled: !!rateCompId,
   });
 
   useEffect(() => {
@@ -126,102 +121,86 @@ export default function RateTiersDataTable({
       body: JSON.stringify(data),
     }),
     onSuccess: () => {
-      toast({ title: "Rate tier created" });
       qc.invalidateQueries({ queryKey: [`/api/rate-comps/${rateCompId}/tiers`] });
       onTiersUpdated?.();
+      toast({ title: "Rate tier created" });
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to create rate tier", description: error.message, variant: "destructive" });
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => apiRequest(`/api/rate-tiers/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    }),
+    mutationFn: ({ tierId, data }: { tierId: string; data: any }) => 
+      apiRequest(`/api/rate-comps/${rateCompId}/tiers/${tierId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
     onSuccess: () => {
-      toast({ title: "Rate tier updated" });
       qc.invalidateQueries({ queryKey: [`/api/rate-comps/${rateCompId}/tiers`] });
       onTiersUpdated?.();
+      toast({ title: "Rate tier updated" });
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to update rate tier", description: error.message, variant: "destructive" });
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiRequest(`/api/rate-tiers/${id}`, {
-      method: 'DELETE',
-    }),
+    mutationFn: (tierId: string) => 
+      apiRequest(`/api/rate-comps/${rateCompId}/tiers/${tierId}`, { method: 'DELETE' }),
     onSuccess: () => {
-      toast({ title: "Rate tier deleted" });
       qc.invalidateQueries({ queryKey: [`/api/rate-comps/${rateCompId}/tiers`] });
       onTiersUpdated?.();
+      toast({ title: "Rate tier deleted" });
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to delete rate tier", description: error.message, variant: "destructive" });
     },
   });
 
   const handleAddRow = () => {
-    setRows([...rows, { ...EMPTY_ROW }]);
+    const hasEditingRow = rows.some(r => r.isEditing);
+    if (hasEditingRow) {
+      toast({ title: "Please save or cancel the current edit first", variant: "destructive" });
+      return;
+    }
+    setRows(prev => [{ ...EMPTY_ROW }, ...prev]);
   };
 
   const handleRowChange = (index: number, field: keyof TierRowData, value: any) => {
-    const newRows = [...rows];
-    newRows[index] = { ...newRows[index], [field]: value };
-    setRows(newRows);
+    setRows(prev => prev.map((row, i) => i === index ? { ...row, [field]: value } : row));
   };
 
   const handleSaveRow = async (index: number) => {
     const row = rows[index];
     const tierData = rowDataToTier(row);
     
-    if (!tierData.amountCents || tierData.amountCents <= 0) {
-      toast({ title: "Error", description: "Rate amount is required", variant: "destructive" });
+    if (isLocalMode) {
+      setRows(prev => prev.map((r, i) => 
+        i === index ? { ...r, isEditing: false, isNew: false } : r
+      ));
       return;
     }
 
-    if (isLocalMode) {
-      // In local mode, just mark the row as saved (not editing/new)
-      const newRows = [...rows];
-      newRows[index] = { ...newRows[index], isEditing: false, isNew: false };
-      setRows(newRows);
-      setEditingId(null);
-      toast({ title: "Rate tier added", description: "Will be saved when you save the rate comp" });
-    } else {
-      // In API mode, make the API call
-      if (row.isNew) {
-        await createMutation.mutateAsync(tierData);
-      } else if (row.id) {
-        await updateMutation.mutateAsync({ id: row.id, data: tierData });
-      }
-      
-      const newRows = [...rows];
-      newRows[index] = { ...newRows[index], isEditing: false, isNew: false };
-      setRows(newRows);
-      setEditingId(null);
+    if (row.isNew) {
+      await createMutation.mutateAsync(tierData);
+    } else if (row.id) {
+      await updateMutation.mutateAsync({ tierId: row.id, data: tierData });
     }
+    setEditingId(null);
   };
 
   const handleCancelEdit = (index: number) => {
     const row = rows[index];
     if (row.isNew) {
-      // Remove new unsaved rows
-      setRows(rows.filter((_, i) => i !== index));
-    } else if (isLocalMode) {
-      // In local mode, just exit editing (can't revert since no original stored)
-      const newRows = [...rows];
-      newRows[index] = { ...newRows[index], isEditing: false };
-      setRows(newRows);
+      setRows(prev => prev.filter((_, i) => i !== index));
     } else {
-      // In API mode, restore from fetched tiers
-      const original = tiers?.find(t => t.id === row.id);
-      if (original) {
-        const newRows = [...rows];
-        newRows[index] = tierToRowData(original);
-        setRows(newRows);
+      if (tiers && !isLocalMode) {
+        const originalTier = tiers.find(t => t.id === row.id);
+        if (originalTier) {
+          setRows(prev => prev.map((r, i) => i === index ? tierToRowData(originalTier) : r));
+        }
       }
     }
     setEditingId(null);
@@ -229,35 +208,28 @@ export default function RateTiersDataTable({
 
   const handleEditRow = (index: number) => {
     const row = rows[index];
-    const newRows = [...rows];
-    newRows[index] = { ...newRows[index], isEditing: true };
-    setRows(newRows);
-    setEditingId(row.id || null);
+    if (row.id) setEditingId(row.id);
+    setRows(prev => prev.map((r, i) => i === index ? { ...r, isEditing: true } : r));
   };
 
   const handleDeleteRow = async (index: number) => {
     const row = rows[index];
     if (isLocalMode) {
-      // In local mode, just remove from state
-      setRows(rows.filter((_, i) => i !== index));
-    } else if (row.id) {
-      // In API mode, make the delete API call
+      setRows(prev => prev.filter((_, i) => i !== index));
+      return;
+    }
+    if (row.id) {
       await deleteMutation.mutateAsync(row.id);
     }
   };
 
   const formatSizeDisplay = (row: TierRowData) => {
-    if (row.sizeBasis === 'loa_range') {
-      if (row.loaMin && row.loaMax) return `${row.loaMin}'-${row.loaMax}'`;
-      if (row.loaMin) return `${row.loaMin}'+`;
-      if (row.loaMax) return `Up to ${row.loaMax}'`;
-      return '-';
-    }
-    if (row.loaMin) return `${row.loaMin}'`;
+    if (row.sizeBasis === 'any') return 'Any size';
+    if (row.loaMin && row.loaMax) return `${row.loaMin}' - ${row.loaMax}'`;
+    if (row.loaMin) return `${row.loaMin}'+`;
     return '-';
   };
 
-  // Only show loading for API mode
   if (isLoading && !isLocalMode) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -267,14 +239,17 @@ export default function RateTiersDataTable({
   }
 
   const isPending = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
+  const currentRates = rows.filter(r => r.isCurrentRate && !r.isEditing);
+  const historicalRates = rows.filter(r => !r.isCurrentRate && !r.isEditing);
+  const editingRows = rows.filter(r => r.isEditing);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           {isLocalMode 
-            ? "Add pricing tiers (will be saved with the rate comp)"
-            : `Manage pricing tiers for ${marinaName}`
+            ? "Add pricing tiers (saved with comp)"
+            : `${rows.length} rate${rows.length !== 1 ? 's' : ''} configured`
           }
         </p>
         <Button onClick={handleAddRow} size="sm" data-testid="button-add-tier">
@@ -283,250 +258,311 @@ export default function RateTiersDataTable({
         </Button>
       </div>
 
-      <div className="border rounded-lg overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[140px]">Storage Type</TableHead>
-              <TableHead className="w-[100px]">Size Basis</TableHead>
-              <TableHead className="w-[120px]">Boat Size</TableHead>
-              <TableHead className="w-[120px]">Rate Type</TableHead>
-              <TableHead className="w-[100px]">Rate</TableHead>
-              <TableHead className="w-[80px]">Year</TableHead>
-              <TableHead className="w-[80px]">Status</TableHead>
-              <TableHead className="w-[100px]">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                  No rate tiers yet. Click "Add Rate" to create one.
-                </TableCell>
-              </TableRow>
-            ) : (
-              rows.map((row, index) => (
-                <TableRow key={row.id || `new-${index}`} data-testid={`tier-row-${row.id || index}`}>
-                  {row.isEditing ? (
-                    <>
-                      <TableCell>
-                        <Select
-                          value={row.storageType}
-                          onValueChange={(v) => handleRowChange(index, 'storageType', v)}
-                        >
-                          <SelectTrigger className="h-8" data-testid={`select-storage-type-${index}`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Object.entries(STORAGE_TYPE_LABELS).map(([value, label]) => (
-                              <SelectItem key={value} value={value}>{label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          value={row.sizeBasis}
-                          onValueChange={(v) => handleRowChange(index, 'sizeBasis', v)}
-                        >
-                          <SelectTrigger className="h-8" data-testid={`select-size-basis-${index}`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="loa_range">LOA Range</SelectItem>
-                            <SelectItem value="exact_loa">Exact LOA</SelectItem>
-                            <SelectItem value="any">Any Size</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Input
-                            type="number"
-                            value={row.loaMin}
-                            onChange={(e) => handleRowChange(index, 'loaMin', e.target.value)}
-                            placeholder="Min"
-                            className="h-8 w-14"
-                            data-testid={`input-loa-min-${index}`}
-                          />
-                          {row.sizeBasis === 'loa_range' && (
-                            <Input
-                              type="number"
-                              value={row.loaMax}
-                              onChange={(e) => handleRowChange(index, 'loaMax', e.target.value)}
-                              placeholder="Max"
-                              className="h-8 w-14"
-                              data-testid={`input-loa-max-${index}`}
-                            />
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Select
-                            value={row.rateUnit}
-                            onValueChange={(v) => handleRowChange(index, 'rateUnit', v)}
-                          >
-                            <SelectTrigger className="h-8 w-20" data-testid={`select-rate-unit-${index}`}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Object.entries(RATE_UNIT_LABELS).map(([value, label]) => (
-                                <SelectItem key={value} value={value}>{label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Select
-                            value={row.ratePeriod}
-                            onValueChange={(v) => handleRowChange(index, 'ratePeriod', v)}
-                          >
-                            <SelectTrigger className="h-8 w-20" data-testid={`select-rate-period-${index}`}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Object.entries(RATE_PERIOD_LABELS).map(([value, label]) => (
-                                <SelectItem key={value} value={value}>{label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={row.amountCents}
-                          onChange={(e) => handleRowChange(index, 'amountCents', e.target.value)}
-                          placeholder="$0.00"
-                          className="h-8 w-20"
-                          data-testid={`input-amount-${index}`}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={row.rateYear}
-                          onChange={(e) => handleRowChange(index, 'rateYear', e.target.value)}
-                          placeholder={new Date().getFullYear().toString()}
-                          className="h-8 w-16"
-                          data-testid={`input-year-${index}`}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          value={row.isCurrentRate ? 'current' : 'historical'}
-                          onValueChange={(v) => handleRowChange(index, 'isCurrentRate', v === 'current')}
-                        >
-                          <SelectTrigger className="h-8 w-20" data-testid={`select-status-${index}`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="current">Current</SelectItem>
-                            <SelectItem value="historical">Historical</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleSaveRow(index)}
-                            disabled={isPending}
-                            data-testid={`button-save-tier-${index}`}
-                          >
-                            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleCancelEdit(index)}
-                            data-testid={`button-cancel-tier-${index}`}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </>
-                  ) : (
-                    <>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {STORAGE_TYPE_LABELS[row.storageType] || row.storageType}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {row.sizeBasis === 'loa_range' ? 'Range' : row.sizeBasis === 'exact_loa' ? 'LOA' : 'Any'}
-                      </TableCell>
-                      <TableCell className="text-sm font-medium">
-                        {formatSizeDisplay(row)}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {RATE_UNIT_LABELS[row.rateUnit]} / {RATE_PERIOD_LABELS[row.ratePeriod]}
-                      </TableCell>
-                      <TableCell className="text-sm font-medium">
-                        {row.amountCents ? formatRateDisplay(parseFloat(row.amountCents) * 100, row.rateUnit, row.ratePeriod) : '-'}
-                      </TableCell>
-                      <TableCell className="text-sm">{row.rateYear || '-'}</TableCell>
-                      <TableCell>
-                        <Badge variant={row.isCurrentRate ? "default" : "secondary"}>
-                          {row.isCurrentRate ? 'Current' : 'Historical'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditRow(index)}
-                            disabled={editingId !== null}
-                            data-testid={`button-edit-tier-${index}`}
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                disabled={isPending}
-                                data-testid={`button-delete-tier-${index}`}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Rate Tier</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete this rate tier? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDeleteRow(index)}
-                                  className="bg-destructive text-destructive-foreground"
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </TableCell>
-                    </>
-                  )}
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      {/* Editing Form - Card Based */}
+      {editingRows.map((row) => {
+        const index = rows.findIndex(r => r === row);
+        return (
+          <Card key={row.id || `new-${index}`} className="border-primary/50 bg-muted/30" data-testid={`tier-edit-${index}`}>
+            <CardContent className="pt-4 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-muted-foreground">Storage Type</Label>
+                  <Select value={row.storageType} onValueChange={(v) => handleRowChange(index, 'storageType', v)}>
+                    <SelectTrigger data-testid={`select-storage-type-${index}`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(STORAGE_TYPE_LABELS).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-      {rows.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-muted-foreground">Size Basis</Label>
+                  <Select value={row.sizeBasis} onValueChange={(v) => handleRowChange(index, 'sizeBasis', v)}>
+                    <SelectTrigger data-testid={`select-size-basis-${index}`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="loa_range">LOA Range</SelectItem>
+                      <SelectItem value="exact_loa">Exact LOA</SelectItem>
+                      <SelectItem value="any">Any Size</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {row.sizeBasis !== 'any' && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium text-muted-foreground">
+                      {row.sizeBasis === 'loa_range' ? 'Min LOA (ft)' : 'LOA (ft)'}
+                    </Label>
+                    <Input
+                      type="number"
+                      value={row.loaMin}
+                      onChange={(e) => handleRowChange(index, 'loaMin', e.target.value)}
+                      placeholder="e.g., 20"
+                      data-testid={`input-loa-min-${index}`}
+                    />
+                  </div>
+                  {row.sizeBasis === 'loa_range' && (
+                    <div className="space-y-2">
+                      <Label className="text-xs font-medium text-muted-foreground">Max LOA (ft)</Label>
+                      <Input
+                        type="number"
+                        value={row.loaMax}
+                        onChange={(e) => handleRowChange(index, 'loaMax', e.target.value)}
+                        placeholder="e.g., 40"
+                        data-testid={`input-loa-max-${index}`}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-muted-foreground">Rate ($)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={row.amountCents}
+                    onChange={(e) => handleRowChange(index, 'amountCents', e.target.value)}
+                    placeholder="0.00"
+                    data-testid={`input-amount-${index}`}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-muted-foreground">Unit</Label>
+                  <Select value={row.rateUnit} onValueChange={(v) => handleRowChange(index, 'rateUnit', v)}>
+                    <SelectTrigger data-testid={`select-rate-unit-${index}`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(RATE_UNIT_LABELS).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-muted-foreground">Period</Label>
+                  <Select value={row.ratePeriod} onValueChange={(v) => handleRowChange(index, 'ratePeriod', v)}>
+                    <SelectTrigger data-testid={`select-rate-period-${index}`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(RATE_PERIOD_LABELS).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-muted-foreground">Year</Label>
+                  <Input
+                    type="number"
+                    value={row.rateYear}
+                    onChange={(e) => handleRowChange(index, 'rateYear', e.target.value)}
+                    placeholder={new Date().getFullYear().toString()}
+                    data-testid={`input-year-${index}`}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-muted-foreground">Status</Label>
+                  <Select
+                    value={row.isCurrentRate ? 'current' : 'historical'}
+                    onValueChange={(v) => handleRowChange(index, 'isCurrentRate', v === 'current')}
+                  >
+                    <SelectTrigger data-testid={`select-status-${index}`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="current">Current Rate</SelectItem>
+                      <SelectItem value="historical">Historical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleCancelEdit(index)}
+                  data-testid={`button-cancel-tier-${index}`}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => handleSaveRow(index)}
+                  disabled={isPending}
+                  data-testid={`button-save-tier-${index}`}
+                >
+                  {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
+                  Save Rate
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+
+      {/* Display Current Rates */}
+      {currentRates.length > 0 && (
+        <div className="space-y-2">
+          {editingRows.length > 0 && <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Current Rates</p>}
+          <div className="space-y-2">
+            {currentRates.map((row) => {
+              const index = rows.findIndex(r => r === row);
+              return (
+                <div
+                  key={row.id || `row-${index}`}
+                  className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                  data-testid={`tier-row-${row.id || index}`}
+                >
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <Badge variant="outline" className="font-medium">
+                        {STORAGE_TYPE_LABELS[row.storageType] || row.storageType}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {formatSizeDisplay(row)}
+                    </div>
+                    <div className="text-sm font-semibold">
+                      {row.amountCents ? formatRateDisplay(parseFloat(row.amountCents) * 100, row.rateUnit, row.ratePeriod) : '-'}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {row.rateYear}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEditRow(index)}
+                      disabled={editingId !== null}
+                      data-testid={`button-edit-tier-${index}`}
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="sm" disabled={isPending} data-testid={`button-delete-tier-${index}`}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Rate Tier</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to delete this rate tier? This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDeleteRow(index)}>Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Display Historical Rates */}
+      {historicalRates.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Historical Rates</p>
+          <div className="space-y-2">
+            {historicalRates.map((row) => {
+              const index = rows.findIndex(r => r === row);
+              return (
+                <div
+                  key={row.id || `row-${index}`}
+                  className="flex items-center justify-between p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors opacity-75"
+                  data-testid={`tier-row-${row.id || index}`}
+                >
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <Badge variant="secondary" className="font-medium">
+                        {STORAGE_TYPE_LABELS[row.storageType] || row.storageType}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {formatSizeDisplay(row)}
+                    </div>
+                    <div className="text-sm font-medium">
+                      {row.amountCents ? formatRateDisplay(parseFloat(row.amountCents) * 100, row.rateUnit, row.ratePeriod) : '-'}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {row.rateYear}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEditRow(index)}
+                      disabled={editingId !== null}
+                      data-testid={`button-edit-tier-${index}`}
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="sm" disabled={isPending} data-testid={`button-delete-tier-${index}`}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Rate Tier</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to delete this rate tier? This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDeleteRow(index)}>Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {rows.length === 0 && (
+        <div className="text-center py-8 text-muted-foreground border rounded-lg bg-muted/20">
+          <DollarSign className="h-8 w-8 mx-auto mb-2 opacity-50" />
+          <p className="text-sm">No rate tiers yet</p>
+          <p className="text-xs">Click "Add Rate" to create your first pricing tier</p>
+        </div>
+      )}
+
+      {/* Summary Footer */}
+      {rows.length > 0 && !editingRows.length && (
         <p className="text-xs text-muted-foreground">
-          {rows.filter(r => r.isCurrentRate && !r.isNew).length} current rate(s), {rows.filter(r => !r.isCurrentRate && !r.isNew).length} historical rate(s)
+          {currentRates.length} current rate{currentRates.length !== 1 ? 's' : ''}
+          {historicalRates.length > 0 && `, ${historicalRates.length} historical`}
         </p>
       )}
     </div>
