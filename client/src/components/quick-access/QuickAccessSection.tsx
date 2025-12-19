@@ -122,16 +122,19 @@ function SortablePinnedItem({
       style={style} 
       {...attributes}
       className={cn(
-        'flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors group',
+        'flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors group relative',
         isDragging && 'shadow-lg',
         isStale && 'opacity-60 border-destructive/50'
       )}
     >
-      <div {...listeners} className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded opacity-0 group-hover:opacity-100 transition-opacity">
+      {!isStale && (
+        <Link href={item.link} className="absolute inset-0 z-0" data-testid={`link-pinned-${item.id}`} />
+      )}
+      <div {...listeners} className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded opacity-0 group-hover:opacity-100 transition-opacity z-10">
         <GripVertical className="h-4 w-4 text-muted-foreground" />
       </div>
       <div 
-        className="h-8 w-8 rounded-md flex items-center justify-center relative"
+        className="h-8 w-8 rounded-md flex items-center justify-center relative z-10 pointer-events-none"
         style={{ backgroundColor: item.color ? `${item.color}20` : 'hsl(var(--muted))' }}
       >
         <Icon className="h-4 w-4" style={{ color: item.color || 'hsl(var(--muted-foreground))' }} />
@@ -139,7 +142,7 @@ function SortablePinnedItem({
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="absolute -top-1 -right-1">
+                <div className="absolute -top-1 -right-1 pointer-events-auto">
                   <AlertCircle className="h-3.5 w-3.5 text-destructive" />
                 </div>
               </TooltipTrigger>
@@ -150,22 +153,20 @@ function SortablePinnedItem({
           </TooltipProvider>
         )}
       </div>
-      <div className="flex-1 min-w-0">
-        <Link href={item.link}>
-          <span className={cn(
-            "font-medium text-sm hover:underline cursor-pointer truncate block",
-            isStale && "line-through text-muted-foreground"
-          )} data-testid={`link-pinned-${item.id}`}>
-            {displayTitle}
-          </span>
-        </Link>
+      <div className="flex-1 min-w-0 z-10 pointer-events-none">
+        <span className={cn(
+          "font-medium text-sm truncate block",
+          isStale && "line-through text-muted-foreground"
+        )}>
+          {displayTitle}
+        </span>
         {displaySubtitle && (
           <p className="text-xs text-muted-foreground truncate">{displaySubtitle}</p>
         )}
       </div>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity z-10">
             <MoreVertical className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
@@ -223,27 +224,26 @@ function FavoriteItemRow({
   const Icon = getIcon(item.icon, item.itemType);
 
   return (
-    <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent/50 transition-colors group">
-      <div className="h-8 w-8 rounded-md bg-yellow-500/10 flex items-center justify-center">
+    <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent/50 transition-colors group relative">
+      <Link href={item.link} className="absolute inset-0 z-0" data-testid={`link-favorite-${item.id}`} />
+      <div className="h-8 w-8 rounded-md bg-yellow-500/10 flex items-center justify-center z-10 pointer-events-none">
         <Icon className="h-4 w-4 text-yellow-600" />
       </div>
-      <div className="flex-1 min-w-0">
-        <Link href={item.link}>
-          <span className="font-medium text-sm hover:underline cursor-pointer truncate block" data-testid={`link-favorite-${item.id}`}>
-            {item.title}
-          </span>
-        </Link>
+      <div className="flex-1 min-w-0 z-10 pointer-events-none">
+        <span className="font-medium text-sm truncate block">
+          {item.title}
+        </span>
         {item.subtitle && (
           <p className="text-xs text-muted-foreground truncate">{item.subtitle}</p>
         )}
       </div>
-      <Badge variant="outline" className="text-xs capitalize">
+      <Badge variant="outline" className="text-xs capitalize z-10 pointer-events-none">
         {item.itemType.replace('_', ' ')}
       </Badge>
       <Button 
         variant="ghost" 
         size="sm" 
-        className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-yellow-500 hover:text-yellow-600"
+        className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-yellow-500 hover:text-yellow-600 z-10"
         onClick={() => onRemove(item.id)}
       >
         <Star className="h-4 w-4 fill-current" />
