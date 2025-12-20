@@ -10,9 +10,7 @@ import {
   Eye, 
   Edit, 
   Trash2, 
-  MoreHorizontal,
-  Check,
-  X
+  MoreHorizontal
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { formatCurrency } from '@/lib/ratecomps/format';
@@ -21,7 +19,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import type { RateComp } from "@shared/schema";
-import { STORAGE_TYPE_LABELS, RATE_PERIOD_LABELS, RATE_UNIT_LABELS, PROTECTION_LEVEL_LABELS } from "@shared/ratecomps-utils";
+import { STORAGE_TYPE_LABELS } from "@shared/ratecomps-utils";
 
 interface CompsDataGridProps {
   data: RateComp[];
@@ -65,18 +63,10 @@ export default function CompsDataGrid({
   const { toast } = useToast();
 
   const defaultColumns = [
-    { key: 'marina', label: 'Marina', width: 250, sortable: true },
-    { key: 'location', label: 'Location', width: 150, sortable: true },
-    { key: 'storageType', label: 'Storage Type', width: 140, sortable: true },
-    { key: 'boatSize', label: 'Boat Size', width: 130, sortable: true },
-    { key: 'rateAmount', label: 'Rate', width: 120, sortable: true },
-    { key: 'rateType', label: 'Rate Type', width: 120, sortable: true },
-    { key: 'ratePeriod', label: 'Period', width: 100, sortable: true },
-    { key: 'seasonality', label: 'Seasonality', width: 110, sortable: true },
-    { key: 'electricIncluded', label: 'Electric', width: 90, sortable: true },
-    { key: 'protectionLevel', label: 'Protection', width: 110, sortable: true },
-    { key: 'effectiveDate', label: 'Effective Date', width: 130, sortable: true },
-    { key: 'actions', label: 'Actions', width: 100, sortable: false },
+    { key: 'marina', label: 'Marina', width: 280, sortable: true },
+    { key: 'location', label: 'Location', width: 180, sortable: true },
+    { key: 'rateSummary', label: 'Rates', width: 400, sortable: false },
+    { key: 'actions', label: '', width: 80, sortable: false },
   ];
 
   const rowVirtualizer = useVirtualizer({
@@ -97,10 +87,87 @@ export default function CompsDataGrid({
     },
   });
 
+  const buildRateSummary = (comp: RateComp & { tiers?: any[]; tierCount?: number }) => {
+    const tiers = (comp as any).tiers || [];
+    const tierCount = (comp as any).tierCount || 0;
+    
+    // If no tiers, fall back to legacy comp fields
+    if (tierCount === 0 && tiers.length === 0) {
+      // Check for legacy rate fields
+      if (comp.rateAmount || comp.storageType) {
+        const storageType = comp.storageType || 'unknown';
+        const rateAmount = comp.rateAmount ? Number(comp.rateAmount) / 100 : null;
+        
+        return {
+          hasRates: !!rateAmount || !!storageType,
+          storageGroups: [{
+            storageType,
+            label: STORAGE_TYPE_LABELS[storageType as keyof typeof STORAGE_TYPE_LABELS] || storageType,
+            tierCount: 1,
+            minPricePerFoot: null,
+            maxPricePerFoot: null,
+            minFlatRate: rateAmount,
+            maxFlatRate: rateAmount,
+            hasPerFoot: false,
+            hasFlatRate: !!rateAmount,
+          }],
+        };
+      }
+      return { hasRates: false, storageGroups: [] };
+    }
+
+    const tiersByStorage: Record<string, any[]> = {};
+    tiers.forEach((tier: any) => {
+      const storageType = tier.storageType || 'unknown';
+      if (!tiersByStorage[storageType]) {
+        tiersByStorage[storageType] = [];
+      }
+      tiersByStorage[storageType].push(tier);
+    });
+
+    const storageGroups = Object.entries(tiersByStorage).map(([storageType, storageTiers]) => {
+      const pricesPerFoot = storageTiers.map((tier: any) => {
+        if (tier.rateUnit === 'per_foot' && tier.amountCents) {
+          const monthlyAmount = tier.ratePeriod === 'annual' 
+            ? tier.amountCents / 12 
+            : tier.amountCents;
+          return monthlyAmount / 100;
+        }
+        if (tier.amountCents && tier.loaMax) {
+          const monthlyAmount = tier.ratePeriod === 'annual' 
+            ? tier.amountCents / 12 
+            : tier.amountCents;
+          return monthlyAmount / 100 / tier.loaMax;
+        }
+        return null;
+      }).filter((p: any) => p !== null) as number[];
+
+      const minPrice = pricesPerFoot.length > 0 ? Math.min(...pricesPerFoot) : null;
+      const maxPrice = pricesPerFoot.length > 0 ? Math.max(...pricesPerFoot) : null;
+      
+      const flatRates = storageTiers.filter((t: any) => t.rateUnit === 'flat').map((t: any) => (t.amountCents || 0) / 100);
+      const minFlatRate = flatRates.length > 0 ? Math.min(...flatRates) : null;
+      const maxFlatRate = flatRates.length > 0 ? Math.max(...flatRates) : null;
+
+      return {
+        storageType,
+        label: STORAGE_TYPE_LABELS[storageType as keyof typeof STORAGE_TYPE_LABELS] || storageType,
+        tierCount: storageTiers.length,
+        minPricePerFoot: minPrice,
+        maxPricePerFoot: maxPrice,
+        minFlatRate,
+        maxFlatRate,
+        hasPerFoot: pricesPerFoot.length > 0,
+        hasFlatRate: flatRates.length > 0,
+      };
+    });
+
+    return { hasRates: true, storageGroups };
+  };
+
   const formatCellValue = (comp: RateComp & { tiers?: any[]; tierCount?: number }, column: string) => {
     const tiers = (comp as any).tiers || [];
     const tierCount = (comp as any).tierCount || 0;
-    const firstTier = tiers[0];
 
     switch (column) {
       case 'marina':
@@ -109,12 +176,13 @@ export default function CompsDataGrid({
             <span 
               className="truncate font-medium text-primary cursor-pointer hover:underline"
               onClick={() => onCompClick?.(comp)}
+              data-testid={`link-marina-${comp.id}`}
             >
               {comp.marina || '—'}
             </span>
-            {tierCount > 1 && (
-              <Badge variant="outline" className="text-xs shrink-0">
-                {tierCount} rates
+            {tierCount > 0 && (
+              <Badge variant="secondary" className="text-xs shrink-0">
+                {tierCount} {tierCount === 1 ? 'rate' : 'rates'}
               </Badge>
             )}
           </div>
@@ -124,93 +192,53 @@ export default function CompsDataGrid({
         const city = comp.city || '';
         const state = comp.state || '';
         const location = [city, state].filter(Boolean).join(', ');
-        return <span className="truncate">{location || '—'}</span>;
+        return <span className="truncate text-muted-foreground">{location || '—'}</span>;
 
-      case 'storageType':
-        if (firstTier?.storageType) {
-          const storageLabel = STORAGE_TYPE_LABELS[firstTier.storageType as string] || firstTier.storageType;
-          if (tierCount > 1) {
-            const uniqueTypes = [...new Set(tiers.map((t: any) => t.storageType))];
-            if (uniqueTypes.length > 1) {
-              return <span className="truncate">{storageLabel} +{uniqueTypes.length - 1}</span>;
-            }
-          }
-          return <span className="truncate">{storageLabel}</span>;
+      case 'rateSummary':
+        const summary = buildRateSummary(comp);
+        
+        if (!summary.hasRates) {
+          return <span className="text-muted-foreground text-sm">No rates</span>;
         }
-        const legacyStorageLabel = STORAGE_TYPE_LABELS[comp.storageType as string] || comp.storageType;
-        return <span className="truncate">{legacyStorageLabel || '—'}</span>;
 
-      case 'boatSize':
-        if (firstTier) {
-          const minSize = firstTier.loaMin;
-          const maxSize = firstTier.loaMax;
-          if (minSize && maxSize) {
-            return <span>{minSize}-{maxSize} ft</span>;
-          } else if (minSize) {
-            return <span>{minSize}+ ft</span>;
-          } else if (maxSize) {
-            return <span>≤{maxSize} ft</span>;
-          }
-        }
-        const legacyMinSize = comp.boatLengthMin;
-        const legacyMaxSize = comp.boatLengthMax;
-        if (legacyMinSize && legacyMaxSize) {
-          return <span>{legacyMinSize}-{legacyMaxSize} ft</span>;
-        } else if (legacyMinSize) {
-          return <span>{legacyMinSize}+ ft</span>;
-        } else if (legacyMaxSize) {
-          return <span>≤{legacyMaxSize} ft</span>;
-        }
-        return '—';
-
-      case 'rateAmount':
-        if (firstTier?.amountCents) {
-          return formatCurrency(Number(firstTier.amountCents) / 100);
-        }
-        if (!comp.rateAmount) return '—';
-        return formatCurrency(Number(comp.rateAmount) / 100);
-
-      case 'rateType':
-        if (firstTier?.rateUnit) {
-          const rateTypeLabel = RATE_UNIT_LABELS[firstTier.rateUnit as string] || firstTier.rateUnit;
-          return <span>{rateTypeLabel}</span>;
-        }
-        const legacyRateTypeLabel = RATE_UNIT_LABELS[comp.rateType as string] || comp.rateType;
-        return <span>{legacyRateTypeLabel || '—'}</span>;
-
-      case 'ratePeriod':
-        if (firstTier?.ratePeriod) {
-          const periodLabel = RATE_PERIOD_LABELS[firstTier.ratePeriod as string] || firstTier.ratePeriod;
-          return <span>{periodLabel}</span>;
-        }
-        const legacyPeriodLabel = RATE_PERIOD_LABELS[comp.ratePeriod as string] || comp.ratePeriod;
-        return <span>{legacyPeriodLabel || '—'}</span>;
-
-      case 'seasonality':
-        const seasonality = firstTier?.seasonality || comp.seasonality;
-        if (!seasonality) return '—';
         return (
-          <Badge variant={seasonality === 'annual' ? 'default' : 'secondary'}>
-            {seasonality === 'annual' ? 'Annual' : seasonality === 'seasonal' ? 'Seasonal' : seasonality}
-          </Badge>
+          <div className="flex flex-wrap gap-1.5">
+            {summary.storageGroups.map((group) => {
+              let rateText = '';
+              if (group.hasPerFoot && group.minPricePerFoot !== null) {
+                if (group.minPricePerFoot === group.maxPricePerFoot) {
+                  rateText = `$${group.minPricePerFoot.toFixed(2)}/ft/mo`;
+                } else {
+                  rateText = `$${group.minPricePerFoot!.toFixed(2)}-$${group.maxPricePerFoot!.toFixed(2)}/ft/mo`;
+                }
+              } else if (group.hasFlatRate && group.minFlatRate !== null) {
+                if (group.minFlatRate === group.maxFlatRate) {
+                  rateText = formatCurrency(group.minFlatRate);
+                } else {
+                  rateText = `${formatCurrency(group.minFlatRate!)}-${formatCurrency(group.maxFlatRate!)}`;
+                }
+              }
+
+              return (
+                <div 
+                  key={group.storageType}
+                  className="inline-flex items-center gap-1.5 bg-muted/60 rounded-md px-2 py-1 text-xs"
+                >
+                  <span className="font-medium">{group.label}</span>
+                  {group.tierCount > 1 && (
+                    <span className="text-muted-foreground">({group.tierCount})</span>
+                  )}
+                  {rateText && (
+                    <>
+                      <span className="text-muted-foreground">•</span>
+                      <span className="text-foreground">{rateText}</span>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         );
-
-      case 'electricIncluded':
-        const electricIncluded = firstTier?.electricIncluded ?? comp.electricIncluded;
-        return electricIncluded ? (
-          <Check className="h-4 w-4 text-green-600 dark:text-green-400 mx-auto" />
-        ) : (
-          <X className="h-4 w-4 text-muted-foreground mx-auto" />
-        );
-
-      case 'protectionLevel':
-        const protectionLevel = firstTier?.protectionLevel || comp.protectionLevel;
-        const protectionLabel = PROTECTION_LEVEL_LABELS[protectionLevel as string] || protectionLevel;
-        return <span className="truncate">{protectionLabel || '—'}</span>;
-
-      case 'effectiveDate':
-        const effectiveDate = firstTier?.effectiveDate || comp.effectiveDate;
-        return <span>{effectiveDate || '—'}</span>;
       
       default:
         return '—';
