@@ -664,8 +664,8 @@ export default function ViewCompModal({ open, onClose, comp, onEdit, onRateAdded
                 </CardContent>
               </Card>
             </TabsContent>
-          </Tabs>
-        </ScrollArea>
+          </ScrollArea>
+        </Tabs>
       </DialogContent>
 
       <AddRateDialog
