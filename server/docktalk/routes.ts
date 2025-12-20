@@ -15,6 +15,8 @@ import {
 } from "./services/category-summary-service";
 import { getUncachableResendClient } from "./lib/resend-client";
 import { findMatchingCrmCompanies, searchCrmCompanies } from "./company-matcher";
+import { invalidateLearningCache } from "./services/ai-learning";
+import { invalidateCategorizerCache } from "./services/categorizer";
 
 const VALID_CATEGORIES = [
   'Macro',
@@ -1006,6 +1008,10 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
       
       await dockTalkStorage.updateArticleCategoryManual(id, categories, article.category || "");
       
+      // Invalidate AI learning caches so next categorization uses updated patterns
+      invalidateLearningCache();
+      invalidateCategorizerCache();
+      
       // Fetch updated article to return complete data
       const updated = await dockTalkStorage.getArticleById(id);
       res.json(updated);
@@ -1168,6 +1174,10 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
       const userId = req.dockTalkUser!.id;
 
       await dockTalkStorage.removeArticle(id, reason, userId);
+      
+      // Invalidate AI learning caches so next categorization uses updated patterns
+      invalidateLearningCache();
+      invalidateCategorizerCache();
       
       res.json({ 
         success: true,

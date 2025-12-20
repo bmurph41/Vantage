@@ -4,6 +4,7 @@ import { IStorage } from "./storage";
 import { processImmediateAlerts, processDailyAlerts, processWeeklyAlerts } from "./services/alert-service";
 import { generateAllCategorySummaries } from "./services/category-summary-service";
 import { broadcastFetchStatus } from "./websocket";
+import { runLearningCycle } from "./services/ai-learning";
 
 let isInitialized = false;
 let dockTalkStorage: IStorage;
@@ -115,6 +116,17 @@ export function startDockTalkCronJobs(storage: IStorage): void {
       await cleanupOldArticles();
     } catch (error) {
       console.error("Cleanup error:", error);
+    }
+  });
+
+  // AI Learning cycle - analyze reviewed articles and removal patterns every 2 hours
+  cron.schedule("0 */2 * * *", async () => {
+    try {
+      console.log("[AI Learning] Running scheduled learning cycle...");
+      const result = await runLearningCycle();
+      console.log(`[AI Learning] Cycle complete - analyzed ${result.insights.totalReviewedArticles} reviewed, ${result.insights.totalRemovedArticles} removed`);
+    } catch (error) {
+      console.error("[AI Learning] Scheduled learning cycle error:", error);
     }
   });
 

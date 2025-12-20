@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { db } from "../db";
 import { articles as articlesTable } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
+import { analyzeLearningPatterns, buildEnhancedTrainingContext } from "./ai-learning";
 
 export interface CategoryResult {
   categories: string[];
@@ -18,64 +19,29 @@ interface AiCategorizationResult {
   region: string;
 }
 
-interface TrainingExample {
-  title: string;
-  originalCategory: string;
-  correctedCategory: string;
-}
+let enhancedTrainingContextCache: string = "";
+let enhancedContextCacheExpiry = 0;
 
-// Cache for training examples (refreshed every 10 minutes)
-let trainingExamplesCache: TrainingExample[] = [];
-let trainingCacheExpiry = 0;
-
-async function getTrainingExamples(): Promise<TrainingExample[]> {
+async function getEnhancedTrainingContext(): Promise<string> {
   const now = Date.now();
-  if (trainingCacheExpiry > now && trainingExamplesCache.length > 0) {
-    return trainingExamplesCache;
+  if (enhancedContextCacheExpiry > now && enhancedTrainingContextCache) {
+    return enhancedTrainingContextCache;
   }
 
   try {
-    const manuallyReviewed = await db
-      .select({
-        title: articlesTable.title,
-        originalCategory: articlesTable.originalCategory,
-        category: articlesTable.category,
-      })
-      .from(articlesTable)
-      .where(eq(articlesTable.manuallyReviewed, true))
-      .orderBy(desc(articlesTable.updatedAt))
-      .limit(20);
-
-    trainingExamplesCache = manuallyReviewed
-      .filter(a => a.originalCategory && a.category && a.originalCategory !== a.category)
-      .map(a => ({
-        title: a.title,
-        originalCategory: a.originalCategory!,
-        correctedCategory: a.category!,
-      }));
-    
-    trainingCacheExpiry = now + 10 * 60 * 1000;
-    return trainingExamplesCache;
+    const insights = await analyzeLearningPatterns();
+    enhancedTrainingContextCache = buildEnhancedTrainingContext(insights);
+    enhancedContextCacheExpiry = now + 15 * 60 * 1000;
+    return enhancedTrainingContextCache;
   } catch (error) {
-    console.error("Error fetching training examples:", error);
-    return [];
+    console.error("Error building enhanced training context:", error);
+    return "";
   }
 }
 
-function buildTrainingContext(examples: TrainingExample[]): string {
-  if (examples.length === 0) return "";
-  
-  const exampleLines = examples.slice(0, 10).map(ex => 
-    `- "${ex.title.substring(0, 80)}..." was incorrectly categorized as "${ex.originalCategory}", corrected to "${ex.correctedCategory}"`
-  );
-  
-  return `
-
-LEARNING FROM USER CORRECTIONS:
-The following are examples where the AI made mistakes and users corrected them. Learn from these patterns:
-${exampleLines.join('\n')}
-
-Use these corrections to improve your categorization accuracy for similar articles.`;
+export function invalidateCategorizerCache(): void {
+  enhancedContextCacheExpiry = 0;
+  enhancedTrainingContextCache = "";
 }
 
 // This is using OpenAI's API, which points to OpenAI's API servers and requires your own API key.
@@ -83,8 +49,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 async function aiCategorizeAndTag(title: string, content: string): Promise<CategoryResult> {
   try {
-    const trainingExamples = await getTrainingExamples();
-    const trainingContext = buildTrainingContext(trainingExamples);
+    const trainingContext = await getEnhancedTrainingContext();
     
     const prompt = `You are an expert in the marina and marine industry. Analyze this article and assign 1-4 most relevant categories.
 
