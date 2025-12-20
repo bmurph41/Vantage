@@ -264,7 +264,13 @@ export default function AdminPage() {
     mutationFn: ({ id, categories }: { id: number; categories: string[] }) =>
       updateArticleCategory(id, categories),
     onSuccess: () => {
+      // Invalidate all related queries for real-time updates across the app
       queryClient.invalidateQueries({ queryKey: ["/api/docktalk/articles"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/docktalk/articles/trending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/docktalk/analytics/categories"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/docktalk/analytics/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/docktalk/training/review-queue"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/docktalk/training/analytics"] });
       toast({
         title: "Categories Updated",
         description: "Article categories have been updated successfully.",

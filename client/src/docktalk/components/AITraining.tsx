@@ -191,8 +191,12 @@ function TrainingAnalyticsDashboard() {
       return res.json();
     },
     onSuccess: (data) => {
+      // Invalidate all related queries for real-time updates across the app
       dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/training/analytics"] });
       dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/training/review-queue"] });
+      dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/articles"] });
+      dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/articles/trending"] });
+      dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/analytics/categories"] });
       toast({
         title: "Model Refinement Complete",
         description: `Processed ${data.processedCount} feedback items`,
@@ -225,8 +229,13 @@ function TrainingAnalyticsDashboard() {
     onSuccess: (data) => {
       setSelectedArticles([]);
       setBulkCategory('');
+      // Invalidate all related queries for real-time updates across the app
       dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/training/review-queue"] });
       dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/training/analytics"] });
+      dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/articles"] });
+      dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/articles/trending"] });
+      dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/analytics/categories"] });
+      dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/analytics/stats"] });
       toast({
         title: "Bulk Review Complete",
         description: `Updated ${data.updatedCount} articles`,

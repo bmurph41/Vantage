@@ -199,8 +199,40 @@ export default function ArticleManagementPage() {
   const updateCategoryMutation = useMutation({
     mutationFn: ({ id, categories }: { id: number; categories: string[] }) =>
       updateArticleCategory(id, categories),
-    onSuccess: () => {
+    onMutate: async ({ id, categories }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['/api/docktalk/articles'] });
+      
+      // Snapshot the previous value for rollback
+      const previousArticles = queryClient.getQueryData<Article[]>(['/api/docktalk/articles', filters]);
+      
+      // Optimistically update the article in the cache
+      if (previousArticles) {
+        queryClient.setQueryData<Article[]>(['/api/docktalk/articles', filters], (old) =>
+          old?.map(article => 
+            article.id === id 
+              ? { ...article, categories, isReviewed: true }
+              : article
+          )
+        );
+      }
+      
+      return { previousArticles };
+    },
+    onSuccess: (_data, { id, categories }) => {
+      // Invalidate all related queries for real-time updates across the app
       queryClient.invalidateQueries({ queryKey: ['/api/docktalk/articles'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/articles/trending'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/analytics/categories'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/analytics/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/training/review-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/training/analytics'] });
+      
+      // Update local editing state to reflect saved changes
+      if (editingArticle && editingArticle.id === id) {
+        setEditingArticle({ ...editingArticle, categories, isReviewed: true });
+      }
+      
       setIsEditDialogOpen(false);
       setEditingArticle(null);
       toast({
@@ -208,7 +240,11 @@ export default function ArticleManagementPage() {
         description: "Article categories saved. This helps train the AI.",
       });
     },
-    onError: (error) => {
+    onError: (error, _variables, context) => {
+      // Rollback on error
+      if (context?.previousArticles) {
+        queryClient.setQueryData(['/api/docktalk/articles', filters], context.previousArticles);
+      }
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to update categories",
