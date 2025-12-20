@@ -295,7 +295,11 @@ export default function ArticleManagementPage() {
 
   const handleEditCategories = (article: Article) => {
     setEditingArticle(article);
-    setEditCategories(article.categories || []);
+    // Filter to only include valid categories (removes legacy categories like "Investment")
+    const validCategories = (article.categories || []).filter(cat => 
+      availableCategories.includes(cat)
+    );
+    setEditCategories(validCategories);
     setIsEditDialogOpen(true);
   };
 
