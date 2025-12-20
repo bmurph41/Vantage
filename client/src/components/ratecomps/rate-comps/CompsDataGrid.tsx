@@ -1,12 +1,14 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   ChevronUp, 
   ChevronDown, 
+  ChevronRight,
   Eye, 
   Edit, 
   Trash2, 
@@ -59,8 +61,21 @@ export default function CompsDataGrid({
 }: CompsDataGridProps) {
   const [editingComp, setEditingComp] = useState<RateComp | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  const toggleRowExpanded = useCallback((compId: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(compId)) {
+        next.delete(compId);
+      } else {
+        next.add(compId);
+      }
+      return next;
+    });
+  }, []);
 
   const defaultColumns = [
     { key: 'marina', label: 'Marina', width: 280, sortable: true },
@@ -93,76 +108,116 @@ export default function CompsDataGrid({
     
     // If no tiers, fall back to legacy comp fields
     if (tierCount === 0 && tiers.length === 0) {
-      // Check for legacy rate fields
       if (comp.rateAmount || comp.storageType) {
         const storageType = comp.storageType || 'unknown';
         const rateAmount = comp.rateAmount ? Number(comp.rateAmount) / 100 : null;
         
         return {
           hasRates: !!rateAmount || !!storageType,
+          totalStorageTypes: 1,
+          totalRates: 1,
+          overallMin: rateAmount,
+          overallMax: rateAmount,
+          hasUndated: true,
+          years: [],
           storageGroups: [{
             storageType,
             label: STORAGE_TYPE_LABELS[storageType as keyof typeof STORAGE_TYPE_LABELS] || storageType,
             tierCount: 1,
-            minPricePerFoot: null,
-            maxPricePerFoot: null,
-            minFlatRate: rateAmount,
-            maxFlatRate: rateAmount,
-            hasPerFoot: false,
-            hasFlatRate: !!rateAmount,
+            minRate: rateAmount,
+            maxRate: rateAmount,
+            rateText: rateAmount ? formatCurrency(rateAmount) : null,
           }],
         };
       }
-      return { hasRates: false, storageGroups: [] };
+      return { hasRates: false, totalStorageTypes: 0, totalRates: 0, overallMin: null, overallMax: null, hasUndated: false, years: [], storageGroups: [] };
     }
 
     const tiersByStorage: Record<string, any[]> = {};
+    const allRates: number[] = [];
+    const yearsSet = new Set<number>();
+    let hasUndated = false;
+
     tiers.forEach((tier: any) => {
       const storageType = tier.storageType || 'unknown';
       if (!tiersByStorage[storageType]) {
         tiersByStorage[storageType] = [];
       }
       tiersByStorage[storageType].push(tier);
+
+      // Track years
+      if (tier.effectiveDate) {
+        const year = new Date(tier.effectiveDate).getFullYear();
+        if (!isNaN(year)) yearsSet.add(year);
+      } else {
+        hasUndated = true;
+      }
+
+      // Calculate normalized rate for overall range
+      if (tier.amountCents) {
+        let monthlyRate = tier.amountCents;
+        if (tier.ratePeriod === 'annual') monthlyRate = tier.amountCents / 12;
+        
+        if (tier.rateUnit === 'per_foot') {
+          allRates.push(monthlyRate / 100);
+        } else if (tier.loaMax) {
+          allRates.push((monthlyRate / tier.loaMax) / 100);
+        } else {
+          allRates.push(monthlyRate / 100);
+        }
+      }
     });
 
     const storageGroups = Object.entries(tiersByStorage).map(([storageType, storageTiers]) => {
-      const pricesPerFoot = storageTiers.map((tier: any) => {
-        if (tier.rateUnit === 'per_foot' && tier.amountCents) {
-          const monthlyAmount = tier.ratePeriod === 'annual' 
-            ? tier.amountCents / 12 
-            : tier.amountCents;
-          return monthlyAmount / 100;
+      const rates = storageTiers.map((tier: any) => {
+        if (!tier.amountCents) return null;
+        let monthlyRate = tier.amountCents;
+        if (tier.ratePeriod === 'annual') monthlyRate = tier.amountCents / 12;
+        
+        if (tier.rateUnit === 'per_foot') {
+          return monthlyRate / 100;
+        } else if (tier.loaMax) {
+          return (monthlyRate / tier.loaMax) / 100;
         }
-        if (tier.amountCents && tier.loaMax) {
-          const monthlyAmount = tier.ratePeriod === 'annual' 
-            ? tier.amountCents / 12 
-            : tier.amountCents;
-          return monthlyAmount / 100 / tier.loaMax;
-        }
-        return null;
-      }).filter((p: any) => p !== null) as number[];
+        return monthlyRate / 100;
+      }).filter((r): r is number => r !== null);
 
-      const minPrice = pricesPerFoot.length > 0 ? Math.min(...pricesPerFoot) : null;
-      const maxPrice = pricesPerFoot.length > 0 ? Math.max(...pricesPerFoot) : null;
+      const minRate = rates.length > 0 ? Math.min(...rates) : null;
+      const maxRate = rates.length > 0 ? Math.max(...rates) : null;
       
-      const flatRates = storageTiers.filter((t: any) => t.rateUnit === 'flat').map((t: any) => (t.amountCents || 0) / 100);
-      const minFlatRate = flatRates.length > 0 ? Math.min(...flatRates) : null;
-      const maxFlatRate = flatRates.length > 0 ? Math.max(...flatRates) : null;
+      let rateText = null;
+      if (minRate !== null && maxRate !== null) {
+        if (minRate === maxRate) {
+          rateText = `$${minRate.toFixed(0)}`;
+        } else {
+          rateText = `$${minRate.toFixed(0)}-$${maxRate.toFixed(0)}`;
+        }
+      }
 
       return {
         storageType,
         label: STORAGE_TYPE_LABELS[storageType as keyof typeof STORAGE_TYPE_LABELS] || storageType,
         tierCount: storageTiers.length,
-        minPricePerFoot: minPrice,
-        maxPricePerFoot: maxPrice,
-        minFlatRate,
-        maxFlatRate,
-        hasPerFoot: pricesPerFoot.length > 0,
-        hasFlatRate: flatRates.length > 0,
+        minRate,
+        maxRate,
+        rateText,
       };
     });
 
-    return { hasRates: true, storageGroups };
+    const years = Array.from(yearsSet).sort((a, b) => b - a);
+    const overallMin = allRates.length > 0 ? Math.min(...allRates) : null;
+    const overallMax = allRates.length > 0 ? Math.max(...allRates) : null;
+
+    return { 
+      hasRates: true, 
+      totalStorageTypes: Object.keys(tiersByStorage).length,
+      totalRates: tierCount,
+      overallMin,
+      overallMax,
+      hasUndated,
+      years,
+      storageGroups,
+    };
   };
 
   const formatCellValue = (comp: RateComp & { tiers?: any[]; tierCount?: number }, column: string) => {
@@ -196,47 +251,80 @@ export default function CompsDataGrid({
 
       case 'rateSummary':
         const summary = buildRateSummary(comp);
+        const isExpanded = expandedRows.has(comp.id);
         
         if (!summary.hasRates) {
           return <span className="text-muted-foreground text-sm">No rates</span>;
         }
 
-        return (
-          <div className="flex flex-wrap gap-1.5">
-            {summary.storageGroups.map((group) => {
-              let rateText = '';
-              if (group.hasPerFoot && group.minPricePerFoot !== null) {
-                if (group.minPricePerFoot === group.maxPricePerFoot) {
-                  rateText = `$${group.minPricePerFoot.toFixed(2)}/ft/mo`;
-                } else {
-                  rateText = `$${group.minPricePerFoot!.toFixed(2)}-$${group.maxPricePerFoot!.toFixed(2)}/ft/mo`;
-                }
-              } else if (group.hasFlatRate && group.minFlatRate !== null) {
-                if (group.minFlatRate === group.maxFlatRate) {
-                  rateText = formatCurrency(group.minFlatRate);
-                } else {
-                  rateText = `${formatCurrency(group.minFlatRate!)}-${formatCurrency(group.maxFlatRate!)}`;
-                }
-              }
+        // Build condensed summary text
+        let rangeText = '';
+        if (summary.overallMin !== null && summary.overallMax !== null) {
+          if (summary.overallMin === summary.overallMax) {
+            rangeText = `$${summary.overallMin.toFixed(0)}/ft/mo`;
+          } else {
+            rangeText = `$${summary.overallMin.toFixed(0)}-$${summary.overallMax.toFixed(0)}/ft/mo`;
+          }
+        }
 
-              return (
-                <div 
-                  key={group.storageType}
-                  className="inline-flex items-center gap-1.5 bg-muted/60 rounded-md px-2 py-1 text-xs"
+        return (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              {summary.totalStorageTypes > 1 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleRowExpanded(comp.id);
+                  }}
+                  className="flex items-center justify-center w-5 h-5 rounded hover:bg-muted transition-colors"
+                  data-testid={`expand-rates-${comp.id}`}
                 >
-                  <span className="font-medium">{group.label}</span>
-                  {group.tierCount > 1 && (
-                    <span className="text-muted-foreground">({group.tierCount})</span>
-                  )}
-                  {rateText && (
-                    <>
-                      <span className="text-muted-foreground">•</span>
-                      <span className="text-foreground">{rateText}</span>
-                    </>
-                  )}
-                </div>
-              );
-            })}
+                  <ChevronRight className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                </button>
+              )}
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground">
+                  {summary.totalStorageTypes} type{summary.totalStorageTypes !== 1 ? 's' : ''}
+                </span>
+                {rangeText && (
+                  <>
+                    <span className="text-border">•</span>
+                    <span className="font-medium">{rangeText}</span>
+                  </>
+                )}
+                {summary.years.length > 0 && (
+                  <>
+                    <span className="text-border">•</span>
+                    <span className="text-muted-foreground text-xs">
+                      {summary.years.length === 1 ? summary.years[0] : `${summary.years[summary.years.length - 1]}-${summary.years[0]}`}
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+            
+            {isExpanded && (
+              <div className="pl-7 space-y-1 pb-1">
+                {summary.storageGroups.map((group) => (
+                  <div 
+                    key={group.storageType}
+                    className="flex items-center gap-2 text-xs text-muted-foreground"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary/50" />
+                    <span className="font-medium text-foreground">{group.label}</span>
+                    {group.tierCount > 1 && (
+                      <span>({group.tierCount})</span>
+                    )}
+                    {group.rateText && (
+                      <>
+                        <span>•</span>
+                        <span>{group.rateText}</span>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         );
       
@@ -364,7 +452,7 @@ export default function CompsDataGrid({
                         {defaultColumns.map((column) => (
                           <TableCell 
                             key={column.key}
-                            className={`whitespace-nowrap ${
+                            className={`${column.key === 'rateSummary' ? 'whitespace-normal py-2' : 'whitespace-nowrap'} ${
                               column.key === 'electricIncluded' ? 'text-center' : 'text-left'
                             }`}
                             style={{ 
