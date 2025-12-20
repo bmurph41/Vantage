@@ -8239,6 +8239,70 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Get dashboard stats with week-over-week changes
+  app.get("/api/prospecting/dashboard-stats", async (req: any, res) => {
+    try {
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      
+      // Get all entries for the current year
+      const entries = await storage.getProspectingEntriesForUser(req.user.id, currentYear);
+      
+      // Find current week and previous week entries
+      const sortedEntries = entries.sort((a: any, b: any) => {
+        if (a.year !== b.year) return b.year - a.year;
+        if (a.quarter !== b.quarter) return b.quarter - a.quarter;
+        return b.weekNumber - a.weekNumber;
+      });
+      
+      // Get current week entry (most recent or current)
+      const currentWeekEntry = sortedEntries[0] || null;
+      const previousWeekEntry = sortedEntries[1] || null;
+      
+      // Calculate current week totals
+      const currentCalls = currentWeekEntry?.totalCalls || 0;
+      const currentEmails = currentWeekEntry?.totalEmails || 0;
+      const currentLeads = currentWeekEntry?.totalLeadGeneration || 0;
+      const currentMeetings = currentWeekEntry?.totalMeetings || 0;
+      
+      // Calculate previous week totals
+      const prevCalls = previousWeekEntry?.totalCalls || 0;
+      const prevEmails = previousWeekEntry?.totalEmails || 0;
+      const prevLeads = previousWeekEntry?.totalLeadGeneration || 0;
+      const prevMeetings = previousWeekEntry?.totalMeetings || 0;
+      
+      // Calculate percentage changes (handle division by zero)
+      const calcChange = (current: number, prev: number) => {
+        if (prev === 0) return current > 0 ? 100 : 0;
+        return Math.round(((current - prev) / prev) * 100);
+      };
+      
+      res.json({
+        callsMade: currentCalls,
+        emailsSent: currentEmails,
+        leadsGenerated: currentLeads,
+        meetingsBooked: currentMeetings,
+        callsChange: calcChange(currentCalls, prevCalls),
+        emailsChange: calcChange(currentEmails, prevEmails),
+        leadsChange: calcChange(currentLeads, prevLeads),
+        meetingsChange: calcChange(currentMeetings, prevMeetings),
+        currentWeek: currentWeekEntry ? {
+          year: currentWeekEntry.year,
+          quarter: currentWeekEntry.quarter,
+          weekNumber: currentWeekEntry.weekNumber,
+        } : null,
+        previousWeek: previousWeekEntry ? {
+          year: previousWeekEntry.year,
+          quarter: previousWeekEntry.quarter,
+          weekNumber: previousWeekEntry.weekNumber,
+        } : null,
+      });
+    } catch (error) {
+      console.error("Failed to get prospecting dashboard stats:", error);
+      res.status(500).json({ error: "Failed to retrieve dashboard stats" });
+    }
+  });
+
   // Get a specific prospecting entry by week
   app.get("/api/prospecting/entries/:year/:quarter/:weekNumber", async (req: any, res) => {
     try {

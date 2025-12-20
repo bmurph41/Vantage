@@ -101,15 +101,15 @@ export default function ProspectingDashboard() {
           <KpiCard
             title="Total Leads"
             value={leadsCount}
-            change={12}
+            change={stats?.leadsChange}
             icon={Users}
             color="bg-blue-500"
             isLoading={isLoadingStats}
           />
           <KpiCard
             title="New This Week"
-            value={newLeadsThisWeek}
-            change={8}
+            value={stats?.leadsGenerated || 0}
+            change={stats?.leadsChange}
             icon={Target}
             color="bg-green-500"
             isLoading={isLoadingStats}
@@ -117,7 +117,7 @@ export default function ProspectingDashboard() {
           <KpiCard
             title="Calls Made"
             value={stats?.callsMade || 0}
-            change={-5}
+            change={stats?.callsChange}
             icon={Phone}
             color="bg-purple-500"
             isLoading={isLoadingStats}
@@ -125,7 +125,7 @@ export default function ProspectingDashboard() {
           <KpiCard
             title="Emails Sent"
             value={stats?.emailsSent || 0}
-            change={15}
+            change={stats?.emailsChange}
             icon={Mail}
             color="bg-orange-500"
             isLoading={isLoadingStats}
