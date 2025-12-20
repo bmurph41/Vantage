@@ -21452,7 +21452,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const year = req.query.year ? parseInt(req.query.year as string) : null;
       const { salesComps } = await import('@shared/schema');
-      const { desc, isNull, and } = await import('drizzle-orm');
+      const { desc, isNull, and, sql } = await import('drizzle-orm');
       
       const conditions: any[] = [eq(salesComps.orgId, orgId), isNull(salesComps.deletedAt)];
       if (year) {
@@ -21475,7 +21475,7 @@ Current context: Project ${req.params.projectId}`;
         })
         .from(salesComps)
         .where(and(...conditions))
-        .orderBy(desc(salesComps.saleYear), desc(salesComps.saleMonth), desc(salesComps.createdAt))
+        .orderBy(sql`${salesComps.saleYear} DESC NULLS LAST`, sql`${salesComps.saleMonth} DESC NULLS LAST`, desc(salesComps.createdAt))
         .limit(50);
 
       res.json(comps);

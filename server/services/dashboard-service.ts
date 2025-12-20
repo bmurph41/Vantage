@@ -691,8 +691,8 @@ export class DashboardService {
         sumPrice: sql<number>`SUM(COALESCE(${salesComps.salePrice}, ${salesComps.estimatedPurchasePrice}))`,
         countWithPrice: sql<number>`COUNT(CASE WHEN ${salesComps.salePrice} IS NOT NULL OR ${salesComps.estimatedPurchasePrice} IS NOT NULL THEN 1 END)`,
       }).from(salesComps).where(and(...conditions)),
-      // Order by actual sale date (year, month) for chronological order
-      db.select().from(salesComps).where(and(...conditions)).orderBy(desc(salesComps.saleYear), desc(salesComps.saleMonth), desc(salesComps.createdAt)).limit(5),
+      // Order by actual sale date (year, month) for chronological order, NULLS LAST to push records without dates to the end
+      db.select().from(salesComps).where(and(...conditions)).orderBy(sql`${salesComps.saleYear} DESC NULLS LAST`, sql`${salesComps.saleMonth} DESC NULLS LAST`, desc(salesComps.createdAt)).limit(5),
     ]);
 
     const sumPrice = Number(statsResult[0]?.sumPrice) || 0;
