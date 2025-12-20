@@ -13,8 +13,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { X, Save, Plus, Trash2, DollarSign, Search, Link, Unlink, ToggleLeft, Loader2 } from "lucide-react";
+import { X, Save, Plus, Trash2, DollarSign, Search, Link, Unlink, ToggleLeft, Loader2, Copy, MapPin, TrendingUp } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { rateCompsApi } from '@/lib/ratecomps/api';
 import { queryKeys } from '@/lib/ratecomps/queryKeys';
 import { useToast } from "@/hooks/use-toast";
@@ -126,6 +127,17 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
   
   // Occupancy N/A toggle state
   const [occupancyNA, setOccupancyNA] = useState<boolean>(comp?.occupancy === null || (comp as any)?.occupancyNA || false);
+  
+  // Copy from existing comp state
+  const [showCopyFromDialog, setShowCopyFromDialog] = useState(false);
+  const [copySearchQuery, setCopySearchQuery] = useState("");
+  const [copySearchResults, setCopySearchResults] = useState<RateComp[]>([]);
+  const [isCopySearching, setIsCopySearching] = useState(false);
+  
+  // Similar marinas state
+  const [showSimilarMarinas, setShowSimilarMarinas] = useState(false);
+  const [similarMarinas, setSimilarMarinas] = useState<RateComp[]>([]);
+  const [isFindingSimilar, setIsFindingSimilar] = useState(false);
   
   // Local rate tiers for creation mode (before the comp is saved)
   const [pendingRateTiers, setPendingRateTiers] = useState<TierRowData[]>([]);
@@ -297,6 +309,96 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       title: "Marina Unlinked",
       description: "Rate comp is no longer linked to Marina Database.",
     });
+  };
+
+  // Search for existing comps to copy from
+  const searchCompsForCopy = async (query: string) => {
+    if (query.length < 2) {
+      setCopySearchResults([]);
+      return;
+    }
+    
+    setIsCopySearching(true);
+    try {
+      const results = await rateCompsApi.getComps({ search: query, limit: 10 });
+      setCopySearchResults(results.comps || []);
+    } catch (error) {
+      console.error("Error searching comps:", error);
+      setCopySearchResults([]);
+    } finally {
+      setIsCopySearching(false);
+    }
+  };
+
+  const debouncedCopySearch = debounce(searchCompsForCopy, 300);
+
+  // Handle copying property details from existing comp
+  const handleCopyFromComp = (sourceComp: RateComp) => {
+    // Copy property details (not rates - those stay separate)
+    if (sourceComp.city) form.setValue("city", sourceComp.city);
+    if (sourceComp.state) form.setValue("state", sourceComp.state);
+    if (sourceComp.region) form.setValue("region", sourceComp.region);
+    if (sourceComp.bodyOfWater) form.setValue("bodyOfWater", sourceComp.bodyOfWater);
+    if (sourceComp.waterBodyName) form.setValue("waterBodyName", sourceComp.waterBodyName);
+    if (sourceComp.waterType) form.setValue("waterType", sourceComp.waterType);
+    if (sourceComp.coastalType) form.setValue("coastalType", sourceComp.coastalType);
+    if (sourceComp.storageTypes?.length) form.setValue("storageTypes", sourceComp.storageTypes);
+    // Copy profit centers
+    if (sourceComp.profitCenterStorage) form.setValue("profitCenterStorage", true);
+    if (sourceComp.profitCenterEvents) form.setValue("profitCenterEvents", true);
+    if (sourceComp.profitCenterService) form.setValue("profitCenterService", true);
+    if (sourceComp.profitCenterFuel) form.setValue("profitCenterFuel", true);
+    if (sourceComp.profitCenterShipStore) form.setValue("profitCenterShipStore", true);
+    if (sourceComp.profitCenterBoatRentals) form.setValue("profitCenterBoatRentals", true);
+    if (sourceComp.profitCenterBoatSales) form.setValue("profitCenterBoatSales", true);
+    if (sourceComp.profitCenterBoatBrokerage) form.setValue("profitCenterBoatBrokerage", true);
+    if (sourceComp.profitCenterBoatClub) form.setValue("profitCenterBoatClub", true);
+    
+    setShowCopyFromDialog(false);
+    setCopySearchQuery("");
+    setCopySearchResults([]);
+    
+    toast({
+      title: "Settings Copied",
+      description: `Copied region, water type, and profit center settings from "${sourceComp.marina}".`,
+    });
+  };
+
+  // Find similar marinas by state/region
+  const findSimilarMarinas = async () => {
+    const state = form.watch("state");
+    const region = form.watch("region");
+    
+    if (!state && !region) {
+      toast({
+        title: "Location Required",
+        description: "Enter a state or region first to find similar marinas.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsFindingSimilar(true);
+    try {
+      const filters: any = { limit: 10 };
+      if (state) filters.state = state;
+      if (region) filters.region = region;
+      
+      const results = await rateCompsApi.getComps(filters);
+      const currentMarina = form.watch("marina");
+      // Filter out the current marina being edited
+      setSimilarMarinas((results.comps || []).filter((c: RateComp) => c.marina !== currentMarina));
+      setShowSimilarMarinas(true);
+    } catch (error) {
+      console.error("Error finding similar marinas:", error);
+      toast({
+        title: "Error",
+        description: "Failed to find similar marinas",
+        variant: "destructive",
+      });
+    } finally {
+      setIsFindingSimilar(false);
+    }
   };
 
   const createMutation = useMutation({
@@ -686,6 +788,84 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                 {/* Create Mode: Full Property Section */}
                 {!isEdit && (
                 <div className="space-y-6">
+                  {/* Quick Actions Bar */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowCopyFromDialog(true)}
+                      className="text-xs"
+                      data-testid="button-copy-from"
+                    >
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copy From Existing
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={findSimilarMarinas}
+                      disabled={isFindingSimilar}
+                      className="text-xs"
+                      data-testid="button-find-similar"
+                    >
+                      {isFindingSimilar ? (
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      ) : (
+                        <MapPin className="h-3 w-3 mr-1" />
+                      )}
+                      Find Similar Marinas
+                    </Button>
+                  </div>
+
+                  {/* Similar Marinas Panel */}
+                  {showSimilarMarinas && similarMarinas.length > 0 && (
+                    <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-sm flex items-center gap-2">
+                            <TrendingUp className="h-4 w-4 text-blue-600" />
+                            Similar Marinas for Rate Comparison
+                          </CardTitle>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowSimilarMarinas(false)}
+                            className="h-6 w-6 p-0"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <ScrollArea className="h-32">
+                          <div className="space-y-2">
+                            {similarMarinas.map((m) => (
+                              <div 
+                                key={m.id} 
+                                className="flex items-center justify-between p-2 rounded bg-background border text-sm"
+                              >
+                                <div>
+                                  <span className="font-medium">{m.marina}</span>
+                                  <span className="text-muted-foreground ml-2">
+                                    {m.city}, {m.state}
+                                  </span>
+                                </div>
+                                {m.wetSlips && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {m.wetSlips} slips
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </CardContent>
+                    </Card>
+                  )}
+
                   <div className="space-y-6">
                     <Card>
                       <CardHeader>
@@ -1105,6 +1285,87 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
               ) : (
                 'Create Portfolio'
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Copy From Existing Dialog */}
+      <Dialog open={showCopyFromDialog} onOpenChange={setShowCopyFromDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Copy className="h-5 w-5" />
+              Copy Settings From Existing Comp
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              Search for an existing rate comp to copy its region, water type, and profit center settings.
+            </p>
+            <div className="space-y-2">
+              <Label>Search Marinas</Label>
+              <Input
+                value={copySearchQuery}
+                onChange={(e) => {
+                  setCopySearchQuery(e.target.value);
+                  debouncedCopySearch(e.target.value);
+                }}
+                placeholder="Type marina name to search..."
+                data-testid="input-copy-search"
+              />
+            </div>
+            <ScrollArea className="h-48 border rounded-md">
+              {isCopySearching ? (
+                <div className="flex items-center justify-center h-full p-4">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : copySearchResults.length === 0 ? (
+                <div className="p-4 text-center text-sm text-muted-foreground">
+                  {copySearchQuery.length >= 2 ? "No marinas found" : "Type at least 2 characters to search"}
+                </div>
+              ) : (
+                <div className="p-2 space-y-1">
+                  {copySearchResults.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => handleCopyFromComp(c)}
+                      className="w-full text-left p-3 rounded-md hover:bg-muted transition-colors border"
+                      data-testid={`copy-comp-${c.id}`}
+                    >
+                      <div className="font-medium">{c.marina}</div>
+                      <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
+                        <span>{c.city}, {c.state}</span>
+                        {c.region && (
+                          <>
+                            <span className="text-border">•</span>
+                            <span>{c.region}</span>
+                          </>
+                        )}
+                        {c.waterType && (
+                          <>
+                            <span className="text-border">•</span>
+                            <span>{c.waterType}</span>
+                          </>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCopyFromDialog(false);
+                setCopySearchQuery("");
+                setCopySearchResults([]);
+              }}
+            >
+              Cancel
             </Button>
           </DialogFooter>
         </DialogContent>
