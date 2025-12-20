@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { RcAnalyticsFilters } from "./RcAnalyticsFilters";
+import { STORAGE_TYPE_LABELS, RATE_PERIOD_LABELS } from "@shared/ratecomps-utils";
 
 interface MatchedRate {
   id: string;
@@ -27,26 +28,6 @@ interface RcMatchedRatesViewProps {
   filters: RcAnalyticsFilters;
   isLoading?: boolean;
 }
-
-const STORAGE_TYPE_LABELS: Record<string, string> = {
-  'wet_slip': 'Wet Slip',
-  'dry_rack': 'Dry Rack',
-  'mooring': 'Mooring',
-  'trailer': 'Trailer',
-  'rack_storage': 'Rack Storage',
-  'lift_storage': 'Lift Storage',
-  'kayak_sup': 'Kayak/SUP',
-  'jet_ski': 'Jet Ski',
-  'rv_space': 'RV Space',
-};
-
-const RATE_PERIOD_LABELS: Record<string, string> = {
-  'daily': 'Daily',
-  'weekly': 'Weekly',
-  'monthly': 'Monthly',
-  'seasonal': 'Seasonal',
-  'annual': 'Annual',
-};
 
 function formatCurrency(value: number | null | undefined): string {
   if (value === null || value === undefined || isNaN(Number(value))) {

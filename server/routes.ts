@@ -25194,21 +25194,32 @@ Current context: Project ${req.params.projectId}`;
         sizeMax: filters.loaMax,
       });
 
-      const rates = tierAnalysis.tiers.map(t => ({
-        id: t.id,
-        marina: t.marinaName,
-        state: t.state,
-        city: t.city,
-        storageType: t.storageType,
-        ratePeriod: t.ratePeriod,
-        ratePerFt: t.normalizedRate,
-        monthlyRate: t.normalizedRate * ((t.loaMin || 30) + (t.loaMax || 40)) / 2,
-        loaMin: t.loaMin,
-        loaMax: t.loaMax,
-        seasonality: t.seasonality || 'annual',
-        electricIncluded: t.electricIncluded,
-        waterIncluded: true,
-      }));
+      const rates = tierAnalysis.tiers.map(t => {
+        // normalizedRate is in cents per foot per month - convert to dollars
+        const ratePerFtDollars = t.normalizedRate / 100;
+        // Calculate average LOA for monthly rate estimation
+        const avgLoa = t.loaMin && t.loaMax 
+          ? (t.loaMin + t.loaMax) / 2 
+          : t.loaMax || t.loaMin || 35;
+        // Monthly rate = rate per foot * average boat length
+        const monthlyRateDollars = ratePerFtDollars * avgLoa;
+        
+        return {
+          id: t.id,
+          marina: t.marinaName,
+          state: t.state,
+          city: t.city,
+          storageType: t.storageType,
+          ratePeriod: t.ratePeriod,
+          ratePerFt: ratePerFtDollars,
+          monthlyRate: monthlyRateDollars,
+          loaMin: t.loaMin,
+          loaMax: t.loaMax,
+          seasonality: t.seasonality || 'annual',
+          electricIncluded: t.electricIncluded,
+          waterIncluded: true,
+        };
+      });
 
       res.json({ rates, total: rates.length });
     } catch (error) {
