@@ -100,24 +100,35 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
   const canDelete = true;
 
   const handleSave = () => {
-    const updateData = {
-      marina: formData.marina,
-      city: formData.city,
-      state: formData.state,
-      address: formData.address,
-      salePrice: formData.salePrice ? String(formData.salePrice) : null,
-      saleMonth: formData.saleMonth ? Number(formData.saleMonth) : null,
-      saleYear: formData.saleYear ? Number(formData.saleYear) : null,
-      capRate: formData.capRate ? String(formData.capRate) : null,
-      wetSlips: formData.wetSlips ? Number(formData.wetSlips) : null,
-      dryRacks: formData.dryRacks ? Number(formData.dryRacks) : null,
-      notes: formData.notes || null,
-      noi: formData.noi ? String(formData.noi) : null,
-      buyer: formData.buyer || null,
-      seller: formData.seller || null,
-      broker: formData.broker || null,
-      listingPrice: formData.listingPrice ? String(formData.listingPrice) : null,
+    const parseNum = (val: any): number | undefined => {
+      if (val === null || val === undefined || val === '') return undefined;
+      const num = Number(val);
+      return isNaN(num) ? undefined : num;
     };
+    
+    const updateData: Record<string, any> = {
+      marina: formData.marina || undefined,
+      city: formData.city || undefined,
+      state: formData.state || undefined,
+      address: formData.address || undefined,
+      notes: formData.notes || undefined,
+      buyerCompany: formData.buyer || undefined,
+      seller: formData.seller || undefined,
+      broker: formData.broker || undefined,
+      salePrice: parseNum(formData.salePrice),
+      saleMonth: parseNum(formData.saleMonth),
+      saleYear: parseNum(formData.saleYear),
+      capRate: parseNum(formData.capRate),
+      wetSlips: parseNum(formData.wetSlips),
+      dryRacks: parseNum(formData.dryRacks),
+      noi: parseNum(formData.noi),
+      listPrice: parseNum(formData.listingPrice),
+    };
+
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key] === undefined) delete updateData[key];
+    });
+    
     updateMutation.mutate(updateData);
   };
 
