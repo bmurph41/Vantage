@@ -486,7 +486,7 @@ export default function Dashboard() {
     enabled: isCRMDetailOpen,
   });
 
-  // Fetch recent sales comps for detail panel (filtered by selected year if not 'all')
+  // Fetch recent sales comps (filtered by selected year if not 'all') - always fetch for card display
   const { data: recentComps, isLoading: compsLoading } = useQuery({
     queryKey: ['/api/analysis/sales-comps/recent', timeRange, salesCompsYear],
     queryFn: () => {
@@ -496,7 +496,6 @@ export default function Dashboard() {
       }
       return fetch(`/api/analysis/sales-comps/recent?${params.toString()}`).then(res => res.json());
     },
-    enabled: isSalesCompsDetailOpen,
   });
 
   // Fetch year-filtered sales comps metrics using widget query engine
@@ -1033,13 +1032,13 @@ export default function Dashboard() {
                 />
               </MetricGrid>
             )}
-            {data?.recentComps && data.recentComps.length > 0 && (
-              <ModuleSection title="Recent Comps" description="Most recently added comparables">
+            {recentComps && recentComps.length > 0 && (
+              <ModuleSection title="Recent Sales" description={salesCompsYear === 'all' ? 'Most recent sales by date' : `Most recent ${salesCompsYear} sales`}>
                 <DataList
-                  items={data.recentComps.slice(0, 3).map((comp: any) => ({
+                  items={recentComps.slice(0, 3).map((comp: any) => ({
                     label: comp.marina || 'Unnamed Marina',
                     value: formatCurrency(comp.salePrice || 0),
-                    badge: comp.state ? comp.state.substring(0, 2).toUpperCase() : undefined,
+                    badge: comp.saleMonth && comp.saleYear ? `${comp.saleMonth}/${comp.saleYear}` : comp.state?.substring(0, 2).toUpperCase(),
                   }))}
                   maxItems={3}
                 />
