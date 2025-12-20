@@ -155,9 +155,11 @@ export default function CompsDataGrid({
     }
 
     const tiersByStorage: Record<string, any[]> = {};
-    const allRates: number[] = [];
+    const allMonthlyRates: number[] = [];
     const yearsSet = new Set<number>();
     let hasUndated = false;
+    let hasPerFootRates = false;
+    let hasFlatRates = false;
 
     tiers.forEach((tier: any) => {
       const storageType = tier.storageType || 'unknown';
@@ -174,44 +176,46 @@ export default function CompsDataGrid({
         hasUndated = true;
       }
 
-      // Calculate normalized rate for overall range
+      // Calculate monthly rate for overall range
       if (tier.amountCents) {
-        let monthlyRate = tier.amountCents;
-        if (tier.ratePeriod === 'annual') monthlyRate = tier.amountCents / 12;
+        const isPerFoot = tier.rateUnit === 'per_foot' || tier.rateUnit === 'per_foot_loa';
+        let monthlyAmountCents = tier.amountCents;
+        if (tier.ratePeriod === 'annual') monthlyAmountCents = tier.amountCents / 12;
         
-        if (tier.rateUnit === 'per_foot') {
-          allRates.push(monthlyRate / 100);
-        } else if (tier.loaMax) {
-          allRates.push((monthlyRate / tier.loaMax) / 100);
+        if (isPerFoot) {
+          hasPerFootRates = true;
+          const avgLoa = (tier.loaMin && tier.loaMax) ? (tier.loaMin + tier.loaMax) / 2 : tier.loaMax || tier.loaMin || 35;
+          allMonthlyRates.push((monthlyAmountCents / 100) * avgLoa);
         } else {
-          allRates.push(monthlyRate / 100);
+          hasFlatRates = true;
+          allMonthlyRates.push(monthlyAmountCents / 100);
         }
       }
     });
 
     const storageGroups = Object.entries(tiersByStorage).map(([storageType, storageTiers]) => {
-      const rates = storageTiers.map((tier: any) => {
+      const monthlyRates = storageTiers.map((tier: any) => {
         if (!tier.amountCents) return null;
-        let monthlyRate = tier.amountCents;
-        if (tier.ratePeriod === 'annual') monthlyRate = tier.amountCents / 12;
+        const isPerFoot = tier.rateUnit === 'per_foot' || tier.rateUnit === 'per_foot_loa';
+        let monthlyAmountCents = tier.amountCents;
+        if (tier.ratePeriod === 'annual') monthlyAmountCents = tier.amountCents / 12;
         
-        if (tier.rateUnit === 'per_foot') {
-          return monthlyRate / 100;
-        } else if (tier.loaMax) {
-          return (monthlyRate / tier.loaMax) / 100;
+        if (isPerFoot) {
+          const avgLoa = (tier.loaMin && tier.loaMax) ? (tier.loaMin + tier.loaMax) / 2 : tier.loaMax || tier.loaMin || 35;
+          return (monthlyAmountCents / 100) * avgLoa;
         }
-        return monthlyRate / 100;
+        return monthlyAmountCents / 100;
       }).filter((r): r is number => r !== null);
 
-      const minRate = rates.length > 0 ? Math.min(...rates) : null;
-      const maxRate = rates.length > 0 ? Math.max(...rates) : null;
+      const minRate = monthlyRates.length > 0 ? Math.min(...monthlyRates) : null;
+      const maxRate = monthlyRates.length > 0 ? Math.max(...monthlyRates) : null;
       
       let rateText = null;
       if (minRate !== null && maxRate !== null) {
         if (minRate === maxRate) {
-          rateText = `$${minRate.toFixed(0)}`;
+          rateText = `$${minRate.toFixed(0)}/mo`;
         } else {
-          rateText = `$${minRate.toFixed(0)}-$${maxRate.toFixed(0)}`;
+          rateText = `$${minRate.toFixed(0)}-$${maxRate.toFixed(0)}/mo`;
         }
       }
 
@@ -226,8 +230,8 @@ export default function CompsDataGrid({
     });
 
     const years = Array.from(yearsSet).sort((a, b) => b - a);
-    const overallMin = allRates.length > 0 ? Math.min(...allRates) : null;
-    const overallMax = allRates.length > 0 ? Math.max(...allRates) : null;
+    const overallMin = allMonthlyRates.length > 0 ? Math.min(...allMonthlyRates) : null;
+    const overallMax = allMonthlyRates.length > 0 ? Math.max(...allMonthlyRates) : null;
 
     return { 
       hasRates: true, 
@@ -282,9 +286,9 @@ export default function CompsDataGrid({
         let rangeText = '';
         if (summary.overallMin !== null && summary.overallMax !== null) {
           if (summary.overallMin === summary.overallMax) {
-            rangeText = `$${summary.overallMin.toFixed(0)}/ft/mo`;
+            rangeText = `$${summary.overallMin.toFixed(0)}/mo`;
           } else {
-            rangeText = `$${summary.overallMin.toFixed(0)}-$${summary.overallMax.toFixed(0)}/ft/mo`;
+            rangeText = `$${summary.overallMin.toFixed(0)}-$${summary.overallMax.toFixed(0)}/mo`;
           }
         }
 

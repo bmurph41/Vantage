@@ -15,7 +15,8 @@ interface MatchedRate {
   city: string;
   storageType: string;
   ratePeriod: string;
-  ratePerFt: number;
+  rateUnit: string;
+  ratePerFt: number | null;
   monthlyRate: number;
   loaMin: number | null;
   loaMax: number | null;
@@ -122,54 +123,56 @@ export default function RcMatchedRatesView({ filters, isLoading: parentLoading }
                   <TableHead>Location</TableHead>
                   <TableHead>Storage Type</TableHead>
                   <TableHead>LOA Range</TableHead>
-                  <TableHead>Rate/Ft/Mo</TableHead>
-                  <TableHead>Monthly Rate</TableHead>
+                  <TableHead>Rate</TableHead>
                   <TableHead>Period</TableHead>
                   <TableHead>Amenities</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rates.slice(0, 50).map((rate) => (
-                  <TableRow key={rate.id} data-testid={`row-rate-${rate.id}`}>
-                    <TableCell className="font-medium">{rate.marina}</TableCell>
-                    <TableCell>
-                      {rate.city && rate.state ? `${rate.city}, ${rate.state}` : rate.state || 'N/A'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {STORAGE_TYPE_LABELS[rate.storageType] || rate.storageType}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {rate.loaMin && rate.loaMax 
-                        ? `${rate.loaMin}' - ${rate.loaMax}'`
-                        : rate.loaMin 
-                          ? `${rate.loaMin}'+`
-                          : rate.loaMax 
-                            ? `Up to ${rate.loaMax}'`
-                            : 'Any'}
-                    </TableCell>
-                    <TableCell className="font-medium text-primary">
-                      {formatRatePerFt(rate.ratePerFt)}
-                    </TableCell>
-                    <TableCell>
-                      {formatCurrency(rate.monthlyRate)}
-                    </TableCell>
-                    <TableCell>
-                      {RATE_PERIOD_LABELS[rate.ratePeriod] || rate.ratePeriod}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        {rate.electricIncluded && (
-                          <Badge variant="secondary" className="text-xs">Electric</Badge>
-                        )}
-                        {rate.waterIncluded && (
-                          <Badge variant="secondary" className="text-xs">Water</Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {rates.slice(0, 50).map((rate) => {
+                  const isPerFoot = rate.rateUnit === 'per_foot' || rate.rateUnit === 'per_foot_loa';
+                  
+                  return (
+                    <TableRow key={rate.id} data-testid={`row-rate-${rate.id}`}>
+                      <TableCell className="font-medium">{rate.marina}</TableCell>
+                      <TableCell>
+                        {rate.city && rate.state ? `${rate.city}, ${rate.state}` : rate.state || 'N/A'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {STORAGE_TYPE_LABELS[rate.storageType] || rate.storageType}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {rate.loaMin && rate.loaMax 
+                          ? `${rate.loaMin}' - ${rate.loaMax}'`
+                          : rate.loaMin 
+                            ? `${rate.loaMin}'+`
+                            : rate.loaMax 
+                              ? `Up to ${rate.loaMax}'`
+                              : 'Any'}
+                      </TableCell>
+                      <TableCell className="font-medium text-primary">
+                        {isPerFoot && rate.ratePerFt !== null
+                          ? `${formatRatePerFt(rate.ratePerFt)}`
+                          : `${formatCurrency(rate.monthlyRate)}/mo`}
+                      </TableCell>
+                      <TableCell>
+                        {RATE_PERIOD_LABELS[rate.ratePeriod] || rate.ratePeriod}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          {rate.electricIncluded && (
+                            <Badge variant="secondary" className="text-xs">Electric</Badge>
+                          )}
+                          {rate.waterIncluded && (
+                            <Badge variant="secondary" className="text-xs">Water</Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
             {total > 50 && (

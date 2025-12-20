@@ -25195,14 +25195,28 @@ Current context: Project ${req.params.projectId}`;
       });
 
       const rates = tierAnalysis.tiers.map(t => {
-        // normalizedRate is in cents per foot per month - convert to dollars
-        const ratePerFtDollars = t.normalizedRate / 100;
-        // Calculate average LOA for monthly rate estimation
+        const isPerFoot = t.rateUnit === 'per_foot' || t.rateUnit === 'per_foot_loa';
         const avgLoa = t.loaMin && t.loaMax 
           ? (t.loaMin + t.loaMax) / 2 
           : t.loaMax || t.loaMin || 35;
-        // Monthly rate = rate per foot * average boat length
-        const monthlyRateDollars = ratePerFtDollars * avgLoa;
+        
+        let ratePerFtDollars: number | null = null;
+        let monthlyRateDollars: number;
+        
+        if (isPerFoot) {
+          ratePerFtDollars = t.normalizedRate / 100;
+          monthlyRateDollars = ratePerFtDollars * avgLoa;
+        } else {
+          let monthlyAmountCents = t.amountCents;
+          if (t.ratePeriod === 'annual') {
+            monthlyAmountCents = t.amountCents / 12;
+          } else if (t.ratePeriod === 'daily') {
+            monthlyAmountCents = t.amountCents * 30;
+          } else if (t.ratePeriod === 'weekly') {
+            monthlyAmountCents = t.amountCents * 4.33;
+          }
+          monthlyRateDollars = monthlyAmountCents / 100;
+        }
         
         return {
           id: t.id,
@@ -25211,6 +25225,7 @@ Current context: Project ${req.params.projectId}`;
           city: t.city,
           storageType: t.storageType,
           ratePeriod: t.ratePeriod,
+          rateUnit: t.rateUnit,
           ratePerFt: ratePerFtDollars,
           monthlyRate: monthlyRateDollars,
           loaMin: t.loaMin,
