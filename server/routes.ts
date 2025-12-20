@@ -21475,7 +21475,7 @@ Current context: Project ${req.params.projectId}`;
         })
         .from(salesComps)
         .where(and(...conditions))
-        .orderBy(desc(salesComps.createdAt))
+        .orderBy(desc(salesComps.saleYear), desc(salesComps.saleMonth), desc(salesComps.createdAt))
         .limit(50);
 
       res.json(comps);
