@@ -25124,11 +25124,49 @@ Current context: Project ${req.params.projectId}`;
           seasonalityBreakdown[0].avgRate = (seasonalityBreakdown[0].avgRate * (seasonalityBreakdown[0].count - 1) + t.normalizedRate) / seasonalityBreakdown[0].count;
         }
       });
-
       res.json({
         stats,
         byState,
         byStorageType,
+        byYear: (() => {
+          const byYearMap: Record<number, { rates: number[]; count: number }> = {};
+          tierAnalysis.tiers.forEach((t: any) => {
+            const year = t.rateYear || new Date().getFullYear();
+            if (!byYearMap[year]) byYearMap[year] = { rates: [], count: 0 };
+            byYearMap[year].rates.push(t.normalizedRate);
+            byYearMap[year].count++;
+          });
+          return Object.entries(byYearMap).map(([year, data]) => {
+            const sorted = [...data.rates].sort((a, b) => a - b);
+            const avg = data.rates.reduce((a, b) => a + b, 0) / data.rates.length;
+            const median = sorted.length % 2 === 0 ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2 : sorted[Math.floor(sorted.length / 2)];
+            return { year: parseInt(year), avgRatePerFt: avg, medianRatePerFt: median, count: data.count };
+          }).sort((a, b) => a.year - b.year);
+        })(),
+        byBoatSize: (() => {
+          const ranges = [
+            { loaRange: "Under 25'", minLoa: 0, maxLoa: 25 },
+            { loaRange: "25' - 35'", minLoa: 25, maxLoa: 35 },
+            { loaRange: "35' - 45'", minLoa: 35, maxLoa: 45 },
+            { loaRange: "45' - 60'", minLoa: 45, maxLoa: 60 },
+            { loaRange: "60' - 80'", minLoa: 60, maxLoa: 80 },
+            { loaRange: "Over 80'", minLoa: 80, maxLoa: 999 },
+          ];
+          const map: Record<string, { rates: number[]; count: number; minLoa: number; maxLoa: number }> = {};
+          ranges.forEach(r => map[r.loaRange] = { rates: [], count: 0, minLoa: r.minLoa, maxLoa: r.maxLoa });
+          tierAnalysis.tiers.forEach((t: any) => {
+            const avgLoa = t.loaMin && t.loaMax ? (t.loaMin + t.loaMax) / 2 : t.loaMin || t.loaMax || 35;
+            const range = ranges.find(r => avgLoa >= r.minLoa && avgLoa < r.maxLoa) || ranges[ranges.length - 1];
+            map[range.loaRange].rates.push(t.normalizedRate);
+            map[range.loaRange].count++;
+          });
+          return Object.entries(map).filter(([_, d]) => d.count > 0).map(([loaRange, d]) => {
+            const sorted = [...d.rates].sort((a, b) => a - b);
+            const avg = d.rates.reduce((a, b) => a + b, 0) / d.rates.length;
+            const median = sorted.length % 2 === 0 ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2 : sorted[Math.floor(sorted.length / 2)];
+            return { loaRange, minLoa: d.minLoa, maxLoa: d.maxLoa, avgRatePerFt: avg, medianRatePerFt: median, count: d.count };
+          });
+        })(),
         distribution: {
           rateRanges: rateRanges.filter(r => r.count > 0),
           loaRanges: loaRanges.filter(r => r.count > 0),

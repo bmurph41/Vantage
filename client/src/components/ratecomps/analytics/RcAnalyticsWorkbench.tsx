@@ -12,6 +12,7 @@ import RcMatchedRatesView from "./RcMatchedRatesView";
 import RcRegionalView from "./RcRegionalView";
 import RcStorageTypeView from "./RcStorageTypeView";
 import RcDistributionView from "./RcDistributionView";
+import RcTrendsView from "./RcTrendsView";
 
 interface RateStats {
   count: number;
@@ -46,11 +47,29 @@ interface DistributionData {
   seasonalityBreakdown: Array<{ seasonality: string; count: number; avgRate: number }>;
 }
 
+interface YearlyRateData {
+  year: number;
+  avgRatePerFt: number;
+  medianRatePerFt: number;
+  count: number;
+}
+
+interface BoatSizeRateData {
+  loaRange: string;
+  minLoa: number;
+  maxLoa: number;
+  avgRatePerFt: number;
+  medianRatePerFt: number;
+  count: number;
+}
+
 interface RcAnalyticsResponse {
   stats: RateStats;
   byState: RegionalData[];
   byStorageType: StorageTypeData[];
   distribution: DistributionData;
+  byYear?: YearlyRateData[];
+  byBoatSize?: BoatSizeRateData[];
 }
 
 const STORAGE_KEY = 'ratecomps-analytics-filters';
@@ -238,10 +257,14 @@ export default function RcAnalyticsWorkbench() {
 
           {/* Analysis Views */}
           <Tabs value={activeView} onValueChange={setActiveView} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
+            <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
               <TabsTrigger value="matched" className="flex items-center gap-2" data-testid="tab-matched">
                 <Table2 className="h-4 w-4" />
                 <span className="hidden lg:inline">Matched</span>
+              </TabsTrigger>
+              <TabsTrigger value="trends" className="flex items-center gap-2" data-testid="tab-trends">
+                <TrendingUp className="h-4 w-4" />
+                <span className="hidden lg:inline">Trends</span>
               </TabsTrigger>
               <TabsTrigger value="regional" className="flex items-center gap-2" data-testid="tab-regional">
                 <MapPin className="h-4 w-4" />
@@ -262,6 +285,21 @@ export default function RcAnalyticsWorkbench() {
                 filters={appliedFilters}
                 isLoading={isLoading}
               />
+            </TabsContent>
+
+            <TabsContent value="trends" className="mt-2" data-testid="tab-content-trends">
+              {analyticsData?.byYear || analyticsData?.byBoatSize ? (
+                <RcTrendsView
+                  yearlyData={analyticsData.byYear}
+                  boatSizeData={analyticsData.byBoatSize}
+                  isLoading={isLoading}
+                />
+              ) : (
+                <Card className="p-4 text-center border-dashed">
+                  <TrendingUp className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
+                  <p className="text-xs text-muted-foreground">Apply filters to view rate trends over time</p>
+                </Card>
+              )}
             </TabsContent>
 
             <TabsContent value="regional" className="mt-2" data-testid="tab-content-regional">

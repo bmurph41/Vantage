@@ -649,25 +649,40 @@ function AddRateDialog({ open, onClose, rateCompId, marinaName, formData, setFor
   });
 
   const handleSubmit = () => {
+    const errors: string[] = [];
+    
+    if (!formData.storageType) {
+      errors.push("Storage type is required");
+    }
+    if (!formData.rateUnit) {
+      errors.push("Rate unit is required");
+    }
+    if (!formData.ratePeriod) {
+      errors.push("Rate period is required");
+    }
     if (!formData.amountDollars || parseFloat(formData.amountDollars) <= 0) {
+      errors.push("Please enter a valid rate amount greater than 0");
+    }
+    
+    if (errors.length > 0) {
       toast({ 
         title: "Validation Error", 
-        description: "Please enter a valid rate amount",
+        description: errors.join(". "),
         variant: "destructive" 
       });
       return;
     }
 
     const tierData = {
-      storageType: formData.storageType,
+      storageType: formData.storageType || 'wet_slip',
       loaMin: formData.loaMin ? parseInt(formData.loaMin) : null,
       loaMax: formData.loaMax ? parseInt(formData.loaMax) : null,
-      rateUnit: formData.rateUnit,
-      ratePeriod: formData.ratePeriod,
+      rateUnit: formData.rateUnit || 'per_foot',
+      ratePeriod: formData.ratePeriod || 'monthly',
       amountCents: Math.round(parseFloat(formData.amountDollars) * 100),
-      seasonality: formData.seasonality,
-      electricIncluded: formData.electricIncluded,
-      waterIncluded: formData.waterIncluded,
+      seasonality: formData.seasonality || 'annual',
+      electricIncluded: formData.electricIncluded ?? false,
+      waterIncluded: formData.waterIncluded ?? true,
       isCurrentRate: true,
     };
 
