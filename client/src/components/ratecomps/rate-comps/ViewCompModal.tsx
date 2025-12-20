@@ -161,178 +161,126 @@ export default function ViewCompModal({ open, onClose, comp, onEdit, onRateAdded
     const storageLabel = STORAGE_TYPE_LABELS[tier.storageType as keyof typeof STORAGE_TYPE_LABELS] || tier.storageType;
     const periodLabel = RATE_PERIOD_LABELS[tier.ratePeriod as keyof typeof RATE_PERIOD_LABELS] || tier.ratePeriod;
     const unitLabel = RATE_UNIT_LABELS[tier.rateUnit as keyof typeof RATE_UNIT_LABELS] || tier.rateUnit;
-    const protectionLabel = tier.protectionLevel ? (PROTECTION_LEVEL_LABELS[tier.protectionLevel as keyof typeof PROTECTION_LEVEL_LABELS] || tier.protectionLevel) : null;
+
+    const includedAmenities = [
+      tier.electricIncluded && 'Electric',
+      tier.waterIncluded && 'Water',
+      tier.wifiIncluded && 'WiFi',
+      tier.pumpOutIncluded && 'Pump-out',
+    ].filter(Boolean);
 
     return (
-      <Card key={tier.id || index} className="relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between">
-            <div>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Ship className="h-4 w-4 text-primary" />
-                {tier.tierLabel || storageLabel}
-              </CardTitle>
-              {tier.tierLabel && storageLabel && tier.tierLabel !== storageLabel && (
-                <p className="text-sm text-muted-foreground mt-1">{storageLabel}</p>
-              )}
-            </div>
-            <Badge variant="outline" className="font-mono">
-              {formatSizeRange(tier.loaMin, tier.loaMax)}
-            </Badge>
+      <div key={tier.id || index} className="border rounded-lg p-4 bg-card hover:bg-muted/30 transition-colors">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Ship className="h-4 w-4 text-primary" />
+            <span className="font-medium">{tier.tierLabel || storageLabel}</span>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-primary">
-              {formatRateAmount(tier.amountCents)}
-            </span>
-            <span className="text-sm text-muted-foreground">
-              {unitLabel} / {periodLabel}
-            </span>
-          </div>
-
+          <Badge variant="outline" className="text-xs font-mono">
+            {formatSizeRange(tier.loaMin, tier.loaMax)}
+          </Badge>
+        </div>
+        
+        <div className="flex items-baseline gap-2 mb-3">
+          <span className="text-xl font-bold text-primary">
+            {formatRateAmount(tier.amountCents)}
+          </span>
+          <span className="text-xs text-muted-foreground">
+            {unitLabel} / {periodLabel}
+          </span>
           {pricePerFoot && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
-              <TrendingUp className="h-4 w-4" />
-              <span>~${pricePerFoot.toFixed(2)}/ft/month</span>
-            </div>
+            <span className="text-xs text-muted-foreground ml-auto">
+              ~${pricePerFoot.toFixed(2)}/ft/mo
+            </span>
           )}
+        </div>
 
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <p className="text-muted-foreground">Seasonality</p>
-              <p className="font-medium capitalize">{tier.seasonality || 'Annual'}</p>
-            </div>
-            {protectionLabel && (
-              <div>
-                <p className="text-muted-foreground">Protection</p>
-                <p className="font-medium">{protectionLabel}</p>
-              </div>
-            )}
-            {tier.effectiveDate && (
-              <div>
-                <p className="text-muted-foreground">Effective</p>
-                <p className="font-medium">{tier.effectiveDate}</p>
-              </div>
-            )}
-            {tier.minTermMonths && (
-              <div>
-                <p className="text-muted-foreground">Min Term</p>
-                <p className="font-medium">{tier.minTermMonths} months</p>
-              </div>
-            )}
-          </div>
-
-          <Separator />
-
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Included:</p>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              {renderIncludedBadge(tier.electricIncluded, 'Electric')}
-              {renderIncludedBadge(tier.waterIncluded, 'Water')}
-              {renderIncludedBadge(tier.wifiIncluded, 'WiFi')}
-              {renderIncludedBadge(tier.pumpOutIncluded, 'Pump-out')}
-            </div>
-          </div>
-
-          {tier.depositRequired && (
-            <div className="bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-200 rounded-md px-3 py-2 text-sm">
-              <span className="font-medium">Deposit Required</span>
-              {tier.depositAmountCents && (
-                <span className="ml-1">- {formatCurrency(tier.depositAmountCents / 100)}</span>
-              )}
-            </div>
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <span className="capitalize">{tier.seasonality || 'Annual'}</span>
+          {includedAmenities.length > 0 && (
+            <>
+              <span className="text-border">•</span>
+              <span className="flex items-center gap-1">
+                <Check className="h-3 w-3 text-green-600" />
+                {includedAmenities.join(', ')}
+              </span>
+            </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   };
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="max-w-5xl max-h-[90vh] p-0 gap-0 overflow-hidden">
-        <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 border-b">
-          <DialogHeader>
-            <div className="flex items-start justify-between">
-              <div className="space-y-2">
-                <DialogTitle className="text-2xl font-bold">{comp.marina}</DialogTitle>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1.5">
-                    <MapPin className="h-4 w-4" />
-                    <span>{[comp.city, comp.state].filter(Boolean).join(', ') || '—'}</span>
-                  </div>
-                  {comp.waterBody && (
-                    <div className="flex items-center gap-1.5">
-                      <Waves className="h-4 w-4" />
-                      <span>{comp.waterBody}</span>
-                    </div>
-                  )}
-                </div>
-                {rateSummary && (
-                  <div className="flex items-center gap-3 mt-3 flex-wrap">
-                    <Badge variant="default" className="text-sm px-3 py-1">
-                      <DollarSign className="h-3.5 w-3.5 mr-1" />
-                      {rateSummary.rateRange}
-                    </Badge>
-                    {tierCount > 0 ? (
-                      <Badge variant="secondary" className="text-sm px-3 py-1">
-                        {tierCount} rate tier{tierCount !== 1 ? 's' : ''}
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-sm px-3 py-1">
-                        Legacy rate
-                      </Badge>
-                    )}
-                    {rateSummary.storageTypes.map((type: string, i: number) => (
-                      <Badge key={i} variant="outline" className="text-sm">
-                        {STORAGE_TYPE_LABELS[type as keyof typeof STORAGE_TYPE_LABELS] || type}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
+      <DialogContent className="max-w-3xl max-h-[85vh] p-0 gap-0 overflow-hidden">
+        <div className="px-6 py-4 border-b bg-muted/30">
+          <DialogHeader className="space-y-0">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <DialogTitle className="text-xl font-semibold truncate">{comp.marina}</DialogTitle>
+                <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                  <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
+                  {[comp.city, comp.state].filter(Boolean).join(', ') || 'Location not specified'}
+                </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 <Button 
                   variant="outline" 
+                  size="sm"
                   onClick={() => {
                     setRateForm(INITIAL_RATE_FORM);
                     setShowAddRateDialog(true);
                   }} 
                   data-testid="button-add-rate"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
+                  <Plus className="h-4 w-4 mr-1" />
                   Add Rate
                 </Button>
-                <Button onClick={() => onEdit?.(comp)} data-testid="button-edit-comp">
-                  <Edit className="h-4 w-4 mr-2" />
+                <Button size="sm" onClick={() => onEdit?.(comp)} data-testid="button-edit-comp">
+                  <Edit className="h-4 w-4 mr-1" />
                   Edit
                 </Button>
               </div>
             </div>
+            {rateSummary && (
+              <div className="flex items-center gap-2 mt-3 flex-wrap">
+                <Badge variant="default" className="text-xs">
+                  {rateSummary.rateRange}
+                </Badge>
+                <Badge variant="secondary" className="text-xs">
+                  {tierCount} rate{tierCount !== 1 ? 's' : ''}
+                </Badge>
+                {rateSummary.storageTypes.map((type: string, i: number) => (
+                  <Badge key={i} variant="outline" className="text-xs">
+                    {STORAGE_TYPE_LABELS[type as keyof typeof STORAGE_TYPE_LABELS] || type}
+                  </Badge>
+                ))}
+              </div>
+            )}
           </DialogHeader>
         </div>
 
-        <ScrollArea className="flex-1 max-h-[calc(90vh-180px)]">
-          <Tabs defaultValue="rates" className="w-full">
-            <div className="sticky top-0 z-10 bg-background border-b px-6 py-2">
-              <TabsList className="grid w-full max-w-md grid-cols-3">
-                <TabsTrigger value="rates" className="flex items-center gap-2" data-testid="tab-rates">
-                  <DollarSign className="h-4 w-4" />
-                  Rates
-                </TabsTrigger>
-                <TabsTrigger value="amenities" className="flex items-center gap-2" data-testid="tab-amenities">
-                  <Zap className="h-4 w-4" />
-                  Amenities
-                </TabsTrigger>
-                <TabsTrigger value="details" className="flex items-center gap-2" data-testid="tab-details">
-                  <Building2 className="h-4 w-4" />
-                  Details
-                </TabsTrigger>
-              </TabsList>
-            </div>
+        <Tabs defaultValue="rates" className="flex-1 flex flex-col overflow-hidden">
+          <div className="px-6 py-2 border-b bg-background">
+            <TabsList className="h-9">
+              <TabsTrigger value="rates" className="text-xs px-3" data-testid="tab-rates">
+                <DollarSign className="h-3.5 w-3.5 mr-1.5" />
+                Rates
+              </TabsTrigger>
+              <TabsTrigger value="amenities" className="text-xs px-3" data-testid="tab-amenities">
+                <Zap className="h-3.5 w-3.5 mr-1.5" />
+                Amenities
+              </TabsTrigger>
+              <TabsTrigger value="details" className="text-xs px-3" data-testid="tab-details">
+                <Building2 className="h-3.5 w-3.5 mr-1.5" />
+                Details
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-            <TabsContent value="rates" className="p-6 space-y-6 mt-0">
+          <ScrollArea className="flex-1">
+            <TabsContent value="rates" className="p-4 space-y-4 mt-0">
               {tierCount > 0 ? (
                 <>
                   {(() => {
@@ -363,22 +311,22 @@ export default function ViewCompModal({ open, onClose, comp, onEdit, onRateAdded
                           const hasMultipleYears = years.length > 1 || (years.length === 1 && hasUndated);
                           
                           return (
-                            <Card key={storageType} className="border-l-4 border-l-primary">
-                              <CardHeader className="pb-3">
-                                <CardTitle className="text-base flex items-center gap-2">
+                            <div key={storageType} className="border rounded-lg overflow-hidden">
+                              <div className="bg-muted/50 px-4 py-2.5 border-b flex items-center justify-between">
+                                <div className="flex items-center gap-2">
                                   <Anchor className="h-4 w-4 text-primary" />
-                                  {storageLabel}
-                                  <Badge variant="secondary" className="ml-2">
+                                  <span className="font-medium text-sm">{storageLabel}</span>
+                                  <Badge variant="secondary" className="text-xs">
                                     {storageTiers.length} rate{storageTiers.length !== 1 ? 's' : ''}
                                   </Badge>
-                                  {hasMultipleYears && (
-                                    <Badge variant="outline" className="ml-1">
-                                      {years.length} years tracked
-                                    </Badge>
-                                  )}
-                                </CardTitle>
-                              </CardHeader>
-                              <CardContent className="space-y-4">
+                                </div>
+                                {hasMultipleYears && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {years.length} years tracked
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="p-3">
                                 {hasMultipleYears ? (
                                   <div className="space-y-4">
                                     <div className="overflow-x-auto">
@@ -442,12 +390,12 @@ export default function ViewCompModal({ open, onClose, comp, onEdit, onRateAdded
                                     </div>
                                   </div>
                                 ) : (
-                                  <div className="grid gap-3 md:grid-cols-2">
+                                  <div className="grid gap-2">
                                     {storageTiers.map((tier: any, index: number) => renderTierCard(tier, index))}
                                   </div>
                                 )}
-                              </CardContent>
-                            </Card>
+                              </div>
+                            </div>
                           );
                         })}
                       </div>
