@@ -25115,77 +25115,1355 @@ Current context: Project ${req.params.projectId}`;
         sizeMax: filters.loaMax,
       });
 
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
       const stats = {
         count: tierAnalysis.overall.count,
-        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate,
-        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate,
-        minRatePerFt: tierAnalysis.overall.minNormalizedRate,
-        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate,
-        avgMonthlyRate: tierAnalysis.overall.avgNormalizedRate * 35,
-        medianMonthlyRate: tierAnalysis.overall.medianNormalizedRate * 35,
-        avgLoaSize: tierAnalysis.bySize 
-          ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
-             tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
-            (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
-             tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
-          : 35,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
         uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
       };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
 
-      const byState = Object.entries(tierAnalysis.byState || {}).map(([state, data]: [string, any]) => ({
-        state,
-        avgRatePerFt: data.avgNormalizedRate,
-        medianRatePerFt: data.medianNormalizedRate,
-        count: data.count,
-      }));
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
 
-      const byStorageType = Object.entries(tierAnalysis.byStorageType || {}).map(([storageType, data]: [string, any]) => ({
-        storageType,
-        avgRatePerFt: data.avgNormalizedRate,
-        medianRatePerFt: data.medianNormalizedRate,
-        count: data.count,
-        avgMonthlyRate: data.avgNormalizedRate * 35,
-      }));
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
 
-      const rateRanges = [
-        { range: '$0-$10', count: 0, avgRate: 0 },
-        { range: '$10-$20', count: 0, avgRate: 0 },
-        { range: '$20-$30', count: 0, avgRate: 0 },
-        { range: '$30-$50', count: 0, avgRate: 0 },
-        { range: '$50+', count: 0, avgRate: 0 },
-      ];
-      
-      const loaRanges = [
-        { range: 'Under 25\'', count: tierAnalysis.bySize?.small.count || 0, avgRate: tierAnalysis.bySize?.small.avgRate || 0 },
-        { range: '25\'-40\'', count: tierAnalysis.bySize?.medium.count || 0, avgRate: tierAnalysis.bySize?.medium.avgRate || 0 },
-        { range: '40\'-60\'', count: tierAnalysis.bySize?.large.count || 0, avgRate: tierAnalysis.bySize?.large.avgRate || 0 },
-        { range: 'Over 60\'', count: tierAnalysis.bySize?.mega.count || 0, avgRate: tierAnalysis.bySize?.mega.avgRate || 0 },
-      ];
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
 
-      tierAnalysis.tiers.forEach(t => {
-        const rate = t.normalizedRate;
-        if (rate < 10) { rateRanges[0].count++; rateRanges[0].avgRate = (rateRanges[0].avgRate * (rateRanges[0].count - 1) + rate) / rateRanges[0].count; }
-        else if (rate < 20) { rateRanges[1].count++; rateRanges[1].avgRate = (rateRanges[1].avgRate * (rateRanges[1].count - 1) + rate) / rateRanges[1].count; }
-        else if (rate < 30) { rateRanges[2].count++; rateRanges[2].avgRate = (rateRanges[2].avgRate * (rateRanges[2].count - 1) + rate) / rateRanges[2].count; }
-        else if (rate < 50) { rateRanges[3].count++; rateRanges[3].avgRate = (rateRanges[3].avgRate * (rateRanges[3].count - 1) + rate) / rateRanges[3].count; }
-        else { rateRanges[4].count++; rateRanges[4].avgRate = (rateRanges[4].avgRate * (rateRanges[4].count - 1) + rate) / rateRanges[4].count; }
-      });
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
 
-      const seasonalityBreakdown = [
-        { seasonality: 'annual', count: 0, avgRate: 0 },
-        { seasonality: 'seasonal', count: 0, avgRate: 0 },
-        { seasonality: 'peak', count: 0, avgRate: 0 },
-      ];
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
 
-      tierAnalysis.tiers.forEach(t => {
-        const s = t.seasonality || 'annual';
-        const entry = seasonalityBreakdown.find(e => e.seasonality === s);
-        if (entry) {
-          entry.count++;
-          entry.avgRate = (entry.avgRate * (entry.count - 1) + t.normalizedRate) / entry.count;
-        } else {
-          seasonalityBreakdown[0].count++;
-          seasonalityBreakdown[0].avgRate = (seasonalityBreakdown[0].avgRate * (seasonalityBreakdown[0].count - 1) + t.normalizedRate) / seasonalityBreakdown[0].count;
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
+      // Convert all cent values to dollars for display (divide by 100)
+      const avgLoaSize = tierAnalysis.bySize 
+        ? (tierAnalysis.bySize.small.count * 20 + tierAnalysis.bySize.medium.count * 32 + 
+           tierAnalysis.bySize.large.count * 50 + tierAnalysis.bySize.mega.count * 75) / 
+          (tierAnalysis.bySize.small.count + tierAnalysis.bySize.medium.count + 
+           tierAnalysis.bySize.large.count + tierAnalysis.bySize.mega.count || 1)
+        : 35;
+
+      const stats = {
+        count: tierAnalysis.overall.count,
+        avgRatePerFt: tierAnalysis.overall.avgNormalizedRate / 100,
+        medianRatePerFt: tierAnalysis.overall.medianNormalizedRate / 100,
+        minRatePerFt: tierAnalysis.overall.minNormalizedRate / 100,
+        maxRatePerFt: tierAnalysis.overall.maxNormalizedRate / 100,
+        avgMonthlyRate: (tierAnalysis.overall.avgNormalizedRate / 100) * avgLoaSize,
+        medianMonthlyRate: (tierAnalysis.overall.medianNormalizedRate / 100) * avgLoaSize,
+        avgLoaSize,
+        uniqueMarinas: new Set(tierAnalysis.tiers.map(t => t.rateCompId)).size,
+      };
         }
       });
       res.json({
