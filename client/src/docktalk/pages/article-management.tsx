@@ -199,21 +199,49 @@ export default function ArticleManagementPage() {
   const updateCategoryMutation = useMutation({
     mutationFn: ({ id, categories }: { id: number; categories: string[] }) =>
       updateArticleCategory(id, categories),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/articles'] });
-      setIsEditDialogOpen(false);
-      setEditingArticle(null);
-      toast({
-        title: "Categories Updated",
-        description: "Article categories have been updated successfully.",
+    onMutate: async ({ id, categories }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['/api/docktalk/articles'] });
+      
+      // Snapshot the previous value
+      const previousArticles = queryClient.getQueryData(['/api/docktalk/articles', filters]);
+      
+      // Optimistically update
+      queryClient.setQueryData(['/api/docktalk/articles', filters], (old: Article[] | undefined) => {
+        if (!old) return old;
+        return old.map(article => 
+          article.id === id ? { ...article, categories, manuallyReviewed: true } : article
+        );
       });
+      
+      return { previousArticles };
     },
-    onError: (error) => {
+    onSuccess: (_, { id }) => {
+      // Show brief success feedback
+      toast({
+        title: "Saved",
+        description: "Category change saved - AI training updated.",
+        duration: 2000,
+      });
+      // Close dialog if open
+      if (editingArticle?.id === id) {
+        setIsEditDialogOpen(false);
+        setEditingArticle(null);
+      }
+    },
+    onError: (error, _, context) => {
+      // Rollback on error
+      if (context?.previousArticles) {
+        queryClient.setQueryData(['/api/docktalk/articles', filters], context.previousArticles);
+      }
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to update categories",
         variant: "destructive",
       });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/articles'] });
     },
   });
 
@@ -263,21 +291,41 @@ export default function ArticleManagementPage() {
     setIsEditDialogOpen(true);
   };
 
+  // Instant save when toggling categories in the dialog
   const toggleCategory = (category: string) => {
-    setEditCategories(prev => 
-      prev.includes(category) 
-        ? prev.filter(c => c !== category)
-        : [...prev, category]
-    );
+    if (!editingArticle) return;
+    
+    const newCategories = editCategories.includes(category)
+      ? editCategories.filter(c => c !== category)
+      : [...editCategories, category];
+    
+    setEditCategories(newCategories);
+    
+    // Save immediately
+    updateCategoryMutation.mutate({
+      id: editingArticle.id,
+      categories: newCategories
+    });
+  };
+
+  // Instant toggle directly from table row (without opening dialog)
+  const toggleCategoryInline = (article: Article, category: string) => {
+    const currentCategories = article.categories || [];
+    const newCategories = currentCategories.includes(category)
+      ? currentCategories.filter(c => c !== category)
+      : [...currentCategories, category];
+    
+    // Save immediately
+    updateCategoryMutation.mutate({
+      id: article.id,
+      categories: newCategories
+    });
   };
 
   const handleSaveCategories = () => {
-    if (editingArticle) {
-      updateCategoryMutation.mutate({ 
-        id: editingArticle.id, 
-        categories: editCategories 
-      });
-    }
+    // Categories are now saved instantly on toggle, so just close
+    setIsEditDialogOpen(false);
+    setEditingArticle(null);
   };
 
   const handleRemoveArticle = () => {
@@ -478,10 +526,18 @@ export default function ArticleManagementPage() {
                                 return (
                                   <Badge 
                                     key={cat} 
-                                    className={cn("text-xs", style.bg, style.text)}
+                                    className={cn(
+                                      "text-xs cursor-pointer hover:opacity-70 transition-opacity",
+                                      style.bg, 
+                                      style.text
+                                    )}
                                     variant="secondary"
+                                    onClick={() => toggleCategoryInline(article, cat)}
+                                    title="Click to remove this category"
+                                    data-testid={`badge-category-${article.id}-${cat}`}
                                   >
                                     {cat}
+                                    <span className="ml-1 opacity-50">×</span>
                                   </Badge>
                                 );
                               })
@@ -614,8 +670,9 @@ export default function ArticleManagementPage() {
             <DialogTitle>Edit Categories</DialogTitle>
             <DialogDescription>
               {editingArticle && (
-                <span className="line-clamp-2">{editingArticle.title}</span>
+                <span className="line-clamp-2 block mb-2">{editingArticle.title}</span>
               )}
+              <span className="text-xs">Click tags to toggle. Changes save instantly and train the AI.</span>
             </DialogDescription>
           </DialogHeader>
           
@@ -652,16 +709,15 @@ export default function ArticleManagementPage() {
             )}
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              Cancel
-            </Button>
+          <DialogFooter className="flex items-center justify-between sm:justify-between">
+            <p className="text-xs text-muted-foreground">
+              {updateCategoryMutation.isPending ? "Saving..." : "Changes save automatically"}
+            </p>
             <Button 
-              onClick={handleSaveCategories}
-              disabled={updateCategoryMutation.isPending || editCategories.length === 0}
-              data-testid="button-save-categories"
+              onClick={() => setIsEditDialogOpen(false)}
+              data-testid="button-close-categories"
             >
-              {updateCategoryMutation.isPending ? "Saving..." : "Save Categories"}
+              Done
             </Button>
           </DialogFooter>
         </DialogContent>
