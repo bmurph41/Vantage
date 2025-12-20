@@ -8,7 +8,7 @@ interface BreadcrumbItem {
   href?: string;
   icon?: React.ComponentType<{ className?: string }>;
   isDynamic?: boolean;
-  dynamicType?: 'modeling-project' | 'fund';
+  dynamicType?: 'modeling-project' | 'fund' | 'sales-comp' | 'rate-comp';
   dynamicId?: string;
 }
 
@@ -679,6 +679,28 @@ function getBreadcrumbsForPath(path: string): BreadcrumbItem[] {
     return [DASHBOARD_ITEM, ...items];
   }
 
+  const salesCompMatch = path.match(/^\/analysis\/sales-comps\/([a-f0-9-]+)$/i);
+  if (salesCompMatch) {
+    const compId = salesCompMatch[1];
+    return [
+      DASHBOARD_ITEM,
+      CATEGORIES.ANALYSIS,
+      { label: 'Sales Comps', href: '/analysis/sales-comps' },
+      { label: compId, isDynamic: true, dynamicType: 'sales-comp', dynamicId: compId },
+    ];
+  }
+
+  const rateCompMatch = path.match(/^\/analysis\/rate-comps\/([a-f0-9-]+)$/i);
+  if (rateCompMatch) {
+    const compId = rateCompMatch[1];
+    return [
+      DASHBOARD_ITEM,
+      CATEGORIES.ANALYSIS,
+      { label: 'Rate Comps', href: '/analysis/rate-comps' },
+      { label: compId, isDynamic: true, dynamicType: 'rate-comp', dynamicId: compId },
+    ];
+  }
+
   if (ROUTE_MAPPINGS[path]) {
     items = ROUTE_MAPPINGS[path];
   } else {
@@ -736,10 +758,27 @@ function DynamicBreadcrumbItem({ item, isLast }: { item: BreadcrumbItem; isLast:
     queryKey: ['/api/funds', item.dynamicId],
     enabled: item.dynamicType === 'fund' && !!item.dynamicId,
   });
+
+  const { data: salesComp } = useQuery<{ marina: string }>({
+    queryKey: ['/api/sales-comps', item.dynamicId],
+    enabled: item.dynamicType === 'sales-comp' && !!item.dynamicId,
+  });
+
+  const { data: rateComp } = useQuery<{ marina: string }>({
+    queryKey: ['/api/rate-comps', item.dynamicId],
+    enabled: item.dynamicType === 'rate-comp' && !!item.dynamicId,
+  });
   
-  const displayLabel = item.dynamicType === 'fund' 
-    ? (fund?.name || item.label) 
-    : (project?.marinaName || item.label);
+  let displayLabel = item.label;
+  if (item.dynamicType === 'fund') {
+    displayLabel = fund?.name || item.label;
+  } else if (item.dynamicType === 'modeling-project') {
+    displayLabel = project?.marinaName || item.label;
+  } else if (item.dynamicType === 'sales-comp') {
+    displayLabel = salesComp?.marina || item.label;
+  } else if (item.dynamicType === 'rate-comp') {
+    displayLabel = rateComp?.marina || item.label;
+  }
   const Icon = item.icon;
   
   if (isLast) {
