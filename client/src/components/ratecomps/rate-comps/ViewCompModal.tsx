@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import type { RateComp, RateTier } from "@shared/schema";
 import { formatCurrency } from "@/lib/ratecomps/format";
+import { queryKeys } from "@/lib/ratecomps/queryKeys";
 import { STORAGE_TYPE_LABELS, RATE_PERIOD_LABELS, RATE_UNIT_LABELS, PROTECTION_LEVEL_LABELS } from "@shared/ratecomps-utils";
 
 interface ViewCompModalProps {
@@ -54,6 +55,7 @@ interface AddRateFormData {
   seasonality: string;
   electricIncluded: boolean;
   waterIncluded: boolean;
+  rateYear: string;
 }
 
 const INITIAL_RATE_FORM: AddRateFormData = {
@@ -66,6 +68,7 @@ const INITIAL_RATE_FORM: AddRateFormData = {
   seasonality: 'annual',
   electricIncluded: false,
   waterIncluded: true,
+  rateYear: new Date().getFullYear().toString(),
 };
 
 export default function ViewCompModal({ open, onClose, comp, onEdit, onRateAdded }: ViewCompModalProps) {
@@ -332,16 +335,131 @@ export default function ViewCompModal({ open, onClose, comp, onEdit, onRateAdded
             <TabsContent value="rates" className="p-6 space-y-6 mt-0">
               {tierCount > 0 ? (
                 <>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {tiers.map((tier: any, index: number) => renderTierCard(tier, index))}
-                  </div>
+                  {(() => {
+                    const tiersByStorageType = tiers.reduce((acc: Record<string, any[]>, tier: any) => {
+                      const key = tier.storageType || 'other';
+                      if (!acc[key]) acc[key] = [];
+                      acc[key].push(tier);
+                      return acc;
+                    }, {});
+                    
+                    const storageTypes = Object.keys(tiersByStorageType);
+                    
+                    return (
+                      <div className="space-y-6">
+                        {storageTypes.map((storageType) => {
+                          const storageTiers = tiersByStorageType[storageType];
+                          const storageLabel = STORAGE_TYPE_LABELS[storageType as keyof typeof STORAGE_TYPE_LABELS] || storageType;
+                          
+                          const tiersByYear = storageTiers.reduce((acc: Record<string, any[]>, tier: any) => {
+                            const year = tier.rateYear ? tier.rateYear.toString() : 'undated';
+                            if (!acc[year]) acc[year] = [];
+                            acc[year].push(tier);
+                            return acc;
+                          }, {} as Record<string, any[]>);
+                          const yearKeys = Object.keys(tiersByYear).filter(y => y !== 'undated');
+                          const years = yearKeys.map(Number).sort((a, b) => b - a);
+                          const hasUndated = !!tiersByYear['undated'];
+                          const hasMultipleYears = years.length > 1 || (years.length === 1 && hasUndated);
+                          
+                          return (
+                            <Card key={storageType} className="border-l-4 border-l-primary">
+                              <CardHeader className="pb-3">
+                                <CardTitle className="text-base flex items-center gap-2">
+                                  <Anchor className="h-4 w-4 text-primary" />
+                                  {storageLabel}
+                                  <Badge variant="secondary" className="ml-2">
+                                    {storageTiers.length} rate{storageTiers.length !== 1 ? 's' : ''}
+                                  </Badge>
+                                  {hasMultipleYears && (
+                                    <Badge variant="outline" className="ml-1">
+                                      {years.length} years tracked
+                                    </Badge>
+                                  )}
+                                </CardTitle>
+                              </CardHeader>
+                              <CardContent className="space-y-4">
+                                {hasMultipleYears ? (
+                                  <div className="space-y-4">
+                                    <div className="overflow-x-auto">
+                                      <table className="w-full text-sm">
+                                        <thead>
+                                          <tr className="border-b bg-muted/50">
+                                            <th className="text-left py-2 px-3 font-medium">Year</th>
+                                            <th className="text-left py-2 px-3 font-medium">Size Range</th>
+                                            <th className="text-right py-2 px-3 font-medium">Rate</th>
+                                            <th className="text-right py-2 px-3 font-medium">$/ft/mo</th>
+                                            <th className="text-right py-2 px-3 font-medium">YoY Change</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {years.map((year, yearIndex) => {
+                                            const yearTiers = tiersByYear[year.toString()] || [];
+                                            const prevYear = years[yearIndex + 1];
+                                            const prevYearTiers = prevYear ? tiersByYear[prevYear.toString()] : null;
+                                            
+                                            return yearTiers.map((tier: any, tierIndex: number) => {
+                                              const pricePerFoot = calculatePricePerFoot(tier);
+                                              const matchingPrevTier = prevYearTiers?.find((pt: any) => 
+                                                pt.loaMin === tier.loaMin && pt.loaMax === tier.loaMax
+                                              );
+                                              const prevPricePerFoot = matchingPrevTier ? calculatePricePerFoot(matchingPrevTier) : null;
+                                              const yoyChange = pricePerFoot && prevPricePerFoot 
+                                                ? ((pricePerFoot - prevPricePerFoot) / prevPricePerFoot) * 100 
+                                                : null;
+                                              
+                                              return (
+                                                <tr key={tier.id || `${year}-${tierIndex}`} className="border-b last:border-0 hover:bg-muted/30">
+                                                  <td className="py-2 px-3 font-medium">{tier.rateYear || year}</td>
+                                                  <td className="py-2 px-3">{formatSizeRange(tier.loaMin, tier.loaMax)}</td>
+                                                  <td className="py-2 px-3 text-right font-medium">{formatRateAmount(tier.amountCents)}</td>
+                                                  <td className="py-2 px-3 text-right">{pricePerFoot ? `$${pricePerFoot.toFixed(2)}` : '—'}</td>
+                                                  <td className="py-2 px-3 text-right">
+                                                    {yoyChange !== null ? (
+                                                      <span className={yoyChange >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                        {yoyChange >= 0 ? '+' : ''}{yoyChange.toFixed(1)}%
+                                                      </span>
+                                                    ) : '—'}
+                                                  </td>
+                                                </tr>
+                                              );
+                                            });
+                                          })}
+                                          {hasUndated && tiersByYear['undated']?.map((tier: any, tierIndex: number) => {
+                                            const pricePerFoot = calculatePricePerFoot(tier);
+                                            return (
+                                              <tr key={tier.id || `undated-${tierIndex}`} className="border-b last:border-0 hover:bg-muted/30 bg-muted/20">
+                                                <td className="py-2 px-3 font-medium text-muted-foreground italic">Undated</td>
+                                                <td className="py-2 px-3">{formatSizeRange(tier.loaMin, tier.loaMax)}</td>
+                                                <td className="py-2 px-3 text-right font-medium">{formatRateAmount(tier.amountCents)}</td>
+                                                <td className="py-2 px-3 text-right">{pricePerFoot ? `$${pricePerFoot.toFixed(2)}` : '—'}</td>
+                                                <td className="py-2 px-3 text-right text-muted-foreground">—</td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="grid gap-3 md:grid-cols-2">
+                                    {storageTiers.map((tier: any, index: number) => renderTierCard(tier, index))}
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
 
                   {tierCount > 1 && (
                     <Card className="bg-muted/30">
                       <CardHeader className="pb-3">
                         <CardTitle className="text-base flex items-center gap-2">
                           <TrendingUp className="h-4 w-4 text-primary" />
-                          Rate Comparison
+                          All Rates Comparison
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
@@ -349,21 +467,23 @@ export default function ViewCompModal({ open, onClose, comp, onEdit, onRateAdded
                           <table className="w-full text-sm">
                             <thead>
                               <tr className="border-b">
-                                <th className="text-left py-2 pr-4 font-medium">Size Range</th>
+                                <th className="text-left py-2 pr-4 font-medium">Year</th>
                                 <th className="text-left py-2 pr-4 font-medium">Type</th>
+                                <th className="text-left py-2 pr-4 font-medium">Size Range</th>
                                 <th className="text-right py-2 pr-4 font-medium">Rate</th>
                                 <th className="text-right py-2 font-medium">$/ft/mo</th>
                               </tr>
                             </thead>
                             <tbody>
-                              {tiers.map((tier: any, index: number) => {
+                              {[...tiers].sort((a: any, b: any) => (b.rateYear || 0) - (a.rateYear || 0)).map((tier: any, index: number) => {
                                 const pricePerFoot = calculatePricePerFoot(tier);
                                 return (
                                   <tr key={tier.id || index} className="border-b last:border-0">
-                                    <td className="py-2 pr-4">{formatSizeRange(tier.loaMin, tier.loaMax)}</td>
+                                    <td className="py-2 pr-4 font-medium">{tier.rateYear || '—'}</td>
                                     <td className="py-2 pr-4">
                                       {STORAGE_TYPE_LABELS[tier.storageType as keyof typeof STORAGE_TYPE_LABELS] || tier.storageType}
                                     </td>
+                                    <td className="py-2 pr-4">{formatSizeRange(tier.loaMin, tier.loaMax)}</td>
                                     <td className="py-2 pr-4 text-right font-medium">
                                       {formatRateAmount(tier.amountCents)}
                                     </td>
@@ -611,7 +731,10 @@ export default function ViewCompModal({ open, onClose, comp, onEdit, onRateAdded
           setShowAddRateDialog(false);
           setRateForm(INITIAL_RATE_FORM);
           onRateAdded?.();
+          queryClient.invalidateQueries({ queryKey: queryKeys.comps.all });
           queryClient.invalidateQueries({ queryKey: ['/api/rate-comps'] });
+          queryClient.invalidateQueries({ queryKey: queryKeys.comps.tiers(comp.id) });
+          queryClient.invalidateQueries({ queryKey: ['/api/rate-comps', comp.id, 'tiers'] });
         }}
       />
     </Dialog>
@@ -673,6 +796,7 @@ function AddRateDialog({ open, onClose, rateCompId, marinaName, formData, setFor
       return;
     }
 
+    const rateYear = formData.rateYear ? parseInt(formData.rateYear) : new Date().getFullYear();
     const tierData = {
       storageType: formData.storageType || 'wet_slip',
       loaMin: formData.loaMin ? parseInt(formData.loaMin) : null,
@@ -683,7 +807,8 @@ function AddRateDialog({ open, onClose, rateCompId, marinaName, formData, setFor
       seasonality: formData.seasonality || 'annual',
       electricIncluded: formData.electricIncluded ?? false,
       waterIncluded: formData.waterIncluded ?? true,
-      isCurrentRate: true,
+      isCurrentRate: rateYear === new Date().getFullYear(),
+      rateYear,
     };
 
     createTierMutation.mutate(tierData);
@@ -704,7 +829,7 @@ function AddRateDialog({ open, onClose, rateCompId, marinaName, formData, setFor
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="storageType">Storage Type</Label>
               <Select value={formData.storageType} onValueChange={(v) => updateField('storageType', v)}>
@@ -730,6 +855,20 @@ function AddRateDialog({ open, onClose, rateCompId, marinaName, formData, setFor
                   <SelectItem value="seasonal">Seasonal</SelectItem>
                   <SelectItem value="winter">Winter</SelectItem>
                   <SelectItem value="summer">Summer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="rateYear">Rate Year</Label>
+              <Select value={formData.rateYear} onValueChange={(v) => updateField('rateYear', v)}>
+                <SelectTrigger id="rateYear" data-testid="select-rate-year">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+                    <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

@@ -6,6 +6,7 @@ export const queryKeys = {
     details: () => [...queryKeys.comps.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.comps.details(), id] as const,
     portfolios: ['rate-comps', 'portfolios'] as const,
+    tiers: (compId: string) => [`/api/rate-comps/${compId}/tiers`] as const,
   },
   
   columns: {

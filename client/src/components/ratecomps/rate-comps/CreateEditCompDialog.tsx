@@ -335,6 +335,8 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       setPendingRateTiers([]); // Clear pending tiers
       onClose();
       queryClient.invalidateQueries({ queryKey: queryKeys.comps.all });
+      queryClient.invalidateQueries({ queryKey: ['/api/rate-comps'] });
+      queryClient.invalidateQueries({ queryKey: ['rate-comps'] });
       // Invalidate project comps if editing in project context
       if (projectId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.projects.comps(projectId) });
@@ -375,6 +377,11 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       
       onClose();
       queryClient.invalidateQueries({ queryKey: queryKeys.comps.all });
+      queryClient.invalidateQueries({ queryKey: ['/api/rate-comps'] });
+      if (comp) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.comps.tiers(comp.id) });
+        queryClient.invalidateQueries({ queryKey: ['/api/rate-comps', comp.id, 'tiers'] });
+      }
       // Invalidate project comps if editing in project context
       if (projectId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.projects.comps(projectId) });
