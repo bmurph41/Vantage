@@ -256,8 +256,30 @@ export default function ArticleManagementPage() {
   const removeArticleMutation = useMutation({
     mutationFn: ({ id, reason }: { id: number; reason: string }) =>
       removeArticle(id, reason),
+    onMutate: async ({ id }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['/api/docktalk/articles'] });
+      
+      // Snapshot the previous value for rollback
+      const previousArticles = queryClient.getQueryData<Article[]>(['/api/docktalk/articles', filters]);
+      
+      // Optimistically remove the article from the cache
+      if (previousArticles) {
+        queryClient.setQueryData<Article[]>(['/api/docktalk/articles', filters], (old) =>
+          old?.filter(article => article.id !== id)
+        );
+      }
+      
+      return { previousArticles };
+    },
     onSuccess: () => {
+      // Invalidate all related queries for real-time updates
       queryClient.invalidateQueries({ queryKey: ['/api/docktalk/articles'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/articles/trending'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/analytics/categories'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/analytics/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/training/review-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/training/analytics'] });
       setRemoveArticleId(null);
       setRemoveReason("");
       toast({
@@ -265,7 +287,11 @@ export default function ArticleManagementPage() {
         description: "Article has been removed from the feed. This helps train the AI.",
       });
     },
-    onError: (error) => {
+    onError: (error, _variables, context) => {
+      // Rollback on error
+      if (context?.previousArticles) {
+        queryClient.setQueryData(['/api/docktalk/articles', filters], context.previousArticles);
+      }
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to remove article",
@@ -276,15 +302,39 @@ export default function ArticleManagementPage() {
 
   const deleteArticleMutation = useMutation({
     mutationFn: (id: number) => deleteArticle(id),
+    onMutate: async (id) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['/api/docktalk/articles'] });
+      
+      // Snapshot the previous value for rollback
+      const previousArticles = queryClient.getQueryData<Article[]>(['/api/docktalk/articles', filters]);
+      
+      // Optimistically remove the article from the cache
+      if (previousArticles) {
+        queryClient.setQueryData<Article[]>(['/api/docktalk/articles', filters], (old) =>
+          old?.filter(article => article.id !== id)
+        );
+      }
+      
+      return { previousArticles };
+    },
     onSuccess: () => {
+      // Invalidate all related queries for real-time updates
       queryClient.invalidateQueries({ queryKey: ['/api/docktalk/articles'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/articles/trending'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/analytics/categories'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/analytics/stats'] });
       setDeleteArticleId(null);
       toast({
         title: "Article Deleted",
         description: "Article has been permanently deleted.",
       });
     },
-    onError: (error) => {
+    onError: (error, _id, context) => {
+      // Rollback on error
+      if (context?.previousArticles) {
+        queryClient.setQueryData(['/api/docktalk/articles', filters], context.previousArticles);
+      }
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to delete article",
