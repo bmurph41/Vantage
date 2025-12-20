@@ -190,6 +190,7 @@ export interface IStorage {
   removeEntityFromWatchlist(watchlistId: string, entityId: number, userId: string, orgId: string): Promise<boolean>;
   getWatchlistEntities(watchlistId: string, userId: string, orgId: string): Promise<Entity[]>;
   getArticlesByWatchlist(watchlistId: string, userId: string, orgId: string, limit?: number, offset?: number): Promise<Article[]>;
+  backfillHistoricalArticlesForEntity(entityId: number, monthsBack?: number): Promise<{ matchedCount: number; linkedCount: number }>;
   
   // Deal methods
   createDeal(deal: InsertDocktalkDeal): Promise<DocktalkDeal>;
@@ -1637,6 +1638,76 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error('Error adding entity to watchlist:', error);
       return false;
+    }
+  }
+
+  // Backfill historical articles for an entity (past 6 months)
+  async backfillHistoricalArticlesForEntity(entityId: number, monthsBack: number = 6): Promise<{ matchedCount: number; linkedCount: number }> {
+    try {
+      // Get the entity details
+      const entity = await this.getEntityById(entityId);
+      if (!entity) {
+        return { matchedCount: 0, linkedCount: 0 };
+      }
+
+      // Build search terms from entity name and aliases
+      const searchTerms = [
+        entity.name,
+        entity.normalizedName,
+        ...(entity.aliases || []).filter((a: string) => a && a.trim().length > 0)
+      ].filter(Boolean) as string[];
+
+      if (searchTerms.length === 0) {
+        return { matchedCount: 0, linkedCount: 0 };
+      }
+
+      // Calculate date cutoff (default 6 months back)
+      const cutoffDate = new Date();
+      cutoffDate.setMonth(cutoffDate.getMonth() - monthsBack);
+
+      // Build OR conditions for each search term
+      const searchConditions = searchTerms.flatMap(term => [
+        ilike(articles.searchText, `%${term}%`),
+        ilike(articles.title, `%${term}%`)
+      ]);
+
+      // Find historical articles matching the entity
+      const matchingArticles = await db
+        .select({ id: articles.id })
+        .from(articles)
+        .where(
+          and(
+            eq(articles.isRemoved, false),
+            gte(articles.publishedAt, cutoffDate),
+            or(...searchConditions)
+          )
+        )
+        .limit(500); // Limit to prevent overwhelming the system
+
+      const matchedCount = matchingArticles.length;
+      let linkedCount = 0;
+
+      // Create article-entity links for matches
+      for (const article of matchingArticles) {
+        try {
+          await db.insert(articleEntities).values({
+            articleId: article.id,
+            entityId: entityId,
+            mentionCount: 1,
+            confidence: 0.7, // Medium confidence for backfilled matches
+            context: 'Backfilled from historical search'
+          }).onConflictDoNothing();
+          linkedCount++;
+        } catch (linkError) {
+          // Ignore duplicate key errors
+        }
+      }
+
+      console.log(`[Watchlist Backfill] Entity ${entity.name}: matched ${matchedCount} articles, linked ${linkedCount} new`);
+      return { matchedCount, linkedCount };
+    } catch (error) {
+      console.error('[Watchlist Backfill] Error:', error);
+      return { matchedCount: 0, linkedCount: 0 };
     }
   }
 

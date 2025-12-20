@@ -1504,7 +1504,15 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
         return res.status(404).json({ error: "Watchlist not found or entity already added" });
       }
 
-      res.status(201).json({ success: true });
+      // Backfill historical articles for this entity (past 6 months)
+      // This populates matches from existing articles so the watchlist shows historical data
+      const backfillResult = await dockTalkStorage.backfillHistoricalArticlesForEntity(entityId, 6);
+      
+      res.status(201).json({ 
+        success: true,
+        historicalMatches: backfillResult.matchedCount,
+        newLinks: backfillResult.linkedCount
+      });
     } catch (error) {
       console.error("Error adding entity to watchlist:", error);
       res.status(500).json({ error: "Internal server error" });
