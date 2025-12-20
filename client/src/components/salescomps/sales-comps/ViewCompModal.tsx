@@ -1,8 +1,7 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Edit, ExternalLink, MapPin, Building2, DollarSign, Calendar, Users, FileText, Waves } from "lucide-react";
+import { Edit, ExternalLink, MapPin, Calendar, Anchor, Ship, Users, FileText, Droplets, Building } from "lucide-react";
 import type { SalesComp } from "@shared/schema";
 import { formatCurrency } from "@/lib/salescomps/format";
 
@@ -28,298 +27,204 @@ export default function ViewCompModal({ open, onClose, comp, onEdit }: ViewCompM
     return `${monthNames[month - 1]} ${year}`;
   };
 
+  const totalUnits = (comp.wetSlips || 0) + (comp.dryRacks || 0);
+  const pricePerUnit = totalUnits > 0 && comp.salePrice ? Math.round(Number(comp.salePrice) / totalUnits) : null;
+
+  const DataRow = ({ label, value, testId }: { label: string; value: React.ReactNode; testId?: string }) => (
+    <div className="flex justify-between items-baseline py-1.5 border-b border-border/50 last:border-0">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-sm font-medium text-right" data-testid={testId}>{value}</span>
+    </div>
+  );
+
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <div className="flex items-start justify-between">
-            <div>
-              <DialogTitle className="text-2xl mb-2">{comp.marina}</DialogTitle>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <MapPin className="h-4 w-4" />
-                <span>
-                  {[comp.city, comp.state].filter(Boolean).join(', ') || '—'}
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto p-0">
+        <DialogHeader className="px-5 pt-5 pb-3 border-b bg-muted/30">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="text-lg font-semibold truncate">{comp.marina}</DialogTitle>
+              <DialogDescription className="flex items-center gap-1.5 text-sm mt-1">
+                <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
+                <span className="truncate">
+                  {[comp.address, comp.city, comp.state].filter(Boolean).join(', ') || 'Location not specified'}
                 </span>
-              </div>
+              </DialogDescription>
             </div>
-            <Button onClick={() => onEdit?.(comp)} data-testid="button-edit-comp">
-              <Edit className="h-4 w-4 mr-2" />
+            <Button size="sm" onClick={() => onEdit?.(comp)} data-testid="button-edit-comp">
+              <Edit className="h-3.5 w-3.5 mr-1.5" />
               Edit
             </Button>
           </div>
         </DialogHeader>
 
-        <div className="space-y-6 pt-4">
-          {/* Financial Information */}
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-              <DollarSign className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-semibold">Financial Information</h3>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Sale Price</p>
-                <p className="font-medium" data-testid="text-sale-price">
-                  {comp.isPriceDisclosed && comp.salePrice 
-                    ? formatCurrency(comp.salePrice)
-                    : comp.salePrice ? `${formatCurrency(comp.salePrice)} (Undisclosed)` : '—'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">List Price</p>
-                <p className="font-medium" data-testid="text-list-price">
-                  {comp.listPrice ? formatCurrency(comp.listPrice) : '—'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Cap Rate</p>
-                <p className="font-medium" data-testid="text-cap-rate">
-                  {comp.isCapRateDisclosed && comp.capRate 
-                    ? `${(comp.capRate / 100).toFixed(2)}%`
-                    : comp.capRate ? `${(comp.capRate / 100).toFixed(2)}% (Undisclosed)` : '—'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">NOI</p>
-                <p className="font-medium" data-testid="text-noi">
-                  {comp.isNoiDisclosed && comp.noi 
-                    ? formatCurrency(comp.noi)
-                    : comp.noi ? `${formatCurrency(comp.noi)} (Undisclosed)` : '—'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Days on Market</p>
-                <p className="font-medium" data-testid="text-dom">
-                  {formatValue(comp.daysOnMarket)}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Sale Condition</p>
-                <p className="font-medium" data-testid="text-sale-condition">
-                  {formatValue(comp.saleCondition)}
-                </p>
-              </div>
-            </div>
-          </section>
+        <div className="grid grid-cols-4 gap-0 border-b bg-gradient-to-b from-muted/20 to-transparent">
+          <div className="p-3 text-center border-r border-border/50">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Sale Price</p>
+            <p className="text-base font-bold text-primary" data-testid="text-sale-price-hero">
+              {comp.salePrice ? formatCurrency(comp.salePrice) : '—'}
+            </p>
+            {!comp.isPriceDisclosed && comp.salePrice && (
+              <Badge variant="outline" className="text-[9px] mt-0.5">Undisclosed</Badge>
+            )}
+          </div>
+          <div className="p-3 text-center border-r border-border/50">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Cap Rate</p>
+            <p className="text-base font-bold" data-testid="text-cap-rate-hero">
+              {comp.capRate ? `${(Number(comp.capRate) / 100).toFixed(2)}%` : '—'}
+            </p>
+          </div>
+          <div className="p-3 text-center border-r border-border/50">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Sale Date</p>
+            <p className="text-base font-bold" data-testid="text-sale-date-hero">
+              {formatDate(comp.saleMonth, comp.saleYear)}
+            </p>
+          </div>
+          <div className="p-3 text-center">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Total Units</p>
+            <p className="text-base font-bold" data-testid="text-units-hero">
+              {totalUnits > 0 ? totalUnits.toLocaleString() : '—'}
+            </p>
+          </div>
+        </div>
 
-          <Separator />
-
-          {/* Property Details */}
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-              <Building2 className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-semibold">Property Details</h3>
+        <div className="p-4 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-card border rounded-lg p-3">
+              <div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b">
+                <Building className="h-3.5 w-3.5 text-primary" />
+                <h4 className="text-xs font-semibold uppercase tracking-wide">Financials</h4>
+              </div>
+              <div className="space-y-0">
+                <DataRow label="Sale Price" value={comp.salePrice ? formatCurrency(comp.salePrice) : '—'} testId="text-sale-price" />
+                <DataRow label="List Price" value={comp.listPrice ? formatCurrency(comp.listPrice) : '—'} testId="text-list-price" />
+                <DataRow label="NOI" value={comp.noi ? formatCurrency(comp.noi) : '—'} testId="text-noi" />
+                <DataRow label="Cap Rate" value={comp.capRate ? `${(Number(comp.capRate) / 100).toFixed(2)}%` : '—'} testId="text-cap-rate" />
+                <DataRow label="$/Unit" value={pricePerUnit ? formatCurrency(pricePerUnit) : '—'} testId="text-price-per-unit" />
+                <DataRow label="Days on Market" value={formatValue(comp.daysOnMarket)} testId="text-dom" />
+              </div>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Sale Date</p>
-                <p className="font-medium flex items-center gap-2" data-testid="text-sale-date">
-                  <Calendar className="h-4 w-4" />
-                  {formatDate(comp.saleMonth, comp.saleYear)}
-                </p>
+
+            <div className="bg-card border rounded-lg p-3">
+              <div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b">
+                <Anchor className="h-3.5 w-3.5 text-primary" />
+                <h4 className="text-xs font-semibold uppercase tracking-wide">Property</h4>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Wet Slips</p>
-                <p className="font-medium" data-testid="text-wet-slips">
-                  {formatValue(comp.wetSlips)}
-                </p>
+              <div className="space-y-0">
+                <DataRow label="Wet Slips" value={formatValue(comp.wetSlips)} testId="text-wet-slips" />
+                <DataRow label="Dry Racks" value={formatValue(comp.dryRacks)} testId="text-dry-racks" />
+                <DataRow label="Total Units" value={totalUnits > 0 ? totalUnits : '—'} testId="text-total-units" />
+                <DataRow label="Acres" value={formatValue(comp.acres)} testId="text-acres" />
+                <DataRow label="Occupancy" value={comp.occupancy ? `${comp.occupancy}%` : '—'} testId="text-occupancy" />
+                <DataRow label="Year Built" value={formatValue(comp.yearBuilt)} testId="text-year-built" />
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Dry Racks</p>
-                <p className="font-medium" data-testid="text-dry-racks">
-                  {formatValue(comp.dryRacks)}
-                </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-card border rounded-lg p-3">
+              <div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b">
+                <Droplets className="h-3.5 w-3.5 text-primary" />
+                <h4 className="text-xs font-semibold uppercase tracking-wide">Location</h4>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Occupancy</p>
-                <p className="font-medium" data-testid="text-occupancy">
-                  {comp.occupancy ? `${comp.occupancy}%` : '—'}
-                </p>
+              <div className="space-y-0">
+                <DataRow label="Address" value={formatValue(comp.address)} testId="text-address" />
+                <DataRow label="City" value={formatValue(comp.city)} testId="text-city" />
+                <DataRow label="State" value={formatValue(comp.state)} testId="text-state" />
+                <DataRow label="ZIP" value={formatValue(comp.zip)} testId="text-zip" />
+                <DataRow label="Region" value={formatValue(comp.region)} testId="text-region" />
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Acres</p>
-                <p className="font-medium" data-testid="text-acres">
-                  {formatValue(comp.acres)}
-                </p>
+            </div>
+
+            <div className="bg-card border rounded-lg p-3">
+              <div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b">
+                <Ship className="h-3.5 w-3.5 text-primary" />
+                <h4 className="text-xs font-semibold uppercase tracking-wide">Water Access</h4>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Year Built</p>
-                <p className="font-medium" data-testid="text-year-built">
-                  {formatValue(comp.yearBuilt)}
-                </p>
+              <div className="space-y-0">
+                <DataRow label="Body of Water" value={formatValue(comp.bodyOfWater)} testId="text-body-of-water" />
+                <DataRow label="Water Body Name" value={formatValue(comp.waterBodyName)} testId="text-water-body-name" />
+                <DataRow label="Waterfront" value={formatValue(comp.waterfront)} testId="text-waterfront" />
               </div>
               {comp.storageTypes && comp.storageTypes.length > 0 && (
-                <div className="col-span-2 md:col-span-3">
-                  <p className="text-sm text-muted-foreground mb-1">Storage Types</p>
-                  <div className="flex flex-wrap gap-2">
+                <div className="mt-2 pt-2 border-t border-border/50">
+                  <p className="text-xs text-muted-foreground mb-1.5">Storage Types</p>
+                  <div className="flex flex-wrap gap-1">
                     {comp.storageTypes.map((type, idx) => (
-                      <Badge key={idx} variant="secondary">{type}</Badge>
+                      <Badge key={idx} variant="secondary" className="text-[10px] px-1.5 py-0">{type}</Badge>
                     ))}
                   </div>
                 </div>
               )}
             </div>
-          </section>
+          </div>
 
-          <Separator />
-
-          {/* Location */}
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-              <Waves className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-semibold">Location & Water</h3>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Address</p>
-                <p className="font-medium" data-testid="text-address">
-                  {formatValue(comp.address)}
-                </p>
+          {(comp.seller || comp.company || comp.brokerage || comp.broker) && (
+            <div className="bg-card border rounded-lg p-3">
+              <div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b">
+                <Users className="h-3.5 w-3.5 text-primary" />
+                <h4 className="text-xs font-semibold uppercase tracking-wide">Transaction Parties</h4>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">ZIP Code</p>
-                <p className="font-medium" data-testid="text-zip">
-                  {formatValue(comp.zip)}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Region</p>
-                <p className="font-medium" data-testid="text-region">
-                  {formatValue(comp.region)}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Body of Water</p>
-                <p className="font-medium" data-testid="text-body-of-water">
-                  {formatValue(comp.bodyOfWater)}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Water Body Name</p>
-                <p className="font-medium" data-testid="text-water-body-name">
-                  {formatValue(comp.waterBodyName)}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Waterfront</p>
-                <p className="font-medium" data-testid="text-waterfront">
-                  {formatValue(comp.waterfront)}
-                </p>
-              </div>
-            </div>
-          </section>
-
-          <Separator />
-
-          {/* Transaction Parties */}
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-              <Users className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-semibold">Transaction Parties</h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <p className="text-sm font-medium mb-3">Seller</p>
-                <div className="space-y-2">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Company</p>
-                    <p className="text-sm" data-testid="text-seller-company">
-                      {formatValue(comp.sellerCompany)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Principal</p>
-                    <p className="text-sm" data-testid="text-seller-principal">
-                      {formatValue(comp.sellerPrincipal)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Legacy Seller Field</p>
-                    <p className="text-sm" data-testid="text-seller">
-                      {formatValue(comp.seller)}
-                    </p>
-                  </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Seller</p>
+                  <p className="text-sm font-medium" data-testid="text-seller">{formatValue(comp.seller)}</p>
+                  {comp.owner && <p className="text-xs text-muted-foreground">{comp.owner}</p>}
                 </div>
-              </div>
-              <div>
-                <p className="text-sm font-medium mb-3">Buyer</p>
-                <div className="space-y-2">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Company</p>
-                    <p className="text-sm" data-testid="text-buyer-company">
-                      {formatValue(comp.buyerCompany)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Principal</p>
-                    <p className="text-sm" data-testid="text-buyer-principal">
-                      {formatValue(comp.buyerPrincipal)}
-                    </p>
-                  </div>
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Buyer</p>
+                  <p className="text-sm font-medium" data-testid="text-buyer">{formatValue(comp.company)}</p>
                 </div>
-              </div>
-              <div>
-                <p className="text-sm font-medium mb-3">Brokerage</p>
-                <div className="space-y-2">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Brokerage Name</p>
-                    <p className="text-sm" data-testid="text-brokerage">
-                      {formatValue(comp.brokerage)}
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Broker</p>
+                  <p className="text-sm font-medium" data-testid="text-broker">{formatValue(comp.brokerage || comp.broker)}</p>
+                  {comp.agentFirstName && (
+                    <p className="text-xs text-muted-foreground">
+                      {[comp.agentFirstName, comp.agentLastName].filter(Boolean).join(' ')}
                     </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Agent</p>
-                    <p className="text-sm" data-testid="text-agent">
-                      {[comp.agentFirstName, comp.agentLastName].filter(Boolean).join(' ') || '—'}
-                    </p>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
-          </section>
-
-          {/* Article URLs */}
-          {comp.articleUrls && comp.articleUrls.length > 0 && comp.articleUrls[0] !== '' && (
-            <>
-              <Separator />
-              <section>
-                <div className="flex items-center gap-2 mb-4">
-                  <ExternalLink className="h-5 w-5 text-primary" />
-                  <h3 className="text-lg font-semibold">Article Links</h3>
-                </div>
-                <div className="space-y-2">
-                  {comp.articleUrls.map((url, idx) => (
-                    <a
-                      key={idx}
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-blue-600 hover:underline flex items-center gap-2"
-                      data-testid={`link-article-${idx}`}
-                    >
-                      <ExternalLink className="h-3 w-3" />
-                      {url}
-                    </a>
-                  ))}
-                </div>
-              </section>
-            </>
           )}
 
-          {/* Notes */}
+          {comp.articleUrls && comp.articleUrls.length > 0 && comp.articleUrls[0] !== '' && (
+            <div className="bg-card border rounded-lg p-3">
+              <div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b">
+                <ExternalLink className="h-3.5 w-3.5 text-primary" />
+                <h4 className="text-xs font-semibold uppercase tracking-wide">Sources</h4>
+              </div>
+              <div className="space-y-1">
+                {comp.articleUrls.slice(0, 3).map((url, idx) => (
+                  <a
+                    key={idx}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-600 hover:underline flex items-center gap-1.5 truncate"
+                    data-testid={`link-article-${idx}`}
+                  >
+                    <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">{url}</span>
+                  </a>
+                ))}
+                {comp.articleUrls.length > 3 && (
+                  <p className="text-xs text-muted-foreground">+{comp.articleUrls.length - 3} more</p>
+                )}
+              </div>
+            </div>
+          )}
+
           {comp.notes && (
-            <>
-              <Separator />
-              <section>
-                <div className="flex items-center gap-2 mb-4">
-                  <FileText className="h-5 w-5 text-primary" />
-                  <h3 className="text-lg font-semibold">Notes</h3>
-                </div>
-                <p className="text-sm whitespace-pre-wrap" data-testid="text-notes">
-                  {comp.notes}
-                </p>
-              </section>
-            </>
+            <div className="bg-card border rounded-lg p-3">
+              <div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b">
+                <FileText className="h-3.5 w-3.5 text-primary" />
+                <h4 className="text-xs font-semibold uppercase tracking-wide">Notes</h4>
+              </div>
+              <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed" data-testid="text-notes">
+                {comp.notes}
+              </p>
+            </div>
           )}
         </div>
       </DialogContent>

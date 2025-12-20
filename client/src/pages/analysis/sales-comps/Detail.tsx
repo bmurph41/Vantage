@@ -112,7 +112,7 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
       state: formData.state || undefined,
       address: formData.address || undefined,
       notes: formData.notes || undefined,
-      buyerCompany: formData.buyer || undefined,
+      company: formData.company || undefined,
       seller: formData.seller || undefined,
       broker: formData.broker || undefined,
       salePrice: parseNum(formData.salePrice),
@@ -122,7 +122,7 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
       wetSlips: parseNum(formData.wetSlips),
       dryRacks: parseNum(formData.dryRacks),
       noi: parseNum(formData.noi),
-      listPrice: parseNum(formData.listingPrice),
+      listPrice: parseNum(formData.listPrice),
     };
 
     Object.keys(updateData).forEach(key => {
@@ -405,7 +405,7 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
                 {renderField('Sale Month', 'saleMonth', { type: 'select', selectOptions: MONTHS })}
                 {renderField('Sale Year', 'saleYear', { type: 'number', placeholder: 'YYYY' })}
                 {renderField('Sale Price', 'salePrice', { type: 'currency', prefix: '$', placeholder: 'Sale price' })}
-                {renderField('Listing Price', 'listingPrice', { type: 'currency', prefix: '$', placeholder: 'Original listing price' })}
+                {renderField('Listing Price', 'listPrice', { type: 'currency', prefix: '$', placeholder: 'Original listing price' })}
               </CardContent>
             </Card>
           </div>
@@ -477,7 +477,7 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
                 <CardTitle className="text-base">Transaction Parties</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {renderField('Buyer', 'buyer', { placeholder: 'Buyer name' })}
+                {renderField('Buyer Company', 'company', { placeholder: 'Buyer company name' })}
                 {renderField('Seller', 'seller', { placeholder: 'Seller name' })}
                 {renderField('Broker', 'broker', { placeholder: 'Broker name' })}
               </CardContent>
