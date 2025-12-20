@@ -123,6 +123,10 @@ export default function CompsDataGrid({
     },
   });
 
+  const formatRateValue = (value: number): string => {
+    return value.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  };
+
   const buildRateSummary = (comp: RateComp & { tiers?: any[]; tierCount?: number }) => {
     const tiers = (comp as any).tiers || [];
     const tierCount = (comp as any).tierCount || 0;
@@ -137,29 +141,25 @@ export default function CompsDataGrid({
           hasRates: !!rateAmount || !!storageType,
           totalStorageTypes: 1,
           totalRates: 1,
-          overallMin: rateAmount,
-          overallMax: rateAmount,
+          rangeText: rateAmount ? `$${formatRateValue(rateAmount)}/mo` : null,
           hasUndated: true,
           years: [],
           storageGroups: [{
             storageType,
             label: STORAGE_TYPE_LABELS[storageType as keyof typeof STORAGE_TYPE_LABELS] || storageType,
             tierCount: 1,
-            minRate: rateAmount,
-            maxRate: rateAmount,
-            rateText: rateAmount ? formatCurrency(rateAmount) : null,
+            rateText: rateAmount ? `$${formatRateValue(rateAmount)}/mo` : null,
           }],
         };
       }
-      return { hasRates: false, totalStorageTypes: 0, totalRates: 0, overallMin: null, overallMax: null, hasUndated: false, years: [], storageGroups: [] };
+      return { hasRates: false, totalStorageTypes: 0, totalRates: 0, rangeText: null, hasUndated: false, years: [], storageGroups: [] };
     }
 
     const tiersByStorage: Record<string, any[]> = {};
-    const allMonthlyRates: number[] = [];
     const yearsSet = new Set<number>();
     let hasUndated = false;
-    let hasPerFootRates = false;
-    let hasFlatRates = false;
+    const perFootRates: number[] = [];
+    const flatRates: number[] = [];
 
     tiers.forEach((tier: any) => {
       const storageType = tier.storageType || 'unknown';
@@ -176,69 +176,109 @@ export default function CompsDataGrid({
         hasUndated = true;
       }
 
-      // Calculate monthly rate for overall range
+      // Collect rates by type (don't mix per-foot with flat)
       if (tier.amountCents) {
         const isPerFoot = tier.rateUnit === 'per_foot' || tier.rateUnit === 'per_foot_loa';
         let monthlyAmountCents = tier.amountCents;
         if (tier.ratePeriod === 'annual') monthlyAmountCents = tier.amountCents / 12;
         
         if (isPerFoot) {
-          hasPerFootRates = true;
-          const avgLoa = (tier.loaMin && tier.loaMax) ? (tier.loaMin + tier.loaMax) / 2 : tier.loaMax || tier.loaMin || 35;
-          allMonthlyRates.push((monthlyAmountCents / 100) * avgLoa);
+          perFootRates.push(monthlyAmountCents / 100);
         } else {
-          hasFlatRates = true;
-          allMonthlyRates.push(monthlyAmountCents / 100);
+          flatRates.push(monthlyAmountCents / 100);
         }
       }
     });
 
     const storageGroups = Object.entries(tiersByStorage).map(([storageType, storageTiers]) => {
-      const monthlyRates = storageTiers.map((tier: any) => {
-        if (!tier.amountCents) return null;
+      // Separate per-foot and flat rates for this storage type
+      const groupPerFootRates: number[] = [];
+      const groupFlatRates: number[] = [];
+      
+      storageTiers.forEach((tier: any) => {
+        if (!tier.amountCents) return;
         const isPerFoot = tier.rateUnit === 'per_foot' || tier.rateUnit === 'per_foot_loa';
         let monthlyAmountCents = tier.amountCents;
         if (tier.ratePeriod === 'annual') monthlyAmountCents = tier.amountCents / 12;
         
         if (isPerFoot) {
-          const avgLoa = (tier.loaMin && tier.loaMax) ? (tier.loaMin + tier.loaMax) / 2 : tier.loaMax || tier.loaMin || 35;
-          return (monthlyAmountCents / 100) * avgLoa;
-        }
-        return monthlyAmountCents / 100;
-      }).filter((r): r is number => r !== null);
-
-      const minRate = monthlyRates.length > 0 ? Math.min(...monthlyRates) : null;
-      const maxRate = monthlyRates.length > 0 ? Math.max(...monthlyRates) : null;
-      
-      let rateText = null;
-      if (minRate !== null && maxRate !== null) {
-        if (minRate === maxRate) {
-          rateText = `$${minRate.toFixed(0)}/mo`;
+          groupPerFootRates.push(monthlyAmountCents / 100);
         } else {
-          rateText = `$${minRate.toFixed(0)}-$${maxRate.toFixed(0)}/mo`;
+          groupFlatRates.push(monthlyAmountCents / 100);
         }
+      });
+
+      // Build rate text based on what types of rates exist
+      let rateText = null;
+      const parts: string[] = [];
+      
+      if (groupPerFootRates.length > 0) {
+        const minPf = Math.min(...groupPerFootRates);
+        const maxPf = Math.max(...groupPerFootRates);
+        if (minPf === maxPf) {
+          parts.push(`$${formatRateValue(minPf)}/ft/mo`);
+        } else {
+          parts.push(`$${formatRateValue(minPf)}-$${formatRateValue(maxPf)}/ft/mo`);
+        }
+      }
+      
+      if (groupFlatRates.length > 0) {
+        const minFlat = Math.min(...groupFlatRates);
+        const maxFlat = Math.max(...groupFlatRates);
+        if (minFlat === maxFlat) {
+          parts.push(`$${formatRateValue(minFlat)}/mo`);
+        } else {
+          parts.push(`$${formatRateValue(minFlat)}-$${formatRateValue(maxFlat)}/mo`);
+        }
+      }
+      
+      if (parts.length > 0) {
+        rateText = parts.join(', ');
       }
 
       return {
         storageType,
         label: STORAGE_TYPE_LABELS[storageType as keyof typeof STORAGE_TYPE_LABELS] || storageType,
         tierCount: storageTiers.length,
-        minRate,
-        maxRate,
         rateText,
       };
     });
 
+    // Build overall range text
+    let rangeText = null;
+    const rangeParts: string[] = [];
+    
+    if (perFootRates.length > 0) {
+      const minPf = Math.min(...perFootRates);
+      const maxPf = Math.max(...perFootRates);
+      if (minPf === maxPf) {
+        rangeParts.push(`$${formatRateValue(minPf)}/ft/mo`);
+      } else {
+        rangeParts.push(`$${formatRateValue(minPf)}-$${formatRateValue(maxPf)}/ft/mo`);
+      }
+    }
+    
+    if (flatRates.length > 0) {
+      const minFlat = Math.min(...flatRates);
+      const maxFlat = Math.max(...flatRates);
+      if (minFlat === maxFlat) {
+        rangeParts.push(`$${formatRateValue(minFlat)}/mo`);
+      } else {
+        rangeParts.push(`$${formatRateValue(minFlat)}-$${formatRateValue(maxFlat)}/mo`);
+      }
+    }
+    
+    if (rangeParts.length > 0) {
+      rangeText = rangeParts.join(', ');
+    }
+
     const years = Array.from(yearsSet).sort((a, b) => b - a);
-    const overallMin = allMonthlyRates.length > 0 ? Math.min(...allMonthlyRates) : null;
-    const overallMax = allMonthlyRates.length > 0 ? Math.max(...allMonthlyRates) : null;
 
     return { 
       hasRates: true, 
       totalStorageTypes: Object.keys(tiersByStorage).length,
       totalRates: tierCount,
-      overallMin,
-      overallMax,
+      rangeText,
       hasUndated,
       years,
       storageGroups,
@@ -282,16 +322,6 @@ export default function CompsDataGrid({
           return <span className="text-muted-foreground text-sm">No rates</span>;
         }
 
-        // Build condensed summary text
-        let rangeText = '';
-        if (summary.overallMin !== null && summary.overallMax !== null) {
-          if (summary.overallMin === summary.overallMax) {
-            rangeText = `$${summary.overallMin.toFixed(0)}/mo`;
-          } else {
-            rangeText = `$${summary.overallMin.toFixed(0)}-$${summary.overallMax.toFixed(0)}/mo`;
-          }
-        }
-
         const canExpand = summary.totalRates > 0;
 
         return (
@@ -313,10 +343,10 @@ export default function CompsDataGrid({
                 <span className="text-muted-foreground">
                   {summary.totalStorageTypes} type{summary.totalStorageTypes !== 1 ? 's' : ''}
                 </span>
-                {rangeText && (
+                {summary.rangeText && (
                   <>
                     <span className="text-border">•</span>
-                    <span className="font-medium">{rangeText}</span>
+                    <span className="font-medium">{summary.rangeText}</span>
                   </>
                 )}
                 {summary.years.length > 0 && (
