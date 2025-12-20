@@ -23,6 +23,26 @@ import { useMutation } from "@tanstack/react-query";
 import type { RateComp } from "@shared/schema";
 import { STORAGE_TYPE_LABELS } from "@shared/ratecomps-utils";
 
+// Helper to get the period suffix for display
+function getPeriodSuffix(ratePeriod: string): string {
+  switch (ratePeriod) {
+    case 'daily': return '/day';
+    case 'weekly': return '/wk';
+    case 'monthly': return '/mo';
+    case 'seasonal': return '/season';
+    case 'annual': return '/yr';
+    default: return '/mo';
+  }
+}
+
+// Helper to get the unit suffix for display
+function getUnitSuffix(rateUnit: string): string {
+  if (rateUnit === 'per_foot' || rateUnit === 'per_foot_loa') return '/ft';
+  if (rateUnit === 'per_foot_beam') return '/ft';
+  if (rateUnit === 'per_sf') return '/SF';
+  return '';
+}
+
 interface CompsDataGridProps {
   data: RateComp[];
   loading: boolean;
@@ -158,9 +178,12 @@ export default function CompsDataGrid({
     const tiersByStorage: Record<string, any[]> = {};
     const yearsSet = new Set<number>();
     let hasUndated = false;
-    const perFootRates: number[] = [];
-    const flatRates: number[] = [];
-
+    
+    // Group rates by period AND unit type for accurate display
+    type RateGroup = { amounts: number[]; unit: string; period: string };
+    const rateGroups: RateGroup[] = [];
+    const rateGroupMap: Record<string, RateGroup> = {};
+    
     tiers.forEach((tier: any) => {
       const storageType = tier.storageType || 'unknown';
       if (!tiersByStorage[storageType]) {
@@ -176,65 +199,56 @@ export default function CompsDataGrid({
         hasUndated = true;
       }
 
-      // Collect rates by type (don't mix per-foot with flat)
+      // Group rates by unit type and period for accurate display
       if (tier.amountCents) {
-        const isPerFoot = tier.rateUnit === 'per_foot' || tier.rateUnit === 'per_foot_loa';
-        let monthlyAmountCents = tier.amountCents;
-        if (tier.ratePeriod === 'annual') monthlyAmountCents = tier.amountCents / 12;
+        const unit = tier.rateUnit || 'flat';
+        const period = tier.ratePeriod || 'monthly';
+        const amount = tier.amountCents / 100;
+        const key = `${unit}|${period}`;
         
-        if (isPerFoot) {
-          perFootRates.push(monthlyAmountCents / 100);
-        } else {
-          flatRates.push(monthlyAmountCents / 100);
+        if (!rateGroupMap[key]) {
+          const group = { amounts: [], unit, period };
+          rateGroupMap[key] = group;
+          rateGroups.push(group);
         }
+        rateGroupMap[key].amounts.push(amount);
       }
     });
 
     const storageGroups = Object.entries(tiersByStorage).map(([storageType, storageTiers]) => {
-      // Separate per-foot and flat rates for this storage type
-      const groupPerFootRates: number[] = [];
-      const groupFlatRates: number[] = [];
+      // Group rates by unit+period for accurate display within this storage type
+      const groupRateMap: Record<string, { amounts: number[]; unit: string; period: string }> = {};
       
       storageTiers.forEach((tier: any) => {
         if (!tier.amountCents) return;
-        const isPerFoot = tier.rateUnit === 'per_foot' || tier.rateUnit === 'per_foot_loa';
-        let monthlyAmountCents = tier.amountCents;
-        if (tier.ratePeriod === 'annual') monthlyAmountCents = tier.amountCents / 12;
+        const unit = tier.rateUnit || 'flat';
+        const period = tier.ratePeriod || 'monthly';
+        const amount = tier.amountCents / 100;
+        const key = `${unit}|${period}`;
         
-        if (isPerFoot) {
-          groupPerFootRates.push(monthlyAmountCents / 100);
-        } else {
-          groupFlatRates.push(monthlyAmountCents / 100);
+        if (!groupRateMap[key]) {
+          groupRateMap[key] = { amounts: [], unit, period };
         }
+        groupRateMap[key].amounts.push(amount);
       });
 
-      // Build rate text based on what types of rates exist
-      let rateText = null;
+      // Build rate text with each unit+period group shown separately
       const parts: string[] = [];
       
-      if (groupPerFootRates.length > 0) {
-        const minPf = Math.min(...groupPerFootRates);
-        const maxPf = Math.max(...groupPerFootRates);
-        if (minPf === maxPf) {
-          parts.push(`$${formatRateValue(minPf)}/ft/mo`);
+      Object.values(groupRateMap).forEach(group => {
+        const unitSuffix = getUnitSuffix(group.unit);
+        const periodSuffix = getPeriodSuffix(group.period);
+        const minRate = Math.min(...group.amounts);
+        const maxRate = Math.max(...group.amounts);
+        
+        if (minRate === maxRate) {
+          parts.push(`$${formatRateValue(minRate)}${unitSuffix}${periodSuffix}`);
         } else {
-          parts.push(`$${formatRateValue(minPf)}-$${formatRateValue(maxPf)}/ft/mo`);
+          parts.push(`$${formatRateValue(minRate)}-$${formatRateValue(maxRate)}${unitSuffix}${periodSuffix}`);
         }
-      }
+      });
       
-      if (groupFlatRates.length > 0) {
-        const minFlat = Math.min(...groupFlatRates);
-        const maxFlat = Math.max(...groupFlatRates);
-        if (minFlat === maxFlat) {
-          parts.push(`$${formatRateValue(minFlat)}/mo`);
-        } else {
-          parts.push(`$${formatRateValue(minFlat)}-$${formatRateValue(maxFlat)}/mo`);
-        }
-      }
-      
-      if (parts.length > 0) {
-        rateText = parts.join(', ');
-      }
+      const rateText = parts.length > 0 ? parts.join(', ') : null;
 
       return {
         storageType,
@@ -244,33 +258,23 @@ export default function CompsDataGrid({
       };
     });
 
-    // Build overall range text
-    let rangeText = null;
+    // Build overall range text - group by unit+period for accuracy
     const rangeParts: string[] = [];
     
-    if (perFootRates.length > 0) {
-      const minPf = Math.min(...perFootRates);
-      const maxPf = Math.max(...perFootRates);
-      if (minPf === maxPf) {
-        rangeParts.push(`$${formatRateValue(minPf)}/ft/mo`);
+    rateGroups.forEach(group => {
+      const unitSuffix = getUnitSuffix(group.unit);
+      const periodSuffix = getPeriodSuffix(group.period);
+      const minRate = Math.min(...group.amounts);
+      const maxRate = Math.max(...group.amounts);
+      
+      if (minRate === maxRate) {
+        rangeParts.push(`$${formatRateValue(minRate)}${unitSuffix}${periodSuffix}`);
       } else {
-        rangeParts.push(`$${formatRateValue(minPf)}-$${formatRateValue(maxPf)}/ft/mo`);
+        rangeParts.push(`$${formatRateValue(minRate)}-$${formatRateValue(maxRate)}${unitSuffix}${periodSuffix}`);
       }
-    }
+    });
     
-    if (flatRates.length > 0) {
-      const minFlat = Math.min(...flatRates);
-      const maxFlat = Math.max(...flatRates);
-      if (minFlat === maxFlat) {
-        rangeParts.push(`$${formatRateValue(minFlat)}/mo`);
-      } else {
-        rangeParts.push(`$${formatRateValue(minFlat)}-$${formatRateValue(maxFlat)}/mo`);
-      }
-    }
-    
-    if (rangeParts.length > 0) {
-      rangeText = rangeParts.join(', ');
-    }
+    const rangeText = rangeParts.length > 0 ? rangeParts.join(', ') : null;
 
     const years = Array.from(yearsSet).sort((a, b) => b - a);
 
