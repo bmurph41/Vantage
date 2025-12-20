@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -84,12 +84,33 @@ export default function CompsDataGrid({
     { key: 'actions', label: '', width: 80, sortable: false },
   ];
 
+  const getRowHeight = useCallback((index: number) => {
+    const comp = data[index];
+    if (!comp) return 52;
+    if (expandedRows.has(comp.id)) {
+      const tiers = (comp as any).tiers || [];
+      const tiersByStorage: Record<string, any[]> = {};
+      tiers.forEach((tier: any) => {
+        const storageType = tier.storageType || 'unknown';
+        if (!tiersByStorage[storageType]) tiersByStorage[storageType] = [];
+        tiersByStorage[storageType].push(tier);
+      });
+      const storageTypeCount = Object.keys(tiersByStorage).length || 1;
+      return 52 + (storageTypeCount * 24) + 16;
+    }
+    return 52;
+  }, [data, expandedRows]);
+
   const rowVirtualizer = useVirtualizer({
     count: data.length,
     getScrollElement: () => tableContainerRef.current,
-    estimateSize: () => 52,
+    estimateSize: getRowHeight,
     overscan: 5,
   });
+
+  useEffect(() => {
+    rowVirtualizer.measure();
+  }, [expandedRows, rowVirtualizer]);
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiRequest('DELETE', `/api/rate-comps/${id}`),
@@ -267,10 +288,12 @@ export default function CompsDataGrid({
           }
         }
 
+        const canExpand = summary.totalRates > 0;
+
         return (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              {summary.totalStorageTypes > 1 && (
+              {canExpand && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
