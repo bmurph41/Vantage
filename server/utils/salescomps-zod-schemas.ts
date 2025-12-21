@@ -25,21 +25,33 @@ export const salesCompCreateSchema = z.object({
   saleCondition: z.string().optional(),
   daysOnMarket: z.number().int().min(0).optional(),
   broker: z.string().optional(),
+  brokerage: z.string().optional(),
+  agentFirstName: z.string().optional(),
+  agentLastName: z.string().optional(),
   address: z.string().optional(),
   zip: z.string().optional(),
   lat: z.string().optional(), // Geocoded latitude (stored as string in DB)
   lng: z.string().optional(), // Geocoded longitude (stored as string in DB)
   seller: z.string().optional(),
+  sellerCompany: z.string().optional(),
+  sellerPrincipal: z.string().optional(),
+  buyerCompany: z.string().optional(),
+  buyerPrincipal: z.string().optional(),
+  buyer: z.string().optional(),
   company: z.string().optional(),
   owner: z.string().optional(),
   listPrice: z.number().positive().optional().transform(val => val?.toString()),
+  estimatedPurchasePrice: z.number().positive().optional().transform(val => val?.toString()),
   acres: z.number().positive().optional().transform(val => val?.toString()),
   occupancy: z.number().min(0).max(100).optional().transform(val => val?.toString()),
   yearBuilt: z.number().int().min(1800).max(new Date().getFullYear()).optional(),
-  articleUrls: z.array(z.string().url()).default([]),
+  articleUrls: z.array(z.string()).default([]),
   notes: z.string().optional(),
   waterType: z.enum(['Coastal', 'Lake', 'River']).optional(),
   coastalType: z.enum(['Coastal', 'Lake', 'River']).optional(), // Legacy - use waterType
+  
+  // Property reference
+  propertyId: z.string().uuid().nullable().optional(),
   
   // Portfolio functionality
   isPortfolio: z.boolean().default(false),
