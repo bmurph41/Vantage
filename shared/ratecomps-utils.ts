@@ -6,6 +6,12 @@ export interface NormalizationResult {
   normalizedMethod: string;
 }
 
+export interface ProjectSeasonOverride {
+  seasonMonths?: number | null;
+  seasonStartMonth?: number | null;
+  seasonEndMonth?: number | null;
+}
+
 export function normalizeRate(tier: {
   amountCents: number;
   rateUnit: string;
@@ -15,7 +21,7 @@ export function normalizeRate(tier: {
   seasonality?: string | null;
   seasonStartMonth?: number | null;
   seasonEndMonth?: number | null;
-}): NormalizationResult {
+}, projectOverride?: ProjectSeasonOverride | null): NormalizationResult {
   const { amountCents, rateUnit, ratePeriod, loaMin, loaMax, seasonality } = tier;
   
   let monthlyRate = amountCents;
@@ -35,7 +41,11 @@ export function normalizeRate(tier: {
       method = 'monthly direct';
       break;
     case 'seasonal':
-      const seasonMonths = calculateSeasonMonths(tier.seasonStartMonth, tier.seasonEndMonth);
+      const seasonMonths = calculateSeasonMonthsWithOverride(
+        tier.seasonStartMonth, 
+        tier.seasonEndMonth, 
+        projectOverride
+      );
       monthlyRate = Math.round(amountCents / seasonMonths);
       method = `seasonal / ${seasonMonths} months`;
       break;
@@ -83,6 +93,32 @@ function calculateSeasonMonths(startMonth?: number | null, endMonth?: number | n
   } else {
     return (12 - startMonth + 1) + endMonth;
   }
+}
+
+function calculateSeasonMonthsWithOverride(
+  tierStartMonth?: number | null, 
+  tierEndMonth?: number | null,
+  projectOverride?: ProjectSeasonOverride | null
+): number {
+  // First, check if tier has its own season months
+  if (tierStartMonth && tierEndMonth) {
+    return calculateSeasonMonths(tierStartMonth, tierEndMonth);
+  }
+  
+  // Fall back to project-level override
+  if (projectOverride) {
+    // If project has explicit seasonMonths, use it
+    if (projectOverride.seasonMonths) {
+      return projectOverride.seasonMonths;
+    }
+    // Or calculate from project's season start/end months
+    if (projectOverride.seasonStartMonth && projectOverride.seasonEndMonth) {
+      return calculateSeasonMonths(projectOverride.seasonStartMonth, projectOverride.seasonEndMonth);
+    }
+  }
+  
+  // Default fallback
+  return 6;
 }
 
 function calculateAvgLoa(loaMin?: number | null, loaMax?: number | null): number {

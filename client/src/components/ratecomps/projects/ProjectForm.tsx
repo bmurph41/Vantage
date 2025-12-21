@@ -13,7 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { PercentageInput } from "@/components/ui/percentage-input";
-import { X, Save, Palette, Target, Settings } from "lucide-react";
+import { X, Save, Palette, Target, Settings, Calendar } from "lucide-react";
 import { z } from "zod";
 import type { RcProject, InsertRcProject, UpdateRcProject } from "@shared/schema";
 import { PROFIT_CENTERS, COASTAL_TYPES, DEFAULT_RECOMMENDATION_WEIGHTS, US_REGIONS } from "@shared/salescomps-constants";
@@ -32,6 +32,10 @@ const projectFormSchema = z.object({
   coastalType: z.enum(['coastal', 'lake', 'any']).optional(),
   mustHaveProfitCenters: z.array(z.string()).default([]),
   niceToHaveProfitCenters: z.array(z.string()).default([]),
+  // Season duration for rate calculations
+  seasonMonths: z.number().min(1).max(12).optional(),
+  seasonStartMonth: z.number().min(1).max(12).optional(),
+  seasonEndMonth: z.number().min(1).max(12).optional(),
   // Weight overrides
   capacityWeight: z.number().min(0).max(1).optional(),
   financialWeight: z.number().min(0).max(1).optional(),
@@ -102,6 +106,10 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
       coastalType: project?.profile?.coastalType,
       mustHaveProfitCenters: project?.profile?.mustHaveProfitCenters || [],
       niceToHaveProfitCenters: project?.profile?.niceToHaveProfitCenters || [],
+      // Season duration
+      seasonMonths: project?.profile?.seasonMonths,
+      seasonStartMonth: project?.profile?.seasonStartMonth,
+      seasonEndMonth: project?.profile?.seasonEndMonth,
       // Weight overrides
       capacityWeight: project?.weightOverrides?.capacity,
       financialWeight: project?.weightOverrides?.financial,
@@ -129,6 +137,10 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
         coastalType: project.profile?.coastalType,
         mustHaveProfitCenters: project.profile?.mustHaveProfitCenters || [],
         niceToHaveProfitCenters: project.profile?.niceToHaveProfitCenters || [],
+        // Season duration
+        seasonMonths: project.profile?.seasonMonths,
+        seasonStartMonth: project.profile?.seasonStartMonth,
+        seasonEndMonth: project.profile?.seasonEndMonth,
         // Weight overrides
         capacityWeight: project.weightOverrides?.capacity,
         financialWeight: project.weightOverrides?.financial,
@@ -151,6 +163,10 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
         coastalType: undefined,
         mustHaveProfitCenters: [],
         niceToHaveProfitCenters: [],
+        // Season duration - reset to empty
+        seasonMonths: undefined,
+        seasonStartMonth: undefined,
+        seasonEndMonth: undefined,
         // Weight overrides - reset to empty
         capacityWeight: undefined,
         financialWeight: undefined,
@@ -173,6 +189,9 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
       coastalType: (data.coastalType && data.coastalType !== 'any') ? data.coastalType : undefined,
       mustHaveProfitCenters: data.mustHaveProfitCenters?.length ? data.mustHaveProfitCenters : undefined,
       niceToHaveProfitCenters: data.niceToHaveProfitCenters?.length ? data.niceToHaveProfitCenters : undefined,
+      seasonMonths: data.seasonMonths || undefined,
+      seasonStartMonth: data.seasonStartMonth || undefined,
+      seasonEndMonth: data.seasonEndMonth || undefined,
     };
     
     // Build weight overrides object
@@ -556,6 +575,126 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
                     </FormItem>
                   )}
                 />
+              </CardContent>
+            </Card>
+
+            {/* Season Duration for Rate Calculations */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Season Duration
+                </CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Define the operating season for accurate $/ft/mo and $/ft/season rate calculations. This enables apples-to-apples comparisons across marinas.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="seasonMonths"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Season Length (months)</FormLabel>
+                        <Select 
+                          onValueChange={(v) => field.onChange(v ? parseInt(v) : undefined)} 
+                          value={field.value?.toString() ?? ""}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-season-months">
+                              <SelectValue placeholder="Select duration" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="12">12 months (Year-round)</SelectItem>
+                            <SelectItem value="9">9 months</SelectItem>
+                            <SelectItem value="8">8 months</SelectItem>
+                            <SelectItem value="7">7 months</SelectItem>
+                            <SelectItem value="6">6 months</SelectItem>
+                            <SelectItem value="5">5 months</SelectItem>
+                            <SelectItem value="4">4 months</SelectItem>
+                            <SelectItem value="3">3 months</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="seasonStartMonth"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Season Start</FormLabel>
+                        <Select 
+                          onValueChange={(v) => field.onChange(v ? parseInt(v) : undefined)} 
+                          value={field.value?.toString() ?? ""}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-season-start-month">
+                              <SelectValue placeholder="Select month" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="1">January</SelectItem>
+                            <SelectItem value="2">February</SelectItem>
+                            <SelectItem value="3">March</SelectItem>
+                            <SelectItem value="4">April</SelectItem>
+                            <SelectItem value="5">May</SelectItem>
+                            <SelectItem value="6">June</SelectItem>
+                            <SelectItem value="7">July</SelectItem>
+                            <SelectItem value="8">August</SelectItem>
+                            <SelectItem value="9">September</SelectItem>
+                            <SelectItem value="10">October</SelectItem>
+                            <SelectItem value="11">November</SelectItem>
+                            <SelectItem value="12">December</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="seasonEndMonth"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Season End</FormLabel>
+                        <Select 
+                          onValueChange={(v) => field.onChange(v ? parseInt(v) : undefined)} 
+                          value={field.value?.toString() ?? ""}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-season-end-month">
+                              <SelectValue placeholder="Select month" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="1">January</SelectItem>
+                            <SelectItem value="2">February</SelectItem>
+                            <SelectItem value="3">March</SelectItem>
+                            <SelectItem value="4">April</SelectItem>
+                            <SelectItem value="5">May</SelectItem>
+                            <SelectItem value="6">June</SelectItem>
+                            <SelectItem value="7">July</SelectItem>
+                            <SelectItem value="8">August</SelectItem>
+                            <SelectItem value="9">September</SelectItem>
+                            <SelectItem value="10">October</SelectItem>
+                            <SelectItem value="11">November</SelectItem>
+                            <SelectItem value="12">December</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  For year-round marinas, enter 12 months. For seasonal marinas, enter the number of operating months (e.g., 6 for April-September).
+                </p>
               </CardContent>
             </Card>
 

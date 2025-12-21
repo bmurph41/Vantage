@@ -211,7 +211,7 @@ export default function ProjectDetails({ projectId, onClose, onEdit }: ProjectDe
         </div>
 
         {/* Project Stats */}
-        <div className="flex items-center gap-6 mt-4">
+        <div className="flex flex-wrap items-center gap-6 mt-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Database className="h-4 w-4" />
             <span data-testid="project-comp-count">
@@ -224,6 +224,25 @@ export default function ProjectDetails({ projectId, onClose, onEdit }: ProjectDe
               Updated {project.updatedAt ? formatDistanceToNow(new Date(project.updatedAt), { addSuffix: true }) : 'Unknown'}
             </span>
           </div>
+          {project.profile?.seasonMonths && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Calendar className="h-4 w-4 text-blue-500" />
+              <span data-testid="project-season-info">
+                {project.profile.seasonMonths === 12 ? (
+                  'Year-round'
+                ) : (
+                  <>
+                    {project.profile.seasonMonths} month season
+                    {project.profile.seasonStartMonth && project.profile.seasonEndMonth && (
+                      <span className="ml-1">
+                        ({['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][project.profile.seasonStartMonth - 1]}–{['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][project.profile.seasonEndMonth - 1]})
+                      </span>
+                    )}
+                  </>
+                )}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
