@@ -70,7 +70,6 @@ const dealWorkspaceNav = [
   { name: "All Workspaces", href: "/workspaces", icon: Briefcase },
   { name: "DD Projects", href: "/projects", icon: ClipboardList },
   { name: "Data Room", href: "/vdr", icon: FolderLock },
-  { name: "Modeling Projects", href: "/modeling/projects", icon: Calculator },
 ];
 
 // Deal Workspace sub-nav (shown when inside a workspace)
@@ -84,6 +83,7 @@ const getWorkspaceSubNav = (workspaceId: string) => [
 
 // Modeling Tools Navigation (standalone tools not tied to a specific deal)
 const modelingToolsNav = [
+  { name: "Modeling Projects", href: "/modeling/projects", icon: Calculator },
   { name: "OM Builder", href: "/om", icon: FileText },
   { name: "Fund Management", href: "/modeling/funds", icon: Briefcase },
   { name: "LP Portal", href: "/modeling/lp-portal", icon: Users },
@@ -571,7 +571,7 @@ export default function UnifiedSidebar() {
               title="Modeling Tools" 
               expanded={modelingToolsExpanded} 
               onToggle={() => setModelingToolsExpanded(!modelingToolsExpanded)}
-              isActive={location.startsWith('/om') || location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit')}
+              isActive={location.startsWith('/modeling/projects') || location.startsWith('/om') || location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit')}
             />
             {modelingToolsExpanded && modelingToolsNav
               .filter((item) => {
