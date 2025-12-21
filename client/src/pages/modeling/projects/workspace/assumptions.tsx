@@ -60,11 +60,15 @@ import {
   Clock,
   XCircle,
   ChevronDown,
+  ChevronRight,
   RotateCcw,
   Send,
   ThumbsUp,
   ThumbsDown,
-  Plus
+  Plus,
+  Layers,
+  MapPin,
+  Globe
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -97,6 +101,46 @@ interface Scenario {
 type GrowthRates = Record<string, number>;
 type OccupancyData = Record<string, Record<string, number>>;
 type MarginData = Record<string, { historical: number; projected: number }>;
+type StorageGrowthMode = 'universal' | 'per_type' | 'granular';
+
+interface StorageLocation {
+  id: string;
+  name: string;
+  storageTypeId: string;
+}
+
+interface StorageGrowthData {
+  mode: StorageGrowthMode;
+  universalRate: number;
+  typeRates: Record<string, number>;
+  locationRates: Record<string, number>;
+}
+
+const storageTypesConfig = [
+  { id: 'wet_slips', name: 'Wet Slips', icon: <Anchor className="h-4 w-4" />, locations: [
+    { id: 'wet_slips_a_dock', name: 'A Dock' },
+    { id: 'wet_slips_b_dock', name: 'B Dock' },
+    { id: 'wet_slips_c_dock', name: 'C Dock' },
+    { id: 'wet_slips_premium', name: 'Premium Slips' },
+  ]},
+  { id: 'dry_storage', name: 'Dry Storage', icon: <Warehouse className="h-4 w-4" />, locations: [
+    { id: 'dry_storage_covered', name: 'Covered Racks' },
+    { id: 'dry_storage_outdoor', name: 'Outdoor Racks' },
+    { id: 'dry_storage_forklift', name: 'Forklift Access' },
+  ]},
+  { id: 'mooring', name: 'Mooring', icon: <Anchor className="h-4 w-4" />, locations: [
+    { id: 'mooring_inner', name: 'Inner Harbor' },
+    { id: 'mooring_outer', name: 'Outer Harbor' },
+  ]},
+  { id: 'covered_slips', name: 'Covered Slips', icon: <Warehouse className="h-4 w-4" />, locations: [
+    { id: 'covered_slips_main', name: 'Main Marina' },
+    { id: 'covered_slips_annex', name: 'Annex' },
+  ]},
+  { id: 'trailer_storage', name: 'Trailer Storage', icon: <Warehouse className="h-4 w-4" />, locations: [
+    { id: 'trailer_storage_lot_a', name: 'Lot A' },
+    { id: 'trailer_storage_lot_b', name: 'Lot B' },
+  ]},
+];
 
 const revenueCategories = [
   { id: 'wet_slips', name: 'Wet Slips', icon: <Anchor className="h-4 w-4" /> },
@@ -197,6 +241,13 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
   const [expenseGrowth, setExpenseGrowth] = useState<GrowthRates>({});
   const [occupancy, setOccupancy] = useState<OccupancyData>({});
   const [margins, setMargins] = useState<MarginData>({});
+  const [storageGrowth, setStorageGrowth] = useState<StorageGrowthData>({
+    mode: 'universal',
+    universalRate: 3,
+    typeRates: {},
+    locationRates: {},
+  });
+  const [expandedStorageTypes, setExpandedStorageTypes] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (activeScenario?.assumptions) {
@@ -205,12 +256,14 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
       setExpenseGrowth(assumptions.expenseGrowth || getDefaultExpenseGrowth(activeScenarioType));
       setOccupancy(assumptions.occupancy || getDefaultOccupancy(years));
       setMargins(assumptions.margins || getDefaultMargins());
+      setStorageGrowth(assumptions.storageGrowth || getDefaultStorageGrowth(activeScenarioType));
       setHasChanges(false);
     } else {
       setGrowthRates(getDefaultGrowthRates(activeScenarioType));
       setExpenseGrowth(getDefaultExpenseGrowth(activeScenarioType));
       setOccupancy(getDefaultOccupancy(years));
       setMargins(getDefaultMargins());
+      setStorageGrowth(getDefaultStorageGrowth(activeScenarioType));
       setHasChanges(false);
     }
   }, [activeScenario, activeScenarioType, holdPeriod]);
@@ -259,6 +312,32 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
     };
   }
 
+  function getDefaultStorageGrowth(scenarioType: ScenarioType): StorageGrowthData {
+    const baseRates: Record<ScenarioType, number> = {
+      base: 3,
+      aggressive: 5,
+      conservative: 1.5,
+      custom: 3,
+    };
+    const rate = baseRates[scenarioType];
+    const typeRates: Record<string, number> = {};
+    const locationRates: Record<string, number> = {};
+    
+    storageTypesConfig.forEach(type => {
+      typeRates[type.id] = rate;
+      type.locations.forEach(loc => {
+        locationRates[loc.id] = rate;
+      });
+    });
+    
+    return {
+      mode: 'universal',
+      universalRate: rate,
+      typeRates,
+      locationRates,
+    };
+  }
+
   const saveMutation = useMutation({
     mutationFn: ({ createNewVersion }: { createNewVersion: boolean }) => {
       if (!activeScenario) {
@@ -267,11 +346,11 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
           name: getLabel(activeScenarioType as CaseType),
           revenueGrowthRate: Object.values(growthRates).reduce((a, b) => a + b, 0) / Object.values(growthRates).length,
           expenseGrowthRate: Object.values(expenseGrowth).reduce((a, b) => a + b, 0) / Object.values(expenseGrowth).length,
-          assumptions: { growthRates, expenseGrowth, occupancy, margins },
+          assumptions: { growthRates, expenseGrowth, occupancy, margins, storageGrowth },
         });
       }
       return apiRequest('PATCH', `/api/modeling/projects/${projectId}/scenarios/${activeScenario.id}`, {
-        assumptions: { growthRates, expenseGrowth, occupancy, margins },
+        assumptions: { growthRates, expenseGrowth, occupancy, margins, storageGrowth },
         createNewVersion,
       });
     },
@@ -369,6 +448,67 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
       },
     }));
     setHasChanges(true);
+  };
+
+  const updateStorageGrowthMode = (mode: StorageGrowthMode) => {
+    setStorageGrowth(prev => ({ ...prev, mode }));
+    setHasChanges(true);
+  };
+
+  const updateStorageUniversalRate = (value: string) => {
+    const numValue = parseFloat(value) || 0;
+    setStorageGrowth(prev => {
+      const typeRates: Record<string, number> = {};
+      const locationRates: Record<string, number> = {};
+      storageTypesConfig.forEach(type => {
+        typeRates[type.id] = numValue;
+        type.locations.forEach(loc => {
+          locationRates[loc.id] = numValue;
+        });
+      });
+      return {
+        ...prev,
+        universalRate: numValue,
+        typeRates,
+        locationRates,
+      };
+    });
+    setHasChanges(true);
+  };
+
+  const updateStorageTypeRate = (typeId: string, value: string) => {
+    const numValue = parseFloat(value) || 0;
+    setStorageGrowth(prev => {
+      const newLocationRates = { ...prev.locationRates };
+      const storageType = storageTypesConfig.find(t => t.id === typeId);
+      if (storageType) {
+        storageType.locations.forEach(loc => {
+          newLocationRates[loc.id] = numValue;
+        });
+      }
+      return {
+        ...prev,
+        typeRates: { ...prev.typeRates, [typeId]: numValue },
+        locationRates: newLocationRates,
+      };
+    });
+    setHasChanges(true);
+  };
+
+  const updateStorageLocationRate = (locationId: string, value: string) => {
+    const numValue = parseFloat(value) || 0;
+    setStorageGrowth(prev => ({
+      ...prev,
+      locationRates: { ...prev.locationRates, [locationId]: numValue },
+    }));
+    setHasChanges(true);
+  };
+
+  const toggleStorageTypeExpanded = (typeId: string) => {
+    setExpandedStorageTypes(prev => ({
+      ...prev,
+      [typeId]: !prev[typeId],
+    }));
   };
 
   const StatusIcon = activeScenario ? statusConfig[activeScenario.status as ScenarioStatus]?.icon : Clock;
@@ -519,6 +659,188 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
         </TabsList>
 
         <TabsContent value="growth" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Warehouse className="h-5 w-5" />
+                    Storage Revenue Growth
+                  </CardTitle>
+                  <CardDescription>
+                    Annual percentage increase for marina storage revenue by type or location
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select value={storageGrowth.mode} onValueChange={(v) => updateStorageGrowthMode(v as StorageGrowthMode)}>
+                    <SelectTrigger className="w-[180px]" data-testid="select-storage-growth-mode">
+                      <SelectValue placeholder="Select mode" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="universal">
+                        <div className="flex items-center gap-2">
+                          <Globe className="h-4 w-4" />
+                          Universal Rate
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="per_type">
+                        <div className="flex items-center gap-2">
+                          <Layers className="h-4 w-4" />
+                          Per Storage Type
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="granular">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4" />
+                          Granular (Dock/Location)
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {storageGrowth.mode === 'universal' && (
+                <div className="max-w-xs">
+                  <Label htmlFor="storage-universal-rate" className="flex items-center gap-2 mb-2">
+                    <Globe className="h-4 w-4" />
+                    Universal Growth Rate
+                  </Label>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Apply this rate to all storage types and locations
+                  </p>
+                  <div className="relative">
+                    <Input
+                      id="storage-universal-rate"
+                      type="number"
+                      step="0.1"
+                      value={storageGrowth.universalRate}
+                      onChange={(e) => updateStorageUniversalRate(e.target.value)}
+                      className="pr-8"
+                      data-testid="input-storage-universal-rate"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                      %
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {storageGrowth.mode === 'per_type' && (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {storageTypesConfig.map((storageType) => (
+                    <div key={storageType.id} className="space-y-2">
+                      <Label htmlFor={`storage-type-${storageType.id}`} className="flex items-center gap-2">
+                        {storageType.icon}
+                        {storageType.name}
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id={`storage-type-${storageType.id}`}
+                          type="number"
+                          step="0.1"
+                          value={storageGrowth.typeRates[storageType.id] ?? 3}
+                          onChange={(e) => updateStorageTypeRate(storageType.id, e.target.value)}
+                          className="pr-8"
+                          data-testid={`input-storage-type-${storageType.id}`}
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                          %
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {storageType.locations.length} location{storageType.locations.length !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {storageGrowth.mode === 'granular' && (
+                <div className="space-y-4">
+                  {storageTypesConfig.map((storageType) => (
+                    <div key={storageType.id} className="border rounded-lg">
+                      <button
+                        type="button"
+                        onClick={() => toggleStorageTypeExpanded(storageType.id)}
+                        className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+                        data-testid={`button-expand-${storageType.id}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {storageType.icon}
+                          <span className="font-medium">{storageType.name}</span>
+                          <Badge variant="secondary" className="ml-2">
+                            {storageType.locations.length} locations
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-muted-foreground">
+                            Avg: {(
+                              storageType.locations.reduce(
+                                (sum, loc) => sum + (storageGrowth.locationRates[loc.id] ?? 3),
+                                0
+                              ) / storageType.locations.length
+                            ).toFixed(1)}%
+                          </span>
+                          {expandedStorageTypes[storageType.id] ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                        </div>
+                      </button>
+                      
+                      {expandedStorageTypes[storageType.id] && (
+                        <div className="border-t p-4 bg-muted/20">
+                          <div className="flex items-center gap-4 mb-4 pb-3 border-b">
+                            <Label className="text-sm font-medium">Set all locations:</Label>
+                            <div className="relative w-24">
+                              <Input
+                                type="number"
+                                step="0.1"
+                                value={storageGrowth.typeRates[storageType.id] ?? 3}
+                                onChange={(e) => updateStorageTypeRate(storageType.id, e.target.value)}
+                                className="pr-6 h-8"
+                                data-testid={`input-set-all-${storageType.id}`}
+                              />
+                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                                %
+                              </span>
+                            </div>
+                          </div>
+                          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            {storageType.locations.map((location) => (
+                              <div key={location.id} className="flex items-center gap-3">
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                  <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />
+                                  <span className="text-sm truncate">{location.name}</span>
+                                </div>
+                                <div className="relative w-20">
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    value={storageGrowth.locationRates[location.id] ?? 3}
+                                    onChange={(e) => updateStorageLocationRate(location.id, e.target.value)}
+                                    className="pr-6 h-8"
+                                    data-testid={`input-location-${location.id}`}
+                                  />
+                                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                                    %
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Revenue Growth Rates</CardTitle>
