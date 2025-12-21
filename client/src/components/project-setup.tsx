@@ -223,6 +223,51 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
     },
   });
 
+  // Sync form with latest project data when project prop changes
+  useEffect(() => {
+    if (project) {
+      // Ensure contact arrays have at least one empty entry for UI editing
+      const sellerArray = (project.seller && project.seller.length > 0) ? project.seller : [""];
+      const attorneyArray = (project.ourAttorney && project.ourAttorney.length > 0) ? project.ourAttorney : [""];
+      
+      projectForm.reset({
+        name: project.name,
+        description: project.description || "",
+        city: project.city || "",
+        state: project.state || "",
+        anchorType: project.anchorType,
+        useBusinessDays: settings?.useBusinessDays || false,
+        holidayCalendar: settings?.holidayCalendar || "us_federal",
+        tz: project.tz,
+        psaSignedDate: project.psaSignedDate || "",
+        ddExpirationDate: project.ddExpirationDate || "",
+        closingDate: project.closingDate || "",
+        ddPeriodDays: project.ddPeriodDays ?? undefined,
+        hasExtensions: project.hasExtensions || false,
+        extensionCount: project.extensionCount || 0,
+        extensionDays: project.extensionDays || [],
+        daysToClosing: project.daysToClosing ?? undefined,
+        seller: sellerArray,
+        ourAttorney: attorneyArray,
+        titleInsuranceCompany: project.titleInsuranceCompany || "",
+        lender: project.lender || "",
+        firstDepositAmount: project.firstDepositAmount || undefined,
+        firstDepositDueDate: project.firstDepositDueDate || "",
+        secondDepositAmount: project.secondDepositAmount || undefined,
+        secondDepositDueDate: project.secondDepositDueDate || "",
+      });
+      // Also sync local state with placeholder handling
+      setExtensionDaysArray(project.extensionDays || []);
+      setSellersArray(sellerArray);
+      setAttorneysArray(attorneyArray);
+      setCustomDeadlines((project.customDeadlines as any) || []);
+      setFirstDepositAmount(project.firstDepositAmount || undefined);
+      setSecondDepositAmount(project.secondDepositAmount || undefined);
+      setFirstDepositDays(project.firstDepositDays ?? "");
+      setSecondDepositDays(project.secondDepositDays ?? "");
+    }
+  }, [project.id, project.updatedAt, settings?.useBusinessDays, settings?.holidayCalendar]);
+
   // Watch form values for automatic calculation
   const psaSignedDate = projectForm.watch("psaSignedDate");
   const ddPeriodDays = projectForm.watch("ddPeriodDays");
@@ -335,18 +380,6 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
     setAttorneysArray(newAttorneys);
     projectForm.setValue("ourAttorney", newAttorneys);
   };
-
-  // Initialize arrays with at least one empty entry if they're empty
-  useEffect(() => {
-    if (sellersArray.length === 0) {
-      setSellersArray([""]);
-      projectForm.setValue("seller", [""]);
-    }
-    if (attorneysArray.length === 0) {
-      setAttorneysArray([""]);
-      projectForm.setValue("ourAttorney", [""]);
-    }
-  }, []);
 
   const onProjectSubmit = (data: z.infer<typeof projectFormSchema>) => {
     // Update project data
