@@ -6395,6 +6395,9 @@ export const rcProjects = pgTable('rc_projects', {
     coastalType?: 'Coastal' | 'Lake' | 'River'; // Legacy - use waterType
     mustHaveProfitCenters?: string[];
     niceToHaveProfitCenters?: string[];
+    seasonMonths?: number; // Number of months in the season (e.g., 6 for seasonal, 12 for year-round)
+    seasonStartMonth?: number; // 1-12 for January-December
+    seasonEndMonth?: number; // 1-12 for January-December
   }>().default({}),
   
   // User weight overrides for recommendation algorithm
