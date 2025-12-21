@@ -613,7 +613,8 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
 
             {/* Outstanding Bills Summary */}
             {(() => {
-              const unpaidTasks = tasks.filter(t => t.paymentStatus === 'not_paid' && t.cost);
+              // Count ALL unpaid tasks, regardless of whether they have a dollar amount
+              const unpaidTasks = tasks.filter(t => t.paymentStatus === 'not_paid');
               const totalOutstanding = unpaidTasks.reduce((sum, task) => {
                 const costValue = parseFloat(task.cost?.replace(/[^0-9.-]+/g, "") || "0");
                 return sum + costValue;
