@@ -59,7 +59,9 @@ export const rateCompsApi = {
     const searchParams = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
-        if (key === 'columnFilters' && typeof value === 'object') {
+        if (Array.isArray(value)) {
+          searchParams.append(key, JSON.stringify(value));
+        } else if (key === 'columnFilters' && typeof value === 'object') {
           searchParams.append(key, JSON.stringify(value));
         } else {
           searchParams.append(key, value.toString());
