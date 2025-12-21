@@ -213,7 +213,7 @@ export default function ViewCompModal({ open, onClose, comp, onEdit, onRateAdded
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[85vh] p-0 gap-0 overflow-hidden">
+      <DialogContent className="max-w-3xl max-h-[85vh] p-0 gap-0 overflow-hidden flex flex-col">
         <div className="px-6 py-4 border-b bg-muted/30">
           <DialogHeader className="space-y-0">
             <div className="flex items-start justify-between gap-4">
