@@ -383,6 +383,28 @@ export default function AnalyticsFiltersPanel({
           </div>
         )}
 
+        {/* Portfolio Filter */}
+        <div className="space-y-3">
+          <Label className="text-sm font-medium">Transaction Type</Label>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="portfolios-only"
+              checked={localFilters.isPortfolio === true}
+              onCheckedChange={(checked) => setLocalFilters({
+                ...localFilters,
+                isPortfolio: checked ? true : undefined
+              })}
+              data-testid="checkbox-portfolios-only"
+            />
+            <label
+              htmlFor="portfolios-only"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+            >
+              Portfolios only
+            </label>
+          </div>
+        </div>
+
         {/* Apply Button */}
         <Button
           onClick={handleApply}
