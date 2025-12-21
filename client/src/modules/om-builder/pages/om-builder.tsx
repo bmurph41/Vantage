@@ -5,7 +5,7 @@ import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useSensor, useSe
 import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { toast } from "@/hooks/use-toast";
-import { FileDown, ArrowLeft, FileText, Plus, Trash2, GripVertical, Settings, Sparkles, Type, BarChart3, Table, Image, Gauge, Database, History } from "lucide-react";
+import { FileDown, ArrowLeft, FileText, Plus, Trash2, GripVertical, Settings, Sparkles, Type, BarChart3, Table, Image, Gauge, Database, History, AlertCircle, Info, CheckCircle, AlertTriangle, Lightbulb, StickyNote, LayoutTemplate, Link2, Palette, AlignLeft, AlignCenter, AlignRight, Minus, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -15,11 +15,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import type { ModelingProject } from "@shared/schema";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { Om, OmPage as OmPageDb, OmBlock as OmBlockDb } from "@shared/schema";
-import type { OmPage, OmBlock, BlockType, OmTheme } from "../types";
-import { defaultThemes } from "../types";
+import type { OmPage, OmBlock, BlockType, OmTheme, OmPageOrientation, CalloutVariant, FontFamily } from "../types";
+import { defaultThemes, CALLOUT_COLORS, FONT_FAMILIES, FONT_SIZES } from "../types";
 import { DataBindingPanel } from "../components/data-binding-panel";
 import { VersionHistoryPanel } from "../components/version-history-panel";
 
@@ -87,6 +89,35 @@ function SortableBlock({ block, isSelected, onSelect, onUpdate }: SortableBlockP
             </div>
           </div>
         );
+      case 'callout':
+        const variant = (block.style?.calloutVariant || 'info') as CalloutVariant;
+        const colors = CALLOUT_COLORS[variant];
+        const CalloutIcon = variant === 'info' ? Info 
+          : variant === 'success' ? CheckCircle 
+          : variant === 'warning' ? AlertTriangle 
+          : variant === 'error' ? AlertCircle 
+          : variant === 'tip' ? Lightbulb 
+          : StickyNote;
+        return (
+          <div className={`p-4 ${colors.bg} border ${colors.border} rounded-lg flex gap-3`}>
+            <CalloutIcon className={`w-5 h-5 ${colors.icon} shrink-0 mt-0.5`} />
+            <div className={`flex-1 ${colors.text} text-sm`}>
+              {block.content?.text || 'Click to edit callout...'}
+            </div>
+          </div>
+        );
+      case 'divider':
+        return (
+          <div className="py-4">
+            <hr className="border-t border-border" />
+          </div>
+        );
+      case 'spacer':
+        return (
+          <div className="h-8 flex items-center justify-center text-muted-foreground/50">
+            <Minus className="w-4 h-4" />
+          </div>
+        );
       default:
         return (
           <div className="p-4 text-muted-foreground text-sm">
@@ -124,10 +155,46 @@ export default function OMBuilder() {
   const [activePageId, setActivePageId] = useState<string | null>(null);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [draggedBlock, setDraggedBlock] = useState<OmBlock | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [localModelingProjectId, setLocalModelingProjectId] = useState<string | null>(null);
 
   const { data: om, isLoading: omLoading } = useQuery<Om>({
     queryKey: ['/api/om/oms', omId],
     enabled: !!omId,
+  });
+
+  useEffect(() => {
+    if (om?.modelingProjectId !== undefined) {
+      setLocalModelingProjectId(om.modelingProjectId);
+    }
+  }, [om?.modelingProjectId]);
+
+  const { data: modelingProjects = [] } = useQuery<ModelingProject[]>({
+    queryKey: ['/api/modeling/projects'],
+  });
+
+  const updateOmMutation = useMutation({
+    mutationFn: async (data: { modelingProjectId?: string | null }) => {
+      const result = await apiRequest('PATCH', `/api/om/oms/${omId}`, data);
+      return result;
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(['/api/om/oms', omId], data);
+      setSettingsOpen(false);
+      toast({ title: "Settings Updated" });
+    },
+    onError: () => {
+      setLocalModelingProjectId(om?.modelingProjectId || null);
+      toast({ title: "Error", description: "Failed to update settings", variant: "destructive" });
+    },
+  });
+
+  const updatePageMutation = useMutation({
+    mutationFn: (data: { pageId: string; title?: string; layout?: any }) =>
+      apiRequest('PATCH', `/api/om/pages/${data.pageId}`, { title: data.title, layout: data.layout }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/om/oms', omId, 'pages'] });
+    },
   });
 
   const { data: dbPages = [] } = useQuery<OmPageDb[]>({
@@ -201,7 +268,7 @@ export default function OMBuilder() {
       id: `block_${Date.now()}`,
       type,
       content: getDefaultContentForType(type),
-      style: {}
+      style: getDefaultStyleForType(type)
     };
 
     setPages(prev => prev.map(p => 
@@ -264,6 +331,16 @@ export default function OMBuilder() {
       ]};
       case 'image': return { url: "", alt: "Placeholder" };
       case 'table': return { columns: [], rows: [] };
+      case 'callout': return { text: "Add your callout text here..." };
+      case 'divider': return {};
+      case 'spacer': return { height: '2rem' };
+      default: return {};
+    }
+  };
+
+  const getDefaultStyleForType = (type: BlockType): any => {
+    switch (type) {
+      case 'callout': return { calloutVariant: 'info' };
       default: return {};
     }
   };
@@ -300,6 +377,65 @@ export default function OMBuilder() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" data-testid="button-doc-settings">
+                <Settings className="w-4 h-4 mr-1" />
+                Settings
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Document Settings</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div>
+                  <Label className="text-sm font-medium">Linked Modeling Project</Label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Link this document to a modeling project to bind financial data
+                  </p>
+                  <Select 
+                    value={localModelingProjectId || 'none'}
+                    onValueChange={(value) => {
+                      const newValue = value === 'none' ? null : value;
+                      setLocalModelingProjectId(newValue);
+                      updateOmMutation.mutate({ modelingProjectId: newValue });
+                    }}
+                  >
+                    <SelectTrigger data-testid="select-modeling-project">
+                      <SelectValue placeholder="Select a project..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No linked project</SelectItem>
+                      {modelingProjects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {localModelingProjectId && (
+                    <div className="mt-2 p-2 bg-muted rounded-md flex items-center gap-2">
+                      <Link2 className="w-4 h-4 text-primary" />
+                      <span className="text-xs">
+                        Linked to: {modelingProjects.find(p => p.id === localModelingProjectId)?.name || 'Unknown'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <Separator />
+                <div>
+                  <Label className="text-sm font-medium">Document Name</Label>
+                  <Input 
+                    value={om?.name || ''} 
+                    className="mt-2"
+                    disabled
+                    data-testid="input-doc-name"
+                  />
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Link href={`/om/export/${omId}`} className="h-9 px-4 py-2 text-sm border border-input bg-background hover:bg-accent rounded-md text-foreground font-medium transition-colors flex items-center gap-2" data-testid="link-preview">
             Preview
           </Link>
@@ -353,6 +489,8 @@ export default function OMBuilder() {
                     { type: 'chart' as BlockType, icon: BarChart3, label: 'Chart' },
                     { type: 'table' as BlockType, icon: Table, label: 'Table' },
                     { type: 'image' as BlockType, icon: Image, label: 'Image' },
+                    { type: 'callout' as BlockType, icon: AlertCircle, label: 'Callout' },
+                    { type: 'divider' as BlockType, icon: Minus, label: 'Divider' },
                   ].map(({ type, icon: Icon, label }) => (
                     <button
                       key={type}
@@ -514,6 +652,257 @@ export default function OMBuilder() {
                         </div>
                       )}
 
+                      {activeBlock.type === 'callout' && (
+                        <>
+                          <div>
+                            <Label className="text-xs">Callout Text</Label>
+                            <Textarea 
+                              value={activeBlock.content?.text || ''}
+                              onChange={(e) => updateBlock(activeBlock.id, { 
+                                content: { ...activeBlock.content, text: e.target.value }
+                              })}
+                              className="mt-1 min-h-[80px]"
+                              data-testid="textarea-callout-text"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Callout Style</Label>
+                            <Select 
+                              value={activeBlock.style?.calloutVariant || 'info'}
+                              onValueChange={(value) => updateBlock(activeBlock.id, { 
+                                style: { ...activeBlock.style, calloutVariant: value as CalloutVariant }
+                              })}
+                            >
+                              <SelectTrigger className="mt-1" data-testid="select-callout-variant">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="info">Info</SelectItem>
+                                <SelectItem value="success">Success</SelectItem>
+                                <SelectItem value="warning">Warning</SelectItem>
+                                <SelectItem value="error">Error</SelectItem>
+                                <SelectItem value="tip">Tip</SelectItem>
+                                <SelectItem value="note">Note</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </>
+                      )}
+
+                      {(activeBlock.type === 'text' || activeBlock.type === 'callout') && (
+                        <div className="pt-2 border-t">
+                          <Label className="text-xs font-medium flex items-center gap-1 mb-2">
+                            <Palette className="w-3 h-3" />
+                            Typography
+                          </Label>
+                          <div className="space-y-2">
+                            <div>
+                              <Label className="text-[10px] text-muted-foreground">Font Family</Label>
+                              <Select 
+                                value={activeBlock.style?.typography?.fontFamily || 'sans'}
+                                onValueChange={(value) => updateBlock(activeBlock.id, { 
+                                  style: { 
+                                    ...activeBlock.style, 
+                                    typography: { ...activeBlock.style?.typography, fontFamily: value as FontFamily }
+                                  }
+                                })}
+                              >
+                                <SelectTrigger className="mt-1 h-8" data-testid="select-font-family">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="sans">Sans Serif</SelectItem>
+                                  <SelectItem value="serif">Serif</SelectItem>
+                                  <SelectItem value="mono">Monospace</SelectItem>
+                                  <SelectItem value="display">Display</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-[10px] text-muted-foreground">Font Size</Label>
+                              <Select 
+                                value={activeBlock.style?.typography?.fontSize || 'base'}
+                                onValueChange={(value) => updateBlock(activeBlock.id, { 
+                                  style: { 
+                                    ...activeBlock.style, 
+                                    typography: { ...activeBlock.style?.typography, fontSize: value }
+                                  }
+                                })}
+                              >
+                                <SelectTrigger className="mt-1 h-8" data-testid="select-font-size">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {FONT_SIZES.map(({ value, label }) => (
+                                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-[10px] text-muted-foreground">Alignment</Label>
+                              <div className="flex gap-1 mt-1">
+                                {[
+                                  { value: 'left', icon: AlignLeft },
+                                  { value: 'center', icon: AlignCenter },
+                                  { value: 'right', icon: AlignRight },
+                                ].map(({ value, icon: Icon }) => (
+                                  <Button
+                                    key={value}
+                                    variant={activeBlock.style?.textAlign === value ? 'secondary' : 'ghost'}
+                                    size="sm"
+                                    className="h-7 w-7 p-0"
+                                    onClick={() => updateBlock(activeBlock.id, { 
+                                      style: { ...activeBlock.style, textAlign: value as 'left' | 'center' | 'right' }
+                                    })}
+                                    data-testid={`button-align-${value}`}
+                                  >
+                                    <Icon className="w-3 h-3" />
+                                  </Button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="pt-2 border-t">
+                        <Label className="text-xs font-medium flex items-center gap-1 mb-2">
+                          <LayoutTemplate className="w-3 h-3" />
+                          Block Appearance
+                        </Label>
+                        <div className="space-y-2">
+                          <div>
+                            <Label className="text-[10px] text-muted-foreground">Background Color</Label>
+                            <div className="flex gap-2 mt-1">
+                              <Input 
+                                type="color"
+                                value={activeBlock.style?.backgroundColor || '#ffffff'}
+                                onChange={(e) => updateBlock(activeBlock.id, { 
+                                  style: { ...activeBlock.style, backgroundColor: e.target.value }
+                                })}
+                                className="h-8 w-12 p-1"
+                                data-testid="input-block-bg-color"
+                              />
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-xs"
+                                onClick={() => updateBlock(activeBlock.id, { 
+                                  style: { ...activeBlock.style, backgroundColor: undefined }
+                                })}
+                              >
+                                Clear
+                              </Button>
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-[10px] text-muted-foreground">Border Style</Label>
+                            <Select 
+                              value={activeBlock.style?.border?.style || 'none'}
+                              onValueChange={(value) => updateBlock(activeBlock.id, { 
+                                style: { 
+                                  ...activeBlock.style, 
+                                  border: { 
+                                    ...activeBlock.style?.border, 
+                                    style: value as 'solid' | 'dashed' | 'dotted' | 'none',
+                                    width: value !== 'none' ? (activeBlock.style?.border?.width || '1px') : undefined
+                                  }
+                                }
+                              })}
+                            >
+                              <SelectTrigger className="mt-1 h-8" data-testid="select-border-style">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">None</SelectItem>
+                                <SelectItem value="solid">Solid</SelectItem>
+                                <SelectItem value="dashed">Dashed</SelectItem>
+                                <SelectItem value="dotted">Dotted</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {activeBlock.style?.border?.style && activeBlock.style.border.style !== 'none' && (
+                            <div>
+                              <Label className="text-[10px] text-muted-foreground">Border Color</Label>
+                              <Input 
+                                type="color"
+                                value={activeBlock.style?.border?.color || '#e5e5e5'}
+                                onChange={(e) => updateBlock(activeBlock.id, { 
+                                  style: { 
+                                    ...activeBlock.style, 
+                                    border: { ...activeBlock.style?.border, color: e.target.value }
+                                  }
+                                })}
+                                className="mt-1 h-8 w-full p-1"
+                                data-testid="input-border-color"
+                              />
+                            </div>
+                          )}
+                          <div>
+                            <Label className="text-[10px] text-muted-foreground">Shadow</Label>
+                            <Select 
+                              value={activeBlock.style?.shadow || 'none'}
+                              onValueChange={(value) => updateBlock(activeBlock.id, { 
+                                style: { ...activeBlock.style, shadow: value as 'none' | 'sm' | 'md' | 'lg' }
+                              })}
+                            >
+                              <SelectTrigger className="mt-1 h-8" data-testid="select-shadow">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">None</SelectItem>
+                                <SelectItem value="sm">Small</SelectItem>
+                                <SelectItem value="md">Medium</SelectItem>
+                                <SelectItem value="lg">Large</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="text-[10px] text-muted-foreground">Corner Radius</Label>
+                            <Select 
+                              value={activeBlock.style?.border?.radius || 'md'}
+                              onValueChange={(value) => updateBlock(activeBlock.id, { 
+                                style: { 
+                                  ...activeBlock.style, 
+                                  border: { ...activeBlock.style?.border, radius: value }
+                                }
+                              })}
+                            >
+                              <SelectTrigger className="mt-1 h-8" data-testid="select-radius">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">None</SelectItem>
+                                <SelectItem value="sm">Small</SelectItem>
+                                <SelectItem value="md">Medium</SelectItem>
+                                <SelectItem value="lg">Large</SelectItem>
+                                <SelectItem value="full">Full</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="text-[10px] text-muted-foreground">Padding</Label>
+                            <Select 
+                              value={activeBlock.style?.padding || 'md'}
+                              onValueChange={(value) => updateBlock(activeBlock.id, { 
+                                style: { ...activeBlock.style, padding: value }
+                              })}
+                            >
+                              <SelectTrigger className="mt-1 h-8" data-testid="select-padding">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">None</SelectItem>
+                                <SelectItem value="sm">Small</SelectItem>
+                                <SelectItem value="md">Medium</SelectItem>
+                                <SelectItem value="lg">Large</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
+
                       <div className="pt-4 border-t">
                         <Button 
                           variant="destructive" 
@@ -538,13 +927,27 @@ export default function OMBuilder() {
                               p.id === activePageId ? { ...p, title: e.target.value } : p
                             ));
                           }}
+                          onBlur={(e) => {
+                            if (activePage.id) {
+                              updatePageMutation.mutate({ pageId: activePage.id, title: e.target.value });
+                            }
+                          }}
                           className="mt-1"
                           data-testid="input-page-title"
                         />
                       </div>
                       <div>
                         <Label className="text-xs">Layout</Label>
-                        <Select defaultValue="single-column">
+                        <Select 
+                          value={activePage.layout?.layoutType || 'single-column'}
+                          onValueChange={(value) => {
+                            const newLayout = { ...activePage.layout, layoutType: value as any };
+                            setPages(prev => prev.map(p => 
+                              p.id === activePageId ? { ...p, layout: newLayout } : p
+                            ));
+                            updatePageMutation.mutate({ pageId: activePage.id, layout: newLayout });
+                          }}
+                        >
                           <SelectTrigger className="mt-1" data-testid="select-page-layout">
                             <SelectValue />
                           </SelectTrigger>
@@ -552,8 +955,53 @@ export default function OMBuilder() {
                             <SelectItem value="single-column">Single Column</SelectItem>
                             <SelectItem value="two-column">Two Column</SelectItem>
                             <SelectItem value="cover">Cover Page</SelectItem>
+                            <SelectItem value="grid">Grid Layout</SelectItem>
                           </SelectContent>
                         </Select>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Orientation</Label>
+                        <Select 
+                          value={activePage.layout?.orientation || 'portrait'}
+                          onValueChange={(value) => {
+                            const newLayout = { ...activePage.layout, orientation: value as OmPageOrientation };
+                            setPages(prev => prev.map(p => 
+                              p.id === activePageId ? { ...p, layout: newLayout } : p
+                            ));
+                            updatePageMutation.mutate({ pageId: activePage.id, layout: newLayout });
+                          }}
+                        >
+                          <SelectTrigger className="mt-1" data-testid="select-page-orientation">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="portrait">Portrait</SelectItem>
+                            <SelectItem value="landscape">Landscape</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Background Color</Label>
+                        <Input 
+                          type="color"
+                          value={activePage.layout?.backgroundColor || '#ffffff'}
+                          onChange={(e) => {
+                            const newLayout = { ...activePage.layout, backgroundColor: e.target.value };
+                            setPages(prev => prev.map(p => 
+                              p.id === activePageId ? { ...p, layout: newLayout } : p
+                            ));
+                          }}
+                          onBlur={(e) => {
+                            if (activePage.id) {
+                              updatePageMutation.mutate({ 
+                                pageId: activePage.id, 
+                                layout: { ...activePage.layout, backgroundColor: e.target.value }
+                              });
+                            }
+                          }}
+                          className="mt-1 h-8 w-full p-1"
+                          data-testid="input-page-bg-color"
+                        />
                       </div>
                     </div>
                   ) : (

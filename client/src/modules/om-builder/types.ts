@@ -3,22 +3,33 @@ export type BlockType =
   | 'chart' | 'line-chart' | 'pie-chart' | 'area-chart' | 'trend-chart' | 'combo-chart'
   | 'kpi' | 'gauge' | 'target-kpi' | 'currency-kpi' | 'percent-kpi' | 'number-kpi'
   | 'table' | 'matrix' | 'list'
-  | 'image' | 'gallery' | 'map';
+  | 'image' | 'gallery' | 'map'
+  | 'divider' | 'spacer';
 
-export type OmPageLayoutType = 'single-column' | 'two-column' | 'cover' | 'hero-with-body' | 'freeform';
+export type OmPageOrientation = 'portrait' | 'landscape';
+
+export type OmPageLayoutType = 'single-column' | 'two-column' | 'cover' | 'hero-with-body' | 'freeform' | 'grid';
+
+export type FontFamily = 'sans' | 'serif' | 'mono' | 'display';
+
+export type CalloutVariant = 'info' | 'success' | 'warning' | 'error' | 'tip' | 'note';
 
 export interface OmPageLayoutConfig {
   layoutType: OmPageLayoutType;
+  orientation?: OmPageOrientation;
   showHeader?: boolean;
   showFooter?: boolean;
   showPageNumber?: boolean;
   showTocEntry?: boolean;
   heroImageUrl?: string;
   heroOverlay?: boolean;
+  backgroundColor?: string;
   columns?: {
     leftWidthPercent?: number;
     rightWidthPercent?: number;
   };
+  gridColumns?: number;
+  gridGap?: string;
 }
 
 export interface OmTheme {
@@ -65,16 +76,39 @@ export interface GridLayout {
   static?: boolean;
 }
 
+export interface OmTypographyStyle {
+  fontFamily?: FontFamily;
+  fontSize?: string;
+  fontWeight?: 'normal' | 'medium' | 'semibold' | 'bold';
+  lineHeight?: string;
+  letterSpacing?: string;
+  color?: string;
+}
+
+export interface OmBorderStyle {
+  width?: string;
+  style?: 'solid' | 'dashed' | 'dotted' | 'none';
+  color?: string;
+  radius?: string;
+}
+
 export interface OmBlockStyle {
   column?: OmBlockColumn;
-  variant?: 'default' | 'card' | 'emphasis';
+  variant?: 'default' | 'card' | 'emphasis' | 'outlined' | 'ghost';
   gridLayout?: GridLayout;
-  textAlign?: string;
+  textAlign?: 'left' | 'center' | 'right' | 'justify';
+  typography?: OmTypographyStyle;
+  backgroundColor?: string;
+  border?: OmBorderStyle;
+  shadow?: 'none' | 'sm' | 'md' | 'lg';
+  padding?: string;
+  margin?: string;
   marginTop?: string;
   paddingTop?: string;
   height?: string;
   width?: string;
   objectFit?: string;
+  calloutVariant?: CalloutVariant;
 }
 
 export interface OmBlock {
@@ -92,21 +126,35 @@ export interface OmPage {
   blocks: OmBlock[];
 }
 
+export interface OmDocumentSettings {
+  branding?: {
+    logoUrl?: string;
+    headerHeight?: number;
+    footerHeight?: number;
+    companyName?: string;
+  };
+  defaultOrientation?: OmPageOrientation;
+  defaultFontFamily?: FontFamily;
+  pageSize?: 'letter' | 'a4' | 'legal';
+  margins?: {
+    top?: string;
+    bottom?: string;
+    left?: string;
+    right?: string;
+  };
+}
+
 export interface OmProject {
   id: string;
   projectId: string;
   name: string;
   version?: number;
   status?: 'draft' | 'review' | 'published' | 'archived';
+  modelingProjectId?: string | null;
+  dealId?: string | null;
   pages: OmPage[];
   theme?: OmTheme;
-  settings?: {
-    branding?: {
-      logoUrl?: string;
-      headerHeight?: number;
-      footerHeight?: number;
-    }
-  }
+  settings?: OmDocumentSettings;
 }
 
 export interface OmDataSeries {
@@ -129,6 +177,32 @@ export interface OmDataResponse {
   series: OmDataSeries[];
   tables: OmDataTable[];
 }
+
+export const CALLOUT_COLORS: Record<CalloutVariant, { bg: string; border: string; text: string; icon: string }> = {
+  info: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-800', icon: 'text-blue-500' },
+  success: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-800', icon: 'text-green-500' },
+  warning: { bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-800', icon: 'text-yellow-500' },
+  error: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-800', icon: 'text-red-500' },
+  tip: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-800', icon: 'text-purple-500' },
+  note: { bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-800', icon: 'text-gray-500' },
+};
+
+export const FONT_FAMILIES: Record<FontFamily, string> = {
+  sans: 'font-sans',
+  serif: 'font-serif',
+  mono: 'font-mono',
+  display: 'font-serif tracking-tight',
+};
+
+export const FONT_SIZES = [
+  { value: 'xs', label: 'Extra Small' },
+  { value: 'sm', label: 'Small' },
+  { value: 'base', label: 'Normal' },
+  { value: 'lg', label: 'Large' },
+  { value: 'xl', label: 'Extra Large' },
+  { value: '2xl', label: '2X Large' },
+  { value: '3xl', label: '3X Large' },
+];
 
 export const defaultThemes: OmTheme[] = [
   {
