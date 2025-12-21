@@ -36,7 +36,7 @@ export function configureSecurityMiddleware(app: Express) {
       origin: (origin, callback) => {
         if (!origin || allowedOrigins.includes(origin)) {
           callback(null, true);
-        } else if (origin?.includes('.replit.dev') || origin?.includes('.replit.app')) {
+        } else if (origin?.includes('.replit.dev') || origin?.includes('.replit.app') || origin?.includes('.repl.co')) {
           callback(null, true);
         } else {
           logger.warn({ origin, allowedOrigins }, 'CORS rejection');
