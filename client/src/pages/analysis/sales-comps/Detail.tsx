@@ -1,17 +1,16 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, Save, Trash2, Building2, MapPin, DollarSign, Calendar, Anchor, Ship, Info } from "lucide-react";
+import { ArrowLeft, Trash2, Building2, MapPin, DollarSign, Calendar, Anchor, Ship, Info, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import CreateEditCompDialog from "@/components/salescomps/sales-comps/CreateEditCompDialog";
+import type { SalesComp } from "@shared/schema";
 
 interface DetailProps {
   compId?: string;
@@ -53,39 +52,11 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState<any>({});
+  const [showEditDialog, setShowEditDialog] = useState(false);
 
   const { data: comp, isLoading, error } = useQuery({
     queryKey: ['/api/sales-comps', compId],
     enabled: !!compId,
-  });
-
-  useEffect(() => {
-    if (comp) {
-      setFormData({ ...comp });
-    }
-  }, [comp]);
-
-  const updateMutation = useMutation({
-    mutationFn: async (data: any) => {
-      return apiRequest('PATCH', `/api/sales-comps/${compId}`, data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/sales-comps'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/sales-comps', compId] });
-      queryClient.invalidateQueries({ predicate: (query) => {
-        const key = query.queryKey;
-        if (!Array.isArray(key) || key.length === 0) return false;
-        return key[0] === '/api/analysis/sales-comps/recent' ||
-               key[0] === '/api/dashboards/widgets/query';
-      }});
-      toast({ title: "Success", description: "Sales comp updated successfully" });
-      setIsEditing(false);
-    },
-    onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to update sales comp", variant: "destructive" });
-    },
   });
 
   const deleteMutation = useMutation({
@@ -108,46 +79,7 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
     },
   });
 
-  const canEdit = true;
   const canDelete = true;
-
-  const handleSave = () => {
-    const parseNum = (val: any): number | undefined => {
-      if (val === null || val === undefined || val === '') return undefined;
-      const num = Number(val);
-      return isNaN(num) ? undefined : num;
-    };
-    
-    const updateData: Record<string, any> = {
-      marina: formData.marina || undefined,
-      city: formData.city || undefined,
-      state: formData.state || undefined,
-      address: formData.address || undefined,
-      notes: formData.notes || undefined,
-      company: formData.company || undefined,
-      seller: formData.seller || undefined,
-      broker: formData.broker || undefined,
-      salePrice: parseNum(formData.salePrice),
-      saleMonth: parseNum(formData.saleMonth),
-      saleYear: parseNum(formData.saleYear),
-      capRate: parseNum(formData.capRate),
-      wetSlips: parseNum(formData.wetSlips),
-      dryRacks: parseNum(formData.dryRacks),
-      noi: parseNum(formData.noi),
-      listPrice: parseNum(formData.listPrice),
-    };
-
-    Object.keys(updateData).forEach(key => {
-      if (updateData[key] === undefined) delete updateData[key];
-    });
-    
-    updateMutation.mutate(updateData);
-  };
-
-  const handleCancel = () => {
-    setFormData({ ...comp });
-    setIsEditing(false);
-  };
 
   const handleDelete = () => {
     if (window.confirm('Are you sure you want to delete this comp? This action cannot be undone.')) {
@@ -155,8 +87,8 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
     }
   };
 
-  const handleInputChange = (field: string, value: any) => {
-    setFormData((prev: any) => ({ ...prev, [field]: value }));
+  const handleEditClose = () => {
+    setShowEditDialog(false);
   };
 
   const Container = isModal ? 'div' : Card;
@@ -186,93 +118,30 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
   }
 
   const renderField = (label: string, field: string, options?: { 
-    type?: 'text' | 'number' | 'currency' | 'percent' | 'select' | 'textarea';
+    type?: 'text' | 'number' | 'currency' | 'percent' | 'select';
     selectOptions?: { value: string; label: string }[];
-    placeholder?: string;
-    prefix?: string;
-    suffix?: string;
     displayFormatter?: (value: any) => string;
   }) => {
-    const value = formData[field];
-    const { type = 'text', selectOptions, placeholder, prefix, suffix, displayFormatter } = options || {};
+    const value = (comp as any)?.[field];
+    const { type = 'text', selectOptions, displayFormatter } = options || {};
     
-    if (!isEditing) {
-      let displayValue = value;
-      if (displayFormatter) {
-        displayValue = displayFormatter(value);
-      } else if (type === 'currency' && value) {
-        displayValue = `$${Number(value).toLocaleString()}`;
-      } else if (type === 'percent' && value) {
-        displayValue = `${Number(value).toFixed(2)}%`;
-      } else if (type === 'select' && selectOptions) {
-        displayValue = selectOptions.find(o => o.value === String(value))?.label || value;
-      }
-      
-      return (
-        <div className="space-y-1">
-          <Label className="text-sm font-medium text-muted-foreground">{label}</Label>
-          <p className={`text-base ${type === 'currency' ? 'text-green-600 font-semibold' : ''}`}>
-            {displayValue || 'N/A'}
-          </p>
-        </div>
-      );
+    let displayValue = value;
+    if (displayFormatter) {
+      displayValue = displayFormatter(value);
+    } else if (type === 'currency' && value) {
+      displayValue = `$${Number(value).toLocaleString()}`;
+    } else if (type === 'percent' && value) {
+      displayValue = `${Number(value).toFixed(2)}%`;
+    } else if (type === 'select' && selectOptions) {
+      displayValue = selectOptions.find(o => o.value === String(value))?.label || value;
     }
-
-    if (type === 'select' && selectOptions) {
-      return (
-        <div className="space-y-1">
-          <Label className="text-sm font-medium">{label}</Label>
-          <Select 
-            value={String(value || '')} 
-            onValueChange={(v) => handleInputChange(field, v)}
-          >
-            <SelectTrigger data-testid={`select-${field}`}>
-              <SelectValue placeholder={placeholder || `Select ${label.toLowerCase()}`} />
-            </SelectTrigger>
-            <SelectContent>
-              {selectOptions.map(opt => (
-                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      );
-    }
-
-    if (type === 'textarea') {
-      return (
-        <div className="space-y-1">
-          <Label className="text-sm font-medium">{label}</Label>
-          <Textarea
-            value={value || ''}
-            onChange={(e) => handleInputChange(field, e.target.value)}
-            placeholder={placeholder}
-            data-testid={`input-${field}`}
-            className="min-h-[100px]"
-          />
-        </div>
-      );
-    }
-
+    
     return (
       <div className="space-y-1">
-        <Label className="text-sm font-medium">{label}</Label>
-        <div className="relative">
-          {prefix && (
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">{prefix}</span>
-          )}
-          <Input
-            type={type === 'number' || type === 'currency' || type === 'percent' ? 'number' : 'text'}
-            value={value || ''}
-            onChange={(e) => handleInputChange(field, e.target.value)}
-            placeholder={placeholder}
-            data-testid={`input-${field}`}
-            className={prefix ? 'pl-7' : ''}
-          />
-          {suffix && (
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">{suffix}</span>
-          )}
-        </div>
+        <Label className="text-sm font-medium text-muted-foreground">{label}</Label>
+        <p className={`text-base ${type === 'currency' ? 'text-green-600 font-semibold' : ''}`}>
+          {displayValue || 'N/A'}
+        </p>
       </div>
     );
   };
@@ -317,34 +186,14 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
                 Delete
               </Button>
             )}
-            {canEdit && !isEditing && (
-              <Button
-                variant="outline"
-                onClick={() => setIsEditing(true)}
-                data-testid="button-edit"
-              >
-                Edit
-              </Button>
-            )}
-            {canEdit && isEditing && (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={handleCancel}
-                  data-testid="button-cancel"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSave}
-                  disabled={updateMutation.isPending}
-                  data-testid="button-save"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
-                </Button>
-              </>
-            )}
+            <Button
+              variant="outline"
+              onClick={() => setShowEditDialog(true)}
+              data-testid="button-edit"
+            >
+              <Edit className="h-4 w-4 mr-2" />
+              Edit
+            </Button>
           </div>
         </div>
 
@@ -399,9 +248,9 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {renderField('Marina Name', 'marina', { placeholder: 'Enter marina name' })}
-                {renderField('Address', 'address', { placeholder: 'Street address' })}
-                {renderField('City', 'city', { placeholder: 'City' })}
+                {renderField('Marina Name', 'marina')}
+                {renderField('Address', 'address')}
+                {renderField('City', 'city')}
                 {renderField('State', 'state', { type: 'select', selectOptions: US_STATES })}
               </CardContent>
             </Card>
@@ -415,9 +264,9 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
               </CardHeader>
               <CardContent className="space-y-4">
                 {renderField('Sale Month', 'saleMonth', { type: 'select', selectOptions: MONTHS })}
-                {renderField('Sale Year', 'saleYear', { type: 'number', placeholder: 'YYYY' })}
-                {renderField('Sale Price', 'salePrice', { type: 'currency', prefix: '$', placeholder: 'Sale price' })}
-                {renderField('Listing Price', 'listPrice', { type: 'currency', prefix: '$', placeholder: 'Original listing price' })}
+                {renderField('Sale Year', 'saleYear', { type: 'number' })}
+                {renderField('Sale Price', 'salePrice', { type: 'currency' })}
+                {renderField('Listing Price', 'listPrice', { type: 'currency' })}
               </CardContent>
             </Card>
           </div>
@@ -427,7 +276,7 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
               <CardTitle className="text-base">Notes</CardTitle>
             </CardHeader>
             <CardContent>
-              {renderField('Notes', 'notes', { type: 'textarea', placeholder: 'Additional notes about this property...' })}
+              {renderField('Notes', 'notes')}
             </CardContent>
           </Card>
         </TabsContent>
@@ -442,8 +291,8 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {renderField('Cap Rate', 'capRate', { type: 'percent', placeholder: 'Cap rate %' })}
-                {renderField('NOI', 'noi', { type: 'currency', prefix: '$', placeholder: 'Net Operating Income' })}
+                {renderField('Cap Rate', 'capRate', { type: 'percent' })}
+                {renderField('NOI', 'noi', { type: 'currency' })}
                 {renderField('Price per Slip', 'pricePerSlip', { 
                   type: 'currency', 
                   displayFormatter: () => {
@@ -469,12 +318,12 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {renderField('Wet Slips', 'wetSlips', { type: 'number', placeholder: 'Number of wet slips' })}
-                {renderField('Dry Racks', 'dryRacks', { type: 'number', placeholder: 'Number of dry racks' })}
+                {renderField('Wet Slips', 'wetSlips', { type: 'number' })}
+                {renderField('Dry Racks', 'dryRacks', { type: 'number' })}
                 <div className="space-y-1">
                   <Label className="text-sm font-medium text-muted-foreground">Total Units</Label>
                   <p className="text-base font-semibold">
-                    {(Number(formData.wetSlips) || 0) + (Number(formData.dryRacks) || 0)}
+                    {(Number(comp?.wetSlips) || 0) + (Number(comp?.dryRacks) || 0)}
                   </p>
                 </div>
               </CardContent>
@@ -489,9 +338,9 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
                 <CardTitle className="text-base">Transaction Parties</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {renderField('Buyer Company', 'company', { placeholder: 'Buyer company name' })}
-                {renderField('Seller', 'seller', { placeholder: 'Seller name' })}
-                {renderField('Broker', 'broker', { placeholder: 'Broker name' })}
+                {renderField('Buyer Company', 'company')}
+                {renderField('Seller', 'seller')}
+                {renderField('Broker', 'broker')}
               </CardContent>
             </Card>
 
@@ -500,13 +349,21 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
                 <CardTitle className="text-base">Data Source</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {renderField('Source', 'source', { placeholder: 'Data source' })}
-                {renderField('Source URL', 'sourceUrl', { placeholder: 'https://...' })}
+                {renderField('Source', 'source')}
+                {renderField('Source URL', 'sourceUrl')}
               </CardContent>
             </Card>
           </div>
         </TabsContent>
       </Tabs>
+
+      {comp && (
+        <CreateEditCompDialog
+          open={showEditDialog}
+          onClose={handleEditClose}
+          comp={comp as SalesComp}
+        />
+      )}
     </Container>
   );
 }
