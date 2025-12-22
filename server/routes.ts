@@ -21471,6 +21471,7 @@ Current context: Project ${req.params.projectId}`;
           capRate: salesComps.capRate,
           saleYear: salesComps.saleYear,
           saleMonth: salesComps.saleMonth,
+          broker: salesComps.broker,
           createdAt: salesComps.createdAt,
         })
         .from(salesComps)

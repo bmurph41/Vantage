@@ -1779,6 +1779,19 @@ export default function Dashboard() {
                 ),
               },
               {
+                key: 'saleDate',
+                header: 'Sale Date',
+                render: (comp: any) => {
+                  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                  if (comp.saleMonth && comp.saleYear) {
+                    return <div className="text-gray-600">{months[comp.saleMonth - 1]} {comp.saleYear}</div>;
+                  } else if (comp.saleYear) {
+                    return <div className="text-gray-600">{comp.saleYear}</div>;
+                  }
+                  return <div className="text-gray-400">N/A</div>;
+                },
+              },
+              {
                 key: 'salePrice',
                 header: 'Sale Price',
                 render: (comp: any) => (
@@ -1792,6 +1805,13 @@ export default function Dashboard() {
                 header: 'Cap Rate',
                 render: (comp: any) => (
                   <div className="text-gray-600">{comp.capRate ? `${Number(comp.capRate).toFixed(2)}%` : 'N/A'}</div>
+                ),
+              },
+              {
+                key: 'broker',
+                header: 'Broker',
+                render: (comp: any) => (
+                  <div className="text-gray-600">{comp.broker || 'N/A'}</div>
                 ),
               },
             ]}
