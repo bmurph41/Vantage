@@ -2,12 +2,20 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { Loader2 } from 'lucide-react';
 
-export type PackType = 'fund_management' | 'lp_portal' | 'prospecting' | 'analytics_pro';
+// Core packs that users purchase first
+export type CorePackType = 'crm_pipeline' | 'modeling_tools' | 'analysis' | 'operations';
+
+// Add-on packs that require core packs
+export type AddonPackType = 'fund_management' | 'lp_portal' | 'prospecting' | 'analytics_pro';
+
+export type PackType = CorePackType | AddonPackType;
 
 interface PackInfo {
   name: string;
   description: string;
   features: string[];
+  isCore?: boolean;
+  monthlyPriceCents?: number;
 }
 
 interface PackWithStatus {
@@ -45,6 +53,12 @@ export function usePacks() {
     packsWithStatus,
     isLoading,
     hasPack,
+    // Core packs
+    hasCrmPipeline: activePacks.includes('crm_pipeline'),
+    hasModelingTools: activePacks.includes('modeling_tools'),
+    hasAnalysis: activePacks.includes('analysis'),
+    hasOperations: activePacks.includes('operations'),
+    // Add-on packs
     hasFundManagement: activePacks.includes('fund_management'),
     hasLpPortal: activePacks.includes('lp_portal'),
     hasProspecting: activePacks.includes('prospecting'),

@@ -152,14 +152,39 @@ export const organizations = pgTable("organizations", {
 });
 
 // Pack Types - Add-on feature packs that can be purchased
+// Core packs: crm_pipeline, modeling_tools, analysis, operations
+// Add-on packs: fund_management, lp_portal, prospecting, analytics_pro
 export const packTypeEnum = pgEnum("pack_type", [
-  "fund_management",  // Fund Management module
-  "lp_portal",        // LP Portal for investor access
-  "prospecting",      // Premium prospecting & outreach tools
-  "analytics_pro",    // Advanced analytics and reporting
+  "crm_pipeline",     // CRM & Pipeline - deals, contacts, companies, pipeline management
+  "modeling_tools",   // Modeling Tools - modeling projects, OM builder, exit strategies, waterfall
+  "analysis",         // Analysis - sales comps, rate comps, market analytics
+  "operations",       // Operations - rent roll, fuel sales, ship store, dockit, marketing
+  "fund_management",  // Fund Management module (add-on to modeling_tools)
+  "lp_portal",        // LP Portal for investor access (add-on to fund_management)
+  "prospecting",      // Premium prospecting & outreach tools (add-on to crm_pipeline)
+  "analytics_pro",    // Advanced analytics and reporting (add-on to analysis)
 ]);
 
 export const packStatusEnum = pgEnum("pack_status", ["active", "trial", "expired", "cancelled"]);
+
+// Pack Catalog - Static configuration for available packs
+export const packCatalog = pgTable("pack_catalog", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  packType: text("pack_type").notNull().unique(), // References pack_type enum values
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  features: jsonb("features").notNull().default(sql`'[]'`), // Array of feature strings
+  monthlyPriceCents: integer("monthly_price_cents").notNull().default(0), // Price in cents
+  yearlyPriceCents: integer("yearly_price_cents").notNull().default(0), // Annual price in cents
+  stripePriceIdMonthly: text("stripe_price_id_monthly"), // Stripe price ID for monthly billing
+  stripePriceIdYearly: text("stripe_price_id_yearly"), // Stripe price ID for yearly billing
+  dependencies: jsonb("dependencies").notNull().default(sql`'[]'`), // Array of pack_type slugs required
+  isCore: boolean("is_core").notNull().default(false), // Core packs vs add-on packs
+  displayOrder: integer("display_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true), // Whether pack is available for purchase
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
 
 // Organization Packs - Tracks purchased add-on packs per organization
 export const organizationPacks = pgTable("organization_packs", {
@@ -171,6 +196,13 @@ export const organizationPacks = pgTable("organization_packs", {
   purchasedAt: timestamp("purchased_at").notNull().defaultNow(),
   expiresAt: timestamp("expires_at"), // Null = no expiration
   trialEndsAt: timestamp("trial_ends_at"), // For trial packs
+  // Stripe subscription info
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripePriceId: text("stripe_price_id"),
+  billingCycle: text("billing_cycle"), // 'monthly' or 'yearly'
+  currentPeriodEnd: timestamp("current_period_end"),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false),
   // Metadata
   purchasedBy: varchar("purchased_by"), // User who purchased
   notes: text("notes"),
@@ -180,6 +212,7 @@ export const organizationPacks = pgTable("organization_packs", {
   orgPackIdx: index("org_packs_org_idx").on(table.orgId),
   packTypeIdx: index("org_packs_type_idx").on(table.packType),
   orgPackUnique: index("org_packs_unique_idx").on(table.orgId, table.packType),
+  stripeSubIdx: index("org_packs_stripe_sub_idx").on(table.stripeSubscriptionId),
 }));
 
 // SSO Configurations - Per-organization SSO provider settings
@@ -1630,6 +1663,13 @@ export const insertOrganizationSchema = createInsertSchema(organizations).omit({
   createdAt: true,
 });
 
+export const insertPackCatalogSchema = createInsertSchema(packCatalog).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updatePackCatalogSchema = insertPackCatalogSchema.partial();
+
 export const insertOrganizationPackSchema = createInsertSchema(organizationPacks).omit({
   id: true,
   createdAt: true,
@@ -1856,6 +1896,10 @@ export const insertProjectIntegrationSchema = createInsertSchema(projectIntegrat
 // Types
 export type Organization = typeof organizations.$inferSelect;
 export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
+
+export type PackCatalog = typeof packCatalog.$inferSelect;
+export type InsertPackCatalog = z.infer<typeof insertPackCatalogSchema>;
+export type UpdatePackCatalog = z.infer<typeof updatePackCatalogSchema>;
 
 export type OrganizationPack = typeof organizationPacks.$inferSelect;
 export type InsertOrganizationPack = z.infer<typeof insertOrganizationPackSchema>;
