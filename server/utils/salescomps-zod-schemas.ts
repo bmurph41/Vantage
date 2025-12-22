@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { STORAGE_TYPES } from '@shared/salescomps-constants';
 
 export const salesCompCreateSchema = z.object({
   marina: z.string().min(1, "Marina name is required"),
@@ -16,8 +15,8 @@ export const salesCompCreateSchema = z.object({
   state: z.string().min(1).max(50).optional(),
   wetSlips: z.number().int().min(0).optional(),
   dryRacks: z.number().int().min(0).optional(),
-  ioBoth: z.preprocess(v => v === '' || v === 'none' ? undefined : v, z.enum(STORAGE_TYPES).optional()),
-  storageTypes: z.array(z.enum(STORAGE_TYPES)).default([]),
+  ioBoth: z.preprocess(v => v === '' || v === 'none' ? undefined : v, z.string().optional()),
+  storageTypes: z.array(z.string()).default([]),
   bodyOfWater: z.string().optional(),
   waterBodyName: z.string().optional(),
   waterfront: z.string().optional(),
@@ -40,8 +39,8 @@ export const salesCompCreateSchema = z.object({
   buyer: z.string().optional(),
   company: z.string().optional(),
   owner: z.string().optional(),
-  listPrice: z.number().positive().optional().transform(val => val?.toString()),
-  estimatedPurchasePrice: z.number().positive().optional().transform(val => val?.toString()),
+  listPrice: z.number().positive().nullable().optional().transform(val => val?.toString() ?? null),
+  estimatedPurchasePrice: z.number().positive().nullable().optional().transform(val => val?.toString() ?? null),
   acres: z.number().positive().optional().transform(val => val?.toString()),
   occupancy: z.number().min(0).max(100).optional().transform(val => val?.toString()),
   yearBuilt: z.number().int().min(1800).max(new Date().getFullYear()).optional(),
@@ -149,7 +148,7 @@ export const compFiltersSchema = z.object({
   wetSlipsMax: z.coerce.number().int().min(0).optional(),
   dryRacksMin: z.coerce.number().int().min(0).optional(),
   dryRacksMax: z.coerce.number().int().min(0).optional(),
-  ioBoth: z.preprocess(v => v === '' || v === 'none' ? undefined : v, z.enum(STORAGE_TYPES).optional()),
+  ioBoth: z.preprocess(v => v === '' || v === 'none' ? undefined : v, z.string().optional()),
   disclosedOnly: z.coerce.boolean().optional(),
   disclosedCapRateOnly: z.coerce.boolean().optional(),
   portfoliosOnly: z.coerce.boolean().optional(),
