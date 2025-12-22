@@ -1035,11 +1035,15 @@ export default function Dashboard() {
             {recentComps && recentComps.length > 0 && (
               <ModuleSection title="Recent Sales" description={salesCompsYear === 'all' ? 'Most recent sales by date' : `Most recent ${salesCompsYear} sales`}>
                 <DataList
-                  items={recentComps.slice(0, 3).map((comp: any) => ({
-                    label: comp.marina || 'Unnamed Marina',
-                    value: formatCurrency(comp.salePrice || 0),
-                    badge: comp.saleMonth && comp.saleYear ? `${comp.saleMonth}/${comp.saleYear}` : comp.state?.substring(0, 2).toUpperCase(),
-                  }))}
+                  items={recentComps.slice(0, 3).map((comp: any) => {
+                    const price = comp.salePrice || comp.estimatedPurchasePrice;
+                    const isEstimated = !comp.salePrice && comp.estimatedPurchasePrice;
+                    return {
+                      label: comp.marina || 'Unnamed Marina',
+                      value: price ? `${formatCurrency(price)}${isEstimated ? ' (Est.)' : ''}` : 'N/A',
+                      badge: comp.saleMonth && comp.saleYear ? `${comp.saleMonth}/${comp.saleYear}` : comp.state?.substring(0, 2).toUpperCase(),
+                    };
+                  })}
                   maxItems={3}
                 />
               </ModuleSection>
@@ -1794,11 +1798,16 @@ export default function Dashboard() {
               {
                 key: 'salePrice',
                 header: 'Sale Price',
-                render: (comp: any) => (
-                  <div className="text-gray-900 font-semibold">
-                    {formatCurrency(Number(comp.salePrice || 0))}
-                  </div>
-                ),
+                render: (comp: any) => {
+                  const price = comp.salePrice || comp.estimatedPurchasePrice;
+                  const isEstimated = !comp.salePrice && comp.estimatedPurchasePrice;
+                  return (
+                    <div className="text-gray-900 font-semibold">
+                      {price ? formatCurrency(Number(price)) : 'N/A'}
+                      {isEstimated && <span className="text-xs text-amber-600 ml-1">(Est.)</span>}
+                    </div>
+                  );
+                },
               },
               {
                 key: 'capRate',

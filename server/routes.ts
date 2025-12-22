@@ -21472,6 +21472,7 @@ Current context: Project ${req.params.projectId}`;
           saleYear: salesComps.saleYear,
           saleMonth: salesComps.saleMonth,
           broker: salesComps.broker,
+          estimatedPurchasePrice: salesComps.estimatedPurchasePrice,
           createdAt: salesComps.createdAt,
         })
         .from(salesComps)
