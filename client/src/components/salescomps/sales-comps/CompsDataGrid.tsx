@@ -274,6 +274,12 @@ export default function CompsDataGrid({
         queryKey: ['/api/sales-comps'],
         exact: false 
       });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey;
+        if (!Array.isArray(key) || key.length === 0) return false;
+        return key[0] === '/api/analysis/sales-comps/recent' ||
+               key[0] === '/api/dashboards/widgets/query';
+      }});
     },
   });
 
@@ -311,6 +317,12 @@ export default function CompsDataGrid({
         queryKey: ['/api/sales-comps'],
         exact: false
       });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey;
+        if (!Array.isArray(key) || key.length === 0) return false;
+        return key[0] === '/api/analysis/sales-comps/recent' ||
+               key[0] === '/api/dashboards/widgets/query';
+      }});
       
       toast({
         title: "Property added to portfolio",
@@ -356,6 +368,12 @@ export default function CompsDataGrid({
         queryKey: ['/api/sales-comps'],
         exact: false
       });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey;
+        if (!Array.isArray(key) || key.length === 0) return false;
+        return key[0] === '/api/analysis/sales-comps/recent' ||
+               key[0] === '/api/dashboards/widgets/query';
+      }});
       
       toast({
         title: "Marinas added to portfolio",
@@ -388,6 +406,12 @@ export default function CompsDataGrid({
         queryKey: ['/api/sales-comps'],
         exact: false
       });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey;
+        if (!Array.isArray(key) || key.length === 0) return false;
+        return key[0] === '/api/analysis/sales-comps/recent' ||
+               key[0] === '/api/dashboards/widgets/query';
+      }});
       
       toast({
         title: "Property removed from portfolio",
@@ -415,6 +439,12 @@ export default function CompsDataGrid({
         queryKey: ['/api/sales-comps'],
         exact: false
       });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey;
+        if (!Array.isArray(key) || key.length === 0) return false;
+        return key[0] === '/api/analysis/sales-comps/recent' ||
+               key[0] === '/api/dashboards/widgets/query';
+      }});
       
       toast({
         title: "Comp duplicated",

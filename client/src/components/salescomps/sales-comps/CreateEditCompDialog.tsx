@@ -394,6 +394,13 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       });
       onClose();
       queryClient.invalidateQueries({ queryKey: queryKeys.comps.all });
+      queryClient.invalidateQueries({ queryKey: ['/api/sales-comps'] });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey;
+        if (!Array.isArray(key) || key.length === 0) return false;
+        return key[0] === '/api/analysis/sales-comps/recent' ||
+               key[0] === '/api/dashboards/widgets/query';
+      }});
       // Invalidate project comps if editing in project context
       if (projectId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.projects.comps(projectId) });
@@ -434,6 +441,13 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       
       onClose();
       queryClient.invalidateQueries({ queryKey: queryKeys.comps.all });
+      queryClient.invalidateQueries({ queryKey: ['/api/sales-comps'] });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey;
+        if (!Array.isArray(key) || key.length === 0) return false;
+        return key[0] === '/api/analysis/sales-comps/recent' ||
+               key[0] === '/api/dashboards/widgets/query';
+      }});
       // Invalidate project comps if editing in project context
       if (projectId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.projects.comps(projectId) });

@@ -74,6 +74,12 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/sales-comps'] });
       queryClient.invalidateQueries({ queryKey: ['/api/sales-comps', compId] });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey;
+        if (!Array.isArray(key) || key.length === 0) return false;
+        return key[0] === '/api/analysis/sales-comps/recent' ||
+               key[0] === '/api/dashboards/widgets/query';
+      }});
       toast({ title: "Success", description: "Sales comp updated successfully" });
       setIsEditing(false);
     },
@@ -88,6 +94,12 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/sales-comps'] });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey;
+        if (!Array.isArray(key) || key.length === 0) return false;
+        return key[0] === '/api/analysis/sales-comps/recent' ||
+               key[0] === '/api/dashboards/widgets/query';
+      }});
       toast({ title: "Success", description: "Sales comp deleted successfully" });
       navigate('/analysis/sales-comps');
     },
