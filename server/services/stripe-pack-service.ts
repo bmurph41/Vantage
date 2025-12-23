@@ -123,58 +123,100 @@ class StripePackService {
   }
 
   async handleSubscriptionCreated(subscriptionId: string, customerId: string) {
+    console.log(`[StripePackService] Processing subscription created: ${subscriptionId}`);
     const stripe = await getUncachableStripeClient();
     
-    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+      expand: ['items.data.price'],
+    });
     const customer = await stripe.customers.retrieve(customerId);
     
     if (customer.deleted) {
-      console.error('Customer was deleted:', customerId);
+      console.error('[StripePackService] Customer was deleted:', customerId);
       return;
     }
 
     const orgId = (customer as any).metadata?.orgId;
     if (!orgId) {
-      console.error('No orgId found in customer metadata:', customerId);
+      console.error('[StripePackService] No orgId found in customer metadata:', customerId);
       return;
     }
+
+    console.log(`[StripePackService] Activating packs for org ${orgId} from subscription ${subscriptionId}`);
 
     for (const item of subscription.items.data) {
       const packType = this.getPackTypeFromPriceMetadata(item.price.metadata as Record<string, string>);
 
       if (packType) {
-        await packService.activatePack(orgId, packType, undefined, {
-          notes: `Activated via Stripe subscription ${subscriptionId}`,
-        });
+        try {
+          const existingPack = await packService.getOrgPack(orgId, packType);
+          
+          if (existingPack.isActive && existingPack.pack?.stripeSubscriptionId === subscriptionId) {
+            console.log(`[StripePackService] Pack ${packType} already active with subscription ${subscriptionId} for org ${orgId}, skipping`);
+            continue;
+          }
+          
+          if (existingPack.pack?.status === 'cancelled' && existingPack.pack?.stripeSubscriptionId === subscriptionId) {
+            console.log(`[StripePackService] Pack ${packType} was cancelled for same subscription ${subscriptionId}, ignoring stale activation event`);
+            continue;
+          }
+          
+          await packService.activatePack(orgId, packType, undefined, {
+            notes: `Activated via Stripe subscription ${subscriptionId}`,
+            stripeSubscriptionId: subscriptionId,
+            stripeCustomerId: customerId,
+            stripePriceId: item.price.id,
+          });
+          console.log(`[StripePackService] Activated pack ${packType} for org ${orgId}`);
+        } catch (error: any) {
+          console.error(`[StripePackService] Failed to activate pack ${packType}:`, error.message);
+        }
       }
     }
   }
 
   async handleSubscriptionCancelled(subscriptionId: string, customerId: string) {
+    console.log(`[StripePackService] Processing subscription cancelled: ${subscriptionId}`);
     const stripe = await getUncachableStripeClient();
     
-    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+      expand: ['items.data.price'],
+    });
     const customer = await stripe.customers.retrieve(customerId);
     
     if (customer.deleted) {
-      console.error('Customer was deleted:', customerId);
+      console.error('[StripePackService] Customer was deleted:', customerId);
       return;
     }
 
     const orgId = (customer as any).metadata?.orgId;
     if (!orgId) {
-      console.error('No orgId found in customer metadata:', customerId);
+      console.error('[StripePackService] No orgId found in customer metadata:', customerId);
       return;
     }
+
+    console.log(`[StripePackService] Deactivating packs for org ${orgId} from subscription ${subscriptionId}`);
 
     for (const item of subscription.items.data) {
       const packType = this.getPackTypeFromPriceMetadata(item.price.metadata as Record<string, string>);
 
       if (packType) {
-        await packService.deactivatePack(orgId, packType);
+        try {
+          const existingPack = await packService.getOrgPack(orgId, packType);
+          if (existingPack.pack?.stripeSubscriptionId !== subscriptionId) {
+            console.log(`[StripePackService] Pack ${packType} subscription ID mismatch (expected ${existingPack.pack?.stripeSubscriptionId}, got ${subscriptionId}), skipping deactivation`);
+            continue;
+          }
+          
+          await packService.deactivatePack(orgId, packType);
+          console.log(`[StripePackService] Deactivated pack ${packType} for org ${orgId}`);
+        } catch (error: any) {
+          console.error(`[StripePackService] Failed to deactivate pack ${packType}:`, error.message);
+        }
       }
     }
   }
 }
+
 
 export const stripePackService = new StripePackService();

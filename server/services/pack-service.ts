@@ -145,6 +145,31 @@ class PackService {
       .where(eq(organizationPacks.orgId, orgId));
   }
 
+  async getOrgPack(orgId: string, packType: PackType): Promise<{ isActive: boolean; pack: OrganizationPack | null }> {
+    const [pack] = await db
+      .select()
+      .from(organizationPacks)
+      .where(
+        and(
+          eq(organizationPacks.orgId, orgId),
+          eq(organizationPacks.packType, packType)
+        )
+      )
+      .limit(1);
+    
+    if (!pack) {
+      return { isActive: false, pack: null };
+    }
+    
+    const now = new Date();
+    const isActive = 
+      (pack.status === 'active' || pack.status === 'trial') &&
+      (!pack.expiresAt || pack.expiresAt > now) &&
+      (!pack.trialEndsAt || pack.status !== 'trial' || pack.trialEndsAt > now);
+    
+    return { isActive, pack };
+  }
+
   async getActivePacks(orgId: string): Promise<PackType[]> {
     const packs = await db
       .select()
@@ -201,6 +226,9 @@ class PackService {
       trialDays?: number;
       expiresAt?: Date;
       notes?: string;
+      stripeSubscriptionId?: string;
+      stripeCustomerId?: string;
+      stripePriceId?: string;
     }
   ): Promise<OrganizationPack> {
     const requiredPacks = PACK_DEPENDENCIES[packType];
@@ -234,6 +262,9 @@ class PackService {
             ? new Date(Date.now() + options.trialDays * 24 * 60 * 60 * 1000)
             : null,
           notes: options?.notes,
+          stripeSubscriptionId: options?.stripeSubscriptionId || existingPack[0].stripeSubscriptionId,
+          stripeCustomerId: options?.stripeCustomerId || existingPack[0].stripeCustomerId,
+          stripePriceId: options?.stripePriceId || existingPack[0].stripePriceId,
           updatedAt: new Date(),
         })
         .where(eq(organizationPacks.id, existingPack[0].id))
@@ -253,6 +284,9 @@ class PackService {
           ? new Date(Date.now() + options.trialDays * 24 * 60 * 60 * 1000)
           : null,
         notes: options?.notes,
+        stripeSubscriptionId: options?.stripeSubscriptionId,
+        stripeCustomerId: options?.stripeCustomerId,
+        stripePriceId: options?.stripePriceId,
       })
       .returning();
 
