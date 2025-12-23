@@ -1,8 +1,22 @@
 import OpenAI from "openai";
 import * as cheerio from "cheerio";
 import { smartFetch, SmartFetchResult } from "./headless-fetcher";
+import { extractListingsWithDOM } from "./dom-extractor";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+function isOpenAIRateLimitError(error: any): boolean {
+  if (!error) return false;
+  const message = error.message?.toLowerCase() || "";
+  const status = error.status || error.statusCode || 0;
+  return (
+    status === 429 ||
+    message.includes("rate limit") ||
+    message.includes("quota exceeded") ||
+    message.includes("insufficient_quota") ||
+    message.includes("429")
+  );
+}
 
 function isAllowedUrl(url: string): { allowed: boolean; reason?: string } {
   try {
@@ -390,12 +404,126 @@ export async function extractListingsWithAI(
     
   } catch (error: any) {
     console.error(`[AI Extractor] Error:`, error.message);
+    
+    if (isOpenAIRateLimitError(error)) {
+      console.log(`[AI Extractor] OpenAI rate limit hit, falling back to DOM extraction...`);
+      try {
+        const fetchResult = await fetchPageContent(url, { forceHeadless: options.forceHeadless });
+        const domListings = extractListingsWithDOM(fetchResult.html, url, platformName);
+        
+        if (domListings.length > 0) {
+          console.log(`[AI Extractor] DOM fallback extracted ${domListings.length} listings`);
+          return {
+            success: true,
+            listings: domListings,
+            error: `AI unavailable (${error.message}), used DOM fallback`,
+          };
+        }
+      } catch (domError: any) {
+        console.error(`[AI Extractor] DOM fallback also failed:`, domError.message);
+      }
+    }
+    
     return {
       success: false,
       listings: [],
       error: error.message,
     };
   }
+}
+
+export async function extractWithFallback(
+  url: string,
+  platformName: string,
+  options: ExtractionOptions = {}
+): Promise<ExtractionResult> {
+  const forceHeadless = options.forceHeadless || false;
+  console.log(`[Extractor] Fetching page: ${url}${forceHeadless ? ' (forced headless)' : ''}`);
+  
+  let fetchResult: FetchResult;
+  try {
+    fetchResult = await fetchPageContent(url, { forceHeadless });
+  } catch (fetchError: any) {
+    return {
+      success: false,
+      listings: [],
+      error: `Failed to fetch page: ${fetchError.message}`,
+    };
+  }
+  
+  const cleanedContent = cleanHtmlForAI(fetchResult.html);
+  
+  if (cleanedContent.length < 100) {
+    return {
+      success: false,
+      listings: [],
+      error: "Page content too short or empty - may be blocked or require authentication",
+    };
+  }
+  
+  let aiResult: ExtractionResult | null = null;
+  try {
+    console.log(`[Extractor] Trying AI extraction (${cleanedContent.length} chars)...`);
+    
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: MARINA_EXTRACTION_PROMPT },
+        { role: "user", content: `Extract marina listings from this ${platformName} page content:\n\nURL: ${url}\n\nPage Content:\n${cleanedContent}` },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.1,
+      max_tokens: 4000,
+    });
+    
+    const content = response.choices[0]?.message?.content;
+    if (content) {
+      const parsed = JSON.parse(content);
+      const rawListings = parsed.listings || parsed.properties || parsed.results || (Array.isArray(parsed) ? parsed : [parsed]);
+      
+      const listings: ExtractedListing[] = rawListings
+        .filter((l: any) => l && (l.title || l.propertyName))
+        .map((l: any) => ({
+          ...l,
+          sourceUrl: l.sourceUrl || url,
+          attributionText: `Source: ${platformName} - View original listing`,
+          confidence: l.confidence || 70,
+        }));
+      
+      if (listings.length > 0) {
+        console.log(`[Extractor] AI extracted ${listings.length} marina listings`);
+        return {
+          success: true,
+          listings,
+          tokensUsed: response.usage?.total_tokens,
+        };
+      }
+    }
+  } catch (aiError: any) {
+    console.log(`[Extractor] AI extraction failed: ${aiError.message}`);
+    
+    if (isOpenAIRateLimitError(aiError)) {
+      console.log(`[Extractor] OpenAI rate limit/quota exceeded, using DOM fallback only`);
+    }
+  }
+  
+  console.log(`[Extractor] Falling back to DOM extraction...`);
+  const domListings = extractListingsWithDOM(fetchResult.html, url, platformName);
+  
+  if (domListings.length > 0) {
+    console.log(`[Extractor] DOM fallback extracted ${domListings.length} listings`);
+    return {
+      success: true,
+      listings: domListings,
+      error: aiResult ? undefined : "AI unavailable, used DOM fallback",
+    };
+  }
+  
+  return {
+    success: false,
+    listings: [],
+    error: "No listings found with AI or DOM extraction",
+  };
 }
 
 export async function extractSingleListing(
