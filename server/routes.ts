@@ -28658,6 +28658,57 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Stripe checkout routes
+  app.get("/api/stripe/publishable-key", async (_req, res) => {
+    try {
+      const { getStripePublishableKey } = await import("./stripeClient");
+      const publishableKey = await getStripePublishableKey();
+      res.json({ publishableKey });
+    } catch (error) {
+      console.error("Failed to get Stripe publishable key:", error);
+      res.status(500).json({ error: "Failed to get Stripe configuration" });
+    }
+  });
+
+  app.post("/api/stripe/checkout", authenticateUser, async (req: any, res) => {
+    try {
+      const { packTypes } = req.body;
+      if (!packTypes || !Array.isArray(packTypes) || packTypes.length === 0) {
+        return res.status(400).json({ error: "Pack types required" });
+      }
+
+      const { stripePackService } = await import("./services/stripe-pack-service");
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      const session = await stripePackService.createCheckoutSession(
+        req.user.orgId,
+        packTypes,
+        `${baseUrl}/settings/packs?success=true`,
+        `${baseUrl}/settings/packs?canceled=true`
+      );
+
+      res.json({ url: session.url });
+    } catch (error: any) {
+      console.error("Failed to create checkout session:", error);
+      res.status(500).json({ error: error.message || "Failed to create checkout session" });
+    }
+  });
+
+  app.post("/api/stripe/portal", authenticateUser, async (req: any, res) => {
+    try {
+      const { stripePackService } = await import("./services/stripe-pack-service");
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      const session = await stripePackService.createCustomerPortalSession(
+        req.user.orgId,
+        `${baseUrl}/settings/packs`
+      );
+
+      res.json({ url: session.url });
+    } catch (error: any) {
+      console.error("Failed to create portal session:", error);
+      res.status(500).json({ error: error.message || "Failed to create portal session" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
