@@ -198,11 +198,51 @@ function extractImageUrl($el: cheerio.Cheerio<cheerio.Element>, $: cheerio.Cheer
 
 function parsePrice(priceText: string | undefined): number | undefined {
   if (!priceText) return undefined;
+  
+  const text = priceText.toLowerCase().trim();
+  
+  const rangeMatch = text.match(/\$?([\d,.]+)\s*(?:-|to)\s*\$?([\d,.]+)\s*(m|mm|million|k|thousand)?/i);
+  if (rangeMatch) {
+    const lowVal = parseFloat(rangeMatch[1].replace(/,/g, ""));
+    const highVal = parseFloat(rangeMatch[2].replace(/,/g, ""));
+    const suffix = (rangeMatch[3] || "").toLowerCase();
+    let multiplier = 1;
+    if (suffix === "m" || suffix === "mm" || suffix === "million") multiplier = 1_000_000;
+    if (suffix === "k" || suffix === "thousand") multiplier = 1_000;
+    const avgVal = ((lowVal + highVal) / 2) * multiplier;
+    if (!isNaN(avgVal) && avgVal > 10000 && avgVal < 500000000) {
+      return Math.round(avgVal);
+    }
+  }
+  
+  const millionMatch = text.match(/\$?([\d,.]+)\s*(m|mm|million)/i);
+  if (millionMatch) {
+    const num = parseFloat(millionMatch[1].replace(/,/g, ""));
+    if (!isNaN(num)) {
+      const result = num * 1_000_000;
+      if (result > 10000 && result < 500000000) {
+        return Math.round(result);
+      }
+    }
+  }
+  
+  const thousandMatch = text.match(/\$?([\d,.]+)\s*(k|thousand)/i);
+  if (thousandMatch) {
+    const num = parseFloat(thousandMatch[1].replace(/,/g, ""));
+    if (!isNaN(num)) {
+      const result = num * 1_000;
+      if (result > 10000 && result < 500000000) {
+        return Math.round(result);
+      }
+    }
+  }
+  
   const cleaned = priceText.replace(/[^0-9.]/g, "");
   const num = parseFloat(cleaned);
   if (!isNaN(num) && num > 10000 && num < 500000000) {
-    return num;
+    return Math.round(num);
   }
+  
   return undefined;
 }
 
