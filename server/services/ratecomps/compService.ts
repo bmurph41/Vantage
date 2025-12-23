@@ -58,6 +58,7 @@ export class CompService {
 
         await this.storage.createPendingProperty({
           orgId: compData.orgId,
+          sourceType: 'rate_comp',
           rateCompId: comp.id,
           marinaName: compData.marina,
           city: compData.city || null,

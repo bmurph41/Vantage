@@ -2236,11 +2236,15 @@ export const assetPerformanceSnapshots = pgTable("asset_performance_snapshots", 
   assetDateIdx: index("asset_snapshots_asset_date_idx").on(table.ownedAssetId, table.snapshotDate),
 }));
 
-// Pending Properties - Review queue for properties created from sales comps
+// Pending Properties - Review queue for properties created from sales comps or rate comps
 export const pendingProperties = pgTable("pending_properties", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
-  compId: varchar("comp_id").notNull().references(() => salesComps.id),
+  
+  // Source tracking - supports both Sales Comps and Rate Comps
+  sourceType: text("source_type").notNull().default("sales_comp"), // 'sales_comp' | 'rate_comp'
+  compId: varchar("comp_id"), // For sales comps (optional, no FK for flexibility)
+  rateCompId: varchar("rate_comp_id"), // For rate comps (optional, no FK for flexibility)
   
   // Property data extracted from comp
   marinaName: text("marina_name").notNull(),
