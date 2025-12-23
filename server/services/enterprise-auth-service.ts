@@ -14,6 +14,7 @@ const SALT_ROUNDS = 12;
 const SESSION_DURATION_MS = 8 * 60 * 60 * 1000; // 8 hours default
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes idle timeout
 
 export interface AuthResult {
   success: boolean;
@@ -367,7 +368,31 @@ export class EnterpriseAuthService {
     const user = await this.getUserById(session.userId);
     if (!user || !user.isActive) return null;
 
-    // Update last activity
+    const org = await this.getOrganization(user.orgId);
+    const idleTimeout = org?.sessionTimeoutMinutes 
+      ? Math.min(org.sessionTimeoutMinutes * 60 * 1000, IDLE_TIMEOUT_MS) 
+      : IDLE_TIMEOUT_MS;
+    
+    const lastActivity = new Date(session.lastActivityAt).getTime();
+    const now = Date.now();
+    
+    if (now - lastActivity > idleTimeout) {
+      await db.update(userSessions)
+        .set({ 
+          status: 'expired',
+          revokedAt: new Date()
+        })
+        .where(eq(userSessions.id, session.id));
+      
+      logger.info({ 
+        sessionId: session.id, 
+        userId: user.id,
+        idleMinutes: Math.floor((now - lastActivity) / 60000)
+      }, 'Session expired due to idle timeout');
+      
+      return null;
+    }
+
     await db.update(userSessions)
       .set({ lastActivityAt: new Date() })
       .where(eq(userSessions.id, session.id));

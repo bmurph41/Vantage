@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import { Express, Request, Response, NextFunction } from 'express';
 import { getAllowedOrigins, isProduction } from '../config/env';
 import { logger } from '../lib/logger';
+import { csrfProtection } from './csrf';
 
 export function configureSecurityMiddleware(app: Express) {
   app.set('trust proxy', 1);
@@ -82,7 +83,9 @@ export function configureSecurityMiddleware(app: Express) {
     },
   }));
   
-  logger.info('Security middleware configured');
+  app.use('/api/', csrfProtection);
+  
+  logger.info({ env: isProduction() ? 'production' : 'development' }, 'Security middleware configured');
 }
 
 export function createRateLimiter(options: {

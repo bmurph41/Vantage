@@ -17,6 +17,7 @@ import { findAllPotentialDuplicates, getDuplicateExplanation } from "./services/
 import { requirePermission, requireRole } from "./middleware/rbac";
 import { AuditService } from "./services/audit-service";
 import { setTenantContext, clearTenantContext } from "./middleware/tenant-context";
+import { enforceTenant, requireTenantMatch } from "./middleware/tenant-isolation";
 import vdrRouter from "./vdr-routes";
 import shipStoreRouter from "./ship-store-router";
 import serviceRouter from "./service-router";
@@ -320,20 +321,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register auth routes (no authentication required for login/register)
   app.use("/api/auth", authRoutes);
   
-  app.use("/api/dd", authenticateUser);
-  app.use("/api/crm", authenticateUser);
+  app.use("/api/dd", authenticateUser, enforceTenant);
+  app.use("/api/crm", authenticateUser, enforceTenant);
   app.use("/api/prospecting", authenticateUser, requireProspecting());
   // Apply authentication to CRM route aliases
-  app.use("/api/leads", authenticateUser);
-  app.use("/api/deals", authenticateUser);
-  app.use("/api/contacts", authenticateUser);
-  app.use("/api/companies", authenticateUser);
-  app.use("/api/properties", authenticateUser);
+  app.use("/api/leads", authenticateUser, enforceTenant);
+  app.use("/api/deals", authenticateUser, enforceTenant);
+  app.use("/api/contacts", authenticateUser, enforceTenant);
+  app.use("/api/companies", authenticateUser, enforceTenant);
+  app.use("/api/properties", authenticateUser, enforceTenant);
   app.use("/api/pipelines", authenticateUser);
   app.use("/api/stages", authenticateUser);
   app.use("/api/pipeline-stages", authenticateUser);
   app.use("/api/activities", authenticateUser);
-  app.use("/api/sales-comps", authenticateUser);
+  app.use("/api/sales-comps", authenticateUser, enforceTenant);
   app.use("/api/comp-columns", authenticateUser);
   app.use("/api/sc-projects", authenticateUser);
   app.use("/api/saved-searches", authenticateUser);
@@ -342,14 +343,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/pending-properties", authenticateUser);
   app.use("/api/pending-contacts", authenticateUser);
   app.use("/api/pending-companies", authenticateUser);
-  app.use("/api/rate-comps", authenticateUser);
+  app.use("/api/rate-comps", authenticateUser, enforceTenant);
   app.use("/api/rc-columns", authenticateUser);
   app.use("/api/rc-projects", authenticateUser);
   app.use("/api/rc-saved-searches", authenticateUser);
   app.use("/api/rc-recommendations", authenticateUser);
   app.use("/api/rc-pending-properties", authenticateUser);
   app.use("/api/debt-scenarios", authenticateUser);
-  app.use("/api/docktalk", authenticateUser);
+  app.use("/api/docktalk", authenticateUser, enforceTenant);
   app.use("/api/funds", authenticateUser, requireFundManagement());
   app.use("/api/vdr", authenticateUser, vdrRouter);
   app.use("/api/ship-store", authenticateUser, shipStoreRouter);

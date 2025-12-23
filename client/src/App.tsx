@@ -33,6 +33,7 @@ const ProjectPage = lazy(() => import("@/pages/project"));
 const NotificationSettingsPage = lazy(() => import("@/pages/notification-settings"));
 const DDProgressReportPage = lazy(() => import("@/pages/dd-progress-report"));
 const UserSettingsPage = lazy(() => import("@/pages/user-settings"));
+const SecuritySettingsPage = lazy(() => import("@/pages/security-settings"));
 const AuditLogsPage = lazy(() => import("@/pages/audit-logs"));
 const Pipeline = lazy(() => import("@/pages/pipeline"));
 const Leads = lazy(() => import("@/pages/leads"));
@@ -264,6 +265,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <UserSettingsPage />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/security">
+        {() => (
+          <UnifiedLayout>
+            <SecuritySettingsPage />
           </UnifiedLayout>
         )}
       </Route>

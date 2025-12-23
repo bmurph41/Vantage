@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Settings, BarChart3, TrendingUp, User, Bell, Palette } from "lucide-react";
+import { Settings, BarChart3, TrendingUp, User, Bell, Palette, Shield, ExternalLink } from "lucide-react";
+import { Link } from "wouter";
 import { ColumnCustomizer, type ColumnConfig } from "./ColumnCustomizer";
 import { useColumnSettings } from "@/hooks/useColumnSettings";
 import { useToast } from "@/hooks/use-toast";
@@ -120,6 +121,14 @@ export function AppSettingsDialog({
               >
                 <Palette className="h-4 w-4" />
                 Display
+              </TabsTrigger>
+              <TabsTrigger 
+                value="security" 
+                className="w-full justify-start gap-2 data-[state=active]:bg-background"
+                data-testid="settings-tab-security"
+              >
+                <Shield className="h-4 w-4" />
+                Security
               </TabsTrigger>
             </TabsList>
           </div>
@@ -238,6 +247,28 @@ export function AppSettingsDialog({
                     </div>
                     <Switch defaultChecked data-testid="switch-grid-lines" />
                   </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="security" className="mt-0 space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Account Security</h3>
+                <div className="space-y-4">
+                  <p className="text-muted-foreground">
+                    Manage your two-factor authentication, active sessions, and security preferences.
+                  </p>
+                  <Link 
+                    href="/security"
+                    onClick={() => onOpenChange(false)}
+                    className="inline-flex"
+                  >
+                    <Button variant="outline" className="gap-2" data-testid="button-open-security-settings">
+                      <Shield className="h-4 w-4" />
+                      Open Security Settings
+                      <ExternalLink className="h-3 w-3" />
+                    </Button>
+                  </Link>
                 </div>
               </div>
             </TabsContent>
