@@ -27,6 +27,7 @@ import boatSalesRouter from "./boat-sales-router";
 import integrationRouter from "./integration-routes";
 import marinamatchRouter from "./marinamatch/routes";
 import omRouter from "./om/routes";
+import scraperV2Routes from "./docktalk/scraper_v2/routes";
 import authRoutes from "./routes/auth-routes";
 import analyticsRoutes from "./routes/analytics-routes";
 import { enterpriseAuthService } from "./services/enterprise-auth-service";
@@ -351,6 +352,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/rc-pending-properties", authenticateUser);
   app.use("/api/debt-scenarios", authenticateUser);
   app.use("/api/docktalk", authenticateUser, enforceTenant);
+  app.use("/api/docktalk/v2", authenticateUser, enforceTenant, scraperV2Routes);
   app.use("/api/funds", authenticateUser, requireFundManagement());
   app.use("/api/vdr", authenticateUser, vdrRouter);
   app.use("/api/ship-store", authenticateUser, shipStoreRouter);

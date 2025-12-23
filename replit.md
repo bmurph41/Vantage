@@ -49,7 +49,8 @@ The platform utilizes React 18 with TypeScript and Wouter for routing. UI is bui
 - **MarinaMatch Intel (Add-on)**: AI-powered listing aggregation, investment criteria profiles, goals dashboard, automated matching.
 - **Marketing**: Campaigns, expenses, lead attribution.
 - **Virtual Data Room (VDR)**: Secure document management, granular permissions, external user management, diligence request workflows, audit logging.
-- **DockTalk 2.0**: Industry intelligence, AI-powered RSS aggregation, M&A tracking, sentiment analysis, watchlists, structured location watching, article matching.
+- **DockTalk 2.0**: Industry intelligence, AI-powered RSS aggregation, M&A tracking, sentiment analysis, watchlists, structured location watching, article matching. Enhanced with:
+    - **DockTalk V2 Scraper (Feature-Flagged)**: Institutional-grade scraper system enabled via `DOCKTALK_SCRAPER_V2=true`. Features multi-method discovery (RSS/sitemap/HTML crawl), HTTP fetcher with exponential backoff and robots.txt compliance, Readability-style article extraction, content deduplication (exact/SimHash/embedding similarity), relevance scoring with weighted components (embedding similarity 55%, keyword matching, quality checks, recency bonuses), OpenAI embeddings with stub fallback, and user-configurable relevance rules. API routes at `/api/docktalk/v2`.
 - **Launch Operations (Dockit)**: Marina launch/haul scheduling, transient slips, employee assignments.
 - **Market Demographics**: Regional market analysis using FRED and Census Bureau APIs.
 - **Analytics**: Marina KPI Calculator (occupancy, ADR, RevPALF, NOI margin, cap rate, DSCR), ancillary revenue tracking, asset class support, performance snapshots, benchmarking.
