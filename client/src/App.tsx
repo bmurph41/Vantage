@@ -60,6 +60,8 @@ const ImportHistory = lazy(() => import("@/pages/import-history"));
 const SortableListDemo = lazy(() => import("@/pages/demo/SortableListDemo"));
 const MilestoneDemo = lazy(() => import("@/pages/milestone-demo"));
 const NotFound = lazy(() => import("@/pages/not-found"));
+const LoginPage = lazy(() => import("@/pages/auth/login"));
+const SignupPage = lazy(() => import("@/pages/auth/signup"));
 const PacksSettings = lazy(() => import("@/pages/packs-settings"));
 const AccountMappingPage = lazy(() => import("@/pages/admin/AccountMappingPage"));
 const FeatureGate = lazy(() => import("@/components/FeatureGate").then(m => ({ default: m.FeatureGate })));
@@ -194,6 +196,21 @@ function Router() {
 
   return (
     <Switch>
+      {/* Auth pages - no sidebar */}
+      <Route path="/login">
+        {() => (
+          <Suspense fallback={<PageLoader />}>
+            <LoginPage />
+          </Suspense>
+        )}
+      </Route>
+      <Route path="/signup">
+        {() => (
+          <Suspense fallback={<PageLoader />}>
+            <SignupPage />
+          </Suspense>
+        )}
+      </Route>
       {/* Root path redirects to Dashboard */}
       <Route path="/">
         {() => {

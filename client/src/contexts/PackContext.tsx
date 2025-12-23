@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'wouter';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Lock, Sparkles } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 // Core packs that users purchase first
 export type CorePackType = 'crm_pipeline' | 'modeling_tools' | 'analysis' | 'operations';
@@ -123,23 +125,58 @@ export function PackGate({ pack, children, upgradeMessage, showUpgradePrompt = t
   }
   
   const missingPacks = packArray.filter(p => !hasPack(p));
+  const firstMissingPack = missingPacks[0];
+  const packInfo = packsWithStatus.find(ps => ps.packType === firstMissingPack);
   const packNames = missingPacks.map(p => {
-    const packInfo = packsWithStatus.find(ps => ps.packType === p);
-    return packInfo?.info.name || p.replace(/_/g, ' ');
+    const info = packsWithStatus.find(ps => ps.packType === p);
+    return info?.info.name || p.replace(/_/g, ' ');
   }).join(', ');
   
+  const price = packInfo?.info.monthlyPriceCents 
+    ? `$${(packInfo.info.monthlyPriceCents / 100).toFixed(0)}/mo` 
+    : null;
+  
   return (
-    <div className="p-8 m-6 border rounded-lg bg-muted/50 text-center">
-      <div className="text-lg font-semibold mb-2">Premium Feature</div>
-      <p className="text-muted-foreground mb-4 max-w-md mx-auto">
-        {upgradeMessage || `This feature requires the ${packNames} add-on pack.`}
-      </p>
-      <Link 
-        href="/settings/packs" 
-        className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-      >
-        View Available Add-ons
-      </Link>
+    <div className="flex items-center justify-center min-h-[400px] p-8">
+      <div className="max-w-md w-full text-center space-y-6">
+        <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+          <Lock className="h-8 w-8 text-primary" />
+        </div>
+        
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold">Unlock {packNames}</h2>
+          <p className="text-muted-foreground">
+            {upgradeMessage || packInfo?.info.description || `This feature requires the ${packNames} pack to access.`}
+          </p>
+        </div>
+        
+        {packInfo?.info.features && (
+          <ul className="text-left space-y-2 bg-muted/50 rounded-lg p-4">
+            {packInfo.info.features.slice(0, 4).map((feature, idx) => (
+              <li key={idx} className="flex items-center gap-2 text-sm">
+                <Sparkles className="h-4 w-4 text-primary flex-shrink-0" />
+                {feature}
+              </li>
+            ))}
+          </ul>
+        )}
+        
+        <div className="space-y-3">
+          {price && (
+            <p className="text-sm text-muted-foreground">
+              Starting at <span className="font-semibold text-foreground">{price}</span>
+            </p>
+          )}
+          <Link href="/settings/packs">
+            <Button size="lg" className="w-full">
+              Upgrade Now
+            </Button>
+          </Link>
+          <p className="text-xs text-muted-foreground">
+            14-day free trial available
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

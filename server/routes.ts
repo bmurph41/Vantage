@@ -397,6 +397,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Public Pack Catalog endpoint (for signup page - no auth required)
+  app.get("/api/packs/catalog", async (_req, res) => {
+    try {
+      const corePacks = await packService.getCorePacks();
+      const addonPacks = await packService.getAddonPacks();
+      
+      const allPacks = [
+        ...corePacks.map(p => ({
+          packType: p.packType,
+          info: {
+            name: p.name,
+            description: p.description,
+            features: p.features,
+            isCore: p.isCore,
+            monthlyPriceCents: p.monthlyPriceCents,
+          },
+          isActive: false,
+          dependencies: [],
+          canActivate: true,
+        })),
+        ...addonPacks.map(p => ({
+          packType: p.packType,
+          info: {
+            name: p.name,
+            description: p.description,
+            features: p.features,
+            isCore: p.isCore,
+            monthlyPriceCents: p.monthlyPriceCents,
+          },
+          isActive: false,
+          dependencies: p.dependencies,
+          canActivate: true,
+        })),
+      ];
+      
+      res.json(allPacks);
+    } catch (error) {
+      console.error("Failed to fetch pack catalog:", error);
+      res.status(500).json({ error: "Failed to fetch pack catalog" });
+    }
+  });
+
   // Organization Packs endpoints
   app.get("/api/organization/packs", authenticateUser, async (req: any, res) => {
     try {
