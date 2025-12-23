@@ -83,7 +83,7 @@ export async function getRemovalStats(): Promise<{
     .select({
       articleTitle: articleRemovalPatterns.articleTitle,
       removalReason: articleRemovalPatterns.removalReason,
-      source: articleRemovalPatterns.source,
+      source: articleRemovalPatterns.articleSource,
     })
     .from(articleRemovalPatterns)
     .orderBy(desc(articleRemovalPatterns.removedAt))

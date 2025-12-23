@@ -2,7 +2,9 @@ import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const anthropic = process.env.ANTHROPIC_API_KEY 
+  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) 
+  : null;
 
 interface DealMetadata {
   isDeal: boolean;
@@ -139,7 +141,12 @@ Respond ONLY with valid JSON matching this schema:
       };
     } catch (openaiError) {
       
-      // Fallback to Anthropic Claude
+      // Fallback to Anthropic Claude if available
+      if (!anthropic) {
+        console.warn("AI enrichment: OpenAI failed and Anthropic not configured, using fallback");
+        throw openaiError;
+      }
+      
       const message = await anthropic.messages.create({
         model: "claude-sonnet-3-5-20241022",
         max_tokens: 1024,
