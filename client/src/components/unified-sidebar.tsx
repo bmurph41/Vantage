@@ -352,12 +352,14 @@ export default function UnifiedSidebar() {
         {/* Header */}
         <div className="py-4 border-b border-gray-200 flex-shrink-0 space-y-3">
           <div className="flex items-center justify-between px-4">
-            <div className="flex items-center space-x-2.5" data-testid="sidebar-logo">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded flex items-center justify-center flex-shrink-0">
-                <Anchor className="w-5 h-5 text-white" />
+            <Link href="/" data-testid="sidebar-logo">
+              <div className="flex items-center space-x-2.5 cursor-pointer hover:opacity-80 transition-opacity">
+                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded flex items-center justify-center flex-shrink-0">
+                  <Anchor className="w-5 h-5 text-white" />
+                </div>
+                <h1 className="text-lg font-bold text-gray-900 truncate">MarinaMatch</h1>
               </div>
-              <h1 className="text-lg font-bold text-gray-900 truncate">MarinaMatch</h1>
-            </div>
+            </Link>
             {/* Mobile Close Button */}
             <button
               onClick={() => setMobileMenuOpen(false)}
