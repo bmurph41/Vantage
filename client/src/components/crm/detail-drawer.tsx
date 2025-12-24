@@ -62,12 +62,18 @@ export function DetailDrawer({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Helper to pluralize entity type correctly (property -> properties)
+  const getApiPath = (type: string) => {
+    if (type === 'property') return 'properties';
+    return `${type}s`;
+  };
+
   // Fetch entity data
   const { data: entity, isLoading } = useQuery({
-    queryKey: [`/api/${entityType}s`, entityId],
+    queryKey: [`/api/${getApiPath(entityType)}`, entityId],
     queryFn: async () => {
       if (!entityId) return null;
-      const response = await fetch(`/api/${entityType}s/${entityId}`);
+      const response = await fetch(`/api/${getApiPath(entityType)}/${entityId}`);
       if (!response.ok) throw new Error(`Failed to fetch ${entityType}`);
       return response.json();
     },
@@ -89,11 +95,11 @@ export function DetailDrawer({
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await apiRequest('PUT', `/api/${entityType}s/${entityId}`, data);
+      const response = await apiRequest('PUT', `/api/${getApiPath(entityType)}/${entityId}`, data);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/${entityType}s`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/${getApiPath(entityType)}`] });
       toast({ title: `${entityType} updated successfully` });
       setIsEditing(false);
     },
@@ -109,11 +115,11 @@ export function DetailDrawer({
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('DELETE', `/api/${entityType}s/${entityId}`);
+      const response = await apiRequest('DELETE', `/api/${getApiPath(entityType)}/${entityId}`);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/${entityType}s`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/${getApiPath(entityType)}`] });
       toast({ title: `${entityType} deleted successfully` });
       onOpenChange(false);
       onDelete?.();
@@ -154,6 +160,8 @@ export function DetailDrawer({
         return entity.name || "Unnamed Company";
       case "deal":
         return entity.name || "Unnamed Deal";
+      case "property":
+        return entity.name || entity.address || "Unnamed Property";
       default:
         return "";
     }
@@ -169,6 +177,8 @@ export function DetailDrawer({
         return entity.domain || entity.industry || "";
       case "deal":
         return entity.amount ? `$${entity.amount.toLocaleString()}` : "";
+      case "property":
+        return entity.city && entity.state ? `${entity.city}, ${entity.state}` : entity.status || "";
       default:
         return "";
     }

@@ -18,6 +18,12 @@ export function CustomFieldsEditor({
   entityId,
   customFields = {},
 }: CustomFieldsEditorProps) {
+  // Helper to pluralize entity type correctly (property -> properties)
+  const getApiPath = (type: string) => {
+    if (type === 'property') return 'properties';
+    return `${type}s`;
+  };
+
   const [isEditing, setIsEditing] = useState(false);
   const [fields, setFields] = useState<Record<string, string>>(() => 
     Object.fromEntries(
@@ -33,14 +39,14 @@ export function CustomFieldsEditor({
 
   const updateMutation = useMutation({
     mutationFn: async (newFields: Record<string, string>) => {
-      const response = await apiRequest('PUT', `/api/${entityType}s/${entityId}`, {
+      const response = await apiRequest('PUT', `/api/${getApiPath(entityType)}/${entityId}`, {
         customFields: newFields,
       });
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/${entityType}s`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/${entityType}s`, entityId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/${getApiPath(entityType)}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/${getApiPath(entityType)}`, entityId] });
       toast({ title: "Custom fields updated successfully" });
       setIsEditing(false);
     },
@@ -75,7 +81,7 @@ export function CustomFieldsEditor({
       });
       return;
     }
-    if (fields[newFieldKey]) {
+    if (Object.prototype.hasOwnProperty.call(fields, newFieldKey.trim())) {
       toast({
         title: "Field already exists",
         description: "A field with this name already exists",
