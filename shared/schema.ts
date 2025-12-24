@@ -15931,3 +15931,6 @@ export const insertDealWorkspaceSchema = createInsertSchema(dealWorkspaces).omit
 export const updateDealWorkspaceSchema = insertDealWorkspaceSchema.partial();
 export type DealWorkspace = typeof dealWorkspaces.$inferSelect;
 export type InsertDealWorkspace = z.infer<typeof insertDealWorkspaceSchema>;
+
+// Re-export Listing Ingestion V2 schema
+export * from '../server/listings/ingestion_v2/schema';
