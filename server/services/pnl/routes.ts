@@ -12,12 +12,16 @@ import {
   pnlFacts,
   pnlLineItemAliases,
   pnlCanonicalLineItems,
+  pnlKeywordRules,
+  pnlDepartmentEnum,
+  pnlBucketEnum,
 } from '@shared/schema';
 import { sha256File } from '../../utils/hash';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, or, isNull, sql, asc, like } from 'drizzle-orm';
 import { runPnlPipeline } from './parseOrchestrator';
-import { mapParsedStatement, normalizeLabel } from './mapping';
+import { mapParsedStatement, normalizeLabel, addToKeywordBank } from './mapping';
 import { storeMappedFacts } from './ingest';
+import { importKeywordBankFromExcel } from '../../scripts/importPnlKeywordBank';
 
 const router = Router();
 
@@ -177,6 +181,9 @@ router.post('/jobs/:jobId/remap', async (req: any, res) => {
       extractedLabel: z.string().min(1),
       canonicalLineItemId: z.string(),
       saveAsAlias: z.boolean().optional().default(true),
+      addToKeywordBank: z.boolean().optional().default(false),
+      department: z.string().optional(),
+      bucket: z.string().optional(),
     });
 
     const parsedBody = schema.safeParse(req.body);
@@ -184,7 +191,7 @@ router.post('/jobs/:jobId/remap', async (req: any, res) => {
       return res.status(400).json({ error: parsedBody.error.flatten() });
     }
 
-    const { extractedLabel, canonicalLineItemId, saveAsAlias } = parsedBody.data;
+    const { extractedLabel, canonicalLineItemId, saveAsAlias, addToKeywordBank: shouldAddToKeywordBank, department, bucket } = parsedBody.data;
     const normalized = normalizeLabel(extractedLabel);
 
     if (saveAsAlias) {
@@ -194,6 +201,10 @@ router.post('/jobs/:jobId/remap', async (req: any, res) => {
         canonicalLineItemId,
         weight: 25,
       }).onConflictDoNothing();
+    }
+
+    if (shouldAddToKeywordBank && department && bucket) {
+      await addToKeywordBank(orgId, normalized, department, bucket, canonicalLineItemId);
     }
 
     await db
@@ -369,6 +380,242 @@ router.post('/canonical-items/seed', async (req: any, res) => {
     res.json({ message: 'Seeded canonical items', count: DEFAULT_CANONICAL_ITEMS.length });
   } catch (error: any) {
     console.error('Seed canonical items error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/keyword-bank', async (req: any, res) => {
+  try {
+    const { orgId } = getAuthContext(req);
+
+    const schema = z.object({
+      department: z.string().optional(),
+      bucket: z.string().optional(),
+      search: z.string().optional(),
+      includeGlobal: z.coerce.boolean().optional().default(true),
+      limit: z.coerce.number().int().min(1).max(1000).optional().default(500),
+    });
+
+    const parsedQ = schema.safeParse(req.query);
+    if (!parsedQ.success) {
+      return res.status(400).json({ error: parsedQ.error.flatten() });
+    }
+
+    const { department, bucket, search, includeGlobal, limit } = parsedQ.data;
+
+    let whereConditions: any[] = [];
+    
+    if (includeGlobal) {
+      whereConditions.push(or(eq(pnlKeywordRules.orgId, orgId), isNull(pnlKeywordRules.orgId)));
+    } else {
+      whereConditions.push(eq(pnlKeywordRules.orgId, orgId));
+    }
+
+    if (department) {
+      whereConditions.push(eq(pnlKeywordRules.department, department));
+    }
+    if (bucket) {
+      whereConditions.push(eq(pnlKeywordRules.bucket, bucket));
+    }
+
+    const rules = await db.query.pnlKeywordRules.findMany({
+      where: and(...whereConditions),
+      orderBy: [asc(pnlKeywordRules.priority), desc(pnlKeywordRules.timesMatched)],
+      limit,
+    });
+
+    let filteredRules = rules;
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filteredRules = rules.filter(r => r.keyword.toLowerCase().includes(searchLower));
+    }
+
+    const stats = {
+      total: filteredRules.length,
+      byDepartment: filteredRules.reduce((acc, r) => {
+        acc[r.department] = (acc[r.department] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>),
+      byBucket: filteredRules.reduce((acc, r) => {
+        acc[r.bucket] = (acc[r.bucket] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>),
+      bySource: filteredRules.reduce((acc, r) => {
+        acc[r.source] = (acc[r.source] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>),
+    };
+
+    res.json({ rules: filteredRules, stats, departments: pnlDepartmentEnum, buckets: pnlBucketEnum });
+  } catch (error: any) {
+    console.error('Get keyword bank error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/keyword-bank', async (req: any, res) => {
+  try {
+    const { orgId } = getAuthContext(req);
+
+    const schema = z.object({
+      keyword: z.string().min(1),
+      department: z.enum(pnlDepartmentEnum as [string, ...string[]]),
+      bucket: z.enum(pnlBucketEnum as [string, ...string[]]),
+      matchType: z.enum(['exact', 'phrase', 'token', 'regex']).optional().default('phrase'),
+      priority: z.number().int().min(1).max(1000).optional().default(50),
+      canonicalLineItemId: z.string().optional(),
+    });
+
+    const parsedBody = schema.safeParse(req.body);
+    if (!parsedBody.success) {
+      return res.status(400).json({ error: parsedBody.error.flatten() });
+    }
+
+    const { keyword, department, bucket, matchType, priority, canonicalLineItemId } = parsedBody.data;
+    const normalizedKeyword = normalizeLabel(keyword);
+
+    const existing = await db.query.pnlKeywordRules.findFirst({
+      where: and(
+        eq(pnlKeywordRules.orgId, orgId),
+        eq(pnlKeywordRules.keyword, normalizedKeyword),
+        eq(pnlKeywordRules.department, department),
+        eq(pnlKeywordRules.bucket, bucket)
+      ),
+    });
+
+    if (existing) {
+      return res.status(409).json({ error: 'Keyword rule already exists', existingRule: existing });
+    }
+
+    const [created] = await db.insert(pnlKeywordRules).values({
+      orgId,
+      keyword: normalizedKeyword,
+      department,
+      bucket,
+      matchType,
+      priority,
+      canonicalLineItemId: canonicalLineItemId ?? null,
+      isActive: true,
+      source: 'manual',
+      timesMatched: 0,
+    }).returning();
+
+    res.json({ rule: created });
+  } catch (error: any) {
+    console.error('Create keyword rule error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.patch('/keyword-bank/:ruleId', async (req: any, res) => {
+  try {
+    const { orgId } = getAuthContext(req);
+    const ruleId = String(req.params.ruleId);
+
+    const schema = z.object({
+      department: z.enum(pnlDepartmentEnum as [string, ...string[]]).optional(),
+      bucket: z.enum(pnlBucketEnum as [string, ...string[]]).optional(),
+      matchType: z.enum(['exact', 'phrase', 'token', 'regex']).optional(),
+      priority: z.number().int().min(1).max(1000).optional(),
+      isActive: z.boolean().optional(),
+      canonicalLineItemId: z.string().nullable().optional(),
+    });
+
+    const parsedBody = schema.safeParse(req.body);
+    if (!parsedBody.success) {
+      return res.status(400).json({ error: parsedBody.error.flatten() });
+    }
+
+    const existingRule = await db.query.pnlKeywordRules.findFirst({
+      where: and(eq(pnlKeywordRules.id, ruleId), eq(pnlKeywordRules.orgId, orgId)),
+    });
+
+    if (!existingRule) {
+      return res.status(404).json({ error: 'Keyword rule not found or not editable (global rules cannot be edited)' });
+    }
+
+    const [updated] = await db
+      .update(pnlKeywordRules)
+      .set({ ...parsedBody.data, updatedAt: new Date() })
+      .where(eq(pnlKeywordRules.id, ruleId))
+      .returning();
+
+    res.json({ rule: updated });
+  } catch (error: any) {
+    console.error('Update keyword rule error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.delete('/keyword-bank/:ruleId', async (req: any, res) => {
+  try {
+    const { orgId } = getAuthContext(req);
+    const ruleId = String(req.params.ruleId);
+
+    const existingRule = await db.query.pnlKeywordRules.findFirst({
+      where: and(eq(pnlKeywordRules.id, ruleId), eq(pnlKeywordRules.orgId, orgId)),
+    });
+
+    if (!existingRule) {
+      return res.status(404).json({ error: 'Keyword rule not found or not deletable (global rules cannot be deleted)' });
+    }
+
+    await db.delete(pnlKeywordRules).where(eq(pnlKeywordRules.id, ruleId));
+
+    res.json({ ok: true });
+  } catch (error: any) {
+    console.error('Delete keyword rule error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/keyword-bank/import', upload.single('file'), async (req: any, res) => {
+  try {
+    const { orgId } = getAuthContext(req);
+    const isGlobal = req.body.isGlobal === 'true';
+
+    const f = req.file;
+    if (!f) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const targetOrgId = isGlobal ? null : orgId;
+    const result = await importKeywordBankFromExcel(f.path, targetOrgId);
+
+    fs.unlinkSync(f.path);
+
+    res.json({ 
+      message: 'Keyword bank imported successfully',
+      imported: result.imported,
+      skipped: result.skipped,
+    });
+  } catch (error: any) {
+    console.error('Import keyword bank error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/keyword-bank/seed-default', async (req: any, res) => {
+  try {
+    const { orgId } = getAuthContext(req);
+    const isGlobal = req.body.isGlobal === true;
+
+    const defaultKeywordBankPath = 'attached_assets/MarinaMatch_PnL_Keyword_Bank_SS3_2023_2024_1766584332411.xlsx';
+    
+    if (!fs.existsSync(defaultKeywordBankPath)) {
+      return res.status(404).json({ error: 'Default keyword bank file not found' });
+    }
+
+    const targetOrgId = isGlobal ? null : orgId;
+    const result = await importKeywordBankFromExcel(defaultKeywordBankPath, targetOrgId);
+
+    res.json({
+      message: 'Default keyword bank seeded successfully',
+      imported: result.imported,
+      skipped: result.skipped,
+    });
+  } catch (error: any) {
+    console.error('Seed default keyword bank error:', error);
     res.status(500).json({ error: error.message });
   }
 });

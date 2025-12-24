@@ -218,6 +218,42 @@ export const pnlReviewItemsRelations = relations(pnlReviewItems, ({ one }) => ({
   }),
 }));
 
+export const pnlKeywordMatchTypeEnum = ['exact', 'phrase', 'token', 'regex'] as const;
+export type PnlKeywordMatchType = typeof pnlKeywordMatchTypeEnum[number];
+
+export const pnlDepartmentEnum = ['Storage', 'Fuel', 'Marina & Amenities', "Ship's Store", 'Service', 'Boat Sales', 'Boat Brokerage', 'General', 'Payroll'] as const;
+export type PnlDepartment = typeof pnlDepartmentEnum[number];
+
+export const pnlBucketEnum = ['Revenue', 'COGS', 'Expense'] as const;
+export type PnlBucket = typeof pnlBucketEnum[number];
+
+export const pnlKeywordRules = pgTable('pnl_keyword_rules', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id'),
+  department: text('department').notNull(),
+  bucket: text('bucket').notNull(),
+  keyword: text('keyword').notNull(),
+  matchType: text('match_type').notNull().default('phrase'),
+  priority: integer('priority').notNull().default(100),
+  canonicalLineItemId: varchar('canonical_line_item_id').references(() => pnlCanonicalLineItems.id, { onDelete: 'set null' }),
+  isActive: boolean('is_active').notNull().default(true),
+  source: text('source').notNull().default('seed'),
+  timesMatched: integer('times_matched').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  orgKeywordIdx: index('pnl_keyword_rules_org_keyword_idx').on(table.orgId, table.keyword),
+  deptBucketIdx: index('pnl_keyword_rules_dept_bucket_idx').on(table.department, table.bucket),
+  priorityIdx: index('pnl_keyword_rules_priority_idx').on(table.priority),
+}));
+
+export const pnlKeywordRulesRelations = relations(pnlKeywordRules, ({ one }) => ({
+  canonicalLineItem: one(pnlCanonicalLineItems, {
+    fields: [pnlKeywordRules.canonicalLineItemId],
+    references: [pnlCanonicalLineItems.id],
+  }),
+}));
+
 export const insertPnlDocumentSchema = createInsertSchema(pnlDocuments).omit({
   id: true,
   createdAt: true,
@@ -269,6 +305,14 @@ export const insertPnlReviewItemSchema = createInsertSchema(pnlReviewItems).omit
 });
 export type PnlReviewItem = typeof pnlReviewItems.$inferSelect;
 export type InsertPnlReviewItem = z.infer<typeof insertPnlReviewItemSchema>;
+
+export const insertPnlKeywordRuleSchema = createInsertSchema(pnlKeywordRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type PnlKeywordRule = typeof pnlKeywordRules.$inferSelect;
+export type InsertPnlKeywordRule = z.infer<typeof insertPnlKeywordRuleSchema>;
 
 export interface ParsedPeriod {
   label: string;
