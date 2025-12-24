@@ -274,9 +274,9 @@ export default function Contacts() {
 
   // Calculate metrics
   const totalContacts = contacts.length;
-  const prospects = contacts.filter(c => (c.contactType || 'prospect') === 'prospect').length;
-  const clients = contacts.filter(c => (c.contactType || 'prospect') === 'client').length;
-  const hotLeads = contacts.filter(c => (c.leadScore || 'new') === 'hot').length;
+  const prospects = contacts.filter(c => c.contactTag === 'lead').length;
+  const clients = contacts.filter(c => c.dealAssignment).length;
+  const hotLeads = contacts.filter(c => c.contactTag === 'lead' && c.leadScore === 'hot').length;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
