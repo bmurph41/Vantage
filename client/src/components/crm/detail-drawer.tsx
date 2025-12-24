@@ -45,7 +45,7 @@ import { CustomFieldsEditor } from "./custom-fields-editor";
 interface DetailDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  entityType: "contact" | "company" | "deal";
+  entityType: "contact" | "company" | "deal" | "property";
   entityId: string | null;
   onDelete?: () => void;
 }
