@@ -2108,13 +2108,16 @@ export class DashboardService {
         const [avgResult] = await db
           .select({ 
             sumPrice: drizzleSql<number>`SUM(COALESCE(NULLIF(${salesComps.salePrice}, 0), ${salesComps.estimatedPurchasePrice}))`,
-            countWithPrice: drizzleSql<number>`COUNT(CASE WHEN (${salesComps.salePrice} > 0) OR (${salesComps.estimatedPurchasePrice} > 0) THEN 1 END)`
+            countWithPrice: drizzleSql<number>`COUNT(CASE WHEN (${salesComps.salePrice} > 0) OR (${salesComps.estimatedPurchasePrice} > 0) THEN 1 END)`,
+            totalCount: drizzleSql<number>`COUNT(*)`
           })
           .from(salesComps)
           .where(whereCondition);
         const sumPrice = Number(avgResult?.sumPrice) || 0;
         const countWithPrice = Number(avgResult?.countWithPrice) || 0;
+        const totalCount = Number(avgResult?.totalCount) || 0;
         result.value = countWithPrice > 0 ? sumPrice / countWithPrice : 0;
+        result.details = [{ dataCount: countWithPrice, totalCount }];
 
         if (enableComparison && comparisonType === 'yoy' && yearFilter) {
           const [prevResult] = await db
@@ -2150,11 +2153,16 @@ export class DashboardService {
         // Calculate price per slip as salePrice / wetSlips (only for rows with valid wetSlips > 0 and disclosed prices)
         const [avgResult] = await db
           .select({ 
-            avg: drizzleSql<number>`AVG(CASE WHEN ${salesComps.wetSlips} > 0 AND ${salesComps.salePrice} > 0 AND (${salesComps.isPriceDisclosed} = true OR ${salesComps.isPriceDisclosed} IS NULL) THEN ${salesComps.salePrice}::decimal / ${salesComps.wetSlips} ELSE NULL END)` 
+            avg: drizzleSql<number>`AVG(CASE WHEN ${salesComps.wetSlips} > 0 AND ${salesComps.salePrice} > 0 AND (${salesComps.isPriceDisclosed} = true OR ${salesComps.isPriceDisclosed} IS NULL) THEN ${salesComps.salePrice}::decimal / ${salesComps.wetSlips} ELSE NULL END)`,
+            countWithData: drizzleSql<number>`COUNT(CASE WHEN ${salesComps.wetSlips} > 0 AND ${salesComps.salePrice} > 0 AND (${salesComps.isPriceDisclosed} = true OR ${salesComps.isPriceDisclosed} IS NULL) THEN 1 END)`,
+            totalCount: drizzleSql<number>`COUNT(*)`
           })
           .from(salesComps)
           .where(whereCondition);
         result.value = Number(avgResult?.avg) || 0;
+        const countWithData = Number(avgResult?.countWithData) || 0;
+        const totalCount = Number(avgResult?.totalCount) || 0;
+        result.details = [{ dataCount: countWithData, totalCount }];
 
         if (enableComparison && comparisonType === 'yoy' && yearFilter) {
           const [prevResult] = await db

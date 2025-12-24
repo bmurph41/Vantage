@@ -507,8 +507,12 @@ export default function Dashboard() {
         compsTrend: undefined,
         avgPrice: 0,
         avgPriceTrend: undefined,
+        avgPriceDataCount: 0,
+        avgPriceTotalCount: 0,
         avgPricePerSlip: 0,
         avgPricePerSlipTrend: undefined,
+        avgPricePerSlipDataCount: 0,
+        avgPricePerSlipTotalCount: 0,
       };
 
       const fetchMetric = async (metricKey: string) => {
@@ -523,7 +527,13 @@ export default function Dashboard() {
           },
         });
         const data = await response.json();
-        return { value: Number(data.value) || 0, trend: data.trend };
+        const details = data.details?.[0] || {};
+        return { 
+          value: Number(data.value) || 0, 
+          trend: data.trend,
+          dataCount: Number(details.dataCount) || 0,
+          totalCount: Number(details.totalCount) || 0,
+        };
       };
 
       try {
@@ -536,8 +546,12 @@ export default function Dashboard() {
           compsTrend: countResult.trend,
           avgPrice: priceResult.value,
           avgPriceTrend: priceResult.trend,
+          avgPriceDataCount: priceResult.dataCount,
+          avgPriceTotalCount: priceResult.totalCount,
           avgPricePerSlip: pricePerSlipResult.value,
           avgPricePerSlipTrend: pricePerSlipResult.trend,
+          avgPricePerSlipDataCount: pricePerSlipResult.dataCount,
+          avgPricePerSlipTotalCount: pricePerSlipResult.totalCount,
         };
       } catch (error) {
         console.error('Failed to fetch sales comps metrics:', error);
@@ -1022,6 +1036,7 @@ export default function Dashboard() {
                   clickable={true}
                   trend={displayMetrics?.avgPriceTrend}
                   trendLabel={salesCompsYear === 'all' ? 'overall' : 'vs prior year'}
+                  subtitle={displayMetrics?.avgPriceTotalCount > 0 ? `Based on ${displayMetrics.avgPriceDataCount} of ${displayMetrics.avgPriceTotalCount} deals with pricing data` : undefined}
                 />
               </MetricGrid>
             )}
