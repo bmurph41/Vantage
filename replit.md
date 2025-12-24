@@ -51,6 +51,14 @@ The platform utilizes React 18 with TypeScript and Wouter for routing. UI is bui
 - **Virtual Data Room (VDR)**: Secure document management, granular permissions, external user management, diligence request workflows, audit logging.
 - **DockTalk 2.0**: Industry intelligence, AI-powered RSS aggregation, M&A tracking, sentiment analysis, watchlists, structured location watching, article matching. Enhanced with:
     - **DockTalk V2 Scraper (Feature-Flagged)**: Institutional-grade scraper system enabled via `DOCKTALK_SCRAPER_V2=true`. Features multi-method discovery (RSS/sitemap/HTML crawl), HTTP fetcher with exponential backoff and robots.txt compliance, Readability-style article extraction, content deduplication (exact/SimHash/embedding similarity), relevance scoring with weighted components (embedding similarity 55%, keyword matching, quality checks, recency bonuses), OpenAI embeddings with stub fallback, and user-configurable relevance rules. API routes at `/api/docktalk/v2`.
+- **Listing Ingestion V2 (Feature-Flagged)**: Institutional-grade listing aggregation pipeline enabled via `LISTING_INGESTION_V2=true`. Enhanced with:
+    - **Schema**: 9 liv2_* tables (sources, scrape_runs, raw_pages, listing_candidates, listing_payloads, listing_assets, quarantine, field_provenance, listings_current).
+    - **Identity Resolution**: Multi-strategy confidence scoring (JSON-LD 95%, explicit ID 90%, canonical URL 80%, address+geo fallback 65%). Two-key identity model (domain + stableSourceKey → canonicalListingId) prevents cross-wire data corruption.
+    - **Verified Asset Binding**: Image extraction with hero image selection, content hash tracking, and provenance verification.
+    - **Validation Layer**: Sanity checks with automatic quarantine for low-confidence matches (<75%) or identity conflicts.
+    - **SSRF Protection**: Comprehensive security with per-hop redirect validation for both HTML and image fetches. Blocks private IPs, localhost, metadata endpoints, and internal hostnames.
+    - **Field Provenance**: Tracks origin and extractor version for all important fields (title, price, address, slips).
+    - **API Routes**: Feature-flagged at `/api/listings/v2`.
 - **Launch Operations (Dockit)**: Marina launch/haul scheduling, transient slips, employee assignments.
 - **Market Demographics**: Regional market analysis using FRED and Census Bureau APIs.
 - **Analytics**: Marina KPI Calculator (occupancy, ADR, RevPALF, NOI margin, cap rate, DSCR), ancillary revenue tracking, asset class support, performance snapshots, benchmarking.
