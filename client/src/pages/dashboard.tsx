@@ -512,23 +512,16 @@ export default function Dashboard() {
       };
 
       const fetchMetric = async (metricKey: string) => {
-        const response = await fetch('/api/dashboards/widgets/query', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            moduleKey: 'sales_comps',
-            metricKey,
-            filters: salesCompsYear !== 'all' ? { year: salesCompsYear } : {},
-            options: {
-              timeRangeType: salesCompsYear !== 'all' ? 'current_year' : 'all_time',
-              enableComparison: true,
-              comparisonType: 'yoy',
-            },
-          }),
+        const response = await apiRequest('POST', '/api/dashboards/widgets/query', {
+          moduleKey: 'sales_comps',
+          metricKey,
+          filters: salesCompsYear !== 'all' ? { year: salesCompsYear } : {},
+          options: {
+            timeRangeType: salesCompsYear !== 'all' ? 'current_year' : 'all_time',
+            enableComparison: true,
+            comparisonType: 'yoy',
+          },
         });
-        if (!response.ok) {
-          throw new Error(`Failed to fetch ${metricKey}`);
-        }
         const data = await response.json();
         return { value: Number(data.value) || 0, trend: data.trend };
       };
