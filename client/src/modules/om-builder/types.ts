@@ -4,7 +4,10 @@ export type BlockType =
   | 'kpi' | 'gauge' | 'target-kpi' | 'currency-kpi' | 'percent-kpi' | 'number-kpi'
   | 'table' | 'matrix' | 'list'
   | 'image' | 'gallery' | 'map'
-  | 'divider' | 'spacer';
+  | 'divider' | 'spacer'
+  | 'shape' | 'icon' | 'group';
+
+export type ShapeType = 'rect' | 'circle' | 'line' | 'triangle';
 
 export type OmPageOrientation = 'portrait' | 'landscape';
 
@@ -76,6 +79,21 @@ export interface GridLayout {
   static?: boolean;
 }
 
+export interface ElementPosition {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation?: number;
+}
+
+export interface ElementMeta {
+  name?: string;
+  locked?: boolean;
+  hidden?: boolean;
+  zIndex?: number;
+}
+
 export interface OmTypographyStyle {
   fontFamily?: FontFamily;
   fontSize?: string;
@@ -117,6 +135,8 @@ export interface OmBlock {
   content: any;
   dataBinding?: OmDataBinding;
   style?: OmBlockStyle;
+  position?: ElementPosition;
+  meta?: ElementMeta;
 }
 
 export interface OmPage {

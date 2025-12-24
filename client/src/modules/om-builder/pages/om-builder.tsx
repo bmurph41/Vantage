@@ -5,7 +5,7 @@ import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useSensor, useSe
 import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { toast } from "@/hooks/use-toast";
-import { FileDown, ArrowLeft, FileText, Plus, Trash2, GripVertical, Settings, Sparkles, Type, BarChart3, Table, Image, Gauge, Database, History, AlertCircle, Info, CheckCircle, AlertTriangle, Lightbulb, StickyNote, LayoutTemplate, Link2, Palette, AlignLeft, AlignCenter, AlignRight, Minus, RotateCcw } from "lucide-react";
+import { FileDown, ArrowLeft, FileText, Plus, Trash2, GripVertical, Settings, Sparkles, Type, BarChart3, Table, Image, Gauge, Database, History, AlertCircle, Info, CheckCircle, AlertTriangle, Lightbulb, StickyNote, LayoutTemplate, Link2, Palette, AlignLeft, AlignCenter, AlignRight, Minus, RotateCcw, PenTool, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -16,14 +16,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Toggle } from "@/components/ui/toggle";
 import type { ModelingProject } from "@shared/schema";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { Om, OmPage as OmPageDb, OmBlock as OmBlockDb } from "@shared/schema";
-import type { OmPage, OmBlock, BlockType, OmTheme, OmPageOrientation, CalloutVariant, FontFamily } from "../types";
+import type { OmPage, OmBlock, BlockType, OmTheme, OmPageOrientation, CalloutVariant, FontFamily, ElementPosition } from "../types";
 import { defaultThemes, CALLOUT_COLORS, FONT_FAMILIES, FONT_SIZES } from "../types";
 import { DataBindingPanel } from "../components/data-binding-panel";
 import { VersionHistoryPanel } from "../components/version-history-panel";
+import { OmEditorShell } from "../components/OmEditorShell";
 
 interface SortableBlockProps {
   block: OmBlock;
@@ -157,6 +159,7 @@ export default function OMBuilder() {
   const [draggedBlock, setDraggedBlock] = useState<OmBlock | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [localModelingProjectId, setLocalModelingProjectId] = useState<string | null>(null);
+  const [editorMode, setEditorMode] = useState<'classic' | 'freeform'>('classic');
 
   const { data: om, isLoading: omLoading } = useQuery<Om>({
     queryKey: ['/api/om/oms', omId],
@@ -377,6 +380,28 @@ export default function OMBuilder() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 border rounded-md p-0.5">
+            <Button
+              variant={editorMode === 'classic' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-7 px-2"
+              onClick={() => setEditorMode('classic')}
+              data-testid="button-mode-classic"
+            >
+              <Type className="w-3.5 h-3.5 mr-1" />
+              Classic
+            </Button>
+            <Button
+              variant={editorMode === 'freeform' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-7 px-2"
+              onClick={() => setEditorMode('freeform')}
+              data-testid="button-mode-freeform"
+            >
+              <Layers className="w-3.5 h-3.5 mr-1" />
+              Design
+            </Button>
+          </div>
           <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm" data-testid="button-doc-settings">
@@ -446,6 +471,37 @@ export default function OMBuilder() {
         </div>
       </header>
 
+      {editorMode === 'freeform' ? (
+        <OmEditorShell
+          pages={pages}
+          activePageId={activePageId}
+          blocks={activePage?.blocks || []}
+          onUpdateBlocks={(newBlocks) => {
+            setPages(prev => prev.map(p => 
+              p.id === activePageId ? { ...p, blocks: newBlocks } : p
+            ));
+          }}
+          onAddBlock={(type) => {
+            if (!activePageId) return;
+            const newBlock: OmBlock = {
+              id: `block_${Date.now()}`,
+              type,
+              content: getDefaultContentForType(type),
+              style: getDefaultStyleForType(type),
+              position: { x: 50, y: 50, width: 200, height: 100 },
+              meta: { zIndex: (activePage?.blocks.length || 0) + 1 }
+            };
+            setPages(prev => prev.map(p => 
+              p.id === activePageId ? { ...p, blocks: [...p.blocks, newBlock] } : p
+            ));
+          }}
+          onSelectPage={(pageId) => {
+            setActivePageId(pageId);
+            setSelectedBlockId(null);
+          }}
+          onAddPage={addPage}
+        />
+      ) : (
       <div className="flex-1 overflow-hidden">
         <ResizablePanelGroup direction="horizontal">
           <ResizablePanel defaultSize={18} minSize={15} maxSize={25} className="bg-sidebar">
@@ -1065,6 +1121,7 @@ export default function OMBuilder() {
 
         </ResizablePanelGroup>
       </div>
+      )}
     </div>
   );
 }
