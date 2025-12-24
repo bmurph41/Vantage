@@ -10,9 +10,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Plus, Search, Trash2, Edit, Upload, Database, AlertCircle } from "lucide-react";
+import { Plus, Search, Trash2, Edit, Database, AlertCircle, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
-import TabbedModuleLayout from "@/components/layouts/TabbedModuleLayout";
 
 interface KeywordRule {
   id: string;
@@ -170,20 +169,16 @@ export default function PnlKeywordBank() {
     }
   };
 
-  const tabs = [
-    { id: "upload", label: "Upload", href: "/modeling/pnl/upload" },
-    { id: "review", label: "Review", href: "/modeling/pnl/review" },
-    { id: "keyword-bank", label: "Keyword Bank", href: "/modeling/pnl/keyword-bank" },
-  ];
-
   return (
-    <TabbedModuleLayout
-      title="P&L Document Intelligence"
-      tabs={tabs}
-      currentTabId="keyword-bank"
-      backUrl="/modeling"
-      backLabel="Modeling"
-    >
+    <div className="space-y-6 p-6">
+      <div className="flex items-center gap-4 mb-4">
+        <Link href="/modeling/pnl/upload">
+          <Button variant="ghost" size="sm" data-testid="link-back-pnl">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to P&L Upload
+          </Button>
+        </Link>
+      </div>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
@@ -345,23 +340,23 @@ export default function PnlKeywordBank() {
                   data-testid="input-search"
                 />
               </div>
-              <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+              <Select value={departmentFilter || "all"} onValueChange={(v) => setDepartmentFilter(v === "all" ? "" : v)}>
                 <SelectTrigger className="w-[180px]" data-testid="filter-department">
                   <SelectValue placeholder="All departments" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="" data-testid="filter-item-department-all">All departments</SelectItem>
+                  <SelectItem value="all" data-testid="filter-item-department-all">All departments</SelectItem>
                   {data?.departments?.map((dept) => (
                     <SelectItem key={dept} value={dept} data-testid={`filter-item-department-${dept}`}>{dept}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={bucketFilter} onValueChange={setBucketFilter}>
+              <Select value={bucketFilter || "all"} onValueChange={(v) => setBucketFilter(v === "all" ? "" : v)}>
                 <SelectTrigger className="w-[180px]" data-testid="filter-bucket">
                   <SelectValue placeholder="All buckets" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="" data-testid="filter-item-bucket-all">All buckets</SelectItem>
+                  <SelectItem value="all" data-testid="filter-item-bucket-all">All buckets</SelectItem>
                   {data?.buckets?.map((bucket) => (
                     <SelectItem key={bucket} value={bucket} data-testid={`filter-item-bucket-${bucket}`}>{bucket}</SelectItem>
                   ))}
@@ -561,6 +556,6 @@ export default function PnlKeywordBank() {
           </DialogContent>
         </Dialog>
       </div>
-    </TabbedModuleLayout>
+    </div>
   );
 }
