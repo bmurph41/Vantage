@@ -89,6 +89,7 @@ const modelingToolsNav = [
   { name: "LP Portal", href: "/modeling/lp-portal", icon: Users },
   { name: "Debt Scenarios", href: "/modeling/debt-scenarios", icon: Calculator },
   { name: "Exit Strategies", href: "/modeling/exit-strategies", icon: Target },
+  { name: "Modeling Settings", href: "/modeling/settings", icon: Settings },
 ];
 
 // DockTalk Navigation - Single Entry Point
@@ -203,7 +204,7 @@ export default function UnifiedSidebar() {
     // Deal Workspace: consolidated DD, VDR, and Modeling project pages
     const isDealWorkspacePage = location.startsWith('/workspaces') || location === '/projects' || location === '/progress-report' || location.startsWith('/vdr') || location.startsWith('/modeling/projects');
     // Modeling Tools: standalone tools (OM Builder, Funds, etc.) not tied to specific deals
-    const isModelingToolsPage = location.startsWith('/om') || location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit');
+    const isModelingToolsPage = location.startsWith('/om') || location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/modeling/settings');
     const isAnalysisPage = location.startsWith('/analysis/') || location.startsWith('/docktalk');
 
     // Set expanded states - Operations stays expanded by default, others expand when active
@@ -573,7 +574,7 @@ export default function UnifiedSidebar() {
               title="Modeling Tools" 
               expanded={modelingToolsExpanded} 
               onToggle={() => setModelingToolsExpanded(!modelingToolsExpanded)}
-              isActive={location.startsWith('/modeling/projects') || location.startsWith('/om') || location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit')}
+              isActive={location.startsWith('/modeling/projects') || location.startsWith('/om') || location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/modeling/settings')}
             />
             {modelingToolsExpanded && modelingToolsNav
               .filter((item) => {
