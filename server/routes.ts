@@ -4857,6 +4857,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Upload CDD Document
   app.post("/api/dd/projects/:projectId/cdd-documents", cddUpload.single('file'), async (req: any, res) => {
     try {
+      const orgId = req.user.orgId;
+      const { inArray } = await import('drizzle-orm');
+      const orgUserIds = db.select({ id: users.id }).from(users).where(eq(users.orgId, orgId));
+
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
       }
@@ -7406,6 +7410,10 @@ Current context: Project ${req.params.projectId}`;
   // Upload file
   app.post("/api/crm/files", crmFileUpload.single('file'), async (req: any, res) => {
     try {
+      const orgId = req.user.orgId;
+      const { inArray } = await import('drizzle-orm');
+      const orgUserIds = db.select({ id: users.id }).from(users).where(eq(users.orgId, orgId));
+
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
       }
@@ -7422,15 +7430,15 @@ Current context: Project ${req.params.projectId}`;
       let entity;
       if (entityType === 'contact') {
         entity = await db.query.crmContacts.findFirst({
-          where: and(eq(crmContacts.id, entityId), eq(crmContacts.ownerId, req.user.id)),
+          where: and(eq(crmContacts.id, entityId), inArray(crmContacts.ownerId, orgUserIds)),
         });
       } else if (entityType === 'company') {
         entity = await db.query.crmCompanies.findFirst({
-          where: and(eq(crmCompanies.id, entityId), eq(crmCompanies.ownerId, req.user.id)),
+          where: and(eq(crmCompanies.id, entityId), inArray(crmCompanies.ownerId, orgUserIds)),
         });
       } else if (entityType === 'deal') {
         entity = await db.query.crmDeals.findFirst({
-          where: and(eq(crmDeals.id, entityId), eq(crmDeals.ownerId, req.user.id)),
+          where: and(eq(crmDeals.id, entityId), inArray(crmDeals.ownerId, orgUserIds)),
         });
       }
 
@@ -7471,20 +7479,23 @@ Current context: Project ${req.params.projectId}`;
   app.get("/api/crm/files/:entityType/:entityId", async (req: any, res) => {
     try {
       const { entityType, entityId } = req.params;
+      const orgId = req.user.orgId;
+      const { inArray } = await import('drizzle-orm');
+      const orgUserIds = db.select({ id: users.id }).from(users).where(eq(users.orgId, orgId));
 
       // Verify entity exists and belongs to the user
       let entity;
       if (entityType === 'contact') {
         entity = await db.query.crmContacts.findFirst({
-          where: and(eq(crmContacts.id, entityId), eq(crmContacts.ownerId, req.user.id)),
+          where: and(eq(crmContacts.id, entityId), inArray(crmContacts.ownerId, orgUserIds)),
         });
       } else if (entityType === 'company') {
         entity = await db.query.crmCompanies.findFirst({
-          where: and(eq(crmCompanies.id, entityId), eq(crmCompanies.ownerId, req.user.id)),
+          where: and(eq(crmCompanies.id, entityId), inArray(crmCompanies.ownerId, orgUserIds)),
         });
       } else if (entityType === 'deal') {
         entity = await db.query.crmDeals.findFirst({
-          where: and(eq(crmDeals.id, entityId), eq(crmDeals.ownerId, req.user.id)),
+          where: and(eq(crmDeals.id, entityId), inArray(crmDeals.ownerId, orgUserIds)),
         });
       }
 
@@ -7496,7 +7507,7 @@ Current context: Project ${req.params.projectId}`;
         where: and(
           eq(crmFiles.entityType, entityType),
           eq(crmFiles.entityId, entityId),
-          eq(crmFiles.ownerId, req.user.id)
+          inArray(crmFiles.ownerId, orgUserIds)
         ),
         orderBy: [desc(crmFiles.createdAt)],
       });
@@ -7514,7 +7525,7 @@ Current context: Project ${req.params.projectId}`;
       const file = await db.query.crmFiles.findFirst({
         where: and(
           eq(crmFiles.id, req.params.id),
-          eq(crmFiles.ownerId, req.user.id)
+          inArray(crmFiles.ownerId, orgUserIds)
         ),
       });
 
@@ -7526,15 +7537,15 @@ Current context: Project ${req.params.projectId}`;
       let entity;
       if (file.entityType === 'contact') {
         entity = await db.query.crmContacts.findFirst({
-          where: and(eq(crmContacts.id, file.entityId), eq(crmContacts.ownerId, req.user.id)),
+          where: and(eq(crmContacts.id, file.entityId), inArray(crmContacts.ownerId, orgUserIds)),
         });
       } else if (file.entityType === 'company') {
         entity = await db.query.crmCompanies.findFirst({
-          where: and(eq(crmCompanies.id, file.entityId), eq(crmCompanies.ownerId, req.user.id)),
+          where: and(eq(crmCompanies.id, file.entityId), inArray(crmCompanies.ownerId, orgUserIds)),
         });
       } else if (file.entityType === 'deal') {
         entity = await db.query.crmDeals.findFirst({
-          where: and(eq(crmDeals.id, file.entityId), eq(crmDeals.ownerId, req.user.id)),
+          where: and(eq(crmDeals.id, file.entityId), inArray(crmDeals.ownerId, orgUserIds)),
         });
       }
 
@@ -7563,7 +7574,7 @@ Current context: Project ${req.params.projectId}`;
       const file = await db.query.crmFiles.findFirst({
         where: and(
           eq(crmFiles.id, req.params.id),
-          eq(crmFiles.ownerId, req.user.id)
+          inArray(crmFiles.ownerId, orgUserIds)
         ),
       });
 
@@ -7575,15 +7586,15 @@ Current context: Project ${req.params.projectId}`;
       let entity;
       if (file.entityType === 'contact') {
         entity = await db.query.crmContacts.findFirst({
-          where: and(eq(crmContacts.id, file.entityId), eq(crmContacts.ownerId, req.user.id)),
+          where: and(eq(crmContacts.id, file.entityId), inArray(crmContacts.ownerId, orgUserIds)),
         });
       } else if (file.entityType === 'company') {
         entity = await db.query.crmCompanies.findFirst({
-          where: and(eq(crmCompanies.id, file.entityId), eq(crmCompanies.ownerId, req.user.id)),
+          where: and(eq(crmCompanies.id, file.entityId), inArray(crmCompanies.ownerId, orgUserIds)),
         });
       } else if (file.entityType === 'deal') {
         entity = await db.query.crmDeals.findFirst({
-          where: and(eq(crmDeals.id, file.entityId), eq(crmDeals.ownerId, req.user.id)),
+          where: and(eq(crmDeals.id, file.entityId), inArray(crmDeals.ownerId, orgUserIds)),
         });
       }
 
@@ -7614,7 +7625,11 @@ Current context: Project ${req.params.projectId}`;
   app.get("/api/crm/timeline/:entityType/:entityId", async (req: any, res) => {
     try {
       const { entityType, entityId } = req.params;
-      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { inArray } = await import('drizzle-orm');
+
+      // Get all user IDs in this organization for org-scoped queries
+      const orgUserIds = db.select({ id: users.id }).from(users).where(eq(users.orgId, orgId));
 
       // Validate entity type
       const validTypes = ['contact', 'company', 'deal', 'property', 'lead'];
@@ -7627,7 +7642,7 @@ Current context: Project ${req.params.projectId}`;
         where: and(
           eq(crmActivities.entityType, entityType),
           eq(crmActivities.entityId, entityId),
-          eq(crmActivities.userId, userId)
+          inArray(crmActivities.userId, orgUserIds)
         ),
         orderBy: [desc(crmActivities.createdAt)],
       });
@@ -7637,7 +7652,7 @@ Current context: Project ${req.params.projectId}`;
         where: and(
           eq(crmNotes.entityType, entityType),
           eq(crmNotes.entityId, entityId),
-          eq(crmNotes.ownerId, userId)
+          inArray(crmNotes.ownerId, orgUserIds)
         ),
         orderBy: [desc(crmNotes.createdAt)],
       });
@@ -7647,7 +7662,7 @@ Current context: Project ${req.params.projectId}`;
         where: and(
           eq(crmFiles.entityType, entityType),
           eq(crmFiles.entityId, entityId),
-          eq(crmFiles.ownerId, userId)
+          inArray(crmFiles.ownerId, orgUserIds)
         ),
         orderBy: [desc(crmFiles.createdAt)],
       });
@@ -7740,19 +7755,23 @@ Current context: Project ${req.params.projectId}`;
   app.get("/api/crm/stats/:entityType/:entityId", async (req: any, res) => {
     try {
       const { entityType, entityId } = req.params;
-      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { inArray } = await import('drizzle-orm');
+
+      // Get all user IDs in this organization for org-scoped queries
+      const orgUserIds = db.select({ id: users.id }).from(users).where(eq(users.orgId, orgId));
 
       const validTypes = ['contact', 'company', 'deal', 'property'];
       if (!validTypes.includes(entityType)) {
         return res.status(400).json({ error: `Invalid entity type. Must be one of: ${validTypes.join(', ')}` });
       }
 
-      // Common stats for all entities
+      // Common stats for all entities (org-scoped)
       const activitiesResult = await db.query.crmActivities.findMany({
         where: and(
           eq(crmActivities.entityType, entityType),
           eq(crmActivities.entityId, entityId),
-          eq(crmActivities.userId, userId)
+          inArray(crmActivities.userId, orgUserIds)
         ),
         orderBy: [desc(crmActivities.createdAt)],
         limit: 1,
@@ -7763,7 +7782,7 @@ Current context: Project ${req.params.projectId}`;
         .where(and(
           eq(crmNotes.entityType, entityType),
           eq(crmNotes.entityId, entityId),
-          eq(crmNotes.ownerId, userId)
+          inArray(crmNotes.ownerId, orgUserIds)
         ));
 
       const filesCount = await db.select({ count: sql`count(*)` })
@@ -7790,7 +7809,7 @@ Current context: Project ${req.params.projectId}`;
           totalDealValue: sql<number>`coalesce(sum(value::numeric), 0)`,
         }).from(crmDeals).where(and(
           eq(crmDeals.primaryContactId, entityId),
-          eq(crmDeals.ownerId, userId)
+          inArray(crmDeals.ownerId, orgUserIds)
         ));
         
         stats.totalDeals = Number(dealStats[0]?.totalDeals || 0);
@@ -7813,7 +7832,7 @@ Current context: Project ${req.params.projectId}`;
           totalDealValue: sql<number>`coalesce(sum(value::numeric), 0)`,
         }).from(crmDeals).where(and(
           eq(crmDeals.companyId, entityId),
-          eq(crmDeals.ownerId, userId)
+          inArray(crmDeals.ownerId, orgUserIds)
         ));
         
         stats.totalDeals = Number(dealStats[0]?.totalDeals || 0);
