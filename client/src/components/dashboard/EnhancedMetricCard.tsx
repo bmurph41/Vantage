@@ -165,13 +165,13 @@ export function EnhancedMetricCard({
             )}
             <div className="flex-1 min-w-0">
               <p className={cn(
-                "font-medium text-gray-600 tracking-tight leading-tight truncate",
+                "font-medium text-gray-600 tracking-tight leading-tight",
                 sizeClasses[size].label
               )}>
                 {label}
               </p>
               {subtitle && (
-                <p className="text-[10px] text-gray-400 mt-0.5 truncate">{subtitle}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">{subtitle}</p>
               )}
             </div>
           </div>
@@ -200,7 +200,7 @@ export function EnhancedMetricCard({
         </div>
       </div>
 
-      <div className="flex items-baseline gap-3 mb-2">
+      <div className="flex flex-wrap items-baseline gap-2 mb-2">
         <p className={cn(
           "font-bold tracking-tight leading-none",
           sizeClasses[size].value,
@@ -211,7 +211,7 @@ export function EnhancedMetricCard({
 
         {trend !== undefined && (
           <div className={cn(
-            "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-semibold",
+            "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-semibold shrink-0",
             getTrendColorClass()
           )}>
             {getTrendIndicator()}
