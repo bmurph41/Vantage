@@ -217,18 +217,3 @@ export async function importObservedLineItems(filePath: string, orgId: string): 
   console.log(`[Observed Line Items Import] Imported: ${imported}, Skipped: ${skipped}`);
   return { imported, skipped };
 }
-
-if (require.main === module) {
-  const excelPath = process.argv[2] || 'attached_assets/MarinaMatch_PnL_Keyword_Bank_SS3_2023_2024_1766584332411.xlsx';
-  const orgId = process.argv[3] || null;
-
-  importKeywordBankFromExcel(excelPath, orgId)
-    .then(result => {
-      console.log('Import complete:', result);
-      process.exit(0);
-    })
-    .catch(err => {
-      console.error('Import failed:', err);
-      process.exit(1);
-    });
-}
