@@ -3049,7 +3049,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCrmContactsForOrg(orgId: string): Promise<CrmContact[]> {
-    return db.select().from(crmContacts).where(eq(crmContacts.ownerId, orgId)).orderBy(desc(crmContacts.createdAt));
+    const orgUserIds = db.select({ id: users.id }).from(users).where(eq(users.orgId, orgId));
+    return db.select().from(crmContacts).where(inArray(crmContacts.ownerId, orgUserIds)).orderBy(desc(crmContacts.createdAt));
   }
 
   async getCrmContactsForOrgPaginated(
@@ -3059,7 +3060,8 @@ export class DatabaseStorage implements IStorage {
     const { page, pageSize, search, sortBy = 'createdAt', sortDir = 'desc', companyId } = options;
     const offset = (page - 1) * pageSize;
 
-    let whereConditions: any = eq(crmContacts.ownerId, orgId);
+    const orgUserIds = db.select({ id: users.id }).from(users).where(eq(users.orgId, orgId));
+    let whereConditions: any = inArray(crmContacts.ownerId, orgUserIds);
 
     if (companyId) {
       whereConditions = and(whereConditions, eq(crmContacts.companyId, companyId));
@@ -3138,7 +3140,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCrmCompaniesForOrg(orgId: string): Promise<CrmCompany[]> {
-    return db.select().from(crmCompanies).where(eq(crmCompanies.ownerId, orgId)).orderBy(asc(crmCompanies.name));
+    const orgUserIds = db.select({ id: users.id }).from(users).where(eq(users.orgId, orgId));
+    return db.select().from(crmCompanies).where(inArray(crmCompanies.ownerId, orgUserIds)).orderBy(asc(crmCompanies.name));
   }
 
   async getCrmCompaniesForOrgPaginated(
@@ -3148,7 +3151,8 @@ export class DatabaseStorage implements IStorage {
     const { page, pageSize, search, sortBy = 'name', sortDir = 'asc' } = options;
     const offset = (page - 1) * pageSize;
 
-    let whereConditions: any = eq(crmCompanies.ownerId, orgId);
+    const orgUserIds = db.select({ id: users.id }).from(users).where(eq(users.orgId, orgId));
+    let whereConditions: any = inArray(crmCompanies.ownerId, orgUserIds);
 
     if (search && search.trim()) {
       const searchTerm = `%${search.toLowerCase()}%`;
@@ -3218,9 +3222,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCrmPropertiesForOrg(orgId: string): Promise<Property[]> {
+    const orgUserIds = db.select({ id: users.id }).from(users).where(eq(users.orgId, orgId));
     return await db.select()
       .from(crmProperties)
-      .where(eq(crmProperties.ownerId, orgId));
+      .where(inArray(crmProperties.ownerId, orgUserIds));
   }
 
   async createCrmProperty(property: InsertProperty): Promise<Property> {
