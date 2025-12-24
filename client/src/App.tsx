@@ -147,6 +147,10 @@ const ExitAIInsights = lazy(() => import("@/pages/modeling/exit/AIInsights"));
 // Document Intelligence
 const DocumentIntelligence = lazy(() => import("@/pages/modeling/doc-intel/DocumentIntelligence"));
 
+// P&L Pipeline
+const PnlUpload = lazy(() => import("@/pages/modeling/pnl/PnlUpload"));
+const PnlReview = lazy(() => import("@/pages/modeling/pnl/PnlReview"));
+
 // Project Workspace
 const ProjectWorkspace = lazy(() => import("@/pages/modeling/projects/workspace"));
 
@@ -1214,6 +1218,22 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <DebtScenariosIndex />
+          </UnifiedLayout>
+        )}
+      </Route>
+      
+      <Route path="/modeling/pnl/upload">
+        {() => (
+          <UnifiedLayout>
+            <PnlUpload />
+          </UnifiedLayout>
+        )}
+      </Route>
+      
+      <Route path="/modeling/pnl/review">
+        {() => (
+          <UnifiedLayout>
+            <PnlReview />
           </UnifiedLayout>
         )}
       </Route>

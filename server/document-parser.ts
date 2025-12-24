@@ -3,7 +3,10 @@ import path from 'path';
 import * as XLSX from 'xlsx';
 import type { CddDocument, InsertDocPage } from '@shared/schema';
 
-const pdfParse = require('pdf-parse');
+async function parsePdf(buffer: Buffer): Promise<any> {
+  const pdfParse = (await import('pdf-parse')).default;
+  return pdfParse(buffer);
+}
 
 export interface ParsedPage {
   pageNumber: number;
@@ -37,7 +40,7 @@ export class DocumentParser {
   private async parsePDF(filePath: string): Promise<ParsedPage[]> {
     try {
       const dataBuffer = await fs.readFile(filePath);
-      const pdfData = await pdfParse(dataBuffer);
+      const pdfData = await parsePdf(dataBuffer);
 
       const pages: ParsedPage[] = [];
       

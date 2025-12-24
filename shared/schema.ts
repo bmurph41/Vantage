@@ -15934,3 +15934,10 @@ export type InsertDealWorkspace = z.infer<typeof insertDealWorkspaceSchema>;
 
 // Re-export Listing Ingestion V2 schema
 export * from '../server/listings/ingestion_v2/schema';
+
+// ============================================================================
+// Hardened P&L Pipeline Schema Integration
+// Re-export all P&L ingestion tables, types, and schemas
+// This provides the hardened document-to-fact pipeline with full provenance
+// ============================================================================
+export * from './pnl-pipeline-schema';
