@@ -40,6 +40,7 @@ import { FileUploader } from "./file-uploader";
 import { FileList } from "./file-list";
 import UnifiedTimeline from "./unified-timeline";
 import { RelationshipStats } from "./relationship-stats";
+import { CustomFieldsEditor } from "./custom-fields-editor";
 
 interface DetailDrawerProps {
   open: boolean;
@@ -646,11 +647,13 @@ export function DetailDrawer({
               </TabsContent>
 
               <TabsContent value="custom" className="mt-4">
-                <div className="text-center py-12 text-muted-foreground">
-                  <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>Custom Fields coming soon</p>
-                  <p className="text-sm">Add custom fields to track additional data</p>
-                </div>
+                {entityId && entity && (
+                  <CustomFieldsEditor
+                    entityType={entityType}
+                    entityId={entityId}
+                    customFields={entity.customFields || {}}
+                  />
+                )}
               </TabsContent>
             </div>
           </ScrollArea>
