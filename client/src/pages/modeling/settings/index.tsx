@@ -39,7 +39,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, GripVertical, Loader2, Settings } from 'lucide-react';
+import { Plus, Pencil, Trash2, GripVertical, Loader2, Settings, BookText, ChevronRight } from 'lucide-react';
+import { Link } from 'wouter';
 import { DndContext, closestCenter, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -292,6 +293,29 @@ export default function ModelingSettings() {
           <h1 className="text-2xl font-bold" data-testid="text-settings-title">Modeling Settings</h1>
           <p className="text-muted-foreground">Configure regions and preferences for modeling projects</p>
         </div>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <Link href="/modeling/pnl/keyword-bank" data-testid="link-keyword-bank">
+          <Card className="cursor-pointer hover:border-primary/50 transition-colors" data-testid="card-keyword-bank">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <BookText className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">P&L Keyword Bank</CardTitle>
+                    <CardDescription>
+                      Manage keyword rules for automatic P&L classification
+                    </CardDescription>
+                  </div>
+                </div>
+                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+              </div>
+            </CardHeader>
+          </Card>
+        </Link>
       </div>
 
       <Card>
