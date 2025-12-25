@@ -161,6 +161,7 @@ const OMBuilder = lazy(() => import("@/modules/om-builder/pages/om-builder"));
 const OMExport = lazy(() => import("@/modules/om-builder/pages/om-export"));
 const OMTemplates = lazy(() => import("@/modules/om-builder/pages/om-templates"));
 const OMBrandKits = lazy(() => import("@/modules/om-builder/pages/om-brand-kits"));
+const OMCanvasEditor = lazy(() => import("@/pages/om-builder-editor"));
 
 // Lightweight sidebar loader for initial render
 function SidebarLoader() {
@@ -1296,6 +1297,11 @@ function Router() {
           <UnifiedLayout>
             <OMBrandKits />
           </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/om/canvas/:id">
+        {() => (
+          <OMCanvasEditor />
         )}
       </Route>
       
