@@ -1,19 +1,22 @@
 import { useEffect, useState } from 'react';
 import { useParams, useLocation } from 'wouter';
-import { ArrowLeft, PanelLeftClose, PanelRightClose } from 'lucide-react';
+import { ArrowLeft, PanelLeftClose, PanelRightClose, Palette, Images, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
 import { useOmEditorStore } from '@/stores/om-editor-store';
 import { useAutosave } from '@/hooks/use-autosave';
 import { useOmWithPages, usePublishOm, useShareOm } from '@/lib/om-builder-api';
-import { OmCanvas, OmEditorToolbar, OmLayersPanel, OmInspectorPanel, OmPagesPanel } from '@/components/om-builder';
+import { OmCanvas, OmEditorToolbar, OmLayersPanel, OmInspectorPanel, OmPagesPanel, OmBrandKitPanel, OmAssetLibraryPanel, OmDataBindingsPanel } from '@/components/om-builder';
 
 export default function OmBuilderEditorPage() {
   const params = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
   const omId = params.id || null;
+  const [rightTab, setRightTab] = useState<'inspector' | 'brand' | 'assets' | 'bindings'>('inspector');
   
   const {
     document: doc,
@@ -28,50 +31,66 @@ export default function OmBuilderEditorPage() {
   const publishMutation = usePublishOm(omId || '');
   const shareMutation = useShareOm(omId || '');
   
-  const { isSaving, forceSave } = useAutosave(omId, 'user-1', {
-    enabled: Boolean(omId),
+  const userId = user?.id || 'anonymous';
+  const { isSaving, forceSave } = useAutosave(omId, userId, {
+    enabled: Boolean(omId) && Boolean(user),
   });
 
   useEffect(() => {
     if (omData) {
-      const pages = omData.pages.map(p => ({
-        id: p.id,
-        name: p.name,
-        order: p.order,
-        pageSize: (p.pageSize as any) || 'letter',
-        orientation: (p.orientation as any) || 'portrait',
-        width: p.width || 612,
-        height: p.height || 792,
-        backgroundColor: (p.content as any)?.backgroundColor,
-        backgroundImage: (p.content as any)?.backgroundImage,
-      }));
-
-      const blocks = omData.pages.flatMap(p => 
-        (p.blocks || []).map(b => ({
-          id: b.id,
-          pageId: p.id,
-          position: (b.config as any)?.position || { x: 0, y: 0, width: 200, height: 100, zIndex: 0 },
-          style: (b.config as any)?.style || {},
-          data: {
-            type: b.blockType as any,
-            ...(b.content || {}),
+      const snapshot = omData.om.workingSnapshotJson;
+      if (snapshot && typeof snapshot === 'object' && 'pages' in snapshot && 'blocks' in snapshot) {
+        loadFromSnapshot({
+          document: {
+            id: omData.om.id,
+            name: omData.om.name,
+            docType: omData.om.docType,
+            status: (snapshot as any).document?.status || omData.om.status,
+            brandKitId: (snapshot as any).document?.brandKitId || omData.om.brandKitId || undefined,
           },
-          locked: (b.config as any)?.locked,
-          name: (b.config as any)?.name,
-        }))
-      );
+          pages: (snapshot as any).pages || [],
+          blocks: (snapshot as any).blocks || [],
+        });
+      } else {
+        const pages = omData.pages.map(p => ({
+          id: p.id,
+          name: p.name,
+          order: p.order,
+          pageSize: (p.pageSize as any) || 'letter',
+          orientation: (p.orientation as any) || 'portrait',
+          width: p.width || 612,
+          height: p.height || 792,
+          backgroundColor: (p.content as any)?.backgroundColor,
+          backgroundImage: (p.content as any)?.backgroundImage,
+        }));
 
-      loadFromSnapshot({
-        document: {
-          id: omData.om.id,
-          name: omData.om.name,
-          docType: omData.om.docType,
-          status: omData.om.status as any,
-          brandKitId: omData.om.brandKitId || undefined,
-        },
-        pages,
-        blocks,
-      });
+        const blocks = omData.pages.flatMap(p => 
+          (p.blocks || []).map(b => ({
+            id: b.id,
+            pageId: p.id,
+            position: (b.config as any)?.position || { x: 0, y: 0, width: 200, height: 100, zIndex: 0 },
+            style: (b.config as any)?.style || {},
+            data: {
+              type: b.blockType as any,
+              ...(b.content || {}),
+            },
+            locked: (b.config as any)?.locked,
+            name: (b.config as any)?.name,
+          }))
+        );
+
+        loadFromSnapshot({
+          document: {
+            id: omData.om.id,
+            name: omData.om.name,
+            docType: omData.om.docType,
+            status: omData.om.status as any,
+            brandKitId: omData.om.brandKitId || undefined,
+          },
+          pages,
+          blocks,
+        });
+      }
     }
 
     return () => {
@@ -186,8 +205,50 @@ export default function OmBuilderEditorPage() {
         <OmCanvas className="flex-1" />
 
         {sidebarOpen.right && (
-          <div className="w-72 border-l bg-background">
-            <OmInspectorPanel />
+          <div className="w-72 border-l flex flex-col bg-background">
+            <div className="flex border-b">
+              <Button
+                variant={rightTab === 'inspector' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="flex-1 rounded-none text-xs"
+                onClick={() => setRightTab('inspector')}
+              >
+                Properties
+              </Button>
+              <Button
+                variant={rightTab === 'brand' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="flex-1 rounded-none text-xs"
+                onClick={() => setRightTab('brand')}
+              >
+                <Palette className="h-3 w-3 mr-1" />
+                Brand
+              </Button>
+              <Button
+                variant={rightTab === 'assets' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="flex-1 rounded-none text-xs"
+                onClick={() => setRightTab('assets')}
+              >
+                <Images className="h-3 w-3 mr-1" />
+                Assets
+              </Button>
+              <Button
+                variant={rightTab === 'bindings' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="flex-1 rounded-none text-xs"
+                onClick={() => setRightTab('bindings')}
+              >
+                <Database className="h-3 w-3 mr-1" />
+                Data
+              </Button>
+            </div>
+            <div className="flex-1 overflow-auto">
+              {rightTab === 'inspector' && <OmInspectorPanel />}
+              {rightTab === 'brand' && <OmBrandKitPanel omId={omId} />}
+              {rightTab === 'assets' && <OmAssetLibraryPanel omId={omId} />}
+              {rightTab === 'bindings' && <OmDataBindingsPanel omId={omId} />}
+            </div>
           </div>
         )}
       </div>
