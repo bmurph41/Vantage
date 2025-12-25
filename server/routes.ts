@@ -20670,15 +20670,15 @@ Current context: Project ${req.params.projectId}`;
           };
         }
       } else if (personaType === 'broker') {
-        const { crmDeals: dealsTable, crmProperties: propsTable } = await import('@shared/schema');
+        const { crmDeals: dealsTable, crmProperties: propsTable, users } = await import('@shared/schema');
         const { and: andFn, or: orFn, sql: sqlFn, inArray: inArrayFn } = await import('drizzle-orm');
         
         const orgUserIds = db.select({ id: users.id }).from(users).where(eq(users.orgId, orgId));
         
         const activeDealsResult = await db.select({
           count: sqlFn<number>`count(*)`,
-          totalValue: sqlFn<string>`coalesce(sum(\${dealsTable.value}::numeric), 0)`,
-          totalCommission: sqlFn<string>`coalesce(sum(\${dealsTable.commissionAmount}::numeric), 0)`,
+          totalValue: sqlFn<string>`coalesce(sum(${dealsTable.value}::numeric), 0)`,
+          totalCommission: sqlFn<string>`coalesce(sum(${dealsTable.commissionAmount}::numeric), 0)`,
         }).from(dealsTable)
           .where(andFn(
             inArrayFn(dealsTable.ownerId, orgUserIds),
@@ -20687,7 +20687,7 @@ Current context: Project ${req.params.projectId}`;
         
         const listingsResult = await db.select({
           count: sqlFn<number>`count(*)`,
-          totalListPrice: sqlFn<string>`coalesce(sum(\${propsTable.listPrice}::numeric), 0)`,
+          totalListPrice: sqlFn<string>`coalesce(sum(${propsTable.listPrice}::numeric), 0)`,
         }).from(propsTable)
           .where(andFn(
             inArrayFn(propsTable.ownerId, orgUserIds),
@@ -20710,15 +20710,15 @@ Current context: Project ${req.params.projectId}`;
           ]
         };
       } else {
-        const { modelingProjects: mpTable, crmProperties: cpTable } = await import('@shared/schema');
+        const { modelingProjects: mpTable, crmProperties: cpTable, users } = await import('@shared/schema');
         const { and: andOp, sql: sqlOp, inArray: inArrayOp } = await import('drizzle-orm');
         
         const orgUserIds = db.select({ id: users.id }).from(users).where(eq(users.orgId, orgId));
         
         const ownedProjectsResult = await db.select({
           count: sqlOp<number>`count(*)`,
-          totalValue: sqlOp<string>`coalesce(sum(\${mpTable.purchasePrice}::numeric), 0)`,
-          totalEbitda: sqlOp<string>`coalesce(sum(\${mpTable.ebitda}::numeric), 0)`,
+          totalValue: sqlOp<string>`coalesce(sum(${mpTable.purchasePrice}::numeric), 0)`,
+          totalEbitda: sqlOp<string>`coalesce(sum(${mpTable.ebitda}::numeric), 0)`,
         }).from(mpTable)
           .where(andOp(
             eq(mpTable.orgId, orgId),
@@ -20735,7 +20735,7 @@ Current context: Project ${req.params.projectId}`;
         
         const pipelineResult = await db.select({
           count: sqlOp<number>`count(*)`,
-          totalValue: sqlOp<string>`coalesce(sum(\${mpTable.purchasePrice}::numeric), 0)`,
+          totalValue: sqlOp<string>`coalesce(sum(${mpTable.purchasePrice}::numeric), 0)`,
         }).from(mpTable)
           .where(andOp(
             eq(mpTable.orgId, orgId),
