@@ -20676,9 +20676,9 @@ Current context: Project ${req.params.projectId}`;
         const orgUserIds = db.select({ id: users.id }).from(users).where(eq(users.orgId, orgId));
         
         const activeDealsResult = await db.select({
-          count: sqlFn<number>\`count(*)\`,
-          totalValue: sqlFn<string>\`coalesce(sum(\${dealsTable.value}::numeric), 0)\`,
-          totalCommission: sqlFn<string>\`coalesce(sum(\${dealsTable.commissionAmount}::numeric), 0)\`,
+          count: sqlFn<number>`count(*)`,
+          totalValue: sqlFn<string>`coalesce(sum(\${dealsTable.value}::numeric), 0)`,
+          totalCommission: sqlFn<string>`coalesce(sum(\${dealsTable.commissionAmount}::numeric), 0)`,
         }).from(dealsTable)
           .where(andFn(
             inArrayFn(dealsTable.ownerId, orgUserIds),
@@ -20686,8 +20686,8 @@ Current context: Project ${req.params.projectId}`;
           ));
         
         const listingsResult = await db.select({
-          count: sqlFn<number>\`count(*)\`,
-          totalListPrice: sqlFn<string>\`coalesce(sum(\${propsTable.listPrice}::numeric), 0)\`,
+          count: sqlFn<number>`count(*)`,
+          totalListPrice: sqlFn<string>`coalesce(sum(\${propsTable.listPrice}::numeric), 0)`,
         }).from(propsTable)
           .where(andFn(
             inArrayFn(propsTable.ownerId, orgUserIds),
@@ -20716,9 +20716,9 @@ Current context: Project ${req.params.projectId}`;
         const orgUserIds = db.select({ id: users.id }).from(users).where(eq(users.orgId, orgId));
         
         const ownedProjectsResult = await db.select({
-          count: sqlOp<number>\`count(*)\`,
-          totalValue: sqlOp<string>\`coalesce(sum(\${mpTable.purchasePrice}::numeric), 0)\`,
-          totalEbitda: sqlOp<string>\`coalesce(sum(\${mpTable.ebitda}::numeric), 0)\`,
+          count: sqlOp<number>`count(*)`,
+          totalValue: sqlOp<string>`coalesce(sum(\${mpTable.purchasePrice}::numeric), 0)`,
+          totalEbitda: sqlOp<string>`coalesce(sum(\${mpTable.ebitda}::numeric), 0)`,
         }).from(mpTable)
           .where(andOp(
             eq(mpTable.orgId, orgId),
@@ -20726,7 +20726,7 @@ Current context: Project ${req.params.projectId}`;
           ));
         
         const ownedPropertiesResult = await db.select({
-          count: sqlOp<number>\`count(*)\`,
+          count: sqlOp<number>`count(*)`,
         }).from(cpTable)
           .where(andOp(
             inArrayOp(cpTable.ownerId, orgUserIds),
@@ -20734,8 +20734,8 @@ Current context: Project ${req.params.projectId}`;
           ));
         
         const pipelineResult = await db.select({
-          count: sqlOp<number>\`count(*)\`,
-          totalValue: sqlOp<string>\`coalesce(sum(\${mpTable.purchasePrice}::numeric), 0)\`,
+          count: sqlOp<number>`count(*)`,
+          totalValue: sqlOp<string>`coalesce(sum(\${mpTable.purchasePrice}::numeric), 0)`,
         }).from(mpTable)
           .where(andOp(
             eq(mpTable.orgId, orgId),
@@ -20747,7 +20747,7 @@ Current context: Project ${req.params.projectId}`;
         headerData = {
           personaType: personaType,
           title: 'Marina Portfolio',
-          subtitle: totalOwnedCount > 0 ? \`\${totalOwnedCount} owned \${totalOwnedCount === 1 ? 'marina' : 'marinas'}\` : 'Track your marina investments',
+          subtitle: totalOwnedCount > 0 ? `\${totalOwnedCount} owned \${totalOwnedCount === 1 ? 'marina' : 'marinas'}` : 'Track your marina investments',
           metrics: [
             { label: 'Owned Marinas', value: String(totalOwnedCount), icon: 'Building2', color: 'blue' },
             { label: 'Portfolio Value', value: formatCurrency(ownedProjectsResult[0]?.totalValue || 0), icon: 'DollarSign', color: 'green' },
