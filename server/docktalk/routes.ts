@@ -3397,5 +3397,212 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
+  // ============ AI ADAPTIVE SCORING API ============
+  
+  // Get AI training analytics dashboard data
+  app.get("/api/docktalk/ai/analytics", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const { getTrainingAnalytics, initializeDefaultKeywords } = await import("./services/adaptive-scoring");
+      const orgId = req.dockTalkUser!.orgId;
+      
+      // Initialize default keywords if this is a new org
+      await initializeDefaultKeywords(orgId);
+      
+      const analytics = await getTrainingAnalytics(orgId);
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching AI analytics:", error);
+      res.status(500).json({ error: "Failed to fetch AI analytics" });
+    }
+  });
+
+  // Get keyword weights
+  app.get("/api/docktalk/ai/keywords", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const { getKeywordWeights, initializeDefaultKeywords } = await import("./services/adaptive-scoring");
+      const orgId = req.dockTalkUser!.orgId;
+      
+      await initializeDefaultKeywords(orgId);
+      const keywords = await getKeywordWeights(orgId);
+      res.json(keywords);
+    } catch (error) {
+      console.error("Error fetching keywords:", error);
+      res.status(500).json({ error: "Failed to fetch keywords" });
+    }
+  });
+
+  // Add custom keyword
+  app.post("/api/docktalk/ai/keywords", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const KeywordSchema = z.object({
+        keyword: z.string().min(1).max(100),
+        weight: z.number().int().min(1).max(20),
+        category: z.enum(["marina", "investment", "macro", "operational", "regulatory", "negative", "custom"]),
+      });
+
+      const { keyword, weight, category } = KeywordSchema.parse(req.body);
+      const { addCustomKeyword } = await import("./services/adaptive-scoring");
+      
+      await addCustomKeyword(req.dockTalkUser!.orgId, keyword, weight, category);
+      res.status(201).json({ success: true, keyword, weight, category });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      console.error("Error adding keyword:", error);
+      res.status(500).json({ error: "Failed to add keyword" });
+    }
+  });
+
+  // Update keyword weight
+  app.patch("/api/docktalk/ai/keywords/:keywordId", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const keywordId = parseInt(req.params.keywordId);
+      const UpdateSchema = z.object({
+        weight: z.number().int().min(1).max(20),
+      });
+
+      const { weight } = UpdateSchema.parse(req.body);
+      const { updateKeywordWeight } = await import("./services/adaptive-scoring");
+      
+      await updateKeywordWeight(req.dockTalkUser!.orgId, keywordId, weight);
+      res.json({ success: true, keywordId, weight });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      console.error("Error updating keyword:", error);
+      res.status(500).json({ error: "Failed to update keyword" });
+    }
+  });
+
+  // Delete keyword
+  app.delete("/api/docktalk/ai/keywords/:keywordId", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const keywordId = parseInt(req.params.keywordId);
+      const { deleteKeyword } = await import("./services/adaptive-scoring");
+      
+      await deleteKeyword(req.dockTalkUser!.orgId, keywordId);
+      res.json({ success: true, keywordId });
+    } catch (error) {
+      console.error("Error deleting keyword:", error);
+      res.status(500).json({ error: "Failed to delete keyword" });
+    }
+  });
+
+  // Get source adjustments
+  app.get("/api/docktalk/ai/sources", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const { getSourceAdjustments } = await import("./services/adaptive-scoring");
+      const sources = await getSourceAdjustments(req.dockTalkUser!.orgId);
+      res.json(sources);
+    } catch (error) {
+      console.error("Error fetching source adjustments:", error);
+      res.status(500).json({ error: "Failed to fetch source adjustments" });
+    }
+  });
+
+  // Get learning rules
+  app.get("/api/docktalk/ai/rules", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const { getLearningRules } = await import("./services/adaptive-scoring");
+      const rules = await getLearningRules(req.dockTalkUser!.orgId);
+      res.json(rules);
+    } catch (error) {
+      console.error("Error fetching learning rules:", error);
+      res.status(500).json({ error: "Failed to fetch learning rules" });
+    }
+  });
+
+  // Add learning rule
+  app.post("/api/docktalk/ai/rules", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const RuleSchema = z.object({
+        ruleType: z.enum(["include", "exclude", "boost", "penalize"]),
+        pattern: z.string().min(1).max(200),
+        patternType: z.enum(["keyword", "regex", "source", "category"]),
+        scoreAdjustment: z.number().int().min(-50).max(50),
+      });
+
+      const { ruleType, pattern, patternType, scoreAdjustment } = RuleSchema.parse(req.body);
+      const { addLearningRule } = await import("./services/adaptive-scoring");
+      
+      await addLearningRule(req.dockTalkUser!.orgId, ruleType, pattern, patternType, scoreAdjustment);
+      res.status(201).json({ success: true, ruleType, pattern, patternType, scoreAdjustment });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      console.error("Error adding rule:", error);
+      res.status(500).json({ error: "Failed to add rule" });
+    }
+  });
+
+  // Delete learning rule
+  app.delete("/api/docktalk/ai/rules/:ruleId", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const ruleId = parseInt(req.params.ruleId);
+      const { deleteLearningRule } = await import("./services/adaptive-scoring");
+      
+      await deleteLearningRule(req.dockTalkUser!.orgId, ruleId);
+      res.json({ success: true, ruleId });
+    } catch (error) {
+      console.error("Error deleting rule:", error);
+      res.status(500).json({ error: "Failed to delete rule" });
+    }
+  });
+
+  // Score an article with adaptive scoring (for testing/preview)
+  app.post("/api/docktalk/ai/score-preview", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const ScoreSchema = z.object({
+        title: z.string().min(1),
+        content: z.string().default(""),
+        source: z.string().default("Unknown"),
+      });
+
+      const { title, content, source } = ScoreSchema.parse(req.body);
+      const { scoreArticleAdaptive } = await import("./services/adaptive-scoring");
+      
+      const result = await scoreArticleAdaptive(title, content, source, req.dockTalkUser!.orgId);
+      res.json(result);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      console.error("Error scoring article:", error);
+      res.status(500).json({ error: "Failed to score article" });
+    }
+  });
+
+  // Process feedback with adaptive learning (called after feedback submission)
+  app.post("/api/docktalk/ai/process-feedback/:feedbackId", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const feedbackId = parseInt(req.params.feedbackId);
+      const ProcessSchema = z.object({
+        articleId: z.number().int().positive(),
+        feedbackType: z.enum(["irrelevant", "duplicate", "low_quality", "wrong_category", "spam", "helpful"]),
+      });
+
+      const { articleId, feedbackType } = ProcessSchema.parse(req.body);
+      const { processFeedbackForLearning } = await import("./services/adaptive-scoring");
+      
+      const result = await processFeedbackForLearning(
+        feedbackId,
+        articleId,
+        feedbackType,
+        req.dockTalkUser!.orgId
+      );
+      
+      res.json({ success: true, ...result });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      console.error("Error processing feedback:", error);
+      res.status(500).json({ error: "Failed to process feedback" });
+    }
+  });
+
   // DockTalk routes registered successfully
 }
