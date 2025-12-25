@@ -94,6 +94,7 @@
     "googleapis": "^160.0.0",
     "helmet": "^8.1.0",
     "http-proxy-middleware": "^3.0.5",
+    "immer": "^11.1.0",
     "input-otp": "^1.4.2",
     "ioredis": "^5.7.0",
     "jsonwebtoken": "^9.0.2",
@@ -138,7 +139,8 @@
     "ws": "^8.18.0",
     "xlsx": "^0.18.5",
     "zod": "^3.24.2",
-    "zod-validation-error": "^3.4.0"
+    "zod-validation-error": "^3.4.0",
+    "zustand": "^5.0.9"
   },
   "devDependencies": {
     "@replit/vite-plugin-cartographer": "^0.3.0",
