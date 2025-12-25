@@ -38,18 +38,32 @@ export default function OmBuilderEditorPage() {
 
   useEffect(() => {
     if (omData) {
-      const snapshot = omData.om.workingSnapshotJson;
-      if (snapshot && typeof snapshot === 'object' && 'pages' in snapshot && 'blocks' in snapshot) {
+      const rawSnapshot = omData.om.workingSnapshotJson;
+      let parsedSnapshot: any = null;
+      
+      if (rawSnapshot) {
+        if (typeof rawSnapshot === 'string') {
+          try {
+            parsedSnapshot = JSON.parse(rawSnapshot);
+          } catch (e) {
+            console.warn('Failed to parse workingSnapshotJson:', e);
+          }
+        } else if (typeof rawSnapshot === 'object') {
+          parsedSnapshot = rawSnapshot;
+        }
+      }
+      
+      if (parsedSnapshot && 'pages' in parsedSnapshot && 'blocks' in parsedSnapshot) {
         loadFromSnapshot({
           document: {
             id: omData.om.id,
             name: omData.om.name,
             docType: omData.om.docType,
-            status: (snapshot as any).document?.status || omData.om.status,
-            brandKitId: (snapshot as any).document?.brandKitId || omData.om.brandKitId || undefined,
+            status: parsedSnapshot.document?.status || omData.om.status,
+            brandKitId: parsedSnapshot.document?.brandKitId || omData.om.brandKitId || undefined,
           },
-          pages: (snapshot as any).pages || [],
-          blocks: (snapshot as any).blocks || [],
+          pages: parsedSnapshot.pages || [],
+          blocks: parsedSnapshot.blocks || [],
         });
       } else {
         const pages = omData.pages.map(p => ({
