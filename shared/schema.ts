@@ -15245,6 +15245,10 @@ export const oms = pgTable("oms", {
   status: omStatusEnum("status").notNull().default('draft'),
   version: integer("version").notNull().default(1),
   settings: jsonb("settings"),
+  workingSnapshotJson: jsonb("working_snapshot_json"),
+  publishedVersionId: varchar("published_version_id"),
+  shareToken: varchar("share_token", { length: 64 }).unique(),
+  brandKitId: varchar("brand_kit_id"),
   createdBy: varchar("created_by"),
   updatedBy: varchar("updated_by"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -15254,6 +15258,7 @@ export const oms = pgTable("oms", {
   orgIdx: index("oms_org_idx").on(table.organizationId),
   dealIdx: index("oms_deal_idx").on(table.dealId),
   modelingProjectIdx: index("oms_modeling_project_idx").on(table.modelingProjectId),
+  shareTokenIdx: index("oms_share_token_idx").on(table.shareToken),
 }));
 
 export const omPages = pgTable("om_pages", {
@@ -15325,6 +15330,15 @@ export const omBrandKits = pgTable("om_brand_kits", {
   userId: varchar("user_id").notNull(),
   name: text("name").notNull(),
   tokens: jsonb("tokens").notNull().default({}),
+  primaryColors: jsonb("primary_colors").$type<string[]>().default([]),
+  secondaryColors: jsonb("secondary_colors").$type<string[]>().default([]),
+  accentColors: jsonb("accent_colors").$type<string[]>().default([]),
+  fontFamilies: jsonb("font_families").$type<{ heading: string; body: string; alt?: string }>(),
+  logoAssetId: varchar("logo_asset_id"),
+  markAssetId: varchar("mark_asset_id"),
+  guidelines: text("guidelines"),
+  autoImportedFromUrl: varchar("auto_imported_from_url"),
+  sourceScanData: jsonb("source_scan_data"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -15340,6 +15354,8 @@ export const omDocumentVersions = pgTable("om_document_versions", {
   omId: varchar("om_id").notNull().references(() => oms.id, { onDelete: 'cascade' }),
   versionNumber: integer("version_number").notNull(),
   snapshotJson: jsonb("snapshot_json").notNull(),
+  thumbnailUrl: text("thumbnail_url"),
+  changeSummary: text("change_summary"),
   createdBy: varchar("created_by"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
@@ -15358,11 +15374,27 @@ export const omAssets = pgTable("om_assets", {
   mimeType: text("mime_type").notNull(),
   fileName: text("file_name").notNull(),
   sha256: text("sha256"),
+  folder: varchar("folder", { length: 100 }),
+  width: integer("width"),
+  height: integer("height"),
+  byteSize: integer("byte_size"),
   tags: jsonb("tags"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   userIdx: index("om_assets_user_idx").on(table.userId),
   orgIdx: index("om_assets_org_idx").on(table.organizationId),
+  sha256Idx: index("om_assets_sha256_idx").on(table.sha256),
+  folderIdx: index("om_assets_folder_idx").on(table.folder),
+}));
+
+export const omPageThumbnails = pgTable("om_page_thumbnails", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  documentVersionId: varchar("document_version_id").notNull().references(() => omDocumentVersions.id, { onDelete: 'cascade' }),
+  pageIndex: integer("page_index").notNull(),
+  imageUrl: text("image_url").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  versionIdx: index("om_page_thumbnails_version_idx").on(table.documentVersionId),
 }));
 
 export const insertOmSchema = createInsertSchema(oms).omit({
@@ -15432,6 +15464,13 @@ export const insertOmAssetSchema = createInsertSchema(omAssets).omit({
 });
 export type OmAsset = typeof omAssets.$inferSelect;
 export type InsertOmAsset = z.infer<typeof insertOmAssetSchema>;
+
+export const insertOmPageThumbnailSchema = createInsertSchema(omPageThumbnails).omit({
+  id: true,
+  createdAt: true,
+});
+export type OmPageThumbnail = typeof omPageThumbnails.$inferSelect;
+export type InsertOmPageThumbnail = z.infer<typeof insertOmPageThumbnailSchema>;
 
 // ============================================================================
 // MODELING SCENARIOS / CASES SYSTEM
