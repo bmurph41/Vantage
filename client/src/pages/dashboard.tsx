@@ -35,6 +35,7 @@ import { ComparisonCard } from "@/components/dashboard/charts/ComparisonCard";
 import { StatGrid } from "@/components/dashboard/charts/StatGrid";
 import { QuickAccessSection } from "@/components/quick-access";
 import { FundSelector } from "@/components/dashboard/FundSelector";
+import { DashboardPersonaHeader } from "@/components/dashboard/DashboardPersonaHeader";
 
 type DashboardModule = {
   id: string;
@@ -1582,7 +1583,7 @@ export default function Dashboard() {
 
         {/* Fund Context Selector - Shows current fund and key metrics */}
         <div className="mb-6">
-          <FundSelector />
+          <DashboardPersonaHeader />
         </div>
 
         {/* Quick Access - Always at top */}
