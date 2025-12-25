@@ -555,6 +555,93 @@ Respond with JSON only in this exact format:
       ));
   }
 
+  async getStructuredPLData(resultId: string, orgId: string): Promise<{
+    categories: Array<{
+      name: string;
+      type: 'Revenue' | 'COGS' | 'Expenses' | 'Other';
+      items: Array<{
+        id: string;
+        description: string;
+        subcategory: string;
+        amount: number;
+        confidence: number;
+        period?: { year: number; month?: number };
+        sourceText?: string;
+      }>;
+      subtotal: number;
+    }>;
+    periods: Array<{ label: string; year: number; month?: number }>;
+    totals: { revenue: number; cogs: number; expenses: number; netIncome: number };
+    metadata: { documentType: string; companyName?: string; currency?: string };
+  }> {
+    const [result] = await db.select()
+      .from(documentIntelligenceResults)
+      .where(and(
+        eq(documentIntelligenceResults.id, resultId),
+        eq(documentIntelligenceResults.orgId, orgId)
+      ))
+      .limit(1);
+
+    if (!result) throw new Error('Result not found');
+
+    const extractedData = result.extractedData as any;
+    if (!extractedData || result.resultType !== 'p&l') {
+      throw new Error('Only P&L results are supported');
+    }
+
+    const plData = extractedData as PLExtractionResult;
+    
+    const categoryGroups: Record<string, typeof plData.lineItems> = {
+      'Revenue': [],
+      'COGS': [],
+      'Expenses': [],
+      'Other': []
+    };
+    
+    plData.lineItems.forEach((item, index) => {
+      const category = item.category || 'Other';
+      if (!categoryGroups[category]) {
+        categoryGroups[category] = [];
+      }
+      categoryGroups[category].push({ ...item, id: `item-${index}` } as any);
+    });
+
+    const categories = Object.entries(categoryGroups)
+      .filter(([_, items]) => items.length > 0)
+      .map(([name, items]) => ({
+        name,
+        type: name as 'Revenue' | 'COGS' | 'Expenses' | 'Other',
+        items: items.map((item: any, idx: number) => ({
+          id: item.id || `item-${idx}`,
+          description: item.description,
+          subcategory: item.subcategory,
+          amount: item.amount,
+          confidence: item.confidence,
+          period: item.period,
+          sourceText: item.sourceText
+        })),
+        subtotal: items.reduce((sum, item) => sum + (item.amount || 0), 0)
+      }));
+
+    const periods: Array<{ label: string; year: number; month?: number }> = [];
+    if (plData.period?.periodType === 'annual') {
+      const year = plData.period.startDate ? parseInt(plData.period.startDate.split('-')[0]) : new Date().getFullYear();
+      periods.push({ label: `FY ${year}`, year });
+    } else if (plData.period?.periodType === 'monthly' && plData.period.startDate) {
+      const [year, month] = plData.period.startDate.split('-').map(Number);
+      periods.push({ label: `${month}/${year}`, year, month });
+    } else {
+      periods.push({ label: 'Period 1', year: new Date().getFullYear() });
+    }
+
+    return {
+      categories,
+      periods,
+      totals: plData.totals,
+      metadata: plData.metadata
+    };
+  }
+
   async importToModelingActuals(
     resultId: string,
     orgId: string,

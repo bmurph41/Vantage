@@ -16492,6 +16492,21 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  app.get('/api/modeling/document-intelligence/:resultId/structured', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { resultId } = req.params;
+
+      const { documentIntelligenceService } = await import('./services/document-intelligence-service');
+      const data = await documentIntelligenceService.getStructuredPLData(resultId, orgId);
+
+      res.json(data);
+    } catch (error: any) {
+      console.error('Failed to get structured P&L data:', error);
+      res.status(400).json({ error: error.message || 'Failed to get structured P&L data' });
+    }
+  });
+
   // ==================== COMMENT THREADS ROUTES ====================
 
   // Create a comment thread

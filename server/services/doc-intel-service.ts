@@ -75,10 +75,28 @@ interface CategoryMatch {
 
 function sanitizeText(value: string | null | undefined): string {
   if (!value) return '';
-  return value
+  
+  let cleaned = value
     .replace(/\u0000/g, '')
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+    .replace(/\uFFFD/g, '')
+    .replace(/[\u0080-\u009F]/g, '')
+    .replace(/[^\x20-\x7E\u00A0-\u00FF\u0100-\u017F\u2000-\u206F\u2070-\u209F]/g, (char) => {
+      const code = char.charCodeAt(0);
+      if (code >= 0xE000 && code <= 0xF8FF) return '';
+      if (code >= 0x2200 && code <= 0x22FF) return '';
+      if (char.match(/[\uD800-\uDBFF][\uDC00-\uDFFF]/)) return '';
+      return char;
+    })
+    .replace(/\s+/g, ' ')
     .trim();
+  
+  const printableRatio = (cleaned.match(/[a-zA-Z0-9\s.,\-$%()/]/g) || []).length / Math.max(cleaned.length, 1);
+  if (printableRatio < 0.5 && cleaned.length > 10) {
+    cleaned = cleaned.replace(/[^a-zA-Z0-9\s.,\-$%()/&'":;]/g, '');
+  }
+  
+  return cleaned;
 }
 
 export const MARINA_DEFAULT_CATEGORIES = [
