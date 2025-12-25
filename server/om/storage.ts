@@ -15,6 +15,8 @@ import {
   type InsertOmDocumentVersion,
   type OmAsset,
   type InsertOmAsset,
+  type OmPageThumbnail,
+  type InsertOmPageThumbnail,
   oms,
   omPages,
   omBlocks,
@@ -23,9 +25,11 @@ import {
   omBrandKits,
   omDocumentVersions,
   omAssets,
+  omPageThumbnails,
 } from "@shared/schema";
 import { db } from "../db";
-import { eq, desc, and, sql, max } from "drizzle-orm";
+import { eq, desc, and, sql, max, ilike, or } from "drizzle-orm";
+import crypto from "crypto";
 
 export interface IOmStorage {
   getOmById(id: string): Promise<Om | undefined>;
@@ -78,9 +82,22 @@ export interface IOmStorage {
 
   // Assets
   getAssetsByOrganization(organizationId: string): Promise<OmAsset[]>;
+  getAssetsByUser(userId: string): Promise<OmAsset[]>;
   getAssetById(id: string): Promise<OmAsset | undefined>;
+  getAssetBySha256(sha256: string, organizationId?: string): Promise<OmAsset | undefined>;
   createAsset(asset: InsertOmAsset): Promise<OmAsset>;
   deleteAsset(id: string): Promise<void>;
+  searchAssets(query: string, organizationId?: string, folder?: string): Promise<OmAsset[]>;
+
+  // Autosave / Working Snapshot
+  saveWorkingSnapshot(omId: string, snapshot: any, userId?: string): Promise<Om | undefined>;
+  getOmByShareToken(token: string): Promise<Om | undefined>;
+  generateShareToken(omId: string): Promise<string>;
+  publishOm(omId: string, userId?: string, changeSummary?: string): Promise<OmDocumentVersion>;
+
+  // Page Thumbnails
+  getPageThumbnails(documentVersionId: string): Promise<OmPageThumbnail[]>;
+  createPageThumbnail(thumbnail: InsertOmPageThumbnail): Promise<OmPageThumbnail>;
 }
 
 export class OmDbStorage implements IOmStorage {
@@ -438,6 +455,136 @@ export class OmDbStorage implements IOmStorage {
 
   async deleteAsset(id: string): Promise<void> {
     await db.delete(omAssets).where(eq(omAssets.id, id));
+  }
+
+  async getAssetsByUser(userId: string): Promise<OmAsset[]> {
+    return db
+      .select()
+      .from(omAssets)
+      .where(eq(omAssets.userId, userId))
+      .orderBy(desc(omAssets.createdAt));
+  }
+
+  async getAssetBySha256(sha256: string, organizationId?: string): Promise<OmAsset | undefined> {
+    const conditions = [eq(omAssets.sha256, sha256)];
+    if (organizationId) {
+      conditions.push(eq(omAssets.organizationId, organizationId));
+    }
+    const [asset] = await db
+      .select()
+      .from(omAssets)
+      .where(and(...conditions));
+    return asset;
+  }
+
+  async searchAssets(query: string, organizationId?: string, folder?: string): Promise<OmAsset[]> {
+    const conditions: any[] = [];
+    if (query) {
+      conditions.push(ilike(omAssets.fileName, `%${query}%`));
+    }
+    if (organizationId) {
+      conditions.push(eq(omAssets.organizationId, organizationId));
+    }
+    if (folder) {
+      conditions.push(eq(omAssets.folder, folder));
+    }
+    
+    let q = db.select().from(omAssets);
+    if (conditions.length > 0) {
+      q = q.where(and(...conditions)) as any;
+    }
+    return q.orderBy(desc(omAssets.createdAt)).limit(100);
+  }
+
+  // ============================================================================
+  // Autosave / Working Snapshot
+  // ============================================================================
+  async saveWorkingSnapshot(omId: string, snapshot: any, userId?: string): Promise<Om | undefined> {
+    const [updated] = await db
+      .update(oms)
+      .set({
+        workingSnapshotJson: snapshot,
+        updatedAt: new Date(),
+        updatedBy: userId,
+      })
+      .where(eq(oms.id, omId))
+      .returning();
+    return updated;
+  }
+
+  async getOmByShareToken(token: string): Promise<Om | undefined> {
+    const [om] = await db.select().from(oms).where(eq(oms.shareToken, token));
+    return om;
+  }
+
+  async generateShareToken(omId: string): Promise<string> {
+    const token = crypto.randomBytes(32).toString('hex');
+    await db
+      .update(oms)
+      .set({ shareToken: token, updatedAt: new Date() })
+      .where(eq(oms.id, omId));
+    return token;
+  }
+
+  async publishOm(omId: string, userId?: string, changeSummary?: string): Promise<OmDocumentVersion> {
+    return db.transaction(async (tx) => {
+      const [om] = await tx.select().from(oms).where(eq(oms.id, omId));
+      if (!om) throw new Error('OM not found');
+
+      const snapshot = om.workingSnapshotJson || await this.buildSnapshotFromPages(omId);
+      
+      const latestVersion = await this.getLatestVersionNumber(omId);
+      const [version] = await tx
+        .insert(omDocumentVersions)
+        .values({
+          omId,
+          versionNumber: latestVersion + 1,
+          snapshotJson: snapshot,
+          changeSummary,
+          createdBy: userId,
+        })
+        .returning();
+
+      await tx
+        .update(oms)
+        .set({
+          publishedVersionId: version.id,
+          status: 'published',
+          version: latestVersion + 1,
+          updatedAt: new Date(),
+          updatedBy: userId,
+        })
+        .where(eq(oms.id, omId));
+
+      return version;
+    });
+  }
+
+  private async buildSnapshotFromPages(omId: string): Promise<any> {
+    const pages = await this.getPagesByOmId(omId);
+    const pagesWithBlocks = await Promise.all(
+      pages.map(async (page) => {
+        const blocks = await this.getBlocksByPageId(page.id);
+        return { ...page, blocks };
+      })
+    );
+    return { schemaVersion: 1, pages: pagesWithBlocks };
+  }
+
+  // ============================================================================
+  // Page Thumbnails
+  // ============================================================================
+  async getPageThumbnails(documentVersionId: string): Promise<OmPageThumbnail[]> {
+    return db
+      .select()
+      .from(omPageThumbnails)
+      .where(eq(omPageThumbnails.documentVersionId, documentVersionId))
+      .orderBy(omPageThumbnails.pageIndex);
+  }
+
+  async createPageThumbnail(thumbnail: InsertOmPageThumbnail): Promise<OmPageThumbnail> {
+    const [created] = await db.insert(omPageThumbnails).values(thumbnail).returning();
+    return created;
   }
 }
 

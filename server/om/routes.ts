@@ -18,6 +18,7 @@ import multer from "multer";
 import * as XLSX from "xlsx";
 import { generateOmContent, improveContent, suggestLayout, type GenerateRequest } from "./ai-service";
 import { seedSystemTemplates } from "./seed-templates";
+import { scanBrandFromUrl } from "./brand-scan";
 
 const router = Router();
 
@@ -1229,6 +1230,339 @@ router.post("/seed-templates", async (req, res) => {
   } catch (error) {
     console.error("Error seeding templates:", error);
     res.status(500).json({ error: "Failed to seed templates" });
+  }
+});
+
+// ============================================================================
+// Phase 2: Autosave, Publish, Share Routes
+// ============================================================================
+
+router.post("/oms/:id/autosave", async (req, res) => {
+  try {
+    const { snapshot, userId } = req.body;
+    if (!snapshot) {
+      return res.status(400).json({ error: "snapshot is required" });
+    }
+
+    const om = await omStorage.saveWorkingSnapshot(req.params.id, snapshot, userId);
+    if (!om) {
+      return res.status(404).json({ error: "OM not found" });
+    }
+    res.json({ success: true, savedAt: new Date().toISOString() });
+  } catch (error) {
+    console.error("Error autosaving OM:", error);
+    res.status(500).json({ error: "Failed to autosave" });
+  }
+});
+
+router.post("/oms/:id/publish", async (req, res) => {
+  try {
+    const { userId, changeSummary } = req.body;
+    const version = await omStorage.publishOm(req.params.id, userId, changeSummary);
+    res.status(201).json({
+      success: true,
+      version: {
+        id: version.id,
+        versionNumber: version.versionNumber,
+        createdAt: version.createdAt,
+      },
+    });
+  } catch (error: any) {
+    console.error("Error publishing OM:", error);
+    if (error.message === 'OM not found') {
+      return res.status(404).json({ error: "OM not found" });
+    }
+    res.status(500).json({ error: "Failed to publish OM" });
+  }
+});
+
+router.post("/oms/:id/share", async (req, res) => {
+  try {
+    const om = await omStorage.getOmById(req.params.id);
+    if (!om) {
+      return res.status(404).json({ error: "OM not found" });
+    }
+
+    let token = om.shareToken;
+    if (!token) {
+      token = await omStorage.generateShareToken(req.params.id);
+    }
+
+    res.json({
+      shareToken: token,
+      shareUrl: `/shared/om/${token}`,
+    });
+  } catch (error) {
+    console.error("Error generating share link:", error);
+    res.status(500).json({ error: "Failed to generate share link" });
+  }
+});
+
+router.get("/shared/:token", async (req, res) => {
+  try {
+    const om = await omStorage.getOmByShareToken(req.params.token);
+    if (!om) {
+      return res.status(404).json({ error: "Shared document not found or link expired" });
+    }
+
+    if (om.status !== 'published') {
+      return res.status(403).json({ error: "Document is not published for sharing" });
+    }
+
+    const pages = await omStorage.getPagesByOmId(om.id);
+    const pagesWithBlocks = await Promise.all(
+      pages.map(async (page) => {
+        const blocks = await omStorage.getBlocksByPageId(page.id);
+        return { ...page, blocks };
+      })
+    );
+
+    res.json({
+      name: om.name,
+      docType: om.docType,
+      version: om.version,
+      pages: pagesWithBlocks,
+      workingSnapshot: om.workingSnapshotJson,
+    });
+  } catch (error) {
+    console.error("Error fetching shared OM:", error);
+    res.status(500).json({ error: "Failed to fetch shared document" });
+  }
+});
+
+// ============================================================================
+// Phase 2: Asset Library Routes
+// ============================================================================
+
+const assetUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'application/pdf'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only images and PDFs are allowed'));
+    }
+  }
+});
+
+router.get("/assets", async (req, res) => {
+  try {
+    const { organizationId, userId, folder, q } = req.query;
+    
+    if (q && typeof q === 'string') {
+      const assets = await omStorage.searchAssets(
+        q,
+        organizationId as string | undefined,
+        folder as string | undefined
+      );
+      return res.json(assets);
+    }
+
+    if (organizationId && typeof organizationId === 'string') {
+      const assets = await omStorage.getAssetsByOrganization(organizationId);
+      return res.json(assets);
+    }
+
+    if (userId && typeof userId === 'string') {
+      const assets = await omStorage.getAssetsByUser(userId);
+      return res.json(assets);
+    }
+
+    res.status(400).json({ error: "organizationId or userId is required" });
+  } catch (error) {
+    console.error("Error fetching assets:", error);
+    res.status(500).json({ error: "Failed to fetch assets" });
+  }
+});
+
+router.post("/assets/upload", assetUpload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const { userId, organizationId, folder, tags } = req.body;
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required" });
+    }
+
+    const crypto = await import('crypto');
+    const sha256 = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+
+    const existingAsset = await omStorage.getAssetBySha256(sha256, organizationId);
+    if (existingAsset) {
+      return res.json({
+        asset: existingAsset,
+        deduplicated: true,
+        message: "File already exists, returning existing asset",
+      });
+    }
+
+    const fileName = req.file.originalname;
+    const fileUrl = `/uploads/om-assets/${Date.now()}-${fileName}`;
+
+    const fs = await import('fs').then(m => m.promises);
+    const path = await import('path');
+    const uploadDir = path.join(process.cwd(), 'uploads', 'om-assets');
+    await fs.mkdir(uploadDir, { recursive: true });
+    await fs.writeFile(path.join(uploadDir, `${Date.now()}-${fileName}`), req.file.buffer);
+
+    let width: number | undefined;
+    let height: number | undefined;
+    if (req.file.mimetype.startsWith('image/')) {
+    }
+
+    const asset = await omStorage.createAsset({
+      userId,
+      organizationId,
+      fileUrl,
+      mimeType: req.file.mimetype,
+      fileName,
+      sha256,
+      folder: folder || null,
+      width,
+      height,
+      byteSize: req.file.size,
+      tags: tags ? JSON.parse(tags) : null,
+    });
+
+    res.status(201).json({ asset, deduplicated: false });
+  } catch (error) {
+    console.error("Error uploading asset:", error);
+    res.status(500).json({ error: "Failed to upload asset" });
+  }
+});
+
+router.delete("/assets/:id", async (req, res) => {
+  try {
+    await omStorage.deleteAsset(req.params.id);
+    res.status(204).send();
+  } catch (error) {
+    console.error("Error deleting asset:", error);
+    res.status(500).json({ error: "Failed to delete asset" });
+  }
+});
+
+// ============================================================================
+// Phase 2: Bindings Catalog
+// ============================================================================
+
+router.post("/brand-kits/scan-url", async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({ error: "url is required" });
+    }
+
+    try {
+      new URL(url);
+    } catch {
+      return res.status(400).json({ error: "Invalid URL format" });
+    }
+
+    const scanResult = await scanBrandFromUrl(url);
+    res.json(scanResult);
+  } catch (error: any) {
+    console.error("Error scanning brand:", error);
+    res.status(500).json({ error: error.message || "Failed to scan brand from URL" });
+  }
+});
+
+router.post("/brand-kits/auto-import", async (req, res) => {
+  try {
+    const { url, userId, organizationId, name } = req.body;
+    if (!url || !userId) {
+      return res.status(400).json({ error: "url and userId are required" });
+    }
+
+    const scanResult = await scanBrandFromUrl(url);
+
+    const brandKit = await omStorage.createBrandKit({
+      userId,
+      organizationId,
+      name: name || scanResult.siteName || 'Imported Brand Kit',
+      tokens: {},
+      primaryColors: scanResult.primaryColors,
+      secondaryColors: scanResult.secondaryColors,
+      accentColors: scanResult.accentColors,
+      fontFamilies: scanResult.fontFamilies,
+      autoImportedFromUrl: url,
+      sourceScanData: scanResult.scanData,
+    });
+
+    res.status(201).json({
+      brandKit,
+      scanResult,
+    });
+  } catch (error: any) {
+    console.error("Error auto-importing brand kit:", error);
+    res.status(500).json({ error: error.message || "Failed to auto-import brand kit" });
+  }
+});
+
+router.get("/bindings/catalog", async (req, res) => {
+  try {
+    const catalog = {
+      underwriting: {
+        label: "Underwriting Model",
+        fields: [
+          { key: "purchasePrice", label: "Purchase Price", type: "currency" },
+          { key: "noi", label: "Net Operating Income", type: "currency" },
+          { key: "capRate", label: "Cap Rate", type: "percent" },
+          { key: "totalSlips", label: "Total Slips", type: "number" },
+          { key: "occupancy", label: "Occupancy Rate", type: "percent" },
+          { key: "grossRevenue", label: "Gross Revenue", type: "currency" },
+          { key: "operatingExpenses", label: "Operating Expenses", type: "currency" },
+          { key: "debtService", label: "Debt Service", type: "currency" },
+          { key: "cashOnCash", label: "Cash-on-Cash Return", type: "percent" },
+          { key: "irr", label: "Internal Rate of Return", type: "percent" },
+          { key: "projectedExitValue", label: "Projected Exit Value", type: "currency" },
+        ],
+      },
+      salesComps: {
+        label: "Sales Comparables",
+        fields: [
+          { key: "averagePricePerSlip", label: "Avg Price/Slip", type: "currency" },
+          { key: "medianCapRate", label: "Median Cap Rate", type: "percent" },
+          { key: "recentSalesCount", label: "Recent Sales Count", type: "number" },
+          { key: "compsTable", label: "Comps Table", type: "table" },
+        ],
+      },
+      rentComps: {
+        label: "Rent Comparables",
+        fields: [
+          { key: "averageRentPerFoot", label: "Avg Rent/Foot", type: "currency" },
+          { key: "occupancyRate", label: "Occupancy Rate", type: "percent" },
+          { key: "marketGrowthRate", label: "Market Growth Rate", type: "percent" },
+        ],
+      },
+      demographics: {
+        label: "Market Demographics",
+        fields: [
+          { key: "medianIncome", label: "Median Household Income", type: "currency" },
+          { key: "populationGrowth", label: "Population Growth", type: "percent" },
+          { key: "boatRegistrations", label: "Boat Registrations", type: "number" },
+          { key: "waterAccessHouseholds", label: "Waterfront Households", type: "number" },
+        ],
+      },
+      deal: {
+        label: "CRM Deal",
+        fields: [
+          { key: "name", label: "Deal Name", type: "text" },
+          { key: "propertyName", label: "Property Name", type: "text" },
+          { key: "address", label: "Address", type: "text" },
+          { key: "askingPrice", label: "Asking Price", type: "currency" },
+          { key: "stage", label: "Pipeline Stage", type: "text" },
+        ],
+      },
+    };
+
+    res.json(catalog);
+  } catch (error) {
+    console.error("Error fetching bindings catalog:", error);
+    res.status(500).json({ error: "Failed to fetch bindings catalog" });
   }
 });
 
