@@ -189,9 +189,13 @@ export interface RssPreviewResponse {
 }
 
 export async function fetchRssSources(): Promise<RssSource[]> {
-  const response = await fetch(`${API_BASE}/rss-sources`);
+  const response = await fetch(`${API_BASE}/rss-sources`, {
+    credentials: "include",
+  });
   if (!response.ok) {
-    throw new Error(`Failed to fetch RSS sources: ${response.statusText}`);
+    const errorData = await response.json().catch(() => ({ error: response.statusText }));
+    const errorMessage = errorData.error || errorData.message || response.statusText;
+    throw new Error(`Failed to fetch RSS sources: ${errorMessage}`);
   }
   return response.json();
 }
@@ -213,7 +217,9 @@ export async function createRssSource(data: {
   });
   
   if (!response.ok) {
-    throw new Error(`Failed to create RSS source: ${response.statusText}`);
+    const errorData = await response.json().catch(() => ({ error: response.statusText }));
+    const errorMessage = errorData.error || errorData.message || response.statusText;
+    throw new Error(`Failed to create RSS source: ${errorMessage}`);
   }
   
   return response.json();
@@ -237,7 +243,9 @@ export async function updateRssSource(id: number, data: {
   });
   
   if (!response.ok) {
-    throw new Error(`Failed to update RSS source: ${response.statusText}`);
+    const errorData = await response.json().catch(() => ({ error: response.statusText }));
+    const errorMessage = errorData.error || errorData.message || response.statusText;
+    throw new Error(`Failed to update RSS source: ${errorMessage}`);
   }
   
   return response.json();
@@ -250,7 +258,9 @@ export async function deleteRssSource(id: number): Promise<void> {
   });
   
   if (!response.ok) {
-    throw new Error(`Failed to delete RSS source: ${response.statusText}`);
+    const errorData = await response.json().catch(() => ({ error: response.statusText }));
+    const errorMessage = errorData.error || errorData.message || response.statusText;
+    throw new Error(`Failed to delete RSS source: ${errorMessage}`);
   }
 }
 
