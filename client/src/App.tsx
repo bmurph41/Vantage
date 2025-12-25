@@ -151,6 +151,7 @@ const DocumentIntelligence = lazy(() => import("@/pages/modeling/doc-intel/Docum
 const PnlUpload = lazy(() => import("@/pages/modeling/pnl/PnlUpload"));
 const PnlReview = lazy(() => import("@/pages/modeling/pnl/PnlReview"));
 const PnlKeywordBank = lazy(() => import("@/pages/modeling/pnl/PnlKeywordBank"));
+const PnlUploadReview = lazy(() => import("@/pages/modeling/pnl/PnlUploadReview"));
 
 // Project Workspace
 const ProjectWorkspace = lazy(() => import("@/pages/modeling/projects/workspace"));
@@ -1244,6 +1245,14 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <PnlKeywordBank />
+          </UnifiedLayout>
+        )}
+      </Route>
+      
+      <Route path="/modeling/pnl-parser">
+        {() => (
+          <UnifiedLayout>
+            <PnlUploadReview />
           </UnifiedLayout>
         )}
       </Route>
