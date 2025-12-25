@@ -685,6 +685,351 @@ function TrainingAnalyticsDashboard() {
   );
 }
 
+interface AiKeywordWeight {
+  id: number;
+  keyword: string;
+  category: string;
+  currentWeight: number;
+  positiveSignals: number;
+  negativeSignals: number;
+  confidenceScore: number;
+  isUserDefined: boolean;
+}
+
+interface AiSourceAdjustment {
+  id: number;
+  sourceName: string;
+  currentRelevanceBonus: number;
+  totalArticles: number;
+  helpfulArticles: number;
+  irrelevantArticles: number;
+  accuracyRate: number;
+}
+
+interface AiLearningRule {
+  id: number;
+  ruleType: string;
+  pattern: string;
+  patternType: string;
+  scoreAdjustment: number;
+  timesApplied: number;
+  confidenceScore: number;
+}
+
+interface AdaptiveAnalytics {
+  totalFeedback: number;
+  helpfulFeedback: number;
+  irrelevantFeedback: number;
+  totalKeywords: number;
+  activeRules: number;
+  trackedSources: number;
+  estimatedAccuracy: number;
+  lastTrainingAt: string | null;
+}
+
+function AdaptiveAITab() {
+  const { toast } = useToast();
+  const [newKeyword, setNewKeyword] = useState("");
+  const [newKeywordWeight, setNewKeywordWeight] = useState(5);
+  const [newKeywordCategory, setNewKeywordCategory] = useState("custom");
+  const [testTitle, setTestTitle] = useState("");
+  const [testResult, setTestResult] = useState<{ score: number; breakdown: any } | null>(null);
+
+  const { data: analytics, isLoading: analyticsLoading, refetch: refetchAnalytics } = useQuery<AdaptiveAnalytics>({
+    queryKey: ["/api/docktalk/ai/analytics"],
+  });
+
+  const { data: keywords = [], isLoading: keywordsLoading, refetch: refetchKeywords } = useQuery<AiKeywordWeight[]>({
+    queryKey: ["/api/docktalk/ai/keywords"],
+  });
+
+  const { data: sources = [], refetch: refetchSources } = useQuery<AiSourceAdjustment[]>({
+    queryKey: ["/api/docktalk/ai/sources"],
+  });
+
+  const { data: rules = [], refetch: refetchRules } = useQuery<AiLearningRule[]>({
+    queryKey: ["/api/docktalk/ai/rules"],
+  });
+
+  const addKeywordMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/docktalk/ai/keywords", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          keyword: newKeyword,
+          weight: newKeywordWeight,
+          category: newKeywordCategory,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to add keyword");
+      return res.json();
+    },
+    onSuccess: () => {
+      dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/ai/keywords"] });
+      dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/ai/analytics"] });
+      setNewKeyword("");
+      setNewKeywordWeight(5);
+      toast({ title: "Keyword Added", description: "The keyword has been added to the AI model." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to add keyword", variant: "destructive" });
+    },
+  });
+
+  const deleteKeywordMutation = useMutation({
+    mutationFn: async (keywordId: number) => {
+      const res = await fetch(`/api/docktalk/ai/keywords/${keywordId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to delete keyword");
+      return res.json();
+    },
+    onSuccess: () => {
+      dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/ai/keywords"] });
+      dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/ai/analytics"] });
+      toast({ title: "Keyword Removed", description: "The keyword has been removed." });
+    },
+  });
+
+  const testScoreMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/docktalk/ai/score-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ title: testTitle, content: "", source: "Test" }),
+      });
+      if (!res.ok) throw new Error("Failed to score");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setTestResult(data);
+    },
+  });
+
+  const getCategoryColor = (category: string) => {
+    const colors: Record<string, string> = {
+      marina: "bg-blue-100 text-blue-800",
+      investment: "bg-green-100 text-green-800",
+      macro: "bg-purple-100 text-purple-800",
+      operational: "bg-amber-100 text-amber-800",
+      regulatory: "bg-red-100 text-red-800",
+      negative: "bg-gray-100 text-gray-800",
+      custom: "bg-indigo-100 text-indigo-800",
+    };
+    return colors[category] || "bg-gray-100 text-gray-800";
+  };
+
+  if (analyticsLoading) {
+    return <div className="space-y-4"><Skeleton className="h-32 w-full" /><Skeleton className="h-64 w-full" /></div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Zap className="h-5 w-5 text-amber-500" />
+            Adaptive AI Learning
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            Real-time learning from your feedback to improve article relevance
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => { refetchAnalytics(); refetchKeywords(); refetchSources(); }}>
+          <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card><CardContent className="pt-4">
+          <div className="text-center">
+            <div className="text-3xl font-bold text-amber-600">{analytics?.estimatedAccuracy || 50}%</div>
+            <div className="text-xs text-muted-foreground mt-1">Estimated Accuracy</div>
+          </div>
+        </CardContent></Card>
+        <Card><CardContent className="pt-4">
+          <div className="text-center">
+            <div className="text-3xl font-bold text-blue-600">{analytics?.totalKeywords || 0}</div>
+            <div className="text-xs text-muted-foreground mt-1">Active Keywords</div>
+          </div>
+        </CardContent></Card>
+        <Card><CardContent className="pt-4">
+          <div className="text-center">
+            <div className="text-3xl font-bold text-purple-600">{analytics?.activeRules || 0}</div>
+            <div className="text-xs text-muted-foreground mt-1">Learning Rules</div>
+          </div>
+        </CardContent></Card>
+        <Card><CardContent className="pt-4">
+          <div className="text-center">
+            <div className="text-3xl font-bold text-green-600">{analytics?.trackedSources || 0}</div>
+            <div className="text-xs text-muted-foreground mt-1">Tracked Sources</div>
+          </div>
+        </CardContent></Card>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Target className="h-4 w-4" /> Keyword Weights
+            </CardTitle>
+            <CardDescription className="text-xs">Keywords that influence article relevance scoring</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2 mb-4">
+              <Input
+                placeholder="Add keyword..."
+                value={newKeyword}
+                onChange={(e) => setNewKeyword(e.target.value)}
+                className="flex-1"
+                data-testid="input-new-keyword"
+              />
+              <Select value={newKeywordCategory} onValueChange={setNewKeywordCategory}>
+                <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="marina">Marina</SelectItem>
+                  <SelectItem value="investment">Investment</SelectItem>
+                  <SelectItem value="macro">Macro</SelectItem>
+                  <SelectItem value="operational">Operational</SelectItem>
+                  <SelectItem value="regulatory">Regulatory</SelectItem>
+                  <SelectItem value="negative">Negative</SelectItem>
+                  <SelectItem value="custom">Custom</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input
+                type="number"
+                min={1}
+                max={20}
+                value={newKeywordWeight}
+                onChange={(e) => setNewKeywordWeight(parseInt(e.target.value) || 5)}
+                className="w-16"
+                data-testid="input-keyword-weight"
+              />
+              <Button
+                size="sm"
+                onClick={() => addKeywordMutation.mutate()}
+                disabled={!newKeyword || addKeywordMutation.isPending}
+                data-testid="button-add-keyword"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="max-h-64 overflow-y-auto space-y-2">
+              {keywordsLoading ? (
+                <Skeleton className="h-20 w-full" />
+              ) : keywords.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No custom keywords yet. Add keywords to improve accuracy.</p>
+              ) : (
+                keywords.slice(0, 20).map((kw) => (
+                  <div key={kw.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-2">
+                      <Badge className={getCategoryColor(kw.category)}>{kw.keyword}</Badge>
+                      <span className="text-xs text-muted-foreground">weight: {kw.currentWeight}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-green-600">+{kw.positiveSignals}</span>
+                      <span className="text-xs text-red-600">-{kw.negativeSignals}</span>
+                      {kw.isUserDefined && (
+                        <Button variant="ghost" size="sm" onClick={() => deleteKeywordMutation.mutate(kw.id)}>
+                          <Trash2 className="h-3 w-3 text-muted-foreground" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Activity className="h-4 w-4" /> Source Performance
+            </CardTitle>
+            <CardDescription className="text-xs">How each source performs based on your feedback</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="max-h-72 overflow-y-auto space-y-2">
+              {sources.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No source data yet. Rate articles to train source accuracy.</p>
+              ) : (
+                sources.map((src) => (
+                  <div key={src.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                    <div>
+                      <div className="font-medium text-sm truncate max-w-[180px]">{src.sourceName}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {src.totalArticles} articles | {src.helpfulArticles} helpful
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className={`text-sm font-bold ${src.accuracyRate >= 70 ? 'text-green-600' : src.accuracyRate >= 40 ? 'text-amber-600' : 'text-red-600'}`}>
+                        {src.accuracyRate}%
+                      </div>
+                      <div className={`text-xs ${src.currentRelevanceBonus >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {src.currentRelevanceBonus >= 0 ? '+' : ''}{src.currentRelevanceBonus} bonus
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <ListChecks className="h-4 w-4" /> Test Article Scoring
+          </CardTitle>
+          <CardDescription className="text-xs">See how the AI would score an article title</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2">
+            <Input
+              placeholder="Enter an article title to test..."
+              value={testTitle}
+              onChange={(e) => setTestTitle(e.target.value)}
+              className="flex-1"
+              data-testid="input-test-title"
+            />
+            <Button onClick={() => testScoreMutation.mutate()} disabled={!testTitle || testScoreMutation.isPending}>
+              <Zap className="h-4 w-4 mr-1" /> Test
+            </Button>
+          </div>
+          {testResult && (
+            <div className="mt-4 p-4 rounded-lg bg-muted/50">
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-medium">Relevance Score</span>
+                <span className={`text-2xl font-bold ${testResult.score >= 70 ? 'text-green-600' : testResult.score >= 40 ? 'text-amber-600' : 'text-red-600'}`}>
+                  {testResult.score}/100
+                </span>
+              </div>
+              {testResult.breakdown?.matchedKeywords?.length > 0 && (
+                <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground">Matched Keywords:</div>
+                  <div className="flex flex-wrap gap-1">
+                    {testResult.breakdown.matchedKeywords.map((kw: any, i: number) => (
+                      <Badge key={i} variant="outline" className="text-xs">
+                        {kw.keyword} (+{kw.contribution})
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export function AITraining() {
   const { toast } = useToast();
   const [isAddTagOpen, setIsAddTagOpen] = useState(false);
@@ -831,10 +1176,14 @@ export function AITraining() {
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="overview" className="flex items-center gap-2" data-testid="tab-overview">
                 <Sparkles className="h-4 w-4" />
                 Overview
+              </TabsTrigger>
+              <TabsTrigger value="adaptive" className="flex items-center gap-2" data-testid="tab-adaptive">
+                <Zap className="h-4 w-4" />
+                Adaptive AI
               </TabsTrigger>
               <TabsTrigger value="tags" className="flex items-center gap-2" data-testid="tab-tags">
                 <Tags className="h-4 w-4" />
@@ -961,6 +1310,10 @@ export function AITraining() {
                   </CardContent>
                 </Card>
               </div>
+            </TabsContent>
+
+            <TabsContent value="adaptive" className="mt-6">
+              <AdaptiveAITab />
             </TabsContent>
 
             <TabsContent value="tags" className="mt-6">
