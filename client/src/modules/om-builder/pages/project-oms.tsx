@@ -46,16 +46,20 @@ export default function ProjectOms() {
   });
   
   const createOmMutation = useMutation({
-    mutationFn: (data: { projectId: string; name: string; status: string; docType?: string }) =>
-      apiRequest('POST', '/api/om/oms', data),
+    mutationFn: async (data: { projectId: string; name: string; status: string; docType?: string }) => {
+      const res = await apiRequest('POST', '/api/om/oms', data);
+      return res.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/om/oms/project', projectId] });
     },
   });
 
   const cloneOmMutation = useMutation({
-    mutationFn: (omId: string) =>
-      apiRequest('POST', `/api/om/oms/${omId}/clone`),
+    mutationFn: async (omId: string) => {
+      const res = await apiRequest('POST', `/api/om/oms/${omId}/clone`);
+      return res.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/om/oms/project', projectId] });
     },
