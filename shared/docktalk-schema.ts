@@ -772,3 +772,148 @@ export type ArticleView = typeof articleViews.$inferSelect;
 export type InsertArticleView = z.infer<typeof insertArticleViewSchema>;
 export type ArticleLike = typeof articleLikes.$inferSelect;
 export type InsertArticleLike = z.infer<typeof insertArticleLikeSchema>;
+
+// ============================================================================
+// AI TRAINING SYSTEM - Real-time learning from user feedback
+// ============================================================================
+
+// Keyword category for organizing learned keywords
+export const keywordCategoryEnum = pgEnum("docktalk_keyword_category", [
+  "marina", "investment", "macro", "operational", "regulatory", "negative", "custom"
+]);
+
+// AI Keyword Weights - dynamically adjusted based on user feedback
+export const aiKeywordWeights = pgTable("docktalk_ai_keyword_weights", {
+  id: serial("id").primaryKey(),
+  orgId: varchar("org_id").notNull(), // Per-organization learning
+  keyword: text("keyword").notNull(),
+  category: keywordCategoryEnum("category").notNull().default("custom"),
+  baseWeight: integer("base_weight").notNull().default(5), // Initial weight (1-20)
+  currentWeight: integer("current_weight").notNull().default(5), // Adjusted weight
+  positiveSignals: integer("positive_signals").notNull().default(0), // Helpful votes
+  negativeSignals: integer("negative_signals").notNull().default(0), // Irrelevant votes
+  confidenceScore: integer("confidence_score").notNull().default(50), // 0-100 confidence
+  isActive: boolean("is_active").notNull().default(true),
+  isUserDefined: boolean("is_user_defined").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  byOrg: index("idx_docktalk_keyword_weights_org").on(table.orgId),
+  byCategory: index("idx_docktalk_keyword_weights_category").on(table.category),
+  byKeyword: index("idx_docktalk_keyword_weights_keyword").on(table.keyword),
+  uniqueOrgKeyword: uniqueIndex("idx_docktalk_keyword_weights_unique").on(table.orgId, table.keyword),
+}));
+
+// AI Source Adjustments - per-source accuracy adjustments
+export const aiSourceAdjustments = pgTable("docktalk_ai_source_adjustments", {
+  id: serial("id").primaryKey(),
+  orgId: varchar("org_id").notNull(),
+  sourceName: text("source_name").notNull(), // RSS source name
+  sourceUrl: text("source_url"), // Source URL for matching
+  baseRelevanceBonus: integer("base_relevance_bonus").notNull().default(0), // -50 to +50
+  currentRelevanceBonus: integer("current_relevance_bonus").notNull().default(0),
+  totalArticles: integer("total_articles").notNull().default(0),
+  helpfulArticles: integer("helpful_articles").notNull().default(0),
+  irrelevantArticles: integer("irrelevant_articles").notNull().default(0),
+  accuracyRate: integer("accuracy_rate").notNull().default(50), // 0-100 percentage
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  byOrg: index("idx_docktalk_source_adj_org").on(table.orgId),
+  bySource: index("idx_docktalk_source_adj_source").on(table.sourceName),
+  uniqueOrgSource: uniqueIndex("idx_docktalk_source_adj_unique").on(table.orgId, table.sourceName),
+}));
+
+// AI Learning Rules - patterns learned from user corrections
+export const aiLearningRules = pgTable("docktalk_ai_learning_rules", {
+  id: serial("id").primaryKey(),
+  orgId: varchar("org_id").notNull(),
+  ruleType: text("rule_type").notNull(), // "include", "exclude", "boost", "penalize"
+  pattern: text("pattern").notNull(), // Regex or keyword pattern
+  patternType: text("pattern_type").notNull().default("keyword"), // "keyword", "regex", "source", "category"
+  scoreAdjustment: integer("score_adjustment").notNull().default(0), // -50 to +50
+  timesApplied: integer("times_applied").notNull().default(0),
+  timesValidated: integer("times_validated").notNull().default(0), // User confirmed correct
+  timesOverridden: integer("times_overridden").notNull().default(0), // User said wrong
+  confidenceScore: integer("confidence_score").notNull().default(50),
+  isActive: boolean("is_active").notNull().default(true),
+  learnedFromFeedbackId: integer("learned_from_feedback_id").references(() => articleFeedback.id),
+  learnedFromArticleId: integer("learned_from_article_id").references(() => articles.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  byOrg: index("idx_docktalk_learning_rules_org").on(table.orgId),
+  byType: index("idx_docktalk_learning_rules_type").on(table.ruleType),
+  byPattern: index("idx_docktalk_learning_rules_pattern").on(table.pattern),
+}));
+
+// AI Training Sessions - track training progress over time
+export const aiTrainingSessions = pgTable("docktalk_ai_training_sessions", {
+  id: serial("id").primaryKey(),
+  orgId: varchar("org_id").notNull(),
+  sessionType: text("session_type").notNull().default("feedback_processing"), // "feedback_processing", "batch_review", "rule_refinement"
+  feedbackProcessed: integer("feedback_processed").notNull().default(0),
+  keywordsUpdated: integer("keywords_updated").notNull().default(0),
+  sourcesUpdated: integer("sources_updated").notNull().default(0),
+  rulesCreated: integer("rules_created").notNull().default(0),
+  rulesUpdated: integer("rules_updated").notNull().default(0),
+  accuracyBefore: integer("accuracy_before"), // Estimated accuracy before training
+  accuracyAfter: integer("accuracy_after"), // Estimated accuracy after training
+  processedAt: timestamp("processed_at").defaultNow(),
+  durationMs: integer("duration_ms"),
+  metadata: jsonb("metadata"), // Additional session details
+}, (table) => ({
+  byOrg: index("idx_docktalk_training_sessions_org").on(table.orgId),
+  byDate: index("idx_docktalk_training_sessions_date").on(table.processedAt),
+}));
+
+// AI Training Analytics - aggregated stats for dashboard
+export const aiTrainingAnalytics = pgTable("docktalk_ai_training_analytics", {
+  id: serial("id").primaryKey(),
+  orgId: varchar("org_id").notNull().unique(),
+  totalFeedback: integer("total_feedback").notNull().default(0),
+  helpfulFeedback: integer("helpful_feedback").notNull().default(0),
+  irrelevantFeedback: integer("irrelevant_feedback").notNull().default(0),
+  duplicateFeedback: integer("duplicate_feedback").notNull().default(0),
+  wrongCategoryFeedback: integer("wrong_category_feedback").notNull().default(0),
+  totalKeywords: integer("total_keywords").notNull().default(0),
+  customKeywords: integer("custom_keywords").notNull().default(0),
+  activeRules: integer("active_rules").notNull().default(0),
+  estimatedAccuracy: integer("estimated_accuracy").notNull().default(50), // 0-100
+  lastTrainingAt: timestamp("last_training_at"),
+  articlesScored: integer("articles_scored").notNull().default(0),
+  articlesFiltered: integer("articles_filtered").notNull().default(0),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  byOrg: index("idx_docktalk_training_analytics_org").on(table.orgId),
+}));
+
+// Insert schemas for AI training tables
+export const insertAiKeywordWeightSchema = createInsertSchema(aiKeywordWeights).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export const insertAiSourceAdjustmentSchema = createInsertSchema(aiSourceAdjustments).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export const insertAiLearningRuleSchema = createInsertSchema(aiLearningRules).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export const insertAiTrainingSessionSchema = createInsertSchema(aiTrainingSessions).omit({
+  id: true, processedAt: true,
+});
+export const insertAiTrainingAnalyticsSchema = createInsertSchema(aiTrainingAnalytics).omit({
+  id: true, updatedAt: true,
+});
+
+// Types for AI training tables
+export type AiKeywordWeight = typeof aiKeywordWeights.$inferSelect;
+export type InsertAiKeywordWeight = z.infer<typeof insertAiKeywordWeightSchema>;
+export type AiSourceAdjustment = typeof aiSourceAdjustments.$inferSelect;
+export type InsertAiSourceAdjustment = z.infer<typeof insertAiSourceAdjustmentSchema>;
+export type AiLearningRule = typeof aiLearningRules.$inferSelect;
+export type InsertAiLearningRule = z.infer<typeof insertAiLearningRuleSchema>;
+export type AiTrainingSession = typeof aiTrainingSessions.$inferSelect;
+export type InsertAiTrainingSession = z.infer<typeof insertAiTrainingSessionSchema>;
+export type AiTrainingAnalytics = typeof aiTrainingAnalytics.$inferSelect;
+export type InsertAiTrainingAnalytics = z.infer<typeof insertAiTrainingAnalyticsSchema>;
