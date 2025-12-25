@@ -20613,6 +20613,161 @@ Current context: Project ${req.params.projectId}`;
   // DASHBOARD WIDGETS & LAYOUTS
   // ========================================================================
 
+  // Get persona-aware dashboard header metrics
+  app.get('/api/dashboard/header', authenticateUser, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      
+      const persona = await personaService.getUserPersona(userId, orgId);
+      const personaType = persona?.primaryPersona || 'operator';
+      
+      let headerData: {
+        personaType: string;
+        title: string;
+        subtitle: string;
+        metrics: Array<{ label: string; value: string; icon?: string; trend?: string; color?: string }>;
+        actions?: Array<{ label: string; href: string }>;
+      };
+      
+      const formatCurrency = (val: string | number | null) => {
+        if (!val) return '$0';
+        const num = typeof val === 'string' ? parseFloat(val) : val;
+        if (isNaN(num) || num === 0) return '$0';
+        if (num >= 1000000) return `\$${(num / 1000000).toFixed(1)}M`;
+        if (num >= 1000) return `\$${(num / 1000).toFixed(0)}K`;
+        return `\$${num.toFixed(0)}`;
+      };
+      
+      if (personaType === 'pe_investor') {
+        const { fundService } = await import('./services/fund-service');
+        const funds = await fundService.getFundsByOrg(orgId);
+        const activeFund = funds.find(f => f.status === 'investing') || funds[0];
+        
+        if (activeFund) {
+          const formatPercent = (val: string | null) => val ? `${(parseFloat(val) * 100).toFixed(1)}%` : '-';
+          const formatMultiple = (val: string | null) => val ? `${parseFloat(val).toFixed(2)}x` : '-';
+          
+          headerData = {
+            personaType: 'pe_investor',
+            title: activeFund.shortName || activeFund.name,
+            subtitle: `${activeFund.status} • Vintage ${activeFund.vintage}`,
+            metrics: [
+              { label: 'Net IRR', value: formatPercent(activeFund.netIrr), icon: 'TrendingUp', color: 'green' },
+              { label: 'TVPI', value: formatMultiple(activeFund.tvpi), icon: 'DollarSign', color: 'blue' },
+              { label: 'DPI', value: formatMultiple(activeFund.dpi) },
+              { label: 'Committed', value: formatCurrency(activeFund.committedCapital) },
+            ],
+            actions: [{ label: 'Manage Funds', href: '/modeling/funds' }]
+          };
+        } else {
+          headerData = {
+            personaType: 'pe_investor',
+            title: 'No Active Fund',
+            subtitle: 'Create your first fund to start tracking investments',
+            metrics: [],
+            actions: [{ label: 'Create Fund', href: '/modeling/funds' }]
+          };
+        }
+      } else if (personaType === 'broker') {
+        const { crmDeals: dealsTable, crmProperties: propsTable } = await import('@shared/schema');
+        const { and: andFn, or: orFn, sql: sqlFn, inArray: inArrayFn } = await import('drizzle-orm');
+        
+        const orgUserIds = db.select({ id: users.id }).from(users).where(eq(users.orgId, orgId));
+        
+        const activeDealsResult = await db.select({
+          count: sqlFn<number>\`count(*)\`,
+          totalValue: sqlFn<string>\`coalesce(sum(\${dealsTable.value}::numeric), 0)\`,
+          totalCommission: sqlFn<string>\`coalesce(sum(\${dealsTable.commissionAmount}::numeric), 0)\`,
+        }).from(dealsTable)
+          .where(andFn(
+            inArrayFn(dealsTable.ownerId, orgUserIds),
+            orFn(eq(dealsTable.stage, 'lead'), eq(dealsTable.stage, 'qualified'), eq(dealsTable.stage, 'proposal'), eq(dealsTable.stage, 'negotiation'))
+          ));
+        
+        const listingsResult = await db.select({
+          count: sqlFn<number>\`count(*)\`,
+          totalListPrice: sqlFn<string>\`coalesce(sum(\${propsTable.listPrice}::numeric), 0)\`,
+        }).from(propsTable)
+          .where(andFn(
+            inArrayFn(propsTable.ownerId, orgUserIds),
+            eq(propsTable.isOnMarket, true)
+          ));
+        
+        headerData = {
+          personaType: 'broker',
+          title: 'Broker Dashboard',
+          subtitle: 'Active listings and pipeline overview',
+          metrics: [
+            { label: 'Active Listings', value: String(listingsResult[0]?.count || 0), icon: 'Home', color: 'blue' },
+            { label: 'Listing Value', value: formatCurrency(listingsResult[0]?.totalListPrice || 0), icon: 'DollarSign', color: 'green' },
+            { label: 'Pipeline Deals', value: String(activeDealsResult[0]?.count || 0), icon: 'Briefcase', color: 'purple' },
+            { label: 'Potential Commission', value: formatCurrency(activeDealsResult[0]?.totalCommission || 0), icon: 'TrendingUp', color: 'amber' },
+          ],
+          actions: [
+            { label: 'Manage Listings', href: '/crm/properties' },
+            { label: 'View Pipeline', href: '/crm/deals' }
+          ]
+        };
+      } else {
+        const { modelingProjects: mpTable, crmProperties: cpTable } = await import('@shared/schema');
+        const { and: andOp, sql: sqlOp, inArray: inArrayOp } = await import('drizzle-orm');
+        
+        const orgUserIds = db.select({ id: users.id }).from(users).where(eq(users.orgId, orgId));
+        
+        const ownedProjectsResult = await db.select({
+          count: sqlOp<number>\`count(*)\`,
+          totalValue: sqlOp<string>\`coalesce(sum(\${mpTable.purchasePrice}::numeric), 0)\`,
+          totalEbitda: sqlOp<string>\`coalesce(sum(\${mpTable.ebitda}::numeric), 0)\`,
+        }).from(mpTable)
+          .where(andOp(
+            eq(mpTable.orgId, orgId),
+            eq(mpTable.dealOutcome, 'won')
+          ));
+        
+        const ownedPropertiesResult = await db.select({
+          count: sqlOp<number>\`count(*)\`,
+        }).from(cpTable)
+          .where(andOp(
+            inArrayOp(cpTable.ownerId, orgUserIds),
+            eq(cpTable.pipelineStage, 'owned')
+          ));
+        
+        const pipelineResult = await db.select({
+          count: sqlOp<number>\`count(*)\`,
+          totalValue: sqlOp<string>\`coalesce(sum(\${mpTable.purchasePrice}::numeric), 0)\`,
+        }).from(mpTable)
+          .where(andOp(
+            eq(mpTable.orgId, orgId),
+            eq(mpTable.dealOutcome, 'active')
+          ));
+        
+        const totalOwnedCount = Number(ownedProjectsResult[0]?.count || 0) + Number(ownedPropertiesResult[0]?.count || 0);
+        
+        headerData = {
+          personaType: personaType,
+          title: 'Marina Portfolio',
+          subtitle: totalOwnedCount > 0 ? \`\${totalOwnedCount} owned \${totalOwnedCount === 1 ? 'marina' : 'marinas'}\` : 'Track your marina investments',
+          metrics: [
+            { label: 'Owned Marinas', value: String(totalOwnedCount), icon: 'Building2', color: 'blue' },
+            { label: 'Portfolio Value', value: formatCurrency(ownedProjectsResult[0]?.totalValue || 0), icon: 'DollarSign', color: 'green' },
+            { label: 'Annual EBITDA', value: formatCurrency(ownedProjectsResult[0]?.totalEbitda || 0), icon: 'TrendingUp', color: 'purple' },
+            { label: 'Active Deals', value: String(pipelineResult[0]?.count || 0), icon: 'Target', color: 'amber' },
+          ],
+          actions: [
+            { label: 'View Portfolio', href: '/modeling' },
+            { label: 'Deal Pipeline', href: '/crm/deals' }
+          ]
+        };
+      }
+      
+      res.json(headerData);
+    } catch (error) {
+      console.error('Failed to fetch dashboard header:', error);
+      res.status(500).json({ error: 'Failed to fetch dashboard header' });
+    }
+  });
+
   // Get widget registry (optionally filtered by persona)
   app.get('/api/dashboards/widgets', authenticateUser, async (req: any, res) => {
     try {
