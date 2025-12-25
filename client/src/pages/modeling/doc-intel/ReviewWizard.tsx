@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, FileSpreadsheet, Brain, Check, X, Zap, Download, ListChecks, Eye, CheckCircle2, AlertTriangle, Building2, ChevronDown, ChevronRight, Pencil } from "lucide-react";
+import { ArrowLeft, ArrowRight, FileSpreadsheet, Brain, Check, X, Zap, Download, ListChecks, Eye, CheckCircle2, AlertTriangle, Building2, ChevronDown, ChevronRight, Pencil, Table2, List } from "lucide-react";
+import { PLTableView } from "@/components/doc-intel/PLTableView";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -96,12 +97,22 @@ interface VarianceItem {
   itemCount: number;
 }
 
+function sanitizeDisplayText(text: string | null): string {
+  if (!text) return '(no description)';
+  const printableRatio = (text.match(/[a-zA-Z0-9\s.,\-$%()/]/g) || []).length / Math.max(text.length, 1);
+  if (printableRatio < 0.5 && text.length > 10) {
+    return text.replace(/[^a-zA-Z0-9\s.,\-$%()/&'":;]/g, '').trim() || '(garbled text)';
+  }
+  return text.replace(/[\u0000-\u001F\u007F-\u009F]/g, '').trim();
+}
+
 export function ReviewWizard({ projectId, upload, categories, onClose, onComplete }: ReviewWizardProps) {
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(() => getStepFromStatus(upload.status));
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [approvalNotes, setApprovalNotes] = useState("");
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<'list' | 'table'>('list');
   
   const maxAllowedStep = getMaxAllowedStep(upload.status);
   
@@ -468,6 +479,26 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
                 </CardDescription>
               </div>
               <div className="flex gap-2">
+                <div className="flex border rounded-md">
+                  <Button
+                    variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+                    size="sm"
+                    onClick={() => setViewMode('list')}
+                    className="rounded-r-none"
+                    data-testid="button-list-view"
+                  >
+                    <List className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+                    size="sm"
+                    onClick={() => setViewMode('table')}
+                    className="rounded-l-none"
+                    data-testid="button-table-view"
+                  >
+                    <Table2 className="h-4 w-4" />
+                  </Button>
+                </div>
                 <Button
                   variant="outline"
                   size="sm"
@@ -504,6 +535,96 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
               )}
             </div>
 
+            {viewMode === 'table' ? (
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="text-left p-3 font-medium text-sm">Category</th>
+                      <th className="text-left p-3 font-medium text-sm">Department</th>
+                      <th className="text-left p-3 font-medium text-sm">Line Item</th>
+                      <th className="text-right p-3 font-medium text-sm">Amount</th>
+                      <th className="text-right p-3 font-medium text-sm">Confidence</th>
+                      <th className="text-center p-3 font-medium text-sm">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {itemsLoading ? (
+                      <tr>
+                        <td colSpan={6} className="text-center py-8">
+                          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto" />
+                        </td>
+                      </tr>
+                    ) : (
+                      items.map((item) => (
+                        <tr 
+                          key={item.id}
+                          className={`border-t ${
+                            item.status === "confirmed" ? "bg-green-50 dark:bg-green-950/30" :
+                            item.status === "rejected" ? "bg-red-50 dark:bg-red-950/30" :
+                            item.status === "excluded" ? "bg-gray-50 dark:bg-gray-950/30 opacity-60" :
+                            "hover:bg-muted/30"
+                          }`}
+                          data-testid={`table-row-${item.id}`}
+                        >
+                          <td className="p-3 text-sm">
+                            {categories.find(c => c.id === (item.categoryConfirmed || item.categorySuggested))?.name || '-'}
+                          </td>
+                          <td className="p-3 text-sm">
+                            {getDepartmentLabel(item.departmentConfirmed || item.departmentSuggested) || '-'}
+                          </td>
+                          <td className="p-3 text-sm max-w-[300px] truncate">
+                            {sanitizeDisplayText(item.rawText)}
+                          </td>
+                          <td className="p-3 text-sm text-right font-mono">
+                            {formatAmount(item.amountConfirmed || item.amount)}
+                          </td>
+                          <td className="p-3 text-sm text-right">
+                            {getConfidenceBadge(item.confidenceScore)}
+                          </td>
+                          <td className="p-3 text-center">
+                            {item.status === "pending" && (
+                              <div className="flex justify-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-100"
+                                  onClick={() => {
+                                    if (item.categorySuggested) {
+                                      confirmItemMutation.mutate({
+                                        itemId: item.id,
+                                        categoryId: item.categorySuggested,
+                                        amount: item.amount ? parseFloat(item.amount) : undefined,
+                                        department: item.departmentSuggested || undefined,
+                                      });
+                                    }
+                                  }}
+                                  disabled={!item.categorySuggested}
+                                  data-testid={`table-confirm-${item.id}`}
+                                >
+                                  <Check className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-100"
+                                  onClick={() => rejectItemMutation.mutate(item.id)}
+                                  data-testid={`table-reject-${item.id}`}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
+                            {item.status === "confirmed" && <Check className="h-4 w-4 text-green-600 mx-auto" />}
+                            {item.status === "rejected" && <X className="h-4 w-4 text-red-600 mx-auto" />}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
             <ScrollArea className="h-[500px]">
               <div className="space-y-2">
                 {itemsLoading ? (
@@ -524,7 +645,7 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{item.rawText}</p>
+                          <p className="font-medium truncate">{sanitizeDisplayText(item.rawText)}</p>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
                             <span className="text-sm font-mono">{formatAmount(item.amount)}</span>
                             {item.sourcePage && <span className="text-xs text-muted-foreground">Page {item.sourcePage}</span>}
@@ -651,6 +772,7 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
                 )}
               </div>
             </ScrollArea>
+            )}
             <div className="flex justify-end gap-2 mt-4">
               <Button variant="outline" onClick={() => setCurrentStep(2)} data-testid="button-back-step3">
                 <ArrowLeft className="h-4 w-4 mr-2" />
@@ -760,7 +882,7 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
                           <div className="px-8 pb-3 space-y-1">
                             {itemsByCategory.get(variance.categoryId)?.filter(i => i.status === "confirmed").map(item => (
                               <div key={item.id} className="flex justify-between text-sm p-2 bg-muted/30 rounded">
-                                <span className="truncate max-w-[300px]">{item.rawText}</span>
+                                <span className="truncate max-w-[300px]">{sanitizeDisplayText(item.rawText)}</span>
                                 <span className="font-mono">{formatAmount(item.amountConfirmed || item.amount)}</span>
                               </div>
                             ))}
