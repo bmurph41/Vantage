@@ -54,7 +54,7 @@ const crmToolsNav = [
 
 // Operations Navigation - Flattened module links (tabs handle sub-navigation)
 const operationsModulesNav = [
-  { name: "Owned Marinas", href: "/operations/owned-marinas", icon: Building2 },
+  { name: "Portfolio", href: "/portfolio", icon: Building2 },
   { name: "Dockit", href: "/operations/dockit", icon: Anchor },
   { name: "Rent Roll", href: "/operations/rent-roll", icon: Building2 },
   { name: "Fuel Sales", href: "/operations/fuel", icon: Fuel },

@@ -13203,91 +13203,82 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // ========================================
-  // OWNED MARINAS ENDPOINTS
+  // PORTFOLIO ENDPOINTS  
   // ========================================
 
-  // Get owned marinas portfolio summary
-  app.get('/api/operations/owned-marinas', authenticateUser, async (req: any, res) => {
+  // Get portfolio marinas (owned properties)
+  app.get('/api/portfolio/marinas', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      // Return mock data for now - this should be replaced with actual database queries
-      const portfolioData = {
-        summary: {
-          totalMarinas: 5,
-          totalSlips: 742,
-          totalValue: 47500000,
-          annualEbitda: 4820000,
-          avgOccupancy: 89.5,
-          avgNoi: 3640000
-        },
-        marinas: [
-          {
-            id: 1,
-            name: "Sunset Harbor Marina",
-            location: "Tampa, FL",
-            slips: 186,
-            occupancy: 92,
-            revenue: 2450000,
-            ebitda: 980000,
-            value: 12500000,
-            status: "performing"
-          },
-          {
-            id: 2,
-            name: "Gulf Breeze Marina",
-            location: "Clearwater, FL",
-            slips: 124,
-            occupancy: 88,
-            revenue: 1680000,
-            ebitda: 672000,
-            value: 8500000,
-            status: "performing"
-          },
-          {
-            id: 3,
-            name: "Bayview Yacht Club",
-            location: "Sarasota, FL",
-            slips: 156,
-            occupancy: 91,
-            revenue: 2100000,
-            ebitda: 840000,
-            value: 10500000,
-            status: "performing"
-          },
-          {
-            id: 4,
-            name: "Marina del Sol",
-            location: "St. Petersburg, FL",
-            slips: 148,
-            occupancy: 85,
-            revenue: 1890000,
-            ebitda: 756000,
-            value: 9500000,
-            status: "watch"
-          },
-          {
-            id: 5,
-            name: "Coastal Haven Marina",
-            location: "Naples, FL",
-            slips: 128,
-            occupancy: 93,
-            revenue: 2280000,
-            ebitda: 912000,
-            value: 6500000,
-            status: "performing"
-          }
-        ],
-        recentActivity: [
-          { type: "acquisition", marina: "Coastal Haven Marina", date: "2024-11-15", details: "Closed acquisition" },
-          { type: "refinance", marina: "Sunset Harbor Marina", date: "2024-10-22", details: "Refinanced at 5.25%" },
-          { type: "capex", marina: "Gulf Breeze Marina", date: "2024-09-18", details: "Dock renovation complete" }
-        ]
-      };
-      res.json(portfolioData);
+      
+      // Query owned assets with only the specific property columns we need
+      const { ownedAssets, crmProperties } = await import('@shared/schema');
+      
+      const assetsWithProperties = await db
+        .select({
+          // Asset fields
+          id: ownedAssets.id,
+          propertyId: ownedAssets.propertyId,
+          projectId: ownedAssets.projectId,
+          acquisitionDate: ownedAssets.acquisitionDate,
+          acquisitionPrice: ownedAssets.acquisitionPrice,
+          status: ownedAssets.status,
+          keyMetrics: ownedAssets.keyMetrics,
+          // Property fields (only the ones we need)
+          propertyTitle: crmProperties.title,
+          propertyAddress: crmProperties.address,
+          propertySpecs: crmProperties.specifications
+        })
+        .from(ownedAssets)
+        .leftJoin(crmProperties, eq(ownedAssets.propertyId, crmProperties.id))
+        .where(eq(ownedAssets.orgId, orgId))
+        .orderBy(desc(ownedAssets.acquisitionDate));
+      
+      // Transform to expected format
+      const marinas = assetsWithProperties.map((row) => {
+        const specs = (row.propertySpecs || {}) as Record<string, any>;
+        const metrics = (row.keyMetrics || {}) as Record<string, any>;
+        
+        return {
+          id: row.id,
+          name: row.propertyTitle || 'Unknown Marina',
+          location: row.propertyAddress?.split(',')[0]?.trim() || '',
+          state: row.propertyAddress?.split(',').slice(-1)[0]?.trim() || '',
+          slips: specs.slips || metrics.slips || 0,
+          status: row.status || 'under_management',
+          acquisitionPrice: Number(row.acquisitionPrice) || null,
+          acquisitionDate: row.acquisitionDate || null,
+          currentValue: metrics.currentValue || row.acquisitionPrice || null,
+          annualRevenue: metrics.annualRevenue || null,
+          annualEbitda: metrics.annualEbitda || null,
+          occupancy: metrics.occupancy || null,
+          projectId: row.projectId || null,
+          propertyId: row.propertyId
+        };
+      });
+      
+      res.json(marinas);
     } catch (error) {
-      console.error('Failed to fetch owned marinas:', error);
-      res.status(500).json({ error: 'Failed to fetch owned marinas data' });
+      console.error('Failed to fetch portfolio marinas:', error);
+      res.status(500).json({ error: 'Failed to fetch portfolio marinas' });
     }
+  });
+
+  // Get portfolio summary
+  app.get('/api/portfolio/summary', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const summary = await ownedAssetsService.getPortfolioSummary(orgId);
+      res.json(summary);
+    } catch (error) {
+      console.error('Failed to fetch portfolio summary:', error);
+      res.status(500).json({ error: 'Failed to fetch portfolio summary' });
+    }
+  });
+
+  // Legacy endpoint - redirect to new one
+  app.get('/api/operations/owned-marinas', authenticateUser, async (req: any, res) => {
+    res.redirect(301, '/api/portfolio/marinas');
   });
 
   // ========================================

@@ -71,6 +71,7 @@ const MarketingAutomation = lazy(() => import("@/pages/marketing-automation"));
 const CalendarSettings = lazy(() => import("@/pages/calendar-settings"));
 const CustomerAnalytics = lazy(() => import("@/pages/operations/CustomerAnalytics"));
 const OwnedMarinas = lazy(() => import("@/pages/operations/OwnedMarinas"));
+const Portfolio = lazy(() => import("@/pages/Portfolio"));
 const RentRoll = lazy(() => import("@/pages/operations/RentRoll"));
 const RentRollPortfolio = lazy(() => import("@/pages/operations/rent-roll/Portfolio"));
 const RentRollProjects = lazy(() => import("@/pages/operations/rent-roll/Projects"));
@@ -370,14 +371,24 @@ function Router() {
         )}
       </Route>
       
-      {/* Operations Routes - Tabbed Module Pages */}
-      <Route path="/operations/owned-marinas">
+      {/* Portfolio Route */}
+      <Route path="/portfolio">
         {() => (
           <UnifiedLayout>
-            <OwnedMarinas />
+            <Portfolio />
           </UnifiedLayout>
         )}
       </Route>
+
+      {/* Legacy redirect for old owned-marinas route */}
+      <Route path="/operations/owned-marinas">
+        {() => {
+          window.location.replace('/portfolio');
+          return null;
+        }}
+      </Route>
+
+      {/* Operations Routes - Tabbed Module Pages */}
       <Route path="/operations/dockit">
         {() => (
           <UnifiedLayout>

@@ -64,13 +64,13 @@ export function DashboardPersonaHeader() {
   const getMetricHref = (label: string, personaType?: string): string | null => {
     const lowerLabel = label.toLowerCase();
     if (lowerLabel.includes('owned') || lowerLabel.includes('marinas')) {
-      return '/operations/owned-marinas';
+      return '/portfolio';
     }
     if (lowerLabel.includes('portfolio value')) {
-      return '/modeling/portfolio';
+      return '/portfolio?tab=financials';
     }
     if (lowerLabel.includes('ebitda')) {
-      return '/modeling/portfolio?tab=financials';
+      return '/portfolio?tab=financials';
     }
     if (lowerLabel.includes('active deals')) {
       return '/crm/deals';
