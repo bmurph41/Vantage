@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import {
   TrendingUp,
   DollarSign,
@@ -21,6 +21,7 @@ interface DashboardMetric {
   icon?: string;
   trend?: string;
   color?: MetricColor;
+  href?: string;
 }
 
 interface DashboardHeaderData {
@@ -55,9 +56,30 @@ const bgColorMap: Record<string, string> = {
 };
 
 export function DashboardPersonaHeader() {
+  const [, navigate] = useLocation();
   const { data, isLoading, error } = useQuery<DashboardHeaderData>({
     queryKey: ["/api/dashboard/header"],
   });
+  
+  const getMetricHref = (label: string, personaType?: string): string | null => {
+    const lowerLabel = label.toLowerCase();
+    if (lowerLabel.includes('owned') || lowerLabel.includes('marinas')) {
+      return '/operations/owned-marinas';
+    }
+    if (lowerLabel.includes('portfolio value')) {
+      return '/modeling/portfolio';
+    }
+    if (lowerLabel.includes('ebitda')) {
+      return '/modeling/portfolio?tab=financials';
+    }
+    if (lowerLabel.includes('active deals')) {
+      return '/crm/deals';
+    }
+    if (lowerLabel.includes('irr') || lowerLabel.includes('tvpi') || lowerLabel.includes('dpi')) {
+      return '/modeling/funds';
+    }
+    return null;
+  };
 
   if (isLoading) {
     return (
@@ -102,13 +124,11 @@ export function DashboardPersonaHeader() {
                 const IconComponent = metric.icon ? iconMap[metric.icon] : null;
                 const textColor = metric.color ? colorMap[metric.color] : "text-foreground";
                 const bgColor = metric.color ? bgColorMap[metric.color] : "bg-muted";
+                const href = metric.href || getMetricHref(metric.label, data.personaType);
+                const isClickable = !!href;
 
-                return (
-                  <div
-                    key={idx}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-lg ${bgColor}`}
-                    data-testid={`metric-${metric.label.toLowerCase().replace(/\s+/g, '-')}`}
-                  >
+                const metricContent = (
+                  <>
                     {IconComponent && (
                       <IconComponent className={`h-5 w-5 ${textColor}`} />
                     )}
@@ -116,6 +136,29 @@ export function DashboardPersonaHeader() {
                       <div className={`text-lg font-bold ${textColor}`}>{metric.value}</div>
                       <div className="text-xs text-muted-foreground">{metric.label}</div>
                     </div>
+                  </>
+                );
+
+                if (isClickable) {
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => navigate(href!)}
+                      className={`flex items-center gap-3 px-4 py-3 rounded-lg ${bgColor} cursor-pointer transition-all hover:shadow-md hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary/50`}
+                      data-testid={`metric-${metric.label.toLowerCase().replace(/\s+/g, '-')}`}
+                    >
+                      {metricContent}
+                    </button>
+                  );
+                }
+
+                return (
+                  <div
+                    key={idx}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg ${bgColor}`}
+                    data-testid={`metric-${metric.label.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    {metricContent}
                   </div>
                 );
               })}

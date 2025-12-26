@@ -70,6 +70,7 @@ const CrmTasks = lazy(() => import("@/pages/crm-tasks"));
 const MarketingAutomation = lazy(() => import("@/pages/marketing-automation"));
 const CalendarSettings = lazy(() => import("@/pages/calendar-settings"));
 const CustomerAnalytics = lazy(() => import("@/pages/operations/CustomerAnalytics"));
+const OwnedMarinas = lazy(() => import("@/pages/operations/OwnedMarinas"));
 const RentRoll = lazy(() => import("@/pages/operations/RentRoll"));
 const RentRollPortfolio = lazy(() => import("@/pages/operations/rent-roll/Portfolio"));
 const RentRollProjects = lazy(() => import("@/pages/operations/rent-roll/Projects"));
@@ -370,6 +371,13 @@ function Router() {
       </Route>
       
       {/* Operations Routes - Tabbed Module Pages */}
+      <Route path="/operations/owned-marinas">
+        {() => (
+          <UnifiedLayout>
+            <OwnedMarinas />
+          </UnifiedLayout>
+        )}
+      </Route>
       <Route path="/operations/dockit">
         {() => (
           <UnifiedLayout>

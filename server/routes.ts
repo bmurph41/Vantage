@@ -13203,9 +13203,96 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // ========================================
-  // RENT ROLL ENDPOINTS
+  // OWNED MARINAS ENDPOINTS
   // ========================================
 
+  // Get owned marinas portfolio summary
+  app.get('/api/operations/owned-marinas', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      // Return mock data for now - this should be replaced with actual database queries
+      const portfolioData = {
+        summary: {
+          totalMarinas: 5,
+          totalSlips: 742,
+          totalValue: 47500000,
+          annualEbitda: 4820000,
+          avgOccupancy: 89.5,
+          avgNoi: 3640000
+        },
+        marinas: [
+          {
+            id: 1,
+            name: "Sunset Harbor Marina",
+            location: "Tampa, FL",
+            slips: 186,
+            occupancy: 92,
+            revenue: 2450000,
+            ebitda: 980000,
+            value: 12500000,
+            status: "performing"
+          },
+          {
+            id: 2,
+            name: "Gulf Breeze Marina",
+            location: "Clearwater, FL",
+            slips: 124,
+            occupancy: 88,
+            revenue: 1680000,
+            ebitda: 672000,
+            value: 8500000,
+            status: "performing"
+          },
+          {
+            id: 3,
+            name: "Bayview Yacht Club",
+            location: "Sarasota, FL",
+            slips: 156,
+            occupancy: 91,
+            revenue: 2100000,
+            ebitda: 840000,
+            value: 10500000,
+            status: "performing"
+          },
+          {
+            id: 4,
+            name: "Marina del Sol",
+            location: "St. Petersburg, FL",
+            slips: 148,
+            occupancy: 85,
+            revenue: 1890000,
+            ebitda: 756000,
+            value: 9500000,
+            status: "watch"
+          },
+          {
+            id: 5,
+            name: "Coastal Haven Marina",
+            location: "Naples, FL",
+            slips: 128,
+            occupancy: 93,
+            revenue: 2280000,
+            ebitda: 912000,
+            value: 6500000,
+            status: "performing"
+          }
+        ],
+        recentActivity: [
+          { type: "acquisition", marina: "Coastal Haven Marina", date: "2024-11-15", details: "Closed acquisition" },
+          { type: "refinance", marina: "Sunset Harbor Marina", date: "2024-10-22", details: "Refinanced at 5.25%" },
+          { type: "capex", marina: "Gulf Breeze Marina", date: "2024-09-18", details: "Dock renovation complete" }
+        ]
+      };
+      res.json(portfolioData);
+    } catch (error) {
+      console.error('Failed to fetch owned marinas:', error);
+      res.status(500).json({ error: 'Failed to fetch owned marinas data' });
+    }
+  });
+
+  // ========================================
+  // RENT ROLL ENDPOINTS
+  // ========================================
   // Get all rent rolls
   app.get('/api/operations/rent-rolls', authenticateUser, async (req: any, res) => {
     try {
