@@ -95,18 +95,18 @@ export default function PnlUploadReview() {
     queryKey: ["/api/pnl/documents"],
   });
 
-  const { data: jobData, isLoading: jobLoading } = useQuery<{ job: PnlJob; reviewNeedsCount: number }>({
-    queryKey: ["/api/pnl/jobs", selectedJobId],
+  const { data: jobData, isLoading: jobLoading, refetch: refetchJob } = useQuery<{ job: PnlJob; reviewNeedsCount: number }>({
+    queryKey: [`/api/pnl/jobs/${selectedJobId}`],
     enabled: !!selectedJobId,
   });
 
   const { data: reviewData, isLoading: reviewLoading } = useQuery<{ items: ReviewItem[] }>({
-    queryKey: ["/api/pnl/jobs", selectedJobId, "review"],
+    queryKey: [`/api/pnl/jobs/${selectedJobId}/review`],
     enabled: !!selectedJobId,
   });
 
   const { data: parsedData, isLoading: parsedLoading } = useQuery<ParsedStatement>({
-    queryKey: ["/api/pnl/jobs", selectedJobId, "parsed"],
+    queryKey: [`/api/pnl/jobs/${selectedJobId}/parsed`],
     enabled: !!selectedJobId,
   });
 
@@ -139,9 +139,9 @@ export default function PnlUploadReview() {
       setSelectedJobId(data.jobId);
       
       setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["/api/pnl/jobs", data.jobId] });
-        queryClient.invalidateQueries({ queryKey: ["/api/pnl/jobs", data.jobId, "review"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/pnl/jobs", data.jobId, "parsed"] });
+        queryClient.invalidateQueries({ queryKey: [`/api/pnl/jobs/${data.jobId}`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/pnl/jobs/${data.jobId}/review`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/pnl/jobs/${data.jobId}/parsed`] });
       }, 2000);
     },
     onError: (error: Error) => {
@@ -168,8 +168,8 @@ export default function PnlUploadReview() {
     },
     onSuccess: () => {
       toast({ title: "Mapping saved", description: "This mapping will be remembered for future imports." });
-      queryClient.invalidateQueries({ queryKey: ["/api/pnl/jobs", selectedJobId, "review"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/pnl/jobs", selectedJobId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/pnl/jobs/${selectedJobId}/review`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/pnl/jobs/${selectedJobId}`] });
     },
     onError: (error: Error) => {
       toast({ title: "Mapping failed", description: error.message, variant: "destructive" });
@@ -408,9 +408,9 @@ export default function PnlUploadReview() {
                       variant="outline" 
                       size="sm"
                       onClick={() => {
-                        queryClient.invalidateQueries({ queryKey: ["/api/pnl/jobs", selectedJobId] });
-                        queryClient.invalidateQueries({ queryKey: ["/api/pnl/jobs", selectedJobId, "review"] });
-                        queryClient.invalidateQueries({ queryKey: ["/api/pnl/jobs", selectedJobId, "parsed"] });
+                        queryClient.invalidateQueries({ queryKey: [`/api/pnl/jobs/${selectedJobId}`] });
+                        queryClient.invalidateQueries({ queryKey: [`/api/pnl/jobs/${selectedJobId}/review`] });
+                        queryClient.invalidateQueries({ queryKey: [`/api/pnl/jobs/${selectedJobId}/parsed`] });
                       }}
                       data-testid="button-refresh"
                     >
