@@ -13206,17 +13206,17 @@ Current context: Project ${req.params.projectId}`;
   // PORTFOLIO ENDPOINTS  
   // ========================================
 
-  // Get portfolio marinas (owned properties)
+  // Get portfolio marinas (owned properties) with real operational data
   app.get('/api/portfolio/marinas', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       
-      // Query owned assets with only the specific property columns we need
-      const { ownedAssets, crmProperties } = await import('@shared/schema');
+      // Query owned assets with property details and aggregated operational metrics
+      const { ownedAssets, crmProperties, rentRolls, rentRollEntries, fuelSales, assetPerformanceSnapshots } = await import('@shared/schema');
       
+      // Get base asset data with properties
       const assetsWithProperties = await db
         .select({
-          // Asset fields
           id: ownedAssets.id,
           propertyId: ownedAssets.propertyId,
           projectId: ownedAssets.projectId,
@@ -13224,7 +13224,6 @@ Current context: Project ${req.params.projectId}`;
           acquisitionPrice: ownedAssets.acquisitionPrice,
           status: ownedAssets.status,
           keyMetrics: ownedAssets.keyMetrics,
-          // Property fields (only the ones we need)
           propertyTitle: crmProperties.title,
           propertyAddress: crmProperties.address,
           propertySpecs: crmProperties.specifications
@@ -13234,28 +13233,104 @@ Current context: Project ${req.params.projectId}`;
         .where(eq(ownedAssets.orgId, orgId))
         .orderBy(desc(ownedAssets.acquisitionDate));
       
-      // Transform to expected format
-      const marinas = assetsWithProperties.map((row) => {
+      // Enrich with real operational data for each asset
+      const marinas = await Promise.all(assetsWithProperties.map(async (row) => {
         const specs = (row.propertySpecs || {}) as Record<string, any>;
-        const metrics = (row.keyMetrics || {}) as Record<string, any>;
+        const storedMetrics = (row.keyMetrics || {}) as Record<string, any>;
+        
+        // Get latest performance snapshot for this asset
+        const [latestSnapshot] = await db
+          .select()
+          .from(assetPerformanceSnapshots)
+          .where(eq(assetPerformanceSnapshots.ownedAssetId, row.id))
+          .orderBy(desc(assetPerformanceSnapshots.snapshotDate))
+          .limit(1);
+        
+        const snapshotMetrics = (latestSnapshot?.metrics || {}) as Record<string, any>;
+        
+        // Get rent roll metrics if property is linked
+        let rentRollMetrics = { totalUnits: 0, occupiedUnits: 0, monthlyRevenue: 0, occupancyRate: 0 };
+        if (row.propertyId) {
+          const rentRollsList = await db
+            .select({ id: rentRolls.id })
+            .from(rentRolls)
+            .where(and(eq(rentRolls.orgId, orgId), eq(rentRolls.facilityId, row.propertyId)));
+          
+          if (rentRollsList.length > 0) {
+            const rentRollIds = rentRollsList.map(rr => rr.id);
+            const [rrMetrics] = await db
+              .select({
+                totalUnits: sql<number>`COUNT(*)`,
+                occupiedUnits: sql<number>`COUNT(CASE WHEN ${rentRollEntries.status} = 'occupied' THEN 1 END)`,
+                totalRevenue: sql<number>`COALESCE(SUM(${rentRollEntries.monthlyRate}), 0)`,
+              })
+              .from(rentRollEntries)
+              .where(sql`${rentRollEntries.rentRollId} = ANY(${rentRollIds})`);
+            
+            if (rrMetrics) {
+              const totalUnits = Number(rrMetrics.totalUnits) || 0;
+              const occupiedUnits = Number(rrMetrics.occupiedUnits) || 0;
+              rentRollMetrics = {
+                totalUnits,
+                occupiedUnits,
+                monthlyRevenue: Number(rrMetrics.totalRevenue) || 0,
+                occupancyRate: totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0
+              };
+            }
+          }
+        }
+        
+        // Get fuel sales metrics (last 12 months)
+        let fuelMetrics = { annualRevenue: 0 };
+        if (row.propertyId) {
+          const oneYearAgo = new Date();
+          oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+          const [fuelResult] = await db
+            .select({
+              totalRevenue: sql<number>`COALESCE(SUM(${fuelSales.totalPrice}), 0)`,
+            })
+            .from(fuelSales)
+            .where(and(
+              eq(fuelSales.facilityId, row.propertyId),
+              gte(fuelSales.saleDate, oneYearAgo.toISOString().split('T')[0])
+            ));
+          
+          if (fuelResult) {
+            fuelMetrics.annualRevenue = Number(fuelResult.totalRevenue) || 0;
+          }
+        }
+        
+        // Calculate derived metrics from live data
+        const slips = specs.slips || storedMetrics.slips || snapshotMetrics.slips || rentRollMetrics.totalUnits || 0;
+        const occupancy = snapshotMetrics.occupancy || storedMetrics.occupancy || rentRollMetrics.occupancyRate || null;
+        const rentRollAnnualRevenue = rentRollMetrics.monthlyRevenue * 12;
+        const totalAnnualRevenue = rentRollAnnualRevenue + fuelMetrics.annualRevenue;
+        const annualRevenue = snapshotMetrics.annualRevenue || storedMetrics.annualRevenue || (totalAnnualRevenue > 0 ? totalAnnualRevenue : null);
+        const annualEbitda = snapshotMetrics.annualEbitda || storedMetrics.annualEbitda || (annualRevenue ? annualRevenue * 0.35 : null);
+        const currentValue = snapshotMetrics.currentValue || storedMetrics.currentValue || row.acquisitionPrice || null;
         
         return {
           id: row.id,
           name: row.propertyTitle || 'Unknown Marina',
           location: row.propertyAddress?.split(',')[0]?.trim() || '',
           state: row.propertyAddress?.split(',').slice(-1)[0]?.trim() || '',
-          slips: specs.slips || metrics.slips || 0,
+          slips,
           status: row.status || 'under_management',
           acquisitionPrice: Number(row.acquisitionPrice) || null,
           acquisitionDate: row.acquisitionDate || null,
-          currentValue: metrics.currentValue || row.acquisitionPrice || null,
-          annualRevenue: metrics.annualRevenue || null,
-          annualEbitda: metrics.annualEbitda || null,
-          occupancy: metrics.occupancy || null,
+          currentValue: Number(currentValue) || null,
+          annualRevenue: Number(annualRevenue) || null,
+          annualEbitda: Number(annualEbitda) || null,
+          occupancy: Number(occupancy) || null,
           projectId: row.projectId || null,
-          propertyId: row.propertyId
+          propertyId: row.propertyId,
+          operationalData: {
+            rentRoll: rentRollMetrics,
+            fuel: fuelMetrics,
+            hasLiveData: rentRollMetrics.totalUnits > 0 || fuelMetrics.annualRevenue > 0
+          }
         };
-      });
+      }));
       
       res.json(marinas);
     } catch (error) {
@@ -13263,6 +13338,7 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: 'Failed to fetch portfolio marinas' });
     }
   });
+
 
   // Get portfolio summary
   app.get('/api/portfolio/summary', authenticateUser, async (req: any, res) => {
