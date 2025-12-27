@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { eq, and, or, desc, asc, gte, lte, sql, gt } from "drizzle-orm";
+import { eq, and, or, desc, asc, gte, lte, sql, gt, inArray } from "drizzle-orm";
 import { resolveRecipient } from "@shared/recipient-utils";
 import { AIRiskAnalyzer } from "./ai-risk-analyzer";
 import { AINotesEnhancer } from "./ai-notes-enhancer";
@@ -13265,7 +13265,7 @@ Current context: Project ${req.params.projectId}`;
                 totalRevenue: sql<number>`COALESCE(SUM(${rentRollEntries.monthlyRate}), 0)`,
               })
               .from(rentRollEntries)
-              .where(sql`${rentRollEntries.rentRollId} = ANY(${rentRollIds})`);
+              .where(inArray(rentRollEntries.rentRollId, rentRollIds));
             
             if (rrMetrics) {
               const totalUnits = Number(rrMetrics.totalUnits) || 0;
