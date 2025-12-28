@@ -315,7 +315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       next();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Authentication/tenant context error:', error);
       next(error);
     }
@@ -374,7 +374,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { attachDockitRoutes } = await import("../modules/dockit/server/integration");
     await attachDockitRoutes(app, (req: any, res: any, next: any) => next(), "dockit-session-secret");
     console.log("[Dockit] Module routes registered successfully");
-  } catch (error) {
+  } catch (error: any) {
     console.error("[Dockit] Failed to load module:", error);
   }
 
@@ -399,7 +399,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const features = await storage.getOrganizationFeatures(req.user.orgId);
       res.json(features);
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch organization features" });
     }
   });
@@ -440,7 +440,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ];
       
       res.json(allPacks);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to fetch pack catalog:", error);
       res.status(500).json({ error: "Failed to fetch pack catalog" });
     }
@@ -451,7 +451,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const packsWithStatus = await packService.getAllPacksWithStatus(req.user.orgId);
       res.json(packsWithStatus);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to fetch organization packs:", error);
       res.status(500).json({ error: "Failed to fetch organization packs" });
     }
@@ -461,7 +461,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const activePacks = await packService.getActivePacks(req.user.orgId);
       res.json(activePacks);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to fetch active packs:", error);
       res.status(500).json({ error: "Failed to fetch active packs" });
     }
@@ -473,7 +473,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hasAccess = await packService.hasPackAccess(req.user.orgId, packType as PackType);
       const packInfo = await packService.getPackInfo(packType as PackType);
       res.json({ hasAccess, ...packInfo });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to check pack access:", error);
       res.status(500).json({ error: "Failed to check pack access" });
     }
@@ -535,7 +535,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           companies: pendingCompanies.length
         }
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Bootstrap endpoint error:", error);
       res.status(500).json({ error: "Failed to fetch bootstrap data" });
     }
@@ -817,7 +817,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       res.json(projectsWithCost);
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch projects" });
     }
   });
@@ -853,7 +853,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json(project);
-    } catch (error) {
+    } catch (error: any) {
       res.status(400).json({ error: "Invalid project data" });
     }
   });
@@ -875,7 +875,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tasks = await storage.getTasksForProject(project.id);
 
       res.json({ project, settings, tasks });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching project:", error);
       res.status(500).json({ error: "Failed to fetch project" });
     }
@@ -898,7 +898,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       res.status(400).json({ error: "Invalid update data" });
     }
   });
@@ -923,7 +923,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.deleteProject(req.params.id);
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting project:", error);
       res.status(500).json({ error: "Failed to delete project" });
     }
@@ -960,7 +960,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .returning();
       
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error accepting project:", error);
       res.status(500).json({ error: "Failed to accept project" });
     }
@@ -997,7 +997,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .returning();
       
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error unaccepting project:", error);
       res.status(500).json({ error: "Failed to undo DD approval" });
     }
@@ -1008,7 +1008,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updates = insertProjectSettingsSchema.partial().parse(req.body);
       const updated = await storage.updateProjectSettings(req.params.id, updates);
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       res.status(400).json({ error: "Invalid settings data" });
     }
   });
@@ -1018,7 +1018,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const shares = await storage.getProjectShares(req.params.id);
       res.json(shares);
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch project shares" });
     }
   });
@@ -1047,7 +1047,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json(share);
-    } catch (error) {
+    } catch (error: any) {
       res.status(400).json({ error: "Invalid share data" });
     }
   });
@@ -1056,7 +1056,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       await storage.deleteProjectShare(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to delete share" });
     }
   });
@@ -1110,7 +1110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(ddFees.projectId, projectId));
       
       res.json(fees);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to fetch DD fees:", error);
       res.status(500).json({ error: "Failed to retrieve fees" });
     }
@@ -1157,7 +1157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paidFees,
         unpaidFees,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to fetch DD fees summary:", error);
       res.status(500).json({ error: "Failed to retrieve fees summary" });
     }
@@ -1186,7 +1186,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const [newFee] = await db.insert(ddFees).values(validated).returning();
       res.status(201).json(newFee);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -1216,7 +1216,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -1243,7 +1243,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete DD fee:", error);
       res.status(500).json({ error: "Failed to delete fee" });
     }
@@ -1274,7 +1274,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to mark fee as paid:", error);
       res.status(500).json({ error: "Failed to mark fee as paid" });
     }
@@ -1315,7 +1315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           shareType: share.shareType,
         }
       });
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch shared project" });
     }
   });
@@ -1350,7 +1350,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json(results);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating task sort orders:", error);
       res.status(500).json({ error: "Failed to update sort orders" });
     }
@@ -1362,7 +1362,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const includeArchived = req.query.includeArchived === 'true';
       const tasks = await storage.getTasksForProject(req.params.projectId, includeArchived);
       res.json(tasks);
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch tasks" });
     }
   });
@@ -1371,7 +1371,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const assignees = await storage.getProjectAssignees(req.params.projectId);
       res.json(assignees);
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch assignees" });
     }
   });
@@ -1490,7 +1490,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json(task);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Task creation error:", error);
       console.error("Request body:", req.body);
       
@@ -1591,7 +1591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true,
         message: `Reminder sent to ${recipientName} (${recipientEmail})`
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error sending poke email:", error);
       res.status(500).json({ 
         error: "Failed to send reminder",
@@ -1759,7 +1759,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Task update error:", error);
       console.error("Request body:", req.body);
       
@@ -1822,7 +1822,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to delete task" });
     }
   });
@@ -1862,7 +1862,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Task archive error:", error);
       res.status(500).json({ error: "Failed to archive task" });
     }
@@ -1903,7 +1903,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Task unarchive error:", error);
       res.status(500).json({ error: "Failed to unarchive task" });
     }
@@ -1915,7 +1915,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await authorizeProjectAccess(req.params.projectId, req.user.orgId);
       const dependencies = await storage.getTaskDependenciesForProject(req.params.projectId);
       res.json(dependencies);
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch task dependencies" });
     }
   });
@@ -1930,7 +1930,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await authorizeProjectAccess(task.projectId, req.user.orgId);
       const dependencies = await storage.getTaskDependencies(req.params.taskId);
       res.json(dependencies);
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch task dependencies" });
     }
   });
@@ -1983,7 +1983,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       res.json(dependency);
-    } catch (error) {
+    } catch (error: any) {
       res.status(400).json({ error: "Invalid dependency data" });
     }
   });
@@ -2028,7 +2028,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Task dependency update error:", error);
       if (error instanceof Error && error.message.includes("Unauthorized")) {
         return res.status(403).json({ error: "Unauthorized access to task dependency" });
@@ -2076,7 +2076,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Task dependency deletion error:", error);
       if (error instanceof Error && error.message.includes("Unauthorized")) {
         return res.status(403).json({ error: "Unauthorized access to task dependency" });
@@ -2107,7 +2107,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to delete task dependencies" });
     }
   });
@@ -2229,7 +2229,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const files = await storage.getTaskFilesForTask(req.params.taskId);
       res.json(files);
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch files" });
     }
   });
@@ -2256,7 +2256,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Stream file to response
       const fileStream = fs.createReadStream(file.storagePath);
       fileStream.pipe(res);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error downloading file:", error);
       res.status(500).json({ error: "Failed to download file" });
     }
@@ -2292,7 +2292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting file:", error);
       res.status(500).json({ error: "Failed to delete file" });
     }
@@ -2303,7 +2303,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const notes = await storage.getTimelineNotesForTask(req.params.taskId);
       res.json(notes);
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch timeline notes" });
     }
   });
@@ -2339,7 +2339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.json(note);
-    } catch (error) {
+    } catch (error: any) {
       res.status(400).json({ error: "Invalid note data" });
     }
   });
@@ -2351,7 +2351,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updates = insertTimelineNoteSchema.partial().parse(req.body);
       const note = await storage.updateTimelineNote(req.params.id, updates);
       res.json(note);
-    } catch (error) {
+    } catch (error: any) {
       res.status(400).json({ error: "Invalid update data" });
     }
   });
@@ -2362,7 +2362,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // For now, this is a limitation in the current storage interface
       await storage.deleteTimelineNote(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to delete note" });
     }
   });
@@ -2373,7 +2373,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const templates = await storage.getProjectTemplatesForOrg(req.user.orgId);
       res.json(templates);
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch project templates" });
     }
   });
@@ -2387,7 +2387,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const template = await storage.createProjectTemplate(templateData);
       res.json(template);
-    } catch (error) {
+    } catch (error: any) {
       res.status(400).json({ error: "Invalid template data" });
     }
   });
@@ -2479,7 +2479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tasksCreated: createdTasks.length,
         tasks: createdTasks
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Apply template error:", error);
       res.status(500).json({ error: "Failed to apply template" });
     }
@@ -2498,7 +2498,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader("Content-Type", "text/csv");
       res.setHeader("Content-Disposition", "attachment; filename=tasks.csv");
       res.send(csvHeader + csvRows);
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to export CSV" });
     }
   });
@@ -2539,7 +2539,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await sgMail.send(emailData);
 
       res.json({ success: true, message: 'Email sent successfully' });
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Validation failed", details: error.errors });
       }
@@ -2569,7 +2569,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader("Content-Type", "text/calendar");
       res.setHeader("Content-Disposition", "attachment; filename=tasks.ics");
       res.send(icsContent);
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to export ICS" });
     }
   });
@@ -2579,7 +2579,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const logs = await storage.getAuditLogsForProject(req.params.id);
       res.json(logs);
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch audit logs" });
     }
   });
@@ -2591,7 +2591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const risks = await storage.getRisksForProject(req.params.id);
       res.json(risks);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching risks:", error);
       res.status(500).json({ error: "Failed to fetch risks" });
     }
@@ -2602,7 +2602,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const summary = await storage.getProjectRiskSummary(req.params.id);
       res.json(summary);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching risk analytics:", error);
       res.status(500).json({ error: "Failed to fetch risk analytics" });
     }
@@ -2653,7 +2653,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json(analysis);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error performing AI risk analysis:", error);
       res.status(500).json({ error: "Failed to perform AI risk analysis" });
     }
@@ -2671,7 +2671,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedProject = await storage.updateProject(projectId, { executiveNotes });
       
       res.json({ success: true, executiveNotes: updatedProject.executiveNotes });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating executive notes:", error);
       res.status(500).json({ error: "Failed to update executive notes" });
     }
@@ -2721,7 +2721,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json(enhancement);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error enhancing executive notes:", error);
       res.status(500).json({ error: "Failed to enhance executive notes" });
     }
@@ -2733,7 +2733,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const limit = parseInt(req.query.limit as string) || 3;
       const topRisks = await storage.getHighestRisksByScore(req.params.id, limit);
       res.json(topRisks);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching top risks:", error);
       res.status(500).json({ error: "Failed to fetch top risks" });
     }
@@ -2744,7 +2744,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const risks = await storage.getRisksByCategory(req.params.id, req.params.category);
       res.json(risks);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching risks by category:", error);
       res.status(500).json({ error: "Failed to fetch risks by category" });
     }
@@ -2755,7 +2755,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const risks = await storage.getRisksByStatus(req.params.id, req.params.status);
       res.json(risks);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching risks by status:", error);
       res.status(500).json({ error: "Failed to fetch risks by status" });
     }
@@ -2783,7 +2783,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json(risk);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating risk:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid risk data", details: error.errors });
@@ -2801,7 +2801,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Risk not found" });
       }
       res.json(risk);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching risk:", error);
       res.status(500).json({ error: "Failed to fetch risk" });
     }
@@ -2831,7 +2831,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json(updatedRisk);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating risk:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid risk data", details: error.errors });
@@ -2863,7 +2863,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting risk:", error);
       res.status(500).json({ error: "Failed to delete risk" });
     }
@@ -2885,7 +2885,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json({ success: true, message: "Risk scores recalculated successfully" });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error recalculating risk scores:", error);
       res.status(500).json({ error: "Failed to recalculate risk scores" });
     }
@@ -2919,7 +2919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         details: riskDetails,
         totalRisks: risks.length
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating heatmap data:", error);
       res.status(500).json({ error: "Failed to generate heatmap data" });
     }
@@ -2932,7 +2932,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const contacts = await storage.getContactsByOrg(req.user.orgId);
       res.json(contacts);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching contacts:", error);
       res.status(500).json({ error: "Failed to fetch contacts" });
     }
@@ -2973,7 +2973,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // });
 
       res.json(contact);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating contact:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid contact data", details: error.errors });
@@ -3031,7 +3031,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json(updatedContact);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating contact:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid contact data", details: error.errors });
@@ -3068,7 +3068,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // });
 
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting contact:", error);
       res.status(500).json({ 
         error: error instanceof Error ? error.message : "Failed to delete contact" 
@@ -3087,7 +3087,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const projectContacts = await storage.getProjectContacts(req.params.projectId);
       res.json(projectContacts);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching project contacts:", error);
       res.status(500).json({ error: "Failed to fetch project contacts" });
     }
@@ -3114,7 +3114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const projectContact = await storage.addContactToProject(projectContactData);
       res.json(projectContact);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding contact to project:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid project contact data", details: error.errors });
@@ -3140,7 +3140,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.params.role
       );
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error removing contact from project:", error);
       res.status(500).json({ 
         error: error instanceof Error ? error.message : "Failed to remove contact from project" 
@@ -3159,7 +3159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const projectPendingContacts = await storage.getProjectPendingContacts(req.params.projectId);
       res.json(projectPendingContacts);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching project pending contacts:", error);
       res.status(500).json({ error: "Failed to fetch project pending contacts" });
     }
@@ -3201,7 +3201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json({ pendingContact, projectPendingContact });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error quick-adding pending contact to project:", error);
       res.status(500).json({ 
         error: error instanceof Error ? error.message : "Failed to quick-add contact" 
@@ -3223,7 +3223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.params.role
       );
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error removing pending contact from project:", error);
       res.status(500).json({ 
         error: error instanceof Error ? error.message : "Failed to remove pending contact from project" 
@@ -3242,7 +3242,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const subscriptions = await storage.getSubscriptionsByProject(req.params.projectId);
       res.json(subscriptions);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching project subscriptions:", error);
       res.status(500).json({ error: "Failed to fetch subscriptions" });
     }
@@ -3292,7 +3292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json(subscription);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating subscription:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid subscription data", details: error.errors });
@@ -3312,7 +3312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedSubscription = await storage.updateSubscription(req.params.id, updates);
 
       res.json(updatedSubscription);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating subscription:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid subscription data", details: error.errors });
@@ -3326,7 +3326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       await storage.deleteSubscription(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting subscription:", error);
       res.status(500).json({ error: "Failed to delete subscription" });
     }
@@ -3342,7 +3342,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const subscriptions = await storage.getSubscriptionsByRecipient("user", req.params.userId);
       res.json(subscriptions);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching user subscriptions:", error);
       res.status(500).json({ error: "Failed to fetch user subscriptions" });
     }
@@ -3360,7 +3360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const taskId = req.query.taskId as string;
       const history = await storage.getNotificationHistory(req.params.projectId, taskId);
       res.json(history);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching notification history:", error);
       res.status(500).json({ error: "Failed to fetch notification history" });
     }
@@ -3387,7 +3387,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         res.status(500).json({ error: "Failed to send test notification" });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error sending test notification:", error);
       res.status(500).json({ error: "Failed to send test notification" });
     }
@@ -3406,7 +3406,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const scheduled = await storage.getScheduledNotifications(beforeDate);
       res.json(scheduled);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching scheduled notifications:", error);
       res.status(500).json({ error: "Failed to fetch scheduled notifications" });
     }
@@ -3421,7 +3421,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const validation = await storage.validateNotificationChannels(channels);
       res.json(validation);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error validating notification config:", error);
       res.status(500).json({ error: "Failed to validate notification configuration" });
     }
@@ -3437,7 +3437,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const upcomingDeadlines = await deadlineMonitor.getUpcomingDeadlines(days);
       
       res.json(upcomingDeadlines);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching upcoming deadlines:", error);
       res.status(500).json({ error: "Failed to fetch upcoming deadlines" });
     }
@@ -3454,7 +3454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await deadlineMonitor.triggerDeadlineCheck();
       
       res.json({ success: true, message: "Deadline check triggered successfully" });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error triggering deadline check:", error);
       res.status(500).json({ error: "Failed to trigger deadline check" });
     }
@@ -3466,7 +3466,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const status = deadlineMonitor.getStatus();
       
       res.json(status);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching deadline monitor status:", error);
       res.status(500).json({ error: "Failed to fetch deadline monitor status" });
     }
@@ -3479,7 +3479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const healthStatus = reconciliationService.getHealthStatus();
       res.json(healthStatus);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching reconciliation health status:", error);
       res.status(500).json({ error: "Failed to fetch reconciliation health status" });
     }
@@ -3490,7 +3490,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const syncStatuses = reconciliationService.getSyncStatuses();
       res.json(syncStatuses);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching reconciliation sync statuses:", error);
       res.status(500).json({ error: "Failed to fetch reconciliation sync statuses" });
     }
@@ -3510,7 +3510,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.json(syncHistory);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching reconciliation sync history:", error);
       res.status(500).json({ error: "Failed to fetch reconciliation sync history" });
     }
@@ -3538,7 +3538,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: "Sync triggered successfully",
         result: syncResult
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error triggering reconciliation sync:", error);
       res.status(500).json({ error: "Failed to trigger reconciliation sync" });
     }
@@ -3549,7 +3549,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const config = reconciliationService.getConfig();
       res.json(config);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching reconciliation config:", error);
       res.status(500).json({ error: "Failed to fetch reconciliation config" });
     }
@@ -3573,7 +3573,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       reconciliationService.resetSyncStatus(projectId, provider);
       
       res.json({ message: "Sync status reset successfully" });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error resetting reconciliation sync status:", error);
       res.status(500).json({ error: "Failed to reset reconciliation sync status" });
     }
@@ -3587,7 +3587,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: "Health check completed",
         status: healthStatus
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error triggering reconciliation health check:", error);
       res.status(500).json({ error: "Failed to trigger reconciliation health check" });
     }
@@ -3613,7 +3613,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         results: testResults.results
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error running notification tests:", error);
       res.status(500).json({ error: "Failed to run notification tests" });
     }
@@ -3626,7 +3626,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.setHeader('Content-Type', 'text/markdown');
       res.send(report);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating test report:", error);
       res.status(500).json({ error: "Failed to generate test report" });
     }
@@ -3661,7 +3661,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const events = await storage.getProjectCalendarEvents(projectId, filters);
       res.json(events);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching calendar events:", error);
       if (error instanceof Error) {
         if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
@@ -3697,7 +3697,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         syncedEvents: syncedEvents.length,
         events: syncedEvents 
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error syncing calendar events:", error);
       if (error instanceof Error) {
         if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
@@ -3769,7 +3769,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('Content-Type', 'text/calendar');
       res.setHeader('Content-Disposition', 'attachment; filename="calendar-events.ics"');
       res.send(icsContent);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating ICS file:", error);
       if (error instanceof Error) {
         if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
@@ -3812,7 +3812,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('Content-Type', 'text/calendar');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.send(icsContent);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error downloading project calendar:", error);
       if (error instanceof Error) {
         if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
@@ -3834,7 +3834,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ];
       
       res.json(eventTypes);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching event types:", error);
       res.status(500).json({ error: "Failed to fetch event types" });
     }
@@ -3866,7 +3866,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json(event);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating calendar event:", error);
       if (error instanceof Error) {
         if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
@@ -3902,7 +3902,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating calendar event:", error);
       if (error instanceof Error) {
         if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
@@ -3934,7 +3934,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting calendar event:", error);
       if (error instanceof Error) {
         if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
@@ -3972,7 +3972,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const requirements = await storage.getDocumentRequirementsByTask(taskId);
       res.json(requirements);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching task requirements:", error);
       if (error instanceof Error) {
         if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
@@ -4011,7 +4011,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json(requirement);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating document requirement:", error);
       if (error instanceof Error) {
         if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
@@ -4052,7 +4052,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating document requirement:", error);
       if (error instanceof Error) {
         if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
@@ -4077,7 +4077,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const integrations = await storage.getProjectIntegrationsByProject(projectId);
       res.json(integrations);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching project integrations:", error);
       if (error instanceof Error) {
         if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
@@ -4118,7 +4118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating project integration:", error);
       if (error instanceof Error) {
         if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
@@ -4208,7 +4208,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         integration,
         message: existingIntegration ? "Integration updated successfully" : "Integration registered successfully",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error registering integration:", error);
       if (error instanceof Error) {
         if (error.message.includes("Unauthorized") || error.message.includes("not found")) {
@@ -4334,7 +4334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error testing webhook:", error);
       res.status(500).json({ error: "Failed to test webhook connectivity" });
     }
@@ -4419,7 +4419,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updatedAt: integration.updatedAt,
       });
       
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error getting integration status:", error);
       res.status(500).json({ error: "Failed to get integration status" });
     }
@@ -4490,7 +4490,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: "Webhook processed successfully",
         eventType: webhookEvent.event 
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error processing webhook:", error);
       res.status(500).json({ error: "Failed to process webhook" });
     }
@@ -4578,7 +4578,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const emails = await storage.getUserEmails(req.user.id);
       res.json(emails);
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch user emails" });
     }
   });
@@ -4592,7 +4592,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const email = await storage.createUserEmail(emailData);
       res.json(email);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid email data", details: error.errors });
       } else {
@@ -4606,7 +4606,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updates = req.body;
       const email = await storage.updateUserEmail(req.params.id, updates);
       res.json(email);
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to update user email" });
     }
   });
@@ -4615,7 +4615,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       await storage.deleteUserEmail(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to delete user email" });
     }
   });
@@ -4624,7 +4624,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       await storage.setDefaultUserEmail(req.user.id, req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to set default email" });
     }
   });
@@ -4718,7 +4718,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Calendar sync error:', error);
       res.status(500).json({ 
         error: error instanceof Error ? error.message : "Failed to sync events to calendar"
@@ -4734,7 +4734,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         connected: isAvailable,
         service: 'Google Calendar'
       });
-    } catch (error) {
+    } catch (error: any) {
       res.json({ 
         connected: false,
         service: 'Google Calendar',
@@ -4749,7 +4749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await authorizeProjectAccess(req.params.projectId, req.user.orgId);
       const guests = await storage.getProjectGuests(req.params.projectId);
       res.json(guests);
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch project guests" });
     }
   });
@@ -4766,7 +4766,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const guest = await storage.createCalendarGuest(guestData);
       res.json(guest);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid guest data", details: error.errors });
       } else {
@@ -4781,7 +4781,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updates = req.body;
       const guest = await storage.updateCalendarGuest(req.params.id, updates);
       res.json(guest);
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to update calendar guest" });
     }
   });
@@ -4791,7 +4791,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await authorizeProjectAccess(req.params.projectId, req.user.orgId);
       await storage.deleteCalendarGuest(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to delete calendar guest" });
     }
   });
@@ -4807,7 +4807,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const guest = await storage.updateGuestStatus(req.params.id, status);
       res.json(guest);
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ error: "Failed to update guest status" });
     }
   });
@@ -4919,7 +4919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await authorizeProjectAccess(req.params.projectId, req.user.orgId);
       const documents = await storage.getCddDocumentsForProject(req.params.projectId);
       res.json(documents);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching CDD documents:", error);
       res.status(500).json({ error: "Failed to fetch documents" });
     }
@@ -4935,7 +4935,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       await authorizeProjectAccess(document.projectId, req.user.orgId);
       res.json(document);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching CDD document:", error);
       res.status(500).json({ error: "Failed to fetch document" });
     }
@@ -4973,7 +4973,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting CDD document:", error);
       res.status(500).json({ error: "Failed to delete document" });
     }
@@ -5041,7 +5041,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Document parsing error:", parseError);
         res.status(500).json({ error: parseError.message || "Failed to parse document" });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error triggering document parse:", error);
       res.status(500).json({ error: "Failed to trigger document parsing" });
     }
@@ -5059,7 +5059,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const pages = await storage.getDocPagesForDocument(req.params.documentId);
       res.json(pages);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching document pages:", error);
       res.status(500).json({ error: "Failed to fetch document pages" });
     }
@@ -5139,7 +5139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         res.status(500).json({ error: embeddingError.message || "Failed to generate embeddings" });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error triggering embedding generation:", error);
       res.status(500).json({ error: "Failed to trigger embedding generation" });
     }
@@ -5157,7 +5157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const chunks = await storage.getVectorChunksForDocument(req.params.documentId);
       res.json(chunks);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching vector chunks:", error);
       res.status(500).json({ error: "Failed to fetch vector chunks" });
     }
@@ -5240,7 +5240,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("RAG query error:", ragError);
         res.status(500).json({ error: ragError.message || "Failed to execute RAG query" });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error processing RAG request:", error);
       res.status(500).json({ error: "Failed to process RAG request" });
     }
@@ -5384,7 +5384,7 @@ Current context: Project ${req.params.projectId}`;
           details: chatError.response?.data || null
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error processing chat request:", error);
       res.status(500).json({ error: "Failed to process chat request" });
     }
@@ -5398,7 +5398,7 @@ Current context: Project ${req.params.projectId}`;
       
       const kpis = await storage.getKpisForProject(req.params.projectId);
       res.json(kpis);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching KPIs:", error);
       res.status(500).json({ error: "Failed to fetch KPIs" });
     }
@@ -5425,7 +5425,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(kpi);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating KPI:", error);
       res.status(500).json({ error: "Failed to create KPI" });
     }
@@ -5455,7 +5455,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating KPI:", error);
       res.status(500).json({ error: "Failed to update KPI" });
     }
@@ -5484,7 +5484,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting KPI:", error);
       res.status(500).json({ error: "Failed to delete KPI" });
     }
@@ -5561,7 +5561,7 @@ Current context: Project ${req.params.projectId}`;
         console.error("KPI extraction error:", extractionError);
         res.status(500).json({ error: extractionError.message || "Failed to extract KPIs" });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error triggering KPI extraction:", error);
       res.status(500).json({ error: "Failed to trigger KPI extraction" });
     }
@@ -5581,7 +5581,7 @@ Current context: Project ${req.params.projectId}`;
       
       const findings = await storage.getFindingsForProject(req.params.projectId);
       res.json(findings);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching findings:", error);
       res.status(500).json({ error: "Failed to fetch findings" });
     }
@@ -5603,7 +5603,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(finding);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching finding:", error);
       res.status(500).json({ error: "Failed to fetch finding" });
     }
@@ -5724,7 +5724,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting finding:", error);
       res.status(500).json({ error: "Failed to delete finding" });
     }
@@ -5757,7 +5757,7 @@ Current context: Project ${req.params.projectId}`;
       });
       
       res.json(reports);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching reports:", error);
       res.status(500).json({ error: "Failed to fetch reports" });
     }
@@ -5792,7 +5792,7 @@ Current context: Project ${req.params.projectId}`;
       });
       
       res.json(report);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching report:", error);
       res.status(500).json({ error: "Failed to fetch report" });
     }
@@ -5917,7 +5917,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting report:", error);
       res.status(500).json({ error: "Failed to delete report" });
     }
@@ -5939,7 +5939,7 @@ Current context: Project ${req.params.projectId}`;
       
       const logs = await storage.getAuditLogsForOrg(req.user.orgId, filters);
       res.json(logs);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get audit logs:", error);
       res.status(500).json({ error: "Failed to retrieve audit logs" });
     }
@@ -5982,7 +5982,7 @@ Current context: Project ${req.params.projectId}`;
       });
       
       res.json(workspaces);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get workspaces:', error);
       res.status(500).json({ error: 'Failed to get workspaces' });
     }
@@ -6016,7 +6016,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(workspace);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get workspace:', error);
       res.status(500).json({ error: 'Failed to get workspace' });
     }
@@ -6089,7 +6089,7 @@ Current context: Project ${req.params.projectId}`;
           },
         },
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get workspace overview:', error);
       res.status(500).json({ error: 'Failed to get workspace overview' });
     }
@@ -6112,7 +6112,7 @@ Current context: Project ${req.params.projectId}`;
       const [workspace] = await db.insert(dealWorkspaces).values(validated).returning();
       
       res.status(201).json(workspace);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -6145,7 +6145,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -6176,7 +6176,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true, archived });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to archive workspace:', error);
       res.status(500).json({ error: 'Failed to archive workspace' });
     }
@@ -6211,7 +6211,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to link entities to workspace:', error);
       res.status(500).json({ error: 'Failed to link entities' });
     }
@@ -6250,7 +6250,7 @@ Current context: Project ${req.params.projectId}`;
       }).returning();
       
       res.status(201).json(workspace);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create workspace from deal:', error);
       res.status(500).json({ error: 'Failed to create workspace' });
     }
@@ -6283,7 +6283,7 @@ Current context: Project ${req.params.projectId}`;
       });
       
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get deals:", error);
       res.status(500).json({ error: "Failed to retrieve deals" });
     }
@@ -6293,7 +6293,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const deal = await storage.createCrmDeal({ ...req.body, ownerId: req.user.id });
       res.json(deal);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create deal:", error);
       res.status(500).json({ error: "Failed to create deal" });
     }
@@ -6411,7 +6411,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(deal);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update deal:", error);
       res.status(500).json({ error: "Failed to update deal" });
     }
@@ -6421,7 +6421,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await storage.deleteCrmDeal(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete deal:", error);
       res.status(500).json({ error: "Failed to delete deal" });
     }
@@ -6626,7 +6626,7 @@ Current context: Project ${req.params.projectId}`;
         projectId: project.id,
         message: "Deal successfully converted to DD project"
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to convert deal to project:", error);
       res.status(500).json({ error: "Failed to convert deal to project" });
     }
@@ -6637,7 +6637,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const leads = await storage.getCrmLeadsForOrg(req.user.orgId);
       res.json(leads);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get leads:", error);
       res.status(500).json({ error: "Failed to retrieve leads" });
     }
@@ -6647,7 +6647,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const lead = await storage.createCrmLead({ ...req.body, assignedToId: req.user.id });
       res.json(lead);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create lead:", error);
       res.status(500).json({ error: "Failed to create lead" });
     }
@@ -6657,7 +6657,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const lead = await storage.updateCrmLead(req.params.id, req.body);
       res.json(lead);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update lead:", error);
       res.status(500).json({ error: "Failed to update lead" });
     }
@@ -6667,7 +6667,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await storage.deleteCrmLead(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete lead:", error);
       res.status(500).json({ error: "Failed to delete lead" });
     }
@@ -6698,7 +6698,7 @@ Current context: Project ${req.params.projectId}`;
       });
       
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get contacts:", error);
       res.status(500).json({ error: "Failed to retrieve contacts" });
     }
@@ -6708,7 +6708,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const contact = await storage.createCrmContact({ ...req.body, ownerId: req.user.id });
       res.json(contact);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create contact:", error);
       res.status(500).json({ error: "Failed to create contact" });
     }
@@ -6718,7 +6718,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const contact = await storage.updateCrmContact(req.params.id, req.body);
       res.json(contact);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update contact:", error);
       res.status(500).json({ error: "Failed to update contact" });
     }
@@ -6728,7 +6728,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await storage.deleteCrmContact(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete contact:", error);
       res.status(500).json({ error: "Failed to delete contact" });
     }
@@ -6757,7 +6757,7 @@ Current context: Project ${req.params.projectId}`;
       });
       
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get companies:", error);
       res.status(500).json({ error: "Failed to retrieve companies" });
     }
@@ -6767,7 +6767,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const company = await storage.createCrmCompany({ ...req.body, ownerId: req.user.id });
       res.json(company);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create company:", error);
       res.status(500).json({ error: "Failed to create company" });
     }
@@ -6777,7 +6777,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const company = await storage.updateCrmCompany(req.params.id, req.body);
       res.json(company);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update company:", error);
       res.status(500).json({ error: "Failed to update company" });
     }
@@ -6787,7 +6787,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await storage.deleteCrmCompany(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete company:", error);
       res.status(500).json({ error: "Failed to delete company" });
     }
@@ -6798,7 +6798,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const pendingContacts = await storage.getPendingContactsForOrg(req.user.orgId);
       res.json(pendingContacts);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get pending contacts:", error);
       res.status(500).json({ error: "Failed to retrieve pending contacts" });
     }
@@ -6811,7 +6811,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: "Pending contact not found" });
       }
       res.json(pendingContact);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get pending contact:", error);
       res.status(500).json({ error: "Failed to retrieve pending contact" });
     }
@@ -6825,7 +6825,7 @@ Current context: Project ${req.params.projectId}`;
       }
       const contact = await storage.acceptPendingContact(req.params.id, req.user.id, mode);
       res.json(contact);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to accept pending contact:", error);
       res.status(500).json({ error: "Failed to accept pending contact" });
     }
@@ -6835,7 +6835,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await storage.rejectPendingContact(req.params.id, req.user.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to reject pending contact:", error);
       res.status(500).json({ error: "Failed to reject pending contact" });
     }
@@ -6846,7 +6846,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const pendingCompanies = await storage.getPendingCompaniesForOrg(req.user.orgId);
       res.json(pendingCompanies);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get pending companies:", error);
       res.status(500).json({ error: "Failed to retrieve pending companies" });
     }
@@ -6859,7 +6859,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: "Pending company not found" });
       }
       res.json(pendingCompany);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get pending company:", error);
       res.status(500).json({ error: "Failed to retrieve pending company" });
     }
@@ -6873,7 +6873,7 @@ Current context: Project ${req.params.projectId}`;
       }
       const company = await storage.acceptPendingCompany(req.params.id, req.user.id, mode);
       res.json(company);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to accept pending company:", error);
       res.status(500).json({ error: "Failed to accept pending company" });
     }
@@ -6883,7 +6883,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await storage.rejectPendingCompany(req.params.id, req.user.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to reject pending company:", error);
       res.status(500).json({ error: "Failed to reject pending company" });
     }
@@ -6894,7 +6894,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const pendingProperties = await storage.getPendingProperties(req.user.orgId, 'pending');
       res.json(pendingProperties);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get pending properties:", error);
       res.status(500).json({ error: "Failed to retrieve pending properties" });
     }
@@ -6907,7 +6907,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: "Pending property not found" });
       }
       res.json(pendingProperty);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get pending property:", error);
       res.status(500).json({ error: "Failed to retrieve pending property" });
     }
@@ -6921,7 +6921,7 @@ Current context: Project ${req.params.projectId}`;
       }
       const property = await storage.acceptPendingProperty(req.params.id, req.user.id, mode);
       res.json(property);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to accept pending property:", error);
       res.status(500).json({ error: "Failed to accept pending property" });
     }
@@ -6931,7 +6931,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await storage.rejectPendingProperty(req.params.id, req.user.orgId, req.user.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to reject pending property:", error);
       res.status(500).json({ error: "Failed to reject pending property" });
     }
@@ -6960,7 +6960,7 @@ Current context: Project ${req.params.projectId}`;
       
       const lists = await query.orderBy(desc(crmLists.updatedAt));
       res.json(lists);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get CRM lists:", error);
       res.status(500).json({ error: "Failed to retrieve lists" });
     }
@@ -6986,7 +6986,7 @@ Current context: Project ${req.params.projectId}`;
         .where(eq(crmListMembers.listId, listId));
       
       res.json({ ...list, members });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get CRM list:", error);
       res.status(500).json({ error: "Failed to retrieve list" });
     }
@@ -7008,7 +7008,7 @@ Current context: Project ${req.params.projectId}`;
       
       const [newList] = await db.insert(crmLists).values(validated).returning();
       res.status(201).json(newList);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -7038,7 +7038,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -7065,7 +7065,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete CRM list:", error);
       res.status(500).json({ error: "Failed to delete list" });
     }
@@ -7107,7 +7107,7 @@ Current context: Project ${req.params.projectId}`;
       }));
       
       res.json({ added: newMembers.filter(Boolean).length });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to add list members:", error);
       res.status(500).json({ error: "Failed to add members to list" });
     }
@@ -7134,7 +7134,7 @@ Current context: Project ${req.params.projectId}`;
         .where(and(eq(crmListMembers.listId, listId), eq(crmListMembers.entityId, entityId)));
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to remove list member:", error);
       res.status(500).json({ error: "Failed to remove member from list" });
     }
@@ -7145,7 +7145,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const pipelines = await storage.getCrmPipelinesForOrg(req.user.orgId);
       res.json(pipelines);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get pipelines:", error);
       res.status(500).json({ error: "Failed to retrieve pipelines" });
     }
@@ -7155,7 +7155,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const pipeline = await storage.createCrmPipeline({ ...req.body, ownerId: req.user.id });
       res.json(pipeline);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create pipeline:", error);
       res.status(500).json({ error: "Failed to create pipeline" });
     }
@@ -7165,7 +7165,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const pipeline = await storage.updateCrmPipeline(req.params.id, req.body);
       res.json(pipeline);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update pipeline:", error);
       res.status(500).json({ error: "Failed to update pipeline" });
     }
@@ -7175,7 +7175,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await storage.deleteCrmPipeline(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete pipeline:", error);
       res.status(500).json({ error: "Failed to delete pipeline" });
     }
@@ -7186,7 +7186,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const stages = await storage.getAllCrmPipelineStages(req.user.orgId);
       res.json(stages);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get all pipeline stages:", error);
       res.status(500).json({ error: "Failed to retrieve pipeline stages" });
     }
@@ -7196,7 +7196,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const stages = await storage.getCrmPipelineStagesByPipeline(req.params.pipelineId);
       res.json(stages);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get pipeline stages:", error);
       res.status(500).json({ error: "Failed to retrieve pipeline stages" });
     }
@@ -7206,7 +7206,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const stage = await storage.createCrmPipelineStage(req.body);
       res.json(stage);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create pipeline stage:", error);
       res.status(500).json({ error: "Failed to create pipeline stage" });
     }
@@ -7216,7 +7216,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const stage = await storage.updateCrmPipelineStage(req.params.id, req.body);
       res.json(stage);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update pipeline stage:", error);
       res.status(500).json({ error: "Failed to update pipeline stage" });
     }
@@ -7226,7 +7226,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await storage.deleteCrmPipelineStage(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete pipeline stage:", error);
       res.status(500).json({ error: "Failed to delete pipeline stage" });
     }
@@ -7237,7 +7237,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const activities = await storage.getCrmActivitiesForOrg(req.user.id);
       res.json(activities);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get activities:", error);
       res.status(500).json({ error: "Failed to retrieve activities" });
     }
@@ -7247,7 +7247,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const activity = await storage.createCrmActivity({ ...req.body, userId: req.user.id });
       res.json(activity);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create activity:", error);
       res.status(500).json({ error: "Failed to create activity" });
     }
@@ -7257,7 +7257,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const activity = await storage.updateCrmActivity(req.params.id, req.body);
       res.json(activity);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update activity:", error);
       res.status(500).json({ error: "Failed to update activity" });
     }
@@ -7267,7 +7267,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await storage.deleteCrmActivity(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete activity:", error);
       res.status(500).json({ error: "Failed to delete activity" });
     }
@@ -7281,7 +7281,7 @@ Current context: Project ${req.params.projectId}`;
         orderBy: [desc(crmTasks.createdAt)],
       });
       res.json(tasks);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get tasks:", error);
       res.status(500).json({ error: "Failed to retrieve tasks" });
     }
@@ -7295,7 +7295,7 @@ Current context: Project ${req.params.projectId}`;
       });
       const [task] = await db.insert(crmTasks).values(taskData).returning();
       res.json(task);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create task:", error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Invalid task data", details: error.errors });
@@ -7329,7 +7329,7 @@ Current context: Project ${req.params.projectId}`;
         .where(eq(crmTasks.id, req.params.id))
         .returning();
       res.json(task);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update task:", error);
       // Return 400 for validation errors, 500 for other errors
       if (error instanceof z.ZodError) {
@@ -7356,7 +7356,7 @@ Current context: Project ${req.params.projectId}`;
 
       await db.delete(crmTasks).where(eq(crmTasks.id, req.params.id));
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete task:", error);
       res.status(500).json({ error: "Failed to delete task" });
     }
@@ -7462,7 +7462,7 @@ Current context: Project ${req.params.projectId}`;
 
       const [file] = await db.insert(crmFiles).values(fileData).returning();
       res.json(file);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error uploading CRM file:", error);
       // Clean up file if database insert failed
       if (req.file) {
@@ -7513,7 +7513,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(files);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to retrieve files:", error);
       res.status(500).json({ error: "Failed to retrieve files" });
     }
@@ -7562,7 +7562,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.download(filePath, file.name);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to download file:", error);
       res.status(500).json({ error: "Failed to download file" });
     }
@@ -7612,7 +7612,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete file:", error);
       res.status(500).json({ error: "Failed to delete file" });
     }
@@ -7745,7 +7745,7 @@ Current context: Project ${req.params.projectId}`;
           total: timelineItems.length,
         },
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get unified timeline:", error);
       res.status(500).json({ error: "Failed to retrieve timeline" });
     }
@@ -7861,7 +7861,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(stats);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get relationship stats:", error);
       res.status(500).json({ error: "Failed to retrieve stats" });
     }
@@ -7944,7 +7944,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(importJob);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get import job:", error);
       res.status(500).json({ error: "Failed to retrieve import job" });
     }
@@ -7955,7 +7955,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const importJobs = await storage.getImportJobsForOrg(req.user.id);
       res.json(importJobs);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get import jobs:", error);
       res.status(500).json({ error: "Failed to retrieve import jobs" });
     }
@@ -8268,7 +8268,7 @@ Current context: Project ${req.params.projectId}`;
         if (record.wasNew && record.recordType === 'contact') {
           try {
             await storage.deleteCrmContact(record.recordId);
-          } catch (error) {
+          } catch (error: any) {
             console.error(`Failed to delete contact ${record.recordId}:`, error);
           }
         }
@@ -8301,7 +8301,7 @@ Current context: Project ${req.params.projectId}`;
       const year = req.query.year ? parseInt(req.query.year) : undefined;
       const entries = await storage.getProspectingEntriesForUser(req.user.id, year);
       res.json(entries);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get prospecting entries:", error);
       res.status(500).json({ error: "Failed to retrieve prospecting entries" });
     }
@@ -8365,7 +8365,7 @@ Current context: Project ${req.params.projectId}`;
           weekNumber: previousWeekEntry.weekNumber,
         } : null,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get prospecting dashboard stats:", error);
       res.status(500).json({ error: "Failed to retrieve dashboard stats" });
     }
@@ -8385,7 +8385,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(entry);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get prospecting entry:", error);
       res.status(500).json({ error: "Failed to retrieve prospecting entry" });
     }
@@ -8511,7 +8511,7 @@ Current context: Project ${req.params.projectId}`;
       
       await storage.deleteProspectingEntry(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete prospecting entry:", error);
       res.status(500).json({ error: "Failed to delete prospecting entry" });
     }
@@ -8536,7 +8536,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(settings);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get prospecting settings:", error);
       res.status(500).json({ error: "Failed to retrieve prospecting settings" });
     }
@@ -8581,7 +8581,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const templates = await storage.getProspectingGoalTemplates(req.user.id);
       res.json(templates);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get goal templates:", error);
       res.status(500).json({ error: "Failed to retrieve goal templates" });
     }
@@ -8650,7 +8650,7 @@ Current context: Project ${req.params.projectId}`;
       
       await storage.deleteProspectingGoalTemplate(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete goal template:", error);
       res.status(500).json({ error: "Failed to delete goal template" });
     }
@@ -8666,7 +8666,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const leads = await storage.getCrmLeadsForOrg(req.user.orgId);
       res.json(leads);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get leads:", error);
       res.status(500).json({ error: "Failed to retrieve leads" });
     }
@@ -8675,7 +8675,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const lead = await storage.createCrmLead({ ...req.body, assignedToId: req.user.id });
       res.json(lead);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create lead:", error);
       res.status(500).json({ error: "Failed to create lead" });
     }
@@ -8684,7 +8684,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const lead = await storage.updateCrmLead(req.params.id, req.body);
       res.json(lead);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update lead:", error);
       res.status(500).json({ error: "Failed to update lead" });
     }
@@ -8693,7 +8693,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await storage.deleteCrmLead(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete lead:", error);
       res.status(500).json({ error: "Failed to delete lead" });
     }
@@ -8704,7 +8704,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const deals = await storage.getCrmDealsForOrg(req.user.orgId);
       res.json(deals);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get deals:", error);
       res.status(500).json({ error: "Failed to retrieve deals" });
     }
@@ -8713,7 +8713,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const deal = await storage.createCrmDeal({ ...req.body, ownerId: req.user.id });
       res.json(deal);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create deal:", error);
       res.status(500).json({ error: "Failed to create deal" });
     }
@@ -8725,7 +8725,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: "Deal not found" });
       }
       res.json(deal);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get deal:", error);
       res.status(500).json({ error: "Failed to retrieve deal" });
     }
@@ -8745,7 +8745,7 @@ Current context: Project ${req.params.projectId}`;
       
       const deal = await storage.updateCrmDeal(req.params.id, updateData);
       res.json(deal);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update deal:", error);
       res.status(500).json({ error: "Failed to update deal" });
     }
@@ -8754,7 +8754,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await storage.deleteCrmDeal(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete deal:", error);
       res.status(500).json({ error: "Failed to delete deal" });
     }
@@ -8770,7 +8770,7 @@ Current context: Project ${req.params.projectId}`;
       
       await Promise.all(ids.map(id => storage.deleteCrmDeal(id)));
       res.json({ success: true, deleted: ids.length });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to bulk delete deals:", error);
       res.status(500).json({ error: "Failed to bulk delete deals" });
     }
@@ -8781,7 +8781,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const contacts = await storage.getDealContacts(req.params.dealId);
       res.json(contacts);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get deal contacts:", error);
       res.status(500).json({ error: "Failed to retrieve deal contacts" });
     }
@@ -8795,7 +8795,7 @@ Current context: Project ${req.params.projectId}`;
       }
       const result = await storage.addContactToDeal(req.params.dealId, contactId, role, isPrimary, notes);
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to add contact to deal:", error);
       res.status(500).json({ error: "Failed to add contact to deal" });
     }
@@ -8806,7 +8806,7 @@ Current context: Project ${req.params.projectId}`;
       const { role, isPrimary, notes } = req.body;
       const result = await storage.updateDealContact(req.params.linkId, { role, isPrimary, notes });
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update deal contact:", error);
       res.status(500).json({ error: "Failed to update deal contact" });
     }
@@ -8816,7 +8816,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await storage.removeContactFromDeal(req.params.linkId);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to remove contact from deal:", error);
       res.status(500).json({ error: "Failed to remove contact from deal" });
     }
@@ -8827,7 +8827,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const companies = await storage.getDealCompanies(req.params.dealId);
       res.json(companies);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get deal companies:", error);
       res.status(500).json({ error: "Failed to retrieve deal companies" });
     }
@@ -8841,7 +8841,7 @@ Current context: Project ${req.params.projectId}`;
       }
       const result = await storage.addCompanyToDeal(req.params.dealId, companyId, role, isPrimary, notes);
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to add company to deal:", error);
       res.status(500).json({ error: "Failed to add company to deal" });
     }
@@ -8852,7 +8852,7 @@ Current context: Project ${req.params.projectId}`;
       const { role, isPrimary, notes } = req.body;
       const result = await storage.updateDealCompany(req.params.linkId, { role, isPrimary, notes });
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update deal company:", error);
       res.status(500).json({ error: "Failed to update deal company" });
     }
@@ -8862,7 +8862,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await storage.removeCompanyFromDeal(req.params.linkId);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to remove company from deal:", error);
       res.status(500).json({ error: "Failed to remove company from deal" });
     }
@@ -8914,7 +8914,7 @@ Current context: Project ${req.params.projectId}`;
         tasksCreated: createdTasks.length,
         tasks: createdTasks
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to apply stage templates:", error);
       res.status(500).json({ error: "Failed to apply stage templates" });
     }
@@ -8936,7 +8936,7 @@ Current context: Project ${req.params.projectId}`;
         slaWarningDays: (stage as any).slaWarningDays,
         slaMaxDays: (stage as any).slaMaxDays,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get stage templates:", error);
       res.status(500).json({ error: "Failed to retrieve stage templates" });
     }
@@ -8962,7 +8962,7 @@ Current context: Project ${req.params.projectId}`;
         slaWarningDays: (stage as any).slaWarningDays,
         slaMaxDays: (stage as any).slaMaxDays,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update stage templates:", error);
       res.status(500).json({ error: "Failed to update stage templates" });
     }
@@ -9000,7 +9000,7 @@ Current context: Project ${req.params.projectId}`;
         const contacts = await storage.getCrmContactsForOrg(req.user.orgId);
         res.json(contacts);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get contacts:", error);
       res.status(500).json({ error: "Failed to retrieve contacts" });
     }
@@ -9009,7 +9009,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const contact = await storage.createCrmContact({ ...req.body, ownerId: req.user.id });
       res.json(contact);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create contact:", error);
       res.status(500).json({ error: "Failed to create contact" });
     }
@@ -9018,7 +9018,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const contact = await storage.updateCrmContact(req.params.id, req.body);
       res.json(contact);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update contact:", error);
       res.status(500).json({ error: "Failed to update contact" });
     }
@@ -9027,7 +9027,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await storage.deleteCrmContact(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete contact:", error);
       res.status(500).json({ error: "Failed to delete contact" });
     }
@@ -9043,7 +9043,7 @@ Current context: Project ${req.params.projectId}`;
       
       await Promise.all(ids.map(id => storage.deleteCrmContact(id)));
       res.json({ success: true, deleted: ids.length });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to bulk delete contacts:", error);
       res.status(500).json({ error: "Failed to bulk delete contacts" });
     }
@@ -9054,7 +9054,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const companies = await storage.getCrmCompaniesForOrg(req.user.orgId);
       res.json(companies);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get companies:", error);
       res.status(500).json({ error: "Failed to retrieve companies" });
     }
@@ -9063,7 +9063,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const company = await storage.createCrmCompany({ ...req.body, ownerId: req.user.id });
       res.json(company);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create company:", error);
       res.status(500).json({ error: "Failed to create company" });
     }
@@ -9072,7 +9072,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const company = await storage.updateCrmCompany(req.params.id, req.body);
       res.json(company);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update company:", error);
       res.status(500).json({ error: "Failed to update company" });
     }
@@ -9081,7 +9081,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await storage.deleteCrmCompany(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete company:", error);
       res.status(500).json({ error: "Failed to delete company" });
     }
@@ -9097,7 +9097,7 @@ Current context: Project ${req.params.projectId}`;
       
       await Promise.all(ids.map(id => storage.deleteCrmCompany(id)));
       res.json({ success: true, deleted: ids.length });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to bulk delete companies:", error);
       res.status(500).json({ error: "Failed to bulk delete companies" });
     }
@@ -9108,7 +9108,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const properties = await storage.getCrmPropertiesForOrg(req.user.orgId);
       res.json(properties);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get properties:", error);
       res.status(500).json({ error: "Failed to retrieve properties" });
     }
@@ -9120,7 +9120,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: "Property not found" });
       }
       res.json(property);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get property:", error);
       res.status(500).json({ error: "Failed to retrieve property" });
     }
@@ -9129,7 +9129,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const property = await storage.createCrmProperty({ ...req.body, ownerId: req.user.id });
       res.json(property);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create property:", error);
       res.status(500).json({ error: "Failed to create property" });
     }
@@ -9138,7 +9138,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const property = await storage.updateCrmProperty(req.params.id, req.body);
       res.json(property);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update property:", error);
       res.status(500).json({ error: "Failed to update property" });
     }
@@ -9147,7 +9147,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await storage.deleteCrmProperty(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete property:", error);
       res.status(500).json({ error: "Failed to delete property" });
     }
@@ -9158,7 +9158,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const property = await storage.updateCrmProperty(req.params.id, req.body);
       res.json(property);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update property:", error);
       res.status(500).json({ error: "Failed to update property" });
     }
@@ -9220,7 +9220,7 @@ Current context: Project ${req.params.projectId}`;
       });
       
       res.json(formattedResults);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to search properties:", error);
       res.status(500).json({ error: "Failed to search properties" });
     }
@@ -9302,7 +9302,7 @@ Current context: Project ${req.params.projectId}`;
       };
       
       res.json(rateCompData);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get property for rate comp:", error);
       res.status(500).json({ error: "Failed to get property details" });
     }
@@ -9313,7 +9313,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const links = await storage.getPropertyContacts(req.params.id);
       res.json(links);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get property contacts:", error);
       res.status(500).json({ error: "Failed to retrieve property contacts" });
     }
@@ -9327,7 +9327,7 @@ Current context: Project ${req.params.projectId}`;
       }
       const link = await storage.linkPropertyToContact(req.params.id, contactId, relationship, notes);
       res.json(link);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to link property to contact:", error);
       res.status(500).json({ error: "Failed to link property to contact" });
     }
@@ -9337,7 +9337,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await storage.unlinkPropertyFromContact(req.params.linkId);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to unlink property from contact:", error);
       res.status(500).json({ error: "Failed to unlink property from contact" });
     }
@@ -9348,7 +9348,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const links = await storage.getPropertyCompanies(req.params.id);
       res.json(links);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get property companies:", error);
       res.status(500).json({ error: "Failed to retrieve property companies" });
     }
@@ -9362,7 +9362,7 @@ Current context: Project ${req.params.projectId}`;
       }
       const link = await storage.linkPropertyToCompany(req.params.id, companyId, relationship, notes);
       res.json(link);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to link property to company:", error);
       res.status(500).json({ error: "Failed to link property to company" });
     }
@@ -9372,7 +9372,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await storage.unlinkPropertyFromCompany(req.params.linkId);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to unlink property from company:", error);
       res.status(500).json({ error: "Failed to unlink property from company" });
     }
@@ -9383,7 +9383,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const links = await storage.getContactCompanies(req.params.id);
       res.json(links);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get contact companies:", error);
       res.status(500).json({ error: "Failed to retrieve contact companies" });
     }
@@ -9394,7 +9394,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const links = await storage.getContactProperties(req.params.id);
       res.json(links);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get contact properties:", error);
       res.status(500).json({ error: "Failed to retrieve contact properties" });
     }
@@ -9404,7 +9404,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await storage.unlinkContactFromProperty(req.params.linkId);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to unlink contact from property:", error);
       res.status(500).json({ error: "Failed to unlink contact from property" });
     }
@@ -9415,7 +9415,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const links = await storage.getCompanyContacts(req.params.id);
       res.json(links);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get company contacts:", error);
       res.status(500).json({ error: "Failed to retrieve company contacts" });
     }
@@ -9426,7 +9426,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const links = await storage.getCompanyProperties(req.params.id);
       res.json(links);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get company properties:", error);
       res.status(500).json({ error: "Failed to retrieve company properties" });
     }
@@ -9436,7 +9436,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await storage.unlinkCompanyFromProperty(req.params.linkId);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to unlink company from property:", error);
       res.status(500).json({ error: "Failed to unlink company from property" });
     }
@@ -9562,7 +9562,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json({ matches: matchesWithConfidence, property });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get property sales history:", error);
       res.status(500).json({ error: "Failed to retrieve sales history" });
     }
@@ -9633,7 +9633,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json({ matches: matchesWithConfidence, property });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get property rate history:", error);
       res.status(500).json({ error: "Failed to retrieve rate history" });
     }
@@ -9690,7 +9690,7 @@ Current context: Project ${req.params.projectId}`;
           marinaName: pc.marina
         }))
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get property portfolio status:", error);
       res.status(500).json({ error: "Failed to retrieve portfolio status" });
     }
@@ -9706,7 +9706,7 @@ Current context: Project ${req.params.projectId}`;
       
       await Promise.all(ids.map(id => storage.deleteCrmProperty(id)));
       res.json({ success: true, deleted: ids.length });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to bulk delete properties:", error);
       res.status(500).json({ error: "Failed to bulk delete properties" });
     }
@@ -9717,7 +9717,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const pipelines = await storage.getCrmPipelinesForOrg(req.user.orgId);
       res.json(pipelines);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get pipelines:", error);
       res.status(500).json({ error: "Failed to retrieve pipelines" });
     }
@@ -9726,7 +9726,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const pipeline = await storage.createCrmPipeline({ ...req.body, orgId: req.user.orgId });
       res.json(pipeline);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create pipeline:", error);
       res.status(500).json({ error: "Failed to create pipeline" });
     }
@@ -9735,7 +9735,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const pipeline = await storage.updateCrmPipeline(req.params.id, req.body);
       res.json(pipeline);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update pipeline:", error);
       res.status(500).json({ error: "Failed to update pipeline" });
     }
@@ -9744,7 +9744,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await storage.deleteCrmPipeline(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete pipeline:", error);
       res.status(500).json({ error: "Failed to delete pipeline" });
     }
@@ -9753,7 +9753,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const stages = await storage.getCrmStagesForPipeline(req.params.pipelineId);
       res.json(stages);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get pipeline stages:", error);
       res.status(500).json({ error: "Failed to retrieve pipeline stages" });
     }
@@ -9764,7 +9764,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const stages = await storage.getAllCrmPipelineStages(req.user.orgId);
       res.json(stages);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get stages:", error);
       res.status(500).json({ error: "Failed to retrieve stages" });
     }
@@ -9773,7 +9773,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const stage = await storage.createCrmStage(req.body);
       res.json(stage);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create stage:", error);
       res.status(500).json({ error: "Failed to create stage" });
     }
@@ -9782,7 +9782,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const stage = await storage.updateCrmStage(req.params.id, req.body);
       res.json(stage);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update stage:", error);
       res.status(500).json({ error: "Failed to update stage" });
     }
@@ -9791,7 +9791,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await storage.deleteCrmStage(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete stage:", error);
       res.status(500).json({ error: "Failed to delete stage" });
     }
@@ -9800,7 +9800,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const stages = await storage.getAllCrmPipelineStages(req.user.orgId);
       res.json(stages);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get stages:", error);
       res.status(500).json({ error: "Failed to retrieve stages" });
     }
@@ -9809,7 +9809,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const stage = await storage.createCrmStage(req.body);
       res.json(stage);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create stage:", error);
       res.status(500).json({ error: "Failed to create stage" });
     }
@@ -9818,7 +9818,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const stage = await storage.updateCrmStage(req.params.id, req.body);
       res.json(stage);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update stage:", error);
       res.status(500).json({ error: "Failed to update stage" });
     }
@@ -9827,7 +9827,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await storage.deleteCrmStage(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete stage:", error);
       res.status(500).json({ error: "Failed to delete stage" });
     }
@@ -9896,7 +9896,7 @@ Current context: Project ${req.params.projectId}`;
         message: `Created ${createdStages.length} CRE pipeline stages`,
         stages: createdStages 
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to seed CRE stages:", error);
       res.status(500).json({ error: "Failed to seed CRE stages" });
     }
@@ -9907,7 +9907,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const activities = await storage.getCrmActivitiesForOrg(req.user.id);
       res.json(activities);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get activities:", error);
       res.status(500).json({ error: "Failed to retrieve activities" });
     }
@@ -9916,7 +9916,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const activity = await storage.createCrmActivity({ ...req.body, userId: req.user.id });
       res.json(activity);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create activity:", error);
       res.status(500).json({ error: "Failed to create activity" });
     }
@@ -9925,7 +9925,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const activity = await storage.updateCrmActivity(req.params.id, req.body);
       res.json(activity);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update activity:", error);
       res.status(500).json({ error: "Failed to update activity" });
     }
@@ -9934,7 +9934,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await storage.deleteCrmActivity(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete activity:", error);
       res.status(500).json({ error: "Failed to delete activity" });
     }
@@ -10113,7 +10113,7 @@ Current context: Project ${req.params.projectId}`;
       ];
 
       res.json({ results, query });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Global search failed:", error);
       res.status(500).json({ error: "Search failed", results: [] });
     }
@@ -10128,7 +10128,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const sequences = await storage.getEmailSequencesForUser(req.user.id);
       res.json(sequences);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get email sequences:", error);
       res.status(500).json({ error: "Failed to retrieve email sequences" });
     }
@@ -10147,7 +10147,7 @@ Current context: Project ${req.params.projectId}`;
       
       const steps = await storage.getEmailSequenceStepsBySequence(req.params.id);
       res.json({ ...sequence, steps });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get email sequence:", error);
       res.status(500).json({ error: "Failed to retrieve email sequence" });
     }
@@ -10164,7 +10164,7 @@ Current context: Project ${req.params.projectId}`;
       
       const sequence = await storage.createEmailSequence(validated);
       res.status(201).json(sequence);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create email sequence:", error);
       res.status(500).json({ error: "Failed to create email sequence" });
     }
@@ -10207,7 +10207,7 @@ Current context: Project ${req.params.projectId}`;
 
       await storage.deleteEmailSequence(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete email sequence:", error);
       res.status(500).json({ error: "Failed to delete email sequence" });
     }
@@ -10226,7 +10226,7 @@ Current context: Project ${req.params.projectId}`;
       
       const steps = await storage.getEmailSequenceStepsBySequence(req.params.sequenceId);
       res.json(steps);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get sequence steps:", error);
       res.status(500).json({ error: "Failed to retrieve sequence steps" });
     }
@@ -10250,7 +10250,7 @@ Current context: Project ${req.params.projectId}`;
       
       const step = await storage.createEmailSequenceStep(validated);
       res.status(201).json(step);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create sequence step:", error);
       res.status(500).json({ error: "Failed to create sequence step" });
     }
@@ -10295,7 +10295,7 @@ Current context: Project ${req.params.projectId}`;
 
       await storage.deleteEmailSequenceStep(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete sequence step:", error);
       res.status(500).json({ error: "Failed to delete sequence step" });
     }
@@ -10306,7 +10306,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const templates = await storage.getEmailTemplatesForUser(req.user.id);
       res.json(templates);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get email templates:", error);
       res.status(500).json({ error: "Failed to retrieve email templates" });
     }
@@ -10319,7 +10319,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: "Email template not found" });
       }
       res.json(template);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get email template:", error);
       res.status(500).json({ error: "Failed to retrieve email template" });
     }
@@ -10335,7 +10335,7 @@ Current context: Project ${req.params.projectId}`;
       
       const template = await storage.createEmailTemplate(validated);
       res.status(201).json(template);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create email template:", error);
       res.status(500).json({ error: "Failed to create email template" });
     }
@@ -10376,7 +10376,7 @@ Current context: Project ${req.params.projectId}`;
 
       await storage.deleteEmailTemplate(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete email template:", error);
       res.status(500).json({ error: "Failed to delete email template" });
     }
@@ -10387,7 +10387,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const enrollments = await storage.getEmailSequenceEnrollmentsForUser(req.user.id);
       res.json(enrollments);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get enrollments:", error);
       res.status(500).json({ error: "Failed to retrieve enrollments" });
     }
@@ -10405,7 +10405,7 @@ Current context: Project ${req.params.projectId}`;
 
       const enrollments = await storage.getEmailSequenceEnrollmentsBySequence(req.params.sequenceId);
       res.json(enrollments);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get enrollments:", error);
       res.status(500).json({ error: "Failed to retrieve enrollments" });
     }
@@ -10421,7 +10421,7 @@ Current context: Project ${req.params.projectId}`;
       
       const enrollment = await storage.createEmailSequenceEnrollment(validated);
       res.status(201).json(enrollment);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create enrollment:", error);
       res.status(500).json({ error: "Failed to create enrollment" });
     }
@@ -10469,7 +10469,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(settings);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get calendar settings:", error);
       res.status(500).json({ error: "Failed to get calendar settings" });
     }
@@ -10513,7 +10513,7 @@ Current context: Project ${req.params.projectId}`;
 
       const isConnected = await CalendarService.isConnected();
       res.json({ connected: isConnected });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to check calendar status:", error);
       res.json({ connected: false });
     }
@@ -10579,7 +10579,7 @@ Current context: Project ${req.params.projectId}`;
         calendarEventId: createdEvent.id,
         eventLink: createdEvent.htmlLink 
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to sync activity to calendar:", error);
       res.status(500).json({ error: "Failed to sync activity to calendar" });
     }
@@ -10620,7 +10620,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to remove activity from calendar:", error);
       res.status(500).json({ error: "Failed to remove activity from calendar" });
     }
@@ -10679,7 +10679,7 @@ Current context: Project ${req.params.projectId}`;
         calendarEventId: createdEvent.id,
         eventLink: createdEvent.htmlLink 
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to sync task to calendar:", error);
       res.status(500).json({ error: "Failed to sync task to calendar" });
     }
@@ -10721,7 +10721,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to remove task from calendar:", error);
       res.status(500).json({ error: "Failed to remove task from calendar" });
     }
@@ -10741,7 +10741,7 @@ Current context: Project ${req.params.projectId}`;
 
       const calendars = await CalendarService.getCalendars();
       res.json(calendars);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get calendars:", error);
       res.status(500).json({ error: "Failed to get calendars" });
     }
@@ -10771,7 +10771,7 @@ Current context: Project ${req.params.projectId}`;
       res.setHeader('Content-Type', 'text/calendar');
       res.setHeader('Content-Disposition', 'attachment; filename="activities.ics"');
       res.send(icsContent);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to export activities:", error);
       res.status(500).json({ error: "Failed to export activities" });
     }
@@ -10804,7 +10804,7 @@ Current context: Project ${req.params.projectId}`;
       res.setHeader('Content-Type', 'text/calendar');
       res.setHeader('Content-Disposition', 'attachment; filename="tasks.ics"');
       res.send(icsContent);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to export tasks:", error);
       res.status(500).json({ error: "Failed to export tasks" });
     }
@@ -10836,7 +10836,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json({ comps, total, page: filters.page, pageSize: filters.pageSize });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching comps:", error);
       res.status(500).json({ message: "Failed to fetch comps" });
     }
@@ -10847,7 +10847,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const ids = await storage.getAllCompIds(orgId);
       res.json({ ids });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error getting comp IDs:', error);
       res.status(500).json({ message: "Internal server error" });
     }
@@ -10859,7 +10859,7 @@ Current context: Project ${req.params.projectId}`;
       const { column } = req.params;
       const values = await storage.getColumnUniqueValues(orgId, column);
       res.json({ values });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error getting column values:', error);
       res.status(500).json({ message: "Internal server error" });
     }
@@ -10871,7 +10871,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const types = await storage.getScCustomStorageTypes(orgId);
       res.json(types);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching custom storage types:", error);
       res.status(500).json({ message: "Failed to fetch custom storage types" });
     }
@@ -10900,7 +10900,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.status(201).json(type);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating custom storage type:", error);
       res.status(500).json({ message: "Failed to create custom storage type" });
     }
@@ -10914,7 +10914,7 @@ Current context: Project ${req.params.projectId}`;
       if (!success) return res.status(404).json({ message: "Storage type not found" });
 
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting custom storage type:", error);
       res.status(500).json({ message: "Failed to delete custom storage type" });
     }
@@ -10926,7 +10926,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const columns = await storage.getCompColumns(orgId);
       res.json(columns);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching custom columns:", error);
       res.status(500).json({ message: "Failed to fetch custom columns" });
     }
@@ -10959,7 +10959,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.status(201).json(column);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating custom column:", error);
       res.status(500).json({ message: "Failed to create custom column" });
     }
@@ -10973,7 +10973,7 @@ Current context: Project ${req.params.projectId}`;
       if (!success) return res.status(404).json({ message: "Column not found" });
 
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting custom column:", error);
       res.status(500).json({ message: "Failed to delete custom column" });
     }
@@ -10986,7 +10986,7 @@ Current context: Project ${req.params.projectId}`;
       const status = req.query.status as string | undefined;
       const profiles = await storage.getPendingPropertyProfiles(orgId, status);
       res.json(profiles);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching pending property profiles:", error);
       res.status(500).json({ message: "Failed to fetch pending property profiles" });
     }
@@ -11008,7 +11008,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.status(201).json(profile);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating pending property profile:", error);
       res.status(500).json({ message: "Failed to create pending property profile" });
     }
@@ -11028,7 +11028,7 @@ Current context: Project ${req.params.projectId}`;
       
       const updated = await storage.updatePendingPropertyProfile(req.params.id, { status });
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating pending property profile:", error);
       res.status(500).json({ message: "Failed to update pending property profile" });
     }
@@ -11048,7 +11048,7 @@ Current context: Project ${req.params.projectId}`;
       const success = await storage.deletePendingPropertyProfile(req.params.id);
       if (!success) return res.status(404).json({ message: "Pending property profile not found" });
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting pending property profile:", error);
       res.status(500).json({ message: "Failed to delete pending property profile" });
     }
@@ -11060,7 +11060,7 @@ Current context: Project ${req.params.projectId}`;
       const comp = await storage.getComp(req.params.id, orgId);
       if (!comp) return res.status(404).json({ message: "Comp not found" });
       res.json(comp);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching comp:", error);
       res.status(500).json({ message: "Failed to fetch comp" });
     }
@@ -11118,7 +11118,7 @@ Current context: Project ${req.params.projectId}`;
           if (propertyId) {
             await storage.updateComp(comp.id, { propertyId }, orgId);
           }
-        } catch (error) {
+        } catch (error: any) {
           failed++;
           console.error(`❌ Failed to process comp ${comp.id}:`, error);
         }
@@ -11133,7 +11133,7 @@ Current context: Project ${req.params.projectId}`;
       
       
       res.json(summary);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error during property backfill:", error);
       res.status(500).json({ message: "Failed to backfill properties" });
     }
@@ -11215,7 +11215,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.status(201).json(comp);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating comp:", error);
       res.status(500).json({ message: "Failed to create comp" });
     }
@@ -11289,7 +11289,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(comp);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating comp:", error);
       res.status(500).json({ message: "Failed to update comp" });
     }
@@ -11304,7 +11304,7 @@ Current context: Project ${req.params.projectId}`;
       if (!success) return res.status(404).json({ message: "Comp not found" });
 
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting comp:", error);
       res.status(500).json({ message: "Failed to delete comp" });
     }
@@ -11323,7 +11323,7 @@ Current context: Project ${req.params.projectId}`;
 
       const duplicatedComp = await compService.duplicateComp(id, orgId, userId);
       res.status(201).json(duplicatedComp);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error duplicating comp:", error);
       res.status(500).json({ message: "Failed to duplicate comp" });
     }
@@ -11338,7 +11338,7 @@ Current context: Project ${req.params.projectId}`;
       const count = await compService.bulkUpdateComps(ids, updates, orgId, userId);
 
       res.json({ updated: count });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error bulk updating comps:", error);
       res.status(500).json({ message: "Failed to bulk update comps" });
     }
@@ -11356,7 +11356,7 @@ Current context: Project ${req.params.projectId}`;
 
       const count = await compService.bulkDeleteComps(ids, orgId, userId);
       res.json({ deleted: count });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error bulk deleting comps:", error);
       res.status(500).json({ message: "Failed to bulk delete comps" });
     }
@@ -11404,7 +11404,7 @@ Current context: Project ${req.params.projectId}`;
       );
 
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error geocoding comp:", error);
       res.status(500).json({ message: "Failed to geocode comp" });
     }
@@ -11443,7 +11443,7 @@ Current context: Project ${req.params.projectId}`;
         importId: importRecord.id,
         analysis,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error uploading file:", error);
       res.status(500).json({ message: "Failed to upload file" });
     }
@@ -11462,7 +11462,7 @@ Current context: Project ${req.params.projectId}`;
       );
 
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error detecting duplicates:", error);
       res.status(500).json({ message: "Failed to detect duplicates" });
     }
@@ -11483,7 +11483,7 @@ Current context: Project ${req.params.projectId}`;
       );
 
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error previewing import:", error);
       res.status(500).json({ message: "Failed to preview import" });
     }
@@ -11511,7 +11511,7 @@ Current context: Project ${req.params.projectId}`;
       
 
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error processing import:", error);
       res.status(500).json({ message: "Failed to process import" });
     }
@@ -11524,7 +11524,7 @@ Current context: Project ${req.params.projectId}`;
       if (!importRecord) return res.status(404).json({ message: "Import not found" });
 
       res.json(importRecord);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching import status:", error);
       res.status(500).json({ message: "Failed to fetch import status" });
     }
@@ -11536,7 +11536,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const columns = await storage.getCompColumns(orgId);
       res.json(columns);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching columns:", error);
       res.status(500).json({ message: "Failed to fetch columns" });
     }
@@ -11553,7 +11553,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.status(201).json(column);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating column:", error);
       res.status(500).json({ message: "Failed to create column" });
     }
@@ -11568,7 +11568,7 @@ Current context: Project ${req.params.projectId}`;
 
       if (!column) return res.status(404).json({ message: "Column not found" });
       res.json(column);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating column:", error);
       res.status(500).json({ message: "Failed to update column" });
     }
@@ -11582,7 +11582,7 @@ Current context: Project ${req.params.projectId}`;
       if (!success) return res.status(404).json({ message: "Column not found" });
 
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting column:", error);
       res.status(500).json({ message: "Failed to delete column" });
     }
@@ -11614,7 +11614,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json({ metrics, insights });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error calculating analytics:", error);
       res.status(500).json({ message: "Failed to calculate analytics" });
     }
@@ -11628,7 +11628,7 @@ Current context: Project ${req.params.projectId}`;
 
       const correlationData = await calculateCorrelationData(orgId, filters);
       res.json(correlationData);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error calculating correlation data:", error);
       res.status(500).json({ message: "Failed to calculate correlation data" });
     }
@@ -11642,7 +11642,7 @@ Current context: Project ${req.params.projectId}`;
 
       const valuationModels = await calculateValuationModels(orgId, filters);
       res.json(valuationModels);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error calculating valuation models:", error);
       res.status(500).json({ message: "Failed to calculate valuation models" });
     }
@@ -11656,7 +11656,7 @@ Current context: Project ${req.params.projectId}`;
 
       const result = await getMatchedComps(orgId, filters);
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching matched comps:", error);
       res.status(500).json({ message: "Failed to fetch matched comps" });
     }
@@ -11675,7 +11675,7 @@ Current context: Project ${req.params.projectId}`;
         ...trendsData,
         insights,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching market trends:", error);
       res.status(500).json({ message: "Failed to fetch market trends" });
     }
@@ -11689,7 +11689,7 @@ Current context: Project ${req.params.projectId}`;
 
       const presets = await storage.getAnalyticsFilterPresets(orgId, userId);
       res.json(presets);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching analytics filter presets:", error);
       res.status(500).json({ message: "Failed to fetch analytics filter presets" });
     }
@@ -11708,7 +11708,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.status(201).json(preset);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating analytics filter preset:", error);
       res.status(500).json({ message: "Failed to create analytics filter preset" });
     }
@@ -11725,7 +11725,7 @@ Current context: Project ${req.params.projectId}`;
       if (!preset) return res.status(404).json({ message: "Analytics filter preset not found" });
 
       res.json(preset);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating analytics filter preset:", error);
       res.status(500).json({ message: "Failed to update analytics filter preset" });
     }
@@ -11741,7 +11741,7 @@ Current context: Project ${req.params.projectId}`;
       if (!success) return res.status(404).json({ message: "Analytics filter preset not found" });
 
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting analytics filter preset:", error);
       res.status(500).json({ message: "Failed to delete analytics filter preset" });
     }
@@ -11767,7 +11767,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Geocoding error:", error);
       res.status(500).json({ message: "Failed to geocode address" });
     }
@@ -11814,7 +11814,7 @@ Current context: Project ${req.params.projectId}`;
       }, orgId);
 
       res.json({ geocodeResult: result, updatedComp: updated });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Comp geocoding error:", error);
       res.status(500).json({ message: "Failed to geocode comp" });
     }
@@ -11881,7 +11881,7 @@ Current context: Project ${req.params.projectId}`;
       };
 
       res.json(summary);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Batch geocoding error:", error);
       res.status(500).json({ message: "Failed to batch geocode" });
     }
@@ -11907,7 +11907,7 @@ Current context: Project ${req.params.projectId}`;
       );
 
       res.json(suggestions);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Address autocomplete error:", error);
       res.status(500).json({ message: "Failed to get address suggestions" });
     }
@@ -11933,7 +11933,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Place geocoding error:", error);
       res.status(500).json({ message: "Failed to geocode place" });
     }
@@ -11953,7 +11953,7 @@ Current context: Project ${req.params.projectId}`;
 
       const stats = geocodingService.getStats();
       res.json({ configured: true, ...stats });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Geocoding stats error:", error);
       res.status(500).json({ message: "Failed to get geocoding stats" });
     }
@@ -11973,7 +11973,7 @@ Current context: Project ${req.params.projectId}`;
 
       const qualityReport = dataQualityService.calculateQualityScore(comp);
       res.json(qualityReport);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Quality score error:", error);
       res.status(500).json({ message: "Failed to calculate quality score" });
     }
@@ -11996,7 +11996,7 @@ Current context: Project ${req.params.projectId}`;
 
       const batchQuality = dataQualityService.calculateBatchQuality(comps);
       res.json(batchQuality);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Batch quality score error:", error);
       res.status(500).json({ message: "Failed to calculate batch quality" });
     }
@@ -12024,7 +12024,7 @@ Current context: Project ${req.params.projectId}`;
       }, orgId);
 
       res.json({ qualityReport, updatedComp: updated });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Update quality score error:", error);
       res.status(500).json({ message: "Failed to update quality score" });
     }
@@ -12043,7 +12043,7 @@ Current context: Project ${req.params.projectId}`;
         organizationRules: orgRules,
         defaultRules,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Validation rules error:", error);
       res.status(500).json({ message: "Failed to fetch validation rules" });
     }
@@ -12061,7 +12061,7 @@ Current context: Project ${req.params.projectId}`;
 
       const { results, summary } = await validationService.validateBatch(rows, orgId);
       res.json({ results, summary });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Validation error:", error);
       res.status(500).json({ message: "Failed to validate data" });
     }
@@ -12078,7 +12078,7 @@ Current context: Project ${req.params.projectId}`;
 
       const outlierIndices = validationService.detectOutliers(rows, field, method || 'iqr');
       res.json({ field, method: method || 'iqr', outlierIndices });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Outlier detection error:", error);
       res.status(500).json({ message: "Failed to detect outliers" });
     }
@@ -12094,7 +12094,7 @@ Current context: Project ${req.params.projectId}`;
 
       const history = await compHistoryService.getCompHistory(orgId, compId, limit);
       res.json(history);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Comp history error:", error);
       res.status(500).json({ message: "Failed to fetch comp history" });
     }
@@ -12109,7 +12109,7 @@ Current context: Project ${req.params.projectId}`;
 
       const fieldHistory = await compHistoryService.getFieldHistory(orgId, compId, field);
       res.json(fieldHistory);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Field history error:", error);
       res.status(500).json({ message: "Failed to fetch field history" });
     }
@@ -12125,7 +12125,7 @@ Current context: Project ${req.params.projectId}`;
 
       const success = await compHistoryService.rollbackToVersion(orgId, compId, historyId, userId);
       res.json({ success });
-    } catch (error) {
+    } catch (error: any) {
       console.error("History rollback error:", error);
       res.status(500).json({ message: "Failed to rollback to version" });
     }
@@ -12139,7 +12139,7 @@ Current context: Project ${req.params.projectId}`;
 
       const recentChanges = await compHistoryService.getRecentOrgChanges(orgId, limit);
       res.json(recentChanges);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Recent changes error:", error);
       res.status(500).json({ message: "Failed to fetch recent changes" });
     }
@@ -12164,7 +12164,7 @@ Current context: Project ${req.params.projectId}`;
       );
 
       res.json({ adjustmentId });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Adjustment save error:", error);
       res.status(500).json({ message: "Failed to save adjustment" });
     }
@@ -12183,7 +12183,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(adjustment);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Adjustment fetch error:", error);
       res.status(500).json({ message: "Failed to fetch adjustment" });
     }
@@ -12203,7 +12203,7 @@ Current context: Project ${req.params.projectId}`;
 
       const result = compAdjustmentService.calculateAdjustment(comp, adjustments, new Date());
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Calculate adjustment error:", error);
       res.status(500).json({ message: "Failed to calculate adjustment" });
     }
@@ -12228,7 +12228,7 @@ Current context: Project ${req.params.projectId}`;
       );
 
       res.json(grid);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Comparison grid error:", error);
       res.status(500).json({ message: "Failed to build comparison grid" });
     }
@@ -12242,7 +12242,7 @@ Current context: Project ${req.params.projectId}`;
 
       const adjustments = await compAdjustmentService.getProjectAdjustments(orgId, projectId);
       res.json(adjustments);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Project adjustments error:", error);
       res.status(500).json({ message: "Failed to fetch project adjustments" });
     }
@@ -12256,7 +12256,7 @@ Current context: Project ${req.params.projectId}`;
 
       const success = await compAdjustmentService.deleteAdjustment(orgId, adjustmentId);
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Delete adjustment error:", error);
       res.status(500).json({ message: "Failed to delete adjustment" });
     }
@@ -12270,7 +12270,7 @@ Current context: Project ${req.params.projectId}`;
         configured: geocodingService.isConfigured(),
         requestCount: geocodingService.getRequestCount(),
       });
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({ message: "Failed to get geocoding status" });
     }
   });
@@ -12287,7 +12287,7 @@ Current context: Project ${req.params.projectId}`;
 
       const searches = await storage.getSavedSearches(orgId, userId);
       res.json(searches);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching saved searches:", error);
       res.status(500).json({ message: "Failed to fetch saved searches" });
     }
@@ -12301,7 +12301,7 @@ Current context: Project ${req.params.projectId}`;
       if (!search) return res.status(404).json({ message: "Saved search not found" });
 
       res.json(search);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching saved search:", error);
       res.status(500).json({ message: "Failed to fetch saved search" });
     }
@@ -12320,7 +12320,7 @@ Current context: Project ${req.params.projectId}`;
       } as any);
 
       res.status(201).json(search);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating saved search:", error);
       res.status(500).json({ message: "Failed to create saved search" });
     }
@@ -12340,7 +12340,7 @@ Current context: Project ${req.params.projectId}`;
       if (!search) return res.status(404).json({ message: "Saved search not found" });
 
       res.json(search);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating saved search:", error);
       res.status(500).json({ message: "Failed to update saved search" });
     }
@@ -12355,7 +12355,7 @@ Current context: Project ${req.params.projectId}`;
       if (!success) return res.status(404).json({ message: "Saved search not found" });
 
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting saved search:", error);
       res.status(500).json({ message: "Failed to delete saved search" });
     }
@@ -12367,7 +12367,7 @@ Current context: Project ${req.params.projectId}`;
 
       await storage.incrementSavedSearchUsage(req.params.id, orgId);
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error incrementing saved search usage:", error);
       res.status(500).json({ message: "Failed to update saved search usage" });
     }
@@ -12381,7 +12381,7 @@ Current context: Project ${req.params.projectId}`;
 
       const pendingProps = await storage.getPendingProperties(orgId, status);
       res.json(pendingProps);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching pending properties:", error);
       res.status(500).json({ message: "Failed to fetch pending properties" });
     }
@@ -12439,7 +12439,7 @@ Current context: Project ${req.params.projectId}`;
         totalMatches: enhancedMatches.length,
         matches: enhancedMatches
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error finding duplicate properties:", error);
       res.status(500).json({ message: "Failed to find duplicate properties" });
     }
@@ -12457,7 +12457,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(property);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error accepting pending property:", error);
       res.status(500).json({ message: "Failed to accept pending property" });
     }
@@ -12475,7 +12475,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error rejecting pending property:", error);
       res.status(500).json({ message: "Failed to reject pending property" });
     }
@@ -12494,7 +12494,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating pending property:", error);
       res.status(500).json({ message: "Failed to update pending property" });
     }
@@ -12517,7 +12517,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error merging pending property:", error);
       res.status(500).json({ message: "Failed to merge pending property" });
     }
@@ -12565,7 +12565,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating property status:", error);
       res.status(500).json({ error: "Failed to update property status" });
     }
@@ -12585,7 +12585,7 @@ Current context: Project ${req.params.projectId}`;
         .where(and(eq(crmProperties.ownerId, orgId), eq(crmProperties.pipelineStage, stage)));
       
       res.json(properties);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching properties by stage:", error);
       res.status(500).json({ error: "Failed to fetch properties by stage" });
     }
@@ -12627,7 +12627,7 @@ Current context: Project ${req.params.projectId}`;
         ));
       
       res.json(properties);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching on-market properties:", error);
       res.status(500).json({ error: "Failed to fetch on-market properties" });
     }
@@ -12696,7 +12696,7 @@ Current context: Project ${req.params.projectId}`;
         property: updated,
         salesComp: createdComp,
       });
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -12728,7 +12728,7 @@ Current context: Project ${req.params.projectId}`;
         matchCount: matches.length,
         matches: matches.slice(0, 10)
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error detecting duplicates:", error);
       res.status(500).json({ message: "Failed to detect duplicates" });
     }
@@ -12751,7 +12751,7 @@ Current context: Project ${req.params.projectId}`;
       );
       
       res.json(matches);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching matches:", error);
       res.status(500).json({ message: "Failed to fetch matches" });
     }
@@ -12813,7 +12813,7 @@ Current context: Project ${req.params.projectId}`;
         );
         res.json({ success: true, created: true, result: created });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error resolving duplicate:", error);
       res.status(500).json({ message: "Failed to resolve duplicate" });
     }
@@ -12827,7 +12827,7 @@ Current context: Project ${req.params.projectId}`;
 
       const pendingContacts = await storage.getPendingContacts(orgId, status);
       res.json(pendingContacts);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching pending contacts:", error);
       res.status(500).json({ message: "Failed to fetch pending contacts" });
     }
@@ -12872,7 +12872,7 @@ Current context: Project ${req.params.projectId}`;
         .sort((a, b) => b.score - a.score);
 
       res.json(similarityScores);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error finding duplicate contacts:", error);
       res.status(500).json({ message: "Failed to find duplicate contacts" });
     }
@@ -12890,7 +12890,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(contact);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error accepting pending contact:", error);
       res.status(500).json({ message: "Failed to accept pending contact" });
     }
@@ -12908,7 +12908,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error rejecting pending contact:", error);
       res.status(500).json({ message: "Failed to reject pending contact" });
     }
@@ -12927,7 +12927,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating pending contact:", error);
       res.status(500).json({ message: "Failed to update pending contact" });
     }
@@ -12950,7 +12950,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error merging pending contact:", error);
       res.status(500).json({ message: "Failed to merge pending contact" });
     }
@@ -12964,7 +12964,7 @@ Current context: Project ${req.params.projectId}`;
 
       const pendingCompanies = await storage.getPendingCompanies(orgId, status);
       res.json(pendingCompanies);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching pending companies:", error);
       res.status(500).json({ message: "Failed to fetch pending companies" });
     }
@@ -13014,7 +13014,7 @@ Current context: Project ${req.params.projectId}`;
         .sort((a, b) => b.score - a.score);
 
       res.json(similarityScores);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error finding duplicate companies:", error);
       res.status(500).json({ message: "Failed to find duplicate companies" });
     }
@@ -13032,7 +13032,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(company);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error accepting pending company:", error);
       res.status(500).json({ message: "Failed to accept pending company" });
     }
@@ -13050,7 +13050,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error rejecting pending company:", error);
       res.status(500).json({ message: "Failed to reject pending company" });
     }
@@ -13069,7 +13069,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating pending company:", error);
       res.status(500).json({ message: "Failed to update pending company" });
     }
@@ -13092,7 +13092,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error merging pending company:", error);
       res.status(500).json({ message: "Failed to merge pending company" });
     }
@@ -13111,7 +13111,7 @@ Current context: Project ${req.params.projectId}`;
         analysis,
         insights,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error calculating analytics:", error);
       res.status(500).json({ message: "Failed to calculate analytics" });
     }
@@ -13126,7 +13126,7 @@ Current context: Project ${req.params.projectId}`;
       const insights = await generateInsights(analysis, filters);
 
       res.json({ insights });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating insights:", error);
       res.status(500).json({ message: "Failed to generate insights" });
     }
@@ -13142,7 +13142,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const overview = await customerAnalyticsService.getOverview(orgId);
       res.json(overview);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch customer analytics overview:', error);
       res.status(500).json({ error: 'Failed to fetch customer analytics overview' });
     }
@@ -13160,7 +13160,7 @@ Current context: Project ${req.params.projectId}`;
       
       const topCustomers = await customerAnalyticsService.getTopCustomers(orgId, limit);
       res.json(topCustomers);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch top customers:', error);
       res.status(500).json({ error: 'Failed to fetch top customers' });
     }
@@ -13172,7 +13172,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const segments = await customerAnalyticsService.getCustomerSegments(orgId);
       res.json(segments);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch customer segments:', error);
       res.status(500).json({ error: 'Failed to fetch customer segments' });
     }
@@ -13184,7 +13184,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const churnRisk = await customerAnalyticsService.getChurnRiskCustomers(orgId);
       res.json(churnRisk);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch churn risk customers:', error);
       res.status(500).json({ error: 'Failed to fetch churn risk customers' });
     }
@@ -13196,7 +13196,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const distribution = await customerAnalyticsService.getLtvDistribution(orgId);
       res.json(distribution);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch LTV distribution:', error);
       res.status(500).json({ error: 'Failed to fetch LTV distribution' });
     }
@@ -13280,25 +13280,8 @@ Current context: Project ${req.params.projectId}`;
           }
         }
         
-        // Get fuel sales metrics (last 12 months)
+        // Fuel sales metrics - skip for now as fuelSales table is org-level not property-level
         let fuelMetrics = { annualRevenue: 0 };
-        if (row.propertyId) {
-          const oneYearAgo = new Date();
-          oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-          const [fuelResult] = await db
-            .select({
-              totalRevenue: sql<number>`COALESCE(SUM(${fuelSales.totalPrice}), 0)`,
-            })
-            .from(fuelSales)
-            .where(and(
-              eq(fuelSales.facilityId, row.propertyId),
-              gte(fuelSales.saleDate, oneYearAgo.toISOString().split('T')[0])
-            ));
-          
-          if (fuelResult) {
-            fuelMetrics.annualRevenue = Number(fuelResult.totalRevenue) || 0;
-          }
-        }
         
         // Calculate derived metrics from live data
         const slips = specs.slips || storedMetrics.slips || snapshotMetrics.slips || rentRollMetrics.totalUnits || 0;
@@ -13333,9 +13316,9 @@ Current context: Project ${req.params.projectId}`;
       }));
       
       res.json(marinas);
-    } catch (error) {
-      console.error('Failed to fetch portfolio marinas:', error);
-      res.status(500).json({ error: 'Failed to fetch portfolio marinas' });
+    } catch (error: any) {
+      console.error('PORTFOLIO_ERROR:', error?.message || error, error?.stack || '');
+      res.status(500).json({ error: 'Failed to fetch portfolio marinas', details: error?.message || String(error) });
     }
   });
 
@@ -13346,7 +13329,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const summary = await ownedAssetsService.getPortfolioSummary(orgId);
       res.json(summary);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch portfolio summary:', error);
       res.status(500).json({ error: 'Failed to fetch portfolio summary' });
     }
@@ -13367,7 +13350,7 @@ Current context: Project ${req.params.projectId}`;
       const context = req.query.context as 'operational' | 'valuation' | undefined;
       const rolls = await rentRollService.getRentRolls(orgId, context);
       res.json(rolls);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch rent rolls:', error);
       res.status(500).json({ error: 'Failed to fetch rent rolls' });
     }
@@ -13384,7 +13367,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(roll);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch rent roll:', error);
       res.status(500).json({ error: 'Failed to fetch rent roll' });
     }
@@ -13397,7 +13380,7 @@ Current context: Project ${req.params.projectId}`;
       const data = insertRentRollSchema.parse(req.body);
       const roll = await rentRollService.createRentRoll(orgId, data);
       res.status(201).json(roll);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -13418,7 +13401,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(roll);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -13438,7 +13421,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete rent roll:', error);
       res.status(500).json({ error: 'Failed to delete rent roll' });
     }
@@ -13450,7 +13433,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const entries = await rentRollService.getRentRollEntries(req.params.rentRollId, orgId);
       res.json(entries);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch rent roll entries:', error);
       res.status(500).json({ error: 'Failed to fetch rent roll entries' });
     }
@@ -13466,7 +13449,7 @@ Current context: Project ${req.params.projectId}`;
       });
       const entry = await rentRollService.createRentRollEntry(orgId, data);
       res.status(201).json(entry);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -13487,7 +13470,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(entry);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -13507,7 +13490,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete rent roll entry:', error);
       res.status(500).json({ error: 'Failed to delete rent roll entry' });
     }
@@ -13519,7 +13502,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const summary = await rentRollService.getRentRollSummary(req.params.rentRollId, orgId);
       res.json(summary);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch rent roll summary:', error);
       res.status(500).json({ error: 'Failed to fetch rent roll summary' });
     }
@@ -13541,7 +13524,7 @@ Current context: Project ${req.params.projectId}`;
       };
       const campaigns = await marketingService.getCampaigns(orgId, filters);
       res.json(campaigns);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch marketing campaigns:', error);
       res.status(500).json({ error: 'Failed to fetch marketing campaigns' });
     }
@@ -13557,7 +13540,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(campaign);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch marketing campaign:', error);
       res.status(500).json({ error: 'Failed to fetch marketing campaign' });
     }
@@ -13569,7 +13552,7 @@ Current context: Project ${req.params.projectId}`;
       const data = insertMarketingCampaignSchema.parse(req.body);
       const campaign = await marketingService.createCampaign(orgId, data);
       res.status(201).json(campaign);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -13589,7 +13572,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(campaign);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -13608,7 +13591,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete marketing campaign:', error);
       res.status(500).json({ error: 'Failed to delete marketing campaign' });
     }
@@ -13627,7 +13610,7 @@ Current context: Project ${req.params.projectId}`;
       };
       const expenses = await marketingService.getExpenses(orgId, filters);
       res.json(expenses);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch marketing expenses:', error);
       res.status(500).json({ error: 'Failed to fetch marketing expenses' });
     }
@@ -13643,7 +13626,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(expense);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch marketing expense:', error);
       res.status(500).json({ error: 'Failed to fetch marketing expense' });
     }
@@ -13656,7 +13639,7 @@ Current context: Project ${req.params.projectId}`;
       const data = insertMarketingExpenseSchema.parse(req.body);
       const expense = await marketingService.createExpense(orgId, userId, data);
       res.status(201).json(expense);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -13676,7 +13659,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(expense);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -13696,7 +13679,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(expense);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to approve marketing expense:', error);
       res.status(500).json({ error: 'Failed to approve marketing expense' });
     }
@@ -13718,7 +13701,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(expense);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to mark expense as paid:', error);
       res.status(500).json({ error: 'Failed to mark expense as paid' });
     }
@@ -13734,7 +13717,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete marketing expense:', error);
       res.status(500).json({ error: 'Failed to delete marketing expense' });
     }
@@ -13750,7 +13733,7 @@ Current context: Project ${req.params.projectId}`;
       };
       const attributions = await marketingService.getAttributions(orgId, filters);
       res.json(attributions);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch lead attributions:', error);
       res.status(500).json({ error: 'Failed to fetch lead attributions' });
     }
@@ -13762,7 +13745,7 @@ Current context: Project ${req.params.projectId}`;
       const data = insertLeadAttributionSchema.parse(req.body);
       const attribution = await marketingService.createAttribution(orgId, data);
       res.status(201).json(attribution);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -13781,7 +13764,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete lead attribution:', error);
       res.status(500).json({ error: 'Failed to delete lead attribution' });
     }
@@ -13793,7 +13776,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const metrics = await marketingService.getCampaignMetrics(req.params.id, orgId);
       res.json(metrics);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch campaign metrics:', error);
       res.status(500).json({ error: 'Failed to fetch campaign metrics' });
     }
@@ -13804,7 +13787,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const metrics = await marketingService.getOrganizationMetrics(orgId);
       res.json(metrics);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch organization metrics:', error);
       res.status(500).json({ error: 'Failed to fetch organization metrics' });
     }
@@ -13820,7 +13803,7 @@ Current context: Project ${req.params.projectId}`;
       };
       const campaigns = await marketingService.getEmailCampaigns(orgId, filters);
       res.json(campaigns);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch email campaigns:', error);
       res.status(500).json({ error: 'Failed to fetch email campaigns' });
     }
@@ -13832,7 +13815,7 @@ Current context: Project ${req.params.projectId}`;
       const data = insertEmailCampaignSchema.parse(req.body);
       const campaign = await marketingService.upsertEmailCampaign(orgId, data);
       res.json(campaign);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -13851,7 +13834,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const regions = await storage.getModelingRegions(orgId);
       res.json(regions);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch modeling regions:', error);
       res.status(500).json({ error: 'Failed to fetch modeling regions' });
     }
@@ -13863,7 +13846,7 @@ Current context: Project ${req.params.projectId}`;
       const data = insertModelingRegionSchema.parse(req.body);
       const region = await storage.createModelingRegion({ ...data, orgId });
       res.status(201).json(region);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -13883,7 +13866,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(region);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -13902,7 +13885,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete modeling region:', error);
       res.status(500).json({ error: 'Failed to delete modeling region' });
     }
@@ -13981,7 +13964,7 @@ Current context: Project ${req.params.projectId}`;
       );
       
       res.json({ contacts: contactsWithCompany, companies });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to search brokers:', error);
       res.status(500).json({ error: 'Failed to search brokers' });
     }
@@ -13993,7 +13976,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const projects = await storage.getModelingProjects(orgId);
       res.json(projects);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch modeling projects:', error);
       res.status(500).json({ error: 'Failed to fetch modeling projects' });
     }
@@ -14010,7 +13993,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(project);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch modeling project:', error);
       res.status(500).json({ error: 'Failed to fetch modeling project' });
     }
@@ -14022,7 +14005,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const projects = await storage.getModelingProjectsByBroker(req.params.brokerId, orgId);
       res.json(projects);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch modeling projects by broker:', error);
       res.status(500).json({ error: 'Failed to fetch modeling projects by broker' });
     }
@@ -14080,7 +14063,7 @@ Current context: Project ${req.params.projectId}`;
       });
       
       res.status(201).json(result);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -14103,7 +14086,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(project);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -14123,7 +14106,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete modeling project:', error);
       res.status(500).json({ error: 'Failed to delete modeling project' });
     }
@@ -14151,7 +14134,7 @@ Current context: Project ${req.params.projectId}`;
         .where(and(eq(modelingCases.projectId, projectId), eq(modelingCases.orgId, orgId)))
         .orderBy(asc(modelingCases.displayOrder));
       res.json(cases);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch modeling cases:', error);
       res.status(500).json({ error: 'Failed to fetch modeling cases' });
     }
@@ -14174,7 +14157,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(modelCase);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch modeling case:', error);
       res.status(500).json({ error: 'Failed to fetch modeling case' });
     }
@@ -14210,7 +14193,7 @@ Current context: Project ${req.params.projectId}`;
       
       const [newCase] = await db.insert(modelingCases).values(validated).returning();
       res.status(201).json(newCase);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -14240,7 +14223,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -14275,7 +14258,7 @@ Current context: Project ${req.params.projectId}`;
         .where(and(eq(modelingCases.id, caseId), eq(modelingCases.orgId, orgId)));
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete modeling case:', error);
       res.status(500).json({ error: 'Failed to delete modeling case' });
     }
@@ -14313,7 +14296,7 @@ Current context: Project ${req.params.projectId}`;
         .returning();
       
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to set default case:', error);
       res.status(500).json({ error: 'Failed to set default case' });
     }
@@ -14393,7 +14376,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.status(201).json(newCase);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to clone case:', error);
       res.status(500).json({ error: 'Failed to clone case' });
     }
@@ -14426,7 +14409,7 @@ Current context: Project ${req.params.projectId}`;
         .where(eq(modelingCaseAssumptions.caseId, caseId));
       
       res.json(assumptions);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch case assumptions:', error);
       res.status(500).json({ error: 'Failed to fetch case assumptions' });
     }
@@ -14472,7 +14455,7 @@ Current context: Project ${req.params.projectId}`;
         .where(eq(modelingCaseAssumptions.caseId, caseId));
       
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to upsert case assumptions:', error);
       res.status(500).json({ error: 'Failed to upsert case assumptions' });
     }
@@ -14509,7 +14492,7 @@ Current context: Project ${req.params.projectId}`;
       }));
       
       res.json(addbacksWithValues);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch addbacks:', error);
       res.status(500).json({ error: 'Failed to fetch addbacks' });
     }
@@ -14583,7 +14566,7 @@ Current context: Project ${req.params.projectId}`;
         .where(eq(modelingAddbackValues.addbackId, addback.id));
       
       res.json({ ...addback, values: addbackValues });
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -14610,7 +14593,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete addback:', error);
       res.status(500).json({ error: 'Failed to delete addback' });
     }
@@ -14633,7 +14616,7 @@ Current context: Project ${req.params.projectId}`;
       
       const periods = await storage.getModelingFinancialPeriods(projectId, orgId);
       res.json(periods);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch financial periods:', error);
       res.status(500).json({ error: 'Failed to fetch financial periods' });
     }
@@ -14652,7 +14635,7 @@ Current context: Project ${req.params.projectId}`;
       
       const periods = await storage.getAvailableFinancialPeriods(projectId, orgId);
       res.json(periods);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch available periods:', error);
       res.status(500).json({ error: 'Failed to fetch available periods' });
     }
@@ -14669,7 +14652,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(period);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch financial period:', error);
       res.status(500).json({ error: 'Failed to fetch financial period' });
     }
@@ -14688,7 +14671,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(period);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch financial period by label:', error);
       res.status(500).json({ error: 'Failed to fetch financial period by label' });
     }
@@ -14715,7 +14698,7 @@ Current context: Project ${req.params.projectId}`;
       
       const period = await storage.createModelingFinancialPeriod(data);
       res.status(201).json(period);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create financial period:', error);
       res.status(500).json({ error: 'Failed to create financial period' });
     }
@@ -14733,7 +14716,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(period);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update financial period:', error);
       res.status(500).json({ error: 'Failed to update financial period' });
     }
@@ -14750,7 +14733,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete financial period:', error);
       res.status(500).json({ error: 'Failed to delete financial period' });
     }
@@ -14791,7 +14774,7 @@ Current context: Project ${req.params.projectId}`;
       );
       
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to recalculate financial period:', error);
       res.status(500).json({ error: 'Failed to recalculate financial period' });
     }
@@ -14819,7 +14802,7 @@ Current context: Project ${req.params.projectId}`;
         periodLabel as string | undefined
       );
       res.json(adjustments);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch adjustments:', error);
       res.status(500).json({ error: 'Failed to fetch adjustments' });
     }
@@ -14838,7 +14821,7 @@ Current context: Project ${req.params.projectId}`;
       
       const adjustments = await storage.getActiveAdjustmentsForPeriod(projectId, periodLabel, orgId);
       res.json(adjustments);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch adjustments for period:', error);
       res.status(500).json({ error: 'Failed to fetch adjustments for period' });
     }
@@ -14891,7 +14874,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(adjustment);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update adjustment:', error);
       res.status(500).json({ error: 'Failed to update adjustment' });
     }
@@ -14910,7 +14893,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(adjustment);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to toggle adjustment:', error);
       res.status(500).json({ error: 'Failed to toggle adjustment' });
     }
@@ -14927,7 +14910,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete adjustment:', error);
       res.status(500).json({ error: 'Failed to delete adjustment' });
     }
@@ -14950,7 +14933,7 @@ Current context: Project ${req.params.projectId}`;
       
       const categories = await storage.getActualsAggregationByCategory(projectId, orgId);
       res.json(categories);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch category analytics:', error);
       res.status(500).json({ error: 'Failed to fetch category analytics' });
     }
@@ -14969,7 +14952,7 @@ Current context: Project ${req.params.projectId}`;
       
       const subcategories = await storage.getActualsAggregationBySubcategory(projectId, category, orgId);
       res.json(subcategories);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch subcategory analytics:', error);
       res.status(500).json({ error: 'Failed to fetch subcategory analytics' });
     }
@@ -14988,7 +14971,7 @@ Current context: Project ${req.params.projectId}`;
       
       const lineItems = await storage.getActualsAggregationByLineItem(projectId, category, subcategory, orgId);
       res.json(lineItems);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch line item analytics:', error);
       res.status(500).json({ error: 'Failed to fetch line item analytics' });
     }
@@ -15013,7 +14996,7 @@ Current context: Project ${req.params.projectId}`;
         applyAdjustments
       );
       res.json(summary);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch financial summary:', error);
       res.status(500).json({ error: 'Failed to fetch financial summary' });
     }
@@ -15039,7 +15022,7 @@ Current context: Project ${req.params.projectId}`;
       };
       
       res.json(config);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch project config:', error);
       res.status(500).json({ error: 'Failed to fetch project config' });
     }
@@ -15069,7 +15052,7 @@ Current context: Project ${req.params.projectId}`;
       );
       
       res.json(req.body);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save project config:', error);
       res.status(500).json({ error: 'Failed to save project config' });
     }
@@ -15337,7 +15320,7 @@ Current context: Project ${req.params.projectId}`;
       
       const assumptions = (project.customMetrics as any)?.assumptions || null;
       res.json(assumptions);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch project assumptions:', error);
       res.status(500).json({ error: 'Failed to fetch project assumptions' });
     }
@@ -15367,7 +15350,7 @@ Current context: Project ${req.params.projectId}`;
       );
       
       res.json(req.body);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save project assumptions:', error);
       res.status(500).json({ error: 'Failed to save project assumptions' });
     }
@@ -15391,7 +15374,7 @@ Current context: Project ${req.params.projectId}`;
         year ? parseInt(year) : undefined
       );
       res.json(historicalData);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch historical P&L:', error);
       res.status(500).json({ error: 'Failed to fetch historical P&L' });
     }
@@ -15412,7 +15395,7 @@ Current context: Project ${req.params.projectId}`;
       const { proFormaEngineService } = await import('./services/pro-forma-engine-service');
       const proFormaData = await proFormaEngineService.generateProForma(projectId, orgId, scenarioType);
       res.json(proFormaData);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch pro forma:', error);
       res.status(500).json({ error: 'Failed to fetch pro forma' });
     }
@@ -15465,7 +15448,7 @@ Current context: Project ${req.params.projectId}`;
       };
       
       res.json(summaryData);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch executive summary:', error);
       res.status(500).json({ error: 'Failed to fetch executive summary' });
     }
@@ -15490,7 +15473,7 @@ Current context: Project ${req.params.projectId}`;
       const { monteCarloService } = await import('./services/monte-carlo-service');
       const analysis = await monteCarloService.runSimulation(projectId, orgId, { iterations });
       res.json(analysis);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to run Monte Carlo simulation:', error);
       res.status(500).json({ error: 'Failed to run Monte Carlo simulation' });
     }
@@ -15520,7 +15503,7 @@ Current context: Project ${req.params.projectId}`;
       
       const analysis = await monteCarloService.runSimulation(projectId, orgId, simulationInput);
       res.json(analysis);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to run custom Monte Carlo simulation:', error);
       res.status(500).json({ error: 'Failed to run custom Monte Carlo simulation' });
     }
@@ -15540,7 +15523,7 @@ Current context: Project ${req.params.projectId}`;
       const { monteCarloService } = await import('./services/monte-carlo-service');
       const quickResult = await monteCarloService.quickSimulation(projectId, orgId);
       res.json(quickResult);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to run quick Monte Carlo:', error);
       res.status(500).json({ error: 'Failed to run quick Monte Carlo' });
     }
@@ -15564,7 +15547,7 @@ Current context: Project ${req.params.projectId}`;
       const { dcfCalculatorService } = await import('./services/dcf-calculator-service');
       const analysis = await dcfCalculatorService.performDCFAnalysis(projectId, orgId);
       res.json(analysis);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to perform DCF analysis:', error);
       res.status(500).json({ error: 'Failed to perform DCF analysis' });
     }
@@ -15585,7 +15568,7 @@ Current context: Project ${req.params.projectId}`;
       const { dcfCalculatorService } = await import('./services/dcf-calculator-service');
       const analysis = await dcfCalculatorService.performDCFAnalysis(projectId, orgId, scenarios);
       res.json(analysis);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to calculate custom DCF:', error);
       res.status(500).json({ error: 'Failed to calculate custom DCF' });
     }
@@ -15599,7 +15582,7 @@ Current context: Project ${req.params.projectId}`;
       const { dcfCalculatorService } = await import('./services/dcf-calculator-service');
       const irr = dcfCalculatorService.quickIRR(input);
       res.json({ irr });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to calculate quick IRR:', error);
       res.status(500).json({ error: 'Failed to calculate quick IRR' });
     }
@@ -15613,7 +15596,7 @@ Current context: Project ${req.params.projectId}`;
       const { dcfCalculatorService } = await import('./services/dcf-calculator-service');
       const npv = dcfCalculatorService.quickNPV(input);
       res.json({ npv });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to calculate quick NPV:', error);
       res.status(500).json({ error: 'Failed to calculate quick NPV' });
     }
@@ -15632,7 +15615,7 @@ Current context: Project ${req.params.projectId}`;
         metric
       );
       res.json(matrix);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to generate sensitivity matrix:', error);
       res.status(500).json({ error: 'Failed to generate sensitivity matrix' });
     }
@@ -15656,7 +15639,7 @@ Current context: Project ${req.params.projectId}`;
       const { marinaProfitCenterService } = await import('./services/marina-profit-center-service');
       const financialModel = await marinaProfitCenterService.calculateMarinaFinancials(projectId, orgId);
       res.json(financialModel);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to calculate profit centers:', error);
       res.status(500).json({ error: 'Failed to calculate profit centers' });
     }
@@ -15677,7 +15660,7 @@ Current context: Project ${req.params.projectId}`;
       const { marinaProfitCenterService } = await import('./services/marina-profit-center-service');
       const breakdown = await marinaProfitCenterService.getProfitCenterBreakdown(projectId, orgId, year);
       res.json(breakdown);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get profit center breakdown:', error);
       res.status(500).json({ error: 'Failed to get profit center breakdown' });
     }
@@ -15698,7 +15681,7 @@ Current context: Project ${req.params.projectId}`;
       const { marinaProfitCenterService } = await import('./services/marina-profit-center-service');
       const financialModel = await marinaProfitCenterService.calculateMarinaFinancials(projectId, orgId, assumptions);
       res.json(financialModel);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to calculate custom profit centers:', error);
       res.status(500).json({ error: 'Failed to calculate custom profit centers' });
     }
@@ -15727,7 +15710,7 @@ Current context: Project ${req.params.projectId}`;
         scenarioType
       );
       res.json(cashFlowData);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to calculate lease cash flow:', error);
       res.status(500).json({ error: 'Failed to calculate lease cash flow' });
     }
@@ -15747,7 +15730,7 @@ Current context: Project ${req.params.projectId}`;
       const { leaseCashFlowEngine } = await import('./services/lease-cashflow-engine');
       const rolloverData = await leaseCashFlowEngine.getRolloverSchedule(projectId, orgId);
       res.json(rolloverData);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get rollover schedule:', error);
       res.status(500).json({ error: 'Failed to get rollover schedule' });
     }
@@ -15767,7 +15750,7 @@ Current context: Project ${req.params.projectId}`;
       const { leaseCashFlowEngine } = await import('./services/lease-cashflow-engine');
       const tenantData = await leaseCashFlowEngine.getTenantPerformance(projectId, orgId);
       res.json(tenantData);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get tenant performance:', error);
       res.status(500).json({ error: 'Failed to get tenant performance' });
     }
@@ -15793,7 +15776,7 @@ Current context: Project ${req.params.projectId}`;
         assumptions
       );
       res.json(cashFlowData);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to calculate custom scenario:', error);
       res.status(500).json({ error: 'Failed to calculate custom scenario' });
     }
@@ -15829,7 +15812,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to sync operations data:', error);
       res.status(500).json({ error: 'Failed to sync operations data' });
     }
@@ -15877,7 +15860,7 @@ Current context: Project ${req.params.projectId}`;
         grouped: Object.values(grouped),
         year: year ? parseInt(year as string) : null
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch actuals:', error);
       res.status(500).json({ error: 'Failed to fetch actuals' });
     }
@@ -15898,7 +15881,7 @@ Current context: Project ${req.params.projectId}`;
       const history = await operationsDataSyncService.getSyncJobHistory(projectId);
 
       res.json(history);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch sync history:', error);
       res.status(500).json({ error: 'Failed to fetch sync history' });
     }
@@ -15919,7 +15902,7 @@ Current context: Project ${req.params.projectId}`;
       const summary = await operationsDataSyncService.getDataSourceSummary(projectId);
 
       res.json(summary);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch data sources:', error);
       res.status(500).json({ error: 'Failed to fetch data sources' });
     }
@@ -15944,7 +15927,7 @@ Current context: Project ${req.params.projectId}`;
       const scenarios = await scenarioVersioningService.getCurrentScenarios(projectId);
 
       res.json(scenarios);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch scenarios:', error);
       res.status(500).json({ error: 'Failed to fetch scenarios' });
     }
@@ -15966,7 +15949,7 @@ Current context: Project ${req.params.projectId}`;
       const scenarios = await scenarioVersioningService.initializeDefaultScenarios(projectId, orgId, userId);
 
       res.json(scenarios);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to initialize scenarios:', error);
       res.status(500).json({ error: 'Failed to initialize scenarios' });
     }
@@ -16000,7 +15983,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(scenario);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create scenario:', error);
       res.status(500).json({ error: 'Failed to create scenario' });
     }
@@ -16025,7 +16008,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(scenario);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch scenario:', error);
       res.status(500).json({ error: 'Failed to fetch scenario' });
     }
@@ -16058,7 +16041,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(scenario);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update scenario:', error);
       res.status(500).json({ error: 'Failed to update scenario' });
     }
@@ -16080,7 +16063,7 @@ Current context: Project ${req.params.projectId}`;
       const history = await scenarioVersioningService.getScenarioVersionHistory(projectId, scenarioType as any, limit);
 
       res.json(history);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch scenario history:', error);
       res.status(500).json({ error: 'Failed to fetch scenario history' });
     }
@@ -16102,7 +16085,7 @@ Current context: Project ${req.params.projectId}`;
       const restored = await scenarioVersioningService.restoreVersion(scenarioId, userId);
 
       res.json(restored);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to restore scenario:', error);
       res.status(500).json({ error: 'Failed to restore scenario' });
     }
@@ -16124,7 +16107,7 @@ Current context: Project ${req.params.projectId}`;
       const scenario = await scenarioVersioningService.submitForApproval(scenarioId, userId);
 
       res.json(scenario);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to submit scenario:', error);
       res.status(500).json({ error: 'Failed to submit scenario' });
     }
@@ -16147,7 +16130,7 @@ Current context: Project ${req.params.projectId}`;
       const scenario = await scenarioVersioningService.approveScenario(scenarioId, userId, notes);
 
       res.json(scenario);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to approve scenario:', error);
       res.status(500).json({ error: 'Failed to approve scenario' });
     }
@@ -16170,7 +16153,7 @@ Current context: Project ${req.params.projectId}`;
       const scenario = await scenarioVersioningService.rejectScenario(scenarioId, userId, notes);
 
       res.json(scenario);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to reject scenario:', error);
       res.status(500).json({ error: 'Failed to reject scenario' });
     }
@@ -16195,7 +16178,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(history);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch audit history:', error);
       res.status(500).json({ error: 'Failed to fetch audit history' });
     }
@@ -16217,7 +16200,7 @@ Current context: Project ${req.params.projectId}`;
       const comparison = await scenarioVersioningService.compareScenarios(projectId, scenarioIds);
 
       res.json(comparison);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to compare scenarios:', error);
       res.status(500).json({ error: 'Failed to compare scenarios' });
     }
@@ -16247,7 +16230,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(memoData);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to generate IC memo:', error);
       res.status(500).json({ error: 'Failed to generate IC memo' });
     }
@@ -16273,7 +16256,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(auditLog);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch audit log:', error);
       res.status(500).json({ error: 'Failed to fetch audit log' });
     }
@@ -16303,7 +16286,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to generate sensitivity matrix:', error);
       res.status(500).json({ error: 'Failed to generate sensitivity matrix' });
     }
@@ -16324,7 +16307,7 @@ Current context: Project ${req.params.projectId}`;
       const matrices = await sensitivityMatrixService.getMatrices(projectId, orgId);
 
       res.json(matrices);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch sensitivity matrices:', error);
       res.status(500).json({ error: 'Failed to fetch sensitivity matrices' });
     }
@@ -16359,7 +16342,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(benchmarks);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get benchmark comparison:', error);
       res.status(500).json({ error: 'Failed to get benchmark comparison' });
     }
@@ -16374,7 +16357,7 @@ Current context: Project ${req.params.projectId}`;
       const riskMetrics = await benchmarkComparisonService.getPortfolioRiskMetrics(orgId);
 
       res.json(riskMetrics);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get portfolio risk metrics:', error);
       res.status(500).json({ error: 'Failed to get portfolio risk metrics' });
     }
@@ -16406,7 +16389,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json({ id: requestId, message: 'Approval request created successfully' });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create approval request:', error);
       res.status(500).json({ error: 'Failed to create approval request' });
     }
@@ -16427,7 +16410,7 @@ Current context: Project ${req.params.projectId}`;
       const requests = await multiApproverService.getProjectApprovalRequests(projectId, orgId);
 
       res.json(requests);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get approval requests:', error);
       res.status(500).json({ error: 'Failed to get approval requests' });
     }
@@ -16443,7 +16426,7 @@ Current context: Project ${req.params.projectId}`;
       const pendingApprovals = await multiApproverService.getPendingApprovalsForUser(userId, orgId);
 
       res.json(pendingApprovals);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get pending approvals:', error);
       res.status(500).json({ error: 'Failed to get pending approvals' });
     }
@@ -16493,7 +16476,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(request);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get approval request:', error);
       res.status(500).json({ error: 'Failed to get approval request' });
     }
@@ -16570,7 +16553,7 @@ Current context: Project ${req.params.projectId}`;
         : null;
 
       res.json({ job, result });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get document intelligence job:', error);
       res.status(500).json({ error: 'Failed to get document intelligence job' });
     }
@@ -16588,7 +16571,7 @@ Current context: Project ${req.params.projectId}`;
       await documentIntelligenceService.approveResult(resultId, orgId, userId, modifications);
 
       res.json({ message: 'Result approved' });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to approve result:', error);
       res.status(500).json({ error: 'Failed to approve result' });
     }
@@ -16610,7 +16593,7 @@ Current context: Project ${req.params.projectId}`;
       await documentIntelligenceService.rejectResult(resultId, orgId, userId, reason);
 
       res.json({ message: 'Result rejected' });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to reject result:', error);
       res.status(500).json({ error: 'Failed to reject result' });
     }
@@ -16690,7 +16673,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json({ id: threadId, message: 'Thread created successfully' });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create comment thread:', error);
       res.status(500).json({ error: 'Failed to create comment thread' });
     }
@@ -16716,7 +16699,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(threads);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get comment threads:', error);
       res.status(500).json({ error: 'Failed to get comment threads' });
     }
@@ -16732,7 +16715,7 @@ Current context: Project ${req.params.projectId}`;
       const count = await commentThreadsService.getUnresolvedCount(projectId, orgId);
 
       res.json(count);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get unresolved count:', error);
       res.status(500).json({ error: 'Failed to get unresolved count' });
     }
@@ -16752,7 +16735,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(thread);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get thread:', error);
       res.status(500).json({ error: 'Failed to get thread' });
     }
@@ -16906,7 +16889,7 @@ Current context: Project ${req.params.projectId}`;
       const history = await vdrModelingIntegrationService.getVDRExportHistory(projectId, orgId);
 
       res.json(history);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get VDR export history:', error);
       res.status(500).json({ error: 'Failed to get VDR export history' });
     }
@@ -16936,7 +16919,7 @@ Current context: Project ${req.params.projectId}`;
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.send(buffer);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to export modeling project to Excel:', error);
       res.status(500).json({ error: 'Failed to export modeling project' });
     }
@@ -16963,7 +16946,7 @@ Current context: Project ${req.params.projectId}`;
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.send(buffer);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to export case comparison to Excel:', error);
       res.status(500).json({ error: 'Failed to export case comparison' });
     }
@@ -17021,7 +17004,7 @@ Current context: Project ${req.params.projectId}`;
       const structures = await debtSensitivityService.getStandardLenderStructures(price);
 
       res.json(structures);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get lender templates:', error);
       res.status(500).json({ error: 'Failed to get lender templates' });
     }
@@ -17091,7 +17074,7 @@ Current context: Project ${req.params.projectId}`;
       const configs = await waterfallService.getStandardWaterfallConfigs();
 
       res.json(configs);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get waterfall templates:', error);
       res.status(500).json({ error: 'Failed to get waterfall templates' });
     }
@@ -17268,7 +17251,7 @@ Current context: Project ${req.params.projectId}`;
       };
 
       res.json(docs);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get API docs:', error);
       res.status(500).json({ error: 'Failed to get API docs' });
     }
@@ -17294,7 +17277,7 @@ Current context: Project ${req.params.projectId}`;
       
       const analytics = await storage.getModelingAnalytics(orgId, filters);
       res.json(analytics);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch modeling analytics:', error);
       res.status(500).json({ error: 'Failed to fetch modeling analytics' });
     }
@@ -17311,7 +17294,7 @@ Current context: Project ${req.params.projectId}`;
       const { approvalNotificationService } = await import('./services/approval-notification-service');
       const pendingApprovals = await approvalNotificationService.getPendingApprovals(orgId);
       res.json(pendingApprovals);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get pending approvals:', error);
       res.status(500).json({ error: 'Failed to get pending approvals' });
     }
@@ -17324,7 +17307,7 @@ Current context: Project ${req.params.projectId}`;
       const { approvalNotificationService } = await import('./services/approval-notification-service');
       const stats = await approvalNotificationService.getApprovalStats(orgId);
       res.json(stats);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get approval stats:', error);
       res.status(500).json({ error: 'Failed to get approval statistics' });
     }
@@ -17337,7 +17320,7 @@ Current context: Project ${req.params.projectId}`;
       const { approvalNotificationService } = await import('./services/approval-notification-service');
       const approvers = await approvalNotificationService.getOrgApprovers(orgId);
       res.json(approvers);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get approvers:', error);
       res.status(500).json({ error: 'Failed to get approvers' });
     }
@@ -17352,7 +17335,7 @@ Current context: Project ${req.params.projectId}`;
       const { approvalNotificationService } = await import('./services/approval-notification-service');
       const notifications = await approvalNotificationService.getUserNotifications(orgId, userId, unreadOnly);
       res.json(notifications);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get notifications:', error);
       res.status(500).json({ error: 'Failed to get notifications' });
     }
@@ -17366,7 +17349,7 @@ Current context: Project ${req.params.projectId}`;
       const { approvalNotificationService } = await import('./services/approval-notification-service');
       const count = await approvalNotificationService.getUnreadCount(orgId, userId);
       res.json({ count });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get unread count:', error);
       res.status(500).json({ error: 'Failed to get unread count' });
     }
@@ -17380,7 +17363,7 @@ Current context: Project ${req.params.projectId}`;
       const { approvalNotificationService } = await import('./services/approval-notification-service');
       await approvalNotificationService.markNotificationRead(notificationId, userId);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to mark notification as read:', error);
       res.status(500).json({ error: 'Failed to mark notification as read' });
     }
@@ -17394,7 +17377,7 @@ Current context: Project ${req.params.projectId}`;
       const { approvalNotificationService } = await import('./services/approval-notification-service');
       await approvalNotificationService.markAllNotificationsRead(orgId, userId);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to mark all notifications as read:', error);
       res.status(500).json({ error: 'Failed to mark all notifications as read' });
     }
@@ -17429,7 +17412,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to submit for approval:', error);
       res.status(500).json({ error: 'Failed to submit for approval' });
     }
@@ -17455,7 +17438,7 @@ Current context: Project ${req.params.projectId}`;
       await approvalNotificationService.notifyApprovalDecision(scenarioId, 'approved', userId, notes);
 
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to approve scenario:', error);
       res.status(500).json({ error: 'Failed to approve scenario' });
     }
@@ -17481,7 +17464,7 @@ Current context: Project ${req.params.projectId}`;
       await approvalNotificationService.notifyApprovalDecision(scenarioId, 'rejected', userId, notes);
 
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to reject scenario:', error);
       res.status(500).json({ error: 'Failed to reject scenario' });
     }
@@ -17498,7 +17481,7 @@ Current context: Project ${req.params.projectId}`;
       const { quickBooksService } = await import('./services/quickbooks-service');
       const status = await quickBooksService.getConnectionStatus(orgId);
       res.json(status);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get QuickBooks status:', error);
       res.status(500).json({ error: 'Failed to get connection status' });
     }
@@ -17511,7 +17494,7 @@ Current context: Project ${req.params.projectId}`;
       const { quickBooksService } = await import('./services/quickbooks-service');
       const authUrl = quickBooksService.getAuthorizationUrl(orgId);
       res.json({ authUrl });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to generate auth URL:', error);
       res.status(500).json({ error: 'Failed to generate authorization URL' });
     }
@@ -17539,7 +17522,7 @@ Current context: Project ${req.params.projectId}`;
       );
 
       res.redirect('/settings/integrations?qb_connected=true');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to handle QuickBooks callback:', error);
       res.redirect('/settings/integrations?qb_error=connection_failed');
     }
@@ -17552,7 +17535,7 @@ Current context: Project ${req.params.projectId}`;
       const { quickBooksService } = await import('./services/quickbooks-service');
       await quickBooksService.disconnect(orgId);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to disconnect QuickBooks:', error);
       res.status(500).json({ error: 'Failed to disconnect' });
     }
@@ -17565,7 +17548,7 @@ Current context: Project ${req.params.projectId}`;
       const { quickBooksService } = await import('./services/quickbooks-service');
       const companyInfo = await quickBooksService.getCompanyInfo(orgId);
       res.json(companyInfo);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get company info:', error);
       res.status(500).json({ error: 'Failed to get company information' });
     }
@@ -17578,7 +17561,7 @@ Current context: Project ${req.params.projectId}`;
       const { quickBooksService } = await import('./services/quickbooks-service');
       const accounts = await quickBooksService.getChartOfAccounts(orgId);
       res.json(accounts);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get chart of accounts:', error);
       res.status(500).json({ error: 'Failed to get chart of accounts' });
     }
@@ -17601,7 +17584,7 @@ Current context: Project ${req.params.projectId}`;
         endDate as string
       );
       res.json(report);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get P&L report:', error);
       res.status(500).json({ error: 'Failed to get Profit & Loss report' });
     }
@@ -17631,7 +17614,7 @@ Current context: Project ${req.params.projectId}`;
         endDate
       );
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to sync QuickBooks data:', error);
       res.status(500).json({ error: 'Failed to sync QuickBooks data' });
     }
@@ -17645,7 +17628,7 @@ Current context: Project ${req.params.projectId}`;
       const { quickBooksService } = await import('./services/quickbooks-service');
       const history = await quickBooksService.getSyncHistory(orgId, limit);
       res.json(history);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get sync history:', error);
       res.status(500).json({ error: 'Failed to get sync history' });
     }
@@ -17664,7 +17647,7 @@ Current context: Project ${req.params.projectId}`;
       const { quickBooksService } = await import('./services/quickbooks-service');
       await quickBooksService.updateAccountMapping(orgId, mapping);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update account mapping:', error);
       res.status(500).json({ error: 'Failed to update account mapping' });
     }
@@ -17682,7 +17665,7 @@ Current context: Project ${req.params.projectId}`;
       const { portfolioRollupService } = await import('./services/portfolio-rollup-service');
       const summary = await portfolioRollupService.getPortfolioSummary(orgId, projectIds);
       res.json(summary);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get portfolio summary:', error);
       res.status(500).json({ error: 'Failed to get portfolio summary' });
     }
@@ -17702,7 +17685,7 @@ Current context: Project ${req.params.projectId}`;
       const { portfolioRollupService } = await import('./services/portfolio-rollup-service');
       const projects = await portfolioRollupService.getProjectRollups(orgId, filters);
       res.json(projects);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get project rollups:', error);
       res.status(500).json({ error: 'Failed to get project rollups' });
     }
@@ -17715,7 +17698,7 @@ Current context: Project ${req.params.projectId}`;
       const { portfolioRollupService } = await import('./services/portfolio-rollup-service');
       const breakdown = await portfolioRollupService.getPortfolioBreakdown(orgId);
       res.json(breakdown);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get portfolio breakdown:', error);
       res.status(500).json({ error: 'Failed to get portfolio breakdown' });
     }
@@ -17731,7 +17714,7 @@ Current context: Project ${req.params.projectId}`;
       const { portfolioRollupService } = await import('./services/portfolio-rollup-service');
       const projections = await portfolioRollupService.getPortfolioProjections(orgId, projectIds, yearsToProject);
       res.json(projections);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get portfolio projections:', error);
       res.status(500).json({ error: 'Failed to get portfolio projections' });
     }
@@ -17746,7 +17729,7 @@ Current context: Project ${req.params.projectId}`;
       const { portfolioRollupService } = await import('./services/portfolio-rollup-service');
       const topPerformers = await portfolioRollupService.getTopPerformingProjects(orgId, limit);
       res.json(topPerformers);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get top performers:', error);
       res.status(500).json({ error: 'Failed to get top performing projects' });
     }
@@ -17761,7 +17744,7 @@ Current context: Project ${req.params.projectId}`;
       const { portfolioRollupService } = await import('./services/portfolio-rollup-service');
       const underperformers = await portfolioRollupService.getUnderperformingProjects(orgId, occupancyThreshold);
       res.json(underperformers);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get underperformers:', error);
       res.status(500).json({ error: 'Failed to get underperforming projects' });
     }
@@ -17775,7 +17758,7 @@ Current context: Project ${req.params.projectId}`;
       const { portfolioRollupService } = await import('./services/portfolio-rollup-service');
       const report = await portfolioRollupService.exportPortfolioReport(orgId);
       res.json(report);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to export portfolio report:', error);
       res.status(500).json({ error: 'Failed to export portfolio report' });
     }
@@ -17821,7 +17804,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const result = await docIntelService.initializeOrganization(orgId);
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to initialize document intelligence:', error);
       res.status(500).json({ error: 'Failed to initialize document intelligence' });
     }
@@ -17842,7 +17825,7 @@ Current context: Project ${req.params.projectId}`;
         const categories = await docIntelService.getCategories(orgId);
         res.json(categories);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch categories:', error);
       res.status(500).json({ error: 'Failed to fetch categories' });
     }
@@ -17854,7 +17837,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const category = await docIntelService.createCategory(orgId, req.body);
       res.status(201).json(category);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create category:', error);
       res.status(500).json({ error: 'Failed to create category' });
     }
@@ -17869,7 +17852,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Category not found' });
       }
       res.json(category);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update category:', error);
       res.status(500).json({ error: 'Failed to update category' });
     }
@@ -17881,7 +17864,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       await docIntelService.deleteCategory(orgId, req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete category:', error);
       res.status(500).json({ error: 'Failed to delete category' });
     }
@@ -17914,7 +17897,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(uploads);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch document uploads:', error);
       res.status(500).json({ error: 'Failed to fetch document uploads' });
     }
@@ -17978,7 +17961,7 @@ Current context: Project ${req.params.projectId}`;
           createdAt: result.originalUpload.createdAt,
         } : null,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to upload document:', error);
       res.status(500).json({ error: 'Failed to upload document' });
     }
@@ -17997,7 +17980,7 @@ Current context: Project ${req.params.projectId}`;
       
       const stats = await docIntelService.getUploadStats(orgId, uploadId);
       res.json({ ...upload, stats });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch document:', error);
       res.status(500).json({ error: 'Failed to fetch document' });
     }
@@ -18015,7 +17998,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(upload);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update document:', error);
       res.status(500).json({ error: 'Failed to update document' });
     }
@@ -18029,7 +18012,7 @@ Current context: Project ${req.params.projectId}`;
       
       await docIntelService.deleteUpload(orgId, uploadId);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete document:', error);
       res.status(500).json({ error: 'Failed to delete document' });
     }
@@ -18070,7 +18053,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(updatedUpload);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to validate document:', error);
       res.status(500).json({ error: 'Failed to validate document' });
     }
@@ -18091,7 +18074,7 @@ Current context: Project ${req.params.projectId}`;
       
       const items = await docIntelService.parseAndExtract(orgId, uploadId);
       res.json({ items, count: items.length });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to parse document:', error);
       res.status(500).json({ error: 'Failed to parse document' });
     }
@@ -18118,7 +18101,7 @@ Current context: Project ${req.params.projectId}`;
       });
       
       res.json({ items, count: items.length });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to categorize items:', error);
       res.status(500).json({ error: 'Failed to categorize items' });
     }
@@ -18143,7 +18126,7 @@ Current context: Project ${req.params.projectId}`;
         : await docIntelService.getExtractedItems(orgId, uploadId);
       
       res.json(items);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch extracted items:', error);
       res.status(500).json({ error: 'Failed to fetch extracted items' });
     }
@@ -18163,7 +18146,7 @@ Current context: Project ${req.params.projectId}`;
       
       const item = await docIntelService.confirmItem(orgId, itemId, categoryId, userId, amount, department);
       res.json(item);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to confirm item:', error);
       res.status(500).json({ error: 'Failed to confirm item' });
     }
@@ -18177,7 +18160,7 @@ Current context: Project ${req.params.projectId}`;
       
       const item = await docIntelService.rejectItem(orgId, itemId);
       res.json(item);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to reject item:', error);
       res.status(500).json({ error: 'Failed to reject item' });
     }
@@ -18191,7 +18174,7 @@ Current context: Project ${req.params.projectId}`;
       
       const item = await docIntelService.excludeItem(orgId, itemId);
       res.json(item);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to exclude item:', error);
       res.status(500).json({ error: 'Failed to exclude item' });
     }
@@ -18207,7 +18190,7 @@ Current context: Project ${req.params.projectId}`;
       
       const count = await docIntelService.confirmAllHighConfidence(orgId, uploadId, userId, threshold);
       res.json({ confirmed: count });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to auto-confirm items:', error);
       res.status(500).json({ error: 'Failed to auto-confirm items' });
     }
@@ -18225,7 +18208,7 @@ Current context: Project ${req.params.projectId}`;
       
       const upload = await docIntelService.approveDocument(orgId, uploadId, userId, notes);
       res.json(upload);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to approve document:', error);
       res.status(500).json({ error: 'Failed to approve document' });
     }
@@ -18243,7 +18226,7 @@ Current context: Project ${req.params.projectId}`;
       
       const lines = await docIntelService.importConfirmedItems(orgId, uploadId, projectId, userId, fiscalYear);
       res.json({ imported: lines.length, lines });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to import items:', error);
       res.status(500).json({ error: 'Failed to import items' });
     }
@@ -18284,7 +18267,7 @@ Current context: Project ${req.params.projectId}`;
         matchedContacts: result.matchedContacts,
         errors: result.errors,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to import rent roll:', error);
       res.status(500).json({ 
         error: error instanceof Error ? error.message : 'Failed to import rent roll' 
@@ -18323,7 +18306,7 @@ Current context: Project ${req.params.projectId}`;
         },
         crmMatching: crmMatches,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to preview rent roll:', error);
       res.status(500).json({ 
         error: error instanceof Error ? error.message : 'Failed to preview rent roll' 
@@ -18343,7 +18326,7 @@ Current context: Project ${req.params.projectId}`;
       
       const result = await docIntelService.matchTenantsToCrmContacts(orgId, tenantNames);
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to match tenants:', error);
       res.status(500).json({ error: 'Failed to match tenants to CRM contacts' });
     }
@@ -18362,7 +18345,7 @@ Current context: Project ${req.params.projectId}`;
       
       const lines = await docIntelService.getProjectPnlLines(orgId, projectId);
       res.json(lines);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch P&L lines:', error);
       res.status(500).json({ error: 'Failed to fetch P&L lines' });
     }
@@ -18381,7 +18364,7 @@ Current context: Project ${req.params.projectId}`;
       
       const summary = await docIntelService.getPnlSummaryByCategory(orgId, projectId);
       res.json(summary);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch P&L summary:', error);
       res.status(500).json({ error: 'Failed to fetch P&L summary' });
     }
@@ -18397,7 +18380,7 @@ Current context: Project ${req.params.projectId}`;
       
       const mappings = await docIntelService.getCategoryMappings(orgId, projectId);
       res.json(mappings);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch category mappings:', error);
       res.status(500).json({ error: 'Failed to fetch category mappings' });
     }
@@ -18416,7 +18399,7 @@ Current context: Project ${req.params.projectId}`;
       
       const rule = await docIntelService.createLearningRule(orgId, name, keywords, categoryId, userId);
       res.status(201).json(rule);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create learning rule:', error);
       res.status(500).json({ error: 'Failed to create learning rule' });
     }
@@ -18442,7 +18425,7 @@ Current context: Project ${req.params.projectId}`;
       
       const scenarios = await storage.getExitScenarios(projectId, orgId);
       res.json(scenarios);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch exit scenarios:', error);
       res.status(500).json({ error: 'Failed to fetch exit scenarios' });
     }
@@ -18465,7 +18448,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(scenario);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch exit scenario:', error);
       res.status(500).json({ error: 'Failed to fetch exit scenario' });
     }
@@ -18501,7 +18484,7 @@ Current context: Project ${req.params.projectId}`;
       });
       
       res.status(201).json(scenario);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create exit scenario:', error);
       res.status(500).json({ error: 'Failed to create exit scenario' });
     }
@@ -18529,7 +18512,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(scenario);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update exit scenario:', error);
       res.status(500).json({ error: 'Failed to update exit scenario' });
     }
@@ -18552,7 +18535,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete exit scenario:', error);
       res.status(500).json({ error: 'Failed to delete exit scenario' });
     }
@@ -18573,7 +18556,7 @@ Current context: Project ${req.params.projectId}`;
       
       const taxCalcs = await storage.getExitTaxCalculations(scenarioId, orgId);
       res.json(taxCalcs);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch tax calculations:', error);
       res.status(500).json({ error: 'Failed to fetch tax calculations' });
     }
@@ -18602,7 +18585,7 @@ Current context: Project ${req.params.projectId}`;
       });
       
       res.status(201).json(taxCalc);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create tax calculation:', error);
       res.status(500).json({ error: 'Failed to create tax calculation' });
     }
@@ -18620,7 +18603,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(taxCalc);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update tax calculation:', error);
       res.status(500).json({ error: 'Failed to update tax calculation' });
     }
@@ -18638,7 +18621,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete tax calculation:', error);
       res.status(500).json({ error: 'Failed to delete tax calculation' });
     }
@@ -18654,7 +18637,7 @@ Current context: Project ${req.params.projectId}`;
       
       const sellerFinancing = await storage.getExitSellerFinancing(scenarioId, orgId);
       res.json(sellerFinancing);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch seller financing:', error);
       res.status(500).json({ error: 'Failed to fetch seller financing' });
     }
@@ -18678,7 +18661,7 @@ Current context: Project ${req.params.projectId}`;
       });
       
       res.status(201).json(sellerFinancing);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create seller financing:', error);
       res.status(500).json({ error: 'Failed to create seller financing' });
     }
@@ -18696,7 +18679,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(sellerFinancing);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update seller financing:', error);
       res.status(500).json({ error: 'Failed to update seller financing' });
     }
@@ -18714,7 +18697,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete seller financing:', error);
       res.status(500).json({ error: 'Failed to delete seller financing' });
     }
@@ -18730,7 +18713,7 @@ Current context: Project ${req.params.projectId}`;
       
       const earnouts = await storage.getExitEarnouts(scenarioId, orgId);
       res.json(earnouts);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch earnouts:', error);
       res.status(500).json({ error: 'Failed to fetch earnouts' });
     }
@@ -18754,7 +18737,7 @@ Current context: Project ${req.params.projectId}`;
       });
       
       res.status(201).json(earnout);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create earnout:', error);
       res.status(500).json({ error: 'Failed to create earnout' });
     }
@@ -18772,7 +18755,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(earnout);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update earnout:', error);
       res.status(500).json({ error: 'Failed to update earnout' });
     }
@@ -18790,7 +18773,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete earnout:', error);
       res.status(500).json({ error: 'Failed to delete earnout' });
     }
@@ -18806,7 +18789,7 @@ Current context: Project ${req.params.projectId}`;
       
       const exchanges = await storage.getExit1031Exchanges(scenarioId, orgId);
       res.json(exchanges);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch 1031 exchanges:', error);
       res.status(500).json({ error: 'Failed to fetch 1031 exchanges' });
     }
@@ -18830,7 +18813,7 @@ Current context: Project ${req.params.projectId}`;
       });
       
       res.status(201).json(exchange);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create 1031 exchange:', error);
       res.status(500).json({ error: 'Failed to create 1031 exchange' });
     }
@@ -18848,7 +18831,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(exchange);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update 1031 exchange:', error);
       res.status(500).json({ error: 'Failed to update 1031 exchange' });
     }
@@ -18866,7 +18849,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete 1031 exchange:', error);
       res.status(500).json({ error: 'Failed to delete 1031 exchange' });
     }
@@ -18882,7 +18865,7 @@ Current context: Project ${req.params.projectId}`;
       
       const dstAnalyses = await storage.getExitDstAnalyses(scenarioId, orgId);
       res.json(dstAnalyses);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch DST analyses:', error);
       res.status(500).json({ error: 'Failed to fetch DST analyses' });
     }
@@ -18906,7 +18889,7 @@ Current context: Project ${req.params.projectId}`;
       });
       
       res.status(201).json(dstAnalysis);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create DST analysis:', error);
       res.status(500).json({ error: 'Failed to create DST analysis' });
     }
@@ -18924,7 +18907,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(dstAnalysis);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update DST analysis:', error);
       res.status(500).json({ error: 'Failed to update DST analysis' });
     }
@@ -18942,7 +18925,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete DST analysis:', error);
       res.status(500).json({ error: 'Failed to delete DST analysis' });
     }
@@ -18956,7 +18939,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const funds = await storage.getExitFunds(orgId);
       res.json(funds);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch funds:', error);
       res.status(500).json({ error: 'Failed to fetch funds' });
     }
@@ -18974,7 +18957,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(fund);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch fund:', error);
       res.status(500).json({ error: 'Failed to fetch fund' });
     }
@@ -18991,7 +18974,7 @@ Current context: Project ${req.params.projectId}`;
       });
       
       res.status(201).json(fund);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create fund:', error);
       res.status(500).json({ error: 'Failed to create fund' });
     }
@@ -19009,7 +18992,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(fund);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update fund:', error);
       res.status(500).json({ error: 'Failed to update fund' });
     }
@@ -19027,7 +19010,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete fund:', error);
       res.status(500).json({ error: 'Failed to delete fund' });
     }
@@ -19043,7 +19026,7 @@ Current context: Project ${req.params.projectId}`;
       
       const waterfalls = await storage.getExitWaterfallStructures(scenarioId, orgId);
       res.json(waterfalls);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch waterfall structures:', error);
       res.status(500).json({ error: 'Failed to fetch waterfall structures' });
     }
@@ -19067,7 +19050,7 @@ Current context: Project ${req.params.projectId}`;
       });
       
       res.status(201).json(waterfall);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create waterfall structure:', error);
       res.status(500).json({ error: 'Failed to create waterfall structure' });
     }
@@ -19085,7 +19068,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(waterfall);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update waterfall structure:', error);
       res.status(500).json({ error: 'Failed to update waterfall structure' });
     }
@@ -19103,7 +19086,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete waterfall structure:', error);
       res.status(500).json({ error: 'Failed to delete waterfall structure' });
     }
@@ -19124,7 +19107,7 @@ Current context: Project ${req.params.projectId}`;
       
       const investors = await storage.getExitInvestors(fundId, orgId);
       res.json(investors);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch investors:', error);
       res.status(500).json({ error: 'Failed to fetch investors' });
     }
@@ -19148,7 +19131,7 @@ Current context: Project ${req.params.projectId}`;
       });
       
       res.status(201).json(investor);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create investor:', error);
       res.status(500).json({ error: 'Failed to create investor' });
     }
@@ -19166,7 +19149,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(investor);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update investor:', error);
       res.status(500).json({ error: 'Failed to update investor' });
     }
@@ -19184,7 +19167,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete investor:', error);
       res.status(500).json({ error: 'Failed to delete investor' });
     }
@@ -19200,7 +19183,7 @@ Current context: Project ${req.params.projectId}`;
       
       const cashFlows = await storage.getExitCashFlows(scenarioId, orgId);
       res.json(cashFlows);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch cash flows:', error);
       res.status(500).json({ error: 'Failed to fetch cash flows' });
     }
@@ -19233,7 +19216,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.status(201).json(createdFlows);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save cash flows:', error);
       res.status(500).json({ error: 'Failed to save cash flows' });
     }
@@ -19254,7 +19237,7 @@ Current context: Project ${req.params.projectId}`;
         orgId
       );
       res.json(activities);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch exit activities:', error);
       res.status(500).json({ error: 'Failed to fetch exit activities' });
     }
@@ -19301,7 +19284,7 @@ Current context: Project ${req.params.projectId}`;
         transitionCostLines: transitionLines,
         nwcLines: nwcLinesData,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch transaction closing data:', error);
       res.status(500).json({ error: 'Failed to fetch transaction closing data' });
     }
@@ -19427,7 +19410,7 @@ Current context: Project ${req.params.projectId}`;
         transitionCostLines: savedTransitionLines,
         nwcLines: savedNwcLines,
       });
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -19448,7 +19431,7 @@ Current context: Project ${req.params.projectId}`;
       const { capitalStackService } = await import('./services/capital-stack-service');
       const stacks = await capitalStackService.getCapitalStacksByProject(orgId, projectId);
       res.json(stacks);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch capital stacks:', error);
       res.status(500).json({ error: 'Failed to fetch capital stacks' });
     }
@@ -19465,7 +19448,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Capital stack not found' });
       }
       res.json(stack);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch capital stack:', error);
       res.status(500).json({ error: 'Failed to fetch capital stack' });
     }
@@ -19483,7 +19466,7 @@ Current context: Project ${req.params.projectId}`;
         modelingProjectId: projectId,
       });
       res.status(201).json(stack);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create capital stack:', error);
       res.status(500).json({ error: 'Failed to create capital stack' });
     }
@@ -19500,7 +19483,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Capital stack not found' });
       }
       res.json(stack);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update capital stack:', error);
       res.status(500).json({ error: 'Failed to update capital stack' });
     }
@@ -19517,7 +19500,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Capital stack not found' });
       }
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete capital stack:', error);
       res.status(500).json({ error: 'Failed to delete capital stack' });
     }
@@ -19531,7 +19514,7 @@ Current context: Project ${req.params.projectId}`;
       const { capitalStackService } = await import('./services/capital-stack-service');
       const tranches = await capitalStackService.getDebtTranches(orgId, stackId);
       res.json(tranches);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch debt tranches:', error);
       res.status(500).json({ error: 'Failed to fetch debt tranches' });
     }
@@ -19547,7 +19530,7 @@ Current context: Project ${req.params.projectId}`;
         capitalStackId: stackId,
       });
       res.status(201).json(tranche);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create debt tranche:', error);
       res.status(500).json({ error: 'Failed to create debt tranche' });
     }
@@ -19563,7 +19546,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Debt tranche not found' });
       }
       res.json(tranche);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update debt tranche:', error);
       res.status(500).json({ error: 'Failed to update debt tranche' });
     }
@@ -19579,7 +19562,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Debt tranche not found' });
       }
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete debt tranche:', error);
       res.status(500).json({ error: 'Failed to delete debt tranche' });
     }
@@ -19593,7 +19576,7 @@ Current context: Project ${req.params.projectId}`;
       const { capitalStackService } = await import('./services/capital-stack-service');
       const layers = await capitalStackService.getEquityLayers(orgId, stackId);
       res.json(layers);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch equity layers:', error);
       res.status(500).json({ error: 'Failed to fetch equity layers' });
     }
@@ -19609,7 +19592,7 @@ Current context: Project ${req.params.projectId}`;
         capitalStackId: stackId,
       });
       res.status(201).json(layer);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create equity layer:', error);
       res.status(500).json({ error: 'Failed to create equity layer' });
     }
@@ -19625,7 +19608,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Equity layer not found' });
       }
       res.json(layer);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update equity layer:', error);
       res.status(500).json({ error: 'Failed to update equity layer' });
     }
@@ -19641,7 +19624,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Equity layer not found' });
       }
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete equity layer:', error);
       res.status(500).json({ error: 'Failed to delete equity layer' });
     }
@@ -19655,7 +19638,7 @@ Current context: Project ${req.params.projectId}`;
       const { capitalStackService } = await import('./services/capital-stack-service');
       const projections = await capitalStackService.getProjections(orgId, stackId);
       res.json(projections);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch projections:', error);
       res.status(500).json({ error: 'Failed to fetch projections' });
     }
@@ -19669,7 +19652,7 @@ Current context: Project ${req.params.projectId}`;
       const { capitalStackService } = await import('./services/capital-stack-service');
       const projections = await capitalStackService.generateProjections(orgId, stackId, parseFloat(noi));
       res.json(projections);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to generate projections:', error);
       res.status(500).json({ error: 'Failed to generate projections' });
     }
@@ -19684,7 +19667,7 @@ Current context: Project ${req.params.projectId}`;
       const { capitalStackService } = await import('./services/capital-stack-service');
       const metrics = await capitalStackService.getCapitalStackMetrics(orgId, stackId, noi);
       res.json(metrics);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch capital stack metrics:', error);
       res.status(500).json({ error: 'Failed to fetch capital stack metrics' });
     }
@@ -19701,7 +19684,7 @@ Current context: Project ${req.params.projectId}`;
       const { fundService } = await import('./services/fund-service');
       const funds = await fundService.getFundsByOrg(orgId);
       res.json(funds);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch funds:', error);
       res.status(500).json({ error: 'Failed to fetch funds' });
     }
@@ -19717,7 +19700,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Fund not found' });
       }
       res.json(fund);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch fund:', error);
       res.status(500).json({ error: 'Failed to fetch fund' });
     }
@@ -19730,7 +19713,7 @@ Current context: Project ${req.params.projectId}`;
       const { fundService } = await import('./services/fund-service');
       const fund = await fundService.createFund(orgId, userId, req.body);
       res.status(201).json(fund);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -19749,7 +19732,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Fund not found' });
       }
       res.json(fund);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update fund:', error);
       res.status(500).json({ error: 'Failed to update fund' });
     }
@@ -19765,7 +19748,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Fund not found' });
       }
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete fund:', error);
       res.status(500).json({ error: 'Failed to delete fund' });
     }
@@ -19779,7 +19762,7 @@ Current context: Project ${req.params.projectId}`;
       const { fundService } = await import('./services/fund-service');
       const metrics = await fundService.calculateFundMetrics(orgId, fundId);
       res.json(metrics);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to calculate fund metrics:', error);
       res.status(500).json({ error: 'Failed to calculate fund metrics' });
     }
@@ -19793,7 +19776,7 @@ Current context: Project ${req.params.projectId}`;
       await fundService.recalculateFundMetrics(orgId, fundId);
       const fund = await fundService.getFundWithDetails(orgId, fundId);
       res.json(fund);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to recalculate fund metrics:', error);
       res.status(500).json({ error: 'Failed to recalculate fund metrics' });
     }
@@ -19807,7 +19790,7 @@ Current context: Project ${req.params.projectId}`;
       const { fundService } = await import('./services/fund-service');
       const investors = await fundService.getInvestorsByFund(orgId, fundId);
       res.json(investors);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch fund investors:', error);
       res.status(500).json({ error: 'Failed to fetch fund investors' });
     }
@@ -19823,7 +19806,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Investor not found' });
       }
       res.json(investor);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch investor:', error);
       res.status(500).json({ error: 'Failed to fetch investor' });
     }
@@ -19839,7 +19822,7 @@ Current context: Project ${req.params.projectId}`;
         fundId,
       });
       res.status(201).json(investor);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -19858,7 +19841,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Investor not found' });
       }
       res.json(investor);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update investor:', error);
       res.status(500).json({ error: 'Failed to update investor' });
     }
@@ -19874,7 +19857,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Investor not found' });
       }
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete investor:', error);
       res.status(500).json({ error: 'Failed to delete investor' });
     }
@@ -19888,7 +19871,7 @@ Current context: Project ${req.params.projectId}`;
       const { fundService } = await import('./services/fund-service');
       const accounts = await fundService.getInvestorCapitalAccounts(orgId, fundId);
       res.json(accounts);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch capital accounts:', error);
       res.status(500).json({ error: 'Failed to fetch capital accounts' });
     }
@@ -19902,7 +19885,7 @@ Current context: Project ${req.params.projectId}`;
       const { fundService } = await import('./services/fund-service');
       const allocations = await fundService.getAllocationsByFund(orgId, fundId);
       res.json(allocations);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch fund allocations:', error);
       res.status(500).json({ error: 'Failed to fetch fund allocations' });
     }
@@ -19915,7 +19898,7 @@ Current context: Project ${req.params.projectId}`;
       const { fundService } = await import('./services/fund-service');
       const allocations = await fundService.getAllocationsByProject(orgId, projectId);
       res.json(allocations);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch project fund allocations:', error);
       res.status(500).json({ error: 'Failed to fetch project fund allocations' });
     }
@@ -19931,7 +19914,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Deal allocation not found' });
       }
       res.json(allocation);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch deal allocation:', error);
       res.status(500).json({ error: 'Failed to fetch deal allocation' });
     }
@@ -19947,7 +19930,7 @@ Current context: Project ${req.params.projectId}`;
         fundId,
       });
       res.status(201).json(allocation);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -19966,7 +19949,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Deal allocation not found' });
       }
       res.json(allocation);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update deal allocation:', error);
       res.status(500).json({ error: 'Failed to update deal allocation' });
     }
@@ -19982,7 +19965,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Deal allocation not found' });
       }
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete deal allocation:', error);
       res.status(500).json({ error: 'Failed to delete deal allocation' });
     }
@@ -19996,7 +19979,7 @@ Current context: Project ${req.params.projectId}`;
       const { fundService } = await import('./services/fund-service');
       const movements = await fundService.getCapitalMovementsByFund(orgId, fundId);
       res.json(movements);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch capital movements:', error);
       res.status(500).json({ error: 'Failed to fetch capital movements' });
     }
@@ -20012,7 +19995,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Capital movement not found' });
       }
       res.json(movement);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch capital movement:', error);
       res.status(500).json({ error: 'Failed to fetch capital movement' });
     }
@@ -20029,7 +20012,7 @@ Current context: Project ${req.params.projectId}`;
         fundId,
       });
       res.status(201).json(movement);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -20048,7 +20031,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Capital movement not found' });
       }
       res.json(movement);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update capital movement:', error);
       res.status(500).json({ error: 'Failed to update capital movement' });
     }
@@ -20064,7 +20047,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Capital movement not found' });
       }
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete capital movement:', error);
       res.status(500).json({ error: 'Failed to delete capital movement' });
     }
@@ -20078,7 +20061,7 @@ Current context: Project ${req.params.projectId}`;
       const { fundService } = await import('./services/fund-service');
       const cashFlows = await fundService.getCashFlowsByFund(orgId, fundId);
       res.json(cashFlows);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch cash flows:', error);
       res.status(500).json({ error: 'Failed to fetch cash flows' });
     }
@@ -20094,7 +20077,7 @@ Current context: Project ${req.params.projectId}`;
         fundId,
       });
       res.status(201).json(cashFlow);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -20111,7 +20094,7 @@ Current context: Project ${req.params.projectId}`;
       const { fundService } = await import('./services/fund-service');
       const templates = await fundService.getTemplatesByFund(orgId, fundId);
       res.json(templates);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch capital stack templates:', error);
       res.status(500).json({ error: 'Failed to fetch capital stack templates' });
     }
@@ -20127,7 +20110,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Template not found' });
       }
       res.json(template);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch capital stack template:', error);
       res.status(500).json({ error: 'Failed to fetch capital stack template' });
     }
@@ -20144,7 +20127,7 @@ Current context: Project ${req.params.projectId}`;
         fundId,
       });
       res.status(201).json(template);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -20163,7 +20146,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Template not found' });
       }
       res.json(template);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update capital stack template:', error);
       res.status(500).json({ error: 'Failed to update capital stack template' });
     }
@@ -20179,7 +20162,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Template not found' });
       }
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete capital stack template:', error);
       res.status(500).json({ error: 'Failed to delete capital stack template' });
     }
@@ -20193,7 +20176,7 @@ Current context: Project ${req.params.projectId}`;
       const { fundService } = await import('./services/fund-service');
       const waterfall = await fundService.getLatestWaterfallCalculation(orgId, fundId);
       res.json(waterfall);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch waterfall calculation:', error);
       res.status(500).json({ error: 'Failed to fetch waterfall calculation' });
     }
@@ -20206,7 +20189,7 @@ Current context: Project ${req.params.projectId}`;
       const { fundService } = await import('./services/fund-service');
       const history = await fundService.getWaterfallHistory(orgId, fundId);
       res.json(history);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch waterfall history:', error);
       res.status(500).json({ error: 'Failed to fetch waterfall history' });
     }
@@ -20244,7 +20227,7 @@ Current context: Project ${req.params.projectId}`;
         storedCalculation: stored,
         fundMetrics: metrics
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to calculate waterfall:', error);
       res.status(500).json({ error: 'Failed to calculate waterfall' });
     }
@@ -20261,7 +20244,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'No fund allocation found for this project' });
       }
       res.json(allocation);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch deal allocation by project:', error);
       res.status(500).json({ error: 'Failed to fetch deal allocation' });
     }
@@ -20278,7 +20261,7 @@ Current context: Project ${req.params.projectId}`;
         orgId,
       });
       res.status(201).json(allocation);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create fund allocation:', error);
       res.status(500).json({ error: 'Failed to create fund allocation' });
     }
@@ -20295,7 +20278,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Allocation not found' });
       }
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update fund allocation:', error);
       res.status(500).json({ error: 'Failed to update fund allocation' });
     }
@@ -20309,7 +20292,7 @@ Current context: Project ${req.params.projectId}`;
       const { fundService } = await import('./services/fund-service');
       await fundService.deleteDealAllocation(orgId, allocationId);
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete fund allocation:', error);
       res.status(500).json({ error: 'Failed to delete fund allocation' });
     }
@@ -20403,7 +20386,7 @@ Current context: Project ${req.params.projectId}`;
         message: 'Template applied successfully',
         capitalStack: stack
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to apply capital stack template:', error);
       res.status(500).json({ error: 'Failed to apply capital stack template' });
     }
@@ -20420,7 +20403,7 @@ Current context: Project ${req.params.projectId}`;
       // TODO: Add to storage interface
       const scenarios = await storage.getDebtScenarios(orgId);
       res.json(scenarios);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch debt scenarios:', error);
       res.status(500).json({ error: 'Failed to fetch debt scenarios' });
     }
@@ -20435,7 +20418,7 @@ Current context: Project ${req.params.projectId}`;
       // TODO: Add to storage interface
       const scenarios = await storage.getDebtScenariosByProject(projectId, orgId);
       res.json(scenarios);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch debt scenarios for project:', error);
       res.status(500).json({ error: 'Failed to fetch debt scenarios for project' });
     }
@@ -20470,7 +20453,7 @@ Current context: Project ${req.params.projectId}`;
         ...scenario,
         calculatedMetrics: metrics
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch debt scenario:', error);
       res.status(500).json({ error: 'Failed to fetch debt scenario' });
     }
@@ -20509,7 +20492,7 @@ Current context: Project ${req.params.projectId}`;
         ...scenario,
         calculatedMetrics: metrics
       });
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -20563,7 +20546,7 @@ Current context: Project ${req.params.projectId}`;
         ...scenario,
         calculatedMetrics: metrics
       });
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -20590,7 +20573,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete debt scenario:', error);
       res.status(500).json({ error: 'Failed to delete debt scenario' });
     }
@@ -20633,7 +20616,7 @@ Current context: Project ${req.params.projectId}`;
         metrics,
         amortizationSchedule: amortizationSchedule.slice(0, 12) // First year only for performance
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to calculate debt scenario metrics:', error);
       res.status(500).json({ error: 'Failed to calculate debt scenario metrics' });
     }
@@ -20704,7 +20687,7 @@ Current context: Project ${req.params.projectId}`;
         ...(customRateSensitivity && { customRateSensitivity }),
         ...(customLtvSensitivity && { customLtvSensitivity })
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to run sensitivity analysis:', error);
       res.status(500).json({ error: 'Failed to run sensitivity analysis' });
     }
@@ -20723,7 +20706,7 @@ Current context: Project ${req.params.projectId}`;
       
       // Return null with 200 status if no persona assigned (not 404)
       res.json(persona || null);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch user persona:', error);
       res.status(500).json({ error: 'Failed to fetch user persona' });
     }
@@ -20737,7 +20720,7 @@ Current context: Project ${req.params.projectId}`;
       const data = insertUserPersonaAssignmentSchema.parse(req.body);
       const persona = await personaService.assignPersona(userId, orgId, data);
       res.json(persona);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -20753,7 +20736,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const features = await personaService.getUserFeatures(userId, orgId);
       res.json({ features });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch user features:', error);
       res.status(500).json({ error: 'Failed to fetch user features' });
     }
@@ -20772,7 +20755,7 @@ Current context: Project ${req.params.projectId}`;
       
       const hasPermission = await personaService.checkPermission(userId, orgId, featureKey);
       res.json({ hasPermission });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to check permission:', error);
       res.status(500).json({ error: 'Failed to check permission' });
     }
@@ -20931,7 +20914,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(headerData);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch dashboard header:', error);
       res.status(500).json({ error: 'Failed to fetch dashboard header' });
     }
@@ -20943,7 +20926,7 @@ Current context: Project ${req.params.projectId}`;
       const personaType = req.query.personaType;
       const widgets = await dashboardService.getWidgetRegistry(personaType);
       res.json(widgets);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch widget registry:', error);
       res.status(500).json({ error: 'Failed to fetch widget registry' });
     }
@@ -20969,7 +20952,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(layout);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch dashboard layout:', error);
       res.status(500).json({ error: 'Failed to fetch dashboard layout' });
     }
@@ -20989,7 +20972,7 @@ Current context: Project ${req.params.projectId}`;
       
       const layout = await dashboardService.saveDashboardLayout(userId, orgId, data);
       res.json(layout);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -21004,7 +20987,7 @@ Current context: Project ${req.params.projectId}`;
       const { persona } = req.params;
       const template = await dashboardService.getTemplateByPersona(persona);
       res.json({ template });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch dashboard template:', error);
       res.status(500).json({ error: 'Failed to fetch dashboard template' });
     }
@@ -21023,7 +21006,7 @@ Current context: Project ${req.params.projectId}`;
       
       const layout = await dashboardService.resetToDefault(userId, orgId, personaType);
       res.json(layout);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to reset dashboard:', error);
       res.status(500).json({ error: 'Failed to reset dashboard' });
     }
@@ -21038,7 +21021,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       await dashboardService.initializeMetricRegistry();
       res.json({ success: true, message: 'Metric registry initialized' });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to initialize metric registry:', error);
       res.status(500).json({ error: 'Failed to initialize metric registry' });
     }
@@ -21050,7 +21033,7 @@ Current context: Project ${req.params.projectId}`;
       const moduleKey = req.query.module as string | undefined;
       const metrics = await dashboardService.getModuleMetrics(moduleKey);
       res.json(metrics);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch metrics:', error);
       res.status(500).json({ error: 'Failed to fetch metrics' });
     }
@@ -21067,7 +21050,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(metric);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch metric:', error);
       res.status(500).json({ error: 'Failed to fetch metric' });
     }
@@ -21080,7 +21063,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const widgets = await dashboardService.getUserCustomWidgets(userId, orgId);
       res.json(widgets);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch custom widgets:', error);
       res.status(500).json({ error: 'Failed to fetch custom widgets' });
     }
@@ -21097,7 +21080,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(widget);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch custom widget:', error);
       res.status(500).json({ error: 'Failed to fetch custom widget' });
     }
@@ -21111,7 +21094,7 @@ Current context: Project ${req.params.projectId}`;
       const data = insertDashboardCustomWidgetSchema.parse(req.body);
       const widget = await dashboardService.createCustomWidget(userId, orgId, data);
       res.status(201).json(widget);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -21134,7 +21117,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(widget);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -21156,7 +21139,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete custom widget:', error);
       res.status(500).json({ error: 'Failed to delete custom widget' });
     }
@@ -21175,7 +21158,7 @@ Current context: Project ${req.params.projectId}`;
       
       await dashboardService.updateWidgetOrder(userId, orgId, widgetOrder);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update widget order:', error);
       res.status(500).json({ error: 'Failed to update widget order' });
     }
@@ -21188,7 +21171,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const layouts = await dashboardService.getUserSavedLayouts(userId, orgId);
       res.json(layouts);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch saved layouts:', error);
       res.status(500).json({ error: 'Failed to fetch saved layouts' });
     }
@@ -21205,7 +21188,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(layout);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch saved layout:', error);
       res.status(500).json({ error: 'Failed to fetch saved layout' });
     }
@@ -21219,7 +21202,7 @@ Current context: Project ${req.params.projectId}`;
       const data = insertDashboardSavedLayoutSchema.parse(req.body);
       const layout = await dashboardService.createSavedLayout(userId, orgId, data);
       res.status(201).json(layout);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -21242,7 +21225,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(layout);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -21264,7 +21247,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete saved layout:', error);
       res.status(500).json({ error: 'Failed to delete saved layout' });
     }
@@ -21277,7 +21260,7 @@ Current context: Project ${req.params.projectId}`;
       const category = req.query.category as string | undefined;
       const templates = await dashboardService.getWidgetTemplates(moduleKey, category);
       res.json(templates);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch widget templates:', error);
       res.status(500).json({ error: 'Failed to fetch widget templates' });
     }
@@ -21298,7 +21281,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.status(201).json(widget);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create widget from template:', error);
       res.status(500).json({ error: 'Failed to create widget from template' });
     }
@@ -21438,7 +21421,7 @@ Current context: Project ${req.params.projectId}`;
       ];
       
       res.json({ modules });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get module metrics:', error);
       res.status(500).json({ error: 'Failed to get module metrics' });
     }
@@ -21463,7 +21446,7 @@ Current context: Project ${req.params.projectId}`;
       );
       
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to execute widget query:', error);
       res.status(500).json({ error: 'Failed to execute widget query' });
     }
@@ -21488,7 +21471,7 @@ Current context: Project ${req.params.projectId}`;
       });
       
       res.json(resultObj);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to batch execute widget queries:', error);
       res.status(500).json({ error: 'Failed to batch execute widget queries' });
     }
@@ -21520,7 +21503,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(prefs);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch KPI preferences:', error);
       res.status(500).json({ error: 'Failed to fetch KPI preferences' });
     }
@@ -21571,7 +21554,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -21638,7 +21621,7 @@ Current context: Project ${req.params.projectId}`;
         withContacts,
         totalCompanies: parseInt(totalResult.rows[0]?.count as string || '0'),
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch company KPI stats:', error);
       res.status(500).json({ error: 'Failed to fetch company KPI stats' });
     }
@@ -21654,7 +21637,7 @@ Current context: Project ${req.params.projectId}`;
       
       const data = await dashboardService.getAggregatedDashboardData(orgId, timeRange, selectedModules);
       res.json(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch dashboard data:', error);
       res.status(500).json({ error: 'Failed to fetch dashboard data' });
     }
@@ -21667,7 +21650,7 @@ Current context: Project ${req.params.projectId}`;
       const timeRange = (req.query.timeRange as any) || '30d';
       const data = await dashboardService.getCRMTrendData(orgId, timeRange);
       res.json(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch CRM trend data:', error);
       res.status(500).json({ error: 'Failed to fetch CRM trend data' });
     }
@@ -21680,7 +21663,7 @@ Current context: Project ${req.params.projectId}`;
       const timeRange = (req.query.timeRange as any) || '30d';
       const data = await dashboardService.getCRMStageDistribution(orgId, timeRange);
       res.json(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch CRM stage distribution:', error);
       res.status(500).json({ error: 'Failed to fetch stage distribution' });
     }
@@ -21694,7 +21677,7 @@ Current context: Project ${req.params.projectId}`;
       const timeRange = (req.query.timeRange as any) || '30d';
       const data = await dashboardService.getRevenueTrendData(orgId, module, timeRange);
       res.json(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch revenue trend data:', error);
       res.status(500).json({ error: 'Failed to fetch revenue trend data' });
     }
@@ -21726,7 +21709,7 @@ Current context: Project ${req.params.projectId}`;
       res.setHeader('Content-Type', 'application/json');
       res.setHeader('Content-Disposition', `attachment; filename="dashboard-report-${new Date().toISOString().split('T')[0]}.json"`);
       res.json(report);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to export PDF:', error);
       res.status(500).json({ error: 'Failed to export dashboard' });
     }
@@ -21801,7 +21784,7 @@ Current context: Project ${req.params.projectId}`;
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename="dashboard-report-${new Date().toISOString().split('T')[0]}.xlsx"`);
       res.send(excelBuffer);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to export Excel:', error);
       res.status(500).json({ error: 'Failed to export dashboard' });
     }
@@ -21832,7 +21815,7 @@ Current context: Project ${req.params.projectId}`;
         .limit(20);
 
       res.json(deals);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch recent deals:', error);
       res.status(500).json({ error: 'Failed to fetch recent deals' });
     }
@@ -21873,7 +21856,7 @@ Current context: Project ${req.params.projectId}`;
         .limit(50);
 
       res.json(comps);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch recent sales comps:', error);
       res.status(500).json({ error: 'Failed to fetch recent sales comps' });
     }
@@ -21892,7 +21875,7 @@ Current context: Project ${req.params.projectId}`;
       
       const overview = await demographicsService.getDemographicsOverview(orgId, stateCode);
       res.json(overview);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch demographics overview:', error);
       res.status(500).json({ error: 'Failed to fetch demographics overview' });
     }
@@ -21907,7 +21890,7 @@ Current context: Project ${req.params.projectId}`;
       
       const indicators = await demographicsService.getEconomicIndicators(orgId, stateCode);
       res.json(indicators);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch economic indicators:', error);
       res.status(500).json({ error: 'Failed to fetch economic indicators' });
     }
@@ -21922,7 +21905,7 @@ Current context: Project ${req.params.projectId}`;
       
       const stats = await demographicsService.getRegionalMarketStats(orgId, stateCode);
       res.json(stats);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch market statistics:', error);
       res.status(500).json({ error: 'Failed to fetch market statistics' });
     }
@@ -21936,7 +21919,7 @@ Current context: Project ${req.params.projectId}`;
       
       const states = await demographicsService.getAvailableStates(orgId);
       res.json(states);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch available states:', error);
       res.status(500).json({ error: 'Failed to fetch available states' });
     }
@@ -21950,7 +21933,7 @@ Current context: Project ${req.params.projectId}`;
       
       const overview = await demographicsService.getNationalOverview(orgId);
       res.json(overview);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch national overview:', error);
       res.status(500).json({ error: 'Failed to fetch national overview' });
     }
@@ -21991,7 +21974,7 @@ Current context: Project ${req.params.projectId}`;
         demographics,
         fetchedAt: new Date().toISOString()
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch location demographics:', error);
       res.status(500).json({ error: 'Failed to fetch location demographics' });
     }
@@ -22022,7 +22005,7 @@ Current context: Project ${req.params.projectId}`;
         source: estimate.source,
         radiusMiles: estimate.calculatedMiles || estimate.estimatedMiles
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to calculate drive time radius:', error);
       res.status(500).json({ error: 'Failed to calculate drive time radius' });
     }
@@ -22047,7 +22030,7 @@ Current context: Project ${req.params.projectId}`;
       );
       
       res.json(validation);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to validate drive time:', error);
       res.status(500).json({ error: 'Failed to validate drive time' });
     }
@@ -22101,7 +22084,7 @@ Current context: Project ${req.params.projectId}`;
         demographics,
         fetchedAt: new Date().toISOString()
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch property demographics:', error);
       res.status(500).json({ error: 'Failed to fetch property demographics' });
     }
@@ -22137,7 +22120,7 @@ Current context: Project ${req.params.projectId}`;
               demographics,
               success: true
             };
-          } catch (error) {
+          } catch (error: any) {
             return {
               location: loc,
               demographics: null,
@@ -22152,7 +22135,7 @@ Current context: Project ${req.params.projectId}`;
         comparisons: results,
         fetchedAt: new Date().toISOString()
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to compare demographics:', error);
       res.status(500).json({ error: 'Failed to compare demographics' });
     }
@@ -22177,7 +22160,7 @@ Current context: Project ${req.params.projectId}`;
         .orderBy(asc(demographicProjectLocations.sortOrder));
 
       res.json(locations);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch demographic project locations:', error);
       res.status(500).json({ error: 'Failed to fetch demographic project locations' });
     }
@@ -22226,7 +22209,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json({ success: true, count: locations.length });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save demographic project locations:', error);
       res.status(500).json({ error: 'Failed to save demographic project locations' });
     }
@@ -22262,7 +22245,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update demographic location:', error);
       res.status(500).json({ error: 'Failed to update demographic location' });
     }
@@ -22290,7 +22273,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete demographic location:', error);
       res.status(500).json({ error: 'Failed to delete demographic location' });
     }
@@ -22321,7 +22304,7 @@ Current context: Project ${req.params.projectId}`;
         .limit(20);
 
       res.json(transactions);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch recent fuel transactions:', error);
       res.status(500).json({ error: 'Failed to fetch recent fuel transactions' });
     }
@@ -22351,7 +22334,7 @@ Current context: Project ${req.params.projectId}`;
         .limit(20);
 
       res.json(deals);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch recent DockTalk deals:', error);
       res.status(500).json({ error: 'Failed to fetch recent DockTalk deals' });
     }
@@ -22382,7 +22365,7 @@ Current context: Project ${req.params.projectId}`;
         .limit(20);
 
       res.json(documents);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch recent VDR documents:', error);
       res.status(500).json({ error: 'Failed to fetch recent VDR documents' });
     }
@@ -22409,7 +22392,7 @@ Current context: Project ${req.params.projectId}`;
         .limit(20);
 
       res.json(transactions);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch recent ship store transactions:', error);
       res.status(500).json({ error: 'Failed to fetch recent ship store transactions' });
     }
@@ -22440,7 +22423,7 @@ Current context: Project ${req.params.projectId}`;
         .limit(20);
 
       res.json(recentTasks);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch recent DD tasks:', error);
       res.status(500).json({ error: 'Failed to fetch recent DD tasks' });
     }
@@ -22470,7 +22453,7 @@ Current context: Project ${req.params.projectId}`;
         .limit(20);
 
       res.json(entries);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch recent rent roll entries:', error);
       res.status(500).json({ error: 'Failed to fetch recent rent roll entries' });
     }
@@ -22501,7 +22484,7 @@ Current context: Project ${req.params.projectId}`;
         .limit(20);
 
       res.json(projects);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch recent modeling projects:', error);
       res.status(500).json({ error: 'Failed to fetch recent modeling projects' });
     }
@@ -22522,7 +22505,7 @@ Current context: Project ${req.params.projectId}`;
         .orderBy(desc(dashboardCustomModules.displayOrder));
 
       res.json(modules);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch custom modules:', error);
       res.status(500).json({ error: 'Failed to fetch custom modules' });
     }
@@ -22551,7 +22534,7 @@ Current context: Project ${req.params.projectId}`;
         .returning();
 
       res.json(newModule);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create custom module:', error);
       res.status(500).json({ error: 'Failed to create custom module' });
     }
@@ -22589,7 +22572,7 @@ Current context: Project ${req.params.projectId}`;
         .returning();
 
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update custom module:', error);
       res.status(500).json({ error: 'Failed to update custom module' });
     }
@@ -22622,7 +22605,7 @@ Current context: Project ${req.params.projectId}`;
         .where(eq(dashboardCustomModules.id, moduleId));
 
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete custom module:', error);
       res.status(500).json({ error: 'Failed to delete custom module' });
     }
@@ -22637,7 +22620,7 @@ Current context: Project ${req.params.projectId}`;
       
       const data = await getFilteredModuleData({ moduleType, filters, limit }, orgId);
       res.json(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch custom module data:', error);
       res.status(500).json({ error: 'Failed to fetch custom module data' });
     }
@@ -22658,7 +22641,7 @@ Current context: Project ${req.params.projectId}`;
       );
       
       res.json(previewData);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to generate preview data:', error);
       res.status(500).json({ error: 'Failed to generate preview data' });
     }
@@ -22679,7 +22662,7 @@ Current context: Project ${req.params.projectId}`;
       const selectedModules = config.selectedModules || [];
       
       res.json({ selectedModules });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch dashboard modules:', error);
       res.status(500).json({ error: 'Failed to fetch dashboard modules' });
     }
@@ -22724,7 +22707,7 @@ Current context: Project ${req.params.projectId}`;
         .where(eq(users.id, userId));
 
       res.json({ success: true, selectedModules });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save dashboard modules:', error);
       res.status(500).json({ error: 'Failed to save dashboard modules' });
     }
@@ -22835,7 +22818,7 @@ Current context: Project ${req.params.projectId}`;
               results.set(item.id, { exists: true });
             }
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error(`Error batch validating ${itemType} items:`, error);
         for (const item of typeItems) {
           results.set(item.id, { exists: true });
@@ -22879,7 +22862,7 @@ Current context: Project ${req.params.projectId}`;
       } else {
         res.json(items);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch pinned items:', error);
       res.status(500).json({ error: 'Failed to fetch pinned items' });
     }
@@ -22906,7 +22889,7 @@ Current context: Project ${req.params.projectId}`;
         .returning();
       
       res.json({ deleted: deleted.length });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to cleanup stale pinned items:', error);
       res.status(500).json({ error: 'Failed to cleanup stale items' });
     }
@@ -22997,7 +22980,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to remove pinned item:', error);
       res.status(500).json({ error: 'Failed to remove pinned item' });
     }
@@ -23026,7 +23009,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to reorder pinned items:', error);
       res.status(500).json({ error: 'Failed to reorder pinned items' });
     }
@@ -23050,7 +23033,7 @@ Current context: Project ${req.params.projectId}`;
         .limit(limit);
       
       res.json(items);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch recent items:', error);
       res.status(500).json({ error: 'Failed to fetch recent items' });
     }
@@ -23140,7 +23123,7 @@ Current context: Project ${req.params.projectId}`;
         ));
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to clear recent items:', error);
       res.status(500).json({ error: 'Failed to clear recent items' });
     }
@@ -23165,7 +23148,7 @@ Current context: Project ${req.params.projectId}`;
       
       const items = await query;
       res.json(items);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch favorites:', error);
       res.status(500).json({ error: 'Failed to fetch favorites' });
     }
@@ -23194,7 +23177,7 @@ Current context: Project ${req.params.projectId}`;
         .limit(1);
       
       res.json({ isFavorited: !!existing, favorite: existing || null });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to check favorite status:', error);
       res.status(500).json({ error: 'Failed to check favorite status' });
     }
@@ -23259,7 +23242,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to remove favorite:', error);
       res.status(500).json({ error: 'Failed to remove favorite' });
     }
@@ -23287,7 +23270,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to remove favorite:', error);
       res.status(500).json({ error: 'Failed to remove favorite' });
     }
@@ -23308,7 +23291,7 @@ Current context: Project ${req.params.projectId}`;
       };
       const assets = await ownedAssetsService.getOwnedAssets(orgId, filters);
       res.json(assets);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch owned assets:', error);
       res.status(500).json({ error: 'Failed to fetch owned assets' });
     }
@@ -23325,7 +23308,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(asset);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch owned asset:', error);
       res.status(500).json({ error: 'Failed to fetch owned asset' });
     }
@@ -23339,7 +23322,7 @@ Current context: Project ${req.params.projectId}`;
       const data = insertOwnedAssetSchema.parse(req.body);
       const asset = await ownedAssetsService.createOwnedAsset(orgId, userId, data);
       res.status(201).json(asset);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -23360,7 +23343,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(asset);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -23380,7 +23363,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete owned asset:', error);
       res.status(500).json({ error: 'Failed to delete owned asset' });
     }
@@ -23397,7 +23380,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(performance);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch asset performance:', error);
       res.status(500).json({ error: 'Failed to fetch asset performance' });
     }
@@ -23413,7 +23396,7 @@ Current context: Project ${req.params.projectId}`;
       };
       const snapshots = await ownedAssetsService.getAssetPerformanceSnapshots(req.params.id, filters);
       res.json(snapshots);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch performance snapshots:', error);
       res.status(500).json({ error: 'Failed to fetch performance snapshots' });
     }
@@ -23425,7 +23408,7 @@ Current context: Project ${req.params.projectId}`;
       const data = insertAssetPerformanceSnapshotSchema.parse(req.body);
       const snapshot = await ownedAssetsService.createPerformanceSnapshot(req.params.id, data);
       res.status(201).json(snapshot);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
@@ -23440,7 +23423,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const summary = await ownedAssetsService.getPortfolioSummary(orgId);
       res.json(summary);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch portfolio summary:', error);
       res.status(500).json({ error: 'Failed to fetch portfolio summary' });
     }
@@ -23466,7 +23449,7 @@ Current context: Project ${req.params.projectId}`;
       });
       
       res.status(201).json(asset);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to convert deal to owned asset:', error);
       res.status(500).json({ error: 'Failed to convert deal to owned asset' });
     }
@@ -23537,7 +23520,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.status(201).json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating portfolio:", error);
       
       // Handle Zod validation errors
@@ -23560,7 +23543,7 @@ Current context: Project ${req.params.projectId}`;
 
       const projects = await storage.getScProjects(orgId, userId);
       res.json(projects);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching SC projects:", error);
       res.status(500).json({ message: "Failed to fetch SC projects" });
     }
@@ -23574,7 +23557,7 @@ Current context: Project ${req.params.projectId}`;
       if (!project) return res.status(404).json({ message: "Project not found" });
 
       res.json(project);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching SC project:", error);
       res.status(500).json({ message: "Failed to fetch SC project" });
     }
@@ -23667,7 +23650,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.status(201).json({ project, recommendations, addedCount });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating SC project:", error);
       res.status(500).json({ message: "Failed to create SC project" });
     }
@@ -23700,7 +23683,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(updatedProject);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating SC project:", error);
       res.status(500).json({ message: "Failed to update SC project" });
     }
@@ -23727,7 +23710,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting SC project:", error);
       res.status(500).json({ message: "Failed to delete SC project" });
     }
@@ -23743,7 +23726,7 @@ Current context: Project ${req.params.projectId}`;
 
       const projectComps = await storage.getScProjectComps(req.params.id, orgId);
       res.json(projectComps);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching SC project comps:", error);
       res.status(500).json({ message: "Failed to fetch SC project comps" });
     }
@@ -23783,7 +23766,7 @@ Current context: Project ${req.params.projectId}`;
         }
         throw error;
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding comp to SC project:", error);
       res.status(500).json({ message: "Failed to add comp to SC project" });
     }
@@ -23828,7 +23811,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(results);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error bulk adding comps to SC project:", error);
       res.status(500).json({ message: "Failed to bulk add comps to SC project" });
     }
@@ -23867,13 +23850,13 @@ Current context: Project ${req.params.projectId}`;
               before: { projectId: req.params.id, salesCompId: compId },
             });
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error(`Error removing comp ${compId} from SC project:`, error);
         }
       }
 
       res.json({ removed: removedCount });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error bulk removing comps from SC project:", error);
       res.status(500).json({ message: "Failed to bulk remove comps from SC project" });
     }
@@ -23905,7 +23888,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error removing comp from SC project:", error);
       res.status(500).json({ message: "Failed to remove comp from SC project" });
     }
@@ -23938,7 +23921,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(updatedProjectComp);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating SC project comp:", error);
       res.status(500).json({ message: "Failed to update SC project comp" });
     }
@@ -23948,7 +23931,7 @@ Current context: Project ${req.params.projectId}`;
   app.get('/api/profit-centers', async (req: any, res) => {
     try {
       res.json(PROFIT_CENTERS);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching profit centers:", error);
       res.status(500).json({ message: "Failed to fetch profit centers" });
     }
@@ -23988,7 +23971,7 @@ Current context: Project ${req.params.projectId}`;
         projectProfile,
         weights: userWeightOverrides,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating recommendations:", error);
       res.status(500).json({ message: "Failed to generate recommendations" });
     }
@@ -24127,7 +24110,7 @@ Current context: Project ${req.params.projectId}`;
         addedComps,
         message: `Successfully added ${addedCount} comp${addedCount !== 1 ? 's' : ''} to project${skippedCount > 0 ? ` (${skippedCount} already in project)` : ''}`
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error auto-populating SC project:", error);
       res.status(500).json({ message: "Failed to auto-populate project" });
     }
@@ -24145,7 +24128,7 @@ Current context: Project ${req.params.projectId}`;
         profile: project.profile || {},
         weightOverrides: project.weightOverrides || {},
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching SC project preferences:", error);
       res.status(500).json({ message: "Failed to fetch SC project preferences" });
     }
@@ -24189,7 +24172,7 @@ Current context: Project ${req.params.projectId}`;
         profile: updatedProject.profile,
         weightOverrides: updatedProject.weightOverrides,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating SC project preferences:", error);
       res.status(500).json({ message: "Failed to update SC project preferences" });
     }
@@ -24248,7 +24231,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(feedback);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error submitting recommendation feedback:", error);
       res.status(500).json({ message: "Failed to submit feedback" });
     }
@@ -24278,7 +24261,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json({ comps, total, page: filters.page, pageSize: filters.pageSize });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching rate comps:", error);
       res.status(500).json({ message: "Failed to fetch rate comps" });
     }
@@ -24289,7 +24272,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const ids = await storage.getAllRateCompIds(orgId);
       res.json({ ids });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error getting rate comp IDs:', error);
       res.status(500).json({ message: "Internal server error" });
     }
@@ -24301,7 +24284,7 @@ Current context: Project ${req.params.projectId}`;
       const { column } = req.params;
       const values = await storage.getRateCompColumnUniqueValues(orgId, column);
       res.json({ values });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error getting column values:', error);
       res.status(500).json({ message: "Internal server error" });
     }
@@ -24359,7 +24342,7 @@ Current context: Project ${req.params.projectId}`;
       };
       
       res.json(crossRefFilters);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error getting cross-reference filters:', error);
       res.status(500).json({ message: "Failed to fetch cross-reference filters" });
     }
@@ -24377,7 +24360,7 @@ Current context: Project ${req.params.projectId}`;
       
       const marinas = await storage.searchMarinas(orgId, q.trim(), limit ? parseInt(limit) : 20);
       res.json(marinas);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error searching marinas for cross-reference:', error);
       res.status(500).json({ message: "Failed to search marinas" });
     }
@@ -24389,7 +24372,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const types = await storage.getRcCustomStorageTypes(orgId);
       res.json(types);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching custom storage types:", error);
       res.status(500).json({ message: "Failed to fetch custom storage types" });
     }
@@ -24418,7 +24401,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.status(201).json(type);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating custom storage type:", error);
       res.status(500).json({ message: "Failed to create custom storage type" });
     }
@@ -24432,7 +24415,7 @@ Current context: Project ${req.params.projectId}`;
       if (!success) return res.status(404).json({ message: "Storage type not found" });
 
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting custom storage type:", error);
       res.status(500).json({ message: "Failed to delete custom storage type" });
     }
@@ -24444,7 +24427,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const columns = await storage.getRateCompColumns(orgId);
       res.json(columns);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching custom columns:", error);
       res.status(500).json({ message: "Failed to fetch custom columns" });
     }
@@ -24477,7 +24460,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.status(201).json(column);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating custom column:", error);
       res.status(500).json({ message: "Failed to create custom column" });
     }
@@ -24491,7 +24474,7 @@ Current context: Project ${req.params.projectId}`;
       if (!success) return res.status(404).json({ message: "Column not found" });
 
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting custom column:", error);
       res.status(500).json({ message: "Failed to delete custom column" });
     }
@@ -24504,7 +24487,7 @@ Current context: Project ${req.params.projectId}`;
       const status = req.query.status as string | undefined;
       const profiles = await storage.getRcPendingPropertyProfiles(orgId, status);
       res.json(profiles);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching pending property profiles:", error);
       res.status(500).json({ message: "Failed to fetch pending property profiles" });
     }
@@ -24526,7 +24509,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.status(201).json(profile);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating pending property profile:", error);
       res.status(500).json({ message: "Failed to create pending property profile" });
     }
@@ -24546,7 +24529,7 @@ Current context: Project ${req.params.projectId}`;
       
       const updated = await storage.updateRcPendingPropertyProfile(req.params.id, { status });
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating pending property profile:", error);
       res.status(500).json({ message: "Failed to update pending property profile" });
     }
@@ -24566,7 +24549,7 @@ Current context: Project ${req.params.projectId}`;
       const success = await storage.deleteRcPendingPropertyProfile(req.params.id);
       if (!success) return res.status(404).json({ message: "Pending property profile not found" });
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting pending property profile:", error);
       res.status(500).json({ message: "Failed to delete pending property profile" });
     }
@@ -24578,7 +24561,7 @@ Current context: Project ${req.params.projectId}`;
       const comp = await storage.getRateComp(req.params.id, orgId);
       if (!comp) return res.status(404).json({ message: "Rate comp not found" });
       res.json(comp);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching rate comp:", error);
       res.status(500).json({ message: "Failed to fetch rate comp" });
     }
@@ -24636,7 +24619,7 @@ Current context: Project ${req.params.projectId}`;
           if (propertyId) {
             await storage.updateRateComp(comp.id, { propertyId }, orgId);
           }
-        } catch (error) {
+        } catch (error: any) {
           failed++;
           console.error(`❌ Failed to process rate comp ${comp.id}:`, error);
         }
@@ -24651,7 +24634,7 @@ Current context: Project ${req.params.projectId}`;
       
       
       res.json(summary);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error during property backfill:", error);
       res.status(500).json({ message: "Failed to backfill properties" });
     }
@@ -24684,7 +24667,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.status(201).json(comp);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating rate comp:", error);
       res.status(500).json({ message: "Failed to create rate comp" });
     }
@@ -24751,7 +24734,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(comp);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating rate comp:", error);
       res.status(500).json({ message: "Failed to update rate comp" });
     }
@@ -24766,7 +24749,7 @@ Current context: Project ${req.params.projectId}`;
       if (!success) return res.status(404).json({ message: "Rate comp not found" });
 
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting rate comp:", error);
       res.status(500).json({ message: "Failed to delete rate comp" });
     }
@@ -24781,7 +24764,7 @@ Current context: Project ${req.params.projectId}`;
       const count = await rcCompService.bulkUpdateComps(ids, updates, orgId, userId);
 
       res.json({ updated: count });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error bulk updating rate comps:", error);
       res.status(500).json({ message: "Failed to bulk update rate comps" });
     }
@@ -24799,7 +24782,7 @@ Current context: Project ${req.params.projectId}`;
 
       const count = await rcCompService.bulkDeleteComps(ids, orgId, userId);
       res.json({ deleted: count });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error bulk deleting rate comps:", error);
       res.status(500).json({ message: "Failed to bulk delete rate comps" });
     }
@@ -24847,7 +24830,7 @@ Current context: Project ${req.params.projectId}`;
       );
 
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error geocoding rate comp:", error);
       res.status(500).json({ message: "Failed to geocode rate comp" });
     }
@@ -24886,7 +24869,7 @@ Current context: Project ${req.params.projectId}`;
         importId: importRecord.id,
         analysis,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error uploading rate comp file:", error);
       res.status(500).json({ message: "Failed to upload file" });
     }
@@ -24905,7 +24888,7 @@ Current context: Project ${req.params.projectId}`;
       );
 
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error detecting duplicates:", error);
       res.status(500).json({ message: "Failed to detect duplicates" });
     }
@@ -24931,7 +24914,7 @@ Current context: Project ${req.params.projectId}`;
       
 
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error processing rate comp import:", error);
       res.status(500).json({ message: "Failed to process import" });
     }
@@ -24944,7 +24927,7 @@ Current context: Project ${req.params.projectId}`;
       if (!importRecord) return res.status(404).json({ message: "Import not found" });
 
       res.json(importRecord);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching import status:", error);
       res.status(500).json({ message: "Failed to fetch import status" });
     }
@@ -24956,7 +24939,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const columns = await storage.getRateCompColumns(orgId);
       res.json(columns);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching rate comp columns:", error);
       res.status(500).json({ message: "Failed to fetch columns" });
     }
@@ -24973,7 +24956,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.status(201).json(column);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating rate comp column:", error);
       res.status(500).json({ message: "Failed to create column" });
     }
@@ -24988,7 +24971,7 @@ Current context: Project ${req.params.projectId}`;
 
       if (!column) return res.status(404).json({ message: "Column not found" });
       res.json(column);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating rate comp column:", error);
       res.status(500).json({ message: "Failed to update column" });
     }
@@ -25002,7 +24985,7 @@ Current context: Project ${req.params.projectId}`;
       if (!success) return res.status(404).json({ message: "Column not found" });
 
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting rate comp column:", error);
       res.status(500).json({ message: "Failed to delete column" });
     }
@@ -25016,7 +24999,7 @@ Current context: Project ${req.params.projectId}`;
 
       const tiers = await storage.getRateTiersByRateComp(rateCompId, orgId);
       res.json(tiers);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching rate tiers:", error);
       res.status(500).json({ message: "Failed to fetch rate tiers" });
     }
@@ -25038,7 +25021,7 @@ Current context: Project ${req.params.projectId}`;
 
       const tiers = await storage.getRateTiersByOrg(orgId, Object.keys(filters).length > 0 ? filters : undefined);
       res.json(tiers);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching rate tiers:", error);
       res.status(500).json({ message: "Failed to fetch rate tiers" });
     }
@@ -25050,7 +25033,7 @@ Current context: Project ${req.params.projectId}`;
       const tier = await storage.getRateTier(req.params.id, orgId);
       if (!tier) return res.status(404).json({ message: "Rate tier not found" });
       res.json(tier);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching rate tier:", error);
       res.status(500).json({ message: "Failed to fetch rate tier" });
     }
@@ -25083,7 +25066,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.status(201).json(tier);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating rate tier:", error);
       res.status(500).json({ message: "Failed to create rate tier" });
     }
@@ -25122,7 +25105,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.status(201).json(createdTiers);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error bulk creating rate tiers:", error);
       res.status(500).json({ message: "Failed to create rate tiers" });
     }
@@ -25150,7 +25133,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(updatedTier);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating rate tier:", error);
       res.status(500).json({ message: "Failed to update rate tier" });
     }
@@ -25176,7 +25159,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting rate tier:", error);
       res.status(500).json({ message: "Failed to delete rate tier" });
     }
@@ -25188,7 +25171,7 @@ Current context: Project ${req.params.projectId}`;
       const compWithTiers = await storage.getRateCompWithTiers(req.params.id, orgId);
       if (!compWithTiers) return res.status(404).json({ message: "Rate comp not found" });
       res.json(compWithTiers);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching rate comp with tiers:", error);
       res.status(500).json({ message: "Failed to fetch rate comp with tiers" });
     }
@@ -25200,7 +25183,7 @@ Current context: Project ${req.params.projectId}`;
       const filters = req.body.filters || {};
       const compsWithTiers = await storage.getRateCompsWithTiers(orgId, filters);
       res.json(compsWithTiers);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching rate comps with tiers:", error);
       res.status(500).json({ message: "Failed to fetch rate comps with tiers" });
     }
@@ -25233,7 +25216,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching marinas:", error);
       res.status(500).json({ message: "Failed to fetch marinas" });
     }
@@ -25251,7 +25234,7 @@ Current context: Project ${req.params.projectId}`;
 
       const marinas = await storage.searchMarinas(orgId, q.trim(), limit ? parseInt(limit) : 20);
       res.json(marinas);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error searching marinas:", error);
       res.status(500).json({ message: "Failed to search marinas" });
     }
@@ -25264,7 +25247,7 @@ Current context: Project ${req.params.projectId}`;
       const marina = await storage.getMarina(req.params.id, orgId);
       if (!marina) return res.status(404).json({ message: "Marina not found" });
       res.json(marina);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching marina:", error);
       res.status(500).json({ message: "Failed to fetch marina" });
     }
@@ -25277,7 +25260,7 @@ Current context: Project ${req.params.projectId}`;
       const marinaWithRates = await storage.getMarinaWithRates(req.params.id, orgId);
       if (!marinaWithRates) return res.status(404).json({ message: "Marina not found" });
       res.json(marinaWithRates);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching marina with rates:", error);
       res.status(500).json({ message: "Failed to fetch marina with rates" });
     }
@@ -25296,7 +25279,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.status(201).json(marina);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating marina:", error);
       res.status(500).json({ message: "Failed to create marina" });
     }
@@ -25313,7 +25296,7 @@ Current context: Project ${req.params.projectId}`;
 
       const marina = await storage.updateMarina(req.params.id, { ...req.body, updatedBy: userId }, orgId);
       res.json(marina);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating marina:", error);
       res.status(500).json({ message: "Failed to update marina" });
     }
@@ -25329,7 +25312,7 @@ Current context: Project ${req.params.projectId}`;
 
       await storage.deleteMarina(req.params.id, orgId);
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting marina:", error);
       res.status(500).json({ message: "Failed to delete marina" });
     }
@@ -25353,7 +25336,7 @@ Current context: Project ${req.params.projectId}`;
 
       const rates = await storage.getMarinaRates(marinaId, orgId, Object.keys(filters).length > 0 ? filters : undefined);
       res.json(rates);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching marina rates:", error);
       res.status(500).json({ message: "Failed to fetch marina rates" });
     }
@@ -25368,7 +25351,7 @@ Current context: Project ${req.params.projectId}`;
 
       const history = await storage.getMarinaRateHistory(marinaId, orgId, storageType);
       res.json(history);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching marina rate history:", error);
       res.status(500).json({ message: "Failed to fetch marina rate history" });
     }
@@ -25382,7 +25365,7 @@ Current context: Project ${req.params.projectId}`;
 
       const rates = await storage.getLatestMarinaRates(marinaId, orgId);
       res.json(rates);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching current marina rates:", error);
       res.status(500).json({ message: "Failed to fetch current marina rates" });
     }
@@ -25414,7 +25397,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.status(201).json(rate);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating marina rate:", error);
       res.status(500).json({ message: "Failed to create marina rate" });
     }
@@ -25455,7 +25438,7 @@ Current context: Project ${req.params.projectId}`;
 
       const createdRates = await storage.bulkCreateMarinaRates(ratesToCreate);
       res.status(201).json(createdRates);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error bulk creating marina rates:", error);
       res.status(500).json({ message: "Failed to create marina rates" });
     }
@@ -25472,7 +25455,7 @@ Current context: Project ${req.params.projectId}`;
 
       const rate = await storage.updateMarinaRate(req.params.id, { ...req.body, updatedBy: userId }, orgId);
       res.json(rate);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating marina rate:", error);
       res.status(500).json({ message: "Failed to update marina rate" });
     }
@@ -25488,7 +25471,7 @@ Current context: Project ${req.params.projectId}`;
 
       await storage.deleteMarinaRate(req.params.id, orgId);
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting marina rate:", error);
       res.status(500).json({ message: "Failed to delete marina rate" });
     }
@@ -25632,7 +25615,7 @@ Current context: Project ${req.params.projectId}`;
           seasonalityBreakdown: seasonalityBreakdown.filter(s => s.count > 0),
         },
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error calculating rate comp analytics:", error);
       res.status(500).json({ message: "Failed to calculate analytics" });
     }
@@ -25696,7 +25679,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json({ rates, total: rates.length });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching matched rates:", error);
       res.status(500).json({ message: "Failed to fetch matched rates" });
     }
@@ -25710,7 +25693,7 @@ Current context: Project ${req.params.projectId}`;
 
       const searches = await storage.getRcSavedSearches(orgId, userId);
       res.json(searches);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching saved searches:", error);
       res.status(500).json({ message: "Failed to fetch saved searches" });
     }
@@ -25724,7 +25707,7 @@ Current context: Project ${req.params.projectId}`;
       if (!search) return res.status(404).json({ message: "Saved search not found" });
 
       res.json(search);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching saved search:", error);
       res.status(500).json({ message: "Failed to fetch saved search" });
     }
@@ -25743,7 +25726,7 @@ Current context: Project ${req.params.projectId}`;
       } as any);
 
       res.status(201).json(search);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating saved search:", error);
       res.status(500).json({ message: "Failed to create saved search" });
     }
@@ -25763,7 +25746,7 @@ Current context: Project ${req.params.projectId}`;
       if (!search) return res.status(404).json({ message: "Saved search not found" });
 
       res.json(search);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating saved search:", error);
       res.status(500).json({ message: "Failed to update saved search" });
     }
@@ -25778,7 +25761,7 @@ Current context: Project ${req.params.projectId}`;
       if (!success) return res.status(404).json({ message: "Saved search not found" });
 
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting saved search:", error);
       res.status(500).json({ message: "Failed to delete saved search" });
     }
@@ -25790,7 +25773,7 @@ Current context: Project ${req.params.projectId}`;
 
       await storage.incrementRcSavedSearchUsage(req.params.id, orgId);
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error incrementing saved search usage:", error);
       res.status(500).json({ message: "Failed to update saved search usage" });
     }
@@ -25804,7 +25787,7 @@ Current context: Project ${req.params.projectId}`;
 
       const pendingProps = await storage.getRcPendingProperties(orgId, status);
       res.json(pendingProps);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching pending properties:", error);
       res.status(500).json({ message: "Failed to fetch pending properties" });
     }
@@ -25822,7 +25805,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(property);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error accepting pending property:", error);
       res.status(500).json({ message: "Failed to accept pending property" });
     }
@@ -25840,7 +25823,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error rejecting pending property:", error);
       res.status(500).json({ message: "Failed to reject pending property" });
     }
@@ -25859,7 +25842,7 @@ Current context: Project ${req.params.projectId}`;
         analysis,
         insights,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error calculating rate comp analytics:", error);
       res.status(500).json({ message: "Failed to calculate analytics" });
     }
@@ -25874,7 +25857,7 @@ Current context: Project ${req.params.projectId}`;
       const insights = await rcGenerateInsights(analysis, filters);
 
       res.json({ insights });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating insights:", error);
       res.status(500).json({ message: "Failed to generate insights" });
     }
@@ -25893,7 +25876,7 @@ Current context: Project ${req.params.projectId}`;
         analysis,
         insights,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error calculating rate tier analytics:", error);
       res.status(500).json({ message: "Failed to calculate rate tier analytics" });
     }
@@ -25913,7 +25896,7 @@ Current context: Project ${req.params.projectId}`;
         bySize: analysis.bySize,
         tiers: analysis.tiers,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error getting normalized rates:", error);
       res.status(500).json({ message: "Failed to get normalized rates" });
     }
@@ -25960,7 +25943,7 @@ Current context: Project ${req.params.projectId}`;
       };
 
       res.json(comparison);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error comparing rates:", error);
       res.status(500).json({ message: "Failed to compare rates" });
     }
@@ -26031,7 +26014,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.status(201).json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating portfolio:", error);
       
       // Handle Zod validation errors
@@ -26054,7 +26037,7 @@ Current context: Project ${req.params.projectId}`;
 
       const projects = await storage.getRcProjects(orgId, userId);
       res.json(projects);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching RC projects:", error);
       res.status(500).json({ message: "Failed to fetch RC projects" });
     }
@@ -26068,7 +26051,7 @@ Current context: Project ${req.params.projectId}`;
       if (!project) return res.status(404).json({ message: "Project not found" });
 
       res.json(project);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching RC project:", error);
       res.status(500).json({ message: "Failed to fetch RC project" });
     }
@@ -26161,7 +26144,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.status(201).json({ project, recommendations, addedCount });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating RC project:", error);
       res.status(500).json({ message: "Failed to create RC project" });
     }
@@ -26194,7 +26177,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(updatedProject);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating RC project:", error);
       res.status(500).json({ message: "Failed to update RC project" });
     }
@@ -26221,7 +26204,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting RC project:", error);
       res.status(500).json({ message: "Failed to delete RC project" });
     }
@@ -26237,7 +26220,7 @@ Current context: Project ${req.params.projectId}`;
 
       const projectComps = await storage.getRcProjectComps(req.params.id, orgId);
       res.json(projectComps);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching RC project comps:", error);
       res.status(500).json({ message: "Failed to fetch RC project comps" });
     }
@@ -26277,7 +26260,7 @@ Current context: Project ${req.params.projectId}`;
         }
         throw error;
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding comp to RC project:", error);
       res.status(500).json({ message: "Failed to add comp to RC project" });
     }
@@ -26322,7 +26305,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(results);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error bulk adding comps to RC project:", error);
       res.status(500).json({ message: "Failed to bulk add comps to RC project" });
     }
@@ -26361,13 +26344,13 @@ Current context: Project ${req.params.projectId}`;
               before: { projectId: req.params.id, rateCompId: compId },
             });
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error(`Error removing rate comp ${compId} from RC project:`, error);
         }
       }
 
       res.json({ removed: removedCount });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error bulk removing comps from RC project:", error);
       res.status(500).json({ message: "Failed to bulk remove comps from RC project" });
     }
@@ -26399,7 +26382,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error removing comp from RC project:", error);
       res.status(500).json({ message: "Failed to remove comp from RC project" });
     }
@@ -26432,7 +26415,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(updatedProjectComp);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating RC project comp:", error);
       res.status(500).json({ message: "Failed to update RC project comp" });
     }
@@ -26473,7 +26456,7 @@ Current context: Project ${req.params.projectId}`;
         projectProfile,
         weights: userWeightOverrides,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating recommendations:", error);
       res.status(500).json({ message: "Failed to generate recommendations" });
     }
@@ -26491,7 +26474,7 @@ Current context: Project ${req.params.projectId}`;
         profile: project.profile || {},
         weightOverrides: project.weightOverrides || {},
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching RC project preferences:", error);
       res.status(500).json({ message: "Failed to fetch RC project preferences" });
     }
@@ -26535,7 +26518,7 @@ Current context: Project ${req.params.projectId}`;
         profile: updatedProject.profile,
         weightOverrides: updatedProject.weightOverrides,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating RC project preferences:", error);
       res.status(500).json({ message: "Failed to update RC project preferences" });
     }
@@ -26594,7 +26577,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(feedback);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error submitting rate comp recommendation feedback:", error);
       res.status(500).json({ message: "Failed to submit feedback" });
     }
@@ -26624,7 +26607,7 @@ Current context: Project ${req.params.projectId}`;
         },
       });
       res.json(sales);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching fuel sales:", error);
       res.status(500).json({ message: "Failed to fetch fuel sales" });
     }
@@ -26649,7 +26632,7 @@ Current context: Project ${req.params.projectId}`;
       );
 
       res.json(sale);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
@@ -26682,7 +26665,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(sale);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching fuel sale:", error);
       res.status(500).json({ message: "Failed to fetch fuel sale" });
     }
@@ -26725,7 +26708,7 @@ Current context: Project ${req.params.projectId}`;
       );
 
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
@@ -26758,7 +26741,7 @@ Current context: Project ${req.params.projectId}`;
       );
 
       res.json({ message: "Fuel sale deleted successfully" });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting fuel sale:", error);
       res.status(500).json({ message: "Failed to delete fuel sale" });
     }
@@ -26808,7 +26791,7 @@ Current context: Project ${req.params.projectId}`;
       };
 
       res.json(stats);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching fuel sales stats:", error);
       res.status(500).json({ message: "Failed to fetch fuel sales stats" });
     }
@@ -26965,7 +26948,7 @@ Current context: Project ${req.params.projectId}`;
         orderBy: [fuelTypes.category, fuelTypes.name],
       });
       res.json(types);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching fuel types:", error);
       res.status(500).json({ message: "Failed to fetch fuel types" });
     }
@@ -26993,7 +26976,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(type);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
@@ -27034,7 +27017,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
@@ -27067,7 +27050,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json({ message: "Fuel type deleted successfully" });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting fuel type:", error);
       res.status(500).json({ message: "Failed to delete fuel type" });
     }
@@ -27085,7 +27068,7 @@ Current context: Project ${req.params.projectId}`;
         },
       });
       res.json(inventory);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching fuel inventory:", error);
       res.status(500).json({ message: "Failed to fetch fuel inventory" });
     }
@@ -27113,7 +27096,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(inventory);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
@@ -27154,7 +27137,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
@@ -27187,7 +27170,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json({ message: "Fuel inventory deleted successfully" });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting fuel inventory:", error);
       res.status(500).json({ message: "Failed to delete fuel inventory" });
     }
@@ -27206,7 +27189,7 @@ Current context: Project ${req.params.projectId}`;
         },
       });
       res.json(deliveries);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching fuel deliveries:", error);
       res.status(500).json({ message: "Failed to fetch fuel deliveries" });
     }
@@ -27234,7 +27217,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(delivery);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
@@ -27275,7 +27258,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
@@ -27308,7 +27291,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json({ message: "Fuel delivery deleted successfully" });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting fuel delivery:", error);
       res.status(500).json({ message: "Failed to delete fuel delivery" });
     }
@@ -27324,7 +27307,7 @@ Current context: Project ${req.params.projectId}`;
         orderBy: [fuelFinancialProjections.year, fuelFinancialProjections.month],
       });
       res.json(projections);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching fuel projections:", error);
       res.status(500).json({ message: "Failed to fetch fuel projections" });
     }
@@ -27352,7 +27335,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(projection);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
@@ -27393,7 +27376,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
@@ -27426,7 +27409,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json({ message: "Fuel projection deleted successfully" });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting fuel projection:", error);
       res.status(500).json({ message: "Failed to delete fuel projection" });
     }
@@ -27468,7 +27451,7 @@ Current context: Project ${req.params.projectId}`;
         .offset(parseInt(offset as string));
 
       res.json(logs);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching fuel import logs:", error);
       res.status(500).json({ message: "Failed to fetch fuel import logs" });
     }
@@ -27489,7 +27472,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(log);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching fuel import log:", error);
       res.status(500).json({ message: "Failed to fetch fuel import log" });
     }
@@ -27528,7 +27511,7 @@ Current context: Project ${req.params.projectId}`;
         latestSyncStatus: latestLog?.status || null,
         latestSyncTime: latestLog?.startedAt || null,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching fuel import log stats:", error);
       res.status(500).json({ message: "Failed to fetch fuel import log statistics" });
     }
@@ -27548,7 +27531,7 @@ Current context: Project ${req.params.projectId}`;
       }
       
       res.json(integration);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching fuel integration:", error);
       res.status(500).json({ message: "Failed to fetch fuel integration" });
     }
@@ -27560,7 +27543,7 @@ Current context: Project ${req.params.projectId}`;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 5;
       const logs = await storage.getFuelImportLogs(req.user.orgId, limit);
       res.json(logs);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching fuel import logs:", error);
       res.status(500).json({ message: "Failed to fetch import logs" });
     }
@@ -27594,7 +27577,7 @@ Current context: Project ${req.params.projectId}`;
       );
 
       res.status(201).json(integration);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
@@ -27634,7 +27617,7 @@ Current context: Project ${req.params.projectId}`;
       );
 
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
@@ -27673,7 +27656,7 @@ Current context: Project ${req.params.projectId}`;
       );
 
       res.json({ message: "Integration disconnected successfully" });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting fuel integration:", error);
       res.status(500).json({ message: "Failed to disconnect integration" });
     }
@@ -27700,7 +27683,7 @@ Current context: Project ${req.params.projectId}`;
         provider: integration.provider,
         timestamp: new Date().toISOString()
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error testing fuel integration:", error);
       res.status(500).json({ 
         success: false,
@@ -27748,7 +27731,7 @@ Current context: Project ${req.params.projectId}`;
         success: true,
         message: "Sync initiated successfully. Check Import History for progress."
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error initiating fuel sync:", error);
       res.status(500).json({ 
         success: false,
@@ -27791,7 +27774,7 @@ Current context: Project ${req.params.projectId}`;
 
       const data = await response.json();
       res.json(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching FRED data:", error);
       res.status(500).json({ error: "Failed to fetch FRED data" });
     }
@@ -27823,7 +27806,7 @@ Current context: Project ${req.params.projectId}`;
 
       const preview = generateQuickBooksPreview(sales, accountMappings, format);
       res.json({ preview: preview.slice(0, 10) });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating QuickBooks preview:", error);
       res.status(500).json({ error: "Failed to generate preview" });
     }
@@ -27889,7 +27872,7 @@ Current context: Project ${req.params.projectId}`;
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.send(csv);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error exporting QuickBooks data:", error);
       res.status(500).json({ error: "Failed to export data" });
     }
@@ -27980,7 +27963,7 @@ Current context: Project ${req.params.projectId}`;
         limit: validLimit,
         offset: validOffset,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching audit logs:", error);
       res.status(500).json({ error: "Failed to fetch audit logs" });
     }
@@ -27993,7 +27976,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const scenarios = await storage.getDebtScenariosForOrg(req.user.orgId);
       res.json(scenarios);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to fetch debt scenarios:", error);
       res.status(500).json({ error: "Failed to fetch debt scenarios" });
     }
@@ -28014,7 +27997,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json(scenario);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to fetch debt scenario:", error);
       res.status(500).json({ error: "Failed to fetch debt scenario" });
     }
@@ -28060,7 +28043,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(scenario);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create debt scenario:", error);
       if (error instanceof Error && error.name === 'ZodError') {
         return res.status(400).json({ error: "Invalid scenario data", details: error });
@@ -28122,7 +28105,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update debt scenario:", error);
       if (error instanceof Error && error.name === 'ZodError') {
         return res.status(400).json({ error: "Invalid scenario data", details: error });
@@ -28162,7 +28145,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete debt scenario:", error);
       res.status(500).json({ error: "Failed to delete debt scenario" });
     }
@@ -28205,7 +28188,7 @@ Current context: Project ${req.params.projectId}`;
       }));
 
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching organization users:", error);
       res.status(500).json({ error: "Failed to fetch users" });
     }
@@ -28306,7 +28289,7 @@ Current context: Project ${req.params.projectId}`;
       );
 
       res.json({ success: true, message: "Role updated successfully" });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating user role:", error);
       res.status(500).json({ error: "Failed to update role" });
     }
@@ -28412,7 +28395,7 @@ Current context: Project ${req.params.projectId}`;
         columnTypes,
         suggestedMappings,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error parsing import file:', error);
       res.status(500).json({ error: 'Failed to parse file' });
     }
@@ -28478,7 +28461,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       res.json({ conflicts });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error checking conflicts:', error);
       res.status(500).json({ error: 'Failed to check conflicts' });
     }
@@ -28582,7 +28565,7 @@ Current context: Project ${req.params.projectId}`;
         errors,
         total: rows.length,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error executing import:', error);
       res.status(500).json({ error: 'Failed to execute import' });
     }
@@ -28749,7 +28732,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error searching audit logs:", error);
       res.status(500).json({ error: "Failed to search audit logs" });
     }
@@ -28771,7 +28754,7 @@ Current context: Project ${req.params.projectId}`;
       });
 
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching security events:", error);
       res.status(500).json({ error: "Failed to fetch security events" });
     }
@@ -28785,7 +28768,7 @@ Current context: Project ${req.params.projectId}`;
       
       const stats = await AuditService.getAuditStats(orgId, days);
       res.json(stats);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching audit stats:", error);
       res.status(500).json({ error: "Failed to fetch audit statistics" });
     }
@@ -28807,7 +28790,7 @@ Current context: Project ${req.params.projectId}`;
       res.setHeader('Content-Type', exportData.mimeType);
       res.setHeader('Content-Disposition', `attachment; filename="${exportData.filename}"`);
       res.send(exportData.data);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error exporting audit logs:", error);
       res.status(500).json({ error: "Failed to export audit logs" });
     }
@@ -28822,7 +28805,7 @@ Current context: Project ${req.params.projectId}`;
         .where(eq(auditLogs.orgId, req.user.orgId));
       
       res.json(entityTypes.map(r => r.entityType));
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching entity types:", error);
       res.status(500).json({ error: "Failed to fetch entity types" });
     }
@@ -28838,7 +28821,7 @@ Current context: Project ${req.params.projectId}`;
         .limit(100);
       
       res.json(actions.map(r => r.action));
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching actions:", error);
       res.status(500).json({ error: "Failed to fetch actions" });
     }
@@ -28888,7 +28871,7 @@ Current context: Project ${req.params.projectId}`;
 
       // Return null if no targets configured
       res.json(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching target demographics:", error);
       res.status(500).json({ error: "Failed to fetch target demographics" });
     }
@@ -28981,7 +28964,7 @@ Current context: Project ${req.params.projectId}`;
       await db.delete(targetDemographics).where(deleteQuery);
 
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting target demographics:", error);
       res.status(500).json({ error: "Failed to delete target demographics" });
     }
@@ -29002,7 +28985,7 @@ Current context: Project ${req.params.projectId}`;
         .orderBy(desc(targetDemographics.isDefault), asc(targetDemographics.createdAt));
 
       res.json(profiles);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching target demographics profiles:", error);
       res.status(500).json({ error: "Failed to fetch target demographics profiles" });
     }
@@ -29014,7 +28997,7 @@ Current context: Project ${req.params.projectId}`;
       const { getStripePublishableKey } = await import("./stripeClient");
       const publishableKey = await getStripePublishableKey();
       res.json({ publishableKey });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to get Stripe publishable key:", error);
       res.status(500).json({ error: "Failed to get Stripe configuration" });
     }
@@ -29354,3 +29337,4 @@ function transformValue(value: string, fieldName: string): any {
 
   return String(value).trim();
 }
+// Force reload Sat Dec 27 06:56:26 PM UTC 2025
