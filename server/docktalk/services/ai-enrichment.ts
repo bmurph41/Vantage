@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
+import { reportOpenAIQuotaExhausted, shouldSkipAIFeatures } from "./ai-quota-manager";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const anthropic = process.env.ANTHROPIC_API_KEY 
@@ -50,6 +51,16 @@ interface EnrichmentResult {
 }
 
 export async function enrichArticle(title: string, summary: string, content: string): Promise<EnrichmentResult> {
+  if (shouldSkipAIFeatures()) {
+    return {
+      sentiment: detectSentimentFallback(title, summary),
+      dealMetadata: detectDealFallback(title, summary),
+      dealInfo: null,
+      geography: extractGeographyFallback(title, summary, content),
+      entities: extractEntitiesFallback(title, summary, content)
+    };
+  }
+  
   try {
     const prompt = `Analyze this marina industry article and extract structured data:
 
@@ -172,8 +183,11 @@ Respond ONLY with valid JSON matching this schema:
         entities: result.entities || []
       };
     }
-  } catch (error) {
-    console.error("AI enrichment failed completely:", error);
+  } catch (error: any) {
+    if (error?.status === 429 || error?.code === 'insufficient_quota') {
+      reportOpenAIQuotaExhausted();
+    }
+    console.error("AI enrichment failed:", error?.message || error?.code || 'Unknown error');
     
     // Return basic analysis as fallback
     return {

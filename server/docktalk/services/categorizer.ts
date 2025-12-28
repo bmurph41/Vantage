@@ -3,6 +3,7 @@ import { db } from "../db";
 import { articles as articlesTable } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 import { analyzeLearningPatterns, buildEnhancedTrainingContext } from "./ai-learning";
+import { reportOpenAIQuotaExhausted, shouldSkipAIFeatures } from "./ai-quota-manager";
 
 export interface CategoryResult {
   categories: string[];
@@ -48,6 +49,10 @@ export function invalidateCategorizerCache(): void {
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 async function aiCategorizeAndTag(title: string, content: string): Promise<CategoryResult> {
+  if (shouldSkipAIFeatures()) {
+    return legacyCategorizeAndTag(title, content);
+  }
+  
   try {
     const trainingContext = await getEnhancedTrainingContext();
     
@@ -129,9 +134,11 @@ Respond with JSON in this exact format:
       region: result.region || "US/Domestic"
     };
     
-  } catch (error) {
-    console.error("AI categorization failed, falling back to regex:", error);
-    // Fall back to regex-based categorization if AI fails
+  } catch (error: any) {
+    if (error?.status === 429 || error?.code === 'insufficient_quota') {
+      reportOpenAIQuotaExhausted();
+    }
+    console.error("AI categorization failed, falling back to regex:", error?.message || error?.code || 'Unknown error');
     return legacyCategorizeAndTag(title, content);
   }
 }

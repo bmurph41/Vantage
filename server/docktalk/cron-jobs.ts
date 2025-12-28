@@ -6,6 +6,8 @@ import { generateAllCategorySummaries } from "./services/category-summary-servic
 import { broadcastFetchStatus } from "./websocket";
 import { runLearningCycle } from "./services/ai-learning";
 
+import { shouldSkipAIFeatures, getQuotaStatus } from "./services/ai-quota-manager";
+
 let isInitialized = false;
 let dockTalkStorage: IStorage;
 let autoFetchEnabled = true;
@@ -13,13 +15,16 @@ let lastFetchTime: Date | null = null;
 let isFetching = false;
 
 export function getAutoFetchStatus() {
+  const quotaStatus = getQuotaStatus();
   return {
     enabled: autoFetchEnabled,
     lastFetch: lastFetchTime,
     isFetching: isFetching,
     nextFetch: autoFetchEnabled && lastFetchTime 
       ? new Date(lastFetchTime.getTime() + 5 * 60 * 1000) 
-      : null
+      : null,
+    aiQuotaExhausted: quotaStatus.exhausted,
+    aiResumeTime: quotaStatus.resumeTime
   };
 }
 

@@ -143,8 +143,10 @@ import {
   insertDashboardSavedLayoutSchema,
   updateDashboardSavedLayoutSchema,
   userKpiPreferences,
+  ownedAssets,
   insertUserKpiPreferencesSchema,
   insertOwnedAssetSchema,
+  assetPerformanceSnapshots,
   updateOwnedAssetSchema,
   insertAssetPerformanceSnapshotSchema,
   modelingProjects,
@@ -13212,7 +13214,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       
       // Query owned assets with property details and aggregated operational metrics
-      const { ownedAssets, crmProperties, rentRolls, rentRollEntries, fuelSales, assetPerformanceSnapshots } = await import('@shared/schema');
+      // Using static imports from top of file
       
       // Get base asset data with properties
       const assetsWithProperties = await db
