@@ -8,7 +8,7 @@ interface BreadcrumbItem {
   href?: string;
   icon?: React.ComponentType<{ className?: string }>;
   isDynamic?: boolean;
-  dynamicType?: 'modeling-project' | 'fund' | 'sales-comp' | 'rate-comp';
+  dynamicType?: 'modeling-project' | 'fund' | 'sales-comp' | 'rate-comp' | 'dd-project' | 'contact' | 'company' | 'property' | 'deal' | 'workspace';
   dynamicId?: string;
 }
 
@@ -701,6 +701,132 @@ function getBreadcrumbsForPath(path: string): BreadcrumbItem[] {
     ];
   }
 
+  // DD Project pages
+  const ddProjectMatch = path.match(/^\/dd\/projects\/([a-f0-9-]+)(\/.*)?$/i);
+  if (ddProjectMatch) {
+    const projectId = ddProjectMatch[1];
+    const subPath = ddProjectMatch[2] || '';
+    
+    items = [
+      CATEGORIES.DUE_DILIGENCE,
+      { label: 'Projects', href: '/dd/projects' },
+      { label: projectId, isDynamic: true, dynamicType: 'dd-project', dynamicId: projectId },
+    ];
+    
+    if (subPath) {
+      const subSegments = subPath.split('/').filter(Boolean);
+      subSegments.forEach(seg => {
+        const formattedLabel = seg
+          .split('-')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+        items.push({ label: formattedLabel });
+      });
+    }
+    
+    return [DASHBOARD_ITEM, ...items];
+  }
+
+  // Legacy DD project route
+  const legacyDdProjectMatch = path.match(/^\/projects\/([a-f0-9-]+)(\/.*)?$/i);
+  if (legacyDdProjectMatch) {
+    const projectId = legacyDdProjectMatch[1];
+    const subPath = legacyDdProjectMatch[2] || '';
+    
+    items = [
+      CATEGORIES.DUE_DILIGENCE,
+      { label: 'Projects', href: '/projects' },
+      { label: projectId, isDynamic: true, dynamicType: 'dd-project', dynamicId: projectId },
+    ];
+    
+    if (subPath) {
+      const subSegments = subPath.split('/').filter(Boolean);
+      subSegments.forEach(seg => {
+        const formattedLabel = seg
+          .split('-')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+        items.push({ label: formattedLabel });
+      });
+    }
+    
+    return [DASHBOARD_ITEM, ...items];
+  }
+
+  // Contact detail pages
+  const contactMatch = path.match(/^\/crm\/contacts\/([a-f0-9-]+)(\/.*)?$/i);
+  if (contactMatch) {
+    const contactId = contactMatch[1];
+    return [
+      DASHBOARD_ITEM,
+      CATEGORIES.CRM,
+      { label: 'Contacts', href: '/crm/contacts' },
+      { label: contactId, isDynamic: true, dynamicType: 'contact', dynamicId: contactId },
+    ];
+  }
+
+  // Company detail pages
+  const companyMatch = path.match(/^\/crm\/companies\/([a-f0-9-]+)(\/.*)?$/i);
+  if (companyMatch) {
+    const companyId = companyMatch[1];
+    return [
+      DASHBOARD_ITEM,
+      CATEGORIES.CRM,
+      { label: 'Companies', href: '/crm/companies' },
+      { label: companyId, isDynamic: true, dynamicType: 'company', dynamicId: companyId },
+    ];
+  }
+
+  // Property detail pages
+  const propertyMatch = path.match(/^\/crm\/properties\/([a-f0-9-]+)(\/.*)?$/i);
+  if (propertyMatch) {
+    const propertyId = propertyMatch[1];
+    return [
+      DASHBOARD_ITEM,
+      CATEGORIES.CRM,
+      { label: 'Properties', href: '/crm/properties' },
+      { label: propertyId, isDynamic: true, dynamicType: 'property', dynamicId: propertyId },
+    ];
+  }
+
+  // Deal detail pages
+  const dealMatch = path.match(/^\/crm\/deals\/([a-f0-9-]+)(\/.*)?$/i);
+  if (dealMatch) {
+    const dealId = dealMatch[1];
+    return [
+      DASHBOARD_ITEM,
+      CATEGORIES.CRM,
+      { label: 'Deals', href: '/crm/deals' },
+      { label: dealId, isDynamic: true, dynamicType: 'deal', dynamicId: dealId },
+    ];
+  }
+
+  // Deal Workspace detail pages
+  const workspaceMatch = path.match(/^\/deal-workspace\/([a-f0-9-]+)(\/.*)?$/i);
+  if (workspaceMatch) {
+    const workspaceId = workspaceMatch[1];
+    const subPath = workspaceMatch[2] || '';
+    
+    items = [
+      CATEGORIES.DEAL_MANAGEMENT,
+      { label: 'Workspaces', href: '/deal-workspace' },
+      { label: workspaceId, isDynamic: true, dynamicType: 'workspace', dynamicId: workspaceId },
+    ];
+    
+    if (subPath) {
+      const subSegments = subPath.split('/').filter(Boolean);
+      subSegments.forEach(seg => {
+        const formattedLabel = seg
+          .split('-')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+        items.push({ label: formattedLabel });
+      });
+    }
+    
+    return [DASHBOARD_ITEM, ...items];
+  }
+
   if (ROUTE_MAPPINGS[path]) {
     items = ROUTE_MAPPINGS[path];
   } else {
@@ -768,6 +894,36 @@ function DynamicBreadcrumbItem({ item, isLast }: { item: BreadcrumbItem; isLast:
     queryKey: ['/api/rate-comps', item.dynamicId],
     enabled: item.dynamicType === 'rate-comp' && !!item.dynamicId,
   });
+
+  const { data: ddProject } = useQuery<{ name: string }>({
+    queryKey: ['/api/dd-projects', item.dynamicId],
+    enabled: item.dynamicType === 'dd-project' && !!item.dynamicId,
+  });
+
+  const { data: contact } = useQuery<{ firstName: string; lastName: string }>({
+    queryKey: ['/api/contacts', item.dynamicId],
+    enabled: item.dynamicType === 'contact' && !!item.dynamicId,
+  });
+
+  const { data: company } = useQuery<{ name: string }>({
+    queryKey: ['/api/companies', item.dynamicId],
+    enabled: item.dynamicType === 'company' && !!item.dynamicId,
+  });
+
+  const { data: property } = useQuery<{ name: string }>({
+    queryKey: ['/api/properties', item.dynamicId],
+    enabled: item.dynamicType === 'property' && !!item.dynamicId,
+  });
+
+  const { data: deal } = useQuery<{ name: string }>({
+    queryKey: ['/api/deals', item.dynamicId],
+    enabled: item.dynamicType === 'deal' && !!item.dynamicId,
+  });
+
+  const { data: workspace } = useQuery<{ name: string }>({
+    queryKey: ['/api/deal-workspaces', item.dynamicId],
+    enabled: item.dynamicType === 'workspace' && !!item.dynamicId,
+  });
   
   let displayLabel = item.label;
   if (item.dynamicType === 'fund') {
@@ -778,6 +934,18 @@ function DynamicBreadcrumbItem({ item, isLast }: { item: BreadcrumbItem; isLast:
     displayLabel = salesComp?.marina || item.label;
   } else if (item.dynamicType === 'rate-comp') {
     displayLabel = rateComp?.marina || item.label;
+  } else if (item.dynamicType === 'dd-project') {
+    displayLabel = ddProject?.name || item.label;
+  } else if (item.dynamicType === 'contact') {
+    displayLabel = contact ? `${contact.firstName} ${contact.lastName}`.trim() : item.label;
+  } else if (item.dynamicType === 'company') {
+    displayLabel = company?.name || item.label;
+  } else if (item.dynamicType === 'property') {
+    displayLabel = property?.name || item.label;
+  } else if (item.dynamicType === 'deal') {
+    displayLabel = deal?.name || item.label;
+  } else if (item.dynamicType === 'workspace') {
+    displayLabel = workspace?.name || item.label;
   }
   const Icon = item.icon;
   
