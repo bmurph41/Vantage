@@ -35,7 +35,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { queryClient, apiRequest } from "../lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
-import { Mail, Bell, Clock, Plus, Pencil, Trash2, Calendar as CalendarIcon, CheckCircle } from "lucide-react";
+import { Mail, Bell, Clock, Plus, Pencil, Trash2, Calendar as CalendarIcon, CheckCircle, Info, Search } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -175,10 +176,9 @@ export default function NotificationsPage() {
 
   const updatePreferencesMutation = useMutation({
     mutationFn: async (data: EmailSettingsForm & { emailNotifications?: boolean }) => {
-      const response = await fetch("/api/docktalk/user-preferences", {
+      return await apiRequest("/api/docktalk/user-preferences", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({
           email: data.email,
           deliveryTime: data.deliveryTime,
@@ -186,13 +186,6 @@ export default function NotificationsPage() {
           emailNotifications: data.emailNotifications ?? preferences?.emailNotifications ?? true,
         }),
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to update preferences");
-      }
-
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/docktalk/user-preferences"] });
@@ -212,18 +205,10 @@ export default function NotificationsPage() {
 
   const testEmailMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch("/api/docktalk/test-email", {
+      return await apiRequest("/api/docktalk/test-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to send test email");
-      }
-
-      return response.json();
     },
     onSuccess: (data: any) => {
       toast({
@@ -343,17 +328,9 @@ export default function NotificationsPage() {
 
   const deleteSearchMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetch(`/api/docktalk/saved-searches/${id}`, {
+      return await apiRequest(`/api/docktalk/saved-searches/${id}`, {
         method: "DELETE",
-        credentials: "include",
       });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to delete search");
-      }
-      
-      return true;
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["/api/docktalk/saved-searches"] });
@@ -449,6 +426,55 @@ export default function NotificationsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {/* Active Searches Summary */}
+              <div className="mb-6 p-4 bg-muted/50 rounded-lg border" data-testid="active-searches-summary">
+                <div className="flex items-start gap-3">
+                  <Search className="h-5 w-5 text-primary mt-0.5" />
+                  <div className="flex-1">
+                    <h4 className="font-medium text-sm mb-1">Active Email Alert Searches</h4>
+                    {searchesLoading ? (
+                      <p className="text-sm text-muted-foreground">Loading...</p>
+                    ) : savedSearches.filter((s: any) => s.alertFrequency !== "none").length > 0 ? (
+                      <div className="space-y-2">
+                        <p className="text-sm text-muted-foreground">
+                          You have {savedSearches.filter((s: any) => s.alertFrequency !== "none").length} active search{savedSearches.filter((s: any) => s.alertFrequency !== "none").length !== 1 ? 'es' : ''} that will trigger email alerts:
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {savedSearches
+                            .filter((s: any) => s.alertFrequency !== "none")
+                            .map((search: any) => (
+                              <Badge key={search.id} variant="secondary" className="text-xs">
+                                {search.name} ({search.alertFrequency})
+                              </Badge>
+                            ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-sm text-muted-foreground">
+                          No active searches. Create an Email Alert Search below to start receiving notifications about articles matching your criteria.
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditingSearch(null);
+                            setSearchDialogOpen(true);
+                          }}
+                          data-testid="button-create-search-inline"
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          Create Your First Search
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <Separator className="mb-6" />
+
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                   <FormField
