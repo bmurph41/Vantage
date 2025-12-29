@@ -101,12 +101,19 @@ const TIMEZONES = [
 ] as const;
 
 const emailSettingsSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
   deliveryTime: z.string().optional(),
   timezone: z.string().default("America/New_York"),
 });
 
 type EmailSettingsForm = z.infer<typeof emailSettingsSchema>;
+
+interface CurrentUser {
+  id: string;
+  orgId: string;
+  role: string;
+  email: string;
+  name: string;
+}
 
 const savedSearchSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -142,6 +149,10 @@ export default function NotificationsPage() {
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
   const [deleteSearchId, setDeleteSearchId] = useState<string | null>(null);
 
+  const { data: currentUser, isLoading: userLoading } = useQuery<CurrentUser>({
+    queryKey: ['/api/auth/me'],
+  });
+
   const { data: preferences, isLoading: preferencesLoading } = useQuery<UserPreferences>({
     queryKey: ['/api/docktalk/user-preferences'],
   });
@@ -158,7 +169,6 @@ export default function NotificationsPage() {
   const form = useForm<EmailSettingsForm>({
     resolver: zodResolver(emailSettingsSchema),
     defaultValues: {
-      email: "",
       deliveryTime: "09:00",
       timezone: "America/New_York",
     },
@@ -167,7 +177,6 @@ export default function NotificationsPage() {
   useEffect(() => {
     if (preferences) {
       form.reset({
-        email: preferences.email || "",
         deliveryTime: preferences.deliveryTime || "09:00",
         timezone: preferences.timezone || "America/New_York",
       });
@@ -180,7 +189,7 @@ export default function NotificationsPage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: data.email,
+          email: currentUser?.email,
           deliveryTime: data.deliveryTime,
           timezone: data.timezone,
           emailNotifications: data.emailNotifications ?? preferences?.emailNotifications ?? true,
@@ -357,7 +366,7 @@ export default function NotificationsPage() {
     }
   };
 
-  if (preferencesLoading) {
+  if (preferencesLoading || userLoading) {
     return (
       <div className="space-y-6">
         <div>
@@ -426,77 +435,51 @@ export default function NotificationsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {/* Active Searches Summary */}
-              <div className="mb-6 p-4 bg-muted/50 rounded-lg border" data-testid="active-searches-summary">
-                <div className="flex items-start gap-3">
-                  <Search className="h-5 w-5 text-primary mt-0.5" />
-                  <div className="flex-1">
-                    <h4 className="font-medium text-sm mb-1">Active Email Alert Searches</h4>
-                    {searchesLoading ? (
-                      <p className="text-sm text-muted-foreground">Loading...</p>
-                    ) : savedSearches.filter((s: any) => s.alertFrequency !== "none").length > 0 ? (
-                      <div className="space-y-2">
-                        <p className="text-sm text-muted-foreground">
-                          You have {savedSearches.filter((s: any) => s.alertFrequency !== "none").length} active search{savedSearches.filter((s: any) => s.alertFrequency !== "none").length !== 1 ? 'es' : ''} that will trigger email alerts:
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {savedSearches
-                            .filter((s: any) => s.alertFrequency !== "none")
-                            .map((search: any) => (
-                              <Badge key={search.id} variant="secondary" className="text-xs">
-                                {search.name} ({search.alertFrequency})
-                              </Badge>
-                            ))}
+              {/* Quick Status Summary */}
+              {!searchesLoading && (
+                <div className="mb-6 p-4 bg-muted/50 rounded-lg border" data-testid="active-searches-summary">
+                  <div className="flex items-start gap-3">
+                    <Info className="h-5 w-5 text-primary mt-0.5" />
+                    <div className="flex-1">
+                      {savedSearches.filter((s: any) => s.alertFrequency !== "none").length > 0 ? (
+                        <div>
+                          <p className="text-sm font-medium">
+                            {savedSearches.filter((s: any) => s.alertFrequency !== "none").length} active alert{savedSearches.filter((s: any) => s.alertFrequency !== "none").length !== 1 ? 's' : ''} configured
+                          </p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Alerts will be sent to <span className="font-medium">{currentUser?.email}</span>. Manage your searches below.
+                          </p>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <p className="text-sm text-muted-foreground">
-                          No active searches. Create an Email Alert Search below to start receiving notifications about articles matching your criteria.
-                        </p>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setEditingSearch(null);
-                            setSearchDialogOpen(true);
-                          }}
-                          data-testid="button-create-search-inline"
-                        >
-                          <Plus className="h-3 w-3 mr-1" />
-                          Create Your First Search
-                        </Button>
-                      </div>
-                    )}
+                      ) : (
+                        <div>
+                          <p className="text-sm font-medium">No active alerts</p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Create a search below to start receiving email alerts for articles matching your criteria.
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               <Separator className="mb-6" />
 
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email Address</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="your.email@company.com"
-                            {...field}
-                            data-testid="input-notification-email"
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Email address where you'll receive article alerts
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Email Address</label>
+                    <div 
+                      className="flex h-10 w-full items-center rounded-md border border-input bg-muted px-3 py-2 text-sm"
+                      data-testid="display-notification-email"
+                    >
+                      <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
+                      {currentUser?.email || "Loading..."}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Alerts will be sent to your account email. To change this, update your account settings.
+                    </p>
+                  </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
@@ -564,7 +547,7 @@ export default function NotificationsPage() {
                       type="button"
                       variant="outline"
                       onClick={() => testEmailMutation.mutate()}
-                      disabled={testEmailMutation.isPending || !form.watch("email")}
+                      disabled={testEmailMutation.isPending || !currentUser?.email}
                       data-testid="button-test-email"
                     >
                       <Mail className="h-4 w-4 mr-2" />
@@ -581,62 +564,79 @@ export default function NotificationsPage() {
                   </div>
                 </form>
               </Form>
-            </CardContent>
-          </Card>
 
-          <Card data-testid="card-saved-searches">
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <CheckCircle className="h-5 w-5 text-primary" />
-                    Email Alert Searches
-                  </CardTitle>
-                  <CardDescription className="mt-1">
-                    Create searches to define what articles trigger email alerts. Each search can have its own alert frequency.
-                  </CardDescription>
+              <Separator className="my-6" />
+
+              {/* Email Alert Searches Section - Combined into same card */}
+              <div className="space-y-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <CheckCircle className="h-5 w-5 text-primary" />
+                      Email Alert Searches
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Define what articles trigger email alerts. Each search can have its own alert frequency.
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      setEditingSearch(null);
+                      setSearchDialogOpen(true);
+                    }}
+                    size="sm"
+                    data-testid="button-create-search"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Search
+                  </Button>
                 </div>
-                <Button
-                  onClick={() => {
-                    setEditingSearch(null);
-                    setSearchDialogOpen(true);
-                  }}
-                  size="sm"
-                  data-testid="button-create-search"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Search
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {searchesLoading ? (
-                <div className="space-y-3">
-                  {[1, 2].map((i) => (
-                    <Skeleton key={i} className="h-24 w-full" />
-                  ))}
-                </div>
-              ) : savedSearches.length > 0 ? (
-                <div className="space-y-3">
-                  {savedSearches.map((search: any) => (
-                    <Card key={search.id} data-testid={`saved-search-${search.id}`}>
-                      <CardHeader className="pb-3">
+
+                {searchesLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2].map((i) => (
+                      <Skeleton key={i} className="h-24 w-full" />
+                    ))}
+                  </div>
+                ) : savedSearches.length > 0 ? (
+                  <div className="space-y-3">
+                    {savedSearches.map((search: any) => (
+                      <div 
+                        key={search.id} 
+                        className="p-4 border rounded-lg bg-background"
+                        data-testid={`saved-search-${search.id}`}
+                      >
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <CardTitle className="text-base flex items-center gap-2">
-                              {search.name}
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{search.name}</span>
                               <Badge variant={search.alertFrequency === "none" ? "outline" : "default"} className="text-xs">
                                 {search.alertFrequency === "none" ? "No Alerts" : search.alertFrequency}
                               </Badge>
-                            </CardTitle>
-                            <CardDescription className="mt-1">
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1">
                               Created {formatDistanceToNow(new Date(search.createdAt))} ago
                               {search.lastAlertSent && (
                                 <> • Last alert {formatDistanceToNow(new Date(search.lastAlertSent))} ago</>
                               )}
-                            </CardDescription>
+                            </p>
+                            {search.criteria?.search && (
+                              <div className="text-sm mt-2">
+                                <span className="text-muted-foreground">Keywords:</span>{" "}
+                                <span className="font-medium">{search.criteria.search}</span>
+                              </div>
+                            )}
+                            {search.criteria?.categories?.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {search.criteria.categories.map((cat: string) => (
+                                  <Badge key={cat} variant="secondary" className="text-xs">
+                                    {cat}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex gap-1">
                             <Button
                               type="button"
                               variant="ghost"
@@ -660,34 +660,30 @@ export default function NotificationsPage() {
                             </Button>
                           </div>
                         </div>
-                      </CardHeader>
-                      <CardContent className="pt-0">
-                        {search.criteria?.search && (
-                          <div className="text-sm">
-                            <span className="text-muted-foreground">Keywords:</span>{" "}
-                            <span className="font-medium">{search.criteria.search}</span>
-                          </div>
-                        )}
-                        {search.criteria?.categories?.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {search.criteria.categories.map((cat: string) => (
-                              <Badge key={cat} variant="secondary" className="text-xs">
-                                {cat}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Mail className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No saved searches yet.</p>
-                  <p className="text-sm">Create a search to receive email alerts for matching articles.</p>
-                </div>
-              )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground border rounded-lg">
+                    <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No saved searches yet.</p>
+                    <p className="text-sm">Create a search to receive email alerts for matching articles.</p>
+                    <Button
+                      onClick={() => {
+                        setEditingSearch(null);
+                        setSearchDialogOpen(true);
+                      }}
+                      variant="outline"
+                      size="sm"
+                      className="mt-4"
+                      data-testid="button-create-first-search"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Your First Search
+                    </Button>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

@@ -385,7 +385,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({
       id: req.user.id,
       orgId: req.user.orgId,
-      role: req.user.role
+      role: req.user.role,
+      email: req.user.email,
+      name: req.user.name,
     });
   });
 
