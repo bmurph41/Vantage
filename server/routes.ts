@@ -4745,6 +4745,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+
+  // DD Project by ID (for breadcrumb resolution)
+  app.get("/api/dd-projects/:id", async (req: any, res) => {
+    try {
+      const project = await storage.getProject(req.params.id);
+      if (!project) {
+        return res.status(404).json({ error: "DD Project not found" });
+      }
+      res.json(project);
+    } catch (error: any) {
+      console.error("Failed to get DD project:", error);
+      res.status(500).json({ error: "Failed to retrieve DD project" });
+    }
+  });
   // Calendar Guest Management
   app.get("/api/projects/:projectId/guests", async (req: any, res) => {
     try {
@@ -9017,6 +9031,19 @@ Current context: Project ${req.params.projectId}`;
     }
   });
   app.put("/api/contacts/:id", async (req: any, res) => {
+
+  app.get("/api/contacts/:id", async (req: any, res) => {
+    try {
+      const contact = await storage.getCrmContact(req.params.id);
+      if (!contact) {
+        return res.status(404).json({ error: "Contact not found" });
+      }
+      res.json(contact);
+    } catch (error: any) {
+      console.error("Failed to get contact:", error);
+      res.status(500).json({ error: "Failed to retrieve contact" });
+    }
+  });
     try {
       const contact = await storage.updateCrmContact(req.params.id, req.body);
       res.json(contact);
@@ -9068,6 +9095,19 @@ Current context: Project ${req.params.projectId}`;
     } catch (error: any) {
       console.error("Failed to create company:", error);
       res.status(500).json({ error: "Failed to create company" });
+    }
+  });
+
+  app.get("/api/companies/:id", async (req: any, res) => {
+    try {
+      const company = await storage.getCrmCompany(req.params.id);
+      if (!company) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+      res.json(company);
+    } catch (error: any) {
+      console.error("Failed to get company:", error);
+      res.status(500).json({ error: "Failed to retrieve company" });
     }
   });
   app.put("/api/companies/:id", async (req: any, res) => {
