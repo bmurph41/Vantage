@@ -13931,6 +13931,223 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // ========================================================================
+
+  // ========================================================================
+  // RENT ROLL SNAPSHOTS ROUTES
+  // ========================================================================
+
+  // Create or update a snapshot for a rent roll
+  app.post('/api/operations/rent-rolls/:rentRollId/snapshots', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { snapshotMonth, snapshotYear, ownedAssetId } = req.body;
+      
+      if (!snapshotMonth || !snapshotYear) {
+        return res.status(400).json({ error: 'snapshotMonth and snapshotYear are required' });
+      }
+      
+      const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
+      const snapshot = await rentRollSnapshotService.createSnapshot(
+        orgId,
+        req.params.rentRollId,
+        snapshotMonth,
+        snapshotYear,
+        ownedAssetId
+      );
+      res.status(201).json(snapshot);
+    } catch (error: any) {
+      console.error('Failed to create rent roll snapshot:', error);
+      res.status(500).json({ error: error.message || 'Failed to create snapshot' });
+    }
+  });
+
+  // Get snapshots for a rent roll
+  app.get('/api/operations/rent-rolls/:rentRollId/snapshots', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
+      const snapshots = await rentRollSnapshotService.getSnapshotsForRentRoll(
+        req.params.rentRollId,
+        orgId
+      );
+      res.json(snapshots);
+    } catch (error: any) {
+      console.error('Failed to fetch rent roll snapshots:', error);
+      res.status(500).json({ error: 'Failed to fetch snapshots' });
+    }
+  });
+
+  // Get snapshot details
+  app.get('/api/operations/rent-roll-snapshots/:snapshotId/details', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
+      
+      const snapshot = await rentRollSnapshotService.getSnapshot(req.params.snapshotId, orgId);
+      if (!snapshot) {
+        return res.status(404).json({ error: 'Snapshot not found' });
+      }
+      
+      const details = await rentRollSnapshotService.getSnapshotDetails(snapshot.id);
+      res.json({ snapshot, details });
+    } catch (error: any) {
+      console.error('Failed to fetch snapshot details:', error);
+      res.status(500).json({ error: 'Failed to fetch snapshot details' });
+    }
+  });
+
+  // Compare snapshots
+  app.get('/api/operations/rent-roll-snapshots/:currentId/compare/:previousId?', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
+      
+      const comparison = await rentRollSnapshotService.compareSnapshots(
+        req.params.currentId,
+        req.params.previousId || null,
+        orgId
+      );
+      res.json(comparison);
+    } catch (error: any) {
+      console.error('Failed to compare snapshots:', error);
+      res.status(500).json({ error: error.message || 'Failed to compare snapshots' });
+    }
+  });
+
+  // Get time series for a rent roll
+  app.get('/api/operations/rent-rolls/:rentRollId/time-series', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { startYear, startMonth, endYear, endMonth } = req.query;
+      
+      if (!startYear || !startMonth || !endYear || !endMonth) {
+        return res.status(400).json({ error: 'Start and end year/month are required' });
+      }
+      
+      const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
+      const snapshots = await rentRollSnapshotService.getTimeSeries(
+        req.params.rentRollId,
+        orgId,
+        parseInt(startYear as string),
+        parseInt(startMonth as string),
+        parseInt(endYear as string),
+        parseInt(endMonth as string)
+      );
+      res.json(snapshots);
+    } catch (error: any) {
+      console.error('Failed to fetch time series:', error);
+      res.status(500).json({ error: 'Failed to fetch time series' });
+    }
+  });
+
+  // Get portfolio aggregation
+  app.get('/api/operations/rent-roll-snapshots/portfolio', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { year, month, assetIds } = req.query;
+      
+      if (!year || !month) {
+        return res.status(400).json({ error: 'Year and month are required' });
+      }
+      
+      const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
+      const aggregation = await rentRollSnapshotService.getPortfolioAggregation(
+        orgId,
+        parseInt(year as string),
+        parseInt(month as string),
+        assetIds ? (assetIds as string).split(',') : undefined
+      );
+      res.json(aggregation);
+    } catch (error: any) {
+      console.error('Failed to fetch portfolio aggregation:', error);
+      res.status(500).json({ error: 'Failed to fetch portfolio aggregation' });
+    }
+  });
+
+  // ========================================================================
+  // BUDGET RENT ROLL BINDINGS ROUTES
+  // ========================================================================
+
+  // Get bindings for a budget
+  app.get('/api/operations/budgets/:budgetId/rent-roll-bindings', authenticateUser, async (req: any, res) => {
+    try {
+      const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
+      const bindings = await rentRollSnapshotService.getBindingsForBudget(req.params.budgetId);
+      res.json(bindings);
+    } catch (error: any) {
+      console.error('Failed to fetch budget bindings:', error);
+      res.status(500).json({ error: 'Failed to fetch bindings' });
+    }
+  });
+
+  // Create a binding
+  app.post('/api/operations/budgets/:budgetId/rent-roll-bindings', authenticateUser, async (req: any, res) => {
+    try {
+      const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
+      const binding = await rentRollSnapshotService.createBinding({
+        ...req.body,
+        budgetId: req.params.budgetId,
+      });
+      res.status(201).json(binding);
+    } catch (error: any) {
+      console.error('Failed to create budget binding:', error);
+      res.status(500).json({ error: error.message || 'Failed to create binding' });
+    }
+  });
+
+  // Update a binding
+  app.patch('/api/operations/rent-roll-bindings/:bindingId', authenticateUser, async (req: any, res) => {
+    try {
+      const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
+      const binding = await rentRollSnapshotService.updateBinding(req.params.bindingId, req.body);
+      if (!binding) {
+        return res.status(404).json({ error: 'Binding not found' });
+      }
+      res.json(binding);
+    } catch (error: any) {
+      console.error('Failed to update binding:', error);
+      res.status(500).json({ error: error.message || 'Failed to update binding' });
+    }
+  });
+
+  // Delete a binding
+  app.delete('/api/operations/rent-roll-bindings/:bindingId', authenticateUser, async (req: any, res) => {
+    try {
+      const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
+      const deleted = await rentRollSnapshotService.deleteBinding(req.params.bindingId);
+      if (!deleted) {
+        return res.status(404).json({ error: 'Binding not found' });
+      }
+      res.status(204).send();
+    } catch (error: any) {
+      console.error('Failed to delete binding:', error);
+      res.status(500).json({ error: 'Failed to delete binding' });
+    }
+  });
+
+  // Sync budget actuals from rent roll
+  app.post('/api/operations/budgets/:budgetId/sync-rent-roll', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { month, year } = req.body;
+      
+      if (!month || !year) {
+        return res.status(400).json({ error: 'Month and year are required' });
+      }
+      
+      const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
+      const result = await rentRollSnapshotService.syncBudgetActualsFromRentRoll(
+        req.params.budgetId,
+        orgId,
+        month,
+        year
+      );
+      res.json(result);
+    } catch (error: any) {
+      console.error('Failed to sync budget from rent roll:', error);
+      res.status(500).json({ error: error.message || 'Failed to sync' });
+    }
+  });
   // MARKETING OPERATIONS ROUTES
   // ========================================================================
 
