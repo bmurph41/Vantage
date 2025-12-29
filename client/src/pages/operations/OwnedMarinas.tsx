@@ -26,7 +26,9 @@ import {
   BarChart3,
   Plus,
   ExternalLink,
+  Target,
 } from "lucide-react";
+import MarinaBudgetTab from "@/components/operations/MarinaBudgetTab";
 
 interface OwnedMarina {
   id: string;
@@ -219,6 +221,10 @@ export default function OwnedMarinas() {
         <TabsList>
           <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
           <TabsTrigger value="performance" data-testid="tab-performance">Performance</TabsTrigger>
+          <TabsTrigger value="budget" data-testid="tab-budget">
+            <Target className="h-4 w-4 mr-1" />
+            Budget
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
@@ -320,6 +326,18 @@ export default function OwnedMarinas() {
                 <p className="text-lg font-medium mb-2">Performance analytics coming soon</p>
                 <p>Track revenue, occupancy, and valuation trends over time</p>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="budget" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Portfolio Budget Management</CardTitle>
+              <CardDescription>Track annual budgets and compare actual vs budgeted performance</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <MarinaBudgetTab isPortfolioView={true} />
             </CardContent>
           </Card>
         </TabsContent>

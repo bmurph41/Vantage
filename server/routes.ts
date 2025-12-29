@@ -13391,7 +13391,6 @@ Current context: Project ${req.params.projectId}`;
     res.redirect(301, '/api/portfolio/marinas');
   });
 
-BUDGET_PLACEHOLDER
 
   // ========================================
   // RENT ROLL ENDPOINTS
@@ -13711,10 +13710,10 @@ BUDGET_PLACEHOLDER
       
       if (budgetIds.length > 0) {
         allLineItems = await db.select().from(marinaBudgetLineItems)
-          .where(sql\`\${marinaBudgetLineItems.budgetId} IN (\${sql.join(budgetIds.map(id => sql\`\${id}\`), sql\`, \`)})\`);
+          .where(inArray(marinaBudgetLineItems.budgetId, budgetIds));
 
         allActuals = await db.select().from(marinaBudgetActuals)
-          .where(sql\`\${marinaBudgetActuals.budgetId} IN (\${sql.join(budgetIds.map(id => sql\`\${id}\`), sql\`, \`)})\`);
+          .where(inArray(marinaBudgetActuals.budgetId, budgetIds));
       }
 
       const categoryTotals: Record<string, { budgeted: number; actual: number }> = {};
