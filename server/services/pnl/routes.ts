@@ -620,4 +620,287 @@ router.post('/keyword-bank/seed-default', async (req: any, res) => {
   }
 });
 
+router.get('/marina/:marinaId', async (req: any, res) => {
+  try {
+    const { orgId } = getAuthContext(req);
+    const marinaId = String(req.params.marinaId);
+
+    const schema = z.object({
+      from: z.string().optional(),
+      to: z.string().optional(),
+      periodType: z.enum(['month', 'quarter', 'year']).optional(),
+      fiscalYear: z.coerce.number().int().optional(),
+    });
+
+    const parsedQ = schema.safeParse(req.query);
+    if (!parsedQ.success) {
+      return res.status(400).json({ error: parsedQ.error.flatten() });
+    }
+
+    const { from, to, periodType, fiscalYear } = parsedQ.data;
+
+    const { getPnlForMarina } = await import('./aggregationService');
+
+    const result = await getPnlForMarina(orgId, marinaId, {
+      from: from ? new Date(from) : undefined,
+      to: to ? new Date(to) : undefined,
+      periodType,
+      fiscalYear,
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    console.error('Get marina P&L error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/marina/:marinaId/time-series', async (req: any, res) => {
+  try {
+    const { orgId } = getAuthContext(req);
+    const marinaId = String(req.params.marinaId);
+
+    const schema = z.object({
+      fiscalYears: z.string().optional(),
+      periodType: z.enum(['month', 'quarter', 'year']).optional(),
+      sections: z.string().optional(),
+    });
+
+    const parsedQ = schema.safeParse(req.query);
+    if (!parsedQ.success) {
+      return res.status(400).json({ error: parsedQ.error.flatten() });
+    }
+
+    const { fiscalYears, periodType, sections } = parsedQ.data;
+
+    const { getPnlTimeSeries } = await import('./aggregationService');
+
+    const result = await getPnlTimeSeries(orgId, marinaId, {
+      fiscalYears: fiscalYears ? fiscalYears.split(',').map(y => parseInt(y, 10)) : undefined,
+      periodType,
+      sections: sections ? sections.split(',') : undefined,
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    console.error('Get marina time series error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/marina/:marinaId/comparison', async (req: any, res) => {
+  try {
+    const { orgId } = getAuthContext(req);
+    const marinaId = String(req.params.marinaId);
+
+    const schema = z.object({
+      baseYear: z.coerce.number().int(),
+      compareYear: z.coerce.number().int(),
+      periodType: z.enum(['month', 'quarter', 'year']).optional(),
+    });
+
+    const parsedQ = schema.safeParse(req.query);
+    if (!parsedQ.success) {
+      return res.status(400).json({ error: parsedQ.error.flatten() });
+    }
+
+    const { baseYear, compareYear, periodType } = parsedQ.data;
+
+    const { getPnlComparisonYoY } = await import('./aggregationService');
+
+    const result = await getPnlComparisonYoY(orgId, marinaId, {
+      baseYear,
+      compareYear,
+      periodType,
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    console.error('Get marina comparison error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/documents/:documentId', async (req: any, res) => {
+  try {
+    const { orgId } = getAuthContext(req);
+    const documentId = String(req.params.documentId);
+
+    const doc = await db.query.pnlDocuments.findFirst({
+      where: and(eq(pnlDocuments.id, documentId), eq(pnlDocuments.orgId, orgId)),
+    });
+
+    if (!doc) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    const jobs = await db.query.pnlJobs.findMany({
+      where: eq(pnlJobs.documentId, documentId),
+      orderBy: [desc(pnlJobs.createdAt)],
+    });
+
+    const latestJob = jobs[0];
+    let parsedStatement = null;
+    let reviewItemsCount = 0;
+    let factsCount = 0;
+
+    if (latestJob) {
+      parsedStatement = await db.query.pnlParsedStatements.findFirst({
+        where: eq(pnlParsedStatements.jobId, latestJob.id),
+      });
+
+      const reviewItems = await db.query.pnlReviewItems.findMany({
+        where: and(eq(pnlReviewItems.jobId, latestJob.id), eq(pnlReviewItems.status, 'needs_review')),
+      });
+      reviewItemsCount = reviewItems.length;
+
+      const facts = await db.query.pnlFacts.findMany({
+        where: eq(pnlFacts.documentId, documentId),
+      });
+      factsCount = facts.length;
+    }
+
+    res.json({
+      document: doc,
+      jobs,
+      latestJob,
+      parsedStatement: parsedStatement ? {
+        id: parsedStatement.id,
+        confidence: parsedStatement.confidence,
+        periodCount: (parsedStatement.parsedJson as any)?.periods?.length ?? 0,
+        rowCount: (parsedStatement.parsedJson as any)?.rows?.length ?? 0,
+      } : null,
+      reviewItemsCount,
+      factsCount,
+    });
+  } catch (error: any) {
+    console.error('Get document details error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/canonical-items/seed-marina', async (req: any, res) => {
+  try {
+    const { orgId } = getAuthContext(req);
+
+    const { seedMarinaCoa, getCoaStats } = await import('../../scripts/seedMarinaCoa');
+
+    const seedResult = await seedMarinaCoa(orgId);
+    const stats = await getCoaStats(orgId);
+
+    res.json({
+      message: 'Marina COA seeded successfully',
+      ...seedResult,
+      stats,
+    });
+  } catch (error: any) {
+    console.error('Seed marina COA error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/statements/:statementId/approve', async (req: any, res) => {
+  try {
+    const { orgId, userId } = getAuthContext(req);
+    const statementId = String(req.params.statementId);
+
+    const statement = await db.query.pnlParsedStatements.findFirst({
+      where: and(eq(pnlParsedStatements.id, statementId), eq(pnlParsedStatements.orgId, orgId)),
+    });
+
+    if (!statement) {
+      return res.status(404).json({ error: 'Statement not found' });
+    }
+
+    const job = await db.query.pnlJobs.findFirst({
+      where: eq(pnlJobs.id, statement.jobId),
+    });
+
+    if (job) {
+      await db
+        .update(pnlJobs)
+        .set({ 
+          status: 'completed', 
+          stage: 'approved',
+          completedAt: new Date(),
+          updatedAt: new Date() 
+        })
+        .where(eq(pnlJobs.id, job.id));
+
+      await db
+        .update(pnlReviewItems)
+        .set({ status: 'approved', resolvedBy: userId, updatedAt: new Date() })
+        .where(and(eq(pnlReviewItems.jobId, job.id), eq(pnlReviewItems.status, 'needs_review')));
+    }
+
+    res.json({ ok: true, message: 'Statement approved for modeling' });
+  } catch (error: any) {
+    console.error('Approve statement error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/statements/:statementId/lines', async (req: any, res) => {
+  try {
+    const { orgId } = getAuthContext(req);
+    const statementId = String(req.params.statementId);
+
+    const schema = z.object({
+      groupBy: z.enum(['department', 'coa', 'none']).optional().default('none'),
+      periodType: z.enum(['month', 'quarter', 'year']).optional(),
+    });
+
+    const parsedQ = schema.safeParse(req.query);
+    if (!parsedQ.success) {
+      return res.status(400).json({ error: parsedQ.error.flatten() });
+    }
+
+    const { groupBy } = parsedQ.data;
+
+    const statement = await db.query.pnlParsedStatements.findFirst({
+      where: and(eq(pnlParsedStatements.id, statementId), eq(pnlParsedStatements.orgId, orgId)),
+    });
+
+    if (!statement) {
+      return res.status(404).json({ error: 'Statement not found' });
+    }
+
+    const pj = statement.parsedJson as any;
+    const rows = pj.rows ?? [];
+    const periods = pj.periods ?? [];
+
+    if (groupBy === 'none') {
+      return res.json({ rows, periods });
+    }
+
+    const canonicalItems = await db.query.pnlCanonicalLineItems.findMany({
+      where: eq(pnlCanonicalLineItems.orgId, orgId),
+    });
+    const canonicalMap = new Map(canonicalItems.map(c => [c.id, c]));
+
+    const grouped: Record<string, typeof rows> = {};
+    for (const row of rows) {
+      const canonicalId = row.mapping?.canonicalLineItemId;
+      const canonical = canonicalId ? canonicalMap.get(canonicalId) : null;
+      
+      let groupKey = 'Uncategorized';
+      if (groupBy === 'department' && canonical) {
+        groupKey = canonical.department;
+      } else if (groupBy === 'coa' && canonical) {
+        groupKey = canonical.section;
+      }
+
+      if (!grouped[groupKey]) {
+        grouped[groupKey] = [];
+      }
+      grouped[groupKey].push(row);
+    }
+
+    res.json({ grouped, periods });
+  } catch (error: any) {
+    console.error('Get statement lines error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

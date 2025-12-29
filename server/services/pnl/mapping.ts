@@ -12,6 +12,7 @@ import {
   type PnlKeywordRule,
 } from '@shared/schema';
 import { and, eq, or, isNull, sql, desc, asc } from 'drizzle-orm';
+import { getLlmClassifier, type ClassificationRequest } from '../../utils/llm';
 
 interface MapResult {
   canonicalLineItemId?: string;
@@ -213,6 +214,75 @@ async function tryCanonicalMatch(orgId: string, normalized: string): Promise<Map
   return { mappingMethod: 'none', confidence: 0 };
 }
 
+const LLM_PROVIDER = process.env.LLM_PROVIDER?.toLowerCase() ?? 'mock';
+const IS_REAL_LLM = LLM_PROVIDER === 'openai' || LLM_PROVIDER === 'anthropic';
+
+async function tryLlmClassification(
+  orgId: string,
+  label: string,
+  normalized: string,
+  context?: { nearbyLabels?: string[]; vendorHint?: string }
+): Promise<MapResult> {
+  try {
+    const classifier = getLlmClassifier();
+    const request: ClassificationRequest = {
+      label,
+      normalizedLabel: normalized,
+      context,
+    };
+
+    const result = await classifier.classify(request);
+
+    const isMockResult = classifier.name === 'mock';
+    const confidenceAdjustment = isMockResult ? 0.5 : 1.0;
+    const adjustedConfidence = result.confidence * confidenceAdjustment;
+
+    if (!result.canonicalKey || adjustedConfidence < 0.5) {
+      return {
+        mappingMethod: isMockResult ? 'rule' : 'ai',
+        confidence: adjustedConfidence,
+        department: result.department,
+        bucket: result.section === 'cogs' ? 'COGS' : result.section === 'revenue' ? 'Revenue' : 'Expense',
+        suggestion: {
+          llmResponse: result,
+          noCanonicalMatch: true,
+          isMockClassifier: isMockResult,
+        },
+      };
+    }
+
+    const canonicals = await db.query.pnlCanonicalLineItems.findMany({
+      where: eq(pnlCanonicalLineItems.orgId, orgId),
+    });
+
+    const matchingCanonical = canonicals.find(c => 
+      c.canonicalKey === result.canonicalKey ||
+      c.canonicalKey.endsWith(result.canonicalKey.split('.').pop() || '') ||
+      normalizeLabel(c.displayName).includes(result.canonicalKey.split('.').pop() || '')
+    );
+
+    const finalConfidence = matchingCanonical 
+      ? adjustedConfidence 
+      : adjustedConfidence * 0.7;
+
+    return {
+      canonicalLineItemId: matchingCanonical?.id,
+      mappingMethod: isMockResult ? 'rule' : 'ai',
+      confidence: finalConfidence,
+      department: result.department,
+      bucket: result.section === 'cogs' ? 'COGS' : result.section === 'revenue' ? 'Revenue' : 'Expense',
+      suggestion: {
+        llmResponse: result,
+        matchedCanonical: matchingCanonical?.canonicalKey,
+        isMockClassifier: isMockResult,
+      },
+    };
+  } catch (error) {
+    console.error('[P&L LLM Classification] Error:', error);
+    return { mappingMethod: 'none', confidence: 0 };
+  }
+}
+
 export async function mapParsedStatement(jobId: string): Promise<{ reviewCount: number; autoMappedCount: number }> {
   const parsed = await db.query.pnlParsedStatements.findFirst({
     where: eq(pnlParsedStatements.jobId, jobId),
@@ -258,6 +328,20 @@ export async function mapParsedStatement(jobId: string): Promise<{ reviewCount: 
       const canonicalRes = await tryCanonicalMatch(orgId, normalized);
       if (canonicalRes.confidence > (res.confidence || 0)) {
         res = canonicalRes;
+      }
+    }
+
+    if (!res.canonicalLineItemId || res.confidence < CONFIDENCE_THRESHOLD) {
+      const nearbyLabels = rows
+        .slice(Math.max(0, rows.indexOf(row) - 3), rows.indexOf(row) + 3)
+        .filter(r => r !== row)
+        .map(r => r.label);
+      const llmRes = await tryLlmClassification(orgId, rawLabel, normalized, {
+        nearbyLabels,
+        vendorHint: pj.vendorHint || undefined,
+      });
+      if (llmRes.confidence > (res.confidence || 0)) {
+        res = llmRes;
       }
     }
     
