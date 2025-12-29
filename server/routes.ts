@@ -4747,9 +4747,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
   // DD Project by ID (for breadcrumb resolution)
-  app.get("/api/dd-projects/:id", async (req: any, res) => {
+  app.get("/api/dd/projects/:id", async (req: any, res) => {
     try {
-      const project = await storage.getProject(req.params.id);
+      const project = await authorizeProjectAccess(req.params.id, req.user.orgId);
       if (!project) {
         return res.status(404).json({ error: "DD Project not found" });
       }

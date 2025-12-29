@@ -896,7 +896,7 @@ function DynamicBreadcrumbItem({ item, isLast }: { item: BreadcrumbItem; isLast:
   });
 
   const { data: ddProject } = useQuery<{ name: string }>({
-    queryKey: ['/api/dd-projects', item.dynamicId],
+    queryKey: ['/api/dd/projects', item.dynamicId],
     enabled: item.dynamicType === 'dd-project' && !!item.dynamicId,
   });
 
