@@ -149,6 +149,13 @@ import {
   assetPerformanceSnapshots,
   updateOwnedAssetSchema,
   insertAssetPerformanceSnapshotSchema,
+  marinaBudgets,
+  marinaBudgetLineItems,
+  marinaBudgetActuals,
+  insertMarinaBudgetSchema,
+  updateMarinaBudgetSchema,
+  insertMarinaBudgetLineItemSchema,
+  insertMarinaBudgetActualSchema,
   modelingProjects,
   insertModelingProjectSchema,
   updateModelingProjectSchema,
@@ -13384,8 +13391,380 @@ Current context: Project ${req.params.projectId}`;
     res.redirect(301, '/api/portfolio/marinas');
   });
 
+BUDGET_PLACEHOLDER
+
   // ========================================
   // RENT ROLL ENDPOINTS
+
+  // ========================================
+  // MARINA BUDGET ENDPOINTS
+  // ========================================
+
+  // Get budgets for a specific marina/owned asset
+  app.get('/api/operations/budgets/marina/:assetId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { assetId } = req.params;
+      const { year } = req.query;
+
+      let query = db
+        .select()
+        .from(marinaBudgets)
+        .where(and(
+          eq(marinaBudgets.orgId, orgId),
+          eq(marinaBudgets.ownedAssetId, assetId)
+        ))
+        .orderBy(desc(marinaBudgets.fiscalYear));
+
+      const budgets = year 
+        ? await db.select().from(marinaBudgets).where(and(
+            eq(marinaBudgets.orgId, orgId),
+            eq(marinaBudgets.ownedAssetId, assetId),
+            eq(marinaBudgets.fiscalYear, parseInt(year as string))
+          ))
+        : await query;
+
+      res.json(budgets);
+    } catch (error: any) {
+      console.error('Failed to fetch marina budgets:', error);
+      res.status(500).json({ error: 'Failed to fetch marina budgets' });
+    }
+  });
+
+  // Get a single budget with line items
+  app.get('/api/operations/budgets/:budgetId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { budgetId } = req.params;
+
+      const [budget] = await db
+        .select()
+        .from(marinaBudgets)
+        .where(and(
+          eq(marinaBudgets.id, budgetId),
+          eq(marinaBudgets.orgId, orgId)
+        ));
+
+      if (!budget) {
+        return res.status(404).json({ error: 'Budget not found' });
+      }
+
+      const lineItems = await db
+        .select()
+        .from(marinaBudgetLineItems)
+        .where(eq(marinaBudgetLineItems.budgetId, budgetId))
+        .orderBy(marinaBudgetLineItems.category, marinaBudgetLineItems.name);
+
+      const actuals = await db
+        .select()
+        .from(marinaBudgetActuals)
+        .where(eq(marinaBudgetActuals.budgetId, budgetId));
+
+      res.json({ ...budget, lineItems, actuals });
+    } catch (error: any) {
+      console.error('Failed to fetch budget:', error);
+      res.status(500).json({ error: 'Failed to fetch budget' });
+    }
+  });
+
+  // Create a new budget
+  app.post('/api/operations/budgets', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const data = insertMarinaBudgetSchema.parse(req.body);
+
+      const [existing] = await db
+        .select()
+        .from(marinaBudgets)
+        .where(and(
+          eq(marinaBudgets.ownedAssetId, data.ownedAssetId),
+          eq(marinaBudgets.fiscalYear, data.fiscalYear)
+        ));
+
+      if (existing) {
+        return res.status(409).json({ error: 'Budget already exists for this year' });
+      }
+
+      const [budget] = await db
+        .insert(marinaBudgets)
+        .values({ ...data, orgId, createdBy: userId })
+        .returning();
+
+      res.status(201).json(budget);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to create budget:', error);
+      res.status(500).json({ error: 'Failed to create budget' });
+    }
+  });
+
+  // Update a budget
+  app.patch('/api/operations/budgets/:budgetId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { budgetId } = req.params;
+      const data = updateMarinaBudgetSchema.parse(req.body);
+
+      const [budget] = await db
+        .update(marinaBudgets)
+        .set({ ...data, updatedAt: new Date() })
+        .where(and(eq(marinaBudgets.id, budgetId), eq(marinaBudgets.orgId, orgId)))
+        .returning();
+
+      if (!budget) {
+        return res.status(404).json({ error: 'Budget not found' });
+      }
+
+      res.json(budget);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to update budget:', error);
+      res.status(500).json({ error: 'Failed to update budget' });
+    }
+  });
+
+  // Add/update budget line items
+  app.post('/api/operations/budgets/:budgetId/line-items', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { budgetId } = req.params;
+      const items = req.body as any[];
+
+      const [budget] = await db
+        .select()
+        .from(marinaBudgets)
+        .where(and(eq(marinaBudgets.id, budgetId), eq(marinaBudgets.orgId, orgId)));
+
+      if (!budget) {
+        return res.status(404).json({ error: 'Budget not found' });
+      }
+
+      const results = await Promise.all(items.map(async (item) => {
+        const validated = insertMarinaBudgetLineItemSchema.parse({ ...item, budgetId });
+        
+        if (item.id) {
+          const [updated] = await db
+            .update(marinaBudgetLineItems)
+            .set({ ...validated, updatedAt: new Date() })
+            .where(eq(marinaBudgetLineItems.id, item.id))
+            .returning();
+          return updated;
+        } else {
+          const [created] = await db
+            .insert(marinaBudgetLineItems)
+            .values(validated)
+            .returning();
+          return created;
+        }
+      }));
+
+      const allItems = await db.select().from(marinaBudgetLineItems).where(eq(marinaBudgetLineItems.budgetId, budgetId));
+      const totalBudgetAmount = allItems.reduce((sum, item) => sum + parseFloat(item.annualAmount || '0'), 0);
+
+      await db.update(marinaBudgets).set({ totalBudgetAmount: totalBudgetAmount.toString(), updatedAt: new Date() }).where(eq(marinaBudgets.id, budgetId));
+
+      res.json(results);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to save line items:', error);
+      res.status(500).json({ error: 'Failed to save line items' });
+    }
+  });
+
+  // Record actuals against budget
+  app.post('/api/operations/budgets/:budgetId/actuals', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { budgetId } = req.params;
+      const actuals = req.body as any[];
+
+      const [budget] = await db
+        .select()
+        .from(marinaBudgets)
+        .where(and(eq(marinaBudgets.id, budgetId), eq(marinaBudgets.orgId, orgId)));
+
+      if (!budget) {
+        return res.status(404).json({ error: 'Budget not found' });
+      }
+
+      const results = await Promise.all(actuals.map(async (actual) => {
+        const validated = insertMarinaBudgetActualSchema.parse({ ...actual, budgetId });
+
+        if (actual.lineItemId) {
+          const [existing] = await db.select().from(marinaBudgetActuals)
+            .where(and(
+              eq(marinaBudgetActuals.lineItemId, actual.lineItemId),
+              eq(marinaBudgetActuals.year, validated.year),
+              eq(marinaBudgetActuals.month, validated.month)
+            ));
+
+          if (existing) {
+            const [updated] = await db.update(marinaBudgetActuals)
+              .set({ actualAmount: validated.actualAmount, notes: validated.notes })
+              .where(eq(marinaBudgetActuals.id, existing.id))
+              .returning();
+            return updated;
+          }
+        }
+
+        const [created] = await db.insert(marinaBudgetActuals).values(validated).returning();
+        return created;
+      }));
+
+      res.json(results);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
+      console.error('Failed to record actuals:', error);
+      res.status(500).json({ error: 'Failed to record actuals' });
+    }
+  });
+
+  // Get budget vs actual comparison for a marina
+  app.get('/api/operations/budgets/:budgetId/comparison', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { budgetId } = req.params;
+
+      const [budget] = await db.select().from(marinaBudgets)
+        .where(and(eq(marinaBudgets.id, budgetId), eq(marinaBudgets.orgId, orgId)));
+
+      if (!budget) {
+        return res.status(404).json({ error: 'Budget not found' });
+      }
+
+      const lineItems = await db.select().from(marinaBudgetLineItems).where(eq(marinaBudgetLineItems.budgetId, budgetId));
+      const actuals = await db.select().from(marinaBudgetActuals).where(eq(marinaBudgetActuals.budgetId, budgetId));
+
+      const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+      
+      const comparison = lineItems.map(item => {
+        const itemActuals = actuals.filter(a => a.lineItemId === item.id);
+        
+        const monthlyData = months.map((month, idx) => {
+          const budgeted = parseFloat((item as any)[month] || '0');
+          const actualRecord = itemActuals.find(a => a.month === idx + 1);
+          const actual = actualRecord ? parseFloat(actualRecord.actualAmount || '0') : 0;
+          const variance = actual - budgeted;
+          const variancePercent = budgeted !== 0 ? (variance / budgeted) * 100 : 0;
+
+          return { month: month.toUpperCase(), monthNum: idx + 1, budgeted, actual, variance, variancePercent: Math.round(variancePercent * 10) / 10 };
+        });
+
+        const totalBudgeted = parseFloat(item.annualAmount || '0');
+        const totalActual = monthlyData.reduce((sum, m) => sum + m.actual, 0);
+        const totalVariance = totalActual - totalBudgeted;
+
+        return {
+          id: item.id,
+          category: item.category,
+          name: item.name,
+          annualBudget: totalBudgeted,
+          ytdActual: totalActual,
+          ytdVariance: totalVariance,
+          ytdVariancePercent: totalBudgeted !== 0 ? Math.round((totalVariance / totalBudgeted) * 1000) / 10 : 0,
+          monthlyData,
+        };
+      });
+
+      res.json({
+        budget,
+        comparison,
+        summary: {
+          totalBudgeted: comparison.reduce((sum, c) => sum + c.annualBudget, 0),
+          totalActual: comparison.reduce((sum, c) => sum + c.ytdActual, 0),
+          totalVariance: comparison.reduce((sum, c) => sum + c.ytdVariance, 0),
+        },
+      });
+    } catch (error: any) {
+      console.error('Failed to fetch comparison:', error);
+      res.status(500).json({ error: 'Failed to fetch comparison' });
+    }
+  });
+
+  // Get portfolio-level budget summary
+  app.get('/api/operations/budgets/portfolio/summary', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { year } = req.query;
+      const fiscalYear = year ? parseInt(year as string) : new Date().getFullYear();
+
+      const budgets = await db
+        .select({ budget: marinaBudgets, asset: ownedAssets, property: crmProperties })
+        .from(marinaBudgets)
+        .innerJoin(ownedAssets, eq(marinaBudgets.ownedAssetId, ownedAssets.id))
+        .leftJoin(crmProperties, eq(ownedAssets.propertyId, crmProperties.id))
+        .where(and(eq(marinaBudgets.orgId, orgId), eq(marinaBudgets.fiscalYear, fiscalYear)));
+
+      const budgetIds = budgets.map(b => b.budget.id);
+      
+      let allLineItems: any[] = [];
+      let allActuals: any[] = [];
+      
+      if (budgetIds.length > 0) {
+        allLineItems = await db.select().from(marinaBudgetLineItems)
+          .where(sql\`\${marinaBudgetLineItems.budgetId} IN (\${sql.join(budgetIds.map(id => sql\`\${id}\`), sql\`, \`)})\`);
+
+        allActuals = await db.select().from(marinaBudgetActuals)
+          .where(sql\`\${marinaBudgetActuals.budgetId} IN (\${sql.join(budgetIds.map(id => sql\`\${id}\`), sql\`, \`)})\`);
+      }
+
+      const categoryTotals: Record<string, { budgeted: number; actual: number }> = {};
+      
+      for (const item of allLineItems) {
+        if (!categoryTotals[item.category]) {
+          categoryTotals[item.category] = { budgeted: 0, actual: 0 };
+        }
+        categoryTotals[item.category].budgeted += parseFloat(item.annualAmount || '0');
+        
+        const itemActuals = allActuals.filter(a => a.lineItemId === item.id);
+        for (const a of itemActuals) {
+          categoryTotals[item.category].actual += parseFloat(a.actualAmount || '0');
+        }
+      }
+
+      const marinaSummaries = budgets.map(b => {
+        const lineItems = allLineItems.filter(li => li.budgetId === b.budget.id);
+        const actuals = allActuals.filter(a => a.budgetId === b.budget.id);
+        
+        const totalBudgeted = lineItems.reduce((sum, li) => sum + parseFloat(li.annualAmount || '0'), 0);
+        const totalActual = actuals.reduce((sum, a) => sum + parseFloat(a.actualAmount || '0'), 0);
+
+        return {
+          budgetId: b.budget.id,
+          marinaId: b.asset.id,
+          marinaName: b.property?.title || 'Unknown',
+          status: b.budget.status,
+          totalBudgeted,
+          totalActual,
+          variance: totalActual - totalBudgeted,
+        };
+      });
+
+      const portfolioTotalBudgeted = marinaSummaries.reduce((sum, m) => sum + m.totalBudgeted, 0);
+      const portfolioTotalActual = marinaSummaries.reduce((sum, m) => sum + m.totalActual, 0);
+
+      res.json({
+        fiscalYear,
+        marinaCount: budgets.length,
+        portfolioTotal: { budgeted: portfolioTotalBudgeted, actual: portfolioTotalActual, variance: portfolioTotalActual - portfolioTotalBudgeted },
+        categoryBreakdown: Object.entries(categoryTotals).map(([category, totals]) => ({ category, ...totals, variance: totals.actual - totals.budgeted })),
+        marinaSummaries,
+      });
+    } catch (error: any) {
+      console.error('Failed to fetch portfolio budget summary:', error);
+      res.status(500).json({ error: 'Failed to fetch portfolio budget summary' });
+    }
+  });
+
   // ========================================
   // Get all rent rolls
   app.get('/api/operations/rent-rolls', authenticateUser, async (req: any, res) => {

@@ -2236,6 +2236,125 @@ export const assetPerformanceSnapshots = pgTable("asset_performance_snapshots", 
   assetDateIdx: index("asset_snapshots_asset_date_idx").on(table.ownedAssetId, table.snapshotDate),
 }));
 
+// ============================================================================
+// MARINA BUDGETS - Annual budgets with monthly allocations for owned assets
+// ============================================================================
+
+export const budgetCategoryEnum = pgEnum("budget_category", [
+  "revenue_storage",
+  "revenue_fuel",
+  "revenue_service",
+  "revenue_ship_store",
+  "revenue_other",
+  "expense_payroll",
+  "expense_utilities",
+  "expense_repairs",
+  "expense_insurance",
+  "expense_marketing",
+  "expense_admin",
+  "expense_other",
+]);
+
+export const marinaBudgets = pgTable("marina_budgets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  ownedAssetId: varchar("owned_asset_id").notNull().references(() => ownedAssets.id, { onDelete: 'cascade' }),
+  fiscalYear: integer("fiscal_year").notNull(),
+  name: text("name"),
+  description: text("description"),
+  status: text("status").notNull().default("draft"),
+  totalBudgetAmount: decimal("total_budget_amount", { precision: 15, scale: 2 }),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  approvedBy: varchar("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgAssetYearIdx: index("marina_budgets_org_asset_year_idx").on(table.orgId, table.ownedAssetId, table.fiscalYear),
+  uniqueAssetYear: unique().on(table.ownedAssetId, table.fiscalYear),
+}));
+
+export const marinaBudgetLineItems = pgTable("marina_budget_line_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  budgetId: varchar("budget_id").notNull().references(() => marinaBudgets.id, { onDelete: 'cascade' }),
+  category: budgetCategoryEnum("category").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  annualAmount: decimal("annual_amount", { precision: 15, scale: 2 }).notNull().default("0"),
+  jan: decimal("jan", { precision: 15, scale: 2 }).default("0"),
+  feb: decimal("feb", { precision: 15, scale: 2 }).default("0"),
+  mar: decimal("mar", { precision: 15, scale: 2 }).default("0"),
+  apr: decimal("apr", { precision: 15, scale: 2 }).default("0"),
+  may: decimal("may", { precision: 15, scale: 2 }).default("0"),
+  jun: decimal("jun", { precision: 15, scale: 2 }).default("0"),
+  jul: decimal("jul", { precision: 15, scale: 2 }).default("0"),
+  aug: decimal("aug", { precision: 15, scale: 2 }).default("0"),
+  sep: decimal("sep", { precision: 15, scale: 2 }).default("0"),
+  oct: decimal("oct", { precision: 15, scale: 2 }).default("0"),
+  nov: decimal("nov", { precision: 15, scale: 2 }).default("0"),
+  dec: decimal("dec", { precision: 15, scale: 2 }).default("0"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  budgetIdx: index("marina_budget_line_items_budget_idx").on(table.budgetId),
+  categoryIdx: index("marina_budget_line_items_category_idx").on(table.budgetId, table.category),
+}));
+
+export const marinaBudgetActuals = pgTable("marina_budget_actuals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  budgetId: varchar("budget_id").notNull().references(() => marinaBudgets.id, { onDelete: 'cascade' }),
+  lineItemId: varchar("line_item_id").references(() => marinaBudgetLineItems.id, { onDelete: 'cascade' }),
+  month: integer("month").notNull(),
+  year: integer("year").notNull(),
+  actualAmount: decimal("actual_amount", { precision: 15, scale: 2 }).notNull().default("0"),
+  source: text("source"),
+  sourceId: varchar("source_id"),
+  notes: text("notes"),
+  recordedAt: timestamp("recorded_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  budgetMonthIdx: index("marina_budget_actuals_budget_month_idx").on(table.budgetId, table.year, table.month),
+  lineItemMonthIdx: index("marina_budget_actuals_line_item_month_idx").on(table.lineItemId, table.year, table.month),
+  uniqueLineItemMonth: unique().on(table.lineItemId, table.year, table.month),
+}));
+
+export const marinaBudgetsRelations = relations(marinaBudgets, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [marinaBudgets.orgId],
+    references: [organizations.id],
+  }),
+  ownedAsset: one(ownedAssets, {
+    fields: [marinaBudgets.ownedAssetId],
+    references: [ownedAssets.id],
+  }),
+  creator: one(users, {
+    fields: [marinaBudgets.createdBy],
+    references: [users.id],
+  }),
+  lineItems: many(marinaBudgetLineItems),
+  actuals: many(marinaBudgetActuals),
+}));
+
+export const marinaBudgetLineItemsRelations = relations(marinaBudgetLineItems, ({ one, many }) => ({
+  budget: one(marinaBudgets, {
+    fields: [marinaBudgetLineItems.budgetId],
+    references: [marinaBudgets.id],
+  }),
+  actuals: many(marinaBudgetActuals),
+}));
+
+export const marinaBudgetActualsRelations = relations(marinaBudgetActuals, ({ one }) => ({
+  budget: one(marinaBudgets, {
+    fields: [marinaBudgetActuals.budgetId],
+    references: [marinaBudgets.id],
+  }),
+  lineItem: one(marinaBudgetLineItems, {
+    fields: [marinaBudgetActuals.lineItemId],
+    references: [marinaBudgetLineItems.id],
+  }),
+}));
+
 // Pending Properties - Review queue for properties created from sales comps or rate comps
 export const pendingProperties = pgTable("pending_properties", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -9668,6 +9787,50 @@ export type UpdateOwnedAsset = z.infer<typeof updateOwnedAssetSchema>;
 export type AssetPerformanceSnapshot = typeof assetPerformanceSnapshots.$inferSelect;
 export type InsertAssetPerformanceSnapshot = z.infer<typeof insertAssetPerformanceSnapshotSchema>;
 export type UpdateAssetPerformanceSnapshot = z.infer<typeof updateAssetPerformanceSnapshotSchema>;
+
+// ============================================================================
+// Marina Budgets Schemas and Types
+// ============================================================================
+
+export const insertMarinaBudgetSchema = createInsertSchema(marinaBudgets).omit({
+  id: true,
+  orgId: true,
+  createdBy: true,
+  approvedBy: true,
+  approvedAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateMarinaBudgetSchema = insertMarinaBudgetSchema.partial();
+
+export const insertMarinaBudgetLineItemSchema = createInsertSchema(marinaBudgetLineItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateMarinaBudgetLineItemSchema = insertMarinaBudgetLineItemSchema.partial();
+
+export const insertMarinaBudgetActualSchema = createInsertSchema(marinaBudgetActuals).omit({
+  id: true,
+  recordedAt: true,
+  createdAt: true,
+});
+
+export const updateMarinaBudgetActualSchema = insertMarinaBudgetActualSchema.partial();
+
+export type MarinaBudget = typeof marinaBudgets.$inferSelect;
+export type InsertMarinaBudget = z.infer<typeof insertMarinaBudgetSchema>;
+export type UpdateMarinaBudget = z.infer<typeof updateMarinaBudgetSchema>;
+
+export type MarinaBudgetLineItem = typeof marinaBudgetLineItems.$inferSelect;
+export type InsertMarinaBudgetLineItem = z.infer<typeof insertMarinaBudgetLineItemSchema>;
+export type UpdateMarinaBudgetLineItem = z.infer<typeof updateMarinaBudgetLineItemSchema>;
+
+export type MarinaBudgetActual = typeof marinaBudgetActuals.$inferSelect;
+export type InsertMarinaBudgetActual = z.infer<typeof insertMarinaBudgetActualSchema>;
+export type UpdateMarinaBudgetActual = z.infer<typeof updateMarinaBudgetActualSchema>;
 
 // ============================================================================
 // VDR (Virtual Data Room) Schemas and Types
