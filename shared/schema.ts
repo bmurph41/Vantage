@@ -2478,6 +2478,722 @@ export const budgetRentRollBindingsRelations = relations(budgetRentRollBindings,
   }),
 }));
 
+// ============================================================================
+// RENT ROLL ANALYSIS (RRA) INTEGRATION SCHEMA
+// Institutional-grade lease management with project hierarchy, tenant/lease
+// management, economics engine, snapshot versioning, and GL reconciliation
+// ============================================================================
+
+// RRA Feature flag keys
+export const RRA_FEATURE_FLAGS = [
+  "RRA_ECONOMICS_V2",
+  "RRA_SNAPSHOTS",
+  "RRA_RECONCILIATION",
+  "RRA_REPORT_PACKAGE",
+] as const;
+
+export type RraFeatureFlagKey = typeof RRA_FEATURE_FLAGS[number];
+
+// RRA Enums
+export const rraMoveDirectionEnum = pgEnum("rra_move_direction", ["IN", "OUT"]);
+
+export const rraStorageTypeEnum = pgEnum("rra_storage_type", [
+  "Wet Slip",
+  "Lift Slip",
+  "Mooring",
+  "Jet Ski",
+  "Dry Rack - Indoor",
+  "Dry Rack - Outdoor",
+  "Houseboat",
+  "Land Storage",
+  "Boat on Trailer",
+  "Trailer Only",
+  "Carport",
+  "RV Site",
+  "Other"
+]);
+
+export const rraProjectTypeEnum = pgEnum("rra_project_type", ["OWNED", "DEAL"]);
+export const rraSeasonTypeEnum = pgEnum("rra_season_type", ["ANNUAL", "SEASONAL"]);
+export const rraDiscountTypeEnum = pgEnum("rra_discount_type", ["PERCENT_OFF", "FLAT_RATE", "AMOUNT_OFF"]);
+
+export const rraLineItemTypeEnum = pgEnum("rra_line_item_type", [
+  "winter_slip",
+  "summer_slip",
+  "seasonal_slip",
+  "annual_slip",
+  "liveaboard",
+  "electric",
+  "other"
+]);
+
+export const rraChargeTypeEnum = pgEnum("rra_charge_type", [
+  "slip_rent",
+  "rack_rent",
+  "storage_rent",
+  "liveaboard_fee",
+  "electric",
+  "water",
+  "parking",
+  "wifi",
+  "pump_out",
+  "transient_fee",
+  "other"
+]);
+
+export const rraBasisTypeEnum = pgEnum("rra_basis_type", [
+  "per_ft_per_month",
+  "per_ft_per_year",
+  "per_month",
+  "per_year",
+  "per_day",
+  "per_season"
+]);
+
+export const rraChargeFrequencyEnum = pgEnum("rra_charge_frequency", [
+  "monthly",
+  "quarterly",
+  "annual",
+  "seasonal",
+  "one_time"
+]);
+
+export const rraEscalationMethodEnum = pgEnum("rra_escalation_method", [
+  "none",
+  "fixed_percent",
+  "fixed_amount",
+  "cpi"
+]);
+
+export const rraBillingFrequencyEnum = pgEnum("rra_billing_frequency", [
+  "monthly",
+  "quarterly",
+  "annual",
+  "weekly",
+  "daily",
+  "other"
+]);
+
+export const rraBillingTimingEnum = pgEnum("rra_billing_timing", [
+  "in_advance",
+  "arrears"
+]);
+
+export const rraDayCountConventionEnum = pgEnum("rra_day_count_convention", [
+  "actual_30",
+  "actual_actual",
+  "actual_365"
+]);
+
+export const rraTermStatusEnum = pgEnum("rra_term_status", ["active", "expired", "future"]);
+export const rraRentPeriodEnum = pgEnum("rra_rent_period", ["day", "week", "month", "quarter", "year"]);
+
+export const rraEscalationTypeEnum = pgEnum("rra_escalation_type", [
+  "fixed_percent",
+  "fixed_amount",
+  "cpi_linked",
+  "market_review"
+]);
+
+export const rraConcessionTypeEnum = pgEnum("rra_concession_type", [
+  "free_rent",
+  "one_time_credit",
+  "amortized_concession"
+]);
+
+export const rraCashflowTypeEnum = pgEnum("rra_cashflow_type", [
+  "base_rent",
+  "escalation",
+  "concession",
+  "additional_charge",
+  "other"
+]);
+
+export const rraSnapshotStatusEnum = pgEnum("rra_snapshot_status", [
+  "draft",
+  "published",
+  "archived"
+]);
+
+// 1. RRA Marina Locations (Projects)
+export const rraMarinaLocations = pgTable("rra_marina_locations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  code: text("code"),
+  description: text("description"),
+  capacity: integer("capacity"),
+  isActive: boolean("is_active").default(true).notNull(),
+  projectType: rraProjectTypeEnum("project_type").default("OWNED").notNull(),
+  seasonType: rraSeasonTypeEnum("season_type").default("ANNUAL"),
+  status: text("status"),
+  targetNOI: numeric("target_noi", { precision: 14, scale: 2 }),
+  includeInExecutive: boolean("include_in_executive").default(true).notNull(),
+  baseRent1Label: text("base_rent_1_label").default("Base Rent 1"),
+  baseRent2Label: text("base_rent_2_label").default("Base Rent 2"),
+  baseRent3Label: text("base_rent_3_label").default("Base Rent 3"),
+  charge1Label: text("charge_1_label").default("Charge 1"),
+  charge2Label: text("charge_2_label").default("Charge 2"),
+  charge3Label: text("charge_3_label").default("Charge 3"),
+  seasonStartDate: text("season_start_date"),
+  seasonEndDate: text("season_end_date"),
+  winterStartDate: text("winter_start_date"),
+  winterEndDate: text("winter_end_date"),
+  budgetedRevenue: numeric("budgeted_revenue", { precision: 14, scale: 2 }),
+  budgetedOccupancy: numeric("budgeted_occupancy", { precision: 5, scale: 2 }),
+  budgetedExpenses: numeric("budgeted_expenses", { precision: 14, scale: 2 }),
+  budgetYear: integer("budget_year"),
+  seasonalStorageTypes: text("seasonal_storage_types").array(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  nameOrgIdx: index("rra_marina_locations_name_org_idx").on(table.name, table.orgId),
+  orgIdx: index("rra_marina_locations_org_idx").on(table.orgId),
+}));
+
+// 2. RRA Storage Locations (Physical docks/slips within projects)
+export const rraStorageLocations = pgTable("rra_storage_locations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => rraMarinaLocations.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  code: text("code"),
+  description: text("description"),
+  storageType: text("storage_type"),
+  capacity: integer("capacity"),
+  postedRate: numeric("posted_rate", { precision: 14, scale: 2 }),
+  postedRateType: text("posted_rate_type"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  projectIdx: index("rra_storage_locations_project_idx").on(table.projectId),
+}));
+
+// 3. RRA Tenants
+export const rraTenants = pgTable("rra_tenants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  boatMake: text("boat_make"),
+  boatYear: integer("boat_year"),
+  boatLength: numeric("boat_length", { precision: 10, scale: 2 }),
+  boatWidth: numeric("boat_width", { precision: 10, scale: 2 }),
+  address1: text("address1"),
+  address2: text("address2"),
+  city: text("city"),
+  state: text("state"),
+  zip: text("zip"),
+  crmContactId: varchar("crm_contact_id").references(() => crmContacts.id),
+  crmCompanyId: varchar("crm_company_id").references(() => crmCompanies.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("rra_tenants_org_idx").on(table.orgId),
+  crmContactIdx: index("rra_tenants_crm_contact_idx").on(table.crmContactId),
+}));
+
+// 4. RRA Leases
+export const rraLeases = pgTable("rra_leases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  tenantId: varchar("tenant_id").notNull().references(() => rraTenants.id, { onDelete: "cascade" }),
+  locationId: varchar("location_id").references(() => rraMarinaLocations.id, { onDelete: "set null" }),
+  storageLocationId: varchar("storage_location_id").references(() => rraStorageLocations.id, { onDelete: "set null" }),
+  leaseCommencement: date("lease_commencement"),
+  leaseExpiration: date("lease_expiration"),
+  leaseAmount: numeric("lease_amount", { precision: 14, scale: 2 }),
+  baseRent2: numeric("base_rent_2", { precision: 14, scale: 2 }),
+  baseRent3: numeric("base_rent_3", { precision: 14, scale: 2 }),
+  rateType: text("rate_type"),
+  contractTerm: text("contract_term"),
+  storageType: rraStorageTypeEnum("storage_type").default("Wet Slip").notNull(),
+  boatType: text("boat_type"),
+  unitLocation: text("unit_location"),
+  unitNumber: text("unit_number"),
+  boatDimensions: text("boat_dimensions"),
+  slipLength: numeric("slip_length", { precision: 10, scale: 2 }),
+  slipWidth: numeric("slip_width", { precision: 10, scale: 2 }),
+  leaseOnFile: boolean("lease_on_file"),
+  coiOnFile: boolean("coi_on_file"),
+  coiExpiration: date("coi_expiration"),
+  additionalCharge1: numeric("additional_charge_1", { precision: 14, scale: 2 }).default("0"),
+  additionalCharge2: numeric("additional_charge_2", { precision: 14, scale: 2 }).default("0"),
+  additionalCharge3: numeric("additional_charge_3", { precision: 14, scale: 2 }).default("0"),
+  leaseKey: text("lease_key").notNull(),
+  numDays: integer("num_days"),
+  numMonths: integer("num_months"),
+  totalContractValue: numeric("total_contract_value", { precision: 14, scale: 2 }),
+  slipStatus: text("slip_status").default("Occupied"),
+  hasDiscount: boolean("has_discount").default(false),
+  discountType: rraDiscountTypeEnum("discount_type"),
+  discountValue: numeric("discount_value", { precision: 14, scale: 2 }),
+  isActive: boolean("is_active").default(true).notNull(),
+  isIncomplete: boolean("is_incomplete").default(false).notNull(),
+  usesDefaultDates: boolean("uses_default_dates").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  leaseKeyIdx: index("rra_leases_lease_key_idx").on(table.leaseKey),
+  tenantIdx: index("rra_leases_tenant_idx").on(table.tenantId),
+  locationIdx: index("rra_leases_location_idx").on(table.locationId),
+  orgIdx: index("rra_leases_org_idx").on(table.orgId),
+}));
+
+// 5. RRA Lease Line Items
+export const rraLeaseLineItems = pgTable("rra_lease_line_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leaseId: varchar("lease_id").notNull().references(() => rraLeases.id, { onDelete: "cascade" }),
+  lineType: rraLineItemTypeEnum("line_type").notNull(),
+  slipAssignment: text("slip_assignment"),
+  amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  leaseIdx: index("rra_lease_line_items_lease_idx").on(table.leaseId),
+}));
+
+// 6. RRA Contract Charges
+export const rraContractCharges = pgTable("rra_contract_charges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leaseId: varchar("lease_id").notNull().references(() => rraLeases.id, { onDelete: "cascade" }),
+  chargeType: rraChargeTypeEnum("charge_type").notNull(),
+  basis: rraBasisTypeEnum("basis").notNull(),
+  amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
+  frequency: rraChargeFrequencyEnum("frequency").notNull().default("monthly"),
+  seasonStartMonth: integer("season_start_month"),
+  seasonEndMonth: integer("season_end_month"),
+  chargeStartDate: date("charge_start_date"),
+  chargeEndDate: date("charge_end_date"),
+  escalationMethod: rraEscalationMethodEnum("escalation_method").default("none"),
+  escalationValue: numeric("escalation_value", { precision: 5, scale: 2 }),
+  escalationStartDate: date("escalation_start_date"),
+  isActive: boolean("is_active").default(true).notNull(),
+  notes: text("notes"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  leaseIdx: index("rra_contract_charges_lease_idx").on(table.leaseId),
+}));
+
+// 7. RRA Lease Terms
+export const rraLeaseTerms = pgTable("rra_lease_terms", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  leaseId: varchar("lease_id").notNull().references(() => rraLeases.id, { onDelete: "cascade" }),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date"),
+  billingFrequency: rraBillingFrequencyEnum("billing_frequency").notNull().default("monthly"),
+  billingTiming: rraBillingTimingEnum("billing_timing").notNull().default("in_advance"),
+  accrualFrequency: rraBillingFrequencyEnum("accrual_frequency").notNull().default("monthly"),
+  dayCountConvention: rraDayCountConventionEnum("day_count_convention").notNull().default("actual_30"),
+  currency: text("currency").notNull().default("USD"),
+  status: rraTermStatusEnum("status").notNull().default("active"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  leaseIdx: index("rra_lease_terms_lease_idx").on(table.leaseId),
+  orgIdx: index("rra_lease_terms_org_idx").on(table.orgId),
+}));
+
+// 8. RRA Lease Rent Steps
+export const rraLeaseRentSteps = pgTable("rra_lease_rent_steps", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  leaseId: varchar("lease_id").notNull().references(() => rraLeases.id, { onDelete: "cascade" }),
+  effectiveDate: date("effective_date").notNull(),
+  baseRentAmount: numeric("base_rent_amount", { precision: 14, scale: 2 }).notNull(),
+  baseRentPeriod: rraRentPeriodEnum("base_rent_period").notNull().default("month"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  leaseIdx: index("rra_lease_rent_steps_lease_idx").on(table.leaseId),
+  dateIdx: index("rra_lease_rent_steps_date_idx").on(table.effectiveDate),
+}));
+
+// 9. RRA Lease Escalations
+export const rraLeaseEscalations = pgTable("rra_lease_escalations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  leaseId: varchar("lease_id").notNull().references(() => rraLeases.id, { onDelete: "cascade" }),
+  escalationType: rraEscalationTypeEnum("escalation_type").notNull(),
+  escalationValue: numeric("escalation_value", { precision: 5, scale: 2 }),
+  escalationStartDate: date("escalation_start_date"),
+  escalationFrequency: rraBillingFrequencyEnum("escalation_frequency").default("annual"),
+  capRate: numeric("cap_rate", { precision: 5, scale: 2 }),
+  floorRate: numeric("floor_rate", { precision: 5, scale: 2 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  leaseIdx: index("rra_lease_escalations_lease_idx").on(table.leaseId),
+}));
+
+// 10. RRA Lease Concessions
+export const rraLeaseConcessions = pgTable("rra_lease_concessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  leaseId: varchar("lease_id").notNull().references(() => rraLeases.id, { onDelete: "cascade" }),
+  concessionType: rraConcessionTypeEnum("concession_type").notNull(),
+  amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+  amortizationMonths: integer("amortization_months"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  leaseIdx: index("rra_lease_concessions_lease_idx").on(table.leaseId),
+}));
+
+// 11. RRA Lease Cash Flows
+export const rraLeaseCashFlows = pgTable("rra_lease_cash_flows", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  leaseId: varchar("lease_id").notNull().references(() => rraLeases.id, { onDelete: "cascade" }),
+  locationId: varchar("location_id").references(() => rraMarinaLocations.id, { onDelete: "set null" }),
+  cashflowType: rraCashflowTypeEnum("cashflow_type").notNull(),
+  periodStart: date("period_start").notNull(),
+  periodEnd: date("period_end").notNull(),
+  amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(),
+  isProjected: boolean("is_projected").default(false).notNull(),
+  sourceChargeId: varchar("source_charge_id"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  leaseIdx: index("rra_lease_cash_flows_lease_idx").on(table.leaseId),
+  periodIdx: index("rra_lease_cash_flows_period_idx").on(table.year, table.month),
+  locationIdx: index("rra_lease_cash_flows_location_idx").on(table.locationId),
+}));
+
+// 12. RRA Move Events (tenant move in/out tracking)
+export const rraMoveEvents = pgTable("rra_move_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  leaseId: varchar("lease_id").notNull().references(() => rraLeases.id, { onDelete: "cascade" }),
+  locationId: varchar("location_id").references(() => rraMarinaLocations.id, { onDelete: "set null" }),
+  direction: rraMoveDirectionEnum("direction").notNull(),
+  eventDate: date("event_date").notNull(),
+  reason: text("reason"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  leaseIdx: index("rra_move_events_lease_idx").on(table.leaseId),
+  dateIdx: index("rra_move_events_date_idx").on(table.eventDate),
+}));
+
+// 13. RRA Snapshot Versions
+export const rraSnapshotVersions = pgTable("rra_snapshot_versions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  locationId: varchar("location_id").notNull().references(() => rraMarinaLocations.id, { onDelete: "cascade" }),
+  versionNumber: integer("version_number").notNull(),
+  name: text("name"),
+  description: text("description"),
+  status: rraSnapshotStatusEnum("status").default("draft").notNull(),
+  snapshotDate: date("snapshot_date").notNull(),
+  publishedAt: timestamp("published_at"),
+  publishedBy: varchar("published_by").references(() => users.id),
+  totalRevenue: numeric("total_revenue", { precision: 14, scale: 2 }),
+  totalLeases: integer("total_leases"),
+  occupancyRate: numeric("occupancy_rate", { precision: 5, scale: 2 }),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  locationIdx: index("rra_snapshot_versions_location_idx").on(table.locationId),
+  versionIdx: index("rra_snapshot_versions_version_idx").on(table.locationId, table.versionNumber),
+}));
+
+// 14. RRA Lease Snapshots (point-in-time lease data)
+export const rraLeaseSnapshots = pgTable("rra_lease_snapshots", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  snapshotVersionId: varchar("snapshot_version_id").notNull().references(() => rraSnapshotVersions.id, { onDelete: "cascade" }),
+  leaseId: varchar("lease_id").notNull().references(() => rraLeases.id, { onDelete: "cascade" }),
+  leaseData: jsonb("lease_data").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  snapshotIdx: index("rra_lease_snapshots_snapshot_idx").on(table.snapshotVersionId),
+  leaseIdx: index("rra_lease_snapshots_lease_idx").on(table.leaseId),
+}));
+
+// ============================================================================
+// RRA BRIDGE TABLES - Connect to MarinaMatch modules
+// ============================================================================
+
+// Bridge: RRA Projects ↔ MM Modeling Projects
+export const rraModelingProjectLinks = pgTable("rra_modeling_project_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  rraLocationId: varchar("rra_location_id").notNull().references(() => rraMarinaLocations.id, { onDelete: "cascade" }),
+  modelingProjectId: varchar("modeling_project_id").notNull().references(() => modelingProjects.id, { onDelete: "cascade" }),
+  isPrimary: boolean("is_primary").default(false).notNull(),
+  syncEnabled: boolean("sync_enabled").default(true).notNull(),
+  lastSyncAt: timestamp("last_sync_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  rraLocationIdx: index("rra_modeling_project_links_rra_idx").on(table.rraLocationId),
+  modelingProjectIdx: index("rra_modeling_project_links_mp_idx").on(table.modelingProjectId),
+  uniqueLink: unique().on(table.rraLocationId, table.modelingProjectId),
+}));
+
+// Bridge: RRA Projects ↔ MM Deals
+export const rraDealLinks = pgTable("rra_deal_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  rraLocationId: varchar("rra_location_id").notNull().references(() => rraMarinaLocations.id, { onDelete: "cascade" }),
+  dealId: varchar("deal_id").notNull().references(() => crmDeals.id, { onDelete: "cascade" }),
+  isPrimary: boolean("is_primary").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  rraLocationIdx: index("rra_deal_links_rra_idx").on(table.rraLocationId),
+  dealIdx: index("rra_deal_links_deal_idx").on(table.dealId),
+  uniqueLink: unique().on(table.rraLocationId, table.dealId),
+}));
+
+// Bridge: RRA Cash Flows ↔ MM Budget Line Items
+export const rraBudgetCashFlowMap = pgTable("rra_budget_cashflow_map", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  rraCashFlowId: varchar("rra_cashflow_id").notNull().references(() => rraLeaseCashFlows.id, { onDelete: "cascade" }),
+  budgetLineItemId: varchar("budget_line_item_id").notNull().references(() => marinaBudgetLineItems.id, { onDelete: "cascade" }),
+  syncType: text("sync_type").default("auto").notNull(),
+  lastSyncAt: timestamp("last_sync_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  cashFlowIdx: index("rra_budget_cashflow_map_cf_idx").on(table.rraCashFlowId),
+  lineItemIdx: index("rra_budget_cashflow_map_li_idx").on(table.budgetLineItemId),
+}));
+
+// Bridge: RRA Leases ↔ VDR Documents
+export const rraLeaseDocumentBindings = pgTable("rra_lease_document_bindings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  leaseId: varchar("lease_id").notNull().references(() => rraLeases.id, { onDelete: "cascade" }),
+  documentId: varchar("document_id").notNull().references(() => vdrDocuments.id, { onDelete: "cascade" }),
+  documentType: text("document_type").default("lease").notNull(),
+  isPrimaryLease: boolean("is_primary_lease").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  leaseIdx: index("rra_lease_doc_bindings_lease_idx").on(table.leaseId),
+  docIdx: index("rra_lease_doc_bindings_doc_idx").on(table.documentId),
+}));
+
+// ============================================================================
+// RRA TYPES AND SCHEMAS
+// ============================================================================
+
+export const insertRraMarinaLocationSchema = createInsertSchema(rraMarinaLocations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertRraStorageLocationSchema = createInsertSchema(rraStorageLocations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertRraTenantSchema = createInsertSchema(rraTenants).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertRraLeaseSchema = createInsertSchema(rraLeases).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertRraLeaseLineItemSchema = createInsertSchema(rraLeaseLineItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertRraContractChargeSchema = createInsertSchema(rraContractCharges).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertRraLeaseTermSchema = createInsertSchema(rraLeaseTerms).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertRraLeaseCashFlowSchema = createInsertSchema(rraLeaseCashFlows).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertRraSnapshotVersionSchema = createInsertSchema(rraSnapshotVersions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertRraModelingProjectLinkSchema = createInsertSchema(rraModelingProjectLinks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type RraMarinaLocation = typeof rraMarinaLocations.$inferSelect;
+export type InsertRraMarinaLocation = z.infer<typeof insertRraMarinaLocationSchema>;
+export type RraStorageLocation = typeof rraStorageLocations.$inferSelect;
+export type InsertRraStorageLocation = z.infer<typeof insertRraStorageLocationSchema>;
+export type RraTenant = typeof rraTenants.$inferSelect;
+export type InsertRraTenant = z.infer<typeof insertRraTenantSchema>;
+export type RraLease = typeof rraLeases.$inferSelect;
+export type InsertRraLease = z.infer<typeof insertRraLeaseSchema>;
+export type RraLeaseLineItem = typeof rraLeaseLineItems.$inferSelect;
+export type InsertRraLeaseLineItem = z.infer<typeof insertRraLeaseLineItemSchema>;
+export type RraContractCharge = typeof rraContractCharges.$inferSelect;
+export type InsertRraContractCharge = z.infer<typeof insertRraContractChargeSchema>;
+export type RraLeaseTerm = typeof rraLeaseTerms.$inferSelect;
+export type InsertRraLeaseTerm = z.infer<typeof insertRraLeaseTermSchema>;
+export type RraLeaseCashFlow = typeof rraLeaseCashFlows.$inferSelect;
+export type InsertRraLeaseCashFlow = z.infer<typeof insertRraLeaseCashFlowSchema>;
+export type RraSnapshotVersion = typeof rraSnapshotVersions.$inferSelect;
+export type InsertRraSnapshotVersion = z.infer<typeof insertRraSnapshotVersionSchema>;
+export type RraModelingProjectLink = typeof rraModelingProjectLinks.$inferSelect;
+export type InsertRraModelingProjectLink = z.infer<typeof insertRraModelingProjectLinkSchema>;
+export type RraMoveEvent = typeof rraMoveEvents.$inferSelect;
+export type RraLeaseEscalation = typeof rraLeaseEscalations.$inferSelect;
+export type RraLeaseConcession = typeof rraLeaseConcessions.$inferSelect;
+export type RraLeaseSnapshot = typeof rraLeaseSnapshots.$inferSelect;
+
+// ============================================================================
+// RRA RELATIONS
+// ============================================================================
+
+export const rraMarinaLocationsRelations = relations(rraMarinaLocations, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [rraMarinaLocations.orgId],
+    references: [organizations.id],
+  }),
+  storageLocations: many(rraStorageLocations),
+  leases: many(rraLeases),
+  cashFlows: many(rraLeaseCashFlows),
+  moveEvents: many(rraMoveEvents),
+  snapshotVersions: many(rraSnapshotVersions),
+  modelingProjectLinks: many(rraModelingProjectLinks),
+  dealLinks: many(rraDealLinks),
+}));
+
+export const rraStorageLocationsRelations = relations(rraStorageLocations, ({ one }) => ({
+  project: one(rraMarinaLocations, {
+    fields: [rraStorageLocations.projectId],
+    references: [rraMarinaLocations.id],
+  }),
+}));
+
+export const rraTenantsRelations = relations(rraTenants, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [rraTenants.orgId],
+    references: [organizations.id],
+  }),
+  crmContact: one(crmContacts, {
+    fields: [rraTenants.crmContactId],
+    references: [crmContacts.id],
+  }),
+  crmCompany: one(crmCompanies, {
+    fields: [rraTenants.crmCompanyId],
+    references: [crmCompanies.id],
+  }),
+  leases: many(rraLeases),
+}));
+
+export const rraLeasesRelations = relations(rraLeases, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [rraLeases.orgId],
+    references: [organizations.id],
+  }),
+  tenant: one(rraTenants, {
+    fields: [rraLeases.tenantId],
+    references: [rraTenants.id],
+  }),
+  location: one(rraMarinaLocations, {
+    fields: [rraLeases.locationId],
+    references: [rraMarinaLocations.id],
+  }),
+  storageLocation: one(rraStorageLocations, {
+    fields: [rraLeases.storageLocationId],
+    references: [rraStorageLocations.id],
+  }),
+  lineItems: many(rraLeaseLineItems),
+  contractCharges: many(rraContractCharges),
+  terms: many(rraLeaseTerms),
+  rentSteps: many(rraLeaseRentSteps),
+  escalations: many(rraLeaseEscalations),
+  concessions: many(rraLeaseConcessions),
+  cashFlows: many(rraLeaseCashFlows),
+  moveEvents: many(rraMoveEvents),
+  documentBindings: many(rraLeaseDocumentBindings),
+}));
+
+export const rraLeaseCashFlowsRelations = relations(rraLeaseCashFlows, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [rraLeaseCashFlows.orgId],
+    references: [organizations.id],
+  }),
+  lease: one(rraLeases, {
+    fields: [rraLeaseCashFlows.leaseId],
+    references: [rraLeases.id],
+  }),
+  location: one(rraMarinaLocations, {
+    fields: [rraLeaseCashFlows.locationId],
+    references: [rraMarinaLocations.id],
+  }),
+  budgetMappings: many(rraBudgetCashFlowMap),
+}));
+
+export const rraSnapshotVersionsRelations = relations(rraSnapshotVersions, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [rraSnapshotVersions.orgId],
+    references: [organizations.id],
+  }),
+  location: one(rraMarinaLocations, {
+    fields: [rraSnapshotVersions.locationId],
+    references: [rraMarinaLocations.id],
+  }),
+  publisher: one(users, {
+    fields: [rraSnapshotVersions.publishedBy],
+    references: [users.id],
+  }),
+  leaseSnapshots: many(rraLeaseSnapshots),
+}));
+
+export const rraModelingProjectLinksRelations = relations(rraModelingProjectLinks, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [rraModelingProjectLinks.orgId],
+    references: [organizations.id],
+  }),
+  rraLocation: one(rraMarinaLocations, {
+    fields: [rraModelingProjectLinks.rraLocationId],
+    references: [rraMarinaLocations.id],
+  }),
+  modelingProject: one(modelingProjects, {
+    fields: [rraModelingProjectLinks.modelingProjectId],
+    references: [modelingProjects.id],
+  }),
+}));
+
 // Pending Properties - Review queue for properties created from sales comps or rate comps
 export const pendingProperties = pgTable("pending_properties", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
