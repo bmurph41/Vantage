@@ -1,10 +1,11 @@
 import { lazy } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Building2, FolderKanban, Users } from "lucide-react";
+import { Building2, FolderKanban, Users, BarChart3 } from "lucide-react";
 import { TabbedModuleLayout, TabDefinition } from "@/components/layout/TabbedModuleLayout";
 
 const RentRollPortfolio = lazy(() => import("./rent-roll/Portfolio"));
 const RentRollProjects = lazy(() => import("./rent-roll/Projects"));
+const RentRollComparison = lazy(() => import("./rent-roll/Comparison"));
 const CustomerAnalytics = lazy(() => import("./CustomerAnalytics"));
 
 type PackType = 'fund_management' | 'lp_portal' | 'prospecting' | 'analytics_pro';
@@ -43,6 +44,13 @@ export default function RentRollTabbed() {
       icon: FolderKanban,
       component: RentRollProjects,
       description: "Manage rent roll by project",
+    },
+    {
+      id: "comparison",
+      label: "Comparison",
+      icon: BarChart3,
+      component: RentRollComparison,
+      description: "Time-series analysis and portfolio comparison",
     },
     {
       id: "customer-analytics",
