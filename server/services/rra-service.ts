@@ -18,6 +18,8 @@ import {
   rraModelingProjectLinks,
   rraDealLinks,
   rraLeaseDocumentBindings,
+  rraBudgetCashFlowMap,
+  marinaBudgetLineItems,
   InsertRraMarinaLocation,
   InsertRraStorageLocation,
   InsertRraTenant,
@@ -569,6 +571,92 @@ export class RRAService {
     return db.select()
       .from(rraMarinaLocations)
       .where(sql`${rraMarinaLocations.id} IN (${sql.join(locationIds.map(id => sql`${id}`), sql`, `)})`);
+  }
+
+  async mapCashFlowToBudget(
+    orgId: string,
+    cashFlowId: string,
+    budgetLineItemId: string,
+    syncType: string = 'auto'
+  ): Promise<void> {
+    await db.insert(rraBudgetCashFlowMap)
+      .values({
+        orgId,
+        rraCashFlowId: cashFlowId,
+        budgetLineItemId,
+        syncType,
+      })
+      .onConflictDoNothing();
+  }
+
+  async unmapCashFlowFromBudget(cashFlowId: string, budgetLineItemId: string): Promise<void> {
+    await db.delete(rraBudgetCashFlowMap)
+      .where(and(
+        eq(rraBudgetCashFlowMap.rraCashFlowId, cashFlowId),
+        eq(rraBudgetCashFlowMap.budgetLineItemId, budgetLineItemId)
+      ));
+  }
+
+  async getCashFlowBudgetMappings(cashFlowId: string): Promise<any[]> {
+    return db.select()
+      .from(rraBudgetCashFlowMap)
+      .where(eq(rraBudgetCashFlowMap.rraCashFlowId, cashFlowId));
+  }
+
+  async getBudgetLineItemCashFlows(budgetLineItemId: string): Promise<any[]> {
+    return db.select()
+      .from(rraBudgetCashFlowMap)
+      .where(eq(rraBudgetCashFlowMap.budgetLineItemId, budgetLineItemId));
+  }
+
+  async syncCashFlowsToBudget(
+    orgId: string,
+    locationId: string,
+    budgetId: string,
+    fiscalYear: number
+  ): Promise<{ synced: number; skipped: number; errors: string[] }> {
+    const errors: string[] = [];
+    let synced = 0;
+    let skipped = 0;
+    
+    const cashFlows = await db.select()
+      .from(rraLeaseCashFlows)
+      .innerJoin(rraLeaseLineItems, eq(rraLeaseCashFlows.lineItemId, rraLeaseLineItems.id))
+      .innerJoin(rraLeases, eq(rraLeaseLineItems.leaseId, rraLeases.id))
+      .where(and(
+        eq(rraLeases.projectId, locationId),
+        eq(rraLeaseCashFlows.fiscalYear, fiscalYear)
+      ));
+    
+    const budgetLineItems = await db.select()
+      .from(marinaBudgetLineItems)
+      .where(eq(marinaBudgetLineItems.budgetId, budgetId));
+    
+    if (budgetLineItems.length === 0) {
+      return { synced: 0, skipped: cashFlows.length, errors: ['No budget line items found for budgetId: ' + budgetId] };
+    }
+    
+    const rentalIncomeLineItem = budgetLineItems.find(li => li.category === 'storage_revenue');
+    
+    for (const cf of cashFlows) {
+      try {
+        if (rentalIncomeLineItem) {
+          await this.mapCashFlowToBudget(
+            orgId,
+            cf.rra_lease_cash_flows.id,
+            rentalIncomeLineItem.id,
+            'auto'
+          );
+          synced++;
+        } else {
+          skipped++;
+        }
+      } catch (error) {
+        errors.push(`Failed to sync cash flow ${cf.rra_lease_cash_flows.id}: ${error}`);
+      }
+    }
+    
+    return { synced, skipped, errors };
   }
 }
 

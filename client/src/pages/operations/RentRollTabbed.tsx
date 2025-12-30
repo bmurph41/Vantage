@@ -1,8 +1,9 @@
 import { lazy } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Building2, FolderKanban, Users, BarChart3 } from "lucide-react";
+import { Building2, FolderKanban, Users, BarChart3, LayoutDashboard } from "lucide-react";
 import { TabbedModuleLayout, TabDefinition } from "@/components/layout/TabbedModuleLayout";
 
+const RentRollDashboard = lazy(() => import("./rent-roll/Dashboard"));
 const RentRollPortfolio = lazy(() => import("./rent-roll/Portfolio"));
 const RentRollProjects = lazy(() => import("./rent-roll/Projects"));
 const RentRollComparison = lazy(() => import("./rent-roll/Comparison"));
@@ -32,11 +33,11 @@ export default function RentRollTabbed() {
 
   const tabs: TabDefinition[] = [
     {
-      id: "portfolio",
-      label: "Portfolio",
-      icon: Building2,
-      component: RentRollPortfolio,
-      description: "View rent roll across all properties",
+      id: "dashboard",
+      label: "Dashboard",
+      icon: LayoutDashboard,
+      component: RentRollDashboard,
+      description: "Portfolio KPIs, occupancy, and lease analytics",
     },
     {
       id: "projects",
@@ -44,6 +45,13 @@ export default function RentRollTabbed() {
       icon: FolderKanban,
       component: RentRollProjects,
       description: "Manage rent roll by project",
+    },
+    {
+      id: "portfolio",
+      label: "Portfolio",
+      icon: Building2,
+      component: RentRollPortfolio,
+      description: "View rent roll across all properties",
     },
     {
       id: "comparison",
@@ -67,7 +75,7 @@ export default function RentRollTabbed() {
       moduleDescription="Manage marina rental units and occupancy"
       moduleIcon={Building2}
       tabs={tabs}
-      defaultTab="portfolio"
+      defaultTab="dashboard"
       basePath="/operations/rent-roll"
       activePacks={activePacks}
     />

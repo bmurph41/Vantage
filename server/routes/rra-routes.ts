@@ -448,4 +448,129 @@ router.get("/by-modeling-project/:modelingProjectId", async (req: Request, res: 
   }
 });
 
+router.get("/projects", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const locations = await rraService.getLocations(orgId);
+    res.json(locations);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/projects/:id", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const location = await rraService.getLocationById(orgId, req.params.id);
+    if (!location) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+    res.json(location);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/projects", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const validated = insertRraMarinaLocationSchema.parse({
+      ...req.body,
+      orgId,
+    });
+    const location = await rraService.createLocation(validated);
+    res.status(201).json(location);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/projects/:id", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const location = await rraService.updateLocation(orgId, req.params.id, req.body);
+    if (!location) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+    res.json(location);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/projects/:id", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    await rraService.deleteLocation(orgId, req.params.id);
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/cash-flows/:cashFlowId/map-budget", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { budgetLineItemId, syncType } = req.body;
+    if (!budgetLineItemId) {
+      return res.status(400).json({ error: "budgetLineItemId is required" });
+    }
+    await rraService.mapCashFlowToBudget(
+      orgId,
+      req.params.cashFlowId,
+      budgetLineItemId,
+      syncType || 'manual'
+    );
+    res.status(201).json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/cash-flows/:cashFlowId/unmap-budget/:budgetLineItemId", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await rraService.unmapCashFlowFromBudget(req.params.cashFlowId, req.params.budgetLineItemId);
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/cash-flows/:cashFlowId/budget-mappings", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const mappings = await rraService.getCashFlowBudgetMappings(req.params.cashFlowId);
+    res.json(mappings);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/budget-line-items/:lineItemId/cash-flows", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const cashFlows = await rraService.getBudgetLineItemCashFlows(req.params.lineItemId);
+    res.json(cashFlows);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/locations/:locationId/sync-budget", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { budgetId, fiscalYear } = req.body;
+    if (!budgetId || !fiscalYear) {
+      return res.status(400).json({ error: "budgetId and fiscalYear are required" });
+    }
+    const result = await rraService.syncCashFlowsToBudget(
+      orgId,
+      req.params.locationId,
+      budgetId,
+      fiscalYear
+    );
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
