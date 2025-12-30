@@ -82,8 +82,8 @@ const getWorkspaceSubNav = (workspaceId: string) => [
   { name: "Team", href: `/workspaces/${workspaceId}?tab=team`, icon: Users },
 ];
 
-// Modeling Tools Navigation (standalone tools not tied to a specific deal)
-const modelingToolsNav = [
+// Analysis Navigation (standalone tools not tied to a specific deal)
+const analysisToolsNav = [
   { name: "Modeling Projects", href: "/modeling/projects", icon: Calculator },
   { name: "P&L Parser", href: "/modeling/pnl-parser", icon: FileSpreadsheet },
   { name: "OM Builder", href: "/om", icon: FileText },
@@ -99,8 +99,8 @@ const dockTalkNav = [
   { name: "DockTalk", href: "/docktalk", icon: MessageSquare },
 ];
 
-// Analysis Navigation (Sales Comps)
-const analysisNav = [
+// Market Intelligence Navigation (Sales Comps)
+const marketIntelligenceNav = [
   { name: "Sales Comps", href: "/analysis/sales-comps", icon: BarChart3 },
   { name: "Rate Comps", href: "/analysis/rate-comps", icon: TrendingUp },
   { name: "Demographics", href: "/analysis/demographics", icon: Users },
@@ -134,8 +134,8 @@ export default function UnifiedSidebar() {
   const [prospectingExpanded, setProspectingExpanded] = useState(false);
   const [crmToolsExpanded, setCrmToolsExpanded] = useState(false);
   const [dealWorkspaceExpanded, setDealWorkspaceExpanded] = useState(false); // Consolidated DD, VDR, Modeling
-  const [modelingToolsExpanded, setModelingToolsExpanded] = useState(false);
-  const [analysisExpanded, setAnalysisExpanded] = useState(false);
+  const [analysisToolsExpanded, setAnalysisToolsExpanded] = useState(false);
+  const [marketIntelligenceExpanded, setMarketIntelligenceExpanded] = useState(false);
   const [pendingExpanded, setPendingExpanded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
@@ -206,8 +206,8 @@ export default function UnifiedSidebar() {
     // Deal Workspace: consolidated DD, VDR, and Modeling project pages
     const isDealWorkspacePage = location.startsWith('/workspaces') || location === '/projects' || location === '/progress-report' || location.startsWith('/vdr') || location.startsWith('/modeling/projects');
     // Modeling Tools: standalone tools (OM Builder, Funds, etc.) not tied to specific deals
-    const isModelingToolsPage = location.startsWith('/om') || location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/modeling/settings') || location.startsWith('/modeling/pnl');
-    const isAnalysisPage = location.startsWith('/analysis/') || location.startsWith('/docktalk');
+    const isAnalysisToolsPage = location.startsWith('/om') || location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/modeling/settings') || location.startsWith('/modeling/pnl');
+    const isMarketIntelligencePage = location.startsWith('/analysis/') || location.startsWith('/docktalk');
 
     // Set expanded states - Operations stays expanded by default, others expand when active
     if (isOperationsPage) {
@@ -219,8 +219,8 @@ export default function UnifiedSidebar() {
     setCrmToolsExpanded(isCrmToolsPage);
     setPendingExpanded(isPendingPage);
     setDealWorkspaceExpanded(isDealWorkspacePage);
-    setModelingToolsExpanded(isModelingToolsPage);
-    setAnalysisExpanded(isAnalysisPage);
+    setAnalysisToolsExpanded(isAnalysisToolsPage);
+    setMarketIntelligenceExpanded(isMarketIntelligencePage);
   }, [location]);
 
   // Check if there are any pending items to show the Pending section
@@ -569,16 +569,16 @@ export default function UnifiedSidebar() {
           </div>
         )}
         
-        {/* Modeling Tools Section - Standalone tools not tied to specific deals */}
-        {canViewSection('modeling_tools') && (
+        {/* Analysis Section - Standalone tools not tied to specific deals */}
+        {canViewSection('analysis_tools') && (
           <div className="mb-2">
             <SectionHeader 
-              title="Modeling Tools" 
-              expanded={modelingToolsExpanded} 
-              onToggle={() => setModelingToolsExpanded(!modelingToolsExpanded)}
+              title="Analysis" 
+              expanded={analysisToolsExpanded} 
+              onToggle={() => setAnalysisToolsExpanded(!analysisToolsExpanded)}
               isActive={location.startsWith('/modeling/projects') || location.startsWith('/om') || location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/modeling/settings')}
             />
-            {modelingToolsExpanded && modelingToolsNav
+            {analysisToolsExpanded && analysisToolsNav
               .filter((item) => {
                 if (item.href === '/modeling/funds') return hasPack('fund_management');
                 if (item.href === '/modeling/lp-portal') return hasPack('fund_management') && hasPack('lp_portal');
@@ -590,16 +590,16 @@ export default function UnifiedSidebar() {
           </div>
         )}
         
-        {/* Analysis Section */}
-        {canViewSection('analysis') && (
+        {/* Market Intelligence Section */}
+        {canViewSection('market_intelligence') && (
           <div className="mb-2">
             <SectionHeader 
-              title="Analysis" 
-              expanded={analysisExpanded} 
-              onToggle={() => setAnalysisExpanded(!analysisExpanded)}
+              title="Market Intelligence" 
+              expanded={marketIntelligenceExpanded} 
+              onToggle={() => setMarketIntelligenceExpanded(!marketIntelligenceExpanded)}
               isActive={location.startsWith('/analysis/') || location.startsWith('/docktalk')}
             />
-            {analysisExpanded && (
+            {marketIntelligenceExpanded && (
               <div className="ml-4 mt-1 mb-2">
                 {/* DockTalk - Always visible above Sales Comps */}
                 <Link 
@@ -614,9 +614,9 @@ export default function UnifiedSidebar() {
                   <MessageSquare className={cn("w-4 h-4 mr-3 flex-shrink-0", location.startsWith('/docktalk') && "text-blue-600")} />
                   <span className="truncate">DockTalk</span>
                 </Link>
-                {/* Other Analysis Pages - Sales Comps, Rate Comps, etc. */}
+                {/* Other Market Intelligence Pages - Sales Comps, Rate Comps, etc. */}
                 <div>
-                  {analysisNav.map((item) => (
+                  {marketIntelligenceNav.map((item) => (
                     <NavLink key={item.name} item={item} />
                   ))}
                 </div>
