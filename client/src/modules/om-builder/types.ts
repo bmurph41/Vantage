@@ -5,7 +5,8 @@ export type BlockType =
   | 'table' | 'matrix' | 'list'
   | 'image' | 'gallery' | 'map'
   | 'divider' | 'spacer'
-  | 'shape' | 'icon' | 'group';
+  | 'shape' | 'icon' | 'group'
+  | 'metricStrip' | 'imageGrid' | 'mapPage' | 'sectionDivider' | 'teamGrid' | 'disclaimer' | 'portfolioTable';
 
 export type ShapeType = 'rect' | 'circle' | 'line' | 'triangle';
 
@@ -38,21 +39,187 @@ export interface OmPageLayoutConfig {
 export interface OmTheme {
   id: string;
   name: string;
+  description?: string;
+  organizationId?: string;
+  userId?: string;
+  isDefault?: boolean;
+  isSystemDefault?: boolean;
+  baseThemeKey?: string;
   colors: {
     primary: string;
     secondary: string;
     accent: string;
     background: string;
+    surface?: string;
     text: string;
+    textMuted?: string;
+    headerBackground?: string;
+    footerBackground?: string;
+    metricTileBackground?: string;
+    chartSeries?: string[];
+    mapOverlay?: string;
   };
   typography: {
-    headingFont: string;
-    bodyFont: string;
+    headingFont?: string;
+    bodyFont?: string;
+    fontFamilyDisplay?: string;
+    fontFamilyHeading?: string;
+    fontFamilyBody?: string;
+    fontSizes?: {
+      title?: string;
+      section?: string;
+      h1?: string;
+      h2?: string;
+      h3?: string;
+      body?: string;
+      disclaimer?: string;
+      metricValue?: string;
+      metricLabel?: string;
+    };
+    fontWeights?: {
+      title?: number;
+      heading?: number;
+      body?: number;
+      bold?: number;
+    };
+  };
+  branding?: {
+    logoUrl?: string;
+    watermarkUrl?: string;
+    footerTextTemplate?: string;
+    coverOverlayStyle?: 'solid' | 'gradient' | 'none';
+    headerStyle?: 'minimal' | 'branded' | 'none';
   };
   spacing: {
-    blockGap: string;
-    pagePadding: string;
+    blockGap?: string;
+    pagePadding?: string;
+    defaultSpacingScale?: number;
+    defaultBorderRadius?: string;
+    cardShadow?: 'none' | 'sm' | 'md' | 'lg';
+    pageMargins?: { top: number; right: number; bottom: number; left: number };
   };
+}
+
+export type OmLayoutType = 'cover' | 'sectionDivider' | 'execSummary' | 'financials' | 'market' | 'photos' | 'portfolio' | 'team' | 'disclaimer' | 'custom';
+
+export interface OmPageLayoutDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  layoutType: OmLayoutType;
+  themeId?: string;
+  organizationId?: string;
+  userId?: string;
+  isSystemDefault?: boolean;
+  thumbnail?: string;
+  structure: {
+    gridColumns: number;
+    gridRows?: number;
+    gridGap: string;
+    backgroundColor?: string;
+    backgroundImageUrl?: string;
+    placeholders: Array<{
+      id: string;
+      blockType: string;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      label?: string;
+      styleHints?: Record<string, any>;
+    }>;
+  };
+}
+
+export interface MetricStripContent {
+  metrics: Array<{
+    id: string;
+    label: string;
+    value: string | number;
+    iconKey?: string;
+    tooltip?: string;
+    unit?: string;
+  }>;
+  layout?: {
+    columns: number;
+    variant: 'compact' | 'spacious';
+  };
+  styleOverrides?: {
+    backgroundColor?: string;
+    textColor?: string;
+    borderRadius?: string;
+  };
+}
+
+export interface ImageGridContent {
+  layout: '2x2' | '3x1' | '3x2' | '1x3' | 'custom';
+  images: Array<{
+    id: string;
+    url: string;
+    caption?: string;
+    alt?: string;
+    positionIndex: number;
+  }>;
+  showCaptions?: boolean;
+  gap?: string;
+}
+
+export interface MapPageContent {
+  mapImageUrl: string;
+  legendItems: Array<{
+    id: string;
+    label: string;
+    description?: string;
+    iconKey?: string;
+    color?: string;
+  }>;
+  subjectLabel?: string;
+  showSubjectMarker?: boolean;
+  overlayOpacity?: number;
+}
+
+export interface SectionDividerContent {
+  sectionNumber: string | number;
+  title: string;
+  subtitle?: string;
+  variant: 'solid' | 'imageOverlay';
+  backgroundImageUrl?: string;
+}
+
+export interface TeamGridContent {
+  members: Array<{
+    id: string;
+    name: string;
+    title: string;
+    firm?: string;
+    headshotUrl?: string;
+    email?: string;
+    phone?: string;
+    bioShort?: string;
+    bioFull?: string;
+    linkedInUrl?: string;
+  }>;
+  columns?: number;
+  showContactInfo?: boolean;
+}
+
+export interface DisclaimerContent {
+  title: string;
+  body: string;
+  layout: 'fullWidth' | 'twoColumn';
+}
+
+export interface PortfolioTableContent {
+  columns: Array<{
+    id: string;
+    label: string;
+    field: string;
+    alignment?: 'left' | 'center' | 'right';
+    format?: 'text' | 'currency' | 'percent' | 'number';
+  }>;
+  rows: Array<Record<string, any>>;
+  showSummaryRow?: boolean;
+  variant: 'portfolio' | 'pipeline';
 }
 
 export type OmDataSourceType = 'underwriting' | 'sales_comps' | 'rent_comps' | 'market' | 'demographics' | 'manual' | 'dataset';

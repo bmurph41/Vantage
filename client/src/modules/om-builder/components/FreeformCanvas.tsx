@@ -3,8 +3,10 @@ import { Rnd } from "react-rnd";
 import type { OmBlock, OmPage, BlockType, ShapeType } from "../types";
 import { 
   Type, BarChart3, Table, Image, Gauge, AlertCircle, Info, CheckCircle, 
-  AlertTriangle, Lightbulb, StickyNote, Square, Circle, Minus, Star 
+  AlertTriangle, Lightbulb, StickyNote, Square, Circle, Minus, Star,
+  TrendingUp, MapPin, Users, FileText, LayoutGrid, Building2
 } from "lucide-react";
+import type { MetricStripContent, ImageGridContent, TeamGridContent, DisclaimerContent, PortfolioTableContent, SectionDividerContent, MapPageContent } from "../types";
 import { CALLOUT_COLORS, type CalloutVariant } from "../types";
 
 interface FreeformCanvasProps {
@@ -159,6 +161,168 @@ export function FreeformCanvas({
             <hr className="w-full border-t border-border" />
           </div>
         );
+      case 'metricStrip': {
+        const stripContent = block.content as MetricStripContent | undefined;
+        const metrics = stripContent?.metrics || [];
+        return (
+          <div className="h-full flex items-stretch bg-slate-800 rounded-lg overflow-hidden">
+            {metrics.length > 0 ? metrics.map((metric, i) => (
+              <div key={metric.id || i} className="flex-1 flex flex-col items-center justify-center p-3 border-r border-slate-700 last:border-r-0">
+                <div className="text-2xl font-bold text-white">{metric.value}{metric.unit}</div>
+                <div className="text-xs text-slate-400 mt-1">{metric.label}</div>
+              </div>
+            )) : (
+              <div className="flex-1 flex items-center justify-center gap-2">
+                <TrendingUp className="w-5 h-5 text-slate-400" />
+                <span className="text-slate-400 text-sm">Metric Strip</span>
+              </div>
+            )}
+          </div>
+        );
+      }
+      case 'imageGrid': {
+        const gridContent = block.content as ImageGridContent | undefined;
+        const images = gridContent?.images || [];
+        const layout = gridContent?.layout || '2x2';
+        const gridClass = layout === '3x1' ? 'grid-cols-3' : layout === '1x3' ? 'grid-cols-1' : layout === '3x2' ? 'grid-cols-3' : 'grid-cols-2';
+        return (
+          <div className={`h-full grid ${gridClass} gap-1 p-1`}>
+            {images.length > 0 ? images.map((img, i) => (
+              <div key={img.id || i} className="relative bg-muted rounded overflow-hidden">
+                <img src={img.url} alt={img.alt || ''} className="w-full h-full object-cover" />
+                {gridContent?.showCaptions && img.caption && (
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs p-1 truncate">{img.caption}</div>
+                )}
+              </div>
+            )) : (
+              <>
+                <div className="bg-muted/30 rounded flex items-center justify-center"><Image className="w-6 h-6 text-muted-foreground" /></div>
+                <div className="bg-muted/30 rounded flex items-center justify-center"><Image className="w-6 h-6 text-muted-foreground" /></div>
+                <div className="bg-muted/30 rounded flex items-center justify-center"><Image className="w-6 h-6 text-muted-foreground" /></div>
+                <div className="bg-muted/30 rounded flex items-center justify-center"><Image className="w-6 h-6 text-muted-foreground" /></div>
+              </>
+            )}
+          </div>
+        );
+      }
+      case 'mapPage': {
+        const mapContent = block.content as MapPageContent | undefined;
+        return mapContent?.mapImageUrl ? (
+          <div className="h-full relative">
+            <img src={mapContent.mapImageUrl} alt="Map" className="w-full h-full object-cover" />
+            {mapContent.showSubjectMarker && (
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                <MapPin className="w-8 h-8 text-red-600 drop-shadow-lg" />
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="h-full bg-gradient-to-br from-blue-100 to-green-100 rounded flex items-center justify-center">
+            <MapPin className="w-10 h-10 text-blue-500" />
+          </div>
+        );
+      }
+      case 'sectionDivider': {
+        const dividerContent = block.content as SectionDividerContent | undefined;
+        const variant = dividerContent?.variant || 'solid';
+        return (
+          <div 
+            className="h-full flex flex-col items-center justify-center relative overflow-hidden"
+            style={variant === 'imageOverlay' && dividerContent?.backgroundImageUrl ? {
+              backgroundImage: `url(${dividerContent.backgroundImageUrl})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center'
+            } : { backgroundColor: '#1e3a5f' }}
+          >
+            {variant === 'imageOverlay' && <div className="absolute inset-0 bg-black/40" />}
+            <div className="relative z-10 text-center text-white px-6">
+              {dividerContent?.sectionNumber && (
+                <div className="text-sm uppercase tracking-widest mb-2 opacity-80">Section {dividerContent.sectionNumber}</div>
+              )}
+              <h2 className="text-3xl font-bold">{dividerContent?.title || 'Section Title'}</h2>
+              {dividerContent?.subtitle && <p className="text-lg mt-2 opacity-80">{dividerContent.subtitle}</p>}
+            </div>
+          </div>
+        );
+      }
+      case 'teamGrid': {
+        const teamContent = block.content as TeamGridContent | undefined;
+        const members = teamContent?.members || [];
+        const cols = teamContent?.columns || 3;
+        return (
+          <div className={`h-full grid gap-3 p-3`} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
+            {members.length > 0 ? members.map((member, i) => (
+              <div key={member.id || i} className="flex flex-col items-center text-center">
+                {member.headshotUrl ? (
+                  <img src={member.headshotUrl} alt={member.name} className="w-16 h-16 rounded-full object-cover mb-2" />
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center mb-2">
+                    <Users className="w-8 h-8 text-slate-400" />
+                  </div>
+                )}
+                <div className="font-semibold text-sm">{member.name}</div>
+                <div className="text-xs text-muted-foreground">{member.title}</div>
+                {member.firm && <div className="text-xs text-muted-foreground">{member.firm}</div>}
+              </div>
+            )) : (
+              <div className="col-span-full flex items-center justify-center gap-2 text-muted-foreground">
+                <Users className="w-6 h-6" />
+                <span className="text-sm">Team Grid</span>
+              </div>
+            )}
+          </div>
+        );
+      }
+      case 'disclaimer': {
+        const disclaimerContent = block.content as DisclaimerContent | undefined;
+        const layout = disclaimerContent?.layout || 'fullWidth';
+        return (
+          <div className="h-full p-4 overflow-auto bg-slate-50 border border-slate-200 rounded">
+            <h3 className="font-bold text-sm mb-2 text-slate-700">{disclaimerContent?.title || 'Disclaimer'}</h3>
+            <div className={`text-xs text-slate-600 leading-relaxed ${layout === 'twoColumn' ? 'columns-2 gap-4' : ''}`}>
+              {disclaimerContent?.body || 'This document is for informational purposes only and does not constitute an offer to sell or a solicitation of an offer to buy any securities.'}
+            </div>
+          </div>
+        );
+      }
+      case 'portfolioTable': {
+        const tableContent = block.content as PortfolioTableContent | undefined;
+        const columns = tableContent?.columns || [];
+        const rows = tableContent?.rows || [];
+        return (
+          <div className="h-full overflow-auto p-2">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-100">
+                  {columns.length > 0 ? columns.map((col, i) => (
+                    <th key={col.id || i} className={`p-2 border text-${col.alignment || 'left'} font-semibold`}>{col.label}</th>
+                  )) : (
+                    <>
+                      <th className="p-2 border font-semibold">Property</th>
+                      <th className="p-2 border font-semibold text-right">Value</th>
+                      <th className="p-2 border font-semibold text-center">Status</th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.length > 0 ? rows.map((row, i) => (
+                  <tr key={i} className="hover:bg-slate-50">
+                    {columns.map((col, j) => (
+                      <td key={j} className={`p-2 border text-${col.alignment || 'left'}`}>{row[col.field] || '-'}</td>
+                    ))}
+                  </tr>
+                )) : (
+                  <tr><td colSpan={columns.length || 3} className="p-4 border text-center text-muted-foreground">
+                    <Building2 className="w-6 h-6 mx-auto mb-1" />
+                    Portfolio Table
+                  </td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
       default:
         return (
           <div className="p-3 h-full flex items-center justify-center text-muted-foreground text-sm">

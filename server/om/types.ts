@@ -130,7 +130,14 @@ export type BlockType =
   | "kpi"
   | "list"
   | "section"
-  | "group";
+  | "group"
+  | "metricStrip"
+  | "imageGrid"
+  | "mapPage"
+  | "sectionDivider"
+  | "teamGrid"
+  | "disclaimer"
+  | "portfolioTable";
 
 // Base block properties (shared by all block types)
 export interface BaseBlock {

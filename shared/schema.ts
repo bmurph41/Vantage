@@ -16283,6 +16283,7 @@ export const oms = pgTable("oms", {
   publishedVersionId: varchar("published_version_id"),
   shareToken: varchar("share_token", { length: 64 }).unique(),
   brandKitId: varchar("brand_kit_id"),
+  themeId: varchar("theme_id"),
   createdBy: varchar("created_by"),
   updatedBy: varchar("updated_by"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -16293,6 +16294,7 @@ export const oms = pgTable("oms", {
   dealIdx: index("oms_deal_idx").on(table.dealId),
   modelingProjectIdx: index("oms_modeling_project_idx").on(table.modelingProjectId),
   shareTokenIdx: index("oms_share_token_idx").on(table.shareToken),
+  themeIdx: index("oms_theme_idx").on(table.themeId),
 }));
 
 export const omPages = pgTable("om_pages", {
@@ -16301,10 +16303,18 @@ export const omPages = pgTable("om_pages", {
   title: text("title").notNull(),
   orderIndex: integer("order_index").notNull(),
   layout: jsonb("layout"),
+  layoutId: varchar("layout_id"),
+  pageMetadata: jsonb("page_metadata").$type<{
+    backgroundColor?: string;
+    backgroundImageUrl?: string;
+    sectionTitle?: string;
+    sectionNumber?: string;
+  }>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
   omIdx: index("om_pages_om_idx").on(table.omId),
+  layoutIdx: index("om_pages_layout_idx").on(table.layoutId),
 }));
 
 export const omBlocks = pgTable("om_blocks", {
@@ -16431,6 +16441,126 @@ export const omPageThumbnails = pgTable("om_page_thumbnails", {
   versionIdx: index("om_page_thumbnails_version_idx").on(table.documentVersionId),
 }));
 
+// ============================================================================
+// OM Builder - Themes (Institutional-grade theme system)
+// ============================================================================
+export const omThemes = pgTable("om_themes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  name: text("name").notNull(),
+  description: text("description"),
+  organizationId: varchar("organization_id"),
+  userId: varchar("user_id"),
+  isDefault: boolean("is_default").notNull().default(false),
+  isSystemDefault: boolean("is_system_default").notNull().default(false),
+  baseThemeKey: varchar("base_theme_key", { length: 50 }),
+  colors: jsonb("colors").$type<{
+    primary: string;
+    secondary: string;
+    accent: string;
+    background: string;
+    surface: string;
+    text: string;
+    textMuted: string;
+    headerBackground: string;
+    footerBackground: string;
+    metricTileBackground: string;
+    chartSeries: string[];
+    mapOverlay: string;
+  }>().notNull(),
+  typography: jsonb("typography").$type<{
+    fontFamilyDisplay: string;
+    fontFamilyHeading: string;
+    fontFamilyBody: string;
+    fontSizes: {
+      title: string;
+      section: string;
+      h1: string;
+      h2: string;
+      h3: string;
+      body: string;
+      disclaimer: string;
+      metricValue: string;
+      metricLabel: string;
+    };
+    fontWeights: {
+      title: number;
+      heading: number;
+      body: number;
+      bold: number;
+    };
+  }>().notNull(),
+  branding: jsonb("branding").$type<{
+    logoUrl?: string;
+    watermarkUrl?: string;
+    footerTextTemplate?: string;
+    coverOverlayStyle?: 'solid' | 'gradient' | 'none';
+    headerStyle?: 'minimal' | 'branded' | 'none';
+  }>(),
+  spacing: jsonb("spacing").$type<{
+    defaultSpacingScale: number;
+    defaultBorderRadius: string;
+    cardShadow: 'none' | 'sm' | 'md' | 'lg';
+    pageMargins: { top: number; right: number; bottom: number; left: number };
+  }>(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("om_themes_org_idx").on(table.organizationId),
+  userIdx: index("om_themes_user_idx").on(table.userId),
+  defaultIdx: index("om_themes_default_idx").on(table.isDefault),
+}));
+
+// ============================================================================
+// OM Builder - Page Layouts (Reusable page layout templates)
+// ============================================================================
+export const omLayoutTypeEnum = pgEnum("om_layout_type", [
+  'cover',
+  'sectionDivider', 
+  'execSummary',
+  'financials',
+  'market',
+  'photos',
+  'portfolio',
+  'team',
+  'disclaimer',
+  'custom'
+]);
+
+export const omPageLayouts = pgTable("om_page_layouts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  name: text("name").notNull(),
+  description: text("description"),
+  layoutType: omLayoutTypeEnum("layout_type").notNull(),
+  themeId: varchar("theme_id").references(() => omThemes.id, { onDelete: 'set null' }),
+  organizationId: varchar("organization_id"),
+  userId: varchar("user_id"),
+  isSystemDefault: boolean("is_system_default").notNull().default(false),
+  thumbnail: text("thumbnail"),
+  structure: jsonb("structure").$type<{
+    gridColumns: number;
+    gridRows?: number;
+    gridGap: string;
+    backgroundColor?: string;
+    backgroundImageUrl?: string;
+    placeholders: Array<{
+      id: string;
+      blockType: string;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      label?: string;
+      styleHints?: Record<string, any>;
+    }>;
+  }>().notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  typeIdx: index("om_page_layouts_type_idx").on(table.layoutType),
+  orgIdx: index("om_page_layouts_org_idx").on(table.organizationId),
+  themeIdx: index("om_page_layouts_theme_idx").on(table.themeId),
+}));
+
 export const insertOmSchema = createInsertSchema(oms).omit({
   id: true,
   createdAt: true,
@@ -16505,6 +16635,24 @@ export const insertOmPageThumbnailSchema = createInsertSchema(omPageThumbnails).
 });
 export type OmPageThumbnail = typeof omPageThumbnails.$inferSelect;
 export type InsertOmPageThumbnail = z.infer<typeof insertOmPageThumbnailSchema>;
+
+export const insertOmThemeSchema = createInsertSchema(omThemes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateOmThemeSchema = insertOmThemeSchema.partial();
+export type OmTheme = typeof omThemes.$inferSelect;
+export type InsertOmTheme = z.infer<typeof insertOmThemeSchema>;
+
+export const insertOmPageLayoutSchema = createInsertSchema(omPageLayouts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateOmPageLayoutSchema = insertOmPageLayoutSchema.partial();
+export type OmPageLayout = typeof omPageLayouts.$inferSelect;
+export type InsertOmPageLayout = z.infer<typeof insertOmPageLayoutSchema>;
 
 // ============================================================================
 // MODELING SCENARIOS / CASES SYSTEM

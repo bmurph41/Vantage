@@ -8,6 +8,8 @@ import {
   insertOmTemplateSchema, 
   insertOmDatasetSchema,
   insertOmBrandKitSchema,
+  insertOmThemeSchema,
+  insertOmPageLayoutSchema,
   crmDeals,
   modelingProjects
 } from "@shared/schema";
@@ -19,6 +21,7 @@ import * as XLSX from "xlsx";
 import { generateOmContent, improveContent, suggestLayout, type GenerateRequest } from "./ai-service";
 import { seedSystemTemplates } from "./seed-templates";
 import { scanBrandFromUrl } from "./brand-scan";
+import { seedOmThemesAndLayouts } from "./seed-themes-layouts";
 
 const router = Router();
 
@@ -1563,6 +1566,203 @@ router.get("/bindings/catalog", async (req, res) => {
   } catch (error) {
     console.error("Error fetching bindings catalog:", error);
     res.status(500).json({ error: "Failed to fetch bindings catalog" });
+  }
+});
+
+// ============================================================================
+// Theme Routes
+// ============================================================================
+
+router.get("/themes", async (req, res) => {
+  try {
+    const { organizationId, userId, includeSystem } = req.query;
+    const themes = await omStorage.getThemes({
+      organizationId: organizationId as string,
+      userId: userId as string,
+      includeSystem: includeSystem !== 'false',
+    });
+    res.json(themes);
+  } catch (error) {
+    console.error("Error fetching themes:", error);
+    res.status(500).json({ error: "Failed to fetch themes" });
+  }
+});
+
+router.get("/themes/:id", async (req, res) => {
+  try {
+    const theme = await omStorage.getThemeById(req.params.id);
+    if (!theme) {
+      return res.status(404).json({ error: "Theme not found" });
+    }
+    res.json(theme);
+  } catch (error) {
+    console.error("Error fetching theme:", error);
+    res.status(500).json({ error: "Failed to fetch theme" });
+  }
+});
+
+router.post("/themes", async (req, res) => {
+  try {
+    const parsed = insertOmThemeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: fromZodError(parsed.error).toString(),
+      });
+    }
+    const theme = await omStorage.createTheme(parsed.data);
+    res.status(201).json(theme);
+  } catch (error) {
+    console.error("Error creating theme:", error);
+    res.status(500).json({ error: "Failed to create theme" });
+  }
+});
+
+router.put("/themes/:id", async (req, res) => {
+  try {
+    const parsed = insertOmThemeSchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: fromZodError(parsed.error).toString(),
+      });
+    }
+    const theme = await omStorage.updateTheme(req.params.id, parsed.data);
+    if (!theme) {
+      return res.status(404).json({ error: "Theme not found" });
+    }
+    res.json(theme);
+  } catch (error) {
+    console.error("Error updating theme:", error);
+    res.status(500).json({ error: "Failed to update theme" });
+  }
+});
+
+router.delete("/themes/:id", async (req, res) => {
+  try {
+    await omStorage.deleteTheme(req.params.id);
+    res.status(204).send();
+  } catch (error) {
+    console.error("Error deleting theme:", error);
+    res.status(500).json({ error: "Failed to delete theme" });
+  }
+});
+
+router.patch("/oms/:id/theme", async (req, res) => {
+  try {
+    const { themeId } = req.body;
+    const om = await omStorage.assignThemeToDocument(req.params.id, themeId || null);
+    if (!om) {
+      return res.status(404).json({ error: "OM not found" });
+    }
+    res.json(om);
+  } catch (error) {
+    console.error("Error assigning theme:", error);
+    res.status(500).json({ error: "Failed to assign theme" });
+  }
+});
+
+// ============================================================================
+// Page Layout Routes
+// ============================================================================
+
+router.get("/layouts", async (req, res) => {
+  try {
+    const { layoutType, organizationId, themeId, includeSystem } = req.query;
+    const layouts = await omStorage.getPageLayouts({
+      layoutType: layoutType as string,
+      organizationId: organizationId as string,
+      themeId: themeId as string,
+      includeSystem: includeSystem !== 'false',
+    });
+    res.json(layouts);
+  } catch (error) {
+    console.error("Error fetching layouts:", error);
+    res.status(500).json({ error: "Failed to fetch layouts" });
+  }
+});
+
+router.get("/layouts/:id", async (req, res) => {
+  try {
+    const layout = await omStorage.getPageLayoutById(req.params.id);
+    if (!layout) {
+      return res.status(404).json({ error: "Layout not found" });
+    }
+    res.json(layout);
+  } catch (error) {
+    console.error("Error fetching layout:", error);
+    res.status(500).json({ error: "Failed to fetch layout" });
+  }
+});
+
+router.post("/layouts", async (req, res) => {
+  try {
+    const parsed = insertOmPageLayoutSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: fromZodError(parsed.error).toString(),
+      });
+    }
+    const layout = await omStorage.createPageLayout(parsed.data);
+    res.status(201).json(layout);
+  } catch (error) {
+    console.error("Error creating layout:", error);
+    res.status(500).json({ error: "Failed to create layout" });
+  }
+});
+
+router.put("/layouts/:id", async (req, res) => {
+  try {
+    const parsed = insertOmPageLayoutSchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: fromZodError(parsed.error).toString(),
+      });
+    }
+    const layout = await omStorage.updatePageLayout(req.params.id, parsed.data);
+    if (!layout) {
+      return res.status(404).json({ error: "Layout not found" });
+    }
+    res.json(layout);
+  } catch (error) {
+    console.error("Error updating layout:", error);
+    res.status(500).json({ error: "Failed to update layout" });
+  }
+});
+
+router.delete("/layouts/:id", async (req, res) => {
+  try {
+    await omStorage.deletePageLayout(req.params.id);
+    res.status(204).send();
+  } catch (error) {
+    console.error("Error deleting layout:", error);
+    res.status(500).json({ error: "Failed to delete layout" });
+  }
+});
+
+router.patch("/pages/:id/layout", async (req, res) => {
+  try {
+    const { layoutId } = req.body;
+    const page = await omStorage.assignLayoutToPage(req.params.id, layoutId || null);
+    if (!page) {
+      return res.status(404).json({ error: "Page not found" });
+    }
+    res.json(page);
+  } catch (error) {
+    console.error("Error assigning layout:", error);
+    res.status(500).json({ error: "Failed to assign layout" });
+  }
+});
+
+// ============================================================================
+// Seed Routes
+// ============================================================================
+
+router.post("/seed/themes-layouts", async (req, res) => {
+  try {
+    await seedOmThemesAndLayouts();
+    res.json({ success: true, message: "System themes and layouts seeded successfully" });
+  } catch (error) {
+    console.error("Error seeding themes and layouts:", error);
+    res.status(500).json({ error: "Failed to seed themes and layouts" });
   }
 });
 

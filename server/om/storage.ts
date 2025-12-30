@@ -17,6 +17,10 @@ import {
   type InsertOmAsset,
   type OmPageThumbnail,
   type InsertOmPageThumbnail,
+  type OmTheme,
+  type InsertOmTheme,
+  type OmPageLayout,
+  type InsertOmPageLayout,
   oms,
   omPages,
   omBlocks,
@@ -26,6 +30,8 @@ import {
   omDocumentVersions,
   omAssets,
   omPageThumbnails,
+  omThemes,
+  omPageLayouts,
 } from "@shared/schema";
 import { db } from "../db";
 import { eq, desc, and, sql, max, ilike, or } from "drizzle-orm";
@@ -98,6 +104,22 @@ export interface IOmStorage {
   // Page Thumbnails
   getPageThumbnails(documentVersionId: string): Promise<OmPageThumbnail[]>;
   createPageThumbnail(thumbnail: InsertOmPageThumbnail): Promise<OmPageThumbnail>;
+
+  // Themes
+  getThemes(filters?: { organizationId?: string; userId?: string; includeSystem?: boolean }): Promise<OmTheme[]>;
+  getThemeById(id: string): Promise<OmTheme | undefined>;
+  createTheme(theme: InsertOmTheme): Promise<OmTheme>;
+  updateTheme(id: string, theme: Partial<InsertOmTheme>): Promise<OmTheme | undefined>;
+  deleteTheme(id: string): Promise<void>;
+  assignThemeToDocument(documentId: string, themeId: string | null): Promise<Om | undefined>;
+
+  // Page Layouts
+  getPageLayouts(filters?: { layoutType?: string; organizationId?: string; themeId?: string; includeSystem?: boolean }): Promise<OmPageLayout[]>;
+  getPageLayoutById(id: string): Promise<OmPageLayout | undefined>;
+  createPageLayout(layout: InsertOmPageLayout): Promise<OmPageLayout>;
+  updatePageLayout(id: string, layout: Partial<InsertOmPageLayout>): Promise<OmPageLayout | undefined>;
+  deletePageLayout(id: string): Promise<void>;
+  assignLayoutToPage(pageId: string, layoutId: string | null): Promise<OmPage | undefined>;
 }
 
 export class OmDbStorage implements IOmStorage {
@@ -585,6 +607,132 @@ export class OmDbStorage implements IOmStorage {
   async createPageThumbnail(thumbnail: InsertOmPageThumbnail): Promise<OmPageThumbnail> {
     const [created] = await db.insert(omPageThumbnails).values(thumbnail).returning();
     return created;
+  }
+
+  // ============================================================================
+  // Themes
+  // ============================================================================
+  async getThemes(filters?: { organizationId?: string; userId?: string; includeSystem?: boolean }): Promise<OmTheme[]> {
+    const conditions = [];
+    
+    if (filters?.includeSystem !== false) {
+      conditions.push(eq(omThemes.isSystemDefault, true));
+    }
+    
+    if (filters?.organizationId) {
+      conditions.push(eq(omThemes.organizationId, filters.organizationId));
+    }
+    
+    if (filters?.userId) {
+      conditions.push(eq(omThemes.userId, filters.userId));
+    }
+
+    if (conditions.length === 0) {
+      return db.select().from(omThemes).orderBy(desc(omThemes.isSystemDefault), omThemes.name);
+    }
+
+    return db
+      .select()
+      .from(omThemes)
+      .where(or(...conditions))
+      .orderBy(desc(omThemes.isSystemDefault), omThemes.name);
+  }
+
+  async getThemeById(id: string): Promise<OmTheme | undefined> {
+    const [theme] = await db.select().from(omThemes).where(eq(omThemes.id, id));
+    return theme;
+  }
+
+  async createTheme(theme: InsertOmTheme): Promise<OmTheme> {
+    const [created] = await db.insert(omThemes).values(theme).returning();
+    return created;
+  }
+
+  async updateTheme(id: string, theme: Partial<InsertOmTheme>): Promise<OmTheme | undefined> {
+    const [updated] = await db
+      .update(omThemes)
+      .set({ ...theme, updatedAt: new Date() })
+      .where(eq(omThemes.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTheme(id: string): Promise<void> {
+    await db.delete(omThemes).where(eq(omThemes.id, id));
+  }
+
+  async assignThemeToDocument(documentId: string, themeId: string | null): Promise<Om | undefined> {
+    const [updated] = await db
+      .update(oms)
+      .set({ themeId, updatedAt: new Date() })
+      .where(eq(oms.id, documentId))
+      .returning();
+    return updated;
+  }
+
+  // ============================================================================
+  // Page Layouts
+  // ============================================================================
+  async getPageLayouts(filters?: { layoutType?: string; organizationId?: string; themeId?: string; includeSystem?: boolean }): Promise<OmPageLayout[]> {
+    const conditions = [];
+    
+    if (filters?.includeSystem !== false) {
+      conditions.push(eq(omPageLayouts.isSystemDefault, true));
+    }
+    
+    if (filters?.organizationId) {
+      conditions.push(eq(omPageLayouts.organizationId, filters.organizationId));
+    }
+    
+    if (filters?.layoutType) {
+      conditions.push(eq(omPageLayouts.layoutType, filters.layoutType as any));
+    }
+    
+    if (filters?.themeId) {
+      conditions.push(eq(omPageLayouts.themeId, filters.themeId));
+    }
+
+    if (conditions.length === 0) {
+      return db.select().from(omPageLayouts).orderBy(desc(omPageLayouts.isSystemDefault), omPageLayouts.layoutType, omPageLayouts.name);
+    }
+
+    return db
+      .select()
+      .from(omPageLayouts)
+      .where(or(...conditions))
+      .orderBy(desc(omPageLayouts.isSystemDefault), omPageLayouts.layoutType, omPageLayouts.name);
+  }
+
+  async getPageLayoutById(id: string): Promise<OmPageLayout | undefined> {
+    const [layout] = await db.select().from(omPageLayouts).where(eq(omPageLayouts.id, id));
+    return layout;
+  }
+
+  async createPageLayout(layout: InsertOmPageLayout): Promise<OmPageLayout> {
+    const [created] = await db.insert(omPageLayouts).values(layout).returning();
+    return created;
+  }
+
+  async updatePageLayout(id: string, layout: Partial<InsertOmPageLayout>): Promise<OmPageLayout | undefined> {
+    const [updated] = await db
+      .update(omPageLayouts)
+      .set({ ...layout, updatedAt: new Date() })
+      .where(eq(omPageLayouts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePageLayout(id: string): Promise<void> {
+    await db.delete(omPageLayouts).where(eq(omPageLayouts.id, id));
+  }
+
+  async assignLayoutToPage(pageId: string, layoutId: string | null): Promise<OmPage | undefined> {
+    const [updated] = await db
+      .update(omPages)
+      .set({ layoutId, updatedAt: new Date() })
+      .where(eq(omPages.id, pageId))
+      .returning();
+    return updated;
   }
 }
 

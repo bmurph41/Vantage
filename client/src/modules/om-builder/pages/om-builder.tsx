@@ -5,7 +5,7 @@ import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useSensor, useSe
 import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { toast } from "@/hooks/use-toast";
-import { FileDown, ArrowLeft, FileText, Plus, Trash2, GripVertical, Settings, Sparkles, Type, BarChart3, Table, Image, Gauge, Database, History, AlertCircle, Info, CheckCircle, AlertTriangle, Lightbulb, StickyNote, LayoutTemplate, Link2, Palette, AlignLeft, AlignCenter, AlignRight, Minus, RotateCcw, PenTool, Layers } from "lucide-react";
+import { FileDown, ArrowLeft, FileText, Plus, Trash2, GripVertical, Settings, Sparkles, Type, BarChart3, Table, Image, Gauge, Database, History, AlertCircle, Info, CheckCircle, AlertTriangle, Lightbulb, StickyNote, LayoutTemplate, Link2, Palette, AlignLeft, AlignCenter, AlignRight, Minus, RotateCcw, PenTool, Layers, TrendingUp, LayoutGrid, MapPin, Users, Building2, ScrollText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -26,6 +26,9 @@ import { defaultThemes, CALLOUT_COLORS, FONT_FAMILIES, FONT_SIZES } from "../typ
 import { DataBindingPanel } from "../components/data-binding-panel";
 import { VersionHistoryPanel } from "../components/version-history-panel";
 import { OmEditorShell } from "../components/OmEditorShell";
+import { ThemeSelector } from "../components/ThemeSelector";
+import { LayoutGallery } from "../components/LayoutGallery";
+import { AIContentGenerator } from "../components/AIContentGenerator";
 
 interface SortableBlockProps {
   block: OmBlock;
@@ -160,6 +163,10 @@ export default function OMBuilder() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [localModelingProjectId, setLocalModelingProjectId] = useState<string | null>(null);
   const [editorMode, setEditorMode] = useState<'classic' | 'freeform'>('classic');
+  const [selectedThemeId, setSelectedThemeId] = useState<string | null>(null);
+  const [activeTheme, setActiveTheme] = useState<OmTheme | null>(null);
+  const [layoutGalleryOpen, setLayoutGalleryOpen] = useState(false);
+  const [aiGeneratorOpen, setAiGeneratorOpen] = useState(false);
 
   const { data: om, isLoading: omLoading } = useQuery<Om>({
     queryKey: ['/api/om/oms', omId],
@@ -300,29 +307,49 @@ export default function OMBuilder() {
     toast({ title: "Block Deleted" });
   };
 
-  const addPage = async () => {
+  const addPage = async (layout?: any) => {
     if (!omId) return;
     
     try {
+      const pageTitle = layout?.name ? layout.name : `Page ${pages.length + 1}`;
       const newPage = await createPageMutation.mutateAsync({
         omId,
-        title: `Page ${pages.length + 1}`,
+        title: pageTitle,
         orderIndex: pages.length,
       });
+      
+      const layoutBlocks: OmBlock[] = layout?.structure?.placeholders?.map((placeholder: any, index: number) => ({
+        id: `block-${Date.now()}-${index}`,
+        type: placeholder.blockType as BlockType,
+        content: getDefaultContentForType(placeholder.blockType as BlockType),
+        style: getDefaultStyleForType(placeholder.blockType as BlockType),
+        position: {
+          x: placeholder.x,
+          y: placeholder.y,
+          width: placeholder.width,
+          height: placeholder.height,
+        },
+        meta: { name: placeholder.label },
+      })) || [];
       
       const localPage: OmPage = {
         id: newPage.id,
         title: newPage.title,
-        blocks: [],
+        blocks: layoutBlocks,
       };
       
       setPages(prev => [...prev, localPage]);
       setActivePageId(newPage.id);
       setSelectedBlockId(null);
-      toast({ title: "Page Added" });
+      toast({ title: layout ? `Page created with "${layout.name}" layout` : "Page Added" });
     } catch (error) {
       toast({ title: "Error", description: "Failed to add page", variant: "destructive" });
     }
+  };
+
+  const handleLayoutSelect = (layout: any) => {
+    addPage(layout);
+    setLayoutGalleryOpen(false);
   };
 
   const getDefaultContentForType = (type: BlockType): any => {
@@ -509,7 +536,7 @@ export default function OMBuilder() {
               <div className="p-3 border-b">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Pages</span>
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={addPage} data-testid="button-add-page">
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setLayoutGalleryOpen(true)} data-testid="button-add-page">
                     <Plus className="h-3 w-3" />
                   </Button>
                 </div>
@@ -547,6 +574,13 @@ export default function OMBuilder() {
                     { type: 'image' as BlockType, icon: Image, label: 'Image' },
                     { type: 'callout' as BlockType, icon: AlertCircle, label: 'Callout' },
                     { type: 'divider' as BlockType, icon: Minus, label: 'Divider' },
+                    { type: 'metricStrip' as BlockType, icon: TrendingUp, label: 'Metrics' },
+                    { type: 'imageGrid' as BlockType, icon: LayoutGrid, label: 'Gallery' },
+                    { type: 'mapPage' as BlockType, icon: MapPin, label: 'Map' },
+                    { type: 'sectionDivider' as BlockType, icon: Layers, label: 'Section' },
+                    { type: 'teamGrid' as BlockType, icon: Users, label: 'Team' },
+                    { type: 'disclaimer' as BlockType, icon: ScrollText, label: 'Disclaimer' },
+                    { type: 'portfolioTable' as BlockType, icon: Building2, label: 'Portfolio' },
                   ].map(({ type, icon: Icon, label }) => (
                     <button
                       key={type}
@@ -562,21 +596,27 @@ export default function OMBuilder() {
               </div>
 
               <div className="p-3 flex-1">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">Theme</span>
-                <div className="space-y-1">
-                  {defaultThemes.slice(0, 3).map((theme) => (
-                    <div
-                      key={theme.id}
-                      className="flex items-center gap-2 p-2 rounded-md border border-border hover:bg-muted/50 cursor-pointer transition-colors"
-                    >
-                      <div 
-                        className="w-4 h-4 rounded-full" 
-                        style={{ backgroundColor: theme.colors.primary }}
-                      />
-                      <span className="text-xs">{theme.name}</span>
-                    </div>
-                  ))}
-                </div>
+                <ThemeSelector
+                  selectedThemeId={selectedThemeId}
+                  onSelectTheme={(theme) => {
+                    setSelectedThemeId(theme.id);
+                    setActiveTheme(theme);
+                    toast({ title: `Theme "${theme.name}" applied` });
+                  }}
+                />
+              </div>
+
+              <div className="p-3 border-t">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full gap-2" 
+                  onClick={() => setAiGeneratorOpen(true)}
+                  data-testid="button-ai-generator"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  AI Content Generator
+                </Button>
               </div>
             </div>
           </ResizablePanel>
@@ -1122,6 +1162,66 @@ export default function OMBuilder() {
         </ResizablePanelGroup>
       </div>
       )}
+
+      <LayoutGallery
+        open={layoutGalleryOpen}
+        onClose={() => setLayoutGalleryOpen(false)}
+        onSelectLayout={handleLayoutSelect}
+      />
+
+      <AIContentGenerator
+        open={aiGeneratorOpen}
+        onClose={() => setAiGeneratorOpen(false)}
+        onInsert={(content) => {
+          if (!activePageId) {
+            if (pages.length > 0) {
+              const newBlock: OmBlock = {
+                id: `block_${Date.now()}`,
+                type: 'text',
+                content: { markdown: content },
+                style: getDefaultStyleForType('text'),
+                position: { x: 50, y: 50, width: 600, height: 200 },
+                meta: { zIndex: 1 }
+              };
+              setPages(prev => prev.map((p, idx) => 
+                idx === 0 ? { ...p, blocks: [...p.blocks, newBlock] } : p
+              ));
+              setActivePageId(pages[0].id);
+            }
+            return;
+          }
+          if (selectedBlockId) {
+            const selectedBlock = activePage?.blocks.find(b => b.id === selectedBlockId);
+            if (selectedBlock?.type === 'text') {
+              updateBlock(selectedBlockId, { content: { markdown: content } });
+            } else {
+              const newBlock: OmBlock = {
+                id: `block_${Date.now()}`,
+                type: 'text',
+                content: { markdown: content },
+                style: getDefaultStyleForType('text'),
+                position: { x: 50, y: 50, width: 600, height: 200 },
+                meta: { zIndex: (activePage?.blocks.length || 0) + 1 }
+              };
+              setPages(prev => prev.map(p => 
+                p.id === activePageId ? { ...p, blocks: [...p.blocks, newBlock] } : p
+              ));
+            }
+          } else {
+            const newBlock: OmBlock = {
+              id: `block_${Date.now()}`,
+              type: 'text',
+              content: { markdown: content },
+              style: getDefaultStyleForType('text'),
+              position: { x: 50, y: 50, width: 600, height: 200 },
+              meta: { zIndex: (activePage?.blocks.length || 0) + 1 }
+            };
+            setPages(prev => prev.map(p => 
+              p.id === activePageId ? { ...p, blocks: [...p.blocks, newBlock] } : p
+            ));
+          }
+        }}
+      />
     </div>
   );
 }
