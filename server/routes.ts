@@ -13507,6 +13507,19 @@ Current context: Project ${req.params.projectId}`;
       const { budgetId } = req.params;
       const data = updateMarinaBudgetSchema.parse(req.body);
 
+      // Validate rent roll ownership if linking
+      if (data.rentRollId) {
+        const [rentRoll] = await db
+          .select()
+          .from(rentRolls)
+          .where(and(eq(rentRolls.id, data.rentRollId), eq(rentRolls.orgId, orgId)))
+          .limit(1);
+
+        if (!rentRoll) {
+          return res.status(400).json({ error: 'Rent roll not found or does not belong to your organization' });
+        }
+      }
+
       const [budget] = await db
         .update(marinaBudgets)
         .set({ ...data, updatedAt: new Date() })

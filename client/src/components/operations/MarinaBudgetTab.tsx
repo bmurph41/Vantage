@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Plus, 
@@ -27,7 +29,13 @@ import {
   ArrowDown,
   Minus,
   FileText,
-  Edit
+  Edit,
+  Link,
+  Unlink,
+  RefreshCw,
+  Anchor,
+  CheckCircle,
+  AlertCircle
 } from "lucide-react";
 
 interface MarinaBudgetTabProps {
@@ -39,10 +47,20 @@ interface MarinaBudgetTabProps {
 interface Budget {
   id: string;
   ownedAssetId: string;
+  rentRollId: string | null;
   fiscalYear: number;
   status: string;
   totalBudgetAmount: string;
+  rentRollSyncEnabled: boolean | null;
+  lastRentRollSyncAt: string | null;
   createdAt: string;
+}
+
+interface RentRoll {
+  id: string;
+  name: string;
+  effectiveDate: string;
+  context: string;
 }
 
 interface LineItem {
@@ -142,6 +160,206 @@ function VarianceCell({ variance, variancePercent }: { variance: number; varianc
       <span>{formatCurrency(Math.abs(variance))}</span>
       <span className="text-xs">({variancePercent > 0 ? "+" : ""}{variancePercent.toFixed(1)}%)</span>
     </div>
+  );
+}
+
+function RentRollLinkCard({ budget, assetId, onUpdate }: { budget: Budget; assetId: string; onUpdate: () => void }) {
+  const { toast } = useToast();
+  const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [selectedRentRollId, setSelectedRentRollId] = useState<string>("");
+
+  const { data: rentRolls } = useQuery<RentRoll[]>({
+    queryKey: ["/api/operations/rent-rolls"],
+  });
+
+  const linkRentRoll = useMutation({
+    mutationFn: async (rentRollId: string | null) => {
+      return apiRequest(`/api/operations/budgets/${budget.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ 
+          rentRollId, 
+          rentRollSyncEnabled: rentRollId !== null 
+        }),
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Budget updated", description: "Rent roll link updated successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/operations/budgets/marina", assetId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/operations/budgets", budget.id, "comparison"] });
+      setShowLinkDialog(false);
+      onUpdate();
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to update", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const syncFromRentRoll = useMutation({
+    mutationFn: async () => {
+      const now = new Date();
+      return apiRequest(`/api/operations/budgets/${budget.id}/sync-rent-roll`, {
+        method: "POST",
+        body: JSON.stringify({ 
+          month: now.getMonth() + 1,
+          year: now.getFullYear()
+        }),
+      });
+    },
+    onSuccess: (result: any) => {
+      toast({ 
+        title: "Sync complete", 
+        description: `${result.synced} line item(s) synced from rent roll`
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/operations/budgets", budget.id, "comparison"] });
+      onUpdate();
+    },
+    onError: (error: any) => {
+      toast({ title: "Sync failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const linkedRentRoll = rentRolls?.find(r => r.id === budget.rentRollId);
+
+  return (
+    <TooltipProvider>
+      <Card className="mb-4">
+        <CardContent className="pt-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-full ${budget.rentRollId ? 'bg-green-100 dark:bg-green-900/30' : 'bg-muted'}`}>
+                <Anchor className={`h-4 w-4 ${budget.rentRollId ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`} />
+              </div>
+              <div>
+                <div className="font-medium flex items-center gap-2">
+                  Rent Roll Integration
+                  {budget.rentRollId && (
+                    <Badge variant="outline" className="text-green-600 border-green-600" data-testid="badge-rent-roll-linked">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Linked
+                    </Badge>
+                  )}
+                </div>
+                {linkedRentRoll ? (
+                  <div className="text-sm text-muted-foreground">
+                    Connected to: <span data-testid="text-linked-rent-roll-name">{linkedRentRoll.name}</span>
+                    {budget.lastRentRollSyncAt && (
+                      <span className="ml-2" data-testid="text-last-sync">
+                        Last sync: {new Date(budget.lastRentRollSyncAt).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    Link a rent roll to automatically sync storage revenue actuals
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {budget.rentRollId && (
+                <>
+                  <div className="flex items-center gap-2 mr-4">
+                    <Label htmlFor="sync-toggle" className="text-sm">Auto-sync</Label>
+                    <Switch
+                      id="sync-toggle"
+                      checked={budget.rentRollSyncEnabled || false}
+                      onCheckedChange={(checked) => {
+                        apiRequest(`/api/operations/budgets/${budget.id}`, {
+                          method: "PATCH",
+                          body: JSON.stringify({ rentRollSyncEnabled: checked }),
+                        }).then(() => {
+                          queryClient.invalidateQueries({ queryKey: ["/api/operations/budgets/marina", assetId] });
+                          toast({ 
+                            title: checked ? "Auto-sync enabled" : "Auto-sync disabled",
+                            description: checked ? "Budget actuals will sync from rent roll" : "Manual entry mode"
+                          });
+                        });
+                      }}
+                      data-testid="switch-auto-sync"
+                    />
+                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => syncFromRentRoll.mutate()}
+                        disabled={syncFromRentRoll.isPending}
+                        data-testid="btn-sync-rent-roll"
+                      >
+                        <RefreshCw className={`h-4 w-4 mr-1 ${syncFromRentRoll.isPending ? 'animate-spin' : ''}`} />
+                        Sync Now
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Pull latest revenue from rent roll</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => linkRentRoll.mutate(null)}
+                        disabled={linkRentRoll.isPending}
+                        data-testid="btn-unlink-rent-roll"
+                      >
+                        <Unlink className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Unlink rent roll</TooltipContent>
+                  </Tooltip>
+                </>
+              )}
+              {!budget.rentRollId && (
+                <Dialog open={showLinkDialog} onOpenChange={setShowLinkDialog}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" data-testid="btn-link-rent-roll">
+                      <Link className="h-4 w-4 mr-1" />
+                      Link Rent Roll
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Link Rent Roll to Budget</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-4 space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                        Linking a rent roll allows automatic syncing of storage revenue to your budget actuals.
+                      </p>
+                      <div className="space-y-2">
+                        <Label>Select Rent Roll</Label>
+                        <Select value={selectedRentRollId} onValueChange={setSelectedRentRollId}>
+                          <SelectTrigger data-testid="select-rent-roll">
+                            <SelectValue placeholder="Choose a rent roll..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {rentRolls?.filter(r => r.context === 'operational').map((rr) => (
+                              <SelectItem key={rr.id} value={rr.id}>
+                                {rr.name} ({new Date(rr.effectiveDate).toLocaleDateString()})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setShowLinkDialog(false)}>Cancel</Button>
+                      <Button 
+                        onClick={() => linkRentRoll.mutate(selectedRentRollId)}
+                        disabled={!selectedRentRollId || linkRentRoll.isPending}
+                        data-testid="btn-confirm-link"
+                      >
+                        {linkRentRoll.isPending ? "Linking..." : "Link Rent Roll"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </TooltipProvider>
   );
 }
 
@@ -488,6 +706,11 @@ function MarinaBudgetView({ assetId, marinaName, year }: { assetId: string; mari
     );
   }
 
+  const handleUpdate = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/operations/budgets/marina", assetId] });
+    queryClient.invalidateQueries({ queryKey: ["/api/operations/budgets", currentBudget.id, "comparison"] });
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -504,6 +727,8 @@ function MarinaBudgetView({ assetId, marinaName, year }: { assetId: string; mari
           Edit Budget
         </Button>
       </div>
+
+      <RentRollLinkCard budget={currentBudget} assetId={assetId} onUpdate={handleUpdate} />
 
       <BudgetSummaryCards summary={comparison.summary} />
       <BudgetComparisonTable comparison={comparison} />
