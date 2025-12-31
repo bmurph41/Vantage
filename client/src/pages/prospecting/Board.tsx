@@ -225,28 +225,63 @@ export default function ProspectingBoard() {
   const { data: prospectingEntries = [], isLoading } = useProspectingEntries(selectedYear);
   
   // Fetch dashboard stats for KPI cards
-  const { data: dashboardStats, isLoading: isLoadingStats } = useQuery({
+  const { data: dashboardStats, isLoading: isLoadingStats } = useQuery<{
+    callsMade: number;
+    emailsSent: number;
+    leadsGenerated: number;
+    callsChange: number;
+    emailsChange: number;
+    leadsChange: number;
+  }>({
     queryKey: ['/api/prospecting/dashboard-stats'],
   });
 
   // Fetch leads for lead counts
-  const { data: leads } = useQuery({
+  const { data: leads } = useQuery<any[]>({
     queryKey: ['/api/leads'],
+  });
+
+  // Fetch deals for conversion funnel
+  const { data: deals } = useQuery<any[]>({
+    queryKey: ['/api/deals'],
+  });
+
+  // Fetch settings for weekly goals
+  const { data: settings } = useQuery<{
+    weeklyCallsGoal?: number;
+    weeklyEmailsGoal?: number;
+    weeklyLeadsGoal?: number;
+  }>({
+    queryKey: ['/api/prospecting/settings'],
   });
   
   // Enable real-time updates
   useProspectingRealTime();
   
   // Calculate lead metrics
-  const leadsCount = Array.isArray(leads) ? leads.length : 0;
-  const newLeadsThisWeek = Array.isArray(leads) 
-    ? leads.filter((l: any) => {
-        const createdAt = new Date(l.createdAt);
-        const weekAgo = new Date();
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        return createdAt >= weekAgo;
-      }).length 
-    : 0;
+  const leadsArray = Array.isArray(leads) ? leads : [];
+  const dealsArray = Array.isArray(deals) ? deals : [];
+  const leadsCount = leadsArray.length;
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const newLeadsThisWeek = leadsArray.filter((l: any) => {
+    const createdAt = new Date(l.createdAt);
+    return createdAt >= weekAgo;
+  }).length;
+
+  // Goal settings with defaults
+  const callsGoal = settings?.weeklyCallsGoal || 50;
+  const emailsGoal = settings?.weeklyEmailsGoal || 100;
+  const leadsGoal = settings?.weeklyLeadsGoal || 20;
+
+  // Calculate conversion funnel from real data
+  const totalTouches = (dashboardStats?.callsMade || 0) + (dashboardStats?.emailsSent || 0);
+  const conversations = leadsArray.filter((l: any) => l.status === 'contacted' || l.status === 'qualified' || l.status === 'converted').length;
+  const qualified = leadsArray.filter((l: any) => l.status === 'qualified' || l.status === 'converted').length;
+  const dealsCreated = dealsArray.length;
+  const conversationsRate = totalTouches > 0 ? Math.round((conversations / totalTouches) * 100) : 0;
+  const qualifiedRate = totalTouches > 0 ? Math.round((qualified / totalTouches) * 100) : 0;
+  const dealsRate = totalTouches > 0 ? Math.round((dealsCreated / totalTouches) * 100) : 0;
 
   // Check if we're viewing the current period
   const isCurrentPeriod = selectedYear === currentDate.getFullYear() && selectedQuarter === currentQuarter;
@@ -524,7 +559,7 @@ export default function ProspectingBoard() {
                 <KpiCard
                   title="Total Leads"
                   value={leadsCount}
-                  change={12}
+                  change={dashboardStats?.leadsChange}
                   icon={Users}
                   color="bg-blue-500"
                   isLoading={isLoadingStats}
@@ -532,7 +567,7 @@ export default function ProspectingBoard() {
                 <KpiCard
                   title="New This Week"
                   value={newLeadsThisWeek}
-                  change={8}
+                  change={dashboardStats?.leadsChange}
                   icon={Target}
                   color="bg-green-500"
                   isLoading={isLoadingStats}
@@ -540,7 +575,7 @@ export default function ProspectingBoard() {
                 <KpiCard
                   title="Calls Made"
                   value={dashboardStats?.callsMade || 0}
-                  change={-5}
+                  change={dashboardStats?.callsChange}
                   icon={Phone}
                   color="bg-purple-500"
                   isLoading={isLoadingStats}
@@ -548,7 +583,7 @@ export default function ProspectingBoard() {
                 <KpiCard
                   title="Emails Sent"
                   value={dashboardStats?.emailsSent || 0}
-                  change={15}
+                  change={dashboardStats?.emailsChange}
                   icon={Mail}
                   color="bg-orange-500"
                   isLoading={isLoadingStats}
@@ -565,28 +600,28 @@ export default function ProspectingBoard() {
                     <div>
                       <div className="flex justify-between text-xs mb-1">
                         <span className="text-gray-600">Calls</span>
-                        <span className="font-medium">{dashboardStats?.callsMade || 0} / 50</span>
+                        <span className="font-medium">{dashboardStats?.callsMade || 0} / {callsGoal}</span>
                       </div>
                       <div className="w-full h-1.5 bg-gray-200 rounded-full">
-                        <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(((dashboardStats?.callsMade || 0) / 50) * 100, 100)}%` }} />
+                        <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${Math.min(((dashboardStats?.callsMade || 0) / callsGoal) * 100, 100)}%` }} />
                       </div>
                     </div>
                     <div>
                       <div className="flex justify-between text-xs mb-1">
                         <span className="text-gray-600">Emails</span>
-                        <span className="font-medium">{dashboardStats?.emailsSent || 0} / 100</span>
+                        <span className="font-medium">{dashboardStats?.emailsSent || 0} / {emailsGoal}</span>
                       </div>
                       <div className="w-full h-1.5 bg-gray-200 rounded-full">
-                        <div className="h-full bg-green-500 rounded-full" style={{ width: `${Math.min(((dashboardStats?.emailsSent || 0) / 100) * 100, 100)}%` }} />
+                        <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${Math.min(((dashboardStats?.emailsSent || 0) / emailsGoal) * 100, 100)}%` }} />
                       </div>
                     </div>
                     <div>
                       <div className="flex justify-between text-xs mb-1">
                         <span className="text-gray-600">New Leads</span>
-                        <span className="font-medium">{newLeadsThisWeek} / 20</span>
+                        <span className="font-medium">{newLeadsThisWeek} / {leadsGoal}</span>
                       </div>
                       <div className="w-full h-1.5 bg-gray-200 rounded-full">
-                        <div className="h-full bg-purple-500 rounded-full" style={{ width: `${Math.min((newLeadsThisWeek / 20) * 100, 100)}%` }} />
+                        <div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${Math.min((newLeadsThisWeek / leadsGoal) * 100, 100)}%` }} />
                       </div>
                     </div>
                   </CardContent>
@@ -598,7 +633,7 @@ export default function ProspectingBoard() {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-600">Touches</span>
+                      <span className="text-xs text-gray-600">Touches ({totalTouches})</span>
                       <div className="flex items-center">
                         <div className="w-24 h-1.5 bg-gray-200 rounded-full mr-2">
                           <div className="w-full h-full bg-blue-500 rounded-full" />
@@ -607,30 +642,30 @@ export default function ProspectingBoard() {
                       </div>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-600">Conversations</span>
+                      <span className="text-xs text-gray-600">Conversations ({conversations})</span>
                       <div className="flex items-center">
                         <div className="w-24 h-1.5 bg-gray-200 rounded-full mr-2">
-                          <div className="w-3/4 h-full bg-green-500 rounded-full" />
+                          <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${conversationsRate}%` }} />
                         </div>
-                        <span className="text-xs font-medium">42%</span>
+                        <span className="text-xs font-medium">{conversationsRate}%</span>
                       </div>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-600">Qualified</span>
+                      <span className="text-xs text-gray-600">Qualified ({qualified})</span>
                       <div className="flex items-center">
                         <div className="w-24 h-1.5 bg-gray-200 rounded-full mr-2">
-                          <div className="w-1/2 h-full bg-yellow-500 rounded-full" />
+                          <div className="h-full bg-yellow-500 rounded-full transition-all" style={{ width: `${qualifiedRate}%` }} />
                         </div>
-                        <span className="text-xs font-medium">28%</span>
+                        <span className="text-xs font-medium">{qualifiedRate}%</span>
                       </div>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-600">Deals Created</span>
+                      <span className="text-xs text-gray-600">Deals ({dealsCreated})</span>
                       <div className="flex items-center">
                         <div className="w-24 h-1.5 bg-gray-200 rounded-full mr-2">
-                          <div className="w-1/4 h-full bg-purple-500 rounded-full" />
+                          <div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${dealsRate}%` }} />
                         </div>
-                        <span className="text-xs font-medium">12%</span>
+                        <span className="text-xs font-medium">{dealsRate}%</span>
                       </div>
                     </div>
                   </CardContent>

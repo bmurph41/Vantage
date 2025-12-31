@@ -3,10 +3,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
   Target, TrendingUp, Phone, Mail, Calendar, Users, 
-  ArrowUpRight, ArrowDownRight, Minus, RefreshCcw 
+  ArrowUpRight, ArrowDownRight, Minus, RefreshCcw, Loader2
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
+import { format, formatDistanceToNow } from "date-fns";
 
 type KpiCardProps = {
   title: string;
@@ -61,27 +62,87 @@ function KpiCard({ title, value, change, changeLabel, icon: Icon, color, isLoadi
 }
 
 export default function ProspectingDashboard() {
-  const { data: stats, isLoading: isLoadingStats } = useQuery({
+  const queryClient = useQueryClient();
+  
+  const { data: stats, isLoading: isLoadingStats, refetch: refetchStats } = useQuery<{
+    callsMade: number;
+    emailsSent: number;
+    leadsGenerated: number;
+    meetingsBooked: number;
+    callsChange: number;
+    emailsChange: number;
+    leadsChange: number;
+    meetingsChange: number;
+  }>({
     queryKey: ['/api/prospecting/dashboard-stats'],
   });
 
-  const { data: leads } = useQuery({
+  const { data: settings } = useQuery<{
+    weeklyCallsGoal?: number;
+    weeklyEmailsGoal?: number;
+    weeklyLeadsGoal?: number;
+    weeklyDealsGoal?: number;
+  }>({
+    queryKey: ['/api/prospecting/settings'],
+  });
+
+  const { data: leads } = useQuery<any[]>({
     queryKey: ['/api/leads'],
   });
 
-  const { data: recentActivity } = useQuery({
-    queryKey: ['/api/prospecting/recent-activity'],
+  const { data: deals } = useQuery<any[]>({
+    queryKey: ['/api/deals'],
   });
 
-  const leadsCount = Array.isArray(leads) ? leads.length : 0;
-  const newLeadsThisWeek = Array.isArray(leads) 
-    ? leads.filter((l: any) => {
-        const createdAt = new Date(l.createdAt);
-        const weekAgo = new Date();
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        return createdAt >= weekAgo;
-      }).length 
-    : 0;
+  const { data: activities, isLoading: isLoadingActivities } = useQuery<any[]>({
+    queryKey: ['/api/activities'],
+  });
+
+  const handleRefresh = () => {
+    refetchStats();
+    queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/deals'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/activities'] });
+  };
+
+  const leadsArray = Array.isArray(leads) ? leads : [];
+  const dealsArray = Array.isArray(deals) ? deals : [];
+  const activitiesArray = Array.isArray(activities) ? activities : [];
+  
+  const leadsCount = leadsArray.length;
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  
+  const newLeadsThisWeek = leadsArray.filter((l: any) => {
+    const createdAt = new Date(l.createdAt);
+    return createdAt >= weekAgo;
+  }).length;
+
+  const newDealsThisWeek = dealsArray.filter((d: any) => {
+    const createdAt = new Date(d.createdAt);
+    return createdAt >= weekAgo;
+  }).length;
+
+  const callsGoal = settings?.weeklyCallsGoal || 50;
+  const emailsGoal = settings?.weeklyEmailsGoal || 100;
+  const leadsGoal = settings?.weeklyLeadsGoal || 20;
+  const dealsGoal = settings?.weeklyDealsGoal || 5;
+
+  const currentCalls = stats?.callsMade || 0;
+  const currentEmails = stats?.emailsSent || 0;
+
+  const totalTouches = currentCalls + currentEmails;
+  const conversations = leadsArray.filter((l: any) => l.status === 'contacted' || l.status === 'qualified' || l.status === 'converted').length;
+  const qualified = leadsArray.filter((l: any) => l.status === 'qualified' || l.status === 'converted').length;
+  const dealsCreated = dealsArray.length;
+
+  const conversationsRate = totalTouches > 0 ? Math.round((conversations / totalTouches) * 100) : 0;
+  const qualifiedRate = totalTouches > 0 ? Math.round((qualified / totalTouches) * 100) : 0;
+  const dealsRate = totalTouches > 0 ? Math.round((dealsCreated / totalTouches) * 100) : 0;
+
+  const recentActivities = activitiesArray
+    .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 5);
 
   return (
     <div className="flex-1 overflow-auto p-6 bg-gray-50">
@@ -91,7 +152,7 @@ export default function ProspectingDashboard() {
             <h1 className="text-2xl font-bold text-gray-900" data-testid="page-title">Prospecting Dashboard</h1>
             <p className="text-gray-500 mt-1">Track your outreach velocity and lead generation</p>
           </div>
-          <Button variant="outline" size="sm" data-testid="button-refresh">
+          <Button variant="outline" size="sm" onClick={handleRefresh} data-testid="button-refresh">
             <RefreshCcw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
@@ -108,7 +169,7 @@ export default function ProspectingDashboard() {
           />
           <KpiCard
             title="New This Week"
-            value={stats?.leadsGenerated || 0}
+            value={newLeadsThisWeek}
             change={stats?.leadsChange}
             icon={Target}
             color="bg-green-500"
@@ -116,7 +177,7 @@ export default function ProspectingDashboard() {
           />
           <KpiCard
             title="Calls Made"
-            value={stats?.callsMade || 0}
+            value={currentCalls}
             change={stats?.callsChange}
             icon={Phone}
             color="bg-purple-500"
@@ -124,7 +185,7 @@ export default function ProspectingDashboard() {
           />
           <KpiCard
             title="Emails Sent"
-            value={stats?.emailsSent || 0}
+            value={currentEmails}
             change={stats?.emailsChange}
             icon={Mail}
             color="bg-orange-500"
@@ -141,7 +202,7 @@ export default function ProspectingDashboard() {
             <CardContent>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Touches</span>
+                  <span className="text-sm text-gray-600">Touches ({totalTouches})</span>
                   <div className="flex items-center">
                     <div className="w-48 h-2 bg-gray-200 rounded-full mr-3">
                       <div className="w-full h-full bg-blue-500 rounded-full" />
@@ -150,30 +211,39 @@ export default function ProspectingDashboard() {
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Conversations</span>
+                  <span className="text-sm text-gray-600">Conversations ({conversations})</span>
                   <div className="flex items-center">
                     <div className="w-48 h-2 bg-gray-200 rounded-full mr-3">
-                      <div className="w-3/4 h-full bg-green-500 rounded-full" />
+                      <div 
+                        className="h-full bg-green-500 rounded-full" 
+                        style={{ width: `${conversationsRate}%` }}
+                      />
                     </div>
-                    <span className="text-sm font-medium">42%</span>
+                    <span className="text-sm font-medium">{conversationsRate}%</span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Qualified</span>
+                  <span className="text-sm text-gray-600">Qualified ({qualified})</span>
                   <div className="flex items-center">
                     <div className="w-48 h-2 bg-gray-200 rounded-full mr-3">
-                      <div className="w-1/2 h-full bg-yellow-500 rounded-full" />
+                      <div 
+                        className="h-full bg-yellow-500 rounded-full" 
+                        style={{ width: `${qualifiedRate}%` }}
+                      />
                     </div>
-                    <span className="text-sm font-medium">28%</span>
+                    <span className="text-sm font-medium">{qualifiedRate}%</span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Deals Created</span>
+                  <span className="text-sm text-gray-600">Deals Created ({dealsCreated})</span>
                   <div className="flex items-center">
                     <div className="w-48 h-2 bg-gray-200 rounded-full mr-3">
-                      <div className="w-1/4 h-full bg-purple-500 rounded-full" />
+                      <div 
+                        className="h-full bg-purple-500 rounded-full" 
+                        style={{ width: `${dealsRate}%` }}
+                      />
                     </div>
-                    <span className="text-sm font-medium">12%</span>
+                    <span className="text-sm font-medium">{dealsRate}%</span>
                   </div>
                 </div>
               </div>
@@ -190,40 +260,49 @@ export default function ProspectingDashboard() {
                 <div>
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-gray-600">Calls</span>
-                    <span className="font-medium">24 / 50</span>
+                    <span className="font-medium">{currentCalls} / {callsGoal}</span>
                   </div>
                   <div className="w-full h-2 bg-gray-200 rounded-full">
-                    <div className="w-[48%] h-full bg-blue-500 rounded-full" />
+                    <div 
+                      className="h-full bg-blue-500 rounded-full transition-all" 
+                      style={{ width: `${Math.min((currentCalls / callsGoal) * 100, 100)}%` }}
+                    />
                   </div>
                 </div>
                 <div>
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-gray-600">Emails</span>
-                    <span className="font-medium">65 / 100</span>
+                    <span className="font-medium">{currentEmails} / {emailsGoal}</span>
                   </div>
                   <div className="w-full h-2 bg-gray-200 rounded-full">
-                    <div className="w-[65%] h-full bg-green-500 rounded-full" />
+                    <div 
+                      className="h-full bg-green-500 rounded-full transition-all" 
+                      style={{ width: `${Math.min((currentEmails / emailsGoal) * 100, 100)}%` }}
+                    />
                   </div>
                 </div>
                 <div>
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-gray-600">New Leads</span>
-                    <span className="font-medium">{newLeadsThisWeek} / 20</span>
+                    <span className="font-medium">{newLeadsThisWeek} / {leadsGoal}</span>
                   </div>
                   <div className="w-full h-2 bg-gray-200 rounded-full">
                     <div 
-                      className="h-full bg-purple-500 rounded-full" 
-                      style={{ width: `${Math.min((newLeadsThisWeek / 20) * 100, 100)}%` }}
+                      className="h-full bg-purple-500 rounded-full transition-all" 
+                      style={{ width: `${Math.min((newLeadsThisWeek / leadsGoal) * 100, 100)}%` }}
                     />
                   </div>
                 </div>
                 <div>
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-gray-600">Deals Created</span>
-                    <span className="font-medium">3 / 5</span>
+                    <span className="font-medium">{newDealsThisWeek} / {dealsGoal}</span>
                   </div>
                   <div className="w-full h-2 bg-gray-200 rounded-full">
-                    <div className="w-[60%] h-full bg-orange-500 rounded-full" />
+                    <div 
+                      className="h-full bg-orange-500 rounded-full transition-all" 
+                      style={{ width: `${Math.min((newDealsThisWeek / dealsGoal) * 100, 100)}%` }}
+                    />
                   </div>
                 </div>
               </div>
@@ -237,32 +316,42 @@ export default function ProspectingDashboard() {
             <CardDescription>Your latest prospecting activities</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="flex items-center justify-between py-3 border-b last:border-b-0">
-                  <div className="flex items-center">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${
-                      i % 3 === 0 ? 'bg-blue-100' : i % 3 === 1 ? 'bg-green-100' : 'bg-purple-100'
-                    }`}>
-                      {i % 3 === 0 ? <Phone className="w-4 h-4 text-blue-600" /> :
-                       i % 3 === 1 ? <Mail className="w-4 h-4 text-green-600" /> :
-                       <Calendar className="w-4 h-4 text-purple-600" />}
+            {isLoadingActivities ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+              </div>
+            ) : recentActivities.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>No recent activities found.</p>
+                <p className="text-sm mt-1">Start making calls and sending emails to see your activity here.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {recentActivities.map((activity: any) => (
+                  <div key={activity.id} className="flex items-center justify-between py-3 border-b last:border-b-0">
+                    <div className="flex items-center">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${
+                        activity.type === 'call' ? 'bg-blue-100' : 
+                        activity.type === 'email' ? 'bg-green-100' : 'bg-purple-100'
+                      }`}>
+                        {activity.type === 'call' ? <Phone className="w-4 h-4 text-blue-600" /> :
+                         activity.type === 'email' ? <Mail className="w-4 h-4 text-green-600" /> :
+                         <Calendar className="w-4 h-4 text-purple-600" />}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {activity.subject || activity.description || `${activity.type} activity`}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true })}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {i % 3 === 0 ? 'Call with Marina Owner' : 
-                         i % 3 === 1 ? 'Email sent to broker' : 
-                         'Meeting scheduled'}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {i} hour{i > 1 ? 's' : ''} ago
-                      </p>
-                    </div>
+                    <Badge variant="secondary">{activity.status || 'Logged'}</Badge>
                   </div>
-                  <Badge variant="secondary">{i % 2 === 0 ? 'Completed' : 'Logged'}</Badge>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
