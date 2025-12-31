@@ -1,16 +1,17 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Users, TrendingUp, DollarSign, Calendar } from "lucide-react";
+import { Users, TrendingUp, DollarSign, Calendar, UserPlus, UserMinus, ArrowUpDown } from "lucide-react";
 import type { CustomerOverview } from "@/types/customer-analytics";
 
 interface Props {
   data: CustomerOverview | undefined;
   isLoading: boolean;
   error: Error | null;
+  periodLabel?: string;
 }
 
-export function CustomerOverviewCards({ data, isLoading, error }: Props) {
+export function CustomerOverviewCards({ data, isLoading, error, periodLabel }: Props) {
   if (error) {
     return (
       <Alert variant="destructive" data-testid="alert-overview-error">
@@ -114,6 +115,60 @@ export function CustomerOverviewCards({ data, isLoading, error }: Props) {
           </p>
         </CardContent>
       </Card>
+
+      {data.moveIns !== undefined && (
+        <Card data-testid="card-move-ins">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Move-Ins</CardTitle>
+            <UserPlus className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600" data-testid="value-move-ins">
+              {data.moveIns.toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {periodLabel || "Selected period"}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {data.moveOuts !== undefined && (
+        <Card data-testid="card-move-outs">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Move-Outs</CardTitle>
+            <UserMinus className="h-4 w-4 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600" data-testid="value-move-outs">
+              {data.moveOuts.toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {periodLabel || "Selected period"}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {data.netChange !== undefined && (
+        <Card data-testid="card-net-change">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Net Change</CardTitle>
+            <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div 
+              className={`text-2xl font-bold ${data.netChange >= 0 ? 'text-green-600' : 'text-red-600'}`} 
+              data-testid="value-net-change"
+            >
+              {data.netChange >= 0 ? '+' : ''}{data.netChange.toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {periodLabel || "Selected period"}
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

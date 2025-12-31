@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RefreshCw } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { CustomerOverviewCards } from "@/components/analytics/customer/CustomerOverviewCards";
@@ -8,6 +10,7 @@ import { LtvDistributionChart } from "@/components/analytics/customer/LtvDistrib
 import { SegmentBreakdown } from "@/components/analytics/customer/SegmentBreakdown";
 import { ChurnRiskTable } from "@/components/analytics/customer/ChurnRiskTable";
 import { CUSTOMER_ANALYTICS_QUERY_KEYS } from "@/types/customer-analytics";
+import { calculateDateRange, getTimePeriodOptions, type TimePeriodFilter } from "@shared/timePeriodUtils";
 import type { 
   CustomerOverview, 
   TopCustomer, 
@@ -17,6 +20,9 @@ import type {
 } from "@/types/customer-analytics";
 
 export default function CustomerAnalytics() {
+  const [periodFilter, setPeriodFilter] = useState<TimePeriodFilter>("YTD");
+  const { label: periodLabel } = calculateDateRange(periodFilter);
+  const timePeriodOptions = getTimePeriodOptions();
   const overviewQuery = useQuery<CustomerOverview>({
     queryKey: CUSTOMER_ANALYTICS_QUERY_KEYS.overview(),
   });
@@ -64,21 +70,39 @@ export default function CustomerAnalytics() {
             Comprehensive analytics and insights about your marina customers, engagement patterns, and revenue metrics.
           </p>
         </div>
-        <Button 
-          onClick={handleRefresh} 
-          disabled={isAnyLoading}
-          variant="outline"
-          data-testid="button-refresh-analytics"
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${isAnyLoading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Select
+            value={periodFilter}
+            onValueChange={(value) => setPeriodFilter(value as TimePeriodFilter)}
+          >
+            <SelectTrigger className="w-[200px]" data-testid="select-time-period">
+              <SelectValue placeholder="Select time period" />
+            </SelectTrigger>
+            <SelectContent>
+              {timePeriodOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button 
+            onClick={handleRefresh} 
+            disabled={isAnyLoading}
+            variant="outline"
+            data-testid="button-refresh-analytics"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isAnyLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <CustomerOverviewCards 
         data={overviewQuery.data}
         isLoading={overviewQuery.isLoading}
         error={overviewQuery.error}
+        periodLabel={periodLabel}
       />
 
       <TopCustomersTable 

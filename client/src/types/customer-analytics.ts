@@ -7,6 +7,9 @@ export interface CustomerOverview {
   avgTenure: number;
   retentionRate: number;
   churnRate: number;
+  moveIns?: number;
+  moveOuts?: number;
+  netChange?: number;
 }
 
 export interface TopCustomer {
