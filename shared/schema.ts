@@ -17162,3 +17162,9 @@ export * from '../server/listings/ingestion_v2/schema';
 // This provides the hardened document-to-fact pipeline with full provenance
 // ============================================================================
 export * from './pnl-pipeline-schema';
+
+// ============================================================================
+// Financial COA Module Schema
+// Self-contained P&L parsing and mapping module with COA categories, segments, and aliases
+// ============================================================================
+export * from './financial-coa-schema';
