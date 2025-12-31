@@ -504,8 +504,8 @@ export default function UnifiedSidebar() {
             />
             {prospectingExpanded && (
               <>
-                {/* Prospecting */}
-                <NavLink item={{ name: "Prospecting", href: "/prospecting", icon: Target }} />
+                {/* Dashboard */}
+                <NavLink item={{ name: "Dashboard", href: "/prospecting", icon: Target }} />
                 {/* Marketing & Analytics */}
                 <NavLink item={{ name: "Marketing", href: "/crm/marketing-automation", icon: Send }} />
                 <NavLink item={{ name: "Analytics", href: "/crm/analytics", icon: PieChart }} />
