@@ -81,15 +81,11 @@ const getWorkspaceSubNav = (workspaceId: string) => [
   { name: "Team", href: `/workspaces/${workspaceId}?tab=team`, icon: Users },
 ];
 
-// Scenario Planning Navigation (all users - core modeling functionality)
-const scenarioPlanningNav = [
+// Underwriting Tools Navigation (all users - modeling, analysis, and document processing)
+const underwritingToolsNav = [
   { name: "Modeling Projects", href: "/modeling/projects", icon: Calculator },
   { name: "Debt Scenarios", href: "/modeling/debt-scenarios", icon: Calculator },
   { name: "Exit Strategies", href: "/modeling/exit-strategies", icon: Target },
-];
-
-// Underwriting Tools Navigation (all users - document processing and exports)
-const underwritingToolsNav = [
   { name: "P&L Parser", href: "/modeling/pnl-parser", icon: FileSpreadsheet },
   { name: "OM Builder", href: "/om", icon: FileText },
   { name: "Modeling Settings", href: "/modeling/settings", icon: Settings },
@@ -141,7 +137,6 @@ export default function UnifiedSidebar() {
   const [prospectingExpanded, setProspectingExpanded] = useState(false); // Prospecting, Marketing, Analytics, Tools
   const [crmToolsExpanded, setCrmToolsExpanded] = useState(false);
   const [dealWorkspaceExpanded, setDealWorkspaceExpanded] = useState(false); // Consolidated DD, VDR, Modeling
-  const [scenarioPlanningExpanded, setScenarioPlanningExpanded] = useState(false);
   const [underwritingToolsExpanded, setUnderwritingToolsExpanded] = useState(false);
   const [investorServicesExpanded, setInvestorServicesExpanded] = useState(false);
   const [marketIntelligenceExpanded, setMarketIntelligenceExpanded] = useState(false);
@@ -214,10 +209,8 @@ export default function UnifiedSidebar() {
     const isCrmToolsPage = location === '/calendar-settings' || location.startsWith('/import-');
     // Deal Workspace: consolidated DD, VDR, and Modeling project pages
     const isDealWorkspacePage = location.startsWith('/workspaces') || location === '/projects' || location === '/progress-report' || location.startsWith('/vdr') || location.startsWith('/modeling/projects');
-    // Scenario Planning: Modeling Projects, Debt Scenarios, Exit Strategies
-    const isScenarioPlanningPage = location.startsWith('/modeling/projects') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit');
-    // Underwriting Tools: P&L Parser, OM Builder, Modeling Settings
-    const isUnderwritingToolsPage = location.startsWith('/om') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings');
+    // Underwriting Tools: Modeling Projects, Debt Scenarios, Exit Strategies, P&L Parser, OM Builder, Modeling Settings
+    const isUnderwritingToolsPage = location.startsWith('/modeling/projects') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/om') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings');
     // Investor Services: Fund Management, LP Portal (GP only)
     const isInvestorServicesPage = location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal');
     const isMarketIntelligencePage = location.startsWith('/analysis/') || location.startsWith('/docktalk');
@@ -232,7 +225,6 @@ export default function UnifiedSidebar() {
     setCrmToolsExpanded(isCrmToolsPage);
     setPendingExpanded(isPendingPage);
     setDealWorkspaceExpanded(isDealWorkspacePage);
-    setScenarioPlanningExpanded(isScenarioPlanningPage);
     setUnderwritingToolsExpanded(isUnderwritingToolsPage);
     setInvestorServicesExpanded(isInvestorServicesPage);
     setMarketIntelligenceExpanded(isMarketIntelligencePage);
@@ -595,29 +587,14 @@ export default function UnifiedSidebar() {
           </div>
         )}
         
-        {/* Scenario Planning Section - Modeling Projects, Debt Scenarios, Exit Strategies (all users) */}
-        {canViewSection('modeling_tools') && (
-          <div className="mb-2">
-            <SectionHeader 
-              title="Scenario Planning" 
-              expanded={scenarioPlanningExpanded} 
-              onToggle={() => setScenarioPlanningExpanded(!scenarioPlanningExpanded)}
-              isActive={location.startsWith('/modeling/projects') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit')}
-            />
-            {scenarioPlanningExpanded && scenarioPlanningNav.map((item) => (
-              <NavLink key={item.name} item={item} />
-            ))}
-          </div>
-        )}
-        
-        {/* Underwriting Tools Section - P&L Parser, OM Builder, Modeling Settings (all users) */}
+        {/* Underwriting Tools Section - Modeling Projects, Debt Scenarios, Exit Strategies, P&L Parser, OM Builder (all users) */}
         {canViewSection('modeling_tools') && (
           <div className="mb-2">
             <SectionHeader 
               title="Underwriting Tools" 
               expanded={underwritingToolsExpanded} 
               onToggle={() => setUnderwritingToolsExpanded(!underwritingToolsExpanded)}
-              isActive={location.startsWith('/om') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings')}
+              isActive={location.startsWith('/modeling/projects') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/om') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings')}
             />
             {underwritingToolsExpanded && underwritingToolsNav.map((item) => (
               <NavLink key={item.name} item={item} />
