@@ -61,7 +61,6 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -73,7 +72,6 @@ const rssSourceSchema = z.object({
   name: z.string().min(1, "Name is required"),
   sourceType: z.enum(["rss", "web_scrape"]).default("rss"),
   url: z.string().url("Must be a valid URL"),
-  minRelevanceScore: z.number().min(0).max(100).default(50),
   customKeywords: z.string().optional(),
 });
 
@@ -99,7 +97,6 @@ export default function SourcesPage() {
       name: "",
       sourceType: "rss",
       url: "",
-      minRelevanceScore: 50,
       customKeywords: "",
     },
   });
@@ -119,7 +116,6 @@ export default function SourcesPage() {
         name: data.name,
         sourceType: data.sourceType,
         url: data.url,
-        minRelevanceScore: data.minRelevanceScore,
         customKeywords: data.customKeywords
           ? data.customKeywords.split(",").map((k) => k.trim()).filter(Boolean)
           : [],
@@ -149,7 +145,6 @@ export default function SourcesPage() {
         name: data.name,
         sourceType: data.sourceType,
         url: data.url,
-        minRelevanceScore: data.minRelevanceScore,
         customKeywords: data.customKeywords
           ? data.customKeywords.split(",").map((k) => k.trim()).filter(Boolean)
           : [],
@@ -247,7 +242,6 @@ export default function SourcesPage() {
       name: source.name,
       sourceType: source.sourceType || "rss",
       url: source.url,
-      minRelevanceScore: source.minRelevanceScore,
       customKeywords: source.customKeywords?.join(", ") || "",
     });
     setIsEditDialogOpen(true);
@@ -395,30 +389,6 @@ export default function SourcesPage() {
 
                 <FormField
                   control={addForm.control}
-                  name="minRelevanceScore"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Minimum Relevance Score: {field.value}%</FormLabel>
-                      <FormControl>
-                        <Slider
-                          min={0}
-                          max={100}
-                          step={5}
-                          value={[field.value]}
-                          onValueChange={([value]) => field.onChange(value)}
-                          data-testid="slider-relevance"
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Articles below this relevance score will be filtered out
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={addForm.control}
                   name="customKeywords"
                   render={({ field }) => (
                     <FormItem>
@@ -476,7 +446,6 @@ export default function SourcesPage() {
                   <TableRow>
                     <TableHead>Source</TableHead>
                     <TableHead>Type</TableHead>
-                    <TableHead>Min Relevance</TableHead>
                     <TableHead>Last Fetched</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -508,7 +477,6 @@ export default function SourcesPage() {
                           )}
                         </Badge>
                       </TableCell>
-                      <TableCell>{source.minRelevanceScore}%</TableCell>
                       <TableCell>
                         {source.lastFetchedAt 
                           ? formatDistanceToNow(new Date(source.lastFetchedAt)) + " ago"
@@ -716,26 +684,6 @@ export default function SourcesPage() {
                         Preview
                       </Button>
                     </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={editForm.control}
-                name="minRelevanceScore"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Minimum Relevance Score: {field.value}%</FormLabel>
-                    <FormControl>
-                      <Slider
-                        min={0}
-                        max={100}
-                        step={5}
-                        value={[field.value]}
-                        onValueChange={([value]) => field.onChange(value)}
-                      />
-                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
