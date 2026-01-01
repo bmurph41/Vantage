@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -109,14 +110,16 @@ export default function TopPerformers({ dateRange }: TopPerformersProps) {
     refetchOnReconnect: true,
   });
 
-  // Handle errors with toast
-  if (error && !isLoading) {
-    toast({
-      title: "Failed to load top performers",
-      description: error instanceof Error ? error.message : "Please try again later.",
-      variant: "destructive",
-    });
-  }
+  // Handle errors with toast - must be in useEffect to avoid infinite re-renders
+  useEffect(() => {
+    if (error && !isLoading) {
+      toast({
+        title: "Failed to load top performers",
+        description: error instanceof Error ? error.message : "Please try again later.",
+        variant: "destructive",
+      });
+    }
+  }, [error, isLoading, toast]);
 
   if (isLoading) {
     return (
