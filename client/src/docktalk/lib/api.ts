@@ -2,6 +2,23 @@ import { Article, SystemStats, TrendingTopic, CategoryDistribution, SourceDistri
 
 const API_BASE = "/api/docktalk";
 
+function getCsrfToken(): string {
+  const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
+function getHeaders(includeContentType = true): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (includeContentType) {
+    headers["Content-Type"] = "application/json";
+  }
+  const csrfToken = getCsrfToken();
+  if (csrfToken) {
+    headers["X-CSRF-Token"] = csrfToken;
+  }
+  return headers;
+}
+
 export async function fetchArticles(filters: ArticleFilters): Promise<Article[]> {
   const params = new URLSearchParams();
   
@@ -36,9 +53,7 @@ export async function fetchArticleById(id: number): Promise<Article> {
 export async function updateBookmarkStatus(id: number, isBookmarked: boolean): Promise<void> {
   const response = await fetch(`${API_BASE}/articles/${id}/bookmark`, {
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: getHeaders(),
     credentials: "include",
     body: JSON.stringify({ isBookmarked }),
   });
@@ -102,6 +117,8 @@ export async function fetchSourceDistribution(): Promise<SourceDistribution[]> {
 export async function triggerManualFetch(): Promise<{ success: boolean; newArticles: number; timestamp: string }> {
   const response = await fetch(`${API_BASE}/rss-sources/fetch`, {
     method: "POST",
+    headers: getHeaders(false),
+    credentials: "include",
   });
   
   if (!response.ok) {
@@ -209,9 +226,7 @@ export async function createRssSource(data: {
 }): Promise<RssSource> {
   const response = await fetch(`${API_BASE}/rss-sources`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: getHeaders(),
     credentials: "include",
     body: JSON.stringify(data),
   });
@@ -235,9 +250,7 @@ export async function updateRssSource(id: number, data: {
 }): Promise<RssSource> {
   const response = await fetch(`${API_BASE}/rss-sources/${id}`, {
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: getHeaders(),
     credentials: "include",
     body: JSON.stringify(data),
   });
@@ -254,6 +267,7 @@ export async function updateRssSource(id: number, data: {
 export async function deleteRssSource(id: number): Promise<void> {
   const response = await fetch(`${API_BASE}/rss-sources/${id}`, {
     method: "DELETE",
+    headers: getHeaders(false),
     credentials: "include",
   });
   
@@ -267,9 +281,7 @@ export async function deleteRssSource(id: number): Promise<void> {
 export async function previewRssSource(url: string, sourceType: "rss" | "web_scrape" = "rss"): Promise<RssPreviewResponse> {
   const response = await fetch(`${API_BASE}/rss-sources/preview`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: getHeaders(),
     credentials: "include",
     body: JSON.stringify({ url, sourceType }),
   });
@@ -284,9 +296,7 @@ export async function previewRssSource(url: string, sourceType: "rss" | "web_scr
 export async function updateArticleCategory(id: number, categories: string[]): Promise<void> {
   const response = await fetch(`${API_BASE}/articles/${id}/category`, {
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: getHeaders(),
     credentials: "include",
     body: JSON.stringify({ categories }),
   });
@@ -302,9 +312,7 @@ export async function updateArticleCategory(id: number, categories: string[]): P
 export async function updateArticleRegion(id: number, region: string | null): Promise<void> {
   const response = await fetch(`${API_BASE}/articles/${id}/region`, {
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: getHeaders(),
     credentials: "include",
     body: JSON.stringify({ region }),
   });
@@ -333,9 +341,7 @@ export async function removeArticle(id: number, reason: string): Promise<void> {
   const response = await fetch(`${API_BASE}/articles/${id}/remove`, {
     method: "POST",
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: getHeaders(),
     body: JSON.stringify({ reason }),
   });
   
