@@ -681,6 +681,115 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
+  // Content freshness check - alerts if no new articles in 24+ hours
+  app.get("/api/docktalk/health/content-freshness", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const articles = await dockTalkStorage.getArticles(null, { limit: 1, offset: 0 });
+      const latestArticle = articles[0];
+      
+      if (!latestArticle) {
+        return res.json({
+          status: 'stale',
+          message: 'No articles found in the system',
+          latestArticleDate: null,
+          hoursStale: null,
+          isStale: true
+        });
+      }
+      
+      const latestDate = new Date(latestArticle.publishedAt || latestArticle.createdAt);
+      const now = new Date();
+      const hoursStale = Math.round((now.getTime() - latestDate.getTime()) / (1000 * 60 * 60));
+      const isStale = hoursStale >= 24;
+      
+      res.json({
+        status: isStale ? 'stale' : 'fresh',
+        message: isStale 
+          ? `Content is stale - no new articles in ${hoursStale} hours` 
+          : `Content is fresh - latest article is ${hoursStale} hours old`,
+        latestArticleDate: latestDate.toISOString(),
+        latestArticleTitle: latestArticle.title,
+        hoursStale,
+        isStale
+      });
+    } catch (error) {
+      console.error("Error checking content freshness:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // AI quota status endpoint
+  app.get("/api/docktalk/health/ai-quota", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const { getQuotaStatus, resetQuotaState } = await import("./services/ai-quota-manager");
+      const status = getQuotaStatus();
+      
+      res.json({
+        ...status,
+        openaiConfigured: !!process.env.OPENAI_API_KEY,
+        anthropicConfigured: !!process.env.ANTHROPIC_API_KEY
+      });
+    } catch (error) {
+      console.error("Error checking AI quota:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Reset AI quota state (admin only)
+  app.post("/api/docktalk/admin/reset-ai-quota", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    if (req.dockTalkUser?.role !== 'admin') {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    
+    try {
+      const { resetQuotaState, getQuotaStatus } = await import("./services/ai-quota-manager");
+      resetQuotaState();
+      const newStatus = getQuotaStatus();
+      
+      res.json({
+        success: true,
+        message: 'AI quota state has been reset',
+        status: newStatus
+      });
+    } catch (error) {
+      console.error("Error resetting AI quota:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Quick backfill for last 10 days (triggers without requiring admin)
+  app.post("/api/docktalk/backfill-recent", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const { backfillHistoricalArticles } = await import("./services/backfill");
+      
+      console.log('[DockTalk] Starting quick backfill for last 10 days...');
+      
+      const results = await backfillHistoricalArticles({
+        daysBack: 10,
+        maxArticlesPerSource: 30
+      });
+      
+      const totalNew = results.reduce((sum, r) => sum + r.newArticles, 0);
+      const totalDuplicates = results.reduce((sum, r) => sum + r.duplicates, 0);
+      const totalErrors = results.reduce((sum, r) => sum + r.errors, 0);
+      
+      console.log(`[DockTalk] Quick backfill completed: ${totalNew} new, ${totalDuplicates} duplicates, ${totalErrors} errors`);
+      
+      res.json({ 
+        success: true,
+        totalNew,
+        totalDuplicates,
+        totalErrors,
+        message: `Quick backfill completed: ${totalNew} new articles ingested`
+      });
+    } catch (error) {
+      console.error("Error during quick backfill:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Internal server error" 
+      });
+    }
+  });
+
   // Historical backfill endpoint (admin only)
   app.post("/api/docktalk/admin/backfill", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     // Admin role check

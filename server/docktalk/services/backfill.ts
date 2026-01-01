@@ -20,6 +20,7 @@ interface BackfillOptions {
   sourceId?: number;
   sourceName?: string;
   monthsBack?: number;
+  daysBack?: number;
   maxArticlesPerSource?: number;
 }
 
@@ -41,12 +42,18 @@ export async function backfillHistoricalArticles(options: BackfillOptions = {}):
     sourceId,
     sourceName,
     monthsBack = 6,
+    daysBack,
     maxArticlesPerSource = 500
   } = options;
 
   const results: BackfillResult[] = [];
   const cutoffDate = new Date();
-  cutoffDate.setMonth(cutoffDate.getMonth() - monthsBack);
+  
+  if (daysBack !== undefined) {
+    cutoffDate.setDate(cutoffDate.getDate() - daysBack);
+  } else {
+    cutoffDate.setMonth(cutoffDate.getMonth() - monthsBack);
+  }
 
   try {
     const sources = await storage.getRssSources();
@@ -164,8 +171,8 @@ async function backfillRssSource(
         // Score article for relevance
         const relevanceScore = scoreArticle(title, content, source.name);
         
-        // Skip low relevance articles
-        if (relevanceScore < 40) {
+        // Skip low relevance articles (lowered threshold to capture more marina content)
+        if (relevanceScore < 25) {
           continue;
         }
 

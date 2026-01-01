@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
-import { reportOpenAIQuotaExhausted, shouldSkipAIFeatures } from "./ai-quota-manager";
+import { reportOpenAIQuotaExhausted, reportOpenAISuccess, shouldSkipAIFeatures, waitForRateLimit } from "./ai-quota-manager";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const anthropic = process.env.ANTHROPIC_API_KEY 
@@ -127,8 +127,10 @@ Respond ONLY with valid JSON matching this schema:
   "entities": [{name: string, type: string, context?: string, confidence?: number}]
 }`;
 
-    // Try OpenAI GPT-4 first
+    // Try OpenAI GPT-4 first with rate limiting
     try {
+      await waitForRateLimit();
+      
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
@@ -142,6 +144,8 @@ Respond ONLY with valid JSON matching this schema:
         response_format: { type: "json_object" }
       });
 
+      reportOpenAISuccess();
+      
       const result = JSON.parse(completion.choices[0].message.content || "{}");
       return {
         sentiment: result.sentiment || 'neutral',
