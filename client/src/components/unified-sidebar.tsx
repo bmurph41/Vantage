@@ -81,16 +81,24 @@ const getWorkspaceSubNav = (workspaceId: string) => [
   { name: "Team", href: `/workspaces/${workspaceId}?tab=team`, icon: Users },
 ];
 
-// Analysis Navigation (standalone tools not tied to a specific deal)
-const analysisToolsNav = [
+// Scenario Planning Navigation (all users - core modeling functionality)
+const scenarioPlanningNav = [
   { name: "Modeling Projects", href: "/modeling/projects", icon: Calculator },
-  { name: "P&L Parser", href: "/modeling/pnl-parser", icon: FileSpreadsheet },
-  { name: "OM Builder", href: "/om", icon: FileText },
-  { name: "Fund Management", href: "/modeling/funds", icon: Briefcase },
-  { name: "LP Portal", href: "/modeling/lp-portal", icon: Users },
   { name: "Debt Scenarios", href: "/modeling/debt-scenarios", icon: Calculator },
   { name: "Exit Strategies", href: "/modeling/exit-strategies", icon: Target },
+];
+
+// Underwriting Tools Navigation (all users - document processing and exports)
+const underwritingToolsNav = [
+  { name: "P&L Parser", href: "/modeling/pnl-parser", icon: FileSpreadsheet },
+  { name: "OM Builder", href: "/om", icon: FileText },
   { name: "Modeling Settings", href: "/modeling/settings", icon: Settings },
+];
+
+// Investor Services Navigation (GP users only via pack check)
+const investorServicesNav = [
+  { name: "Fund Management", href: "/modeling/funds", icon: Briefcase },
+  { name: "LP Portal", href: "/modeling/lp-portal", icon: Users },
 ];
 
 // DockTalk Navigation - Single Entry Point
@@ -133,7 +141,9 @@ export default function UnifiedSidebar() {
   const [prospectingExpanded, setProspectingExpanded] = useState(false); // Prospecting, Marketing, Analytics, Tools
   const [crmToolsExpanded, setCrmToolsExpanded] = useState(false);
   const [dealWorkspaceExpanded, setDealWorkspaceExpanded] = useState(false); // Consolidated DD, VDR, Modeling
-  const [analysisToolsExpanded, setAnalysisToolsExpanded] = useState(false);
+  const [scenarioPlanningExpanded, setScenarioPlanningExpanded] = useState(false);
+  const [underwritingToolsExpanded, setUnderwritingToolsExpanded] = useState(false);
+  const [investorServicesExpanded, setInvestorServicesExpanded] = useState(false);
   const [marketIntelligenceExpanded, setMarketIntelligenceExpanded] = useState(false);
   const [pendingExpanded, setPendingExpanded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -204,8 +214,12 @@ export default function UnifiedSidebar() {
     const isCrmToolsPage = location === '/calendar-settings' || location.startsWith('/import-');
     // Deal Workspace: consolidated DD, VDR, and Modeling project pages
     const isDealWorkspacePage = location.startsWith('/workspaces') || location === '/projects' || location === '/progress-report' || location.startsWith('/vdr') || location.startsWith('/modeling/projects');
-    // Modeling Tools: standalone tools (OM Builder, Funds, etc.) not tied to specific deals
-    const isAnalysisToolsPage = location.startsWith('/om') || location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/modeling/settings') || location.startsWith('/modeling/pnl');
+    // Scenario Planning: Modeling Projects, Debt Scenarios, Exit Strategies
+    const isScenarioPlanningPage = location.startsWith('/modeling/projects') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit');
+    // Underwriting Tools: P&L Parser, OM Builder, Modeling Settings
+    const isUnderwritingToolsPage = location.startsWith('/om') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings');
+    // Investor Services: Fund Management, LP Portal (GP only)
+    const isInvestorServicesPage = location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal');
     const isMarketIntelligencePage = location.startsWith('/analysis/') || location.startsWith('/docktalk');
 
     // Set expanded states - Operations stays expanded by default, others expand when active
@@ -218,7 +232,9 @@ export default function UnifiedSidebar() {
     setCrmToolsExpanded(isCrmToolsPage);
     setPendingExpanded(isPendingPage);
     setDealWorkspaceExpanded(isDealWorkspacePage);
-    setAnalysisToolsExpanded(isAnalysisToolsPage);
+    setScenarioPlanningExpanded(isScenarioPlanningPage);
+    setUnderwritingToolsExpanded(isUnderwritingToolsPage);
+    setInvestorServicesExpanded(isInvestorServicesPage);
     setMarketIntelligenceExpanded(isMarketIntelligencePage);
   }, [location]);
 
@@ -579,19 +595,49 @@ export default function UnifiedSidebar() {
           </div>
         )}
         
-        {/* Analysis Section - Standalone tools not tied to specific deals */}
-        {canViewSection('analysis_tools') && (
+        {/* Scenario Planning Section - Modeling Projects, Debt Scenarios, Exit Strategies (all users) */}
+        {canViewSection('modeling_tools') && (
           <div className="mb-2">
             <SectionHeader 
-              title="Analysis" 
-              expanded={analysisToolsExpanded} 
-              onToggle={() => setAnalysisToolsExpanded(!analysisToolsExpanded)}
-              isActive={location.startsWith('/modeling/projects') || location.startsWith('/om') || location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/modeling/settings')}
+              title="Scenario Planning" 
+              expanded={scenarioPlanningExpanded} 
+              onToggle={() => setScenarioPlanningExpanded(!scenarioPlanningExpanded)}
+              isActive={location.startsWith('/modeling/projects') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit')}
             />
-            {analysisToolsExpanded && analysisToolsNav
+            {scenarioPlanningExpanded && scenarioPlanningNav.map((item) => (
+              <NavLink key={item.name} item={item} />
+            ))}
+          </div>
+        )}
+        
+        {/* Underwriting Tools Section - P&L Parser, OM Builder, Modeling Settings (all users) */}
+        {canViewSection('modeling_tools') && (
+          <div className="mb-2">
+            <SectionHeader 
+              title="Underwriting Tools" 
+              expanded={underwritingToolsExpanded} 
+              onToggle={() => setUnderwritingToolsExpanded(!underwritingToolsExpanded)}
+              isActive={location.startsWith('/om') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings')}
+            />
+            {underwritingToolsExpanded && underwritingToolsNav.map((item) => (
+              <NavLink key={item.name} item={item} />
+            ))}
+          </div>
+        )}
+        
+        {/* Investor Services Section - Fund Management, LP Portal (GP users only via pack check) */}
+        {(hasPack('fund_management') || hasPack('lp_portal')) && (
+          <div className="mb-2">
+            <SectionHeader 
+              title="Investor Services" 
+              expanded={investorServicesExpanded} 
+              onToggle={() => setInvestorServicesExpanded(!investorServicesExpanded)}
+              isActive={location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal')}
+            />
+            {investorServicesExpanded && investorServicesNav
               .filter((item) => {
                 if (item.href === '/modeling/funds') return hasPack('fund_management');
-                if (item.href === '/modeling/lp-portal') return hasPack('fund_management') && hasPack('lp_portal');
+                if (item.href === '/modeling/lp-portal') return hasPack('lp_portal');
                 return true;
               })
               .map((item) => (
