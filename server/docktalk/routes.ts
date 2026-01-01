@@ -535,13 +535,31 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
         name: z.string().min(1, "Name is required"),
         sourceType: z.enum(["rss", "web_scrape"]).optional(),
         url: z.string().url("Invalid URL format"),
-        minRelevanceScore: z.number().min(0).max(100).default(50),
+        minRelevanceScore: z.number().min(0).max(100).default(25),
         customKeywords: z.array(z.string()).default([])
       });
 
       const validated = RssSourceSchema.parse(req.body);
       
       const newSource = await dockTalkStorage.createRssSource(validated);
+      
+      // Trigger 6-month backfill for the new source in the background
+      (async () => {
+        try {
+          console.log(`[DockTalk] Starting 6-month backfill for new source: ${newSource.name} (ID: ${newSource.id})`);
+          const { backfillHistoricalArticles } = await import("./services/backfill");
+          const results = await backfillHistoricalArticles({
+            sourceId: newSource.id,
+            monthsBack: 6,
+            maxArticlesPerSource: 200
+          });
+          const totalNew = results.reduce((sum, r) => sum + r.newArticles, 0);
+          console.log(`[DockTalk] Backfill completed for ${newSource.name}: ${totalNew} new articles`);
+        } catch (backfillError) {
+          console.error(`[DockTalk] Backfill failed for source ${newSource.name}:`, backfillError);
+        }
+      })();
+      
       res.json(newSource);
     } catch (error) {
       if (error instanceof z.ZodError) {
