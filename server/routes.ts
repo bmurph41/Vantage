@@ -6789,6 +6789,34 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: "Failed to retrieve companies" });
     }
   });
+  // Company autocomplete search for contact form
+  app.get("/api/crm/companies/autocomplete", async (req: any, res) => {
+    try {
+      const query = (req.query.q as string || '').trim();
+      if (query.length < 2) {
+        return res.json([]);
+      }
+      
+      const result = await storage.getCrmCompaniesForOrgPaginated(req.user.orgId, {
+        page: 1,
+        pageSize: 10,
+        sortBy: 'name',
+        sortDir: 'asc',
+        search: query
+      });
+      
+      res.json(result.data.map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        website: c.website,
+        industry: c.industry
+      })));
+    } catch (error: any) {
+      console.error("Failed to search companies:", error);
+      res.status(500).json({ error: "Failed to search companies" });
+    }
+  });
+
 
   app.post("/api/crm/companies", async (req: any, res) => {
     try {
