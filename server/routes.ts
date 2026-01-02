@@ -9062,13 +9062,48 @@ Current context: Project ${req.params.projectId}`;
   });
   app.post("/api/contacts", async (req: any, res) => {
     try {
-      const contact = await storage.createCrmContact({ ...req.body, ownerId: req.user.id });
-      res.json(contact);
+      const { company, companyId, ...contactData } = req.body;
+      
+      // If company name provided without companyId, create a pending company
+      let pendingCompanyId = null;
+      if (company && !companyId) {
+        const pendingCompany = await storage.createPendingCompany({
+          orgId: req.user.orgId,
+          sourceType: 'contact_form',
+          sourceId: null,
+          name: company,
+          status: 'pending',
+        });
+        pendingCompanyId = pendingCompany.id;
+      }
+      
+      // Create the contact
+      const contact = await storage.createCrmContact({
+        ...contactData,
+        company,
+        ownerId: req.user.id,
+      });
+      
+      // If we have a companyId, link the contact to the company
+      if (companyId) {
+        await storage.linkContactToCompany(contact.id, companyId, contactData.role || null, true);
+      }
+      
+      res.json({ ...contact, linkedCompanyId: companyId, pendingCompanyId });
     } catch (error: any) {
       console.error("Failed to create contact:", error);
       res.status(500).json({ error: "Failed to create contact" });
     }
   });
+
+
+
+
+
+
+
+
+
   app.put("/api/contacts/:id", async (req: any, res) => {
 
   app.get("/api/contacts/:id", async (req: any, res) => {

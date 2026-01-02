@@ -34,6 +34,7 @@ export type ContactPayload = {
   state?: string;
   zipCode?: string;
   company?: string;
+  companyId?: string | null; // Link to existing CRM company
   role?: string;
   position?: string; // legacy field mapping
   onDealTeam?: boolean;
@@ -85,6 +86,9 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
   const [state, setState] = useState(contact?.state ?? "");
   const [zipCode, setZipCode] = useState(contact?.zipCode ?? "");
   const [company, setCompany] = useState(contact?.company ?? "");
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
+  const [companySearchQuery, setCompanySearchQuery] = useState("");
+  const [companyPopoverOpen, setCompanyPopoverOpen] = useState(false);
   const [role, setRole] = useState(contact?.role ?? contact?.position ?? "");
   const [onDealTeam, setOnDealTeam] = useState(Boolean(contact?.onDealTeam));
   const [dealTeamNotes, setDealTeamNotes] = useState(contact?.dealTeamNotes ?? "");
@@ -105,6 +109,19 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
     queryKey: ['/api/deals'],
     enabled: onDealTeam, // Only fetch when Deal Team is toggled on
   }) as { data: Deal[] };
+
+  // Company autocomplete search query
+  const { data: companySuggestions = [] } = useQuery<{ id: string; name: string; website?: string; industry?: string }[]>({
+    queryKey: ['/api/crm/companies/autocomplete', companySearchQuery],
+    queryFn: async () => {
+      if (companySearchQuery.length < 2) return [];
+      const res = await fetch(`/api/crm/companies/autocomplete?q=${encodeURIComponent(companySearchQuery)}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: companySearchQuery.length >= 2,
+    staleTime: 30000,
+  });
 
   useEffect(() => {
     if (isOpen) {
@@ -131,6 +148,9 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
     setState(contact?.state ?? "");
     setZipCode(contact?.zipCode ?? "");
     setCompany(contact?.company ?? "");
+    setSelectedCompanyId(null);
+    setCompanySearchQuery("");
+    setCompanyPopoverOpen(false);
     setRole(contact?.role ?? contact?.position ?? "");
     setOnDealTeam(Boolean(contact?.onDealTeam));
     setDealTeamNotes(contact?.dealTeamNotes ?? "");
@@ -243,6 +263,9 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
     setState("");
     setZipCode("");
     setCompany("");
+    setSelectedCompanyId(null);
+    setCompanySearchQuery("");
+    setCompanyPopoverOpen(false);
     setRole("");
     setOnDealTeam(false);
     setDealTeamNotes("");
@@ -274,6 +297,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
       state: state.trim() || undefined,
       zipCode: zipCode.trim() || undefined,
       company: company.trim() || undefined,
+      companyId: selectedCompanyId || undefined,
       role: role.trim() || undefined,
       position: role.trim() || undefined, // Map role to position for backward compatibility
       onDealTeam,
@@ -465,16 +489,99 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
               </div>
               <div className="space-y-2">
                 <Label htmlFor="company">Company *</Label>
-                <Input 
-                  id="company" 
-                  value={company} 
-                  onChange={(e) => setCompany(e.target.value)} 
-                  placeholder="Southern Marinas" 
-                  className={classNames(touched && errors.company && "border-destructive focus-visible:ring-destructive")}
-                  data-testid="input-company"
-                />
+                <Popover open={companyPopoverOpen} onOpenChange={setCompanyPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <div className="relative">
+                      <Input 
+                        id="company" 
+                        value={company} 
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setCompany(val);
+                          setCompanySearchQuery(val);
+                          setSelectedCompanyId(null);
+                          if (val.length >= 2) {
+                            setCompanyPopoverOpen(true);
+                          } else {
+                            setCompanyPopoverOpen(false);
+                          }
+                        }}
+                        onFocus={() => {
+                          if (company.length >= 2) setCompanyPopoverOpen(true);
+                        }}
+                        placeholder="Search or enter company name..." 
+                        className={classNames(touched && errors.company && "border-destructive focus-visible:ring-destructive")}
+                        data-testid="input-company"
+                        autoComplete="off"
+                      />
+                      {selectedCompanyId && (
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                          <Badge variant="secondary" className="text-xs">Linked</Badge>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-5 w-5 p-0"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setSelectedCompanyId(null);
+                            }}
+                            data-testid="button-clear-company-link"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
+                    <Command>
+                      <CommandList>
+                        {companySuggestions.length === 0 && companySearchQuery.length >= 2 && (
+                          <CommandEmpty>
+                            <div className="p-2 text-sm text-muted-foreground text-center">
+                              No existing companies found.<br />
+                              <span className="text-xs">New company will be created for review.</span>
+                            </div>
+                          </CommandEmpty>
+                        )}
+                        {companySuggestions.length > 0 && (
+                          <CommandGroup heading="Existing Companies">
+                            {companySuggestions.map((c) => (
+                              <CommandItem
+                                key={c.id}
+                                value={c.id}
+                                onSelect={() => {
+                                  setCompany(c.name);
+                                  setSelectedCompanyId(c.id);
+                                  setCompanyPopoverOpen(false);
+                                }}
+                                data-testid={`company-suggestion-${c.id}`}
+                              >
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{c.name}</span>
+                                  {c.industry && (
+                                    <span className="text-xs text-muted-foreground">{c.industry}</span>
+                                  )}
+                                </div>
+                                {selectedCompanyId === c.id && (
+                                  <Check className="ml-auto h-4 w-4" />
+                                )}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
                 {touched && errors.company && (
                   <p className="text-xs text-destructive">{errors.company}</p>
+                )}
+                {company.trim() && !selectedCompanyId && (
+                  <p className="text-xs text-muted-foreground">
+                    New company will be created and sent to Pending Companies for review.
+                  </p>
                 )}
               </div>
               <div className="space-y-2">

@@ -375,6 +375,7 @@ export interface IStorage {
   createCrmContact(contact: InsertCrmContact): Promise<CrmContact>;
   updateCrmContact(id: string, updates: Partial<InsertCrmContact>): Promise<CrmContact>;
   deleteCrmContact(id: string): Promise<void>;
+  linkContactToCompany(contactId: string, companyId: string, role: string | null, isPrimary: boolean): Promise<void>;
 
   // CRM - Companies
   getCrmCompany(id: string): Promise<CrmCompany | undefined>;
@@ -3131,6 +3132,15 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCrmContact(id: string): Promise<void> {
     await db.delete(crmContacts).where(eq(crmContacts.id, id));
+  }
+
+  async linkContactToCompany(contactId: string, companyId: string, role: string | null, isPrimary: boolean): Promise<void> {
+    await db.insert(crmContactCompanies).values({
+      contactId,
+      companyId,
+      role,
+      isPrimary,
+    });
   }
 
   // CRM - Companies

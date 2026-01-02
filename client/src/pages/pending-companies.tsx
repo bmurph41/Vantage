@@ -246,6 +246,7 @@ export default function PendingCompanies() {
                             <Badge variant="outline" className="text-xs">
                               {pending.sourceType === 'dd_project' ? 'DD Project' : 
                                pending.sourceType === 'sales_comp' ? 'Sales Comp' :
+                               pending.sourceType === 'contact_form' ? 'Contact Form' :
                                pending.sourceType}
                             </Badge>
                           )}
