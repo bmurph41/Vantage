@@ -47,6 +47,7 @@ export default function PendingContacts() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-contacts'] });
       queryClient.invalidateQueries({ queryKey: ['/api/crm/contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/bootstrap'] });
       toast({ title: "Contact accepted and created successfully" });
       setShowDuplicatesDialog(false);
       setSelectedPending(null);
@@ -63,6 +64,7 @@ export default function PendingContacts() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/bootstrap'] });
       toast({ title: "Pending contact removed" });
       setShowDuplicatesDialog(false);
       setSelectedPending(null);

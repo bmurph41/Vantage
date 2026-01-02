@@ -86,6 +86,7 @@ export default function PendingProperties() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-properties'] });
       queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/bootstrap'] });
       toast({ title: "Property accepted and created successfully" });
       setShowDuplicatesDialog(false);
       setSelectedPending(null);
@@ -102,6 +103,7 @@ export default function PendingProperties() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-properties'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/bootstrap'] });
       toast({ title: "Pending property removed" });
       setShowDuplicatesDialog(false);
       setSelectedPending(null);

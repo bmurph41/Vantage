@@ -47,6 +47,7 @@ export default function PendingCompanies() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-companies'] });
       queryClient.invalidateQueries({ queryKey: ['/api/crm/companies'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/bootstrap'] });
       toast({ title: "Company accepted and created successfully" });
       setShowDuplicatesDialog(false);
       setSelectedPending(null);
@@ -63,6 +64,7 @@ export default function PendingCompanies() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-companies'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/bootstrap'] });
       toast({ title: "Pending company removed" });
       setShowDuplicatesDialog(false);
       setSelectedPending(null);

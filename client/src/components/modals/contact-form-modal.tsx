@@ -216,6 +216,8 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-companies'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/bootstrap'] });
       toast({ title: "Contact created successfully" });
       onClose();
       resetForm();

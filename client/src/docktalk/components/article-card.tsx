@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
-import { Bookmark, Share2, ExternalLink, TrendingUp, TrendingDown, Minus, DollarSign, MapPin, Globe, Heart } from "lucide-react";
+import { Bookmark, Share2, ExternalLink, Heart } from "lucide-react";
 
 interface ArticleCardProps {
   article: Article;
@@ -224,68 +224,6 @@ export default function ArticleCard({ article, featured = false }: ArticleCardPr
           >
             {article.summary}
           </p>
-        )}
-
-        {/* PE Intelligence Indicators */}
-        {(article.sentiment || article.dealMetadata?.isDeal || (article.geography && article.geography.length > 0) || article.region) && (
-          <div className="flex flex-wrap gap-2 mb-4">
-            {/* Sentiment Indicator */}
-            {article.sentiment && (
-              <Badge 
-                variant="secondary"
-                className={cn(
-                  "text-xs font-medium gap-1",
-                  article.sentiment === 'positive' && "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400",
-                  article.sentiment === 'negative' && "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400",
-                  article.sentiment === 'neutral' && "bg-gray-50 dark:bg-gray-900/30 text-gray-700 dark:text-gray-400"
-                )}
-                data-testid={`sentiment-${article.id}`}
-              >
-                {article.sentiment === 'positive' && <TrendingUp className="h-3 w-3" />}
-                {article.sentiment === 'negative' && <TrendingDown className="h-3 w-3" />}
-                {article.sentiment === 'neutral' && <Minus className="h-3 w-3" />}
-                {article.sentiment.charAt(0).toUpperCase() + article.sentiment.slice(1)}
-              </Badge>
-            )}
-
-            {/* Deal Indicator */}
-            {article.dealMetadata?.isDeal && (
-              <Badge 
-                variant="secondary"
-                className="bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 text-xs font-medium gap-1"
-                data-testid={`deal-${article.id}`}
-              >
-                <DollarSign className="h-3 w-3" />
-                {article.dealMetadata.dealType ? article.dealMetadata.dealType.toUpperCase() : 'DEAL'}
-                {article.dealMetadata.dealValue && ` • ${article.dealMetadata.dealValue}`}
-              </Badge>
-            )}
-
-            {/* Geography Indicator */}
-            {article.geography && article.geography.length > 0 && (
-              <Badge 
-                variant="secondary"
-                className="bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-400 text-xs font-medium gap-1"
-                data-testid={`geography-${article.id}`}
-              >
-                <MapPin className="h-3 w-3" />
-                {article.geography.slice(0, 2).join(', ')}
-                {article.geography.length > 2 && ` +${article.geography.length - 2}`}
-              </Badge>
-            )}
-
-            {/* Region Indicator */}
-            {article.region && (
-              <Badge 
-                variant="secondary"
-                className="bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 text-xs font-medium gap-1"
-                data-testid={`region-${article.id}`}
-              >
-                <Globe className="h-3 w-3" />
-                {article.region}
-              </Badge>
-            )}
-          </div>
         )}
 
         {/* Footer: Metadata + Actions */}
