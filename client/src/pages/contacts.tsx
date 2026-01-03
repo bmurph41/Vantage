@@ -75,6 +75,7 @@ export default function Contacts() {
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [isPropertyModalOpen, setIsPropertyModalOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [isContactDetailModalOpen, setIsContactDetailModalOpen] = useState(false);
   const [importResults, setImportResults] = useState<ImportResult[]>([]);
   const [showImportResults, setShowImportResults] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -682,6 +683,23 @@ export default function Contacts() {
           }}
         />
 
+        <ContactDetailModal
+          isOpen={isContactDetailModalOpen}
+          onClose={() => {
+            setIsContactDetailModalOpen(false);
+            setSelectedContact(null);
+          }}
+          contact={selectedContact}
+          onCompanyClick={(company) => {
+            setSelectedCompany(company);
+            setIsCompanyModalOpen(true);
+          }}
+          onPropertyClick={(property) => {
+            setSelectedProperty(property);
+            setIsPropertyModalOpen(true);
+          }}
+        />
+
         <CompanyDetailModal
           isOpen={isCompanyModalOpen}
           onClose={() => {
@@ -691,7 +709,7 @@ export default function Contacts() {
           company={selectedCompany}
           onContactClick={(contact) => {
             setSelectedContact(contact);
-            setIsDetailModalOpen(true);
+            setIsContactDetailModalOpen(true);
           }}
           onPropertyClick={(property) => {
             setSelectedProperty(property);
@@ -708,7 +726,7 @@ export default function Contacts() {
           property={selectedProperty}
           onContactClick={(contact) => {
             setSelectedContact(contact);
-            setIsDetailModalOpen(true);
+            setIsContactDetailModalOpen(true);
           }}
           onCompanyClick={(company) => {
             setSelectedCompany(company);

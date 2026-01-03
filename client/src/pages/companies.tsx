@@ -92,6 +92,7 @@ export default function Companies() {
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [isPropertyModalOpen, setIsPropertyModalOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [isCompanyDetailModalOpen, setIsCompanyDetailModalOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -718,6 +719,23 @@ export default function Companies() {
           }}
         />
 
+        <CompanyDetailModal
+          isOpen={isCompanyDetailModalOpen}
+          onClose={() => {
+            setIsCompanyDetailModalOpen(false);
+            setSelectedCompany(null);
+          }}
+          company={selectedCompany}
+          onContactClick={(contact) => {
+            setSelectedContact(contact);
+            setIsContactModalOpen(true);
+          }}
+          onPropertyClick={(property) => {
+            setSelectedProperty(property);
+            setIsPropertyModalOpen(true);
+          }}
+        />
+
         <ContactDetailModal
           isOpen={isContactModalOpen}
           onClose={() => {
@@ -727,7 +745,7 @@ export default function Companies() {
           contact={selectedContact}
           onCompanyClick={(company) => {
             setSelectedCompany(company);
-            setIsDetailModalOpen(true);
+            setIsCompanyDetailModalOpen(true);
           }}
           onPropertyClick={(property) => {
             setSelectedProperty(property);
@@ -748,7 +766,7 @@ export default function Companies() {
           }}
           onCompanyClick={(company) => {
             setSelectedCompany(company);
-            setIsDetailModalOpen(true);
+            setIsCompanyDetailModalOpen(true);
           }}
         />
 
