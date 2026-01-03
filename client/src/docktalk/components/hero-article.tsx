@@ -11,14 +11,25 @@ interface HeroArticleProps {
 
 const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
   "Macro": { bg: "bg-blue-600/90", text: "text-white" },
+  "M&A": { bg: "bg-orange-600/90", text: "text-white" },
   "Development": { bg: "bg-purple-600/90", text: "text-white" },
-  "Operations": { bg: "bg-orange-600/90", text: "text-white" },
+  "Operations": { bg: "bg-slate-600/90", text: "text-white" },
   "Regulatory": { bg: "bg-red-600/90", text: "text-white" },
   "Environmental": { bg: "bg-green-600/90", text: "text-white" },
   "Technology": { bg: "bg-indigo-600/90", text: "text-white" },
+  "General": { bg: "bg-gray-600/90", text: "text-white" },
+  "Boat Sales": { bg: "bg-cyan-600/90", text: "text-white" },
+  "Boat Show": { bg: "bg-pink-600/90", text: "text-white" },
+  "Manufacturing": { bg: "bg-stone-600/90", text: "text-white" },
+  "Industry Trends": { bg: "bg-amber-600/90", text: "text-white" },
   "Marina Sale": { bg: "bg-rose-600/90", text: "text-white" },
   "Education": { bg: "bg-emerald-600/90", text: "text-white" },
-  "General": { bg: "bg-gray-600/90", text: "text-white" }
+  "Insurance": { bg: "bg-yellow-600/90", text: "text-white" },
+  "Legal": { bg: "bg-fuchsia-600/90", text: "text-white" },
+  "People Moves": { bg: "bg-teal-600/90", text: "text-white" },
+  "Company Earnings": { bg: "bg-lime-600/90", text: "text-white" },
+  "Awards": { bg: "bg-amber-600/90", text: "text-white" },
+  "Business Planning": { bg: "bg-violet-600/90", text: "text-white" }
 };
 
 export default function HeroArticle({ article }: HeroArticleProps) {

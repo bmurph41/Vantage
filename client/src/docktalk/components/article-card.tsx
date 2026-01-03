@@ -15,19 +15,26 @@ interface ArticleCardProps {
 }
 
 const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  "Macro": { bg: "bg-blue-50 dark:bg-blue-950/30", text: "text-blue-700 dark:text-blue-400", border: "border-l-blue-500" },
-  "Development": { bg: "bg-purple-50 dark:bg-purple-950/30", text: "text-purple-700 dark:text-purple-400", border: "border-l-purple-500" },
-  "Operations": { bg: "bg-orange-50 dark:bg-orange-950/30", text: "text-orange-700 dark:text-orange-400", border: "border-l-orange-500" },
-  "Regulatory": { bg: "bg-red-50 dark:bg-red-950/30", text: "text-red-700 dark:text-red-400", border: "border-l-red-500" },
-  "Environmental": { bg: "bg-green-50 dark:bg-green-950/30", text: "text-green-700 dark:text-green-400", border: "border-l-green-500" },
-  "Technology": { bg: "bg-indigo-50 dark:bg-indigo-950/30", text: "text-indigo-700 dark:text-indigo-400", border: "border-l-indigo-500" },
-  "General": { bg: "bg-gray-50 dark:bg-gray-900/30", text: "text-gray-700 dark:text-gray-400", border: "border-l-gray-500" },
-  "Boat Sales": { bg: "bg-cyan-50 dark:bg-cyan-950/30", text: "text-cyan-700 dark:text-cyan-400", border: "border-l-cyan-500" },
-  "Industry Trends": { bg: "bg-amber-50 dark:bg-amber-950/30", text: "text-amber-700 dark:text-amber-400", border: "border-l-amber-500" },
-  "Marina Sale": { bg: "bg-rose-50 dark:bg-rose-950/30", text: "text-rose-700 dark:text-rose-400", border: "border-l-rose-500" },
-  "Education": { bg: "bg-emerald-50 dark:bg-emerald-950/30", text: "text-emerald-700 dark:text-emerald-400", border: "border-l-emerald-500" },
-  "Insurance": { bg: "bg-yellow-50 dark:bg-yellow-950/30", text: "text-yellow-700 dark:text-yellow-400", border: "border-l-yellow-500" },
-  "Legal": { bg: "bg-pink-50 dark:bg-pink-950/30", text: "text-pink-700 dark:text-pink-400", border: "border-l-pink-500" }
+  "Macro": { bg: "bg-blue-100 dark:bg-blue-950/30", text: "text-blue-700 dark:text-blue-400", border: "border-l-blue-500" },
+  "M&A": { bg: "bg-orange-100 dark:bg-orange-950/30", text: "text-orange-700 dark:text-orange-400", border: "border-l-orange-500" },
+  "Development": { bg: "bg-purple-100 dark:bg-purple-950/30", text: "text-purple-700 dark:text-purple-400", border: "border-l-purple-500" },
+  "Operations": { bg: "bg-slate-100 dark:bg-slate-950/30", text: "text-slate-700 dark:text-slate-400", border: "border-l-slate-500" },
+  "Regulatory": { bg: "bg-red-100 dark:bg-red-950/30", text: "text-red-700 dark:text-red-400", border: "border-l-red-500" },
+  "Environmental": { bg: "bg-green-100 dark:bg-green-950/30", text: "text-green-700 dark:text-green-400", border: "border-l-green-500" },
+  "Technology": { bg: "bg-indigo-100 dark:bg-indigo-950/30", text: "text-indigo-700 dark:text-indigo-400", border: "border-l-indigo-500" },
+  "General": { bg: "bg-gray-100 dark:bg-gray-900/30", text: "text-gray-700 dark:text-gray-400", border: "border-l-gray-500" },
+  "Boat Sales": { bg: "bg-cyan-100 dark:bg-cyan-950/30", text: "text-cyan-700 dark:text-cyan-400", border: "border-l-cyan-500" },
+  "Boat Show": { bg: "bg-pink-100 dark:bg-pink-950/30", text: "text-pink-700 dark:text-pink-400", border: "border-l-pink-500" },
+  "Manufacturing": { bg: "bg-stone-100 dark:bg-stone-950/30", text: "text-stone-700 dark:text-stone-400", border: "border-l-stone-500" },
+  "Industry Trends": { bg: "bg-amber-100 dark:bg-amber-950/30", text: "text-amber-700 dark:text-amber-400", border: "border-l-amber-500" },
+  "Marina Sale": { bg: "bg-rose-100 dark:bg-rose-950/30", text: "text-rose-700 dark:text-rose-400", border: "border-l-rose-500" },
+  "Education": { bg: "bg-emerald-100 dark:bg-emerald-950/30", text: "text-emerald-700 dark:text-emerald-400", border: "border-l-emerald-500" },
+  "Insurance": { bg: "bg-yellow-100 dark:bg-yellow-950/30", text: "text-yellow-700 dark:text-yellow-400", border: "border-l-yellow-500" },
+  "Legal": { bg: "bg-fuchsia-100 dark:bg-fuchsia-950/30", text: "text-fuchsia-700 dark:text-fuchsia-400", border: "border-l-fuchsia-500" },
+  "People Moves": { bg: "bg-teal-100 dark:bg-teal-950/30", text: "text-teal-700 dark:text-teal-400", border: "border-l-teal-500" },
+  "Company Earnings": { bg: "bg-lime-100 dark:bg-lime-950/30", text: "text-lime-700 dark:text-lime-400", border: "border-l-lime-500" },
+  "Awards": { bg: "bg-amber-100 dark:bg-amber-950/30", text: "text-amber-700 dark:text-amber-400", border: "border-l-amber-500" },
+  "Business Planning": { bg: "bg-violet-100 dark:bg-violet-950/30", text: "text-violet-700 dark:text-violet-400", border: "border-l-violet-500" }
 };
 
 interface ExtendedArticle extends Article {
