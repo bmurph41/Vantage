@@ -62,6 +62,9 @@ interface PropertyDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   property: Property | null;
+  onContactClick?: (contact: Contact) => void;
+  onCompanyClick?: (company: Company) => void;
+  onDealClick?: (deal: Deal) => void;
 }
 
 const propertyTypeColors = {
@@ -105,7 +108,7 @@ type CompanyPropertyWithCompany = {
   company?: Company | null;
 };
 
-export default function PropertyDetailModal({ isOpen, onClose, property }: PropertyDetailModalProps) {
+export default function PropertyDetailModal({ isOpen, onClose, property, onContactClick, onCompanyClick, onDealClick }: PropertyDetailModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("overview");

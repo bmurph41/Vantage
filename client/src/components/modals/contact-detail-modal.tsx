@@ -34,6 +34,9 @@ interface ContactDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   contact: Contact | null;
+  onCompanyClick?: (company: Company) => void;
+  onPropertyClick?: (property: Property) => void;
+  onDealClick?: (deal: Deal) => void;
 }
 
 const contactTagColors = {
@@ -95,7 +98,7 @@ type ContactPropertyWithProperty = {
   property?: Property | null;
 };
 
-export default function ContactDetailModal({ isOpen, onClose, contact }: ContactDetailModalProps) {
+export default function ContactDetailModal({ isOpen, onClose, contact, onCompanyClick, onPropertyClick, onDealClick }: ContactDetailModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("overview");
