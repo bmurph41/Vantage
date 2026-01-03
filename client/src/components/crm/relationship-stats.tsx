@@ -53,22 +53,14 @@ export function RelationshipStats({ entityType, entityId }: RelationshipStatsPro
     );
   }
 
-  if (isError) {
+  if (isError || !stats) {
     return (
-      <div className="text-center py-4 mb-4 bg-muted/30 rounded-lg" data-testid="relationship-stats-error">
-        <p className="text-sm text-muted-foreground">Unable to load stats</p>
-        <button 
-          onClick={() => refetch()} 
-          className="text-xs text-primary hover:underline mt-1"
-          data-testid="button-retry-stats"
-        >
-          Retry
-        </button>
+      <div className="text-center py-4 mb-4 bg-muted/30 rounded-lg" data-testid="relationship-stats-empty">
+        <p className="text-sm text-muted-foreground">No Stats Available</p>
+        <p className="text-xs text-muted-foreground/70 mt-1">Add activities, notes, or deals to see stats</p>
       </div>
     );
   }
-
-  if (!stats) return null;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
