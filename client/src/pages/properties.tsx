@@ -9,8 +9,11 @@ import { Upload, Plus, Search, Edit, Trash2, MapPin, Anchor, Building, DollarSig
 import { FileUpload } from "@/components/file-upload";
 import PropertyDetailModal from "@/components/modals/property-detail-modal";
 import PropertyFormModal from "@/components/modals/property-form-modal";
+import ContactDetailModal from "@/components/modals/contact-detail-modal";
+import CompanyDetailModal from "@/components/modals/company-detail-modal";
 import PortfolioWizard from "@/components/salescomps/sales-comps/PortfolioWizard";
 import { apiRequest } from "@/lib/queryClient";
+import type { Contact, Company, Deal } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -73,6 +76,12 @@ export default function Properties() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [showPortfolioWizard, setShowPortfolioWizard] = useState(false);
+  
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -523,6 +532,48 @@ export default function Properties() {
             setSelectedProperty(null);
           }}
           property={selectedProperty}
+          onContactClick={(contact) => {
+            setSelectedContact(contact);
+            setIsContactModalOpen(true);
+          }}
+          onCompanyClick={(company) => {
+            setSelectedCompany(company);
+            setIsCompanyModalOpen(true);
+          }}
+        />
+
+        <ContactDetailModal
+          isOpen={isContactModalOpen}
+          onClose={() => {
+            setIsContactModalOpen(false);
+            setSelectedContact(null);
+          }}
+          contact={selectedContact}
+          onCompanyClick={(company) => {
+            setSelectedCompany(company);
+            setIsCompanyModalOpen(true);
+          }}
+          onPropertyClick={(property) => {
+            setSelectedProperty(property as any);
+            setIsDetailModalOpen(true);
+          }}
+        />
+
+        <CompanyDetailModal
+          isOpen={isCompanyModalOpen}
+          onClose={() => {
+            setIsCompanyModalOpen(false);
+            setSelectedCompany(null);
+          }}
+          company={selectedCompany}
+          onContactClick={(contact) => {
+            setSelectedContact(contact);
+            setIsContactModalOpen(true);
+          }}
+          onPropertyClick={(property) => {
+            setSelectedProperty(property as any);
+            setIsDetailModalOpen(true);
+          }}
         />
 
         <PortfolioWizard

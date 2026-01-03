@@ -9,12 +9,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Building, Plus, Edit, Trash2, Upload, Search, Globe, Users, MapPin, TrendingUp, Download, Phone, Settings, Calendar, Briefcase, Home, Loader2 } from "lucide-react";
 import CompanyFormModal from "@/components/modals/company-form-modal";
 import CompanyDetailModal from "@/components/modals/company-detail-modal";
+import ContactDetailModal from "@/components/modals/contact-detail-modal";
+import PropertyDetailModal from "@/components/modals/property-detail-modal";
 import { DetailDrawer } from "@/components/crm/detail-drawer";
 import { FileUpload } from "@/components/file-upload";
 import KpiSettingsModal from "@/components/modals/kpi-settings-modal";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Company, KpiConfigItem } from "@shared/schema";
+import type { Company, Contact, Property, KpiConfigItem } from "@shared/schema";
 
 const industryColors = {
   technology: 'bg-blue-100 text-blue-800',
@@ -85,6 +87,11 @@ export default function Companies() {
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isKpiSettingsOpen, setIsKpiSettingsOpen] = useState(false);
+  
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [isPropertyModalOpen, setIsPropertyModalOpen] = useState(false);
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -708,6 +715,40 @@ export default function Companies() {
           entityId={selectedCompany?.id || null}
           onDelete={() => {
             queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
+          }}
+        />
+
+        <ContactDetailModal
+          isOpen={isContactModalOpen}
+          onClose={() => {
+            setIsContactModalOpen(false);
+            setSelectedContact(null);
+          }}
+          contact={selectedContact}
+          onCompanyClick={(company) => {
+            setSelectedCompany(company);
+            setIsDetailModalOpen(true);
+          }}
+          onPropertyClick={(property) => {
+            setSelectedProperty(property);
+            setIsPropertyModalOpen(true);
+          }}
+        />
+
+        <PropertyDetailModal
+          isOpen={isPropertyModalOpen}
+          onClose={() => {
+            setIsPropertyModalOpen(false);
+            setSelectedProperty(null);
+          }}
+          property={selectedProperty}
+          onContactClick={(contact) => {
+            setSelectedContact(contact);
+            setIsContactModalOpen(true);
+          }}
+          onCompanyClick={(company) => {
+            setSelectedCompany(company);
+            setIsDetailModalOpen(true);
           }}
         />
 

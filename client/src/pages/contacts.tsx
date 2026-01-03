@@ -11,10 +11,12 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import ContactFormModal from "@/components/modals/contact-form-modal";
 import ContactDetailModal from "@/components/modals/contact-detail-modal";
+import CompanyDetailModal from "@/components/modals/company-detail-modal";
+import PropertyDetailModal from "@/components/modals/property-detail-modal";
 import { DetailDrawer } from "@/components/crm/detail-drawer";
 import { FileUpload } from "@/components/file-upload";
 import { ImportResultsModal, type ImportResult } from "@/components/import-results-modal";
-import type { Contact, Company, Deal } from "@shared/schema";
+import type { Contact, Company, Deal, Property } from "@shared/schema";
 
 type ContactWithCompany = Contact & { 
   company?: Company | null;
@@ -68,6 +70,11 @@ export default function Contacts() {
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [showFileUpload, setShowFileUpload] = useState(false);
+  
+  const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [isPropertyModalOpen, setIsPropertyModalOpen] = useState(false);
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [importResults, setImportResults] = useState<ImportResult[]>([]);
   const [showImportResults, setShowImportResults] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -672,6 +679,40 @@ export default function Contacts() {
           entityId={selectedContact?.id || null}
           onDelete={() => {
             queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
+          }}
+        />
+
+        <CompanyDetailModal
+          isOpen={isCompanyModalOpen}
+          onClose={() => {
+            setIsCompanyModalOpen(false);
+            setSelectedCompany(null);
+          }}
+          company={selectedCompany}
+          onContactClick={(contact) => {
+            setSelectedContact(contact);
+            setIsDetailModalOpen(true);
+          }}
+          onPropertyClick={(property) => {
+            setSelectedProperty(property);
+            setIsPropertyModalOpen(true);
+          }}
+        />
+
+        <PropertyDetailModal
+          isOpen={isPropertyModalOpen}
+          onClose={() => {
+            setIsPropertyModalOpen(false);
+            setSelectedProperty(null);
+          }}
+          property={selectedProperty}
+          onContactClick={(contact) => {
+            setSelectedContact(contact);
+            setIsDetailModalOpen(true);
+          }}
+          onCompanyClick={(company) => {
+            setSelectedCompany(company);
+            setIsCompanyModalOpen(true);
           }}
         />
         
