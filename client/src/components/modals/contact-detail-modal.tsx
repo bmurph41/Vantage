@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,37 +13,28 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Progress } from "@/components/ui/progress";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   User, Building, Mail, Phone, MapPin, Star, 
-  Edit, X, Clock, Save, Check, Loader2, Briefcase, Home, DollarSign, Thermometer
+  Edit, X, Clock, Save, Check, Loader2, Briefcase, Home, DollarSign, Thermometer,
+  Calendar, FileText, CheckSquare, MessageSquare, Video, Send, Plus, ExternalLink,
+  TrendingUp, Activity, Target, AlertCircle, MoreVertical, Trash2, Eye, Download,
+  Link as LinkIcon, Users, FolderOpen, Pencil, ArrowUpRight, Filter, Search, Anchor
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { format } from "date-fns";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { format, formatDistanceToNow, differenceInDays } from "date-fns";
 import { AddressInput, type AddressComponents } from "@/components/address-input";
-import type { Contact, Company, Deal, Property, Activity as ActivityType, Note } from "@shared/schema";
+import type { Contact, Company, Deal, Property, Activity as ActivityType, Note, CrmTask, CrmFile } from "@shared/schema";
 
 interface ContactDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   contact: Contact | null;
 }
-
-const contactTypeColors = {
-  prospect: 'bg-blue-100 text-blue-800',
-  vendor: 'bg-orange-100 text-orange-800',
-  buyer: 'bg-green-100 text-green-800',
-  seller: 'bg-purple-100 text-purple-800',
-  partner: 'bg-indigo-100 text-indigo-800',
-  client: 'bg-emerald-100 text-emerald-800'
-};
-
-const leadScoreColors = {
-  hot: 'bg-red-100 text-red-800',
-  warm: 'bg-yellow-100 text-yellow-800',
-  cold: 'bg-blue-100 text-blue-800',
-  new: 'bg-gray-100 text-gray-800'
-};
 
 const contactTagColors = {
   lead: 'bg-blue-500 text-white',
@@ -58,12 +49,12 @@ const contactTagColors = {
 };
 
 const leadStatusColors = {
-  none: 'bg-gray-100 text-gray-800',
-  new: 'bg-blue-100 text-blue-800',
-  contacted: 'bg-yellow-100 text-yellow-800',
-  qualified: 'bg-green-100 text-green-800',
-  unqualified: 'bg-red-100 text-red-800',
-  converted: 'bg-purple-100 text-purple-800'
+  none: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
+  new: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+  contacted: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+  qualified: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  unqualified: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+  converted: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
 };
 
 const contactFormSchema = z.object({
@@ -110,6 +101,8 @@ export default function ContactDetailModal({ isOpen, onClose, contact }: Contact
   const [activeTab, setActiveTab] = useState("overview");
   const [isEditing, setIsEditing] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [newNote, setNewNote] = useState("");
+  const [activityFilter, setActivityFilter] = useState<string>("all");
   const isAutosaveRef = useRef(false);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -166,6 +159,31 @@ export default function ContactDetailModal({ isOpen, onClose, contact }: Contact
     enabled: isOpen && !!contact?.id,
   });
 
+  // Fetch tasks for this contact
+  const { data: tasks = [] } = useQuery<CrmTask[]>({
+    queryKey: ['/api/crm/tasks', { contactId: contact?.id }],
+    enabled: isOpen && !!contact?.id,
+  });
+
+  // Fetch files for this contact
+  const { data: files = [] } = useQuery<CrmFile[]>({
+    queryKey: ['/api/crm/files', { entityType: 'contact', entityId: contact?.id }],
+    enabled: isOpen && !!contact?.id,
+  });
+
+  // Fetch DD projects where contact is team member
+  const { data: ddProjects = [] } = useQuery<any[]>({
+    queryKey: ['/api/dd/projects', { contactId: contact?.id }],
+    enabled: isOpen && !!contact?.id,
+  });
+
+  // Fetch related contacts (same company)
+  const primaryCompanyId = linkedCompanies.find(c => c.isPrimary)?.companyId || linkedCompanies[0]?.companyId;
+  const { data: relatedContacts = [] } = useQuery<Contact[]>({
+    queryKey: ['/api/companies', primaryCompanyId, 'contacts'],
+    enabled: isOpen && !!primaryCompanyId,
+  });
+
   // Update contact mutation
   const updateContactMutation = useMutation({
     mutationFn: async (data: ContactFormData) => {
@@ -176,10 +194,7 @@ export default function ContactDetailModal({ isOpen, onClose, contact }: Contact
       queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
       
       if (!isAutosaveRef.current) {
-        toast({
-          title: "Success",
-          description: "Contact updated successfully",
-        });
+        toast({ title: "Success", description: "Contact updated successfully" });
         setIsEditing(false);
       } else {
         setSaveStatus('saved');
@@ -189,15 +204,45 @@ export default function ContactDetailModal({ isOpen, onClose, contact }: Contact
     },
     onError: () => {
       if (!isAutosaveRef.current) {
-        toast({
-          title: "Error",
-          description: "Failed to update contact",
-          variant: "destructive",
-        });
+        toast({ title: "Error", description: "Failed to update contact", variant: "destructive" });
       } else {
         setSaveStatus('idle');
         isAutosaveRef.current = false;
       }
+    },
+  });
+
+  // Create note mutation
+  const createNoteMutation = useMutation({
+    mutationFn: async (content: string) => {
+      return await apiRequest('POST', '/api/notes', {
+        content,
+        entityType: 'contact',
+        entityId: contact?.id,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notes', 'contact', contact?.id] });
+      setNewNote("");
+      toast({ title: "Note added" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to add note", variant: "destructive" });
+    },
+  });
+
+  // Create activity mutation
+  const createActivityMutation = useMutation({
+    mutationFn: async (data: { type: string; subject: string; description?: string }) => {
+      return await apiRequest('POST', '/api/activities', {
+        ...data,
+        entityType: 'contact',
+        entityId: contact?.id,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/activities', 'contact', contact?.id] });
+      toast({ title: "Activity logged" });
     },
   });
 
@@ -235,6 +280,7 @@ export default function ContactDetailModal({ isOpen, onClose, contact }: Contact
       });
       setIsEditing(false);
       setSaveStatus('idle');
+      setActiveTab("overview");
     }
   }, [contact, form]);
 
@@ -270,69 +316,137 @@ export default function ContactDetailModal({ isOpen, onClose, contact }: Contact
   }
 
   const contactDeals = allDeals.filter(d => d.contactId === contact.id);
+  const totalDealValue = contactDeals.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+  const openTasks = tasks.filter(t => t.status !== 'completed');
+  const daysSinceLastContact = activities.length > 0 
+    ? differenceInDays(new Date(), new Date(activities[0].createdAt as string))
+    : null;
+  const engagementScore = Math.min(100, (activities.length * 10) + (notes.length * 5) + (contactDeals.length * 20));
+
+  const filteredActivities = activityFilter === 'all' 
+    ? activities 
+    : activities.filter(a => a.type === activityFilter);
+
   const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName[0]}${lastName[0]}`.toUpperCase();
+    return `${(firstName || 'U')[0]}${(lastName || 'K')[0]}`.toUpperCase();
+  };
+
+  const handleQuickAction = (type: string) => {
+    switch (type) {
+      case 'email':
+        window.location.href = `mailto:${contact.email}`;
+        createActivityMutation.mutate({ type: 'email', subject: `Email to ${contact.firstName}` });
+        break;
+      case 'call':
+        if (contact.phone) {
+          window.location.href = `tel:${contact.phone}`;
+          createActivityMutation.mutate({ type: 'call', subject: `Called ${contact.firstName}` });
+        }
+        break;
+      case 'note':
+        setActiveTab('notes');
+        break;
+      case 'task':
+        setActiveTab('tasks');
+        break;
+    }
+  };
+
+  const activityTypeIcons: Record<string, any> = {
+    email: Mail,
+    call: Phone,
+    meeting: Calendar,
+    note: FileText,
+    task: CheckSquare,
+    default: Activity,
+  };
+
+  const activityTypeColors: Record<string, string> = {
+    email: 'text-blue-600 bg-blue-100',
+    call: 'text-green-600 bg-green-100',
+    meeting: 'text-purple-600 bg-purple-100',
+    note: 'text-yellow-600 bg-yellow-100',
+    task: 'text-orange-600 bg-orange-100',
+    default: 'text-gray-600 bg-gray-100',
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-hidden flex flex-col" data-testid="modal-contact-detail">
-        <DialogHeader className="flex-shrink-0">
+      <DialogContent className="sm:max-w-[1100px] max-h-[95vh] overflow-hidden flex flex-col p-0" data-testid="modal-contact-detail">
+        {/* Enhanced Header */}
+        <div className="bg-gradient-to-r from-slate-50 to-blue-50 dark:from-slate-900 dark:to-blue-950 px-6 py-5 border-b">
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-4 flex-1">
-              {/* Contact Avatar */}
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white text-xl font-bold shadow-md flex-shrink-0">
-                {getInitials(form.watch('firstName'), form.watch('lastName'))}
+              {/* Contact Avatar with photo support */}
+              <div className="relative">
+                {contact.photoDataUrl ? (
+                  <Avatar className="w-20 h-20 border-4 border-white shadow-lg">
+                    <AvatarImage src={contact.photoDataUrl} alt={`${contact.firstName} ${contact.lastName}`} />
+                    <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white text-xl font-bold">
+                      {getInitials(form.watch('firstName'), form.watch('lastName'))}
+                    </AvatarFallback>
+                  </Avatar>
+                ) : (
+                  <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg border-4 border-white">
+                    {getInitials(form.watch('firstName'), form.watch('lastName'))}
+                  </div>
+                )}
+                {contact.contactTag === 'lead' && contact.leadStatus === 'qualified' && (
+                  <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-1">
+                    <Check className="w-3 h-3 text-white" />
+                  </div>
+                )}
               </div>
               
-              <div className="flex-1">
-                <DialogTitle className="text-2xl font-bold">
-                  {form.watch('firstName')} {form.watch('lastName')}
-                </DialogTitle>
-                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                  {/* Contact Tag Badge (Primary, Read-only) */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3">
+                  <DialogTitle className="text-2xl font-bold truncate">
+                    {form.watch('firstName')} {form.watch('lastName')}
+                  </DialogTitle>
+                  {isEditing && (
+                    <div className="flex items-center gap-1.5 text-sm" data-testid="text-save-status">
+                      {saveStatus === 'saving' && (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                          <span className="text-muted-foreground">Saving...</span>
+                        </>
+                      )}
+                      {saveStatus === 'saved' && (
+                        <>
+                          <Check className="w-4 h-4 text-green-600" />
+                          <span className="text-green-600">Saved</span>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 mt-1 text-muted-foreground">
+                  {form.watch('position') && (
+                    <span className="text-sm">{form.watch('position')}</span>
+                  )}
+                  {form.watch('position') && form.watch('company') && <span>•</span>}
+                  {form.watch('company') && (
+                    <span className="text-sm font-medium text-foreground">{form.watch('company')}</span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 mt-3 flex-wrap">
                   {contact?.contactTag && (
-                    <Badge 
-                      className={contactTagColors[contact.contactTag as keyof typeof contactTagColors] || 'bg-gray-500 text-white'}
-                      data-testid={`badge-contact-tag-${contact.contactTag}`}
-                    >
+                    <Badge className={contactTagColors[contact.contactTag as keyof typeof contactTagColors] || 'bg-gray-500 text-white'}>
                       {contact.contactTag.charAt(0).toUpperCase() + contact.contactTag.slice(1)}
                     </Badge>
                   )}
-                  
-                  {/* Lead Status Badge (Conditional - only when contactTag = 'lead', Read-only) */}
                   {contact?.contactTag === 'lead' && contact?.leadStatus && (
-                    <Badge 
-                      className={`flex items-center gap-1 ${leadStatusColors[contact.leadStatus as keyof typeof leadStatusColors] || 'bg-gray-100 text-gray-800'}`}
-                      data-testid={`badge-lead-status-${contact.leadStatus}`}
-                    >
+                    <Badge className={`flex items-center gap-1 ${leadStatusColors[contact.leadStatus as keyof typeof leadStatusColors]}`}>
                       <Thermometer className="h-3 w-3" />
                       {contact.leadStatus.charAt(0).toUpperCase() + contact.leadStatus.slice(1)}
                     </Badge>
                   )}
-                  
-                  {/* Legacy Contact Type (De-emphasized, uses form.watch for edit mode) */}
-                  <Badge 
-                    variant="outline" 
-                    className="opacity-50 text-xs border-dashed"
-                    data-testid={`badge-legacy-type-${form.watch('contactType')}`}
-                  >
-                    Legacy: {form.watch('contactType')}
-                  </Badge>
-                  
-                  {/* Legacy Lead Score (De-emphasized, uses form.watch for edit mode) */}
-                  <Badge 
-                    variant="outline" 
-                    className="opacity-50 text-xs border-dashed"
-                    data-testid={`badge-legacy-score-${form.watch('leadScore')}`}
-                  >
-                    Legacy: {form.watch('leadScore')} lead
-                  </Badge>
-                  
-                  {/* Deal Team Member Badge */}
                   {form.watch('onDealTeam') && (
-                    <Badge variant="outline" className="border-blue-500 text-blue-700">
-                      Deal Team Member
+                    <Badge variant="outline" className="border-blue-500 text-blue-700 dark:text-blue-400">
+                      <Users className="w-3 h-3 mr-1" />
+                      Deal Team
                     </Badge>
                   )}
                 </div>
@@ -340,509 +454,780 @@ export default function ContactDetailModal({ isOpen, onClose, contact }: Contact
             </div>
             
             <div className="flex gap-2 items-center flex-shrink-0">
-              {isEditing && (
-                <div className="flex items-center gap-1.5 text-sm mr-2" data-testid="text-save-status">
-                  {saveStatus === 'saving' && (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                      <span className="text-gray-600">Saving...</span>
-                    </>
-                  )}
-                  {saveStatus === 'saved' && (
-                    <>
-                      <Check className="w-4 h-4 text-green-600" />
-                      <span className="text-green-600">Saved</span>
-                    </>
-                  )}
-                </div>
-              )}
               {isEditing ? (
-                <Button 
-                  onClick={() => {
-                    setIsEditing(false);
-                    form.reset();
-                    setSaveStatus('idle');
-                  }} 
-                  variant="outline" 
-                  size="sm"
-                  data-testid="button-done-edit"
-                >
+                <Button onClick={() => { setIsEditing(false); form.reset(); setSaveStatus('idle'); }} variant="outline" size="sm">
                   Done
                 </Button>
               ) : (
-                <Button 
-                  onClick={() => setIsEditing(true)} 
-                  variant="outline" 
-                  size="sm" 
-                  data-testid="button-edit-contact"
-                >
+                <Button onClick={() => setIsEditing(true)} variant="outline" size="sm">
                   <Edit className="w-4 h-4 mr-2" />
                   Edit
                 </Button>
               )}
-              <Button onClick={onClose} variant="ghost" size="sm" data-testid="button-close-detail">
+              <Button onClick={onClose} variant="ghost" size="icon" className="h-8 w-8">
                 <X className="w-4 h-4" />
               </Button>
             </div>
           </div>
-        </DialogHeader>
 
+          {/* Quick Action Buttons */}
+          <div className="flex items-center gap-2 mt-4">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={() => handleQuickAction('email')} className="gap-2">
+                    <Mail className="w-4 h-4" />
+                    Email
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Send email to {contact.email}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={() => handleQuickAction('call')} disabled={!contact.phone} className="gap-2">
+                    <Phone className="w-4 h-4" />
+                    Call
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{contact.phone || 'No phone number'}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <Button variant="outline" size="sm" onClick={() => handleQuickAction('note')} className="gap-2">
+              <FileText className="w-4 h-4" />
+              Note
+            </Button>
+
+            <Button variant="outline" size="sm" onClick={() => handleQuickAction('task')} className="gap-2">
+              <CheckSquare className="w-4 h-4" />
+              Task
+            </Button>
+
+            <Button variant="outline" size="sm" className="gap-2">
+              <Calendar className="w-4 h-4" />
+              Schedule
+            </Button>
+          </div>
+        </div>
+
+        {/* Main Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
-          <TabsList className="grid w-full grid-cols-6 flex-shrink-0">
-            <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
-            <TabsTrigger value="companies" data-testid="tab-companies">Companies ({linkedCompanies.length})</TabsTrigger>
-            <TabsTrigger value="deals" data-testid="tab-deals">Deals ({contactDeals.length})</TabsTrigger>
-            <TabsTrigger value="properties" data-testid="tab-properties">Properties ({linkedProperties.length})</TabsTrigger>
-            <TabsTrigger value="activity" data-testid="tab-activity">Activity ({activities.length})</TabsTrigger>
-            <TabsTrigger value="notes" data-testid="tab-notes">Notes ({notes.length})</TabsTrigger>
-          </TabsList>
+          <div className="border-b px-6">
+            <TabsList className="h-11 bg-transparent gap-4 p-0">
+              <TabsTrigger value="overview" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+                Overview
+              </TabsTrigger>
+              <TabsTrigger value="activity" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+                Activity
+                {activities.length > 0 && <Badge variant="secondary" className="ml-1.5 h-5 px-1.5">{activities.length}</Badge>}
+              </TabsTrigger>
+              <TabsTrigger value="deals" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+                Deals
+                {contactDeals.length > 0 && <Badge variant="secondary" className="ml-1.5 h-5 px-1.5">{contactDeals.length}</Badge>}
+              </TabsTrigger>
+              <TabsTrigger value="tasks" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+                Tasks
+                {openTasks.length > 0 && <Badge variant="secondary" className="ml-1.5 h-5 px-1.5">{openTasks.length}</Badge>}
+              </TabsTrigger>
+              <TabsTrigger value="notes" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+                Notes
+                {notes.length > 0 && <Badge variant="secondary" className="ml-1.5 h-5 px-1.5">{notes.length}</Badge>}
+              </TabsTrigger>
+              <TabsTrigger value="files" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+                Files
+                {files.length > 0 && <Badge variant="secondary" className="ml-1.5 h-5 px-1.5">{files.length}</Badge>}
+              </TabsTrigger>
+              <TabsTrigger value="connections" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+                Connections
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-          <div className="flex-1 overflow-y-auto mt-4">
-            <TabsContent value="overview" className="mt-0 space-y-4">
-              {/* Contact Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <User className="w-5 h-5" />
-                    Contact Information
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName" className="font-semibold">First Name</Label>
-                      {isEditing ? (
-                        <Input
-                          id="firstName"
-                          {...form.register('firstName')}
-                          className="border-2 border-gray-300 focus:border-blue-500"
-                          data-testid="input-first-name"
-                        />
-                      ) : (
-                        <div className="font-medium px-3 py-2">{form.watch('firstName')}</div>
-                      )}
-                      {form.formState.errors.firstName && (
-                        <p className="text-sm text-red-500">{form.formState.errors.firstName.message}</p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="lastName" className="font-semibold">Last Name</Label>
-                      {isEditing ? (
-                        <Input
-                          id="lastName"
-                          {...form.register('lastName')}
-                          className="border-2 border-gray-300 focus:border-blue-500"
-                          data-testid="input-last-name"
-                        />
-                      ) : (
-                        <div className="font-medium px-3 py-2">{form.watch('lastName')}</div>
-                      )}
-                      {form.formState.errors.lastName && (
-                        <p className="text-sm text-red-500">{form.formState.errors.lastName.message}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="email" className="font-semibold flex items-center gap-2">
-                        <Mail className="w-4 h-4 text-gray-500" />
-                        Email
-                      </Label>
-                      {isEditing ? (
-                        <Input
-                          id="email"
-                          type="email"
-                          {...form.register('email')}
-                          className="border-2 border-gray-300 focus:border-blue-500"
-                          data-testid="input-email"
-                        />
-                      ) : (
-                        <a 
-                          href={`mailto:${form.watch('email')}`}
-                          className="font-medium text-blue-600 hover:underline px-3 py-2 block"
-                        >
-                          {form.watch('email')}
-                        </a>
-                      )}
-                      {form.formState.errors.email && (
-                        <p className="text-sm text-red-500">{form.formState.errors.email.message}</p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="phone" className="font-semibold flex items-center gap-2">
-                        <Phone className="w-4 h-4 text-gray-500" />
-                        Phone
-                      </Label>
-                      {isEditing ? (
-                        <Input
-                          id="phone"
-                          {...form.register('phone')}
-                          className="border-2 border-gray-300 focus:border-blue-500"
-                          data-testid="input-phone"
-                        />
-                      ) : (
-                        <a 
-                          href={`tel:${form.watch('phone')}`}
-                          className="font-medium text-blue-600 hover:underline px-3 py-2 block"
-                        >
-                          {form.watch('phone') || '-'}
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="company" className="font-semibold flex items-center gap-2">
-                        <Building className="w-4 h-4 text-gray-500" />
-                        Company
-                      </Label>
-                      {isEditing ? (
-                        <Input
-                          id="company"
-                          {...form.register('company')}
-                          className="border-2 border-gray-300 focus:border-blue-500"
-                          data-testid="input-company"
-                        />
-                      ) : (
-                        <div className="font-medium px-3 py-2">{form.watch('company') || '-'}</div>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="position" className="font-semibold flex items-center gap-2">
-                        <Briefcase className="w-4 h-4 text-gray-500" />
-                        Position
-                      </Label>
-                      {isEditing ? (
-                        <Input
-                          id="position"
-                          {...form.register('position')}
-                          className="border-2 border-gray-300 focus:border-blue-500"
-                          data-testid="input-position"
-                        />
-                      ) : (
-                        <div className="font-medium px-3 py-2">{form.watch('position') || '-'}</div>
-                      )}
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Address Information */}
-                  <div className="space-y-4">
-                    <h4 className="font-semibold flex items-center gap-2">
-                      <Home className="w-4 h-4 text-gray-500" />
-                      Address
-                    </h4>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2 col-span-2">
-                        {isEditing ? (
-                          <AddressInput
-                            value={form.watch('address') || ""}
-                            onChange={(value) => form.setValue('address', value, { shouldDirty: true })}
-                            onAddressSelect={(components: AddressComponents) => {
-                              form.setValue('address', components.streetAddress || components.fullAddress || '', { shouldDirty: true });
-                              if (components.city) form.setValue('city', components.city, { shouldDirty: true });
-                              if (components.state) form.setValue('state', components.state, { shouldDirty: true });
-                              if (components.zipCode) form.setValue('zipCode', components.zipCode, { shouldDirty: true });
-                            }}
-                            label="Street Address"
-                            placeholder="Start typing an address..."
-                            testId="input-address"
-                          />
-                        ) : (
-                          <>
-                            <Label htmlFor="address">Street Address</Label>
-                            <div className="font-medium px-3 py-2">{form.watch('address') || '-'}</div>
-                          </>
-                        )}
+          <ScrollArea className="flex-1 px-6 py-4">
+            {/* Overview Tab */}
+            <TabsContent value="overview" className="mt-0 space-y-6">
+              {/* Stats Cards */}
+              <div className="grid grid-cols-4 gap-4">
+                <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-blue-500/20 rounded-lg">
+                        <Activity className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                       </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="unit">Unit/Suite</Label>
-                        {isEditing ? (
-                          <Input
-                            id="unit"
-                            {...form.register('unit')}
-                            className="border-2 border-gray-300 focus:border-blue-500"
-                            data-testid="input-unit"
-                          />
-                        ) : (
-                          <div className="font-medium px-3 py-2">{form.watch('unit') || '-'}</div>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="city">City</Label>
-                        {isEditing ? (
-                          <Input
-                            id="city"
-                            {...form.register('city')}
-                            className="border-2 border-gray-300 focus:border-blue-500"
-                            data-testid="input-city"
-                          />
-                        ) : (
-                          <div className="font-medium px-3 py-2">{form.watch('city') || '-'}</div>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="state">State</Label>
-                        {isEditing ? (
-                          <Input
-                            id="state"
-                            {...form.register('state')}
-                            className="border-2 border-gray-300 focus:border-blue-500"
-                            data-testid="input-state"
-                          />
-                        ) : (
-                          <div className="font-medium px-3 py-2">{form.watch('state') || '-'}</div>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="zipCode">ZIP Code</Label>
-                        {isEditing ? (
-                          <Input
-                            id="zipCode"
-                            {...form.register('zipCode')}
-                            className="border-2 border-gray-300 focus:border-blue-500"
-                            data-testid="input-zip"
-                          />
-                        ) : (
-                          <div className="font-medium px-3 py-2">{form.watch('zipCode') || '-'}</div>
-                        )}
+                      <div>
+                        <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">{engagementScore}%</p>
+                        <p className="text-xs text-blue-600 dark:text-blue-400">Engagement Score</p>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
+                    <Progress value={engagementScore} className="mt-2 h-1.5" />
+                  </CardContent>
+                </Card>
 
-              {/* Contact Details */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Star className="w-5 h-5" />
-                    Contact Details
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="contactType" className="font-semibold">Contact Type</Label>
-                      {isEditing ? (
-                        <Select
-                          value={form.watch('contactType')}
-                          onValueChange={(value) => form.setValue('contactType', value)}
-                        >
-                          <SelectTrigger 
-                            className="border-2 border-gray-300 focus:border-blue-500"
-                            data-testid="select-contact-type"
-                          >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="prospect">Prospect</SelectItem>
-                            <SelectItem value="vendor">Vendor</SelectItem>
-                            <SelectItem value="buyer">Buyer</SelectItem>
-                            <SelectItem value="seller">Seller</SelectItem>
-                            <SelectItem value="partner">Partner</SelectItem>
-                            <SelectItem value="client">Client</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <div className="font-medium capitalize px-3 py-2">{form.watch('contactType')}</div>
-                      )}
+                <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200 dark:border-green-800">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-green-500/20 rounded-lg">
+                        <DollarSign className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-green-700 dark:text-green-300">${(totalDealValue / 1000000).toFixed(1)}M</p>
+                        <p className="text-xs text-green-600 dark:text-green-400">Deal Value</p>
+                      </div>
                     </div>
+                  </CardContent>
+                </Card>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="leadScore" className="font-semibold">Lead Score</Label>
-                      {isEditing ? (
-                        <Select
-                          value={form.watch('leadScore')}
-                          onValueChange={(value) => form.setValue('leadScore', value)}
-                        >
-                          <SelectTrigger 
-                            className="border-2 border-gray-300 focus:border-blue-500"
-                            data-testid="select-lead-score"
-                          >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="hot">Hot</SelectItem>
-                            <SelectItem value="warm">Warm</SelectItem>
-                            <SelectItem value="cold">Cold</SelectItem>
-                            <SelectItem value="new">New</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <div className="font-medium capitalize px-3 py-2">{form.watch('leadScore')}</div>
-                      )}
+                <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border-purple-200 dark:border-purple-800">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-purple-500/20 rounded-lg">
+                        <MessageSquare className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">{activities.length}</p>
+                        <p className="text-xs text-purple-600 dark:text-purple-400">Total Interactions</p>
+                      </div>
                     </div>
-                  </div>
+                  </CardContent>
+                </Card>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="role" className="font-semibold">Role/Title</Label>
-                    {isEditing ? (
-                      <Input
-                        id="role"
-                        {...form.register('role')}
-                        className="border-2 border-gray-300 focus:border-blue-500"
-                        data-testid="input-role"
-                      />
-                    ) : (
-                      <div className="font-medium px-3 py-2">{form.watch('role') || '-'}</div>
-                    )}
-                  </div>
-
-                  {form.watch('onDealTeam') && (
-                    <div className="space-y-2">
-                      <Label htmlFor="dealTeamNotes" className="font-semibold">Deal Team Notes</Label>
-                      {isEditing ? (
-                        <Textarea
-                          id="dealTeamNotes"
-                          {...form.register('dealTeamNotes')}
-                          className="border-2 border-gray-300 focus:border-blue-500 min-h-[80px]"
-                          data-testid="input-deal-team-notes"
-                        />
-                      ) : (
-                        <div className="font-medium px-3 py-2">{form.watch('dealTeamNotes') || '-'}</div>
-                      )}
+                <Card className={`bg-gradient-to-br ${daysSinceLastContact !== null && daysSinceLastContact > 30 ? 'from-red-50 to-red-100 dark:from-red-950 dark:to-red-900 border-red-200 dark:border-red-800' : 'from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900 border-amber-200 dark:border-amber-800'}`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${daysSinceLastContact !== null && daysSinceLastContact > 30 ? 'bg-red-500/20' : 'bg-amber-500/20'}`}>
+                        <Clock className={`w-5 h-5 ${daysSinceLastContact !== null && daysSinceLastContact > 30 ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`} />
+                      </div>
+                      <div>
+                        <p className={`text-2xl font-bold ${daysSinceLastContact !== null && daysSinceLastContact > 30 ? 'text-red-700 dark:text-red-300' : 'text-amber-700 dark:text-amber-300'}`}>
+                          {daysSinceLastContact !== null ? `${daysSinceLastContact}d` : 'N/A'}
+                        </p>
+                        <p className={`text-xs ${daysSinceLastContact !== null && daysSinceLastContact > 30 ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>Since Last Contact</p>
+                      </div>
                     </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Two Column Layout */}
+              <div className="grid grid-cols-3 gap-6">
+                {/* Left Column - Contact Details */}
+                <div className="col-span-2 space-y-6">
+                  {/* Contact Information Card */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <User className="w-4 h-4" />
+                        Contact Information
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">First Name</Label>
+                          {isEditing ? (
+                            <Input {...form.register('firstName')} className="h-9" />
+                          ) : (
+                            <p className="font-medium">{form.watch('firstName')}</p>
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Last Name</Label>
+                          {isEditing ? (
+                            <Input {...form.register('lastName')} className="h-9" />
+                          ) : (
+                            <p className="font-medium">{form.watch('lastName')}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                            <Mail className="w-3 h-3" /> Email
+                          </Label>
+                          {isEditing ? (
+                            <Input {...form.register('email')} type="email" className="h-9" />
+                          ) : (
+                            <a href={`mailto:${form.watch('email')}`} className="font-medium text-primary hover:underline block">
+                              {form.watch('email')}
+                            </a>
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                            <Phone className="w-3 h-3" /> Phone
+                          </Label>
+                          {isEditing ? (
+                            <Input {...form.register('phone')} className="h-9" />
+                          ) : (
+                            <a href={`tel:${form.watch('phone')}`} className="font-medium text-primary hover:underline block">
+                              {form.watch('phone') || '-'}
+                            </a>
+                          )}
+                        </div>
+                      </div>
+
+                      <Separator />
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                            <Building className="w-3 h-3" /> Company
+                          </Label>
+                          {isEditing ? (
+                            <Input {...form.register('company')} className="h-9" />
+                          ) : (
+                            <p className="font-medium">{form.watch('company') || '-'}</p>
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                            <Briefcase className="w-3 h-3" /> Position
+                          </Label>
+                          {isEditing ? (
+                            <Input {...form.register('position')} className="h-9" />
+                          ) : (
+                            <p className="font-medium">{form.watch('position') || '-'}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <Separator />
+
+                      <div className="space-y-3">
+                        <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                          <MapPin className="w-3 h-3" /> Address
+                        </Label>
+                        {isEditing ? (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="col-span-2">
+                              <AddressInput
+                                value={form.watch('address') || ""}
+                                onChange={(value) => form.setValue('address', value, { shouldDirty: true })}
+                                onAddressSelect={(components: AddressComponents) => {
+                                  form.setValue('address', components.streetAddress || components.fullAddress || '', { shouldDirty: true });
+                                  if (components.city) form.setValue('city', components.city, { shouldDirty: true });
+                                  if (components.state) form.setValue('state', components.state, { shouldDirty: true });
+                                  if (components.zipCode) form.setValue('zipCode', components.zipCode, { shouldDirty: true });
+                                }}
+                                placeholder="Street address..."
+                              />
+                            </div>
+                            <Input {...form.register('city')} placeholder="City" className="h-9" />
+                            <div className="flex gap-2">
+                              <Input {...form.register('state')} placeholder="State" className="h-9 w-20" />
+                              <Input {...form.register('zipCode')} placeholder="ZIP" className="h-9 flex-1" />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-sm">
+                            {form.watch('address') || form.watch('city') || form.watch('state') ? (
+                              <>
+                                {form.watch('address') && <p>{form.watch('address')}</p>}
+                                {(form.watch('city') || form.watch('state') || form.watch('zipCode')) && (
+                                  <p className="text-muted-foreground">
+                                    {[form.watch('city'), form.watch('state')].filter(Boolean).join(', ')} {form.watch('zipCode')}
+                                  </p>
+                                )}
+                              </>
+                            ) : (
+                              <p className="text-muted-foreground">No address</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Recent Activity Preview */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Activity className="w-4 h-4" />
+                          Recent Activity
+                        </CardTitle>
+                        <Button variant="ghost" size="sm" onClick={() => setActiveTab('activity')}>
+                          View All <ArrowUpRight className="w-3 h-3 ml-1" />
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {activities.length === 0 ? (
+                        <div className="text-center py-6 text-muted-foreground">
+                          <Activity className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                          <p className="text-sm">No activities recorded yet</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {activities.slice(0, 3).map((activity) => {
+                            const IconComponent = activityTypeIcons[activity.type] || activityTypeIcons.default;
+                            const colorClass = activityTypeColors[activity.type] || activityTypeColors.default;
+                            return (
+                              <div key={activity.id} className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50">
+                                <div className={`p-1.5 rounded-lg ${colorClass}`}>
+                                  <IconComponent className="w-3.5 h-3.5" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">{activity.subject || activity.type}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {activity.createdAt && formatDistanceToNow(new Date(activity.createdAt as string), { addSuffix: true })}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Right Column - Sidebar */}
+                <div className="space-y-6">
+                  {/* Open Tasks */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <CheckSquare className="w-4 h-4" />
+                          Open Tasks
+                        </CardTitle>
+                        <Badge variant={openTasks.length > 0 ? "default" : "secondary"}>
+                          {openTasks.length}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {openTasks.length === 0 ? (
+                        <div className="text-center py-4 text-muted-foreground">
+                          <p className="text-sm">No open tasks</p>
+                          <Button variant="link" size="sm" className="mt-1" onClick={() => setActiveTab('tasks')}>
+                            <Plus className="w-3 h-3 mr-1" /> Add Task
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {openTasks.slice(0, 3).map((task) => (
+                            <div key={task.id} className="flex items-center gap-2 p-2 rounded-lg border bg-muted/30">
+                              <div className={`w-2 h-2 rounded-full ${task.priority === 'high' ? 'bg-red-500' : task.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'}`} />
+                              <span className="text-sm truncate flex-1">{task.title}</span>
+                            </div>
+                          ))}
+                          {openTasks.length > 3 && (
+                            <Button variant="ghost" size="sm" className="w-full" onClick={() => setActiveTab('tasks')}>
+                              +{openTasks.length - 3} more
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Linked Companies */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Building className="w-4 h-4" />
+                        Companies
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {linkedCompanies.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-2">No linked companies</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {linkedCompanies.map((link) => (
+                            <div key={link.id} className="flex items-center gap-2 p-2 rounded-lg border hover:bg-muted/50 cursor-pointer">
+                              <Building className="w-4 h-4 text-muted-foreground" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{link.company?.name || 'Unknown'}</p>
+                                {link.role && <p className="text-xs text-muted-foreground">{link.role}</p>}
+                              </div>
+                              {link.isPrimary && <Badge variant="outline" className="text-xs">Primary</Badge>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Related Contacts */}
+                  {relatedContacts.length > 1 && (
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Users className="w-4 h-4" />
+                          Same Company
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          {relatedContacts.filter(c => c.id !== contact.id).slice(0, 3).map((relatedContact) => (
+                            <div key={relatedContact.id} className="flex items-center gap-2 p-2 rounded-lg border hover:bg-muted/50 cursor-pointer">
+                              <Avatar className="w-6 h-6">
+                                <AvatarFallback className="text-xs bg-muted">
+                                  {getInitials(relatedContact.firstName, relatedContact.lastName)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{relatedContact.firstName} {relatedContact.lastName}</p>
+                                {relatedContact.position && <p className="text-xs text-muted-foreground truncate">{relatedContact.position}</p>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </TabsContent>
 
-            <TabsContent value="companies" className="mt-0 space-y-4">
+            {/* Activity Tab */}
+            <TabsContent value="activity" className="mt-0 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Activity Timeline</h3>
+                <Select value={activityFilter} onValueChange={setActivityFilter}>
+                  <SelectTrigger className="w-40 h-9">
+                    <Filter className="w-3 h-3 mr-2" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Activities</SelectItem>
+                    <SelectItem value="email">Emails</SelectItem>
+                    <SelectItem value="call">Calls</SelectItem>
+                    <SelectItem value="meeting">Meetings</SelectItem>
+                    <SelectItem value="note">Notes</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {filteredActivities.length === 0 ? (
+                <Card>
+                  <CardContent className="text-center py-12 text-muted-foreground">
+                    <Activity className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p className="font-medium">No activities {activityFilter !== 'all' ? `of type "${activityFilter}"` : ''}</p>
+                    <p className="text-sm mt-1">Activities will appear here when you interact with this contact</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {filteredActivities.map((activity, index) => {
+                    const IconComponent = activityTypeIcons[activity.type] || activityTypeIcons.default;
+                    const colorClass = activityTypeColors[activity.type] || activityTypeColors.default;
+                    return (
+                      <Card key={activity.id} className="hover:shadow-md transition-shadow">
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-4">
+                            <div className={`p-2 rounded-lg ${colorClass} flex-shrink-0`}>
+                              <IconComponent className="w-4 h-4" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between">
+                                <p className="font-medium">{activity.subject || activity.type}</p>
+                                <span className="text-xs text-muted-foreground">
+                                  {activity.createdAt && format(new Date(activity.createdAt as string), "MMM dd, yyyy 'at' h:mm a")}
+                                </span>
+                              </div>
+                              {activity.description && (
+                                <p className="text-sm text-muted-foreground mt-1">{activity.description}</p>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Deals Tab */}
+            <TabsContent value="deals" className="mt-0 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Associated Deals</h3>
+                <Button variant="outline" size="sm">
+                  <Plus className="w-4 h-4 mr-2" /> Add Deal
+                </Button>
+              </div>
+
+              {contactDeals.length === 0 ? (
+                <Card>
+                  <CardContent className="text-center py-12 text-muted-foreground">
+                    <DollarSign className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p className="font-medium">No deals associated</p>
+                    <p className="text-sm mt-1">Create a deal to track opportunities with this contact</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  {contactDeals.map((deal) => (
+                    <Card key={deal.id} className="hover:shadow-md transition-shadow cursor-pointer">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h4 className="font-semibold">{deal.title}</h4>
+                            <p className="text-2xl font-bold text-green-600 mt-1">
+                              ${Number(deal.amount || 0).toLocaleString()}
+                            </p>
+                          </div>
+                          <Badge variant={deal.priority === 'high' ? 'destructive' : deal.priority === 'medium' ? 'default' : 'secondary'}>
+                            {deal.priority || 'medium'}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 mt-3">
+                          <div className="flex-1 bg-muted rounded-full h-2">
+                            <div className="bg-primary rounded-full h-2" style={{ width: `${Math.min(100, Number(deal.probability || 50))}%` }} />
+                          </div>
+                          <span className="text-xs text-muted-foreground">{deal.probability || 50}%</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Tasks Tab */}
+            <TabsContent value="tasks" className="mt-0 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Tasks</h3>
+                <Button variant="outline" size="sm">
+                  <Plus className="w-4 h-4 mr-2" /> New Task
+                </Button>
+              </div>
+
+              {tasks.length === 0 ? (
+                <Card>
+                  <CardContent className="text-center py-12 text-muted-foreground">
+                    <CheckSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p className="font-medium">No tasks yet</p>
+                    <p className="text-sm mt-1">Create tasks to track follow-ups with this contact</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-2">
+                  {tasks.map((task) => (
+                    <Card key={task.id} className={`${task.status === 'completed' ? 'opacity-60' : ''}`}>
+                      <CardContent className="p-3 flex items-center gap-3">
+                        <div className={`w-3 h-3 rounded-full border-2 ${task.status === 'completed' ? 'bg-green-500 border-green-500' : 'border-muted-foreground'}`} />
+                        <div className="flex-1">
+                          <p className={`font-medium ${task.status === 'completed' ? 'line-through' : ''}`}>{task.title}</p>
+                          {task.dueDate && (
+                            <p className="text-xs text-muted-foreground">
+                              Due: {format(new Date(task.dueDate), 'MMM dd, yyyy')}
+                            </p>
+                          )}
+                        </div>
+                        <Badge variant={task.priority === 'high' ? 'destructive' : task.priority === 'medium' ? 'default' : 'secondary'} className="text-xs">
+                          {task.priority}
+                        </Badge>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Notes Tab */}
+            <TabsContent value="notes" className="mt-0 space-y-4">
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Building className="w-5 h-5" />
-                    Linked Companies
-                  </CardTitle>
+                <CardContent className="p-4">
+                  <Textarea
+                    placeholder="Add a note about this contact..."
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                    className="min-h-[100px] resize-none"
+                  />
+                  <div className="flex justify-end mt-3">
+                    <Button 
+                      onClick={() => newNote.trim() && createNoteMutation.mutate(newNote)} 
+                      disabled={!newNote.trim() || createNoteMutation.isPending}
+                      size="sm"
+                    >
+                      {createNoteMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+                      Add Note
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {notes.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p className="font-medium">No notes yet</p>
+                  <p className="text-sm mt-1">Add your first note above</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {notes.map((note) => (
+                    <Card key={note.id}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <span className="text-xs text-muted-foreground">
+                            {note.createdAt && format(new Date(note.createdAt as string), "MMM dd, yyyy 'at' h:mm a")}
+                          </span>
+                          <Button variant="ghost" size="icon" className="h-6 w-6">
+                            <MoreVertical className="w-3 h-3" />
+                          </Button>
+                        </div>
+                        <p className="whitespace-pre-wrap text-sm">{note.content}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Files Tab */}
+            <TabsContent value="files" className="mt-0 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Files & Attachments</h3>
+                <Button variant="outline" size="sm">
+                  <Plus className="w-4 h-4 mr-2" /> Upload File
+                </Button>
+              </div>
+
+              {files.length === 0 ? (
+                <Card>
+                  <CardContent className="text-center py-12 text-muted-foreground">
+                    <FolderOpen className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p className="font-medium">No files attached</p>
+                    <p className="text-sm mt-1">Upload documents, contracts, or other files related to this contact</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {files.map((file) => (
+                    <Card key={file.id} className="hover:shadow-md transition-shadow">
+                      <CardContent className="p-3 flex items-center gap-3">
+                        <div className="p-2 bg-muted rounded-lg">
+                          <FileText className="w-5 h-5 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate text-sm">{file.fileName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {file.createdAt && format(new Date(file.createdAt as string), 'MMM dd, yyyy')}
+                          </p>
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Download className="w-4 h-4" />
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Connections Tab */}
+            <TabsContent value="connections" className="mt-0 space-y-6">
+              {/* Companies */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Building className="w-4 h-4" />
+                      Linked Companies
+                    </CardTitle>
+                    <Button variant="outline" size="sm">
+                      <Plus className="w-4 h-4 mr-2" /> Link Company
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {linkedCompanies.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <Building className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                      <p>No companies linked yet</p>
-                    </div>
+                    <p className="text-center text-muted-foreground py-4">No companies linked</p>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       {linkedCompanies.map((link) => (
-                        <div key={link.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                          <div>
-                            <div className="font-semibold">{link.company?.name || 'Unknown Company'}</div>
-                            {link.role && <div className="text-sm text-gray-600">{link.role}</div>}
-                            {link.isPrimary && (
-                              <Badge variant="outline" className="text-xs mt-1">Primary</Badge>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="deals" className="mt-0 space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <DollarSign className="w-5 h-5" />
-                    Associated Deals
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {contactDeals.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <DollarSign className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                      <p>No deals associated with this contact</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {contactDeals.map((deal) => (
-                        <div key={deal.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                          <div>
-                            <div className="font-semibold">{deal.title}</div>
-                            <div className="text-sm text-gray-600">
-                              ${Number(deal.amount || 0).toLocaleString()}
+                        <div key={link.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
+                          <div className="flex items-center gap-3">
+                            <Building className="w-5 h-5 text-muted-foreground" />
+                            <div>
+                              <p className="font-medium">{link.company?.name || 'Unknown Company'}</p>
+                              {link.role && <p className="text-sm text-muted-foreground">{link.role}</p>}
                             </div>
                           </div>
-                          <Badge variant="outline">{deal.priority || 'medium'}</Badge>
+                          <div className="flex items-center gap-2">
+                            {link.isPrimary && <Badge variant="outline">Primary</Badge>}
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <ExternalLink className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>
                   )}
                 </CardContent>
               </Card>
-            </TabsContent>
 
-            <TabsContent value="properties" className="mt-0 space-y-4">
+              {/* Properties */}
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <MapPin className="w-5 h-5" />
-                    Linked Properties
-                  </CardTitle>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Anchor className="w-4 h-4" />
+                      Linked Properties
+                    </CardTitle>
+                    <Button variant="outline" size="sm">
+                      <Plus className="w-4 h-4 mr-2" /> Link Property
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {linkedProperties.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <MapPin className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                      <p>No properties linked yet</p>
-                    </div>
+                    <p className="text-center text-muted-foreground py-4">No properties linked</p>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       {linkedProperties.map((link) => (
-                        <div key={link.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                          <div>
-                            <div className="font-semibold">{link.property?.title || 'Unknown Property'}</div>
-                            {link.relationship && <div className="text-sm text-gray-600">{link.relationship}</div>}
+                        <div key={link.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
+                          <div className="flex items-center gap-3">
+                            <Anchor className="w-5 h-5 text-muted-foreground" />
+                            <div>
+                              <p className="font-medium">{link.property?.title || 'Unknown Property'}</p>
+                              {link.relationship && <p className="text-sm text-muted-foreground">{link.relationship}</p>}
+                            </div>
                           </div>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <ExternalLink className="w-4 h-4" />
+                          </Button>
                         </div>
                       ))}
                     </div>
                   )}
                 </CardContent>
               </Card>
-            </TabsContent>
 
-            <TabsContent value="activity" className="mt-0 space-y-4">
+              {/* Due Diligence Projects */}
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Clock className="w-5 h-5" />
-                    Activity Timeline
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <FolderOpen className="w-4 h-4" />
+                    Due Diligence Projects
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {activities.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <Clock className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                      <p>No activities recorded yet</p>
-                    </div>
+                  {ddProjects.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-4">Not assigned to any DD projects</p>
                   ) : (
-                    <div className="space-y-4">
-                      {activities.map((activity) => (
-                        <div key={activity.id} className="flex gap-3 border-l-2 border-gray-300 pl-4 pb-4">
-                          <div className="flex-1">
-                            <div className="font-semibold">{activity.subject || activity.type}</div>
-                            <div className="text-sm text-gray-600">{activity.description || 'No description'}</div>
-                            <div className="text-xs text-gray-400 mt-1">
-                              {activity.createdAt && format(new Date(activity.createdAt), "MMM dd, yyyy 'at' h:mm a")}
+                    <div className="space-y-2">
+                      {ddProjects.map((project: any) => (
+                        <div key={project.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
+                          <div className="flex items-center gap-3">
+                            <FolderOpen className="w-5 h-5 text-muted-foreground" />
+                            <div>
+                              <p className="font-medium">{project.name}</p>
+                              <p className="text-sm text-muted-foreground">{project.status}</p>
                             </div>
                           </div>
-                          <Badge variant="outline" className="text-xs">
-                            {activity.type}
-                          </Badge>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <ExternalLink className="w-4 h-4" />
+                          </Button>
                         </div>
                       ))}
                     </div>
@@ -850,33 +1235,7 @@ export default function ContactDetailModal({ isOpen, onClose, contact }: Contact
                 </CardContent>
               </Card>
             </TabsContent>
-
-            <TabsContent value="notes" className="mt-0 space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Notes</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {notes.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <p>No notes added yet</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {notes.map((note) => (
-                        <div key={note.id} className="p-4 border rounded-lg">
-                          <div className="text-sm text-gray-600 mb-2">
-                            {note.createdAt && format(new Date(note.createdAt), "MMM dd, yyyy 'at' h:mm a")}
-                          </div>
-                          <div className="whitespace-pre-wrap">{note.content}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </div>
+          </ScrollArea>
         </Tabs>
       </DialogContent>
     </Dialog>
