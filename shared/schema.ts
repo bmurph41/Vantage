@@ -2084,6 +2084,15 @@ export const crmCompanies = pgTable("crm_companies", {
   description: text("description"),
   labels: text("labels").array().default(sql`ARRAY[]::text[]`),
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  
+  // Financial & Business Info
+  annualRevenue: decimal("annual_revenue", { precision: 14, scale: 2 }),
+  annualMarinaSpend: decimal("annual_marina_spend", { precision: 14, scale: 2 }),
+  
+  // Acquisition & Pipeline
+  acquisitionInterest: text("acquisition_interest"), // hot, warm, cold, none, unknown
+  portfolioCount: integer("portfolio_count").default(0), // Number of marinas/properties owned
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -2116,6 +2125,19 @@ export const crmContacts = pgTable("crm_contacts", {
   labels: text("labels").array().default(sql`ARRAY[]::text[]`),
   companyId: varchar("company_id").references(() => crmCompanies.id), // Legacy field for backward compatibility
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  
+  // Lead Source & Communication
+  leadSource: text("lead_source"), // website, referral, trade_show, cold_call, linkedin, other
+  communicationPreference: text("communication_preference").default('email'), // email, phone, text
+  
+  // Social Profiles
+  linkedinUrl: text("linkedin_url"),
+  twitterHandle: text("twitter_handle"),
+  
+  // Personal Details
+  birthday: date("birthday"),
+  anniversary: date("anniversary"),
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -2175,12 +2197,32 @@ export const crmProperties = pgTable("crm_properties", {
   status: text("status").notNull().default('available'), // available, under_contract, sold, off_market
   listingPrice: decimal("listing_price", { precision: 12, scale: 2 }),
   address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
   coordinates: jsonb("coordinates"), // { lat: number, lng: number }
   specifications: jsonb("specifications").default({}), // marina/boat specific details
   description: text("description"),
   images: jsonb("images").default([]),
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
   listingAgentId: varchar("listing_agent_id").references(() => crmContacts.id),
+  
+  // Marina Capacity
+  wetSlips: integer("wet_slips"),
+  drySlips: integer("dry_slips"),
+  moorings: integer("moorings"),
+  totalCapacity: integer("total_capacity"),
+  
+  // Amenities (stored as JSON array of strings)
+  amenities: jsonb("amenities").default(sql`'[]'`), // ['fuel', 'restaurant', 'pool', 'ship_store', 'repairs', 'wifi', 'laundry', 'showers', 'pumpout']
+  
+  // Occupancy & Financials
+  occupancyRate: decimal("occupancy_rate", { precision: 5, scale: 2 }), // percentage 0-100
+  annualRevenue: decimal("annual_revenue", { precision: 14, scale: 2 }),
+  noiEstimate: decimal("noi_estimate", { precision: 14, scale: 2 }),
+  
+  // Price History (stored as JSON array of {date, price, notes})
+  askingPriceHistory: jsonb("asking_price_history").default(sql`'[]'`),
   
   // Property Status Toggles (Upgrade G)
   isSelling: boolean("is_selling").default(false),

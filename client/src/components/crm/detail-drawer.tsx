@@ -417,9 +417,209 @@ export function DetailDrawer({
                             />
                           ) : (
                             <Badge variant="secondary" data-testid="badge-lifecycleStage">
-                              {entity?.lifecycleStage || "Unknown"}
+                              {entity?.lifecycleStage || entity?.contactTag || "Unknown"}
                             </Badge>
                           )}
+                        </div>
+
+                        <Separator className="my-4" />
+                        <h4 className="text-sm font-medium text-muted-foreground mb-3">Lead & Communication</h4>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Lead Source</Label>
+                            {isEditing ? (
+                              <Input
+                                value={editData.leadSource || ""}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, leadSource: e.target.value })
+                                }
+                                placeholder="website, referral, trade show..."
+                                data-testid="input-leadSource"
+                              />
+                            ) : (
+                              <div className="text-sm" data-testid="text-leadSource">
+                                {entity?.leadSource || "-"}
+                              </div>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Preferred Contact</Label>
+                            {isEditing ? (
+                              <Input
+                                value={editData.communicationPreference || ""}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, communicationPreference: e.target.value })
+                                }
+                                placeholder="email, phone, text"
+                                data-testid="input-communicationPreference"
+                              />
+                            ) : (
+                              <div className="text-sm capitalize" data-testid="text-communicationPreference">
+                                {entity?.communicationPreference || "Email"}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <Separator className="my-4" />
+                        <h4 className="text-sm font-medium text-muted-foreground mb-3">Social Profiles</h4>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>LinkedIn</Label>
+                            {isEditing ? (
+                              <Input
+                                value={editData.linkedinUrl || ""}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, linkedinUrl: e.target.value })
+                                }
+                                placeholder="https://linkedin.com/in/..."
+                                data-testid="input-linkedinUrl"
+                              />
+                            ) : (
+                              <div className="text-sm flex items-center gap-2" data-testid="text-linkedinUrl">
+                                {entity?.linkedinUrl ? (
+                                  <a
+                                    href={entity.linkedinUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:underline flex items-center gap-1"
+                                  >
+                                    View Profile <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                ) : "-"}
+                              </div>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Twitter/X</Label>
+                            {isEditing ? (
+                              <Input
+                                value={editData.twitterHandle || ""}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, twitterHandle: e.target.value })
+                                }
+                                placeholder="@handle"
+                                data-testid="input-twitterHandle"
+                              />
+                            ) : (
+                              <div className="text-sm" data-testid="text-twitterHandle">
+                                {entity?.twitterHandle ? `@${entity.twitterHandle.replace('@', '')}` : "-"}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <Separator className="my-4" />
+                        <h4 className="text-sm font-medium text-muted-foreground mb-3">Address</h4>
+
+                        <div className="space-y-2">
+                          <Label>Street Address</Label>
+                          {isEditing ? (
+                            <Input
+                              value={editData.address || ""}
+                              onChange={(e) =>
+                                setEditData({ ...editData, address: e.target.value })
+                              }
+                              data-testid="input-address"
+                            />
+                          ) : (
+                            <div className="text-sm" data-testid="text-address">
+                              {entity?.address || "-"}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="space-y-2">
+                            <Label>City</Label>
+                            {isEditing ? (
+                              <Input
+                                value={editData.city || ""}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, city: e.target.value })
+                                }
+                                data-testid="input-city"
+                              />
+                            ) : (
+                              <div className="text-sm" data-testid="text-city">
+                                {entity?.city || "-"}
+                              </div>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            <Label>State</Label>
+                            {isEditing ? (
+                              <Input
+                                value={editData.state || ""}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, state: e.target.value })
+                                }
+                                data-testid="input-state"
+                              />
+                            ) : (
+                              <div className="text-sm" data-testid="text-state">
+                                {entity?.state || "-"}
+                              </div>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Zip</Label>
+                            {isEditing ? (
+                              <Input
+                                value={editData.zipCode || ""}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, zipCode: e.target.value })
+                                }
+                                data-testid="input-zipCode"
+                              />
+                            ) : (
+                              <div className="text-sm" data-testid="text-zipCode">
+                                {entity?.zipCode || "-"}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <Separator className="my-4" />
+                        <h4 className="text-sm font-medium text-muted-foreground mb-3">Personal Dates</h4>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Birthday</Label>
+                            {isEditing ? (
+                              <Input
+                                type="date"
+                                value={editData.birthday || ""}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, birthday: e.target.value })
+                                }
+                                data-testid="input-birthday"
+                              />
+                            ) : (
+                              <div className="text-sm" data-testid="text-birthday">
+                                {entity?.birthday ? new Date(entity.birthday).toLocaleDateString() : "-"}
+                              </div>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Anniversary</Label>
+                            {isEditing ? (
+                              <Input
+                                type="date"
+                                value={editData.anniversary || ""}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, anniversary: e.target.value })
+                                }
+                                data-testid="input-anniversary"
+                              />
+                            ) : (
+                              <div className="text-sm" data-testid="text-anniversary">
+                                {entity?.anniversary ? new Date(entity.anniversary).toLocaleDateString() : "-"}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )}
@@ -521,6 +721,115 @@ export function DetailDrawer({
                             </div>
                           )}
                         </div>
+
+                        <Separator className="my-4" />
+                        <h4 className="text-sm font-medium text-muted-foreground mb-3">Financial & Business</h4>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Annual Revenue</Label>
+                            {isEditing ? (
+                              <Input
+                                type="number"
+                                value={editData.annualRevenue || ""}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, annualRevenue: e.target.value })
+                                }
+                                placeholder="$0"
+                                data-testid="input-annualRevenue"
+                              />
+                            ) : (
+                              <div className="text-sm" data-testid="text-annualRevenue">
+                                {entity?.annualRevenue ? `$${Number(entity.annualRevenue).toLocaleString()}` : "-"}
+                              </div>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Marina Spend</Label>
+                            {isEditing ? (
+                              <Input
+                                type="number"
+                                value={editData.annualMarinaSpend || ""}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, annualMarinaSpend: e.target.value })
+                                }
+                                placeholder="$0"
+                                data-testid="input-annualMarinaSpend"
+                              />
+                            ) : (
+                              <div className="text-sm" data-testid="text-annualMarinaSpend">
+                                {entity?.annualMarinaSpend ? `$${Number(entity.annualMarinaSpend).toLocaleString()}` : "-"}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <Separator className="my-4" />
+                        <h4 className="text-sm font-medium text-muted-foreground mb-3">Acquisition & Portfolio</h4>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Acquisition Interest</Label>
+                            {isEditing ? (
+                              <Input
+                                value={editData.acquisitionInterest || ""}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, acquisitionInterest: e.target.value })
+                                }
+                                placeholder="hot, warm, cold, none"
+                                data-testid="input-acquisitionInterest"
+                              />
+                            ) : (
+                              <div className="text-sm" data-testid="text-acquisitionInterest">
+                                <Badge variant={
+                                  entity?.acquisitionInterest === 'hot' ? 'default' :
+                                  entity?.acquisitionInterest === 'warm' ? 'secondary' : 'outline'
+                                } className={
+                                  entity?.acquisitionInterest === 'hot' ? 'bg-red-500' :
+                                  entity?.acquisitionInterest === 'warm' ? 'bg-yellow-500' : ''
+                                }>
+                                  {entity?.acquisitionInterest || "Unknown"}
+                                </Badge>
+                              </div>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Portfolio Size</Label>
+                            {isEditing ? (
+                              <Input
+                                type="number"
+                                value={editData.portfolioCount || ""}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, portfolioCount: parseInt(e.target.value) || 0 })
+                                }
+                                placeholder="0"
+                                data-testid="input-portfolioCount"
+                              />
+                            ) : (
+                              <div className="text-sm" data-testid="text-portfolioCount">
+                                {entity?.portfolioCount ? `${entity.portfolioCount} properties` : "-"}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Size Tier</Label>
+                          {isEditing ? (
+                            <Input
+                              value={editData.size || ""}
+                              onChange={(e) =>
+                                setEditData({ ...editData, size: e.target.value })
+                              }
+                              placeholder="startup, small, medium, large, enterprise"
+                              data-testid="input-size"
+                            />
+                          ) : (
+                            <div className="text-sm capitalize" data-testid="text-size">
+                              {entity?.size || "-"}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
 
@@ -603,6 +912,321 @@ export function DetailDrawer({
                             </div>
                           </div>
                         )}
+                      </div>
+                    )}
+
+                    {/* Property Overview */}
+                    {entityType === "property" && (
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Property Name</Label>
+                          {isEditing ? (
+                            <Input
+                              value={editData.title || ""}
+                              onChange={(e) =>
+                                setEditData({ ...editData, title: e.target.value })
+                              }
+                              data-testid="input-title"
+                            />
+                          ) : (
+                            <div className="text-sm" data-testid="text-title">
+                              {entity?.title || "-"}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Type</Label>
+                            {isEditing ? (
+                              <Input
+                                value={editData.type || "marina"}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, type: e.target.value })
+                                }
+                                data-testid="input-type"
+                              />
+                            ) : (
+                              <div className="text-sm capitalize" data-testid="text-type">
+                                {entity?.type || "Marina"}
+                              </div>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Status</Label>
+                            {isEditing ? (
+                              <Input
+                                value={editData.status || ""}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, status: e.target.value })
+                                }
+                                data-testid="input-status"
+                              />
+                            ) : (
+                              <Badge variant="secondary" data-testid="badge-status">
+                                {entity?.status || "Available"}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+
+                        <Separator className="my-4" />
+                        <h4 className="text-sm font-medium text-muted-foreground mb-3">Location</h4>
+
+                        <div className="space-y-2">
+                          <Label>Address</Label>
+                          {isEditing ? (
+                            <Input
+                              value={editData.address || ""}
+                              onChange={(e) =>
+                                setEditData({ ...editData, address: e.target.value })
+                              }
+                              data-testid="input-address"
+                            />
+                          ) : (
+                            <div className="text-sm" data-testid="text-address">
+                              {entity?.address || "-"}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="space-y-2">
+                            <Label>City</Label>
+                            {isEditing ? (
+                              <Input
+                                value={editData.city || ""}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, city: e.target.value })
+                                }
+                                data-testid="input-city"
+                              />
+                            ) : (
+                              <div className="text-sm" data-testid="text-city">
+                                {entity?.city || "-"}
+                              </div>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            <Label>State</Label>
+                            {isEditing ? (
+                              <Input
+                                value={editData.state || ""}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, state: e.target.value })
+                                }
+                                data-testid="input-state"
+                              />
+                            ) : (
+                              <div className="text-sm" data-testid="text-state">
+                                {entity?.state || "-"}
+                              </div>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Zip</Label>
+                            {isEditing ? (
+                              <Input
+                                value={editData.zipCode || ""}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, zipCode: e.target.value })
+                                }
+                                data-testid="input-zipCode"
+                              />
+                            ) : (
+                              <div className="text-sm" data-testid="text-zipCode">
+                                {entity?.zipCode || "-"}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <Separator className="my-4" />
+                        <h4 className="text-sm font-medium text-muted-foreground mb-3">Marina Capacity</h4>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Wet Slips</Label>
+                            {isEditing ? (
+                              <Input
+                                type="number"
+                                value={editData.wetSlips || ""}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, wetSlips: parseInt(e.target.value) || null })
+                                }
+                                data-testid="input-wetSlips"
+                              />
+                            ) : (
+                              <div className="text-sm" data-testid="text-wetSlips">
+                                {entity?.wetSlips || "-"}
+                              </div>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Dry Slips</Label>
+                            {isEditing ? (
+                              <Input
+                                type="number"
+                                value={editData.drySlips || ""}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, drySlips: parseInt(e.target.value) || null })
+                                }
+                                data-testid="input-drySlips"
+                              />
+                            ) : (
+                              <div className="text-sm" data-testid="text-drySlips">
+                                {entity?.drySlips || "-"}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Moorings</Label>
+                            {isEditing ? (
+                              <Input
+                                type="number"
+                                value={editData.moorings || ""}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, moorings: parseInt(e.target.value) || null })
+                                }
+                                data-testid="input-moorings"
+                              />
+                            ) : (
+                              <div className="text-sm" data-testid="text-moorings">
+                                {entity?.moorings || "-"}
+                              </div>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Total Capacity</Label>
+                            {isEditing ? (
+                              <Input
+                                type="number"
+                                value={editData.totalCapacity || ""}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, totalCapacity: parseInt(e.target.value) || null })
+                                }
+                                data-testid="input-totalCapacity"
+                              />
+                            ) : (
+                              <div className="text-sm" data-testid="text-totalCapacity">
+                                {entity?.totalCapacity || "-"}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Occupancy Rate</Label>
+                          {isEditing ? (
+                            <Input
+                              type="number"
+                              value={editData.occupancyRate || ""}
+                              onChange={(e) =>
+                                setEditData({ ...editData, occupancyRate: e.target.value })
+                              }
+                              placeholder="0-100%"
+                              data-testid="input-occupancyRate"
+                            />
+                          ) : (
+                            <div className="text-sm" data-testid="text-occupancyRate">
+                              {entity?.occupancyRate ? `${entity.occupancyRate}%` : "-"}
+                            </div>
+                          )}
+                        </div>
+
+                        <Separator className="my-4" />
+                        <h4 className="text-sm font-medium text-muted-foreground mb-3">Amenities</h4>
+
+                        <div className="text-sm" data-testid="text-amenities">
+                          {entity?.amenities && Array.isArray(entity.amenities) && entity.amenities.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {entity.amenities.map((amenity: string, idx: number) => (
+                                <Badge key={idx} variant="outline" className="capitalize">
+                                  {amenity.replace(/_/g, ' ')}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : "-"}
+                        </div>
+
+                        <Separator className="my-4" />
+                        <h4 className="text-sm font-medium text-muted-foreground mb-3">Financials</h4>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Listing Price</Label>
+                            {isEditing ? (
+                              <Input
+                                type="number"
+                                value={editData.listingPrice || ""}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, listingPrice: e.target.value })
+                                }
+                                data-testid="input-listingPrice"
+                              />
+                            ) : (
+                              <div className="text-sm font-medium text-green-600" data-testid="text-listingPrice">
+                                {entity?.listingPrice ? `$${Number(entity.listingPrice).toLocaleString()}` : "-"}
+                              </div>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Annual Revenue</Label>
+                            {isEditing ? (
+                              <Input
+                                type="number"
+                                value={editData.annualRevenue || ""}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, annualRevenue: e.target.value })
+                                }
+                                data-testid="input-annualRevenue"
+                              />
+                            ) : (
+                              <div className="text-sm" data-testid="text-annualRevenue">
+                                {entity?.annualRevenue ? `$${Number(entity.annualRevenue).toLocaleString()}` : "-"}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>NOI Estimate</Label>
+                          {isEditing ? (
+                            <Input
+                              type="number"
+                              value={editData.noiEstimate || ""}
+                              onChange={(e) =>
+                                setEditData({ ...editData, noiEstimate: e.target.value })
+                              }
+                              data-testid="input-noiEstimate"
+                            />
+                          ) : (
+                            <div className="text-sm" data-testid="text-noiEstimate">
+                              {entity?.noiEstimate ? `$${Number(entity.noiEstimate).toLocaleString()}` : "-"}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Description</Label>
+                          {isEditing ? (
+                            <Textarea
+                              value={editData.description || ""}
+                              onChange={(e) =>
+                                setEditData({ ...editData, description: e.target.value })
+                              }
+                              rows={3}
+                              data-testid="input-description"
+                            />
+                          ) : (
+                            <div className="text-sm" data-testid="text-description">
+                              {entity?.description || "-"}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
 
