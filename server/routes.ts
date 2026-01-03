@@ -9064,17 +9064,32 @@ Current context: Project ${req.params.projectId}`;
     try {
       const { company, companyId, ...contactData } = req.body;
       
-      // If company name provided without companyId, create a pending company
+      let linkedCompanyId = companyId || null;
       let pendingCompanyId = null;
+      
+      // If company name provided without companyId, check for existing companies first
       if (company && !companyId) {
-        const pendingCompany = await storage.createPendingCompany({
-          orgId: req.user.orgId,
-          sourceType: 'contact_form',
-          sourceId: null,
-          name: company,
-          status: 'pending',
-        });
-        pendingCompanyId = pendingCompany.id;
+        // First check for exact match
+        const existingCompany = await storage.findCompanyByName(req.user.orgId, company);
+        
+        if (existingCompany) {
+          // Exact match found - automatically link to this company
+          linkedCompanyId = existingCompany.id;
+        } else {
+          // No exact match - check for similar companies to suggest as duplicates
+          const similarCompanies = await storage.findSimilarCompanies(req.user.orgId, company);
+          
+          // Create pending company with suggested duplicates if any found
+          const pendingCompany = await storage.createPendingCompany({
+            orgId: req.user.orgId,
+            sourceType: 'contact_form',
+            sourceId: null,
+            name: company,
+            status: 'pending',
+            suggestedDuplicates: similarCompanies.length > 0 ? similarCompanies.map(c => c.id) : null,
+          });
+          pendingCompanyId = pendingCompany.id;
+        }
       }
       
       // Create the contact
@@ -9084,12 +9099,12 @@ Current context: Project ${req.params.projectId}`;
         ownerId: req.user.id,
       });
       
-      // If we have a companyId, link the contact to the company
-      if (companyId) {
-        await storage.linkContactToCompany(contact.id, companyId, contactData.role || null, true);
+      // If we have a companyId (either provided or found via exact match), link the contact to the company
+      if (linkedCompanyId) {
+        await storage.linkContactToCompany(contact.id, linkedCompanyId, contactData.role || null, true);
       }
       
-      res.json({ ...contact, linkedCompanyId: companyId, pendingCompanyId });
+      res.json({ ...contact, linkedCompanyId, pendingCompanyId, exactMatchFound: !companyId && linkedCompanyId !== null });
     } catch (error: any) {
       console.error("Failed to create contact:", error);
       res.status(500).json({ error: "Failed to create contact" });

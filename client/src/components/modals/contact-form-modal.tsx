@@ -212,13 +212,33 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
         if (cleanData[key] === "") delete cleanData[key];
       });
       
-      return await apiRequest('POST', '/api/contacts', cleanData);
+      const response = await apiRequest('POST', '/api/contacts', cleanData);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || error.error || 'Failed to create contact');
+      }
+      return await response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: { exactMatchFound?: boolean; pendingCompanyId?: string; linkedCompanyId?: string }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
       queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-companies'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
       queryClient.invalidateQueries({ queryKey: ['/api/bootstrap'] });
-      toast({ title: "Contact created successfully" });
+      
+      if (data.exactMatchFound) {
+        toast({ 
+          title: "Contact created and linked", 
+          description: `Found existing company "${company}" and automatically linked the contact.`
+        });
+      } else if (data.pendingCompanyId) {
+        toast({ 
+          title: "Contact created", 
+          description: `Company "${company}" has been added to Pending Companies for review.`
+        });
+      } else {
+        toast({ title: "Contact created successfully" });
+      }
+      
       onClose();
       resetForm();
     },
