@@ -2074,6 +2074,7 @@ export type InsertChecklistItem = z.infer<typeof insertChecklistItemSchema>;
 
 export const crmCompanies = pgTable("crm_companies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
   name: text("name").notNull(),
   domain: text("domain"),
   industry: text("industry"),
@@ -2101,6 +2102,7 @@ export const crmCompanies = pgTable("crm_companies", {
 
 export const crmContacts = pgTable("crm_contacts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   email: text("email").notNull(),
@@ -2192,6 +2194,7 @@ export const crmContactsLabels = pgTable("crm_contacts_labels", {
 
 export const crmProperties = pgTable("crm_properties", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
   title: text("title").notNull(),
   type: text("type").notNull().default('marina'), // marina, boat, slip, dry_storage
   status: text("status").notNull().default('available'), // available, under_contract, sold, off_market
