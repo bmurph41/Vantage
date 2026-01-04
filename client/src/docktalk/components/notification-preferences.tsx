@@ -47,33 +47,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Slider } from "@/components/ui/slider";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
-const CATEGORIES = [
-  "Development",
-  "Operations",
-  "Regulatory",
-  "Environmental",
-  "Technology",
-  "Macro",
-  "M&A",
-  "General",
-  "Boat Sales",
-  "Boat Show",
-  "Manufacturing",
-  "Industry Trends",
-  "Marina Sale",
-  "Education",
-  "Insurance",
-  "Legal",
-  "People Moves",
-  "Company Earnings",
-  "Awards",
-  "Business Planning",
-  "International",
-] as const;
 
 const TIMEZONES = [
   { value: "America/New_York", label: "Eastern Time (ET)" },
@@ -106,7 +82,6 @@ const savedSearchSchema = z.object({
   criteria: z.object({
     search: z.string().optional(),
     categories: z.array(z.string()).optional(),
-    minRelevance: z.number().min(0).max(100).optional(),
     sentiment: z.enum(["any", "positive", "neutral", "negative"]).optional(),
     dealsOnly: z.boolean().optional(),
   }),
@@ -146,6 +121,12 @@ export default function NotificationPreferences({
   const { data: notifications, isLoading: notificationsLoading } = useQuery<any[]>({
     queryKey: ["/api/docktalk/notifications"],
     enabled: open && activeTab === "history",
+  });
+
+  // Fetch categories dynamically from the API
+  const { data: categories = [] } = useQuery<string[]>({
+    queryKey: ["/api/docktalk/categories/all"],
+    enabled: open,
   });
 
   const form = useForm<EmailSettingsForm>({
@@ -251,7 +232,6 @@ export default function NotificationPreferences({
       criteria: {
         search: "",
         categories: [],
-        minRelevance: 50,
         sentiment: "any",
         dealsOnly: false,
       },
@@ -267,7 +247,6 @@ export default function NotificationPreferences({
           criteria: editingSearch.criteria || {
             search: "",
             categories: [],
-            minRelevance: 50,
             sentiment: "any",
             dealsOnly: false,
           },
@@ -279,7 +258,6 @@ export default function NotificationPreferences({
           criteria: {
             search: "",
             categories: [],
-            minRelevance: 50,
             sentiment: "any",
             dealsOnly: false,
           },
@@ -627,9 +605,6 @@ export default function NotificationPreferences({
                               {search.criteria?.sentiment && search.criteria.sentiment !== "any" && (
                                 <span>Sentiment: {search.criteria.sentiment}</span>
                               )}
-                              {search.criteria?.minRelevance && (
-                                <span>Min Relevance: {search.criteria.minRelevance}%</span>
-                              )}
                               {search.criteria?.dealsOnly && (
                                 <Badge variant="outline" className="text-xs">Deals Only</Badge>
                               )}
@@ -719,9 +694,9 @@ export default function NotificationPreferences({
       <Dialog open={searchDialogOpen} onOpenChange={setSearchDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle>{editingSearch ? "Edit Search" : "Create New Search"}</DialogTitle>
+            <DialogTitle>{editingSearch ? "Edit Saved Search" : "New Saved Search"}</DialogTitle>
             <DialogDescription>
-              {editingSearch ? "Update your saved search criteria" : "Set up a new search to monitor specific marina industry articles"}
+              Define criteria for articles that will trigger email alerts
             </DialogDescription>
           </DialogHeader>
 
@@ -768,7 +743,7 @@ export default function NotificationPreferences({
                     </FormDescription>
                     <ScrollArea className="h-32 border rounded-md p-3">
                       <div className="grid grid-cols-2 gap-2">
-                        {CATEGORIES.map((category) => (
+                        {categories.map((category) => (
                           <div key={category} className="flex items-center space-x-2">
                             <Checkbox
                               id={`search-category-${category}`}
@@ -803,54 +778,30 @@ export default function NotificationPreferences({
                 )}
               />
 
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={searchForm.control}
-                  name="criteria.minRelevance"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Min Relevance: {field.value}%</FormLabel>
+              <FormField
+                control={searchForm.control}
+                name="criteria.sentiment"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sentiment</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || "any"}>
                       <FormControl>
-                        <Slider
-                          min={0}
-                          max={100}
-                          step={5}
-                          value={[field.value || 50]}
-                          onValueChange={(vals) => field.onChange(vals[0])}
-                          data-testid="slider-min-relevance"
-                        />
+                        <SelectTrigger data-testid="select-sentiment">
+                          <SelectValue placeholder="Any" />
+                        </SelectTrigger>
                       </FormControl>
-                      <FormDescription className="text-xs">Minimum relevance score</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={searchForm.control}
-                  name="criteria.sentiment"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Sentiment</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || "any"}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-sentiment">
-                            <SelectValue placeholder="Any" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="any">Any</SelectItem>
-                          <SelectItem value="positive">Positive</SelectItem>
-                          <SelectItem value="neutral">Neutral</SelectItem>
-                          <SelectItem value="negative">Negative</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormDescription className="text-xs">Article sentiment filter</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                      <SelectContent>
+                        <SelectItem value="any">Any</SelectItem>
+                        <SelectItem value="positive">Positive</SelectItem>
+                        <SelectItem value="neutral">Neutral</SelectItem>
+                        <SelectItem value="negative">Negative</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription className="text-xs">Article sentiment filter</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={searchForm.control}
