@@ -600,13 +600,13 @@ class DocIntelService {
         extractedItems.push(extracted);
       }
 
-      const errorMessage = usedOcrFallback 
-        ? 'Note: OCR was used because the PDF text was unreadable. Some line items may need manual review.'
+      const holdingNotes = usedOcrFallback 
+        ? 'OCR was used because the PDF text was unreadable. Some line items may need manual review.'
         : undefined;
 
       await this.updateUpload(orgId, uploadId, { 
         status: 'parsed',
-        errorMessage 
+        holdingNotes 
       });
       
       return extractedItems;
@@ -648,29 +648,33 @@ class DocIntelService {
   }
 
   private extractAmountFromLine(line: string): { text: string; amount: number | null } {
-    const amountPatterns = [
-      /\$?\s*([\d,]+\.?\d*)\s*$/,
-      /\(\$?\s*([\d,]+\.?\d*)\)\s*$/,
-      /\$?\s*([\d,]+\.?\d*)\s*\(.*\)\s*$/,
-    ];
-    
-    let amount: number | null = null;
-    let text = line;
-    
-    for (const pattern of amountPatterns) {
-      const match = line.match(pattern);
-      if (match) {
-        const numStr = match[1].replace(/,/g, '');
-        const parsed = parseFloat(numStr);
-        if (!isNaN(parsed)) {
-          amount = line.includes('(') && !line.includes('$(') ? -parsed : parsed;
-          text = line.replace(match[0], '').trim();
-          break;
-        }
+    const negativePattern = /\(\$?\s*([\d,]+\.?\d*)\)\s*$/;
+    const negativeMatch = line.match(negativePattern);
+    if (negativeMatch) {
+      const numStr = negativeMatch[1].replace(/,/g, '');
+      const parsed = parseFloat(numStr);
+      if (!isNaN(parsed)) {
+        return {
+          text: line.replace(negativeMatch[0], '').trim(),
+          amount: -parsed
+        };
       }
     }
     
-    return { text, amount };
+    const positivePattern = /\$?\s*([\d,]+\.?\d{2})\s*$/;
+    const positiveMatch = line.match(positivePattern);
+    if (positiveMatch) {
+      const numStr = positiveMatch[1].replace(/,/g, '');
+      const parsed = parseFloat(numStr);
+      if (!isNaN(parsed)) {
+        return {
+          text: line.replace(positiveMatch[0], '').trim(),
+          amount: parsed
+        };
+      }
+    }
+    
+    return { text: line, amount: null };
   }
 
   async categorizeItems(orgId: string, uploadId: string): Promise<DocIntelExtractedItem[]> {
