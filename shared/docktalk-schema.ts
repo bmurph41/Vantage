@@ -333,6 +333,33 @@ export const userArticleAnnotations = pgTable("docktalk_user_article_annotations
   uniqueUserArticle: index("idx_docktalk_annotations_user_article").on(table.userId, table.articleId),
 }));
 
+// DockTalk Article-CRM Entity Links (Phase 4A - Cross-Module Integration)
+// Junction table linking DockTalk articles to CRM entities (contacts, companies, properties)
+export const docktalkCrmEntityLinkTypeEnum = pgEnum("docktalk_crm_entity_link_type", [
+  "contact",
+  "company", 
+  "property",
+  "deal"
+]);
+
+export const articleCrmLinks = pgTable("docktalk_article_crm_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(), // Organization scope for multi-tenancy
+  articleId: integer("article_id").notNull().references(() => articles.id, { onDelete: "cascade" }),
+  entityType: docktalkCrmEntityLinkTypeEnum("entity_type").notNull(),
+  entityId: varchar("entity_id").notNull(), // References crmContacts.id, crmCompanies.id, crmProperties.id, or crmDeals.id
+  linkSource: text("link_source").notNull().default("manual"), // "manual" | "ai_detected" | "keyword_match"
+  confidence: integer("confidence").default(100), // 0-100 confidence score for AI-detected links
+  notes: text("notes"),
+  createdBy: varchar("created_by"), // User who created the link (null for AI-detected)
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  byOrg: index("idx_docktalk_crm_links_org").on(table.orgId),
+  byArticle: index("idx_docktalk_crm_links_article").on(table.articleId),
+  byEntity: index("idx_docktalk_crm_links_entity").on(table.entityType, table.entityId),
+  uniqueArticleEntity: uniqueIndex("idx_docktalk_crm_links_unique").on(table.articleId, table.entityType, table.entityId),
+}));
+
 export const companyTypeEnum = pgEnum("docktalk_company_type", [
   "marina_operator", 
   "marina_owner", 
@@ -527,6 +554,11 @@ export const insertUserArticleAnnotationSchema = createInsertSchema(userArticleA
   id: true,
   createdAt: true,
   updatedAt: true,
+});
+
+export const insertArticleCrmLinkSchema = createInsertSchema(articleCrmLinks).omit({
+  id: true,
+  createdAt: true,
 });
 
 export const insertPortfolioCompanySchema = createInsertSchema(portfolioCompanies).omit({
@@ -735,6 +767,8 @@ export type SavedSearch = typeof savedSearches.$inferSelect;
 export type InsertSavedSearch = z.infer<typeof insertSavedSearchSchema>;
 export type UserArticleAnnotation = typeof userArticleAnnotations.$inferSelect;
 export type InsertUserArticleAnnotation = z.infer<typeof insertUserArticleAnnotationSchema>;
+export type ArticleCrmLink = typeof articleCrmLinks.$inferSelect;
+export type InsertArticleCrmLink = z.infer<typeof insertArticleCrmLinkSchema>;
 export type PortfolioCompany = typeof portfolioCompanies.$inferSelect;
 export type InsertPortfolioCompany = z.infer<typeof insertPortfolioCompanySchema>;
 export type Notification = typeof notifications.$inferSelect;

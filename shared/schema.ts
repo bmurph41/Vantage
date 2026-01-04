@@ -682,6 +682,10 @@ export const projects = pgTable("projects", {
   healthScoreUpdatedAt: timestamp("health_score_updated_at"),
   customDeadlines: jsonb("custom_deadlines").default(sql`'[]'`), // Array of {label: string, date: string}
   leases: jsonb("leases").default(sql`'[]'`), // Array of lease information from deal
+  // Cross-Module Entity Links (Phase 1A - Architecture Consolidation)
+  dealId: varchar("deal_id").references(() => crmDeals.id, { onDelete: 'set null' }), // Link to CRM deal
+  propertyId: varchar("property_id").references(() => crmProperties.id, { onDelete: 'set null' }), // Link to CRM property
+  modelingProjectId: varchar("modeling_project_id"), // Link to modeling project (forward reference, no FK to avoid circular)
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
