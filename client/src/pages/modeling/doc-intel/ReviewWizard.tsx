@@ -405,6 +405,15 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
                 <p className="text-sm text-muted-foreground mt-2">Click "Parse Document" below to try again.</p>
               </div>
             )}
+            {upload.status !== 'error' && upload.errorMessage?.includes('OCR') && (
+              <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-lg flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">OCR Processing Note</p>
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">{upload.errorMessage}</p>
+                </div>
+              </div>
+            )}
             <div className="bg-muted p-4 rounded-lg">
               <div className="flex items-center gap-4 mb-4">
                 <FileSpreadsheet className="h-12 w-12 text-green-600" />
@@ -439,6 +448,15 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {upload.errorMessage?.includes('OCR') && (
+              <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-lg flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">OCR Processing Note</p>
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">{upload.errorMessage}</p>
+                </div>
+              </div>
+            )}
             <div className="bg-muted p-4 rounded-lg">
               <div className="flex items-center gap-4 mb-4">
                 <Brain className="h-12 w-12 text-purple-600" />

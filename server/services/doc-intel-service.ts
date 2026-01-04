@@ -34,6 +34,7 @@ import * as fs from 'fs';
 import * as crypto from 'crypto';
 import path from 'path';
 import * as XLSX from 'xlsx';
+import { extractDocument } from '../utils/ocr';
 
 interface ParsedLineItem {
   rawText: string;
@@ -553,7 +554,24 @@ class DocIntelService {
     await this.updateUpload(orgId, uploadId, { status: 'processing' });
 
     try {
-      const parsedItems = await this.parseExcelFile(upload.storagePath);
+      let parsedItems: ParsedLineItem[] = [];
+      let usedOcrFallback = false;
+      
+      const isPdf = upload.mimeType === 'application/pdf';
+      
+      if (isPdf) {
+        console.log(`[DocIntelService] Processing PDF file: ${upload.originalName}`);
+        const ocrResult = await extractDocument(upload.storagePath, upload.mimeType);
+        usedOcrFallback = ocrResult.meta?.usedOcrFallback === true;
+        
+        if (usedOcrFallback) {
+          console.log(`[DocIntelService] OCR fallback was used for ${upload.originalName}`);
+        }
+        
+        parsedItems = this.parsePdfOcrResult(ocrResult);
+      } else {
+        parsedItems = await this.parseExcelFile(upload.storagePath);
+      }
       
       const extractedItems: DocIntelExtractedItem[] = [];
 
@@ -582,7 +600,14 @@ class DocIntelService {
         extractedItems.push(extracted);
       }
 
-      await this.updateUpload(orgId, uploadId, { status: 'parsed' });
+      const errorMessage = usedOcrFallback 
+        ? 'Note: OCR was used because the PDF text was unreadable. Some line items may need manual review.'
+        : undefined;
+
+      await this.updateUpload(orgId, uploadId, { 
+        status: 'parsed',
+        errorMessage 
+      });
       
       return extractedItems;
     } catch (error) {
@@ -592,6 +617,60 @@ class DocIntelService {
       });
       throw error;
     }
+  }
+
+  private parsePdfOcrResult(ocrResult: any): ParsedLineItem[] {
+    const items: ParsedLineItem[] = [];
+    let globalRow = 0;
+    
+    for (const page of ocrResult.pages || []) {
+      const lines = (page.content || '').split('\n').filter((l: string) => l.trim());
+      
+      for (const line of lines) {
+        globalRow++;
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.length < 3) continue;
+        
+        const { text, amount } = this.extractAmountFromLine(trimmed);
+        
+        if (text || amount !== null) {
+          items.push({
+            rawText: text || '(no description)',
+            amount,
+            sourcePage: page.pageNumber,
+            sourceRow: globalRow,
+          });
+        }
+      }
+    }
+    
+    return items;
+  }
+
+  private extractAmountFromLine(line: string): { text: string; amount: number | null } {
+    const amountPatterns = [
+      /\$?\s*([\d,]+\.?\d*)\s*$/,
+      /\(\$?\s*([\d,]+\.?\d*)\)\s*$/,
+      /\$?\s*([\d,]+\.?\d*)\s*\(.*\)\s*$/,
+    ];
+    
+    let amount: number | null = null;
+    let text = line;
+    
+    for (const pattern of amountPatterns) {
+      const match = line.match(pattern);
+      if (match) {
+        const numStr = match[1].replace(/,/g, '');
+        const parsed = parseFloat(numStr);
+        if (!isNaN(parsed)) {
+          amount = line.includes('(') && !line.includes('$(') ? -parsed : parsed;
+          text = line.replace(match[0], '').trim();
+          break;
+        }
+      }
+    }
+    
+    return { text, amount };
   }
 
   async categorizeItems(orgId: string, uploadId: string): Promise<DocIntelExtractedItem[]> {
