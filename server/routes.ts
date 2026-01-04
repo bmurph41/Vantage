@@ -6733,7 +6733,15 @@ Current context: Project ${req.params.projectId}`;
 
   app.post("/api/crm/contacts", async (req: any, res) => {
     try {
-      const contact = await storage.createCrmContact({ ...req.body, ownerId: req.user.id });
+      // Ensure required fields have values (database has notNull constraints)
+      const contactData = {
+        ...req.body,
+        firstName: req.body.firstName || '',
+        lastName: req.body.lastName || '',
+        email: req.body.email || '',
+        ownerId: req.user.id
+      };
+      const contact = await storage.createCrmContact(contactData);
       res.json(contact);
     } catch (error: any) {
       console.error("Failed to create contact:", error);
@@ -6743,7 +6751,12 @@ Current context: Project ${req.params.projectId}`;
 
   app.put("/api/crm/contacts/:id", async (req: any, res) => {
     try {
-      const contact = await storage.updateCrmContact(req.params.id, req.body);
+      // Ensure required fields have values if provided
+      const updateData = { ...req.body };
+      if ('firstName' in updateData && !updateData.firstName) updateData.firstName = '';
+      if ('lastName' in updateData && !updateData.lastName) updateData.lastName = '';
+      if ('email' in updateData && !updateData.email) updateData.email = '';
+      const contact = await storage.updateCrmContact(req.params.id, updateData);
       res.json(contact);
     } catch (error: any) {
       console.error("Failed to update contact:", error);
@@ -6820,7 +6833,13 @@ Current context: Project ${req.params.projectId}`;
 
   app.post("/api/crm/companies", async (req: any, res) => {
     try {
-      const company = await storage.createCrmCompany({ ...req.body, ownerId: req.user.id });
+      // Ensure required fields have values (database has notNull constraints)
+      const companyData = {
+        ...req.body,
+        name: req.body.name || '',
+        ownerId: req.user.id
+      };
+      const company = await storage.createCrmCompany(companyData);
       res.json(company);
     } catch (error: any) {
       console.error("Failed to create company:", error);
@@ -6830,7 +6849,10 @@ Current context: Project ${req.params.projectId}`;
 
   app.put("/api/crm/companies/:id", async (req: any, res) => {
     try {
-      const company = await storage.updateCrmCompany(req.params.id, req.body);
+      // Ensure required fields have values if provided
+      const updateData = { ...req.body };
+      if ('name' in updateData && !updateData.name) updateData.name = '';
+      const company = await storage.updateCrmCompany(req.params.id, updateData);
       res.json(company);
     } catch (error: any) {
       console.error("Failed to update company:", error);
@@ -9258,7 +9280,15 @@ Current context: Project ${req.params.projectId}`;
   });
   app.post("/api/properties", async (req: any, res) => {
     try {
-      const property = await storage.createCrmProperty({ ...req.body, ownerId: req.user.id });
+      // Ensure required fields have values (database has notNull constraints)
+      const propertyData = {
+        ...req.body,
+        title: req.body.title || req.body.name || '',
+        type: req.body.type || 'marina',
+        status: req.body.status || 'available',
+        ownerId: req.user.id
+      };
+      const property = await storage.createCrmProperty(propertyData);
       res.json(property);
     } catch (error: any) {
       console.error("Failed to create property:", error);
@@ -9267,7 +9297,10 @@ Current context: Project ${req.params.projectId}`;
   });
   app.put("/api/properties/:id", async (req: any, res) => {
     try {
-      const property = await storage.updateCrmProperty(req.params.id, req.body);
+      // Ensure required fields have values if provided
+      const updateData = { ...req.body };
+      if ('title' in updateData && !updateData.title) updateData.title = '';
+      const property = await storage.updateCrmProperty(req.params.id, updateData);
       res.json(property);
     } catch (error: any) {
       console.error("Failed to update property:", error);
@@ -9287,7 +9320,10 @@ Current context: Project ${req.params.projectId}`;
   // PATCH route for property updates (used by detail modal)
   app.patch("/api/properties/:id", async (req: any, res) => {
     try {
-      const property = await storage.updateCrmProperty(req.params.id, req.body);
+      // Ensure required fields have values if provided
+      const updateData = { ...req.body };
+      if ('title' in updateData && !updateData.title) updateData.title = '';
+      const property = await storage.updateCrmProperty(req.params.id, updateData);
       res.json(property);
     } catch (error: any) {
       console.error("Failed to update property:", error);
