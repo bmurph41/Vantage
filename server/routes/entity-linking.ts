@@ -25,7 +25,7 @@ import {
   modelingProjects,
 } from "@shared/schema";
 import {
-  docktalkArticles,
+  articles as docktalkArticles,
   articleCrmLinks,
   docktalkCrmEntityLinkTypeEnum,
 } from "@shared/docktalk-schema";
