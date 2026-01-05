@@ -15,6 +15,7 @@ const AnalyticsOverview = lazy(() => import("@/components/analytics/analytics-ov
 const RevenueTrendChart = lazy(() => import("@/components/analytics/revenue-trend-chart"));
 const PipelinePerformanceChart = lazy(() => import("@/components/analytics/pipeline-performance-chart"));
 const TopPerformers = lazy(() => import("@/components/analytics/top-performers"));
+const UnifiedAnalyticsPanel = lazy(() => import("@/components/analytics/unified-analytics-panel"));
 
 // Loading component for lazy-loaded components
 const ComponentLoader = ({ className = "" }: { className?: string }) => (
@@ -260,9 +261,17 @@ export default function Analytics() {
             </div>
           </div>
 
+          {/* Cross-Module Analytics */}
+          <section className="mb-6 sm:mb-8" aria-labelledby="unified-heading">
+            <h2 id="unified-heading" className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Cross-Module Analytics</h2>
+            <Suspense fallback={<ComponentLoader />}>
+              <UnifiedAnalyticsPanel />
+            </Suspense>
+          </section>
+
           {/* Overview Metrics */}
           <section className="mb-6 sm:mb-8" aria-labelledby="overview-heading">
-            <h2 id="overview-heading" className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Overview</h2>
+            <h2 id="overview-heading" className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Pipeline Overview</h2>
             <Suspense fallback={<ComponentLoader />}>
               <AnalyticsOverview dateRange={dateRange} />
             </Suspense>

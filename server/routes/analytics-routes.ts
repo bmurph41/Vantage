@@ -2,11 +2,23 @@
  * Analytics API Routes
  * 
  * Provides endpoints for institutional-grade KPI calculations and benchmarking
+ * Including unified cross-module analytics dashboard (Phase 4B)
  */
 
 import { Router, Request, Response } from 'express';
 import { marinaKpiCalculator } from '../services/analytics';
 import { z } from 'zod';
+import { db } from '../db';
+import { 
+  crmContacts, 
+  crmCompanies, 
+  crmProperties, 
+  crmDeals,
+  projects,
+  modelingProjects,
+} from '@shared/schema';
+import { articles } from '@shared/docktalk-schema';
+import { eq, sql, count, and, gte, lte } from 'drizzle-orm';
 
 const router = Router();
 
@@ -260,5 +272,306 @@ function getMarinaKpiDefinitions() {
     },
   ];
 }
+
+// ============================================================================
+// Phase 4B: Unified Cross-Module Analytics Dashboard
+// ============================================================================
+
+interface UnifiedAnalytics {
+  crm: {
+    totalContacts: number;
+    totalCompanies: number;
+    totalProperties: number;
+    totalDeals: number;
+    dealsByStage: Record<string, number>;
+    recentDeals: number;
+    pipelineValue: number;
+  };
+  dueDiligence: {
+    totalProjects: number;
+    activeProjects: number;
+    completedProjects: number;
+    projectsByStatus: Record<string, number>;
+  };
+  modeling: {
+    totalProjects: number;
+    recentProjects: number;
+  };
+  intelligence: {
+    totalArticles: number;
+    recentArticles: number;
+  };
+  crossModule: {
+    dealsWithDDProjects: number;
+    dealsWithModelingProjects: number;
+    propertiesWithDeals: number;
+    contactsWithDeals: number;
+  };
+  lastUpdated: string;
+}
+
+/**
+ * GET /api/analytics/unified
+ * Get unified cross-module analytics for the dashboard
+ */
+router.get('/unified', async (req: Request, res: Response) => {
+  try {
+    const orgId = (req as any).tenantId || 'org-1';
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    // Parallel queries for all modules
+    const [
+      contactsCount,
+      companiesCount,
+      propertiesCount,
+      dealsData,
+      ddProjectsData,
+      modelingProjectsCount,
+      articlesData,
+      crossModuleData,
+    ] = await Promise.all([
+      // CRM Contacts
+      db.select({ count: count() })
+        .from(crmContacts)
+        .where(eq(crmContacts.organizationId, orgId))
+        .then(r => r[0]?.count || 0),
+      
+      // CRM Companies
+      db.select({ count: count() })
+        .from(crmCompanies)
+        .where(eq(crmCompanies.organizationId, orgId))
+        .then(r => r[0]?.count || 0),
+      
+      // CRM Properties
+      db.select({ count: count() })
+        .from(crmProperties)
+        .where(eq(crmProperties.organizationId, orgId))
+        .then(r => r[0]?.count || 0),
+      
+      // CRM Deals with stage breakdown
+      db.select({
+        stage: crmDeals.stage,
+        count: count(),
+        totalValue: sql<number>`COALESCE(SUM(${crmDeals.value}), 0)`,
+      })
+        .from(crmDeals)
+        .where(eq(crmDeals.organizationId, orgId))
+        .groupBy(crmDeals.stage)
+        .then(rows => {
+          const dealsByStage: Record<string, number> = {};
+          let total = 0;
+          let pipelineValue = 0;
+          rows.forEach(r => {
+            dealsByStage[r.stage || 'unknown'] = Number(r.count);
+            total += Number(r.count);
+            pipelineValue += Number(r.totalValue);
+          });
+          return { dealsByStage, total, pipelineValue };
+        }),
+      
+      // DD Projects with status breakdown
+      db.select({
+        status: projects.status,
+        count: count(),
+      })
+        .from(projects)
+        .where(eq(projects.organizationId, orgId))
+        .groupBy(projects.status)
+        .then(rows => {
+          const projectsByStatus: Record<string, number> = {};
+          let total = 0;
+          let active = 0;
+          let completed = 0;
+          rows.forEach(r => {
+            const status = r.status || 'unknown';
+            projectsByStatus[status] = Number(r.count);
+            total += Number(r.count);
+            if (status === 'in_progress' || status === 'pending') active += Number(r.count);
+            if (status === 'completed') completed += Number(r.count);
+          });
+          return { projectsByStatus, total, active, completed };
+        }),
+      
+      // Modeling Projects
+      db.select({ count: count() })
+        .from(modelingProjects)
+        .where(eq(modelingProjects.organizationId, orgId))
+        .then(r => r[0]?.count || 0),
+      
+      // DockTalk Articles
+      db.select({ 
+        count: count(),
+        recent: sql<number>`COUNT(*) FILTER (WHERE ${articles.publishedAt} >= ${thirtyDaysAgo})`,
+      })
+        .from(articles)
+        .where(eq(articles.organizationId, orgId))
+        .then(r => ({ total: r[0]?.count || 0, recent: Number(r[0]?.recent) || 0 })),
+      
+      // Cross-module relationships
+      Promise.all([
+        // Deals with DD projects
+        db.select({ count: count() })
+          .from(projects)
+          .where(and(
+            eq(projects.organizationId, orgId),
+            sql`${projects.dealId} IS NOT NULL`
+          ))
+          .then(r => r[0]?.count || 0),
+        
+        // Deals with modeling projects (via DD project link)
+        db.select({ count: count() })
+          .from(projects)
+          .where(and(
+            eq(projects.organizationId, orgId),
+            sql`${projects.modelingProjectId} IS NOT NULL`
+          ))
+          .then(r => r[0]?.count || 0),
+        
+        // Properties with deals
+        db.select({ count: sql<number>`COUNT(DISTINCT ${crmDeals.propertyId})` })
+          .from(crmDeals)
+          .where(and(
+            eq(crmDeals.organizationId, orgId),
+            sql`${crmDeals.propertyId} IS NOT NULL`
+          ))
+          .then(r => Number(r[0]?.count) || 0),
+        
+        // Contacts with deals (via primary contact)
+        db.select({ count: sql<number>`COUNT(DISTINCT ${crmDeals.primaryContactId})` })
+          .from(crmDeals)
+          .where(and(
+            eq(crmDeals.organizationId, orgId),
+            sql`${crmDeals.primaryContactId} IS NOT NULL`
+          ))
+          .then(r => Number(r[0]?.count) || 0),
+      ]),
+    ]);
+
+    // Recent deals count
+    const recentDeals = await db.select({ count: count() })
+      .from(crmDeals)
+      .where(and(
+        eq(crmDeals.organizationId, orgId),
+        gte(crmDeals.createdAt, thirtyDaysAgo)
+      ))
+      .then(r => r[0]?.count || 0);
+
+    // Recent modeling projects
+    const recentModelingProjects = await db.select({ count: count() })
+      .from(modelingProjects)
+      .where(and(
+        eq(modelingProjects.organizationId, orgId),
+        gte(modelingProjects.createdAt, thirtyDaysAgo)
+      ))
+      .then(r => r[0]?.count || 0);
+
+    const analytics: UnifiedAnalytics = {
+      crm: {
+        totalContacts: Number(contactsCount),
+        totalCompanies: Number(companiesCount),
+        totalProperties: Number(propertiesCount),
+        totalDeals: dealsData.total,
+        dealsByStage: dealsData.dealsByStage,
+        recentDeals: Number(recentDeals),
+        pipelineValue: dealsData.pipelineValue,
+      },
+      dueDiligence: {
+        totalProjects: ddProjectsData.total,
+        activeProjects: ddProjectsData.active,
+        completedProjects: ddProjectsData.completed,
+        projectsByStatus: ddProjectsData.projectsByStatus,
+      },
+      modeling: {
+        totalProjects: Number(modelingProjectsCount),
+        recentProjects: Number(recentModelingProjects),
+      },
+      intelligence: {
+        totalArticles: Number(articlesData.total),
+        recentArticles: articlesData.recent,
+      },
+      crossModule: {
+        dealsWithDDProjects: Number(crossModuleData[0]),
+        dealsWithModelingProjects: Number(crossModuleData[1]),
+        propertiesWithDeals: crossModuleData[2],
+        contactsWithDeals: crossModuleData[3],
+      },
+      lastUpdated: new Date().toISOString(),
+    };
+
+    res.json(analytics);
+  } catch (error: any) {
+    console.error('[Analytics] Error fetching unified analytics:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch unified analytics',
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * GET /api/analytics/unified/trends
+ * Get trend data for the unified dashboard
+ */
+router.get('/unified/trends', async (req: Request, res: Response) => {
+  try {
+    const orgId = (req as any).tenantId || 'org-1';
+    const months = parseInt(req.query.months as string) || 6;
+    
+    // Generate monthly data points
+    const trends = [];
+    const now = new Date();
+    
+    for (let i = months - 1; i >= 0; i--) {
+      const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+      
+      const [dealsCount, projectsCount, articlesCount] = await Promise.all([
+        db.select({ count: count() })
+          .from(crmDeals)
+          .where(and(
+            eq(crmDeals.organizationId, orgId),
+            gte(crmDeals.createdAt, monthStart),
+            lte(crmDeals.createdAt, monthEnd)
+          ))
+          .then(r => r[0]?.count || 0),
+        
+        db.select({ count: count() })
+          .from(projects)
+          .where(and(
+            eq(projects.organizationId, orgId),
+            gte(projects.createdAt, monthStart),
+            lte(projects.createdAt, monthEnd)
+          ))
+          .then(r => r[0]?.count || 0),
+        
+        db.select({ count: count() })
+          .from(articles)
+          .where(and(
+            eq(articles.organizationId, orgId),
+            gte(articles.publishedAt, monthStart),
+            lte(articles.publishedAt, monthEnd)
+          ))
+          .then(r => r[0]?.count || 0),
+      ]);
+      
+      trends.push({
+        month: monthStart.toISOString().slice(0, 7), // YYYY-MM format
+        label: monthStart.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+        deals: Number(dealsCount),
+        projects: Number(projectsCount),
+        articles: Number(articlesCount),
+      });
+    }
+    
+    res.json({ trends });
+  } catch (error: any) {
+    console.error('[Analytics] Error fetching unified trends:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch unified trends',
+      message: error.message 
+    });
+  }
+});
 
 export default router;
