@@ -33,6 +33,7 @@ import pnlRouter from "./services/pnl/routes";
 import rraRoutes from "./routes/rra-routes";
 import authRoutes from "./routes/auth-routes";
 import analyticsRoutes from "./routes/analytics-routes";
+import { registerEntityLinkingRoutes, registerEventMonitoringRoutes } from "./routes/entity-linking";
 import { enterpriseAuthService } from "./services/enterprise-auth-service";
 import { userSessions } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
@@ -378,6 +379,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/integration", authenticateUser, integrationRouter);
   app.use("/api/marinamatch", authenticateUser, marinamatchRouter);
   app.use("/api/om", authenticateUser, omRouter);
+
+  // Entity Linking API (Phase 2B) - Cross-module relationship management
+  registerEntityLinkingRoutes(app);
+  registerEventMonitoringRoutes(app);
   app.use("/api/analytics", authenticateUser, analyticsRoutes);
 
   // Dockit Marina Operations Module - mounted at /dockit/api
