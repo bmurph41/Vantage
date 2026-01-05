@@ -4776,6 +4776,75 @@ export const crmPipelineStages = pgTable("crm_pipeline_stages", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Deal Playbooks - Configurable stage-based checklists and automation templates
+export const crmPlaybooks = pgTable("crm_playbooks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  pipelineId: varchar("pipeline_id").references(() => crmPipelines.id),
+  stageId: varchar("stage_id").references(() => crmPipelineStages.id),
+  dealType: text("deal_type"), // marina_acquisition, storage_lease, new_listing - null means all
+  isActive: boolean("is_active").default(true),
+  isDefault: boolean("is_default").default(false),
+  sortOrder: integer("sort_order").default(0),
+  createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("crm_playbooks_org_idx").on(table.orgId),
+  pipelineIdx: index("crm_playbooks_pipeline_idx").on(table.pipelineId),
+  stageIdx: index("crm_playbooks_stage_idx").on(table.stageId),
+}));
+
+// Playbook Items - Individual checklist items within a playbook
+export const crmPlaybookItems = pgTable("crm_playbook_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  playbookId: varchar("playbook_id").references(() => crmPlaybooks.id, { onDelete: 'cascade' }).notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  itemType: text("item_type").notNull().default('checklist'), // checklist, task, document, approval, milestone
+  sortOrder: integer("sort_order").default(0),
+  isRequired: boolean("is_required").default(false),
+  dueDaysOffset: integer("due_days_offset"), // days from stage entry to due
+  assigneeType: text("assignee_type").default('deal_owner'), // deal_owner, specific_user, role
+  assigneeId: varchar("assignee_id"), // specific user ID if assigneeType = specific_user
+  assigneeRole: text("assignee_role"), // role name if assigneeType = role
+  automationTrigger: text("automation_trigger"), // on_complete, on_skip, on_overdue
+  automationAction: jsonb("automation_action").default({}), // {type: 'create_task', 'send_email', 'move_stage', etc.}
+  documentType: text("document_type"), // for document items: psa, loi, insurance, environmental, etc.
+  approvalRequiredBy: text("approval_required_by").array(), // role names that can approve
+  metadata: jsonb("metadata").default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  playbookIdx: index("crm_playbook_items_playbook_idx").on(table.playbookId),
+}));
+
+// Deal Playbook Progress - Track completion of playbook items per deal
+export const crmDealPlaybookProgress = pgTable("crm_deal_playbook_progress", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => crmDeals.id, { onDelete: 'cascade' }).notNull(),
+  playbookId: varchar("playbook_id").references(() => crmPlaybooks.id).notNull(),
+  playbookItemId: varchar("playbook_item_id").references(() => crmPlaybookItems.id, { onDelete: 'cascade' }).notNull(),
+  status: text("status").notNull().default('pending'), // pending, in_progress, completed, skipped, blocked
+  completedById: varchar("completed_by_id").references(() => users.id),
+  completedAt: timestamp("completed_at"),
+  skippedReason: text("skipped_reason"),
+  dueDate: timestamp("due_date"),
+  notes: text("notes"),
+  documentUrl: text("document_url"), // for document items
+  approvedById: varchar("approved_by_id").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  dealIdx: index("crm_deal_playbook_progress_deal_idx").on(table.dealId),
+  playbookIdx: index("crm_deal_playbook_progress_playbook_idx").on(table.playbookId),
+  statusIdx: index("crm_deal_playbook_progress_status_idx").on(table.status),
+  uniqueProgress: unique().on(table.dealId, table.playbookItemId),
+}));
+
 // Deal History table (audit trail for drag & drop and field changes)
 
 export const crmDealHistory = pgTable("crm_deal_history", {
@@ -5421,6 +5490,32 @@ export const insertCrmPipelineStageSchema = createInsertSchema(crmPipelineStages
   updatedAt: true,
 });
 export type InsertCrmPipelineStage = z.infer<typeof insertCrmPipelineStageSchema>;
+
+// Playbook schemas and types
+export type CrmPlaybook = typeof crmPlaybooks.$inferSelect;
+export type CrmPlaybookItem = typeof crmPlaybookItems.$inferSelect;
+export type CrmDealPlaybookProgress = typeof crmDealPlaybookProgress.$inferSelect;
+
+export const insertCrmPlaybookSchema = createInsertSchema(crmPlaybooks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCrmPlaybook = z.infer<typeof insertCrmPlaybookSchema>;
+
+export const insertCrmPlaybookItemSchema = createInsertSchema(crmPlaybookItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCrmPlaybookItem = z.infer<typeof insertCrmPlaybookItemSchema>;
+
+export const insertCrmDealPlaybookProgressSchema = createInsertSchema(crmDealPlaybookProgress).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCrmDealPlaybookProgress = z.infer<typeof insertCrmDealPlaybookProgressSchema>;
 
 export const insertCrmActivitySchema = createInsertSchema(crmActivities).omit({
   id: true,

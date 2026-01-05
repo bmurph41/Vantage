@@ -34,6 +34,7 @@ import rraRoutes from "./routes/rra-routes";
 import authRoutes from "./routes/auth-routes";
 import analyticsRoutes from "./routes/analytics-routes";
 import { registerEntityLinkingRoutes, registerEventMonitoringRoutes } from "./routes/entity-linking";
+import playbookRoutes from "./routes/playbook-routes";
 import { enterpriseAuthService } from "./services/enterprise-auth-service";
 import { userSessions } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
@@ -337,6 +338,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.use("/api/dd", authenticateUser, enforceTenant);
   app.use("/api/crm", authenticateUser, enforceTenant);
+  app.use("/api/crm", playbookRoutes);
   app.use("/api/prospecting", authenticateUser, requireProspecting());
   // Apply authentication to CRM route aliases
   app.use("/api/leads", authenticateUser, enforceTenant);
