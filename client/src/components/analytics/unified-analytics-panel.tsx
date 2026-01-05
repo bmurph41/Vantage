@@ -82,21 +82,14 @@ function formatCurrency(value: number): string {
 export function UnifiedAnalyticsPanel() {
   const { data: analytics, isLoading: analyticsLoading } = useQuery<UnifiedAnalytics>({
     queryKey: ["/api/analytics/unified"],
-    queryFn: async () => {
-      const response = await fetch("/api/analytics/unified");
-      if (!response.ok) throw new Error("Failed to fetch unified analytics");
-      return response.json();
-    },
-    refetchInterval: 60000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
   const { data: trends, isLoading: trendsLoading } = useQuery<TrendData>({
     queryKey: ["/api/analytics/unified/trends"],
-    queryFn: async () => {
-      const response = await fetch("/api/analytics/unified/trends?months=6");
-      if (!response.ok) throw new Error("Failed to fetch trends");
-      return response.json();
-    },
+    staleTime: 10 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   if (analyticsLoading) {

@@ -2100,7 +2100,9 @@ export const crmCompanies = pgTable("crm_companies", {
   
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  orgIdx: index("crm_companies_org_idx").on(table.orgId),
+}));
 
 // Contacts table
 
@@ -2146,7 +2148,9 @@ export const crmContacts = pgTable("crm_contacts", {
   
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  orgIdx: index("crm_contacts_org_idx").on(table.orgId),
+}));
 
 // Junction table for many-to-many relationship between contacts and companies
 
@@ -2250,7 +2254,9 @@ export const crmProperties = pgTable("crm_properties", {
   
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  orgIdx: index("crm_properties_org_idx").on(table.orgId),
+}));
 
 // Owned Assets - Acquired properties under management
 export const ownedAssets = pgTable("owned_assets", {
