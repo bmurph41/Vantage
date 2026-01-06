@@ -17457,3 +17457,228 @@ export * from './pnl-pipeline-schema';
 // Self-contained P&L parsing and mapping module with COA categories, segments, and aliases
 // ============================================================================
 export * from './financial-coa-schema';
+
+// ============================================================================
+// SLA-Driven Task Routing
+// Deadline tracking, auto-assignment, and escalation for tasks
+// ============================================================================
+
+export const slaConfigStatusEnum = pgEnum('sla_config_status', ['active', 'inactive']);
+export const slaTargetTypeEnum = pgEnum('sla_target_type', ['dd_task', 'crm_task', 'activity', 'all']);
+export const slaEscalationStatusEnum = pgEnum('sla_escalation_status', ['pending', 'notified', 'resolved', 'ignored']);
+
+export const slaConfigs = pgTable('sla_configs', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  description: text('description'),
+  targetType: slaTargetTypeEnum('target_type').notNull().default('all'),
+  
+  // Matching criteria (JSON for flexibility)
+  matchCriteria: jsonb('match_criteria').$type<{
+    taskTypes?: string[];
+    priorities?: string[];
+    categories?: string[];
+    dealStages?: string[];
+  }>().default({}),
+  
+  // SLA thresholds (in hours)
+  warningThresholdHours: integer('warning_threshold_hours').notNull().default(24),
+  criticalThresholdHours: integer('critical_threshold_hours').notNull().default(48),
+  breachThresholdHours: integer('breach_threshold_hours').notNull().default(72),
+  
+  // Escalation chain (user IDs in order)
+  escalationChain: text('escalation_chain').array().default(sql`'{}'`),
+  escalationDelayHours: integer('escalation_delay_hours').notNull().default(4),
+  
+  // Auto-assignment rules
+  autoAssignEnabled: boolean('auto_assign_enabled').notNull().default(false),
+  autoAssignRules: jsonb('auto_assign_rules').$type<{
+    roundRobin?: boolean;
+    assigneePool?: string[];
+    assignByWorkload?: boolean;
+    assignByExpertise?: string[];
+  }>().default({}),
+  
+  status: slaConfigStatusEnum('status').notNull().default('active'),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('sla_configs_org_idx').on(table.orgId),
+  statusIdx: index('sla_configs_status_idx').on(table.status),
+  targetTypeIdx: index('sla_configs_target_type_idx').on(table.targetType),
+}));
+
+export const slaTracking = pgTable('sla_tracking', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  slaConfigId: varchar('sla_config_id').notNull().references(() => slaConfigs.id, { onDelete: 'cascade' }),
+  
+  // The entity being tracked
+  entityType: text('entity_type').notNull(), // 'dd_task', 'crm_task', 'activity'
+  entityId: varchar('entity_id').notNull(),
+  
+  // SLA timing
+  slaStartTime: timestamp('sla_start_time').notNull(),
+  slaDueTime: timestamp('sla_due_time').notNull(),
+  warningTime: timestamp('warning_time'),
+  criticalTime: timestamp('critical_time'),
+  
+  // Current status
+  currentStatus: text('current_status').notNull().default('on_track'), // on_track, warning, critical, breached
+  currentEscalationLevel: integer('current_escalation_level').notNull().default(0),
+  
+  // Resolution
+  resolvedAt: timestamp('resolved_at'),
+  resolvedBy: varchar('resolved_by').references(() => users.id),
+  resolutionNotes: text('resolution_notes'),
+  
+  // Assignment
+  currentAssigneeId: varchar('current_assignee_id').references(() => users.id),
+  previousAssigneeId: varchar('previous_assignee_id').references(() => users.id),
+  
+  // Metrics
+  timeToFirstResponse: integer('time_to_first_response'), // minutes
+  totalResolutionTime: integer('total_resolution_time'), // minutes
+  escalationCount: integer('escalation_count').notNull().default(0),
+  reassignmentCount: integer('reassignment_count').notNull().default(0),
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  slaConfigIdx: index('sla_tracking_config_idx').on(table.slaConfigId),
+  entityIdx: index('sla_tracking_entity_idx').on(table.entityType, table.entityId),
+  statusIdx: index('sla_tracking_status_idx').on(table.currentStatus),
+  dueTimeIdx: index('sla_tracking_due_time_idx').on(table.slaDueTime),
+  assigneeIdx: index('sla_tracking_assignee_idx').on(table.currentAssigneeId),
+}));
+
+export const slaEscalations = pgTable('sla_escalations', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  slaTrackingId: varchar('sla_tracking_id').notNull().references(() => slaTracking.id, { onDelete: 'cascade' }),
+  escalationLevel: integer('escalation_level').notNull(),
+  escalatedToId: varchar('escalated_to_id').notNull().references(() => users.id),
+  escalatedById: varchar('escalated_by_id').references(() => users.id), // null if auto-escalated
+  reason: text('reason').notNull(),
+  status: slaEscalationStatusEnum('status').notNull().default('pending'),
+  notifiedAt: timestamp('notified_at'),
+  respondedAt: timestamp('responded_at'),
+  responseNotes: text('response_notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  trackingIdx: index('sla_escalations_tracking_idx').on(table.slaTrackingId),
+  escalatedToIdx: index('sla_escalations_to_idx').on(table.escalatedToId),
+  statusIdx: index('sla_escalations_status_idx').on(table.status),
+}));
+
+export const slaAssignmentHistory = pgTable('sla_assignment_history', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  slaTrackingId: varchar('sla_tracking_id').notNull().references(() => slaTracking.id, { onDelete: 'cascade' }),
+  fromUserId: varchar('from_user_id').references(() => users.id),
+  toUserId: varchar('to_user_id').notNull().references(() => users.id),
+  assignmentReason: text('assignment_reason').notNull(), // 'auto_assign', 'manual', 'escalation', 'workload_balance'
+  assignedAt: timestamp('assigned_at').defaultNow().notNull(),
+  assignedBy: varchar('assigned_by').references(() => users.id), // null if auto-assigned
+}, (table) => ({
+  trackingIdx: index('sla_assignment_history_tracking_idx').on(table.slaTrackingId),
+  toUserIdx: index('sla_assignment_history_to_idx').on(table.toUserId),
+}));
+
+export const slaConfigsRelations = relations(slaConfigs, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [slaConfigs.orgId],
+    references: [organizations.id],
+  }),
+  creator: one(users, {
+    fields: [slaConfigs.createdBy],
+    references: [users.id],
+  }),
+  trackings: many(slaTracking),
+}));
+
+export const slaTrackingRelations = relations(slaTracking, ({ one, many }) => ({
+  config: one(slaConfigs, {
+    fields: [slaTracking.slaConfigId],
+    references: [slaConfigs.id],
+  }),
+  currentAssignee: one(users, {
+    fields: [slaTracking.currentAssigneeId],
+    references: [users.id],
+  }),
+  resolver: one(users, {
+    fields: [slaTracking.resolvedBy],
+    references: [users.id],
+  }),
+  escalations: many(slaEscalations),
+  assignmentHistory: many(slaAssignmentHistory),
+}));
+
+export const slaEscalationsRelations = relations(slaEscalations, ({ one }) => ({
+  tracking: one(slaTracking, {
+    fields: [slaEscalations.slaTrackingId],
+    references: [slaTracking.id],
+  }),
+  escalatedTo: one(users, {
+    fields: [slaEscalations.escalatedToId],
+    references: [users.id],
+    relationName: 'escalatedTo',
+  }),
+  escalatedBy: one(users, {
+    fields: [slaEscalations.escalatedById],
+    references: [users.id],
+    relationName: 'escalatedBy',
+  }),
+}));
+
+export const slaAssignmentHistoryRelations = relations(slaAssignmentHistory, ({ one }) => ({
+  tracking: one(slaTracking, {
+    fields: [slaAssignmentHistory.slaTrackingId],
+    references: [slaTracking.id],
+  }),
+  fromUser: one(users, {
+    fields: [slaAssignmentHistory.fromUserId],
+    references: [users.id],
+    relationName: 'fromUser',
+  }),
+  toUser: one(users, {
+    fields: [slaAssignmentHistory.toUserId],
+    references: [users.id],
+    relationName: 'toUser',
+  }),
+  assignedBy: one(users, {
+    fields: [slaAssignmentHistory.assignedBy],
+    references: [users.id],
+    relationName: 'assignedBy',
+  }),
+}));
+
+export const insertSlaConfigSchema = createInsertSchema(slaConfigs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateSlaConfigSchema = insertSlaConfigSchema.partial();
+export type SlaConfig = typeof slaConfigs.$inferSelect;
+export type InsertSlaConfig = z.infer<typeof insertSlaConfigSchema>;
+
+export const insertSlaTrackingSchema = createInsertSchema(slaTracking).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type SlaTracking = typeof slaTracking.$inferSelect;
+export type InsertSlaTracking = z.infer<typeof insertSlaTrackingSchema>;
+
+export const insertSlaEscalationSchema = createInsertSchema(slaEscalations).omit({
+  id: true,
+  createdAt: true,
+});
+export type SlaEscalation = typeof slaEscalations.$inferSelect;
+export type InsertSlaEscalation = z.infer<typeof insertSlaEscalationSchema>;
+
+export const insertSlaAssignmentHistorySchema = createInsertSchema(slaAssignmentHistory).omit({
+  id: true,
+  assignedAt: true,
+});
+export type SlaAssignmentHistory = typeof slaAssignmentHistory.$inferSelect;
+export type InsertSlaAssignmentHistory = z.infer<typeof insertSlaAssignmentHistorySchema>;
