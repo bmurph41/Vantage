@@ -22,7 +22,12 @@ export function registerCommentRoutes(app: Router) {
   router.get('/threads', async (req, res) => {
     try {
       const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const userId = req.headers['x-user-id'] as string;
       const { entityType, entityId, status } = req.query;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
 
       const threads = await db.query.crmCommentThreads.findMany({
         where: and(
@@ -66,6 +71,11 @@ export function registerCommentRoutes(app: Router) {
     try {
       const { threadId } = req.params;
       const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const userId = req.headers['x-user-id'] as string;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
 
       const thread = await db.query.crmCommentThreads.findFirst({
         where: and(eq(crmCommentThreads.id, threadId), eq(crmCommentThreads.orgId, orgId)),
@@ -96,6 +106,11 @@ export function registerCommentRoutes(app: Router) {
     try {
       const orgId = req.headers['x-org-id'] as string || 'default-org';
       const userId = req.headers['x-user-id'] as string;
+      
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
       const validatedData = insertCrmCommentThreadSchema.parse({
         ...req.body,
         orgId,
@@ -117,6 +132,12 @@ export function registerCommentRoutes(app: Router) {
     try {
       const { threadId } = req.params;
       const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const userId = req.headers['x-user-id'] as string;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
       const validatedData = updateCrmCommentThreadSchema.parse(req.body);
 
       const [updated] = await db.update(crmCommentThreads)
@@ -144,6 +165,10 @@ export function registerCommentRoutes(app: Router) {
       const orgId = req.headers['x-org-id'] as string || 'default-org';
       const userId = req.headers['x-user-id'] as string;
 
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
       const [updated] = await db.update(crmCommentThreads)
         .set({
           status: 'resolved',
@@ -169,6 +194,11 @@ export function registerCommentRoutes(app: Router) {
     try {
       const { threadId } = req.params;
       const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const userId = req.headers['x-user-id'] as string;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
 
       const [updated] = await db.update(crmCommentThreads)
         .set({
@@ -195,7 +225,12 @@ export function registerCommentRoutes(app: Router) {
     try {
       const { threadId } = req.params;
       const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const userId = req.headers['x-user-id'] as string;
       const { isPinned } = req.body;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
 
       const [updated] = await db.update(crmCommentThreads)
         .set({ isPinned, updatedAt: new Date() })
@@ -218,6 +253,11 @@ export function registerCommentRoutes(app: Router) {
     try {
       const { threadId } = req.params;
       const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const userId = req.headers['x-user-id'] as string;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
 
       const thread = await db.query.crmCommentThreads.findFirst({
         where: and(eq(crmCommentThreads.id, threadId), eq(crmCommentThreads.orgId, orgId)),
@@ -248,12 +288,16 @@ export function registerCommentRoutes(app: Router) {
       const orgId = req.headers['x-org-id'] as string || 'default-org';
       const userId = req.headers['x-user-id'] as string;
 
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
       const thread = await db.query.crmCommentThreads.findFirst({
         where: and(eq(crmCommentThreads.id, threadId), eq(crmCommentThreads.orgId, orgId)),
       });
 
       if (!thread) {
-        return res.status(404).json({ error: 'Thread not found' });
+        return res.status(404).json({ error: 'Thread not found or access denied' });
       }
 
       const validatedData = insertCrmCommentSchema.parse({
@@ -303,6 +347,10 @@ export function registerCommentRoutes(app: Router) {
       const orgId = req.headers['x-org-id'] as string || 'default-org';
       const userId = req.headers['x-user-id'] as string;
 
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
       const comment = await db.query.crmComments.findFirst({
         where: eq(crmComments.id, commentId),
         with: { thread: true },
@@ -338,6 +386,10 @@ export function registerCommentRoutes(app: Router) {
       const { commentId } = req.params;
       const orgId = req.headers['x-org-id'] as string || 'default-org';
       const userId = req.headers['x-user-id'] as string;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
 
       const comment = await db.query.crmComments.findFirst({
         where: eq(crmComments.id, commentId),

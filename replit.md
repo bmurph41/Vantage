@@ -28,7 +28,7 @@ The platform uses React 18 with TypeScript and Wouter for routing. The UI is bui
 - **Cross-Module Architecture**: Comprehensive system for connecting CRM, Due Diligence, Modeling, and DockTalk via database schema consolidation, a query key factory for cache invalidation, a Deal Orchestrator Service, Entity Linking API, and a Cross-Module Event System.
 
 ### Feature Specifications
-- **CRM**: Deals, leads, contacts, pipelines, activities, email sequences, marketing automation, user-defined lists, property status tracking, and entity relationship management.
+- **CRM**: Deals, leads, contacts, pipelines, activities, email sequences, marketing automation, user-defined lists, property status tracking, entity relationship management, and Comment Threads with @mentions and notifications.
 - **Due Diligence**: Project management, task tracking, template management, and DD Fees Tracker.
 - **Rent Roll**: Unit occupancy, rental income, and customer analytics.
 - **SalesComps**: Marina sales comparables with import/export, Google Maps integration, validation, and history tracking.
