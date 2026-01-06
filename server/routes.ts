@@ -40,6 +40,7 @@ import phaseGatesRoutes from "./routes/phase-gates-routes";
 import redFlagRoutes from "./routes/red-flag-routes";
 import { getSlaRouter } from "./routes/sla-routes";
 import { enterpriseAuthService } from "./services/enterprise-auth-service";
+import { registerCommentRoutes } from "./routes/comment-routes";
 import { userSessions } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { rentRollService } from "./services/rent-roll-service";
@@ -348,6 +349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/crm/red-flags", redFlagRoutes);
   app.use("/api/prospecting", authenticateUser, requireProspecting());
   app.use("/api/sla", getSlaRouter());
+  registerCommentRoutes(app);
   // Apply authentication to CRM route aliases
   app.use("/api/leads", authenticateUser, enforceTenant);
   app.use("/api/deals", authenticateUser, enforceTenant);

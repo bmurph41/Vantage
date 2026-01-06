@@ -17682,3 +17682,188 @@ export const insertSlaAssignmentHistorySchema = createInsertSchema(slaAssignment
 });
 export type SlaAssignmentHistory = typeof slaAssignmentHistory.$inferSelect;
 export type InsertSlaAssignmentHistory = z.infer<typeof insertSlaAssignmentHistorySchema>;
+
+// ================================
+// CRM Comment Threads & Notifications (Phase 3A)
+// ================================
+
+export const crmCommentThreads = pgTable('crm_comment_threads', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  entityType: text('entity_type').notNull(), // 'deal', 'contact', 'company', 'lead', 'property', 'task'
+  entityId: varchar('entity_id').notNull(),
+  subject: text('subject'),
+  status: text('status').notNull().default('open'), // 'open', 'resolved', 'archived'
+  isPinned: boolean('is_pinned').default(false),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  resolvedBy: varchar('resolved_by').references(() => users.id),
+  resolvedAt: timestamp('resolved_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('crm_comment_threads_org_idx').on(table.orgId),
+  entityIdx: index('crm_comment_threads_entity_idx').on(table.entityType, table.entityId),
+  statusIdx: index('crm_comment_threads_status_idx').on(table.status),
+}));
+
+export const crmComments = pgTable('crm_comments', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  threadId: varchar('thread_id').notNull().references(() => crmCommentThreads.id, { onDelete: 'cascade' }),
+  parentCommentId: varchar('parent_comment_id'), // For nested replies
+  content: text('content').notNull(),
+  contentHtml: text('content_html'), // Rendered HTML with mentions
+  mentions: jsonb('mentions').default([]), // Array of { userId, displayName, startIdx, endIdx }
+  attachments: jsonb('attachments').default([]), // Array of { name, url, type, size }
+  isEdited: boolean('is_edited').default(false),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  editedAt: timestamp('edited_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  threadIdx: index('crm_comments_thread_idx').on(table.threadId),
+  parentIdx: index('crm_comments_parent_idx').on(table.parentCommentId),
+  createdByIdx: index('crm_comments_created_by_idx').on(table.createdBy),
+}));
+
+export const crmNotifications = pgTable('crm_notifications', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  userId: varchar('user_id').notNull().references(() => users.id), // Recipient
+  type: text('type').notNull(), // 'mention', 'reply', 'thread_update', 'assignment', 'deadline', 'red_flag', 'escalation'
+  title: text('title').notNull(),
+  message: text('message'),
+  entityType: text('entity_type'), // 'deal', 'comment', 'task', 'red_flag', 'sla'
+  entityId: varchar('entity_id'),
+  threadId: varchar('thread_id').references(() => crmCommentThreads.id),
+  commentId: varchar('comment_id').references(() => crmComments.id),
+  triggeredBy: varchar('triggered_by').references(() => users.id), // Who caused this notification
+  isRead: boolean('is_read').default(false),
+  readAt: timestamp('read_at'),
+  emailSent: boolean('email_sent').default(false),
+  emailSentAt: timestamp('email_sent_at'),
+  metadata: jsonb('metadata').default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('crm_notifications_org_idx').on(table.orgId),
+  userIdx: index('crm_notifications_user_idx').on(table.userId),
+  typeIdx: index('crm_notifications_type_idx').on(table.type),
+  readIdx: index('crm_notifications_read_idx').on(table.isRead),
+}));
+
+export const crmNotificationPreferences = pgTable('crm_notification_preferences', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  notificationType: text('notification_type').notNull(), // 'mention', 'reply', 'deadline', 'red_flag', etc.
+  inApp: boolean('in_app').default(true),
+  email: boolean('email').default(true),
+  emailDigest: text('email_digest').default('instant'), // 'instant', 'hourly', 'daily', 'never'
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  userOrgTypeIdx: index('crm_notif_prefs_user_org_type_idx').on(table.userId, table.orgId, table.notificationType),
+}));
+
+export const crmCommentThreadsRelations = relations(crmCommentThreads, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [crmCommentThreads.orgId],
+    references: [organizations.id],
+  }),
+  creator: one(users, {
+    fields: [crmCommentThreads.createdBy],
+    references: [users.id],
+    relationName: 'threadCreator',
+  }),
+  resolver: one(users, {
+    fields: [crmCommentThreads.resolvedBy],
+    references: [users.id],
+    relationName: 'threadResolver',
+  }),
+  comments: many(crmComments),
+  notifications: many(crmNotifications),
+}));
+
+export const crmCommentsRelations = relations(crmComments, ({ one, many }) => ({
+  thread: one(crmCommentThreads, {
+    fields: [crmComments.threadId],
+    references: [crmCommentThreads.id],
+  }),
+  parentComment: one(crmComments, {
+    fields: [crmComments.parentCommentId],
+    references: [crmComments.id],
+    relationName: 'parentComment',
+  }),
+  replies: many(crmComments, { relationName: 'parentComment' }),
+  creator: one(users, {
+    fields: [crmComments.createdBy],
+    references: [users.id],
+  }),
+  notifications: many(crmNotifications),
+}));
+
+export const crmNotificationsRelations = relations(crmNotifications, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [crmNotifications.orgId],
+    references: [organizations.id],
+  }),
+  user: one(users, {
+    fields: [crmNotifications.userId],
+    references: [users.id],
+    relationName: 'notificationRecipient',
+  }),
+  triggerer: one(users, {
+    fields: [crmNotifications.triggeredBy],
+    references: [users.id],
+    relationName: 'notificationTriggerer',
+  }),
+  thread: one(crmCommentThreads, {
+    fields: [crmNotifications.threadId],
+    references: [crmCommentThreads.id],
+  }),
+  comment: one(crmComments, {
+    fields: [crmNotifications.commentId],
+    references: [crmComments.id],
+  }),
+}));
+
+export const crmNotificationPreferencesRelations = relations(crmNotificationPreferences, ({ one }) => ({
+  user: one(users, {
+    fields: [crmNotificationPreferences.userId],
+    references: [users.id],
+  }),
+  organization: one(organizations, {
+    fields: [crmNotificationPreferences.orgId],
+    references: [organizations.id],
+  }),
+}));
+
+export const insertCrmCommentThreadSchema = createInsertSchema(crmCommentThreads).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateCrmCommentThreadSchema = insertCrmCommentThreadSchema.partial();
+export type CrmCommentThread = typeof crmCommentThreads.$inferSelect;
+export type InsertCrmCommentThread = z.infer<typeof insertCrmCommentThreadSchema>;
+
+export const insertCrmCommentSchema = createInsertSchema(crmComments).omit({
+  id: true,
+  createdAt: true,
+});
+export const updateCrmCommentSchema = insertCrmCommentSchema.partial();
+export type CrmComment = typeof crmComments.$inferSelect;
+export type InsertCrmComment = z.infer<typeof insertCrmCommentSchema>;
+
+export const insertCrmNotificationSchema = createInsertSchema(crmNotifications).omit({
+  id: true,
+  createdAt: true,
+});
+export type CrmNotification = typeof crmNotifications.$inferSelect;
+export type InsertCrmNotification = z.infer<typeof insertCrmNotificationSchema>;
+
+export const insertCrmNotificationPreferencesSchema = createInsertSchema(crmNotificationPreferences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type CrmNotificationPreference = typeof crmNotificationPreferences.$inferSelect;
+export type InsertCrmNotificationPreference = z.infer<typeof insertCrmNotificationPreferencesSchema>;

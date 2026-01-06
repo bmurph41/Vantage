@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { db } from '@db';
+import { db } from '../db';
 import { 
   slaConfigs, slaTracking, slaEscalations, slaAssignmentHistory,
   insertSlaConfigSchema, updateSlaConfigSchema, insertSlaTrackingSchema,
@@ -349,56 +349,31 @@ function getSlaRouter() {
     try {
       const orgId = req.headers['x-org-id'] as string || 'default-org';
       
-      const allTrackings = await db.query.slaTracking.findMany({
-        where: isNull(slaTracking.resolvedAt),
-        with: {
-          config: {
-            where: eq(slaConfigs.orgId, orgId),
-          },
-        },
+      const allTracking = await db.query.slaTracking.findMany({
+        with: { config: true },
       });
+      
+      const tracking = allTracking.filter(t => t.config?.orgId === orgId);
       
       const now = new Date();
       const summary = {
-        total: allTrackings.length,
-        byStatus: {
-          on_track: 0,
-          warning: 0,
-          critical: 0,
-          breached: 0,
-        },
-        byEntityType: {} as Record<string, number>,
-        upcomingDeadlines: [] as any[],
-        breached: [] as any[],
+        total: tracking.length,
+        active: tracking.filter(t => !t.resolvedAt).length,
+        resolved: tracking.filter(t => t.resolvedAt).length,
+        breached: tracking.filter(t => !t.resolvedAt && new Date(t.slaDueTime) < now).length,
+        warning: tracking.filter(t => {
+          if (t.resolvedAt) return false;
+          const dueTime = new Date(t.slaDueTime);
+          const warningTime = new Date(dueTime.getTime() - (t.config?.warningThresholdHours || 4) * 60 * 60 * 1000);
+          return now >= warningTime && now < dueTime;
+        }).length,
+        onTrack: tracking.filter(t => {
+          if (t.resolvedAt) return false;
+          const dueTime = new Date(t.slaDueTime);
+          const warningTime = new Date(dueTime.getTime() - (t.config?.warningThresholdHours || 4) * 60 * 60 * 1000);
+          return now < warningTime;
+        }).length,
       };
-      
-      for (const t of allTrackings) {
-        const dueTime = new Date(t.slaDueTime);
-        const warningTime = t.warningTime ? new Date(t.warningTime) : null;
-        const criticalTime = t.criticalTime ? new Date(t.criticalTime) : null;
-        
-        let status = 'on_track';
-        if (now > dueTime) {
-          status = 'breached';
-          summary.breached.push(t);
-        } else if (criticalTime && now > criticalTime) {
-          status = 'critical';
-        } else if (warningTime && now > warningTime) {
-          status = 'warning';
-        }
-        
-        summary.byStatus[status as keyof typeof summary.byStatus]++;
-        
-        summary.byEntityType[t.entityType] = (summary.byEntityType[t.entityType] || 0) + 1;
-        
-        const hoursUntilDue = (dueTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-        if (hoursUntilDue > 0 && hoursUntilDue <= 24) {
-          summary.upcomingDeadlines.push({ ...t, hoursUntilDue: Math.round(hoursUntilDue * 10) / 10 });
-        }
-      }
-      
-      summary.upcomingDeadlines.sort((a, b) => a.hoursUntilDue - b.hoursUntilDue);
-      summary.upcomingDeadlines = summary.upcomingDeadlines.slice(0, 10);
       
       res.json(summary);
     } catch (error) {
@@ -407,108 +382,28 @@ function getSlaRouter() {
     }
   });
 
-  router.post('/check-slas', async (req, res) => {
-    try {
-      const now = new Date();
-      
-      const activeTrackings = await db.query.slaTracking.findMany({
-        where: isNull(slaTracking.resolvedAt),
-        with: {
-          config: true,
-        },
-      });
-      
-      const updates: { id: string; newStatus: string }[] = [];
-      const escalationsNeeded: { trackingId: string; config: any }[] = [];
-      
-      for (const tracking of activeTrackings) {
-        if (!tracking.config) continue;
-        
-        const dueTime = new Date(tracking.slaDueTime);
-        const warningTime = tracking.warningTime ? new Date(tracking.warningTime) : null;
-        const criticalTime = tracking.criticalTime ? new Date(tracking.criticalTime) : null;
-        
-        let newStatus = 'on_track';
-        if (now > dueTime) {
-          newStatus = 'breached';
-        } else if (criticalTime && now > criticalTime) {
-          newStatus = 'critical';
-        } else if (warningTime && now > warningTime) {
-          newStatus = 'warning';
-        }
-        
-        if (newStatus !== tracking.currentStatus) {
-          updates.push({ id: tracking.id, newStatus });
-          
-          if ((newStatus === 'critical' || newStatus === 'breached') && 
-              tracking.config.escalationChain && 
-              tracking.config.escalationChain.length > tracking.currentEscalationLevel) {
-            escalationsNeeded.push({ trackingId: tracking.id, config: tracking.config });
-          }
-        }
-      }
-      
-      for (const update of updates) {
-        await db.update(slaTracking)
-          .set({ currentStatus: update.newStatus, updatedAt: new Date() })
-          .where(eq(slaTracking.id, update.id));
-      }
-      
-      for (const esc of escalationsNeeded) {
-        const tracking = await db.query.slaTracking.findFirst({
-          where: eq(slaTracking.id, esc.trackingId),
-        });
-        if (!tracking) continue;
-        
-        const nextLevel = tracking.currentEscalationLevel + 1;
-        const escalateToId = esc.config.escalationChain[tracking.currentEscalationLevel];
-        
-        if (escalateToId) {
-          await db.insert(slaEscalations).values({
-            slaTrackingId: esc.trackingId,
-            escalationLevel: nextLevel,
-            escalatedToId,
-            reason: `Auto-escalation: SLA status changed to ${tracking.currentStatus}`,
-            notifiedAt: new Date(),
-          });
-          
-          await db.update(slaTracking)
-            .set({
-              currentEscalationLevel: nextLevel,
-              escalationCount: (tracking.escalationCount || 0) + 1,
-              updatedAt: new Date(),
-            })
-            .where(eq(slaTracking.id, esc.trackingId));
-        }
-      }
-      
-      res.json({
-        checked: activeTrackings.length,
-        updated: updates.length,
-        escalated: escalationsNeeded.length,
-      });
-    } catch (error) {
-      console.error('Error checking SLAs:', error);
-      res.status(500).json({ error: 'Failed to check SLAs' });
-    }
-  });
-
   router.get('/metrics', async (req, res) => {
     try {
-      const { startDate, endDate } = req.query;
       const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const { startDate, endDate } = req.query;
       
-      const resolvedTrackings = await db.query.slaTracking.findMany({
-        with: {
-          config: {
-            where: eq(slaConfigs.orgId, orgId),
-          },
-        },
+      const allTracking = await db.query.slaTracking.findMany({
+        with: { config: true },
       });
       
-      const resolved = resolvedTrackings.filter(t => t.resolvedAt && t.config);
+      let tracking = allTracking.filter(t => t.config?.orgId === orgId);
+      
+      if (startDate) {
+        tracking = tracking.filter(t => new Date(t.createdAt) >= new Date(startDate as string));
+      }
+      if (endDate) {
+        tracking = tracking.filter(t => new Date(t.createdAt) <= new Date(endDate as string));
+      }
+      
+      const resolved = tracking.filter(t => t.resolvedAt);
       
       const metrics = {
+        totalTracked: tracking.length,
         totalResolved: resolved.length,
         avgResolutionTime: 0,
         avgFirstResponseTime: 0,
