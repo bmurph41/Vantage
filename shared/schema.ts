@@ -4845,6 +4845,33 @@ export const crmDealPlaybookProgress = pgTable("crm_deal_playbook_progress", {
   uniqueProgress: unique().on(table.dealId, table.playbookItemId),
 }));
 
+// Phase Gate Approvals - Track approval workflow for stage transitions
+export const crmPhaseGateApprovals = pgTable("crm_phase_gate_approvals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => crmDeals.id, { onDelete: 'cascade' }).notNull(),
+  fromStageId: varchar("from_stage_id").references(() => crmPipelineStages.id),
+  toStageId: varchar("to_stage_id").references(() => crmPipelineStages.id).notNull(),
+  status: text("status").notNull().default('pending'), // pending, approved, rejected, bypassed
+  requestedById: varchar("requested_by_id").references(() => users.id).notNull(),
+  requestedAt: timestamp("requested_at").defaultNow().notNull(),
+  reviewedById: varchar("reviewed_by_id").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  rejectionReason: text("rejection_reason"),
+  requiredApproverRole: text("required_approver_role"), // manager, director, vp, etc.
+  requiredApproverId: varchar("required_approver_id").references(() => users.id),
+  autoApproveAfterDays: integer("auto_approve_after_days"), // optional auto-approval
+  gateConditions: jsonb("gate_conditions").default([]), // snapshot of conditions at request time
+  conditionsMetAt: timestamp("conditions_met_at"),
+  metadata: jsonb("metadata").default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  dealIdx: index("crm_phase_gate_approvals_deal_idx").on(table.dealId),
+  toStageIdx: index("crm_phase_gate_approvals_to_stage_idx").on(table.toStageId),
+  statusIdx: index("crm_phase_gate_approvals_status_idx").on(table.status),
+}));
+
 // Deal History table (audit trail for drag & drop and field changes)
 
 export const crmDealHistory = pgTable("crm_deal_history", {
@@ -5516,6 +5543,14 @@ export const insertCrmDealPlaybookProgressSchema = createInsertSchema(crmDealPla
   updatedAt: true,
 });
 export type InsertCrmDealPlaybookProgress = z.infer<typeof insertCrmDealPlaybookProgressSchema>;
+
+export const insertCrmPhaseGateApprovalSchema = createInsertSchema(crmPhaseGateApprovals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCrmPhaseGateApproval = z.infer<typeof insertCrmPhaseGateApprovalSchema>;
+export type CrmPhaseGateApproval = typeof crmPhaseGateApprovals.$inferSelect;
 
 export const insertCrmActivitySchema = createInsertSchema(crmActivities).omit({
   id: true,
