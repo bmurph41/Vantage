@@ -26,7 +26,7 @@ router.get('/pending', async (req: Request, res: Response) => {
   try {
     const userId = (req as any).userId || 'user-1';
 
-    const pendingApprovals = await db.select({
+    const rawApprovals = await db.select({
       approval: crmPhaseGateApprovals,
       deal: {
         id: crmDeals.id,
@@ -38,11 +38,6 @@ router.get('/pending', async (req: Request, res: Response) => {
         id: crmPipelineStages.id,
         name: crmPipelineStages.name,
       },
-      toStage: sql<{ id: string; name: string }>`(
-        SELECT json_build_object('id', s.id, 'name', s.name)
-        FROM crm_pipeline_stages s
-        WHERE s.id = ${crmPhaseGateApprovals.toStageId}
-      )`,
       requester: {
         id: users.id,
         username: users.username,
@@ -52,18 +47,22 @@ router.get('/pending', async (req: Request, res: Response) => {
     .leftJoin(crmDeals, eq(crmPhaseGateApprovals.dealId, crmDeals.id))
     .leftJoin(crmPipelineStages, eq(crmPhaseGateApprovals.fromStageId, crmPipelineStages.id))
     .leftJoin(users, eq(crmPhaseGateApprovals.requestedById, users.id))
-    .where(
-      and(
-        eq(crmPhaseGateApprovals.status, 'pending'),
-        or(
-          eq(crmPhaseGateApprovals.requiredApproverId, userId),
-          sql`${crmPhaseGateApprovals.requiredApproverRole} IN (
-            SELECT role FROM users WHERE id = ${userId}
-          )`
-        )
-      )
-    )
+    .where(eq(crmPhaseGateApprovals.status, 'pending'))
     .orderBy(desc(crmPhaseGateApprovals.requestedAt));
+
+    const toStageIds = rawApprovals.map(a => a.approval.toStageId).filter(Boolean);
+    const toStages = toStageIds.length > 0 
+      ? await db.select({ id: crmPipelineStages.id, name: crmPipelineStages.name })
+          .from(crmPipelineStages)
+          .where(sql`${crmPipelineStages.id} IN (${sql.join(toStageIds.map(id => sql`${id}`), sql`, `)})`)
+      : [];
+
+    const toStageMap = new Map(toStages.map(s => [s.id, s]));
+
+    const pendingApprovals = rawApprovals.map(item => ({
+      ...item,
+      toStage: toStageMap.get(item.approval.toStageId) || { id: item.approval.toStageId, name: 'Unknown' },
+    }));
 
     res.json(pendingApprovals);
   } catch (error) {
@@ -321,13 +320,17 @@ router.post('/check-requirements', async (req: Request, res: Response) => {
     const automations = (stage.automations || []) as any[];
     const approvalAutomation = automations.find((a: any) => a.type === 'require_approval');
 
+    const fromStageId = deal.stageId;
     const [existingApproval] = await db.select()
       .from(crmPhaseGateApprovals)
       .where(
         and(
           eq(crmPhaseGateApprovals.dealId, dealId),
           eq(crmPhaseGateApprovals.toStageId, targetStageId),
-          eq(crmPhaseGateApprovals.status, 'approved')
+          eq(crmPhaseGateApprovals.status, 'approved'),
+          fromStageId 
+            ? eq(crmPhaseGateApprovals.fromStageId, fromStageId)
+            : sql`${crmPhaseGateApprovals.fromStageId} IS NULL`
         )
       );
 
