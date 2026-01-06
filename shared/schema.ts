@@ -4872,6 +4872,87 @@ export const crmPhaseGateApprovals = pgTable("crm_phase_gate_approvals", {
   statusIdx: index("crm_phase_gate_approvals_status_idx").on(table.status),
 }));
 
+// Red Flag Escalation - Auto-notify deal leads about blockers, issues, and deal health concerns
+export const crmRedFlagStatusEnum = pgEnum("crm_red_flag_status", ["open", "acknowledged", "resolved", "dismissed"]);
+export const crmRedFlagSeverityEnum = pgEnum("crm_red_flag_severity", ["low", "medium", "high", "critical"]);
+export const crmRedFlagCategoryEnum = pgEnum("crm_red_flag_category", [
+  "stale_deal", "deadline_missed", "value_discrepancy", "missing_documents",
+  "approval_blocked", "communication_gap", "risk_identified", "compliance_issue", "custom"
+]);
+
+export const crmRedFlags = pgTable("crm_red_flags", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => crmDeals.id, { onDelete: 'cascade' }).notNull(),
+  category: crmRedFlagCategoryEnum("category").notNull(),
+  severity: crmRedFlagSeverityEnum("severity").notNull().default("medium"),
+  status: crmRedFlagStatusEnum("status").notNull().default("open"),
+  title: text("title").notNull(),
+  description: text("description"),
+  triggeredBy: text("triggered_by").notNull().default("system"), // system, manual, automation
+  triggerCondition: jsonb("trigger_condition").default({}),
+  raisedById: varchar("raised_by_id").references(() => users.id),
+  raisedAt: timestamp("raised_at").defaultNow().notNull(),
+  acknowledgedById: varchar("acknowledged_by_id").references(() => users.id),
+  acknowledgedAt: timestamp("acknowledged_at"),
+  resolvedById: varchar("resolved_by_id").references(() => users.id),
+  resolvedAt: timestamp("resolved_at"),
+  resolutionNotes: text("resolution_notes"),
+  dismissedById: varchar("dismissed_by_id").references(() => users.id),
+  dismissedAt: timestamp("dismissed_at"),
+  dismissReason: text("dismiss_reason"),
+  dueDate: timestamp("due_date"),
+  autoEscalateAfterDays: integer("auto_escalate_after_days"),
+  metadata: jsonb("metadata").default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  dealIdx: index("crm_red_flags_deal_idx").on(table.dealId),
+  statusIdx: index("crm_red_flags_status_idx").on(table.status),
+  severityIdx: index("crm_red_flags_severity_idx").on(table.severity),
+  categoryIdx: index("crm_red_flags_category_idx").on(table.category),
+}));
+
+// Red Flag Escalations - Track escalation history and notifications
+export const crmRedFlagEscalations = pgTable("crm_red_flag_escalations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  redFlagId: varchar("red_flag_id").references(() => crmRedFlags.id, { onDelete: 'cascade' }).notNull(),
+  escalationLevel: integer("escalation_level").notNull().default(1),
+  escalatedToId: varchar("escalated_to_id").references(() => users.id).notNull(),
+  escalatedToRole: text("escalated_to_role"), // deal_owner, manager, director, vp
+  notificationMethod: text("notification_method").notNull().default("in_app"), // in_app, email, sms
+  notificationSent: boolean("notification_sent").default(false),
+  notificationSentAt: timestamp("notification_sent_at"),
+  responseStatus: text("response_status").default("pending"), // pending, viewed, responded
+  respondedAt: timestamp("responded_at"),
+  responseNotes: text("response_notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  redFlagIdx: index("crm_red_flag_escalations_red_flag_idx").on(table.redFlagId),
+  escalatedToIdx: index("crm_red_flag_escalations_escalated_to_idx").on(table.escalatedToId),
+  levelIdx: index("crm_red_flag_escalations_level_idx").on(table.escalationLevel),
+}));
+
+// Red Flag Rules - Configurable rules for auto-detecting red flags
+export const crmRedFlagRules = pgTable("crm_red_flag_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: crmRedFlagCategoryEnum("category").notNull(),
+  severity: crmRedFlagSeverityEnum("severity").notNull().default("medium"),
+  isActive: boolean("is_active").default(true),
+  pipelineId: varchar("pipeline_id").references(() => crmPipelines.id),
+  conditions: jsonb("conditions").notNull().default([]),
+  escalationChain: jsonb("escalation_chain").default([]),
+  autoEscalateAfterDays: integer("auto_escalate_after_days").default(3),
+  ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  categoryIdx: index("crm_red_flag_rules_category_idx").on(table.category),
+  activeIdx: index("crm_red_flag_rules_active_idx").on(table.isActive),
+  pipelineIdx: index("crm_red_flag_rules_pipeline_idx").on(table.pipelineId),
+}));
+
 // Deal History table (audit trail for drag & drop and field changes)
 
 export const crmDealHistory = pgTable("crm_deal_history", {
@@ -5551,6 +5632,29 @@ export const insertCrmPhaseGateApprovalSchema = createInsertSchema(crmPhaseGateA
 });
 export type InsertCrmPhaseGateApproval = z.infer<typeof insertCrmPhaseGateApprovalSchema>;
 export type CrmPhaseGateApproval = typeof crmPhaseGateApprovals.$inferSelect;
+
+export const insertCrmRedFlagSchema = createInsertSchema(crmRedFlags).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCrmRedFlag = z.infer<typeof insertCrmRedFlagSchema>;
+export type CrmRedFlag = typeof crmRedFlags.$inferSelect;
+
+export const insertCrmRedFlagEscalationSchema = createInsertSchema(crmRedFlagEscalations).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertCrmRedFlagEscalation = z.infer<typeof insertCrmRedFlagEscalationSchema>;
+export type CrmRedFlagEscalation = typeof crmRedFlagEscalations.$inferSelect;
+
+export const insertCrmRedFlagRuleSchema = createInsertSchema(crmRedFlagRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCrmRedFlagRule = z.infer<typeof insertCrmRedFlagRuleSchema>;
+export type CrmRedFlagRule = typeof crmRedFlagRules.$inferSelect;
 
 export const insertCrmActivitySchema = createInsertSchema(crmActivities).omit({
   id: true,

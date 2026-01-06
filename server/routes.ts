@@ -37,6 +37,7 @@ import { registerEntityLinkingRoutes, registerEventMonitoringRoutes } from "./ro
 import playbookRoutes from "./routes/playbook-routes";
 import forecastingRoutes from "./routes/forecasting-routes";
 import phaseGatesRoutes from "./routes/phase-gates-routes";
+import redFlagRoutes from "./routes/red-flag-routes";
 import { enterpriseAuthService } from "./services/enterprise-auth-service";
 import { userSessions } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
@@ -343,6 +344,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/crm", playbookRoutes);
   app.use("/api/crm/forecasting", forecastingRoutes);
   app.use("/api/crm/phase-gates", phaseGatesRoutes);
+  app.use("/api/crm/red-flags", redFlagRoutes);
   app.use("/api/prospecting", authenticateUser, requireProspecting());
   // Apply authentication to CRM route aliases
   app.use("/api/leads", authenticateUser, enforceTenant);
