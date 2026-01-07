@@ -36,7 +36,11 @@ import {
   AlertTriangle,
   ChevronRight,
   Eye,
-  Edit
+  Edit,
+  Link2,
+  Unlink,
+  ExternalLink,
+  Loader2
 } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -514,6 +518,224 @@ function SettingsTab({ project, loading }: { project?: ProjectDetails; loading: 
   );
 }
 
+function ModelingTab({ projectId, projectName, loading }: { projectId: string; projectName?: string; loading: boolean }) {
+  const { toast } = useToast();
+  
+  const { data: linkedProjects = [], isLoading: linksLoading } = useQuery<any[]>({
+    queryKey: ['/api/rent-roll/locations', projectId, 'modeling-projects'],
+    enabled: !!projectId,
+  });
+
+  const { data: modelingProjects = [] } = useQuery<any[]>({
+    queryKey: ['/api/modeling/projects'],
+  });
+
+  const { data: metrics, isLoading: metricsLoading } = useQuery<any>({
+    queryKey: ['/api/rent-roll/locations', projectId, 'metrics-for-modeling'],
+    enabled: !!projectId,
+  });
+
+  const linkMutation = useMutation({
+    mutationFn: (data: { rraLocationId: string; modelingProjectId: string }) =>
+      apiRequest('/api/rent-roll/modeling-links', { method: 'POST', body: JSON.stringify(data) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/rent-roll/locations', projectId, 'modeling-projects'] });
+      toast({ title: "Linked", description: "RRA data linked to modeling project." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to link.", variant: "destructive" });
+    }
+  });
+
+  const unlinkMutation = useMutation({
+    mutationFn: (linkId: string) =>
+      apiRequest(`/api/rent-roll/modeling-links/${linkId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/rent-roll/locations', projectId, 'modeling-projects'] });
+      toast({ title: "Unlinked", description: "RRA data unlinked from modeling project." });
+    }
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: (linkId: string) =>
+      apiRequest(`/api/rent-roll/modeling-links/${linkId}/sync`, { method: 'POST' }),
+    onSuccess: () => {
+      toast({ title: "Synced", description: "RRA data synced to modeling project." });
+    }
+  });
+
+  if (loading || linksLoading) {
+    return (
+      <div className="space-y-4">
+        {[1, 2, 3].map(i => <Skeleton key={i} className="h-24 w-full" />)}
+      </div>
+    );
+  }
+
+  const unlinkedProjects = modelingProjects.filter(
+    (mp: any) => !linkedProjects.some((lp: any) => lp.modelingProjectId === mp.id)
+  );
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            RRA Metrics for Modeling
+          </CardTitle>
+          <CardDescription>Current rent roll data available for modeling integration</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {metricsLoading ? (
+            <div className="grid grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-20" />)}
+            </div>
+          ) : metrics ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Occupancy Rate</p>
+                <p className="text-2xl font-bold">{metrics.occupancyRate?.toFixed(1)}%</p>
+              </div>
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Occupied Units</p>
+                <p className="text-2xl font-bold">{metrics.occupiedUnits} / {metrics.totalUnits}</p>
+              </div>
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Annual Revenue</p>
+                <p className="text-2xl font-bold">{formatCurrency(metrics.totalAnnualRevenue || 0)}</p>
+              </div>
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Avg Rent/Unit</p>
+                <p className="text-2xl font-bold">{formatCurrency(metrics.averageRentPerUnit || 0)}</p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-muted-foreground">No metrics available</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Link2 className="h-5 w-5" />
+                Linked Modeling Projects
+              </CardTitle>
+              <CardDescription>Modeling projects connected to this RRA location</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {linkedProjects.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Link2 className="h-10 w-10 mx-auto mb-2 opacity-50" />
+              <p>No modeling projects linked yet</p>
+              <p className="text-sm">Link a modeling project below to enable data sync</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {linkedProjects.map((link: any) => {
+                const project = modelingProjects.find((mp: any) => mp.id === link.modelingProjectId);
+                return (
+                  <div key={link.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <TrendingUp className="h-5 w-5 text-blue-500" />
+                      <div>
+                        <p className="font-medium">{project?.marinaName || 'Unknown Project'}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {link.syncEnabled ? 'Sync enabled' : 'Sync disabled'}
+                          {link.lastSyncAt && ` • Last synced: ${new Date(link.lastSyncAt).toLocaleDateString()}`}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => syncMutation.mutate(link.id)}
+                        disabled={syncMutation.isPending}
+                      >
+                        {syncMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+                        Sync
+                      </Button>
+                      <Link href={`/modeling/projects/${link.modelingProjectId}`}>
+                        <Button variant="outline" size="sm">
+                          <ExternalLink className="h-4 w-4 mr-1" />
+                          Open
+                        </Button>
+                      </Link>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => unlinkMutation.mutate(link.id)}
+                        disabled={unlinkMutation.isPending}
+                      >
+                        <Unlink className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Plus className="h-5 w-5" />
+            Link to Modeling Project
+          </CardTitle>
+          <CardDescription>Connect this RRA data to a modeling project for analysis</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {unlinkedProjects.length === 0 ? (
+            <div className="text-center py-4">
+              <p className="text-muted-foreground mb-3">All modeling projects are already linked</p>
+              <Link href="/modeling/projects/new">
+                <Button variant="outline">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create New Modeling Project
+                </Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {unlinkedProjects.slice(0, 5).map((project: any) => (
+                <div key={project.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
+                  <div>
+                    <p className="font-medium">{project.marinaName}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {[project.city, project.state].filter(Boolean).join(', ') || 'No location'}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => linkMutation.mutate({ rraLocationId: projectId, modelingProjectId: project.id })}
+                    disabled={linkMutation.isPending}
+                  >
+                    {linkMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4 mr-1" />}
+                    Link
+                  </Button>
+                </div>
+              ))}
+              {unlinkedProjects.length > 5 && (
+                <p className="text-sm text-muted-foreground text-center">
+                  And {unlinkedProjects.length - 5} more projects...
+                </p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function RentRollProjectDetails() {
   const [, params] = useRoute('/operations/rent-roll/projects/:id');
   const projectId = params?.id;
@@ -587,6 +809,10 @@ export default function RentRollProjectDetails() {
             <FileText className="h-4 w-4 mr-2" />
             Leases
           </TabsTrigger>
+          <TabsTrigger value="modeling">
+            <TrendingUp className="h-4 w-4 mr-2" />
+            Modeling
+          </TabsTrigger>
           <TabsTrigger value="settings">
             <Settings className="h-4 w-4 mr-2" />
             Settings
@@ -599,6 +825,10 @@ export default function RentRollProjectDetails() {
 
         <TabsContent value="leases" className="mt-6">
           <LeasesTab projectId={projectId || ''} loading={isLoading} />
+        </TabsContent>
+
+        <TabsContent value="modeling" className="mt-6">
+          <ModelingTab projectId={projectId || ''} projectName={project?.name} loading={isLoading} />
         </TabsContent>
 
         <TabsContent value="settings" className="mt-6">
