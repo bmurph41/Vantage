@@ -491,12 +491,28 @@ export default function WeekProspectingModal({
       }
       saveStatusTimeoutRef.current = setTimeout(() => setSaveStatus('idle'), 2000);
       
-      // Update cache with server response to ensure consistency
+      // Update individual entry cache with server response
       queryClient.setQueryData(['/api/prospecting/entries', year, quarter, weekNumber], savedEntry);
       
-      // Invalidate list queries to ensure full refresh
-      queryClient.invalidateQueries({ queryKey: ['/api/prospecting/entries'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/prospecting/entries', year] });
+      // Update the list cache directly with server response instead of invalidating
+      // This prevents refetch from overwriting optimistic updates in progress
+      const currentEntries = queryClient.getQueryData<any[]>(['/api/prospecting/entries', year]);
+      if (currentEntries) {
+        const existingIndex = currentEntries.findIndex(
+          (e: any) => e.year === savedEntry.year && e.quarter === savedEntry.quarter && e.weekNumber === savedEntry.weekNumber
+        );
+        
+        let updatedEntries;
+        if (existingIndex >= 0) {
+          updatedEntries = currentEntries.map((e: any, idx: number) => 
+            idx === existingIndex ? savedEntry : e
+          );
+        } else {
+          updatedEntries = [...currentEntries, savedEntry];
+        }
+        
+        queryClient.setQueryData(['/api/prospecting/entries', year], updatedEntries);
+      }
     },
     onError: (error, _newData, context) => {
       console.error('Autosave failed:', error);
@@ -729,8 +745,8 @@ export default function WeekProspectingModal({
   const updateCacheOptimistically = useCallback(() => {
     if (!dataLoadedRef.current) return;
     
-    const previousEntries = queryClient.getQueryData<any[]>(['/api/prospecting/entries', year]);
-    if (!previousEntries) return;
+    // Get existing entries or start with empty array if cache not yet populated
+    const previousEntries = queryClient.getQueryData<any[]>(['/api/prospecting/entries', year]) || [];
     
     // Build a clean, serializable cache entry (deep clone with plain objects only)
     const cleanDailyActivities: Record<string, any> = {};
