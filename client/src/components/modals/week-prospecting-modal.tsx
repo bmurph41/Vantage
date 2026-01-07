@@ -418,13 +418,70 @@ export default function WeekProspectingModal({
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const saveStatusTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // Autosave mutation for prospecting data
+  // Autosave mutation for prospecting data with optimistic updates for real-time sync
   const autosaveMutation = useMutation({
     mutationFn: async (data: any) => {
       setSaveStatus('saving');
       const response = await apiRequest('PUT', `/api/prospecting/entries/${year}/${quarter}/${weekNumber}`, data);
       const result = await response.json();
       return result;
+    },
+    onMutate: async (newData: any) => {
+      // Cancel any outgoing refetches to avoid overwriting optimistic update
+      await queryClient.cancelQueries({ queryKey: ['/api/prospecting/entries', year] });
+      
+      // Snapshot the previous value
+      const previousEntries = queryClient.getQueryData<any[]>(['/api/prospecting/entries', year]);
+      
+      // Optimistically update the cache with deep-cloned serializable data
+      if (previousEntries) {
+        // Deep clone the data to ensure it's fully serializable
+        const cleanDailyActivities = JSON.parse(JSON.stringify(newData.dailyActivities || {}));
+        const cleanGoals = JSON.parse(JSON.stringify(newData.goals || []));
+        const cleanEnabledDays = Array.isArray(newData.enabledDays) 
+          ? [...newData.enabledDays] 
+          : [];
+        
+        const optimisticEntry = {
+          id: entry?.id || `temp-${year}-${quarter}-${weekNumber}`,
+          userId: entry?.userId || newData.userId || 'temp-user-id',
+          year: newData.year,
+          quarter: newData.quarter,
+          weekNumber: newData.weekNumber,
+          weekStartDate: newData.weekStartDate instanceof Date 
+            ? newData.weekStartDate.toISOString() 
+            : newData.weekStartDate,
+          weekEndDate: newData.weekEndDate instanceof Date 
+            ? newData.weekEndDate.toISOString() 
+            : newData.weekEndDate,
+          goals: cleanGoals,
+          enabledDays: cleanEnabledDays,
+          dailyActivities: cleanDailyActivities,
+          totalLeadGeneration: newData.totalLeadGeneration || 0,
+          totalCalls: newData.totalCalls || 0,
+          totalEmails: newData.totalEmails || 0,
+          totalMeetings: newData.totalMeetings || 0,
+          createdAt: entry?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        
+        const existingIndex = previousEntries.findIndex(
+          (e: any) => e.year === year && e.quarter === quarter && e.weekNumber === weekNumber
+        );
+        
+        let updatedEntries;
+        if (existingIndex >= 0) {
+          updatedEntries = previousEntries.map((e: any, idx: number) => 
+            idx === existingIndex ? optimisticEntry : e
+          );
+        } else {
+          updatedEntries = [...previousEntries, optimisticEntry];
+        }
+        
+        queryClient.setQueryData(['/api/prospecting/entries', year], updatedEntries);
+      }
+      
+      return { previousEntries };
     },
     onSuccess: (savedEntry: any) => {
       // Show saved indicator briefly
@@ -434,14 +491,22 @@ export default function WeekProspectingModal({
       }
       saveStatusTimeoutRef.current = setTimeout(() => setSaveStatus('idle'), 2000);
       
-      // Force invalidate all prospecting queries to ensure Week cards refresh with new data
+      // Update cache with server response to ensure consistency
+      queryClient.setQueryData(['/api/prospecting/entries', year, quarter, weekNumber], savedEntry);
+      
+      // Invalidate list queries to ensure full refresh
       queryClient.invalidateQueries({ queryKey: ['/api/prospecting/entries'] });
       queryClient.invalidateQueries({ queryKey: ['/api/prospecting/entries', year] });
-      queryClient.invalidateQueries({ queryKey: ['/api/prospecting/entries', year, quarter, weekNumber] });
     },
-    onError: (error) => {
+    onError: (error, _newData, context) => {
       console.error('Autosave failed:', error);
       setSaveStatus('idle');
+      
+      // Rollback to previous value on error
+      if (context?.previousEntries) {
+        queryClient.setQueryData(['/api/prospecting/entries', year], context.previousEntries);
+      }
+      
       toast({
         title: "Save failed",
         description: "Your changes couldn't be saved. Please try again.",
@@ -659,6 +724,71 @@ export default function WeekProspectingModal({
     autosaveMutation.mutate(prospectingData);
   }, [prepareDataForSave, autosaveMutation]);
 
+  // Immediate optimistic cache update for real-time Week card sync (no server call)
+  // Uses a deep clone of data to ensure cache receives only serializable, normalized objects
+  const updateCacheOptimistically = useCallback(() => {
+    if (!dataLoadedRef.current) return;
+    
+    const previousEntries = queryClient.getQueryData<any[]>(['/api/prospecting/entries', year]);
+    if (!previousEntries) return;
+    
+    // Build a clean, serializable cache entry (deep clone with plain objects only)
+    const cleanDailyActivities: Record<string, any> = {};
+    ALL_DAYS_OF_WEEK.forEach(day => {
+      const dayData = dailyData[day.id];
+      cleanDailyActivities[day.id] = {
+        targetActivities: dayData?.targetActivities ?? targets.dailyActivities,
+        goals: JSON.parse(JSON.stringify(dayData?.goals ?? [])),
+        activities: JSON.parse(JSON.stringify(dayData?.activities ?? [])),
+        activityBoxes: JSON.parse(JSON.stringify(dayData?.activityBoxes ?? []))
+      };
+    });
+    
+    const cleanGoals = weeklyGoals
+      .filter(g => g && g.text && g.text.trim())
+      .map(g => ({ id: g.id, text: g.text, completed: g.completed, type: g.type }));
+    
+    const optimisticEntry = {
+      id: entry?.id || `temp-${year}-${quarter}-${weekNumber}`,
+      userId: entry?.userId || 'temp-user-id',
+      year,
+      quarter,
+      weekNumber,
+      weekStartDate: weekStart instanceof Date ? weekStart.toISOString() : weekStart,
+      weekEndDate: weekEnd instanceof Date ? weekEnd.toISOString() : weekEnd,
+      goals: cleanGoals,
+      enabledDays: Array.from(selectedDays),
+      dailyActivities: cleanDailyActivities,
+      totalLeadGeneration: weeklyStats.totalLeads,
+      totalCalls: Object.values(dailyData).reduce((sum, day) => 
+        sum + day.activityBoxes.filter((box: ActivityBox) => box.completed && box.type === 'call').length, 0
+      ),
+      totalEmails: Object.values(dailyData).reduce((sum, day) => 
+        sum + day.activityBoxes.filter((box: ActivityBox) => box.completed && box.type === 'email').length, 0
+      ),
+      totalMeetings: Object.values(dailyData).reduce((sum, day) => 
+        sum + day.activityBoxes.filter((box: ActivityBox) => box.completed && box.type === 'meeting').length, 0
+      ),
+      createdAt: entry?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    const existingIndex = previousEntries.findIndex(
+      (e: any) => e.year === year && e.quarter === quarter && e.weekNumber === weekNumber
+    );
+    
+    let updatedEntries;
+    if (existingIndex >= 0) {
+      updatedEntries = previousEntries.map((e: any, idx: number) => 
+        idx === existingIndex ? optimisticEntry : e
+      );
+    } else {
+      updatedEntries = [...previousEntries, optimisticEntry];
+    }
+    
+    queryClient.setQueryData(['/api/prospecting/entries', year], updatedEntries);
+  }, [queryClient, year, quarter, weekNumber, entry, weekStart, weekEnd, weeklyGoals, dailyData, targets, selectedDays, weeklyStats]);
+
   // Debounced autosave function (placed after weeklyStats)
   const debounceTimeoutRef = useRef<NodeJS.Timeout>();
   const autosave = useCallback(() => {
@@ -675,12 +805,15 @@ export default function WeekProspectingModal({
     }, 4000); // 4 second debounce for user inactivity
   }, [prepareDataForSave, autosaveMutation]);
 
-  // Auto-save when data changes (only after initial data is loaded)
+  // Real-time cache update and debounced autosave when data changes
   useEffect(() => {
-    if (open && dataLoadedRef.current) { // Only autosave when modal is open AND data is loaded
+    if (open && dataLoadedRef.current) {
+      // Immediately update cache for real-time Week card sync
+      updateCacheOptimistically();
+      // Also trigger debounced autosave to persist to server
       autosave();
     }
-  }, [dailyData, targets, weeklyGoals, open, autosave]);
+  }, [dailyData, targets, weeklyGoals, selectedDays, open, autosave, updateCacheOptimistically]);
 
   // Save immediately when modal is closing
   const prevOpenRef = useRef(open);
