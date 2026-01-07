@@ -82,3 +82,13 @@ The platform uses React 18 with TypeScript and Wouter for routing. The UI is bui
 - `Census Bureau API`
 - `QuickBooks API`
 - `Google Maps Services`
+- `Constant Contact` (Email Marketing)
+
+## Security Requirements
+
+### Email Marketing Module
+- **Token Encryption**: OAuth tokens stored using AES-256-GCM encryption
+- **Required Secrets**: `EMAIL_MARKETING_ENCRYPTION_KEY` or `JWT_SECRET` must be set (min 16 chars) - no fallback allowed
+- **OAuth State**: Server-side nonce validation with single-use cryptographic nonces, 10-minute expiration, tenant-scoped
+- **Token Refresh**: Automatic token refresh with connection deactivation on failure
+- **Multi-tenancy**: All queries scoped by both userId AND orgId

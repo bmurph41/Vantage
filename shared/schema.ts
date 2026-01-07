@@ -9255,6 +9255,83 @@ export const emailCampaigns = pgTable('email_campaigns', {
   externalIdx: index('email_campaigns_external_idx').on(table.externalId),
 }));
 
+// Email Marketing Providers - Supported email platforms
+export const emailMarketingProviders = pgTable('email_marketing_providers', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  slug: text('slug').notNull().unique(), // e.g., "constant_contact", "mailchimp"
+  displayName: text('display_name').notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  slugIdx: index('email_marketing_providers_slug_idx').on(table.slug),
+}));
+
+// Email Marketing Connections - User OAuth connections to email providers
+export const emailMarketingConnections = pgTable('email_marketing_connections', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  providerSlug: text('provider_slug').notNull(), // constant_contact, mailchimp
+  accessToken: text('access_token'), // Encrypted/secure storage
+  refreshToken: text('refresh_token'),
+  expiresAt: timestamp('expires_at'),
+  accountLabel: text('account_label'), // e.g., "Main Constant Contact Account"
+  providerAccountId: text('provider_account_id'), // Provider's account ID
+  scopes: text('scopes'), // Granted OAuth scopes
+  isActive: boolean('is_active').default(true).notNull(),
+  lastSyncAt: timestamp('last_sync_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('email_marketing_connections_org_idx').on(table.orgId),
+  userIdx: index('email_marketing_connections_user_idx').on(table.userId),
+  providerIdx: index('email_marketing_connections_provider_idx').on(table.providerSlug),
+  uniqueUserProvider: index('email_marketing_connections_unique').on(table.userId, table.providerSlug),
+}));
+
+// Email Marketing Lists - Synced lists from providers
+export const emailMarketingLists = pgTable('email_marketing_lists', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  connectionId: varchar('connection_id').notNull().references(() => emailMarketingConnections.id, { onDelete: 'cascade' }),
+  providerListId: text('provider_list_id').notNull(), // External list ID from provider
+  name: text('name').notNull(),
+  contactCount: integer('contact_count').default(0),
+  lastSyncAt: timestamp('last_sync_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('email_marketing_lists_org_idx').on(table.orgId),
+  connectionIdx: index('email_marketing_lists_connection_idx').on(table.connectionId),
+  providerListIdx: index('email_marketing_lists_provider_list_idx').on(table.providerListId),
+}));
+
+// Email Marketing Leads - Leads captured and synced to email providers
+export const emailMarketingLeads = pgTable('email_marketing_leads', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  email: text('email').notNull(),
+  firstName: text('first_name'),
+  lastName: text('last_name'),
+  source: text('source').default('manual'), // manual, form, import, crm_sync
+  connectionId: varchar('connection_id').references(() => emailMarketingConnections.id),
+  providerContactId: text('provider_contact_id'), // Contact ID in the provider system
+  listIds: text('list_ids').array(), // Array of list IDs this lead belongs to
+  syncStatus: text('sync_status').default('pending'), // pending, synced, failed
+  syncError: text('sync_error'),
+  lastSyncAt: timestamp('last_sync_at'),
+  crmContactId: varchar('crm_contact_id').references(() => crmContacts.id), // Link to CRM contact
+  crmLeadId: varchar('crm_lead_id').references(() => crmLeads.id), // Link to CRM lead
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('email_marketing_leads_org_idx').on(table.orgId),
+  emailIdx: index('email_marketing_leads_email_idx').on(table.email),
+  connectionIdx: index('email_marketing_leads_connection_idx').on(table.connectionId),
+  syncStatusIdx: index('email_marketing_leads_sync_status_idx').on(table.syncStatus),
+}));
+
 // ================================================================================
 // MODELING PROJECTS - Valuation & Financial Modeling
 // ================================================================================
@@ -10521,6 +10598,49 @@ export type InsertLeadAttribution = z.infer<typeof insertLeadAttributionSchema>;
 
 export type EmailCampaign = typeof emailCampaigns.$inferSelect;
 export type InsertEmailCampaign = z.infer<typeof insertEmailCampaignSchema>;
+
+// Email Marketing Provider schemas
+export const insertEmailMarketingConnectionSchema = createInsertSchema(emailMarketingConnections).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateEmailMarketingConnectionSchema = insertEmailMarketingConnectionSchema.partial();
+
+export const insertEmailMarketingListSchema = createInsertSchema(emailMarketingLists).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertEmailMarketingLeadSchema = createInsertSchema(emailMarketingLeads).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+  syncStatus: true,
+  syncError: true,
+  lastSyncAt: true,
+  providerContactId: true,
+});
+
+export const updateEmailMarketingLeadSchema = insertEmailMarketingLeadSchema.partial();
+
+// Types for Email Marketing
+export type EmailMarketingProvider = typeof emailMarketingProviders.$inferSelect;
+export type EmailMarketingConnection = typeof emailMarketingConnections.$inferSelect;
+export type InsertEmailMarketingConnection = z.infer<typeof insertEmailMarketingConnectionSchema>;
+export type UpdateEmailMarketingConnection = z.infer<typeof updateEmailMarketingConnectionSchema>;
+
+export type EmailMarketingList = typeof emailMarketingLists.$inferSelect;
+export type InsertEmailMarketingList = z.infer<typeof insertEmailMarketingListSchema>;
+
+export type EmailMarketingLead = typeof emailMarketingLeads.$inferSelect;
+export type InsertEmailMarketingLead = z.infer<typeof insertEmailMarketingLeadSchema>;
+export type UpdateEmailMarketingLead = z.infer<typeof updateEmailMarketingLeadSchema>;
 
 // Modeling Projects schemas
 // Modeling Region schemas
