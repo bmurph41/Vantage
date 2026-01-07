@@ -17,6 +17,7 @@ import { getUncachableResendClient } from "./lib/resend-client";
 import { findMatchingCrmCompanies, searchCrmCompanies } from "./company-matcher";
 import { invalidateLearningCache } from "./services/ai-learning";
 import { invalidateCategorizerCache } from "./services/categorizer";
+import { sendNewSearchRecap } from "./services/alert-service";
 
 const VALID_CATEGORIES = [
   'Macro',
@@ -2265,6 +2266,21 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
         ...data,
         userId: req.dockTalkUser!.id,
         orgId: user.orgId,
+      });
+
+      // Trigger 24-hour recap email asynchronously (don't block response)
+      setImmediate(async () => {
+        try {
+          console.log(`[Recap] Triggering 24-hour recap for new search: ${search.id}`);
+          const result = await sendNewSearchRecap(search.id, req.dockTalkUser!.id, user.orgId);
+          if (result.sent) {
+            console.log(`[Recap] Successfully sent recap email with ${result.articleCount} articles`);
+          } else {
+            console.log(`[Recap] Recap not sent: ${result.error || 'No articles found'}`);
+          }
+        } catch (error) {
+          console.error(`[Recap] Error triggering recap:`, error);
+        }
       });
 
       res.status(201).json(search);
