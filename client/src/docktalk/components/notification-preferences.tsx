@@ -700,6 +700,36 @@ export default function NotificationPreferences({
             </DialogDescription>
           </DialogHeader>
 
+          {/* Quick Create - All News */}
+          {!editingSearch && (
+            <div className="bg-muted/50 border rounded-lg p-4 mb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-medium text-sm">All News</h4>
+                  <p className="text-xs text-muted-foreground">Receive alerts for all new articles</p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    searchForm.setValue("name", "All News");
+                    searchForm.setValue("criteria.search", "");
+                    searchForm.setValue("criteria.categories", []);
+                    searchForm.setValue("criteria.sentiment", "any");
+                    searchForm.setValue("criteria.dealsOnly", false);
+                    searchForm.setValue("alertFrequency", "daily");
+                    searchForm.handleSubmit(onSearchSubmit)();
+                  }}
+                  disabled={createSearchMutation.isPending}
+                  data-testid="button-quick-all-news"
+                >
+                  {createSearchMutation.isPending ? "Creating..." : "Create All News Alert"}
+                </Button>
+              </div>
+            </div>
+          )}
+
           <Form {...searchForm}>
             <form onSubmit={searchForm.handleSubmit(onSearchSubmit)} className="space-y-4 overflow-y-auto pr-2">
               <FormField
@@ -739,9 +769,9 @@ export default function NotificationPreferences({
                   <FormItem>
                     <FormLabel>Categories (Optional)</FormLabel>
                     <FormDescription className="mb-2">
-                      Select categories to monitor
+                      Select categories to monitor ({categories.length} available)
                     </FormDescription>
-                    <ScrollArea className="h-32 border rounded-md p-3">
+                    <ScrollArea className="h-48 border rounded-md p-3">
                       <div className="grid grid-cols-2 gap-2">
                         {categories.map((category) => (
                           <div key={category} className="flex items-center space-x-2">
