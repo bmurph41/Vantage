@@ -154,15 +154,19 @@ export const organizations = pgTable("organizations", {
 // Pack Types - Add-on feature packs that can be purchased
 // Core packs: crm_pipeline, modeling_tools, analysis, operations
 // Add-on packs: fund_management, lp_portal, prospecting, analytics_pro
+// Role-based packs: owner, investor, broker (for RRA access)
 export const packTypeEnum = pgEnum("pack_type", [
   "crm_pipeline",     // CRM & Pipeline - deals, contacts, companies, pipeline management
   "modeling_tools",   // Modeling Tools - modeling projects, OM builder, exit strategies, waterfall
   "analysis",         // Analysis - sales comps, rate comps, market analytics
-  "operations",       // Operations - rent roll, fuel sales, ship store, dockit, marketing
+  "operations",       // Operations - fuel sales, ship store, dockit, marketing
   "fund_management",  // Fund Management module (add-on to modeling_tools)
   "lp_portal",        // LP Portal for investor access (add-on to fund_management)
   "prospecting",      // Premium prospecting & outreach tools (add-on to crm_pipeline)
   "analytics_pro",    // Advanced analytics and reporting (add-on to analysis)
+  "owner",            // Owner pack ($149/mo) - RRA with full portfolio management
+  "investor",         // Investor pack ($99/mo) - RRA with analysis focus
+  "broker",           // Broker pack ($99/mo) - RRA with transaction focus
 ]);
 
 export const packStatusEnum = pgEnum("pack_status", ["active", "trial", "expired", "cancelled"]);
