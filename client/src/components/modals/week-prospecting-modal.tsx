@@ -822,6 +822,8 @@ export default function WeekProspectingModal({
   }, [prepareDataForSave, autosaveMutation]);
 
   // Real-time cache update and debounced autosave when data changes
+  // Note: We intentionally omit updateCacheOptimistically and autosave from deps to prevent infinite loops
+  // These callbacks change when their internal deps change, but we only want to trigger on data changes
   useEffect(() => {
     if (open && dataLoadedRef.current) {
       // Immediately update cache for real-time Week card sync
@@ -829,7 +831,8 @@ export default function WeekProspectingModal({
       // Also trigger debounced autosave to persist to server
       autosave();
     }
-  }, [dailyData, targets, weeklyGoals, selectedDays, open, autosave, updateCacheOptimistically]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dailyData, targets, weeklyGoals, selectedDays, open]);
 
   // Save immediately when modal is closing
   const prevOpenRef = useRef(open);
