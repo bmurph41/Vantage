@@ -75,6 +75,7 @@ const Portfolio = lazy(() => import("@/pages/Portfolio"));
 const RentRoll = lazy(() => import("@/pages/operations/RentRoll"));
 const RentRollPortfolio = lazy(() => import("@/pages/operations/rent-roll/Portfolio"));
 const RentRollProjects = lazy(() => import("@/pages/operations/rent-roll/Projects"));
+const RentRollLeases = lazy(() => import("@/pages/operations/rent-roll/Leases"));
 
 // Operations - Tabbed Module Pages
 const FuelSalesTabbed = lazy(() => import("@/pages/operations/FuelSalesTabbed"));
@@ -485,6 +486,15 @@ function Router() {
           window.location.replace('/operations/rent-roll?tab=projects');
           return null;
         }}
+      </Route>
+      <Route path="/operations/rent-roll/leases">
+        {() => (
+          <PrivateRoute>
+            <Suspense fallback={<LoadingSpinner />}>
+              <RentRollLeases />
+            </Suspense>
+          </PrivateRoute>
+        )}
       </Route>
       <Route path="/operations/fuel/dashboard">
         {() => {

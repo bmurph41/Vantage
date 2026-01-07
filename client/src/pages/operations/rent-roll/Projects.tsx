@@ -6,15 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   Select,
   SelectContent,
@@ -35,7 +34,10 @@ import {
   MoreVertical,
   Trash2,
   Edit,
-  Eye
+  Eye,
+  Settings,
+  Sun,
+  Snowflake
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -47,17 +49,39 @@ import { Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 
 type RRAProject = {
-  id: number;
+  id: string;
   name: string;
+  code?: string;
   description: string | null;
   status: string;
-  asOfDate: string | null;
+  projectType: string;
+  seasonType: string;
+  capacity?: number;
+  isActive: boolean;
+  targetNOI?: string;
+  includeInExecutive: boolean;
+  seasonStartDate?: string;
+  seasonEndDate?: string;
+  winterStartDate?: string;
+  winterEndDate?: string;
+  budgetedRevenue?: string;
+  budgetedOccupancy?: string;
+  budgetedExpenses?: string;
+  budgetYear?: number;
+  baseRent1Label?: string;
+  baseRent2Label?: string;
+  baseRent3Label?: string;
+  charge1Label?: string;
+  charge2Label?: string;
+  charge3Label?: string;
   locationCount: number;
   totalUnits: number;
   occupiedUnits: number;
@@ -65,15 +89,34 @@ type RRAProject = {
   tenantCount: number;
 };
 
-const createProjectSchema = z.object({
+const projectFormSchema = z.object({
   name: z.string().min(1, "Project name is required"),
+  code: z.string().optional(),
   description: z.string().optional(),
-  asOfDate: z.string().optional(),
+  projectType: z.string().default("OWNED"),
+  seasonType: z.string().default("ANNUAL"),
+  capacity: z.string().optional(),
+  targetNOI: z.string().optional(),
+  includeInExecutive: z.boolean().default(true),
+  seasonStartDate: z.string().optional(),
+  seasonEndDate: z.string().optional(),
+  winterStartDate: z.string().optional(),
+  winterEndDate: z.string().optional(),
+  budgetedRevenue: z.string().optional(),
+  budgetedOccupancy: z.string().optional(),
+  budgetedExpenses: z.string().optional(),
+  budgetYear: z.string().optional(),
+  baseRent1Label: z.string().default("Base Rent 1"),
+  baseRent2Label: z.string().default("Base Rent 2"),
+  baseRent3Label: z.string().default("Base Rent 3"),
+  charge1Label: z.string().default("Charge 1"),
+  charge2Label: z.string().default("Charge 2"),
+  charge3Label: z.string().default("Charge 3"),
 });
 
-type CreateProjectForm = z.infer<typeof createProjectSchema>;
+type ProjectFormData = z.infer<typeof projectFormSchema>;
 
-function ProjectCard({ project, onDelete }: { project: RRAProject; onDelete: (id: number) => void }) {
+function ProjectCard({ project, onDelete, onEdit }: { project: RRAProject; onDelete: (id: string) => void; onEdit: (project: RRAProject) => void }) {
   const occupancyRate = project.totalUnits > 0 
     ? ((project.occupiedUnits / project.totalUnits) * 100).toFixed(1)
     : '0';
@@ -87,6 +130,20 @@ function ProjectCard({ project, onDelete }: { project: RRAProject; onDelete: (id
     }
   };
 
+  const getProjectTypeLabel = (type: string) => {
+    switch (type) {
+      case 'OWNED': return 'Owned';
+      case 'ACQUISITION': return 'Acquisition';
+      case 'MANAGED': return 'Managed';
+      case 'DEVELOPMENT': return 'Development';
+      default: return type;
+    }
+  };
+
+  const getSeasonTypeIcon = (type: string) => {
+    return type === 'SEASONAL' ? <Sun className="h-3 w-3" /> : <Calendar className="h-3 w-3" />;
+  };
+
   return (
     <Card className="hover:shadow-md transition-shadow" data-testid={`project-card-${project.id}`}>
       <CardHeader className="pb-3">
@@ -97,17 +154,23 @@ function ProjectCard({ project, onDelete }: { project: RRAProject; onDelete: (id
             </div>
             <div>
               <CardTitle className="text-lg">{project.name}</CardTitle>
-              {project.asOfDate && (
-                <CardDescription className="flex items-center gap-1 mt-1">
-                  <Calendar className="h-3 w-3" />
-                  As of {new Date(project.asOfDate).toLocaleDateString()}
-                </CardDescription>
-              )}
+              <div className="flex items-center gap-2 mt-1">
+                {project.code && (
+                  <span className="text-xs text-muted-foreground font-mono">{project.code}</span>
+                )}
+                <Badge variant="outline" className="text-xs">
+                  {getProjectTypeLabel(project.projectType)}
+                </Badge>
+                <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                  {getSeasonTypeIcon(project.seasonType)}
+                  {project.seasonType === 'SEASONAL' ? 'Seasonal' : 'Annual'}
+                </Badge>
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Badge className={getStatusColor(project.status)} variant="outline">
-              {project.status}
+            <Badge className={getStatusColor(project.status || 'active')} variant="outline">
+              {project.status || 'active'}
             </Badge>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -122,7 +185,7 @@ function ProjectCard({ project, onDelete }: { project: RRAProject; onDelete: (id
                     View Details
                   </DropdownMenuItem>
                 </Link>
-                <DropdownMenuItem data-testid={`menu-edit-${project.id}`}>
+                <DropdownMenuItem onClick={() => onEdit(project)} data-testid={`menu-edit-${project.id}`}>
                   <Edit className="h-4 w-4 mr-2" />
                   Edit Project
                 </DropdownMenuItem>
@@ -150,28 +213,35 @@ function ProjectCard({ project, onDelete }: { project: RRAProject; onDelete: (id
           <div className="flex items-center gap-2">
             <Building2 className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm">
-              <span className="font-medium">{project.locationCount}</span> locations
+              <span className="font-medium">{project.capacity || project.totalUnits || 0}</span> slips
             </span>
           </div>
           <div className="flex items-center gap-2">
             <MapPin className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm">
-              <span className="font-medium">{project.totalUnits}</span> units
+              <span className="font-medium">{project.occupiedUnits || 0}</span> occupied
             </span>
           </div>
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm">
-              <span className="font-medium">{project.tenantCount}</span> tenants
+              <span className="font-medium">{project.tenantCount || 0}</span> tenants
             </span>
           </div>
           <div className="flex items-center gap-2">
             <DollarSign className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm font-medium">
-              {formatCurrency(project.totalGrossRent)}/mo
+              {formatCurrency(project.totalGrossRent || 0)}/mo
             </span>
           </div>
         </div>
+
+        {project.targetNOI && (
+          <div className="flex items-center gap-2 mb-4 p-2 bg-muted/50 rounded-lg">
+            <span className="text-xs text-muted-foreground">Target NOI:</span>
+            <span className="text-sm font-medium">{formatCurrency(parseFloat(project.targetNOI))}</span>
+          </div>
+        )}
 
         <div className="flex items-center justify-between pt-4 border-t">
           <div className="text-sm">
@@ -190,36 +260,66 @@ function ProjectCard({ project, onDelete }: { project: RRAProject; onDelete: (id
   );
 }
 
-function CreateProjectDialog({ 
+function LocationFormDrawer({ 
   open, 
   onOpenChange,
+  editProject,
   onSuccess 
 }: { 
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  editProject?: RRAProject | null;
   onSuccess: () => void;
 }) {
   const { toast } = useToast();
   
-  const form = useForm<CreateProjectForm>({
-    resolver: zodResolver(createProjectSchema),
+  const form = useForm<ProjectFormData>({
+    resolver: zodResolver(projectFormSchema),
     defaultValues: {
-      name: "",
-      description: "",
-      asOfDate: new Date().toISOString().split('T')[0],
+      name: editProject?.name || "",
+      code: editProject?.code || "",
+      description: editProject?.description || "",
+      projectType: editProject?.projectType || "OWNED",
+      seasonType: editProject?.seasonType || "ANNUAL",
+      capacity: editProject?.capacity?.toString() || "",
+      targetNOI: editProject?.targetNOI || "",
+      includeInExecutive: editProject?.includeInExecutive ?? true,
+      seasonStartDate: editProject?.seasonStartDate || "",
+      seasonEndDate: editProject?.seasonEndDate || "",
+      winterStartDate: editProject?.winterStartDate || "",
+      winterEndDate: editProject?.winterEndDate || "",
+      budgetedRevenue: editProject?.budgetedRevenue || "",
+      budgetedOccupancy: editProject?.budgetedOccupancy || "",
+      budgetedExpenses: editProject?.budgetedExpenses || "",
+      budgetYear: editProject?.budgetYear?.toString() || new Date().getFullYear().toString(),
+      baseRent1Label: editProject?.baseRent1Label || "Base Rent 1",
+      baseRent2Label: editProject?.baseRent2Label || "Base Rent 2",
+      baseRent3Label: editProject?.baseRent3Label || "Base Rent 3",
+      charge1Label: editProject?.charge1Label || "Charge 1",
+      charge2Label: editProject?.charge2Label || "Charge 2",
+      charge3Label: editProject?.charge3Label || "Charge 3",
     },
   });
 
-  const createMutation = useMutation({
-    mutationFn: async (data: CreateProjectForm) => {
-      const res = await apiRequest('POST', '/api/rent-roll/projects', {
+  const seasonType = form.watch("seasonType");
+
+  const saveMutation = useMutation({
+    mutationFn: async (data: ProjectFormData) => {
+      const payload = {
         ...data,
-        status: 'draft',
-      });
+        capacity: data.capacity ? parseInt(data.capacity) : null,
+        budgetYear: data.budgetYear ? parseInt(data.budgetYear) : null,
+        status: editProject?.status || 'active',
+      };
+      if (editProject) {
+        const res = await apiRequest('PATCH', `/api/rent-roll/projects/${editProject.id}`, payload);
+        return res.json();
+      }
+      const res = await apiRequest('POST', '/api/rent-roll/projects', payload);
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Project created successfully" });
+      toast({ title: editProject ? "Project updated successfully" : "Project created successfully" });
       queryClient.invalidateQueries({ queryKey: ['/api/rent-roll/projects'] });
       form.reset();
       onOpenChange(false);
@@ -227,90 +327,469 @@ function CreateProjectDialog({
     },
     onError: (error: Error) => {
       toast({
-        title: "Failed to create project",
+        title: editProject ? "Failed to update project" : "Failed to create project",
         description: error.message,
         variant: "destructive",
       });
     },
   });
 
-  const onSubmit = (data: CreateProjectForm) => {
-    createMutation.mutate(data);
+  const onSubmit = (data: ProjectFormData) => {
+    saveMutation.mutate(data);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>Create Rent Roll Project</DialogTitle>
-          <DialogDescription>
-            Create a new rent roll project to organize and analyze lease data.
-          </DialogDescription>
-        </DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="sm:max-w-[650px] overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>{editProject ? "Edit Marina Project" : "Create Marina Project"}</SheetTitle>
+          <SheetDescription>
+            {editProject 
+              ? "Update the project details including seasons, capacity, and budget information." 
+              : "Create a new rent roll project to organize and analyze lease data."
+            }
+          </SheetDescription>
+        </SheetHeader>
+        
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Project Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., Marina Bay Acquisition" {...field} data-testid="input-project-name" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description (Optional)</FormLabel>
-                  <FormControl>
-                    <Textarea 
-                      placeholder="Brief description of this rent roll project..."
-                      {...field}
-                      data-testid="input-project-description"
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 mt-6">
+            <Tabs defaultValue="basic" className="w-full">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="basic">Basic</TabsTrigger>
+                <TabsTrigger value="seasons">Seasons</TabsTrigger>
+                <TabsTrigger value="budget">Budget</TabsTrigger>
+                <TabsTrigger value="labels">Labels</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="basic" className="space-y-4 mt-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Project Name *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., Marina Bay" {...field} data-testid="input-project-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="code"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Project Code</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., MB-001" {...field} data-testid="input-project-code" />
+                        </FormControl>
+                        <FormDescription>Short identifier for reports</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="capacity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Total Capacity</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="e.g., 250" {...field} data-testid="input-capacity" />
+                        </FormControl>
+                        <FormDescription>Number of slips/units</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Brief description of this marina project..."
+                          {...field}
+                          data-testid="input-project-description"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="projectType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Project Type</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-project-type">
+                              <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="OWNED">Owned</SelectItem>
+                            <SelectItem value="ACQUISITION">Acquisition</SelectItem>
+                            <SelectItem value="MANAGED">Managed</SelectItem>
+                            <SelectItem value="DEVELOPMENT">Development</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="seasonType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Season Type</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-season-type">
+                              <SelectValue placeholder="Select season type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="ANNUAL">Annual (Year-Round)</SelectItem>
+                            <SelectItem value="SEASONAL">Seasonal</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="space-y-0.5">
+                    <FormLabel>Include in Executive Dashboard</FormLabel>
+                    <FormDescription>
+                      Show this project in portfolio-wide analytics and summaries
+                    </FormDescription>
+                  </div>
+                  <FormField
+                    control={form.control}
+                    name="includeInExecutive"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-include-executive"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="seasons" className="space-y-4 mt-4">
+                {seasonType === 'SEASONAL' ? (
+                  <>
+                    <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Sun className="h-5 w-5 text-blue-600" />
+                        <h3 className="font-medium text-blue-900 dark:text-blue-100">Summer Season</h3>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="seasonStartDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Start Date</FormLabel>
+                              <FormControl>
+                                <Input type="date" {...field} data-testid="input-season-start" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="seasonEndDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>End Date</FormLabel>
+                              <FormControl>
+                                <Input type="date" {...field} data-testid="input-season-end" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Snowflake className="h-5 w-5 text-slate-600" />
+                        <h3 className="font-medium text-slate-900 dark:text-slate-100">Winter Season</h3>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="winterStartDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Start Date</FormLabel>
+                              <FormControl>
+                                <Input type="date" {...field} data-testid="input-winter-start" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="winterEndDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>End Date</FormLabel>
+                              <FormControl>
+                                <Input type="date" {...field} data-testid="input-winter-end" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Season dates are only available for seasonal projects.</p>
+                    <p className="text-sm mt-2">Change the project to "Seasonal" type to configure seasons.</p>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="budget" className="space-y-4 mt-4">
+                <FormField
+                  control={form.control}
+                  name="budgetYear"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Budget Year</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder={new Date().getFullYear().toString()} {...field} data-testid="input-budget-year" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <Separator />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="targetNOI"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Target NOI</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-target-noi" />
+                        </FormControl>
+                        <FormDescription>Net Operating Income target</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="budgetedOccupancy"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Budgeted Occupancy (%)</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.1" placeholder="95.0" {...field} data-testid="input-budget-occupancy" />
+                        </FormControl>
+                        <FormDescription>Target occupancy rate</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="budgetedRevenue"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Budgeted Revenue</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-budget-revenue" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="budgetedExpenses"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Budgeted Expenses</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-budget-expenses" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="labels" className="space-y-4 mt-4">
+                <div className="p-4 bg-muted/50 rounded-lg mb-4">
+                  <p className="text-sm text-muted-foreground">
+                    Customize the labels for rent and charge columns used in this project's rent roll.
+                    These labels will appear in reports and exports.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-sm font-medium flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Base Rent Labels
+                  </h4>
+                  <div className="grid grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="baseRent1Label"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Rent Column 1</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Base Rent 1" {...field} data-testid="input-rent-label-1" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="asOfDate"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>As-Of Date</FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} data-testid="input-project-date" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <DialogFooter>
+                    <FormField
+                      control={form.control}
+                      name="baseRent2Label"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Rent Column 2</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Base Rent 2" {...field} data-testid="input-rent-label-2" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="baseRent3Label"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Rent Column 3</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Base Rent 3" {...field} data-testid="input-rent-label-3" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-4">
+                  <h4 className="text-sm font-medium flex items-center gap-2">
+                    <Settings className="h-4 w-4" />
+                    Charge Labels
+                  </h4>
+                  <div className="grid grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="charge1Label"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Charge Column 1</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Charge 1" {...field} data-testid="input-charge-label-1" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="charge2Label"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Charge Column 2</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Charge 2" {...field} data-testid="input-charge-label-2" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="charge3Label"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Charge Column 3</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Charge 3" {...field} data-testid="input-charge-label-3" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
+
+            <div className="flex justify-end gap-3 pt-4 border-t">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={createMutation.isPending} data-testid="btn-submit-project">
-                {createMutation.isPending ? "Creating..." : "Create Project"}
+              <Button type="submit" disabled={saveMutation.isPending} data-testid="btn-submit-project">
+                {saveMutation.isPending ? "Saving..." : editProject ? "Update Project" : "Create Project"}
               </Button>
-            </DialogFooter>
+            </div>
           </form>
         </Form>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
 
 export default function RentRollProjects() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [formDrawerOpen, setFormDrawerOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<RRAProject | null>(null);
   const { toast } = useToast();
 
   const { data: projects, isLoading, error } = useQuery<RRAProject[]>({
@@ -319,7 +798,7 @@ export default function RentRollProjects() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async (id: string) => {
       await apiRequest('DELETE', `/api/rent-roll/projects/${id}`);
     },
     onSuccess: () => {
@@ -335,11 +814,24 @@ export default function RentRollProjects() {
     },
   });
 
+  const handleEdit = (project: RRAProject) => {
+    setEditingProject(project);
+    setFormDrawerOpen(true);
+  };
+
+  const handleDelete = (id: string) => {
+    if (confirm("Are you sure you want to delete this project? This action cannot be undone.")) {
+      deleteMutation.mutate(id);
+    }
+  };
+
   const filteredProjects = (projects || []).filter((project) => {
     const matchesSearch = project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (project.description?.toLowerCase().includes(searchQuery.toLowerCase()));
+      (project.description?.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (project.code?.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesStatus = statusFilter === "all" || project.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesType = typeFilter === "all" || project.projectType === typeFilter;
+    return matchesSearch && matchesStatus && matchesType;
   });
 
   return (
@@ -347,13 +839,16 @@ export default function RentRollProjects() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2" data-testid="heading-rent-roll-projects">
-            Rent Roll Projects
+            Marina Projects
           </h1>
           <p className="text-muted-foreground" data-testid="description-rent-roll-projects">
-            Manage and analyze rent rolls organized by acquisition or portfolio projects.
+            Manage and analyze rent rolls organized by marina or acquisition project.
           </p>
         </div>
-        <Button onClick={() => setCreateDialogOpen(true)} data-testid="btn-create-project">
+        <Button 
+          onClick={() => { setEditingProject(null); setFormDrawerOpen(true); }} 
+          data-testid="btn-create-project"
+        >
           <Plus className="h-4 w-4 mr-2" />
           New Project
         </Button>
@@ -376,9 +871,21 @@ export default function RentRollProjects() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="draft">Draft</SelectItem>
             <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="draft">Draft</SelectItem>
             <SelectItem value="archived">Archived</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-[150px]" data-testid="select-type-filter">
+            <SelectValue placeholder="Type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="OWNED">Owned</SelectItem>
+            <SelectItem value="ACQUISITION">Acquisition</SelectItem>
+            <SelectItem value="MANAGED">Managed</SelectItem>
+            <SelectItem value="DEVELOPMENT">Development</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -408,15 +915,15 @@ export default function RentRollProjects() {
           <CardContent className="py-12 text-center">
             <FolderKanban className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-lg font-semibold mb-2">
-              {searchQuery || statusFilter !== "all" ? "No matching projects" : "No projects yet"}
+              {searchQuery || statusFilter !== "all" || typeFilter !== "all" ? "No matching projects" : "No projects yet"}
             </h3>
             <p className="text-muted-foreground mb-4">
-              {searchQuery || statusFilter !== "all" 
+              {searchQuery || statusFilter !== "all" || typeFilter !== "all"
                 ? "Try adjusting your search or filter criteria."
-                : "Create your first rent roll project to get started."}
+                : "Create your first marina project to get started."}
             </p>
-            {!searchQuery && statusFilter === "all" && (
-              <Button onClick={() => setCreateDialogOpen(true)} data-testid="btn-create-first-project">
+            {!searchQuery && statusFilter === "all" && typeFilter === "all" && (
+              <Button onClick={() => setFormDrawerOpen(true)} data-testid="btn-create-first-project">
                 <Plus className="h-4 w-4 mr-2" />
                 Create Project
               </Button>
@@ -429,16 +936,18 @@ export default function RentRollProjects() {
             <ProjectCard 
               key={project.id} 
               project={project} 
-              onDelete={(id) => deleteMutation.mutate(id)}
+              onDelete={handleDelete}
+              onEdit={handleEdit}
             />
           ))}
         </div>
       )}
 
-      <CreateProjectDialog 
-        open={createDialogOpen}
-        onOpenChange={setCreateDialogOpen}
-        onSuccess={() => {}}
+      <LocationFormDrawer 
+        open={formDrawerOpen}
+        onOpenChange={setFormDrawerOpen}
+        editProject={editingProject}
+        onSuccess={() => { setEditingProject(null); }}
       />
     </div>
   );
