@@ -672,7 +672,7 @@ export default function WeekProspectingModal({
     debounceTimeoutRef.current = setTimeout(() => {
       const prospectingData = prepareDataForSave();
       autosaveMutation.mutate(prospectingData);
-    }, 5000); // 5 second debounce for user inactivity
+    }, 4000); // 4 second debounce for user inactivity
   }, [prepareDataForSave, autosaveMutation]);
 
   // Auto-save when data changes (only after initial data is loaded)
@@ -707,7 +707,7 @@ export default function WeekProspectingModal({
         const prospectingData = prepareDataForSave();
         fetch(`/api/prospecting/entries/${year}/${quarter}/${weekNumber}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.cookie.match(/(?:^|; )csrf_token=([^;]*)/)?.[1] || '' },
           body: JSON.stringify(prospectingData),
           keepalive: true
         });

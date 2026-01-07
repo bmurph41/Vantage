@@ -41,7 +41,7 @@ import redFlagRoutes from "./routes/red-flag-routes";
 import { getSlaRouter } from "./routes/sla-routes";
 import { enterpriseAuthService } from "./services/enterprise-auth-service";
 import { registerCommentRoutes } from "./routes/comment-routes";
-import { userSessions } from "@shared/schema";
+import { userSessions, insertProspectingEntrySchema } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { rentRollService } from "./services/rent-roll-service";
 import { marketingService } from "./services/marketing-service";
@@ -234,6 +234,7 @@ const syncToCalendarSchema = z.object({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+
   // Health check endpoints (no authentication required)
   app.get("/health", async (_req, res) => {
     try {
@@ -8489,7 +8490,7 @@ Current context: Project ${req.params.projectId}`;
   app.post("/api/prospecting/entries", async (req: any, res) => {
     try {
       // Import schema for validation
-      const { insertProspectingEntrySchema } = await import("@shared/schema");
+      // Schema already imported at top of file
       
       // Convert date strings to Date objects before validation
       const bodyData = { ...req.body };
@@ -8532,11 +8533,11 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
-  // Update a prospecting entry (create if doesn't exist)
+  // Update a prospecting entry (create if doesnt exist)
   app.put("/api/prospecting/entries/:year/:quarter/:weekNumber", async (req: any, res) => {
     try {
       // Import schema for validation
-      const { insertProspectingEntrySchema } = await import("@shared/schema");
+      // Schema already imported at top of file
       
       const year = parseInt(req.params.year);
       const quarter = parseInt(req.params.quarter);
@@ -8545,6 +8546,7 @@ Current context: Project ${req.params.projectId}`;
       // Check if entry exists
       const existingEntry = await storage.getProspectingEntryByWeek(req.user.id, year, quarter, weekNumber);
       
+      console.log('[DEBUG] PUT prospecting entry - checking existing entry', { userId: req.user?.id, year, quarter, weekNumber });
       // Convert date strings to Date objects before validation
       const bodyData = { ...req.body };
       if (bodyData.weekStartDate && typeof bodyData.weekStartDate === 'string') {
