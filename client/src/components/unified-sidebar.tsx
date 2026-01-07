@@ -201,8 +201,8 @@ export default function UnifiedSidebar() {
     const isPendingPage = location.includes('/pending-');
     // Pipeline section: Deal Board, Activity Log, Follow-Ups, Forecast
     const isPipelinePage = ['/deal-workspace', '/crm/activity', '/crm/tasks', '/crm/forecast'].includes(location) || location.startsWith('/deal-workspace');
-    // Prospecting section: Prospecting, Analytics (Marketing moved to its own section)
-    const isProspectingPage = location.startsWith('/prospecting/') || location === '/prospecting' || location === '/crm/analytics';
+    // Prospecting section: Overview and Workroom
+    const isProspectingPage = location === '/prospecting' || location.startsWith('/prospecting/');
     // Deal Workspace: consolidated DD, VDR, and Modeling project pages
     const isDealWorkspacePage = location.startsWith('/workspaces') || location === '/projects' || location === '/progress-report' || location.startsWith('/vdr') || location.startsWith('/modeling/projects');
     // Underwriting Tools: Modeling Projects, Debt Scenarios, Exit Strategies, P&L Parser, OM Builder, Modeling Settings
@@ -483,21 +483,21 @@ export default function UnifiedSidebar() {
           </div>
         )}
         
-        {/* Prospecting Section - Prospecting, Analytics */}
+        {/* Prospecting Section - Overview and Workroom */}
         {canViewSection('crm') && (
           <div className="mb-2">
             <SectionHeader 
               title="Prospecting" 
               expanded={prospectingExpanded} 
               onToggle={() => setProspectingExpanded(!prospectingExpanded)}
-              isActive={['/crm/analytics', '/prospecting'].includes(location) || location.startsWith('/prospecting')}
+              isActive={location === '/prospecting' || location.startsWith('/prospecting/')}
             />
             {prospectingExpanded && (
               <>
-                {/* Dashboard */}
-                <NavLink item={{ name: "Dashboard", href: "/prospecting", icon: Target }} />
-                {/* Analytics */}
-                <NavLink item={{ name: "Analytics", href: "/crm/analytics", icon: PieChart }} />
+                {/* Overview - merged Dashboard + Analytics */}
+                <NavLink item={{ name: "Overview", href: "/prospecting", icon: PieChart }} />
+                {/* Workroom - weekly cards and goals */}
+                <NavLink item={{ name: "Workroom", href: "/prospecting/workroom", icon: Target }} />
               </>
             )}
           </div>
