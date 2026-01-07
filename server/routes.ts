@@ -13916,7 +13916,7 @@ Current context: Project ${req.params.projectId}`;
 
   // ========================================
   // Get all rent rolls
-  app.get('/api/operations/rent-rolls', authenticateUser, async (req: any, res) => {
+  app.get('/api/operations/rent-rolls', authenticateUser, requireRentRoll(), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const context = req.query.context as 'operational' | 'valuation' | undefined;
@@ -13929,7 +13929,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Get a single rent roll
-  app.get('/api/operations/rent-rolls/:id', authenticateUser, async (req: any, res) => {
+  app.get('/api/operations/rent-rolls/:id', authenticateUser, requireRentRoll(), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const roll = await rentRollService.getRentRollById(req.params.id, orgId);
@@ -13946,7 +13946,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Create a new rent roll
-  app.post('/api/operations/rent-rolls', authenticateUser, async (req: any, res) => {
+  app.post('/api/operations/rent-rolls', authenticateUser, requireRentRoll(), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const data = insertRentRollSchema.parse(req.body);
@@ -13962,7 +13962,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Update a rent roll
-  app.patch('/api/operations/rent-rolls/:id', authenticateUser, async (req: any, res) => {
+  app.patch('/api/operations/rent-rolls/:id', authenticateUser, requireRentRoll(), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const data = updateRentRollSchema.parse(req.body);
@@ -13983,7 +13983,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Delete a rent roll
-  app.delete('/api/operations/rent-rolls/:id', authenticateUser, async (req: any, res) => {
+  app.delete('/api/operations/rent-rolls/:id', authenticateUser, requireRentRoll(), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const success = await rentRollService.deleteRentRoll(req.params.id, orgId);
@@ -14000,7 +14000,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Get rent roll entries
-  app.get('/api/operations/rent-rolls/:rentRollId/entries', authenticateUser, async (req: any, res) => {
+  app.get('/api/operations/rent-rolls/:rentRollId/entries', authenticateUser, requireRentRoll(), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const entries = await rentRollService.getRentRollEntries(req.params.rentRollId, orgId);
@@ -14012,7 +14012,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Create a rent roll entry
-  app.post('/api/operations/rent-rolls/:rentRollId/entries', authenticateUser, async (req: any, res) => {
+  app.post('/api/operations/rent-rolls/:rentRollId/entries', authenticateUser, requireRentRoll(), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const data = insertRentRollEntrySchema.parse({
@@ -14031,7 +14031,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Update a rent roll entry
-  app.patch('/api/operations/rent-roll-entries/:id', authenticateUser, async (req: any, res) => {
+  app.patch('/api/operations/rent-roll-entries/:id', authenticateUser, requireRentRoll(), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const data = updateRentRollEntrySchema.parse(req.body);
@@ -14052,7 +14052,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Delete a rent roll entry
-  app.delete('/api/operations/rent-roll-entries/:id', authenticateUser, async (req: any, res) => {
+  app.delete('/api/operations/rent-roll-entries/:id', authenticateUser, requireRentRoll(), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const success = await rentRollService.deleteRentRollEntry(req.params.id, orgId);
@@ -14069,7 +14069,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Get rent roll summary statistics
-  app.get('/api/operations/rent-rolls/:rentRollId/summary', authenticateUser, async (req: any, res) => {
+  app.get('/api/operations/rent-rolls/:rentRollId/summary', authenticateUser, requireRentRoll(), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const summary = await rentRollService.getRentRollSummary(req.params.rentRollId, orgId);
@@ -14087,7 +14087,7 @@ Current context: Project ${req.params.projectId}`;
   // ========================================================================
 
   // Create or update a snapshot for a rent roll
-  app.post('/api/operations/rent-rolls/:rentRollId/snapshots', authenticateUser, async (req: any, res) => {
+  app.post('/api/operations/rent-rolls/:rentRollId/snapshots', authenticateUser, requireRentRoll(), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const { snapshotMonth, snapshotYear, ownedAssetId } = req.body;
@@ -14112,7 +14112,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Get snapshots for a rent roll
-  app.get('/api/operations/rent-rolls/:rentRollId/snapshots', authenticateUser, async (req: any, res) => {
+  app.get('/api/operations/rent-rolls/:rentRollId/snapshots', authenticateUser, requireRentRoll(), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
@@ -14128,7 +14128,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Get snapshot details
-  app.get('/api/operations/rent-roll-snapshots/:snapshotId/details', authenticateUser, async (req: any, res) => {
+  app.get('/api/operations/rent-roll-snapshots/:snapshotId/details', authenticateUser, requireRentRoll(), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
@@ -14147,7 +14147,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Compare snapshots
-  app.get('/api/operations/rent-roll-snapshots/:currentId/compare/:previousId?', authenticateUser, async (req: any, res) => {
+  app.get('/api/operations/rent-roll-snapshots/:currentId/compare/:previousId?', authenticateUser, requireRentRoll(), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
@@ -14165,7 +14165,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Get time series for a rent roll
-  app.get('/api/operations/rent-rolls/:rentRollId/time-series', authenticateUser, async (req: any, res) => {
+  app.get('/api/operations/rent-rolls/:rentRollId/time-series', authenticateUser, requireRentRoll(), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const { startYear, startMonth, endYear, endMonth } = req.query;
@@ -14191,7 +14191,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Get portfolio aggregation
-  app.get('/api/operations/rent-roll-snapshots/portfolio', authenticateUser, async (req: any, res) => {
+  app.get('/api/operations/rent-roll-snapshots/portfolio', authenticateUser, requireRentRoll(), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const { year, month, assetIds } = req.query;
@@ -14246,7 +14246,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Update a binding
-  app.patch('/api/operations/rent-roll-bindings/:bindingId', authenticateUser, async (req: any, res) => {
+  app.patch('/api/operations/rent-roll-bindings/:bindingId', authenticateUser, requireRentRoll(), async (req: any, res) => {
     try {
       const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
       const binding = await rentRollSnapshotService.updateBinding(req.params.bindingId, req.body);
@@ -14261,7 +14261,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Delete a binding
-  app.delete('/api/operations/rent-roll-bindings/:bindingId', authenticateUser, async (req: any, res) => {
+  app.delete('/api/operations/rent-roll-bindings/:bindingId', authenticateUser, requireRentRoll(), async (req: any, res) => {
     try {
       const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
       const deleted = await rentRollSnapshotService.deleteBinding(req.params.bindingId);
