@@ -1,4 +1,4 @@
-import { db } from "@/db";
+import { db } from "../../db";
 import { scCompAdjustments, salesComps, crmProperties } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 

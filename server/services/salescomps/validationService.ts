@@ -1,4 +1,4 @@
-import { db } from "@/db";
+import { db } from "../../db";
 import { scValidationRules } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 
