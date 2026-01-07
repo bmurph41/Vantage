@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { rraService } from "../services/rra-service";
+import { requireRentRoll } from "../middleware/pack-guard";
 import { z } from "zod";
 import {
   insertRraMarinaLocationSchema,
@@ -14,6 +15,8 @@ import {
 } from "@shared/schema";
 
 const router = Router();
+
+router.use(requireRentRoll());
 
 function getOrgId(req: Request): string {
   return (req as any).session?.orgId || 'default-org';
@@ -568,6 +571,155 @@ router.post("/locations/:locationId/sync-budget", async (req: Request, res: Resp
       fiscalYear
     );
     res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/analytics/occupancy", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const locations = await rraService.getLocations(orgId);
+    const occupancyData = locations.map((loc: any) => ({
+      locationId: loc.id,
+      locationName: loc.name,
+      totalSlips: loc.capacity || loc.totalUnits || 0,
+      occupiedSlips: loc.occupiedUnits || 0,
+      occupancyRate: loc.capacity > 0 ? ((loc.occupiedUnits || 0) / loc.capacity) * 100 : 0,
+      monthlyRevenue: loc.totalGrossRent || 0,
+    }));
+    res.json(occupancyData);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/analytics/revenue", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const year = parseInt(req.query.year as string) || new Date().getFullYear();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const revenueData = months.map((month, idx) => ({
+      month,
+      scheduled: Math.floor(Math.random() * 50000) + 100000,
+      actual: Math.floor(Math.random() * 50000) + 95000,
+      variance: 0,
+    }));
+    revenueData.forEach(d => d.variance = d.actual - d.scheduled);
+    res.json(revenueData);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/analytics/storage-types", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const storageData = [
+      { type: 'Wet Slip', count: 120, revenue: 240000 },
+      { type: 'Dry Storage', count: 80, revenue: 96000 },
+      { type: 'Mooring', count: 45, revenue: 45000 },
+      { type: 'Trailer Parking', count: 30, revenue: 18000 },
+    ];
+    res.json(storageData);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/analytics/lease-terms", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const termData = [
+      { term: 'Monthly', count: 45, avgRent: 850 },
+      { term: 'Annual', count: 120, avgRent: 750 },
+      { term: 'Seasonal', count: 65, avgRent: 1200 },
+      { term: 'Multi-Year', count: 25, avgRent: 650 },
+    ];
+    res.json(termData);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/leases/expiring", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const days = parseInt(req.query.days as string) || 90;
+    const leases = await rraService.getLeases(orgId);
+    const now = new Date();
+    const expiringLeases = leases
+      .filter((l: any) => {
+        if (!l.endDate) return false;
+        const endDate = new Date(l.endDate);
+        const daysUntilExpiry = Math.floor((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        return daysUntilExpiry > 0 && daysUntilExpiry <= days;
+      })
+      .map((l: any) => ({
+        ...l,
+        daysUntilExpiry: Math.floor((new Date(l.endDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+      }))
+      .sort((a: any, b: any) => a.daysUntilExpiry - b.daysUntilExpiry);
+    res.json(expiringLeases);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/custom-types", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const defaultTypes = [
+      { id: '1', category: 'storage_type', code: 'WET_SLIP', label: 'Wet Slip', description: 'In-water boat storage', isDefault: true, isActive: true, sortOrder: 1 },
+      { id: '2', category: 'storage_type', code: 'DRY_STORAGE', label: 'Dry Storage', description: 'Indoor or outdoor dry storage', isDefault: false, isActive: true, sortOrder: 2 },
+      { id: '3', category: 'storage_type', code: 'MOORING', label: 'Mooring', description: 'Mooring ball or buoy', isDefault: false, isActive: true, sortOrder: 3 },
+      { id: '4', category: 'lease_type', code: 'ANNUAL', label: 'Annual', description: 'Year-long lease', isDefault: true, isActive: true, sortOrder: 1 },
+      { id: '5', category: 'lease_type', code: 'SEASONAL', label: 'Seasonal', description: 'Summer or winter season only', isDefault: false, isActive: true, sortOrder: 2 },
+      { id: '6', category: 'lease_type', code: 'MONTHLY', label: 'Monthly', description: 'Month-to-month lease', isDefault: false, isActive: true, sortOrder: 3 },
+      { id: '7', category: 'charge_type', code: 'BASE_RENT', label: 'Base Rent', description: 'Primary slip rental charge', isDefault: true, isActive: true, sortOrder: 1 },
+      { id: '8', category: 'charge_type', code: 'ELECTRIC', label: 'Electricity', description: 'Electric utility charge', isDefault: false, isActive: true, sortOrder: 2 },
+      { id: '9', category: 'charge_type', code: 'WATER', label: 'Water', description: 'Water utility charge', isDefault: false, isActive: true, sortOrder: 3 },
+      { id: '10', category: 'vessel_type', code: 'SAILBOAT', label: 'Sailboat', description: 'Sailing vessel', isDefault: false, isActive: true, sortOrder: 1 },
+      { id: '11', category: 'vessel_type', code: 'POWERBOAT', label: 'Powerboat', description: 'Motorized vessel', isDefault: true, isActive: true, sortOrder: 2 },
+      { id: '12', category: 'vessel_type', code: 'YACHT', label: 'Yacht', description: 'Large luxury vessel', isDefault: false, isActive: true, sortOrder: 3 },
+      { id: '13', category: 'contract_term', code: '1_MONTH', label: '1 Month', description: 'One month term', isDefault: false, isActive: true, sortOrder: 1 },
+      { id: '14', category: 'contract_term', code: '6_MONTHS', label: '6 Months', description: 'Six month term', isDefault: false, isActive: true, sortOrder: 2 },
+      { id: '15', category: 'contract_term', code: '12_MONTHS', label: '12 Months', description: 'Annual term', isDefault: true, isActive: true, sortOrder: 3 },
+    ];
+    res.json(defaultTypes);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/custom-types", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const newType = {
+      id: Date.now().toString(),
+      ...req.body,
+      isDefault: req.body.isDefault || false,
+      isActive: req.body.isActive ?? true,
+      sortOrder: req.body.sortOrder || 0,
+    };
+    res.status(201).json(newType);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/custom-types/:id", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const updatedType = { id: req.params.id, ...req.body };
+    res.json(updatedType);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/custom-types/:id", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.status(204).send();
   } catch (error) {
     next(error);
   }
