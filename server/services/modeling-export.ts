@@ -4,7 +4,6 @@ import {
   modelingProjects, 
   modelingCases, 
   modelingCaseAssumptions,
-  modelingCaseLeaseUp,
   modelingAddbacks,
   modelingAddbackValues
 } from '@shared/schema';
@@ -133,29 +132,10 @@ export async function exportModelingProjectToExcel(
       XLSX.utils.book_append_sheet(workbook, assumptionsSheet, sheetName.substring(0, 31));
     }
 
-    // Lease-up schedule for each case
-    if (includeLeaseUp) {
-      const leaseUpData = await db.query.modelingCaseLeaseUp.findMany({
-        where: eq(modelingCaseLeaseUp.caseId, modelCase.id),
-        orderBy: (lu, { asc }) => [asc(lu.month)],
-      });
-
-      if (leaseUpData.length > 0) {
-        const leaseUpSheetName = `${modelCase.name.substring(0, 20)} - Lease-Up`;
-        const leaseUpHeaders = ['Month', 'Occupancy (%)', 'Units Leased', 'Revenue', 'Notes'];
-        const leaseUpRows = leaseUpData.map(lu => [
-          lu.month,
-          lu.occupancy || '',
-          lu.unitsLeased || '',
-          formatCurrency(lu.revenue),
-          lu.notes || '',
-        ]);
-        const leaseUpSheetData = [leaseUpHeaders, ...leaseUpRows];
-        const leaseUpSheet = XLSX.utils.aoa_to_sheet(leaseUpSheetData);
-        leaseUpSheet['!cols'] = [{ wch: 8 }, { wch: 15 }, { wch: 12 }, { wch: 15 }, { wch: 30 }];
-        XLSX.utils.book_append_sheet(workbook, leaseUpSheet, leaseUpSheetName.substring(0, 31));
-      }
-    }
+    // Lease-up schedule for each case - disabled until modelingCaseLeaseUp table is created
+    // if (includeLeaseUp) {
+    //   // Lease-up export would go here
+    // }
   }
 
   // Sheet: Addbacks (if enabled)

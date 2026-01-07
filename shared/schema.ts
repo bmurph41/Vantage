@@ -10682,6 +10682,24 @@ export type ModelingProject = typeof modelingProjects.$inferSelect;
 export type InsertModelingProject = z.infer<typeof insertModelingProjectSchema>;
 export type UpdateModelingProject = z.infer<typeof updateModelingProjectSchema>;
 
+// Modeling Project Config table - holds project-level configuration settings
+export const modelingProjectConfig = pgTable('modeling_project_config', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id),
+  holdPeriod: integer('hold_period').notNull().default(5),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const insertModelingProjectConfigSchema = createInsertSchema(modelingProjectConfig).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type ModelingProjectConfig = typeof modelingProjectConfig.$inferSelect;
+export type InsertModelingProjectConfig = z.infer<typeof insertModelingProjectConfigSchema>;
+
 // Transaction Closing Summary schemas
 export const insertTransactionClosingSummarySchema = createInsertSchema(transactionClosingSummary).omit({
   id: true,
