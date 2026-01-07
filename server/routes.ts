@@ -53,7 +53,7 @@ import { debtScenarioService } from "./debt-scenario-service";
 import { docIntelService } from "./services/doc-intel-service";
 import { jobQueueService } from "./services/job-queue-service";
 import { packService, type PackType } from "./services/pack-service";
-import { requirePack, requireFundManagement, requireLpPortal, requireProspecting, loadActivePacks } from "./middleware/pack-guard";
+import { requirePack, requireFundManagement, requireLpPortal, requireProspecting, requireRentRoll, loadActivePacks } from "./middleware/pack-guard";
 import { cacheService } from "./services/cache-service";
 import { monitoringService } from "./services/monitoring-service";
 import { dealPricingService } from "./services/deal-pricing-service";
@@ -382,7 +382,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/docktalk", authenticateUser, enforceTenant);
   app.use("/api/docktalk/v2", authenticateUser, enforceTenant, scraperV2Routes);
   app.use("/api/pnl", authenticateUser, enforceTenant, pnlRouter);
-  app.use("/api/rent-roll", authenticateUser, enforceTenant, rraRoutes);
+  app.use("/api/rent-roll", authenticateUser, enforceTenant, requireRentRoll(), rraRoutes);
   app.use("/api/listings/v2", authenticateUser, enforceTenant, liv2Routes);
   app.use("/api/funds", authenticateUser, requireFundManagement());
   app.use("/api/vdr", authenticateUser, vdrRouter);

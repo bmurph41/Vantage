@@ -114,7 +114,7 @@ type PendingItem = {
   status: string;
 };
 
-type PackType = 'fund_management' | 'lp_portal' | 'prospecting' | 'analytics_pro';
+type PackType = 'fund_management' | 'lp_portal' | 'prospecting' | 'analytics_pro' | 'owner' | 'investor' | 'broker';
 
 type BootstrapData = {
   persona: any;
@@ -166,6 +166,19 @@ export default function UnifiedSidebar() {
   const hasPack = (packType: PackType): boolean => {
     return activePacks.includes(packType);
   };
+
+  // Helper function to check if user has access to Rent Roll (requires owner, investor, or broker pack)
+  const hasRentRollAccess = (): boolean => {
+    return hasPack('owner') || hasPack('investor') || hasPack('broker');
+  };
+
+  // Filter operations nav to hide Rent Roll if user doesn't have access
+  const filteredOperationsModulesNav = operationsModulesNav.filter(item => {
+    if (item.href === '/operations/rent-roll') {
+      return hasRentRollAccess();
+    }
+    return true;
+  });
 
   // Helper function to check if user can see a section based on persona
   const canViewSection = (section: string): boolean => {
@@ -412,7 +425,7 @@ export default function UnifiedSidebar() {
               onToggle={() => setOperationsExpanded(!operationsExpanded)}
               isActive={location.startsWith('/operations/')}
             />
-            {operationsExpanded && operationsModulesNav.map((item) => (
+            {operationsExpanded && filteredOperationsModulesNav.map((item) => (
               <NavLink key={item.name} item={item} />
             ))}
           </div>

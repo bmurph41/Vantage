@@ -84,6 +84,42 @@ export function requireAnalyticsPro() {
 }
 
 /**
+ * Require one of the Rent Roll access packs (Owner, Investor, or Broker).
+ * Any one of these packs grants access to the Rent Roll module.
+ */
+export function requireRentRoll() {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = (req as any).user;
+      if (!user?.orgId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const activePacks = await packService.getActivePacks(user.orgId);
+      req.activePacks = activePacks;
+
+      const rentRollPacks: PackType[] = ["owner", "investor", "broker"];
+      const hasAccess = rentRollPacks.some(pack => activePacks.includes(pack));
+
+      if (!hasAccess) {
+        return res.status(403).json({
+          error: "Pack required",
+          code: "RENT_ROLL_PACK_REQUIRED",
+          requiredPacks: rentRollPacks,
+          message: "Access to Rent Roll requires an Owner, Investor, or Broker pack. Please upgrade your subscription.",
+          upgradeUrl: "/settings/packs?category=rent-roll",
+        });
+      }
+
+      next();
+    } catch (error) {
+      console.error("Rent Roll pack guard error:", error);
+      res.status(500).json({ error: "Failed to verify pack access" });
+    }
+  };
+}
+
+/**
  * Pre-load active packs into request for conditional UI logic.
  * Does not block requests - just adds pack info to req.activePacks
  */

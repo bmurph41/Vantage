@@ -9,7 +9,10 @@ export type CorePackType = "crm_pipeline" | "modeling_tools" | "analysis" | "ope
 // Add-on packs that require core packs
 export type AddonPackType = "fund_management" | "lp_portal" | "prospecting" | "analytics_pro";
 
-export type PackType = CorePackType | AddonPackType;
+// Role-based packs for Rent Roll access
+export type RolePackType = "owner" | "investor" | "broker";
+
+export type PackType = CorePackType | AddonPackType | RolePackType;
 
 // Pack dependencies - which packs are required before activation
 const PACK_DEPENDENCIES: Record<PackType, PackType[]> = {
@@ -23,6 +26,10 @@ const PACK_DEPENDENCIES: Record<PackType, PackType[]> = {
   lp_portal: ["fund_management", "modeling_tools"],
   prospecting: ["crm_pipeline"],
   analytics_pro: ["analysis"],
+  // Role-based packs for Rent Roll (no dependencies)
+  owner: [],
+  investor: [],
+  broker: [],
 };
 
 // Static pack information (fallback if catalog not in DB)
@@ -134,6 +141,46 @@ const PACK_INFO: Record<PackType, { name: string; description: string; features:
     ],
     isCore: false,
     monthlyPriceCents: 4900, // $49/month
+  },
+  owner: {
+    name: "Owner Pack",
+    description: "Full access for marina owners with comprehensive rent roll management, lease economics, and portfolio analytics.",
+    features: [
+      "Complete Rent Roll module access",
+      "Lease management and economics",
+      "Cash flow projections",
+      "Executive dashboard and analytics",
+      "File import and export",
+      "Portfolio comparison tools",
+    ],
+    isCore: false,
+    monthlyPriceCents: 14900, // $149/month
+  },
+  investor: {
+    name: "Investor Pack",
+    description: "Investor-focused access to rent roll data with analytics and portfolio overview.",
+    features: [
+      "Rent Roll dashboard access",
+      "Lease analytics and reports",
+      "Portfolio summary views",
+      "Cash flow analysis",
+      "Read-only project access",
+    ],
+    isCore: false,
+    monthlyPriceCents: 9900, // $99/month
+  },
+  broker: {
+    name: "Broker Pack",
+    description: "Broker tools for analyzing and presenting rent roll data to clients.",
+    features: [
+      "Rent Roll analysis tools",
+      "Lease data import",
+      "Client presentation views",
+      "Market comparisons",
+      "Export and reporting",
+    ],
+    isCore: false,
+    monthlyPriceCents: 9900, // $99/month
   },
 };
 
