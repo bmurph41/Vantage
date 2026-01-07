@@ -288,14 +288,14 @@ export default function RentRollDashboard() {
         <MetricCard
           title="Occupancy Rate"
           value={formatPercent(data.occupancyRate)}
-          subValue={`${data.occupiedUnits} of ${data.totalUnits} units`}
+          subValue={`${data.occupiedUnits ?? 0} of ${data.totalUnits ?? 0} units`}
           icon={Percent}
           loading={isLoading}
         />
         <MetricCard
           title="Active Tenants"
-          value={data.tenantCount.toString()}
-          subValue={`${data.activeLeaseCount} active leases`}
+          value={(data.tenantCount ?? 0).toString()}
+          subValue={`${data.activeLeaseCount ?? 0} active leases`}
           icon={Users}
           loading={isLoading}
         />
@@ -318,28 +318,28 @@ export default function RentRollDashboard() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-4 rounded-lg bg-muted/50">
                   <p className="text-sm text-muted-foreground">Projects</p>
-                  <p className="text-2xl font-bold">{isLoading ? '-' : data.projectCount}</p>
+                  <p className="text-2xl font-bold">{isLoading ? '-' : (data.projectCount ?? 0)}</p>
                 </div>
                 <div className="p-4 rounded-lg bg-muted/50">
                   <p className="text-sm text-muted-foreground">Vacant Units</p>
-                  <p className="text-2xl font-bold">{isLoading ? '-' : data.vacantUnits}</p>
+                  <p className="text-2xl font-bold">{isLoading ? '-' : (data.vacantUnits ?? 0)}</p>
                 </div>
                 <div className="p-4 rounded-lg bg-muted/50">
                   <p className="text-sm text-muted-foreground">Pending Renewals</p>
-                  <p className="text-2xl font-bold">{isLoading ? '-' : data.pendingRenewalCount}</p>
+                  <p className="text-2xl font-bold">{isLoading ? '-' : (data.pendingRenewalCount ?? 0)}</p>
                 </div>
                 <div className="p-4 rounded-lg bg-muted/50">
                   <p className="text-sm text-muted-foreground">Net Rent</p>
-                  <p className="text-2xl font-bold">{isLoading ? '-' : formatCurrency(data.totalNetRent)}</p>
+                  <p className="text-2xl font-bold">{isLoading ? '-' : formatCurrency(data.totalNetRent ?? 0)}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           
-          <RecentActivity data={data.recentActivity} loading={isLoading} />
+          <RecentActivity data={data.recentActivity ?? []} loading={isLoading} />
         </div>
 
-        <ExpirationTimeline data={data.leaseExpirations} loading={isLoading} />
+        <ExpirationTimeline data={data.leaseExpirations ?? []} loading={isLoading} />
       </div>
     </div>
   );
