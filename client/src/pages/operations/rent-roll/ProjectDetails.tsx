@@ -265,6 +265,21 @@ function OverviewTab({ project, loading }: { project?: ProjectDetails; loading: 
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
+            {project?.id ? (
+              <Link href={`/modeling/projects/new?rraLocationId=${project.id}&marinaName=${encodeURIComponent(project.name || '')}`}>
+                <Button className="w-full justify-start bg-primary hover:bg-primary/90" data-testid="button-model-this-property">
+                  <TrendingUp className="h-4 w-4 mr-2" />
+                  Model This Property
+                  <ChevronRight className="h-4 w-4 ml-auto" />
+                </Button>
+              </Link>
+            ) : (
+              <Button className="w-full justify-start" disabled data-testid="button-model-this-property-disabled">
+                <TrendingUp className="h-4 w-4 mr-2" />
+                Model This Property
+                <ChevronRight className="h-4 w-4 ml-auto" />
+              </Button>
+            )}
             <Button variant="outline" className="w-full justify-start" onClick={() => setActiveLeasesModalOpen(true)}>
               <FileText className="h-4 w-4 mr-2" />
               View Active Leases

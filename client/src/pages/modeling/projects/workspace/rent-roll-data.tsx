@@ -156,6 +156,7 @@ export default function RentRollDataTab({ projectId, projectName }: RentRollData
                   if (link?.linkId) syncMutation.mutate(link.linkId);
                 }}
                 disabled={syncMutation.isPending}
+                data-testid="button-sync-rra-data"
               >
                 {syncMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCcw className="h-4 w-4 mr-2" />}
                 Sync Data
