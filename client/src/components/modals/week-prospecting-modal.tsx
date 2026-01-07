@@ -406,14 +406,26 @@ export default function WeekProspectingModal({
   // Mock prospecting activities for now - will be replaced with real data
   const [activities, setActivities] = useState<ProspectingActivity[]>([]);
 
+  // Track save status for visual feedback
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const saveStatusTimeoutRef = useRef<NodeJS.Timeout>();
+
   // Autosave mutation for prospecting data
   const autosaveMutation = useMutation({
     mutationFn: async (data: any) => {
+      setSaveStatus('saving');
       const response = await apiRequest('PUT', `/api/prospecting/entries/${year}/${quarter}/${weekNumber}`, data);
       const result = await response.json();
       return result;
     },
     onSuccess: (savedEntry: any) => {
+      // Show saved indicator briefly
+      setSaveStatus('saved');
+      if (saveStatusTimeoutRef.current) {
+        clearTimeout(saveStatusTimeoutRef.current);
+      }
+      saveStatusTimeoutRef.current = setTimeout(() => setSaveStatus('idle'), 2000);
+      
       // Update the cache directly with the saved entry
       queryClient.setQueryData(['/api/prospecting/entries', year, quarter, weekNumber], savedEntry);
       
@@ -442,7 +454,12 @@ export default function WeekProspectingModal({
     },
     onError: (error) => {
       console.error('Autosave failed:', error);
-      // Don't show error toast for autosave failures to avoid annoying the user
+      setSaveStatus('idle');
+      toast({
+        title: "Save failed",
+        description: "Your changes couldn't be saved. Please try again.",
+        variant: "destructive",
+      });
     }
   });
 
@@ -688,11 +705,14 @@ export default function WeekProspectingModal({
     prevOpenRef.current = open;
   }, [open, saveNow]);
 
-  // Clean up timeout on unmount
+  // Clean up timeouts on unmount
   useEffect(() => {
     return () => {
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
+      }
+      if (saveStatusTimeoutRef.current) {
+        clearTimeout(saveStatusTimeoutRef.current);
       }
     };
   }, []);
@@ -1044,6 +1064,18 @@ export default function WeekProspectingModal({
               </div>
             </div>
             <div className="flex items-center gap-4">
+              {saveStatus === 'saving' && (
+                <span className="text-sm text-gray-500 flex items-center gap-1" data-testid="text-saving-indicator">
+                  <Clock className="w-3 h-3 animate-spin" />
+                  Saving...
+                </span>
+              )}
+              {saveStatus === 'saved' && (
+                <span className="text-sm text-green-600 flex items-center gap-1" data-testid="text-saved-indicator">
+                  <Check className="w-3 h-3" />
+                  Saved
+                </span>
+              )}
               <Badge variant="outline" className="border-gray-300 text-gray-700 px-3 py-1">
                 {weeklyStats.totalActivities} Activities
               </Badge>
