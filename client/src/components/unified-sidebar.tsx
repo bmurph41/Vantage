@@ -134,8 +134,7 @@ export default function UnifiedSidebar() {
   const [operationsExpanded, setOperationsExpanded] = useState(false); // Default collapsed for Operations
   const [crmExpanded, setCrmExpanded] = useState(false);
   const [pipelineExpanded, setPipelineExpanded] = useState(false); // Pipeline deals section
-  const [prospectingExpanded, setProspectingExpanded] = useState(false); // Prospecting, Marketing, Analytics, Tools
-  const [crmToolsExpanded, setCrmToolsExpanded] = useState(false);
+  const [prospectingExpanded, setProspectingExpanded] = useState(false); // Prospecting, Analytics
   const [dealWorkspaceExpanded, setDealWorkspaceExpanded] = useState(false); // Consolidated DD, VDR, Modeling
   const [underwritingToolsExpanded, setUnderwritingToolsExpanded] = useState(false);
   const [investorServicesExpanded, setInvestorServicesExpanded] = useState(false);
@@ -204,9 +203,8 @@ export default function UnifiedSidebar() {
     const isPendingPage = location.includes('/pending-');
     // Pipeline section: Deal Board, Activity Log, Follow-Ups, Forecast
     const isPipelinePage = ['/deal-workspace', '/crm/activity', '/crm/tasks', '/crm/forecast'].includes(location) || location.startsWith('/deal-workspace');
-    // Prospecting section: Prospecting, Marketing, Analytics, Tools & Settings
-    const isProspectingPage = location.startsWith('/prospecting/') || location === '/prospecting' || ['/crm/marketing-automation', '/crm/analytics'].includes(location) || location === '/calendar-settings' || location.startsWith('/import-');
-    const isCrmToolsPage = location === '/calendar-settings' || location.startsWith('/import-');
+    // Prospecting section: Prospecting, Analytics (Marketing moved to its own section)
+    const isProspectingPage = location.startsWith('/prospecting/') || location === '/prospecting' || location === '/crm/analytics';
     // Deal Workspace: consolidated DD, VDR, and Modeling project pages
     const isDealWorkspacePage = location.startsWith('/workspaces') || location === '/projects' || location === '/progress-report' || location.startsWith('/vdr') || location.startsWith('/modeling/projects');
     // Underwriting Tools: Modeling Projects, Debt Scenarios, Exit Strategies, P&L Parser, OM Builder, Modeling Settings
@@ -222,7 +220,6 @@ export default function UnifiedSidebar() {
     setCrmExpanded(isCrmPage);
     setPipelineExpanded(isPipelinePage);
     setProspectingExpanded(isProspectingPage);
-    setCrmToolsExpanded(isCrmToolsPage);
     setPendingExpanded(isPendingPage);
     setDealWorkspaceExpanded(isDealWorkspacePage);
     setUnderwritingToolsExpanded(isUnderwritingToolsPage);
@@ -501,43 +498,43 @@ export default function UnifiedSidebar() {
           </div>
         )}
         
-        {/* Prospecting Section - Prospecting, Marketing, Analytics, Tools & Settings */}
+        {/* Prospecting Section - Prospecting, Analytics */}
         {canViewSection('crm') && (
           <div className="mb-2">
             <SectionHeader 
               title="Prospecting" 
               expanded={prospectingExpanded} 
               onToggle={() => setProspectingExpanded(!prospectingExpanded)}
-              isActive={['/crm/marketing-automation', '/crm/analytics', '/prospecting'].includes(location) || location.startsWith('/prospecting') || location.startsWith('/import-') || location === '/calendar-settings'}
+              isActive={['/crm/analytics', '/prospecting'].includes(location) || location.startsWith('/prospecting')}
             />
             {prospectingExpanded && (
               <>
                 {/* Dashboard */}
                 <NavLink item={{ name: "Dashboard", href: "/prospecting", icon: Target }} />
-                {/* Marketing & Analytics */}
-                <NavLink item={{ name: "Marketing", href: "/crm/marketing-automation", icon: Send }} />
+                {/* Analytics */}
                 <NavLink item={{ name: "Analytics", href: "/crm/analytics", icon: PieChart }} />
-                {/* Tools & Settings */}
-                <div className="ml-4 mt-1 mb-2">
-                  <button
-                    onClick={() => setCrmToolsExpanded(!crmToolsExpanded)}
-                    className={cn(
-                      "flex items-center justify-between w-full px-4 py-1.5 text-xs font-medium transition-colors rounded-lg",
-                      (location === '/calendar-settings' || location.startsWith('/import-'))
-                        ? "bg-blue-600 text-white hover:bg-blue-700"
-                        : "text-gray-500 hover:text-gray-700"
-                    )}
-                    data-testid="toggle-tools"
-                  >
-                    <span>Tools & Settings</span>
-                    {crmToolsExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                  </button>
-                  {crmToolsExpanded && crmToolsNav.map((item) => (
-                    <NavLink key={item.name} item={item} />
-                  ))}
-                </div>
               </>
             )}
+          </div>
+        )}
+        
+        {/* Marketing - Independent Top-Level Navigation */}
+        {canViewSection('crm') && (
+          <div className="mb-2">
+            <Link href="/crm/marketing-automation">
+              <div 
+                className={cn(
+                  "flex items-center px-4 py-2.5 text-sm font-medium transition-colors rounded-md mx-2",
+                  location.startsWith('/crm/marketing-automation')
+                    ? "bg-primary/10 text-primary"
+                    : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                )}
+                data-testid="nav-marketing"
+              >
+                <Send className="w-4 h-4 mr-3 flex-shrink-0" />
+                <span className="truncate">Marketing</span>
+              </div>
+            </Link>
           </div>
         )}
         

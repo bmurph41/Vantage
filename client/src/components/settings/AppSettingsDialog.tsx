@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Settings, BarChart3, TrendingUp, User, Bell, Palette, Shield, ExternalLink } from "lucide-react";
+import { Settings, BarChart3, TrendingUp, User, Bell, Palette, Shield, ExternalLink, Wrench, Calendar, Tag, Package, FileText, Bot, Webhook, GitMerge, Target, Upload, History } from "lucide-react";
 import { Link } from "wouter";
 import { ColumnCustomizer, type ColumnConfig } from "./ColumnCustomizer";
 import { useColumnSettings } from "@/hooks/useColumnSettings";
@@ -129,6 +129,15 @@ export function AppSettingsDialog({
               >
                 <Shield className="h-4 w-4" />
                 Security
+              </TabsTrigger>
+              <Separator className="my-2" />
+              <TabsTrigger 
+                value="tools" 
+                className="w-full justify-start gap-2 data-[state=active]:bg-background"
+                data-testid="settings-tab-tools"
+              >
+                <Wrench className="h-4 w-4" />
+                Tools & Settings
               </TabsTrigger>
             </TabsList>
           </div>
@@ -268,6 +277,138 @@ export function AppSettingsDialog({
                       Open Security Settings
                       <ExternalLink className="h-3 w-3" />
                     </Button>
+                  </Link>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="tools" className="mt-0 space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Tools & Settings</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Access CRM tools for managing workflows, imports, and system configurations.
+                </p>
+                <div className="grid gap-3">
+                  <Link 
+                    href="/calendar-settings"
+                    onClick={() => onOpenChange(false)}
+                    className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                    data-testid="link-calendar-sync"
+                  >
+                    <Calendar className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <div className="font-medium">Calendar Sync</div>
+                      <div className="text-sm text-muted-foreground">Connect and sync your calendars</div>
+                    </div>
+                  </Link>
+                  <Link 
+                    href="/crm/labels"
+                    onClick={() => onOpenChange(false)}
+                    className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                    data-testid="link-labels"
+                  >
+                    <Tag className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <div className="font-medium">Labels</div>
+                      <div className="text-sm text-muted-foreground">Manage custom labels and tags</div>
+                    </div>
+                  </Link>
+                  <Link 
+                    href="/crm/products"
+                    onClick={() => onOpenChange(false)}
+                    className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                    data-testid="link-products"
+                  >
+                    <Package className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <div className="font-medium">Products</div>
+                      <div className="text-sm text-muted-foreground">Manage product catalog</div>
+                    </div>
+                  </Link>
+                  <Link 
+                    href="/crm/forms"
+                    onClick={() => onOpenChange(false)}
+                    className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                    data-testid="link-forms"
+                  >
+                    <FileText className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <div className="font-medium">Forms</div>
+                      <div className="text-sm text-muted-foreground">Create and manage web forms</div>
+                    </div>
+                  </Link>
+                  <Link 
+                    href="/crm/workflows"
+                    onClick={() => onOpenChange(false)}
+                    className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                    data-testid="link-workflows"
+                  >
+                    <Bot className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <div className="font-medium">Workflows</div>
+                      <div className="text-sm text-muted-foreground">Automate tasks and processes</div>
+                    </div>
+                  </Link>
+                  <Link 
+                    href="/crm/webhooks"
+                    onClick={() => onOpenChange(false)}
+                    className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                    data-testid="link-webhooks"
+                  >
+                    <Webhook className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <div className="font-medium">Webhooks</div>
+                      <div className="text-sm text-muted-foreground">Configure webhook integrations</div>
+                    </div>
+                  </Link>
+                  <Link 
+                    href="/crm/dedupe"
+                    onClick={() => onOpenChange(false)}
+                    className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                    data-testid="link-dedupe"
+                  >
+                    <GitMerge className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <div className="font-medium">Dedupe & Merge</div>
+                      <div className="text-sm text-muted-foreground">Find and merge duplicate records</div>
+                    </div>
+                  </Link>
+                  <Link 
+                    href="/crm/scoring"
+                    onClick={() => onOpenChange(false)}
+                    className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                    data-testid="link-scoring"
+                  >
+                    <Target className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <div className="font-medium">Scoring</div>
+                      <div className="text-sm text-muted-foreground">Configure lead and deal scoring</div>
+                    </div>
+                  </Link>
+                  <Separator className="my-2" />
+                  <Link 
+                    href="/import-contacts"
+                    onClick={() => onOpenChange(false)}
+                    className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                    data-testid="link-import-contacts"
+                  >
+                    <Upload className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <div className="font-medium">Import Contacts</div>
+                      <div className="text-sm text-muted-foreground">Import contacts from CSV or other sources</div>
+                    </div>
+                  </Link>
+                  <Link 
+                    href="/import-history"
+                    onClick={() => onOpenChange(false)}
+                    className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                    data-testid="link-import-history"
+                  >
+                    <History className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <div className="font-medium">Import History</div>
+                      <div className="text-sm text-muted-foreground">View past import operations</div>
+                    </div>
                   </Link>
                 </div>
               </div>
