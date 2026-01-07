@@ -8,9 +8,7 @@ import {
   FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock, Receipt, RefreshCcw, Percent, Search, Wrench, Ship, ShoppingCart, FileSpreadsheet
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SmartSearch } from "@/components/crm/smart-search";
 import { DetailDrawer } from "@/components/crm/detail-drawer";
-import { PersonaSwitcher } from "@/components/PersonaSwitcher";
 import { AppSettingsDialog } from "@/components/settings/AppSettingsDialog";
 
 // CRM Navigation (Core CRM - Entity Management)
@@ -377,9 +375,6 @@ export default function UnifiedSidebar() {
               <X className="w-5 h-5" />
             </button>
           </div>
-          <div className="w-full px-4">
-            <PersonaSwitcher />
-          </div>
           {/* Command Palette Trigger */}
           <div className="w-full px-4">
             <button
@@ -398,16 +393,6 @@ export default function UnifiedSidebar() {
                 <span className="text-xs">⌘</span>K
               </kbd>
             </button>
-          </div>
-          {/* Quick View Search (opens drawer) */}
-          <div className="w-full px-4">
-            <SmartSearch 
-              onResultSelect={(result) => {
-                setSelectedEntity({ type: result.type, id: result.id });
-                setDrawerOpen(true);
-                setMobileMenuOpen(false);
-              }}
-            />
           </div>
         </div>
       
