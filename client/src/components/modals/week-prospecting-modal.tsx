@@ -209,6 +209,7 @@ export default function WeekProspectingModal({
 
   // Load existing goals from entry when modal opens - track loaded entry to prevent overwrites
   const loadedGoalsEntryIdRef = useRef<string | null>(null);
+  const dataLoadedRef = useRef(false);
   
   useEffect(() => {
     if (open) {
@@ -217,6 +218,7 @@ export default function WeekProspectingModal({
       // Only load goals if this is a new/different week
       if (loadedGoalsEntryIdRef.current !== entryId) {
         loadedGoalsEntryIdRef.current = entryId;
+        dataLoadedRef.current = false; // Reset loaded flag for new entry
         
         if (entry?.goals) {
           const existingGoals = entry.goals as any[];
@@ -248,10 +250,16 @@ export default function WeekProspectingModal({
           // New week with no entry - reset to empty (will be initialized by the other useEffect)
           setWeeklyGoals([]);
         }
+        
+        // Mark data as loaded after a brief delay to allow state to settle
+        setTimeout(() => {
+          dataLoadedRef.current = true;
+        }, 100);
       }
     } else {
       // Reset when modal closes
       loadedGoalsEntryIdRef.current = null;
+      dataLoadedRef.current = false;
     }
   }, [open, entry?.goals, entry?.id, year, quarter, weekNumber]);
 
@@ -426,31 +434,10 @@ export default function WeekProspectingModal({
       }
       saveStatusTimeoutRef.current = setTimeout(() => setSaveStatus('idle'), 2000);
       
-      // Update the cache directly with the saved entry
-      queryClient.setQueryData(['/api/prospecting/entries', year, quarter, weekNumber], savedEntry);
-      
-      // Update the year list cache by modifying the existing array
-      queryClient.setQueryData(['/api/prospecting/entries', year], (oldData: any) => {
-        if (!oldData) return [savedEntry];
-        
-        const existingIndex = oldData.findIndex((e: any) => 
-          e.year === year && e.quarter === quarter && e.weekNumber === weekNumber
-        );
-        
-        if (existingIndex >= 0) {
-          // Replace existing entry
-          const newData = [...oldData];
-          newData[existingIndex] = savedEntry;
-          return newData;
-        } else {
-          // Add new entry
-          const newData = [...oldData, savedEntry];
-          return newData;
-        }
-      });
-      
-      // Also refetch to ensure consistency
-      queryClient.refetchQueries({ queryKey: ['/api/prospecting/entries'], type: 'all' });
+      // Force invalidate all prospecting queries to ensure Week cards refresh with new data
+      queryClient.invalidateQueries({ queryKey: ['/api/prospecting/entries'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/prospecting/entries', year] });
+      queryClient.invalidateQueries({ queryKey: ['/api/prospecting/entries', year, quarter, weekNumber] });
     },
     onError: (error) => {
       console.error('Autosave failed:', error);
@@ -675,6 +662,9 @@ export default function WeekProspectingModal({
   // Debounced autosave function (placed after weeklyStats)
   const debounceTimeoutRef = useRef<NodeJS.Timeout>();
   const autosave = useCallback(() => {
+    // Don't autosave until data is loaded from entry
+    if (!dataLoadedRef.current) return;
+    
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
@@ -682,12 +672,12 @@ export default function WeekProspectingModal({
     debounceTimeoutRef.current = setTimeout(() => {
       const prospectingData = prepareDataForSave();
       autosaveMutation.mutate(prospectingData);
-    }, 1000); // 1 second debounce
+    }, 5000); // 5 second debounce for user inactivity
   }, [prepareDataForSave, autosaveMutation]);
 
-  // Auto-save when data changes
+  // Auto-save when data changes (only after initial data is loaded)
   useEffect(() => {
-    if (open) { // Only autosave when modal is open
+    if (open && dataLoadedRef.current) { // Only autosave when modal is open AND data is loaded
       autosave();
     }
   }, [dailyData, targets, weeklyGoals, open, autosave]);
@@ -704,6 +694,31 @@ export default function WeekProspectingModal({
     }
     prevOpenRef.current = open;
   }, [open, saveNow]);
+
+  // Save when user navigates away from the page (beforeunload)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (open && dataLoadedRef.current) {
+        // Cancel any pending debounced save
+        if (debounceTimeoutRef.current) {
+          clearTimeout(debounceTimeoutRef.current);
+        }
+        // Use fetch with keepalive for PUT request (sendBeacon only supports POST)
+        const prospectingData = prepareDataForSave();
+        fetch(`/api/prospecting/entries/${year}/${quarter}/${weekNumber}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(prospectingData),
+          keepalive: true
+        });
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [open, year, quarter, weekNumber, prepareDataForSave]);
 
   // Clean up timeouts on unmount
   useEffect(() => {
