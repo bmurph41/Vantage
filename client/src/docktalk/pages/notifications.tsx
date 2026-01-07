@@ -54,33 +54,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 
-const CATEGORIES = [
-  "Development",
-  "Operations",
-  "Regulatory",
-  "Environmental",
-  "Technology",
-  "Macro",
-  "M&A",
-  "General",
-  "Boat Sales",
-  "Boat Show",
-  "Manufacturing",
-  "Industry Trends",
-  "Marina Sale",
-  "Education",
-  "Insurance",
-  "Legal",
-  "People Moves",
-  "Company Earnings",
-  "Awards",
-  "Business Planning",
-  "International",
-] as const;
 
 const TIMEZONES = [
   { value: "America/New_York", label: "Eastern Time (ET)" },
@@ -120,7 +96,6 @@ const savedSearchSchema = z.object({
   criteria: z.object({
     search: z.string().optional(),
     categories: z.array(z.string()).optional(),
-    minRelevance: z.number().min(0).max(100).optional(),
     sentiment: z.enum(["any", "positive", "neutral", "negative"]).optional(),
     dealsOnly: z.boolean().optional(),
   }),
@@ -148,9 +123,14 @@ export default function NotificationsPage() {
   const [editingSearch, setEditingSearch] = useState<any | null>(null);
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
   const [deleteSearchId, setDeleteSearchId] = useState<string | null>(null);
+  const [allNewsSelected, setAllNewsSelected] = useState(false);
 
   const { data: currentUser, isLoading: userLoading } = useQuery<CurrentUser>({
     queryKey: ['/api/auth/me'],
+  });
+
+  const { data: categories = [] } = useQuery<string[]>({
+    queryKey: ['/api/docktalk/categories/all'],
   });
 
   const { data: preferences, isLoading: preferencesLoading } = useQuery<UserPreferences>({
@@ -245,7 +225,6 @@ export default function NotificationsPage() {
       criteria: {
         search: "",
         categories: [],
-        minRelevance: 50,
         sentiment: "any",
         dealsOnly: false,
       },
@@ -256,24 +235,25 @@ export default function NotificationsPage() {
   useEffect(() => {
     if (searchDialogOpen) {
       if (editingSearch) {
+        const hasNoCategories = !editingSearch.criteria?.categories || editingSearch.criteria.categories.length === 0;
+        setAllNewsSelected(hasNoCategories);
         searchForm.reset({
           name: editingSearch.name,
           criteria: editingSearch.criteria || {
             search: "",
             categories: [],
-            minRelevance: 50,
             sentiment: "any",
             dealsOnly: false,
           },
           alertFrequency: editingSearch.alertFrequency || "daily",
         });
       } else {
+        setAllNewsSelected(false);
         searchForm.reset({
           name: "",
           criteria: {
             search: "",
             categories: [],
-            minRelevance: 50,
             sentiment: "any",
             dealsOnly: false,
           },
@@ -786,49 +766,56 @@ export default function NotificationsPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Categories</FormLabel>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {CATEGORIES.slice(0, 12).map((category) => (
+                    
+                    {/* All News Toggle */}
+                    <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30 mt-2">
+                      <div>
+                        <span className="font-medium text-sm">All News</span>
+                        <p className="text-xs text-muted-foreground">Receive alerts for all categories</p>
+                      </div>
+                      <Switch
+                        checked={allNewsSelected}
+                        onCheckedChange={(checked) => {
+                          setAllNewsSelected(checked);
+                          if (checked) {
+                            field.onChange([]);
+                          }
+                        }}
+                        data-testid="switch-all-news"
+                      />
+                    </div>
+                    
+                    {/* Category Grid */}
+                    <div className={`grid grid-cols-2 gap-2 mt-3 p-3 rounded-lg border ${allNewsSelected ? 'opacity-50 bg-muted/20' : ''}`}>
+                      {categories.map((category) => (
                         <label
                           key={category}
-                          className="flex items-center gap-2 cursor-pointer"
+                          className={`flex items-center gap-2 ${allNewsSelected ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                         >
                           <Checkbox
-                            checked={field.value?.includes(category)}
+                            checked={allNewsSelected || field.value?.includes(category)}
+                            disabled={allNewsSelected}
                             onCheckedChange={(checked) => {
+                              if (allNewsSelected) return;
                               const current = field.value || [];
                               if (checked) {
                                 field.onChange([...current, category]);
                               } else {
                                 field.onChange(current.filter((c) => c !== category));
+                                setAllNewsSelected(false);
                               }
                             }}
+                            data-testid={`checkbox-category-${category.toLowerCase().replace(/ /g, '-')}`}
                           />
                           <span className="text-sm">{category}</span>
                         </label>
                       ))}
                     </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={searchForm.control}
-                name="criteria.minRelevance"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Minimum Relevance Score: {field.value}%</FormLabel>
-                    <FormControl>
-                      <Slider
-                        min={0}
-                        max={100}
-                        step={5}
-                        value={[field.value || 50]}
-                        onValueChange={([value]) => field.onChange(value)}
-                        data-testid="slider-min-relevance"
-                      />
-                    </FormControl>
-                    <FormDescription>Only alert for articles above this relevance threshold</FormDescription>
+                    {!allNewsSelected && field.value && field.value.length > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {field.value.length} of {categories.length} categories selected
+                      </p>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
