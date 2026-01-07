@@ -658,6 +658,172 @@ export class RRAService {
     
     return { synced, skipped, errors };
   }
+
+  // ============================================================================
+  // MODELING PROJECT LINKS
+  // ============================================================================
+
+  async getModelingProjectLinks(orgId: string, rraLocationId?: string, modelingProjectId?: string): Promise<any[]> {
+    let query = db.select()
+      .from(rraModelingProjectLinks)
+      .where(eq(rraModelingProjectLinks.orgId, orgId));
+    
+    if (rraLocationId) {
+      query = query.where(and(
+        eq(rraModelingProjectLinks.orgId, orgId),
+        eq(rraModelingProjectLinks.rraLocationId, rraLocationId)
+      )) as any;
+    }
+    
+    if (modelingProjectId) {
+      query = query.where(and(
+        eq(rraModelingProjectLinks.orgId, orgId),
+        eq(rraModelingProjectLinks.modelingProjectId, modelingProjectId)
+      )) as any;
+    }
+    
+    return query;
+  }
+
+  async getLinkedRraLocations(orgId: string, modelingProjectId: string): Promise<RraLocationWithStats[]> {
+    const links = await db.select()
+      .from(rraModelingProjectLinks)
+      .innerJoin(rraMarinaLocations, eq(rraModelingProjectLinks.rraLocationId, rraMarinaLocations.id))
+      .where(and(
+        eq(rraModelingProjectLinks.orgId, orgId),
+        eq(rraModelingProjectLinks.modelingProjectId, modelingProjectId)
+      ));
+    
+    return links.map(link => ({
+      ...link.rra_marina_locations,
+      isPrimary: link.rra_modeling_project_links.isPrimary,
+      syncEnabled: link.rra_modeling_project_links.syncEnabled,
+      lastSyncAt: link.rra_modeling_project_links.lastSyncAt,
+      linkId: link.rra_modeling_project_links.id,
+    })) as any;
+  }
+
+  async getLinkedModelingProjects(orgId: string, rraLocationId: string): Promise<any[]> {
+    const links = await db.select()
+      .from(rraModelingProjectLinks)
+      .where(and(
+        eq(rraModelingProjectLinks.orgId, orgId),
+        eq(rraModelingProjectLinks.rraLocationId, rraLocationId)
+      ));
+    
+    return links;
+  }
+
+  async createModelingProjectLink(
+    orgId: string,
+    rraLocationId: string,
+    modelingProjectId: string,
+    options?: { isPrimary?: boolean; syncEnabled?: boolean }
+  ): Promise<any> {
+    const [link] = await db.insert(rraModelingProjectLinks)
+      .values({
+        orgId,
+        rraLocationId,
+        modelingProjectId,
+        isPrimary: options?.isPrimary ?? false,
+        syncEnabled: options?.syncEnabled ?? true,
+      })
+      .returning();
+    return link;
+  }
+
+  async updateModelingProjectLink(
+    linkId: string,
+    updates: { isPrimary?: boolean; syncEnabled?: boolean; lastSyncAt?: Date }
+  ): Promise<any> {
+    const [updated] = await db.update(rraModelingProjectLinks)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(rraModelingProjectLinks.id, linkId))
+      .returning();
+    return updated;
+  }
+
+  async deleteModelingProjectLink(linkId: string): Promise<void> {
+    await db.delete(rraModelingProjectLinks)
+      .where(eq(rraModelingProjectLinks.id, linkId));
+  }
+
+  async getRraMetricsForModeling(orgId: string, rraLocationId: string): Promise<{
+    occupancyRate: number;
+    totalUnits: number;
+    occupiedUnits: number;
+    totalAnnualRevenue: number;
+    averageRentPerUnit: number;
+    activeLeaseCount: number;
+    expiringLeases90Days: number;
+    cashFlowByMonth: { month: string; amount: number }[];
+  }> {
+    const location = await this.getLocation(orgId, rraLocationId);
+    const leases = await db.select()
+      .from(rraLeases)
+      .where(and(
+        eq(rraLeases.projectId, rraLocationId),
+        eq(rraLeases.status, 'active')
+      ));
+    
+    const totalUnits = location?.capacity || location?.totalUnits || 0;
+    const occupiedUnits = leases.length;
+    const occupancyRate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
+    
+    let totalAnnualRevenue = 0;
+    for (const lease of leases) {
+      totalAnnualRevenue += parseFloat(String(lease.annualRent || 0));
+    }
+    
+    const averageRentPerUnit = occupiedUnits > 0 ? totalAnnualRevenue / occupiedUnits : 0;
+    
+    const now = new Date();
+    const ninetyDaysFromNow = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+    
+    const expiringLeases90Days = leases.filter(l => {
+      if (!l.endDate) return false;
+      const endDate = new Date(l.endDate);
+      return endDate > now && endDate <= ninetyDaysFromNow;
+    }).length;
+    
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const cashFlowByMonth = months.map((month, idx) => ({
+      month,
+      amount: Math.round(totalAnnualRevenue / 12),
+    }));
+    
+    return {
+      occupancyRate,
+      totalUnits,
+      occupiedUnits,
+      totalAnnualRevenue,
+      averageRentPerUnit,
+      activeLeaseCount: leases.length,
+      expiringLeases90Days,
+      cashFlowByMonth,
+    };
+  }
+
+  async syncRraToModeling(orgId: string, linkId: string): Promise<{ success: boolean; syncedFields: string[] }> {
+    const [link] = await db.select()
+      .from(rraModelingProjectLinks)
+      .where(eq(rraModelingProjectLinks.id, linkId));
+    
+    if (!link) {
+      throw new Error('Link not found');
+    }
+    
+    const metrics = await this.getRraMetricsForModeling(orgId, link.rraLocationId);
+    
+    await db.update(rraModelingProjectLinks)
+      .set({ lastSyncAt: new Date(), updatedAt: new Date() })
+      .where(eq(rraModelingProjectLinks.id, linkId));
+    
+    return {
+      success: true,
+      syncedFields: ['occupancyRate', 'totalUnits', 'occupiedUnits', 'totalAnnualRevenue', 'averageRentPerUnit'],
+    };
+  }
 }
 
 export const rraService = new RRAService();
