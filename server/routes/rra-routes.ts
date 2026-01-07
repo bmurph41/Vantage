@@ -725,4 +725,112 @@ router.delete("/custom-types/:id", async (req: Request, res: Response, next: Nex
   }
 });
 
+// ============================================================================
+// MODELING PROJECT LINKS - Bidirectional RRA ↔ Modeling Integration
+// ============================================================================
+
+router.get("/modeling-links", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { rraLocationId, modelingProjectId } = req.query;
+    const links = await rraService.getModelingProjectLinks(
+      orgId,
+      rraLocationId as string | undefined,
+      modelingProjectId as string | undefined
+    );
+    res.json(links);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/locations/:locationId/modeling-projects", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { locationId } = req.params;
+    const links = await rraService.getLinkedModelingProjects(orgId, locationId);
+    res.json(links);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/modeling-projects/:projectId/rra-locations", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId } = req.params;
+    const locations = await rraService.getLinkedRraLocations(orgId, projectId);
+    res.json(locations);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/locations/:locationId/metrics-for-modeling", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { locationId } = req.params;
+    const metrics = await rraService.getRraMetricsForModeling(orgId, locationId);
+    res.json(metrics);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/modeling-links", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { rraLocationId, modelingProjectId, isPrimary, syncEnabled } = req.body;
+    
+    if (!rraLocationId || !modelingProjectId) {
+      return res.status(400).json({ error: 'rraLocationId and modelingProjectId are required' });
+    }
+    
+    const link = await rraService.createModelingProjectLink(
+      orgId,
+      rraLocationId,
+      modelingProjectId,
+      { isPrimary, syncEnabled }
+    );
+    res.status(201).json(link);
+  } catch (error: any) {
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'This link already exists' });
+    }
+    next(error);
+  }
+});
+
+router.patch("/modeling-links/:linkId", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { linkId } = req.params;
+    const { isPrimary, syncEnabled } = req.body;
+    const updated = await rraService.updateModelingProjectLink(linkId, { isPrimary, syncEnabled });
+    res.json(updated);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/modeling-links/:linkId", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { linkId } = req.params;
+    await rraService.deleteModelingProjectLink(linkId);
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/modeling-links/:linkId/sync", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { linkId } = req.params;
+    const result = await rraService.syncRraToModeling(orgId, linkId);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
