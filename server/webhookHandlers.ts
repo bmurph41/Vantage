@@ -1,4 +1,4 @@
-import { getUncachableStripeClient, getStripeSync } from './stripeClient';
+import { getUncachableStripeClient, getStripeSync, isStripeConfigured } from './stripeClient';
 import { stripePackService } from './services/stripe-pack-service';
 import type Stripe from 'stripe';
 
@@ -13,7 +13,17 @@ export class WebhookHandlers {
       );
     }
 
+    const isConfigured = await isStripeConfigured();
+    if (!isConfigured) {
+      console.log('[Stripe Webhook] Stripe not configured, ignoring webhook');
+      return;
+    }
+
     const stripe = await getUncachableStripeClient();
+    if (!stripe) {
+      console.log('[Stripe Webhook] Stripe client not available');
+      return;
+    }
     
     let event: Stripe.Event;
     try {
@@ -23,6 +33,10 @@ export class WebhookHandlers {
       } else {
         console.warn('STRIPE_WEBHOOK_SECRET not set - using stripe-replit-sync for webhook processing');
         const sync = await getStripeSync();
+        if (!sync) {
+          console.log('[Stripe Webhook] Stripe sync not available');
+          return;
+        }
         await sync.processWebhook(payload, signature);
         return;
       }

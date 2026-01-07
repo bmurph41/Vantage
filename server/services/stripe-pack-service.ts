@@ -1,4 +1,4 @@
-import { getUncachableStripeClient, getStripePublishableKey } from '../stripeClient';
+import { getUncachableStripeClient, getStripePublishableKey, isStripeConfigured } from '../stripeClient';
 import { packService, PackType } from './pack-service';
 import { db } from '../db';
 import { organizations } from '@shared/schema';
@@ -18,12 +18,20 @@ const PACK_LOOKUP_KEYS: Record<PackType, string> = {
 let priceIdCache: Record<string, string> | null = null;
 
 class StripePackService {
+  async isAvailable(): Promise<boolean> {
+    return isStripeConfigured();
+  }
+
   private async getPriceIdForPack(packType: PackType): Promise<string> {
     if (priceIdCache && priceIdCache[packType]) {
       return priceIdCache[packType];
     }
 
     const stripe = await getUncachableStripeClient();
+    if (!stripe) {
+      throw new Error('Stripe is not configured');
+    }
+    
     const lookupKey = PACK_LOOKUP_KEYS[packType];
     
     const prices = await stripe.prices.list({
@@ -52,7 +60,8 @@ class StripePackService {
     }
     return undefined;
   }
-  async getPublishableKey() {
+  
+  async getPublishableKey(): Promise<string | null> {
     return getStripePublishableKey();
   }
 
@@ -63,6 +72,9 @@ class StripePackService {
     cancelUrl: string
   ) {
     const stripe = await getUncachableStripeClient();
+    if (!stripe) {
+      throw new Error('Stripe is not configured. Payment features are not available.');
+    }
     
     const [org] = await db.select().from(organizations).where(eq(organizations.id, orgId));
     if (!org) {
@@ -108,6 +120,9 @@ class StripePackService {
 
   async createCustomerPortalSession(orgId: string, returnUrl: string) {
     const stripe = await getUncachableStripeClient();
+    if (!stripe) {
+      throw new Error('Stripe is not configured. Payment features are not available.');
+    }
     
     const [org] = await db.select().from(organizations).where(eq(organizations.id, orgId));
     if (!org?.stripeCustomerId) {
@@ -125,6 +140,10 @@ class StripePackService {
   async handleSubscriptionCreated(subscriptionId: string, customerId: string) {
     console.log(`[StripePackService] Processing subscription created: ${subscriptionId}`);
     const stripe = await getUncachableStripeClient();
+    if (!stripe) {
+      console.error('[StripePackService] Stripe not configured');
+      return;
+    }
     
     const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
       expand: ['items.data.price'],
@@ -178,6 +197,10 @@ class StripePackService {
   async handleSubscriptionCancelled(subscriptionId: string, customerId: string) {
     console.log(`[StripePackService] Processing subscription cancelled: ${subscriptionId}`);
     const stripe = await getUncachableStripeClient();
+    if (!stripe) {
+      console.error('[StripePackService] Stripe not configured');
+      return;
+    }
     
     const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
       expand: ['items.data.price'],

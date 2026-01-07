@@ -29781,19 +29781,39 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Stripe checkout routes
+  app.get("/api/stripe/status", async (_req, res) => {
+    try {
+      const { isStripeConfigured } = await import("./stripeClient");
+      const configured = await isStripeConfigured();
+      res.json({ configured, message: configured ? "Stripe is configured" : "Stripe is not configured - payment features disabled" });
+    } catch (error: any) {
+      res.json({ configured: false, message: "Stripe not available" });
+    }
+  });
+
   app.get("/api/stripe/publishable-key", async (_req, res) => {
     try {
-      const { getStripePublishableKey } = await import("./stripeClient");
+      const { getStripePublishableKey, isStripeConfigured } = await import("./stripeClient");
+      const configured = await isStripeConfigured();
+      if (!configured) {
+        return res.json({ publishableKey: null, configured: false });
+      }
       const publishableKey = await getStripePublishableKey();
-      res.json({ publishableKey });
+      res.json({ publishableKey, configured: true });
     } catch (error: any) {
       console.error("Failed to get Stripe publishable key:", error);
-      res.status(500).json({ error: "Failed to get Stripe configuration" });
+      res.json({ publishableKey: null, configured: false });
     }
   });
 
   app.post("/api/stripe/checkout", authenticateUser, async (req: any, res) => {
     try {
+      const { isStripeConfigured } = await import("./stripeClient");
+      const configured = await isStripeConfigured();
+      if (!configured) {
+        return res.status(503).json({ error: "Payment processing is not yet configured. Please try again later." });
+      }
+
       const { packTypes } = req.body;
       if (!packTypes || !Array.isArray(packTypes) || packTypes.length === 0) {
         return res.status(400).json({ error: "Pack types required" });
@@ -29817,6 +29837,12 @@ Current context: Project ${req.params.projectId}`;
 
   app.post("/api/stripe/portal", authenticateUser, async (req: any, res) => {
     try {
+      const { isStripeConfigured } = await import("./stripeClient");
+      const configured = await isStripeConfigured();
+      if (!configured) {
+        return res.status(503).json({ error: "Payment processing is not yet configured. Please try again later." });
+      }
+
       const { stripePackService } = await import("./services/stripe-pack-service");
       const baseUrl = `${req.protocol}://${req.get("host")}`;
       const session = await stripePackService.createCustomerPortalSession(

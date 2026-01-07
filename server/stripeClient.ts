@@ -1,6 +1,7 @@
 import Stripe from 'stripe';
 
 let connectionSettings: any;
+let stripeAvailable: boolean | null = null;
 
 async function getCredentials() {
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
@@ -10,64 +11,93 @@ async function getCredentials() {
       ? 'depl ' + process.env.WEB_REPL_RENEWAL
       : null;
 
-  if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
+  if (!xReplitToken || !hostname) {
+    return null;
   }
 
   const connectorName = 'stripe';
   const isProduction = process.env.REPLIT_DEPLOYMENT === '1';
   const targetEnvironment = isProduction ? 'production' : 'development';
 
-  const url = new URL(`https://${hostname}/api/v2/connection`);
-  url.searchParams.set('include_secrets', 'true');
-  url.searchParams.set('connector_names', connectorName);
-  url.searchParams.set('environment', targetEnvironment);
+  try {
+    const url = new URL(`https://${hostname}/api/v2/connection`);
+    url.searchParams.set('include_secrets', 'true');
+    url.searchParams.set('connector_names', connectorName);
+    url.searchParams.set('environment', targetEnvironment);
 
-  const response = await fetch(url.toString(), {
-    headers: {
-      'Accept': 'application/json',
-      'X_REPLIT_TOKEN': xReplitToken
+    const response = await fetch(url.toString(), {
+      headers: {
+        'Accept': 'application/json',
+        'X_REPLIT_TOKEN': xReplitToken
+      }
+    });
+
+    const data = await response.json();
+    
+    connectionSettings = data.items?.[0];
+
+    if (!connectionSettings || (!connectionSettings.settings.publishable || !connectionSettings.settings.secret)) {
+      return null;
     }
-  });
 
-  const data = await response.json();
-  
-  connectionSettings = data.items?.[0];
-
-  if (!connectionSettings || (!connectionSettings.settings.publishable || !connectionSettings.settings.secret)) {
-    throw new Error(`Stripe ${targetEnvironment} connection not found`);
+    return {
+      publishableKey: connectionSettings.settings.publishable,
+      secretKey: connectionSettings.settings.secret,
+    };
+  } catch (error) {
+    console.log('[Stripe] Connection not available:', (error as Error).message);
+    return null;
   }
-
-  return {
-    publishableKey: connectionSettings.settings.publishable,
-    secretKey: connectionSettings.settings.secret,
-  };
 }
 
-export async function getUncachableStripeClient() {
-  const { secretKey } = await getCredentials();
+export async function isStripeConfigured(): Promise<boolean> {
+  if (stripeAvailable !== null) {
+    return stripeAvailable;
+  }
+  
+  const credentials = await getCredentials();
+  stripeAvailable = credentials !== null;
+  
+  if (!stripeAvailable) {
+    console.log('[Stripe] Not configured - payment features will be disabled');
+  }
+  
+  return stripeAvailable;
+}
 
-  return new Stripe(secretKey, {
+export async function getUncachableStripeClient(): Promise<Stripe | null> {
+  const credentials = await getCredentials();
+  
+  if (!credentials) {
+    return null;
+  }
+
+  return new Stripe(credentials.secretKey, {
     apiVersion: '2025-08-27.basil',
   });
 }
 
-export async function getStripePublishableKey() {
-  const { publishableKey } = await getCredentials();
-  return publishableKey;
+export async function getStripePublishableKey(): Promise<string | null> {
+  const credentials = await getCredentials();
+  return credentials?.publishableKey ?? null;
 }
 
-export async function getStripeSecretKey() {
-  const { secretKey } = await getCredentials();
-  return secretKey;
+export async function getStripeSecretKey(): Promise<string | null> {
+  const credentials = await getCredentials();
+  return credentials?.secretKey ?? null;
 }
 
 let stripeSync: any = null;
 
 export async function getStripeSync() {
+  const secretKey = await getStripeSecretKey();
+  
+  if (!secretKey) {
+    return null;
+  }
+  
   if (!stripeSync) {
     const { StripeSync } = await import('stripe-replit-sync');
-    const secretKey = await getStripeSecretKey();
 
     stripeSync = new StripeSync({
       poolConfig: {

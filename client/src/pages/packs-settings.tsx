@@ -4,8 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Check, Lock, Briefcase, Users, Target, BarChart3, Building, Calculator, ChartLine, Anchor, DollarSign } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, Check, Lock, Briefcase, Users, Target, BarChart3, Building, Calculator, ChartLine, Anchor, DollarSign, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useStripeStatus } from "@/hooks/useStripeStatus";
 
 // Core packs that users purchase first
 type CorePackType = 'crm_pipeline' | 'modeling_tools' | 'analysis' | 'operations';
@@ -48,6 +50,7 @@ function formatPrice(cents: number): string {
 
 export default function PacksSettingsPage() {
   const { toast } = useToast();
+  const { isStripeConfigured, isLoading: isStripeLoading } = useStripeStatus();
 
   const { data: packs = [], isLoading } = useQuery<PackWithStatus[]>({
     queryKey: ['/api/organization/packs'],
@@ -224,6 +227,16 @@ export default function PacksSettingsPage() {
           Build your MarinaMatch platform with the packs you need. Start with core packs and add specialized features as your business grows.
         </p>
       </div>
+
+      {!isStripeLoading && !isStripeConfigured && (
+        <Alert className="mb-6" data-testid="alert-stripe-not-configured">
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            <strong>Beta Access:</strong> During this testing phase, all packs are available for free trial. 
+            Paid subscriptions will be available once payment processing is configured.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {corePacks.length > 0 && (
         <>
