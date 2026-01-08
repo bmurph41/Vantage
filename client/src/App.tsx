@@ -819,11 +819,10 @@ function Router() {
         )}
       </Route>
       <Route path="/crm/marketing-automation">
-        {() => (
-          <UnifiedLayout>
-            <MarketingAutomation />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.replace('/operations/marketing?tab=automation');
+          return null;
+        }}
       </Route>
       <Route path="/calendar-settings">
         {() => (

@@ -89,7 +89,11 @@ const ROUTE_MAPPINGS: Record<string, BreadcrumbItem[]> = {
     { label: 'Follow-Ups' },
   ],
   '/crm/marketing-automation': [
-    CATEGORIES.DEAL_MANAGEMENT,
+    CATEGORIES.OPERATIONS,
+    { label: 'Marketing' },
+  ],
+  '/operations/marketing': [
+    CATEGORIES.OPERATIONS,
     { label: 'Marketing' },
   ],
   '/crm/analytics': [

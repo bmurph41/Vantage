@@ -59,23 +59,9 @@ export default function MarketingAutomation() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900" data-testid="heading-marketing-automation">
-              Marketing Automation
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Create and manage email sequences, templates, and drip campaigns
-            </p>
-          </div>
-        </div>
-      </div>
-
+    <div className="flex flex-col h-full">
       {/* Stats Cards */}
-      <div className="px-6 py-4 bg-white border-b">
+      <div className="p-6 bg-gray-50">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

@@ -1,6 +1,6 @@
 import { lazy } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Megaphone, LayoutDashboard, Target, DollarSign, Link2, Mail, Settings } from "lucide-react";
+import { Megaphone, LayoutDashboard, Target, DollarSign, Link2, Mail, Settings, Send } from "lucide-react";
 import { TabbedModuleLayout, TabDefinition } from "@/components/layout/TabbedModuleLayout";
 
 const MarketingDashboard = lazy(() => import("./marketing/Dashboard"));
@@ -8,6 +8,7 @@ const MarketingCampaigns = lazy(() => import("./marketing/Campaigns"));
 const MarketingExpenses = lazy(() => import("./marketing/Expenses"));
 const MarketingAttribution = lazy(() => import("./marketing/Attribution"));
 const MarketingEmailCampaigns = lazy(() => import("./marketing/EmailCampaigns"));
+const MarketingAutomation = lazy(() => import("@/pages/marketing-automation"));
 const MarketingSettings = lazy(() => import("./marketing/Settings"));
 
 type PackType = 'fund_management' | 'lp_portal' | 'prospecting' | 'analytics_pro';
@@ -66,7 +67,14 @@ export default function MarketingTabbed() {
       label: "Email Campaigns",
       icon: Mail,
       component: MarketingEmailCampaigns,
-      description: "Email marketing automation",
+      description: "External email integrations",
+    },
+    {
+      id: "automation",
+      label: "Automation",
+      icon: Send,
+      component: MarketingAutomation,
+      description: "Email sequences and drip campaigns",
     },
     {
       id: "settings",

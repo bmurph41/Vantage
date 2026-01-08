@@ -492,15 +492,15 @@ export function DetailDrawer({
                           <Label>Title</Label>
                           {isEditing ? (
                             <Input
-                              value={editData.title || ""}
+                              value={editData.position || editData.title || ""}
                               onChange={(e) =>
-                                setEditData({ ...editData, title: e.target.value })
+                                setEditData({ ...editData, position: e.target.value })
                               }
                               data-testid="input-title"
                             />
                           ) : (
                             <div className="text-sm" data-testid="text-title">
-                              {entity?.title || "-"}
+                              {entity?.position || entity?.title || "-"}
                             </div>
                           )}
                         </div>
