@@ -4,7 +4,7 @@ import {
   contacts, projectContacts, projectPendingContacts, notificationSubscriptions, notificationsLog, calendarEvents,
   documentRequirements, projectIntegrations, taskDependencies, taskFiles, userEmails, calendarGuests,
   cddDocuments, docPages, kpis, findings, recommendations, vectorChunks, cddReports, comps, checklistItems,
-  crmDeals, crmLeads, crmContacts, crmCompanies, crmProperties, crmContactProperties, crmCompanyProperties, pendingProperties, pendingContacts, pendingCompanies, crmPipelines, crmPipelineStages, crmActivities, crmDealContacts, crmDealCompanies,
+  crmDeals, crmLeads, crmContacts, crmCompanies, crmProperties, crmContactProperties, crmCompanyProperties, crmContactCompanies, pendingProperties, pendingContacts, pendingCompanies, crmPipelines, crmPipelineStages, crmActivities, crmDealContacts, crmDealCompanies,
   crmImportJobs, crmImportedRecords, crmProspectingEntries, crmProspectingUserSettings, crmProspectingGoalTemplates,
   crmEmailSequences, crmEmailTemplates, crmEmailSequenceSteps, crmEmailSequenceEnrollments, crmEmailSequenceStepExecutions,
   calendarSettings,

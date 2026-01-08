@@ -42,7 +42,7 @@ import { getSlaRouter } from "./routes/sla-routes";
 import { enterpriseAuthService } from "./services/enterprise-auth-service";
 import { registerCommentRoutes } from "./routes/comment-routes";
 import emailMarketingRoutes from "./routes/email-marketing-routes";
-import { userSessions, insertProspectingEntrySchema } from "@shared/schema";
+import { userSessions, insertProspectingEntrySchema, users } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { rentRollService } from "./services/rent-roll-service";
 import { marketingService } from "./services/marketing-service";
