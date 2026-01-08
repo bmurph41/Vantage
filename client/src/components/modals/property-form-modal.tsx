@@ -337,6 +337,16 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
   });
 
   const onSubmit = (data: any) => {
+    // Validate required address fields
+    if (!address.trim() || !city.trim() || !state.trim() || !zipCode.trim()) {
+      toast({
+        title: "Address Required",
+        description: "Please fill in all required address fields (street, city, state, zip code)",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     if (property) {
       updatePropertyMutation.mutate(data);
     } else {

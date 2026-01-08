@@ -225,10 +225,14 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
 
   const errors = useMemo(() => {
     const e: Record<string, string> = {};
-    // Only first name is truly required - all other fields are optional
+    // Required fields validation
     if (!firstName.trim()) e.firstName = "First name is required";
+    if (!address.trim()) e.address = "Street address is required";
+    if (!city.trim()) e.city = "City is required";
+    if (!state.trim()) e.state = "State is required";
+    if (!zipCode.trim()) e.zipCode = "Zip code is required";
     return e;
-  }, [firstName]);
+  }, [firstName, address, city, state, zipCode]);
 
   const createContactMutation = useMutation({
     mutationFn: async (data: any) => {
