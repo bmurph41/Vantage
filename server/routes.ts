@@ -7980,8 +7980,8 @@ Current context: Project ${req.params.projectId}`;
         // Aggregate deal stats in a single query
         const dealStats = await db.select({
           totalDeals: sql<number>`count(*)`,
-          openDeals: sql<number>`count(*) filter (where is_closed = false)`,
-          wonDeals: sql<number>`count(*) filter (where is_closed = true and is_won = true)`,
+          openDeals: sql<number>`count(*) filter (where stage not in ('closed_won', 'closed_lost'))`,
+          wonDeals: sql<number>`count(*) filter (where stage = 'closed_won')`,
           totalDealValue: sql<number>`coalesce(sum(value::numeric), 0)`,
         }).from(crmDeals).where(and(
           eq(crmDeals.primaryContactId, entityId),
@@ -8004,7 +8004,7 @@ Current context: Project ${req.params.projectId}`;
         // Aggregate deal stats in a single query
         const dealStats = await db.select({
           totalDeals: sql<number>`count(*)`,
-          openDeals: sql<number>`count(*) filter (where is_closed = false)`,
+          openDeals: sql<number>`count(*) filter (where stage not in ('closed_won', 'closed_lost'))`,
           totalDealValue: sql<number>`coalesce(sum(value::numeric), 0)`,
         }).from(crmDeals).where(and(
           eq(crmDeals.companyId, entityId),
@@ -10691,7 +10691,7 @@ Current context: Project ${req.params.projectId}`;
   // Email Sequence Enrollments
   app.get("/api/email-sequence-enrollments", async (req: any, res) => {
     try {
-      const enrollments = await storage.getEmailSequenceEnrollmentsForUser(req.user.id);
+      if (!req.user?.id) { return res.status(401).json({ error: "Unauthorized" }); } const enrollments = await storage.getEmailSequenceEnrollmentsForUser(req.user.id);
       res.json(enrollments);
     } catch (error: any) {
       console.error("Failed to get enrollments:", error);
