@@ -5390,6 +5390,7 @@ export class DatabaseStorage implements IStorage {
         state: pending.state,
         zipCode: pending.zipCode,
         industry: pending.industry,
+        orgId: orgId,
         ownerId: userId,
       }).returning();
 
