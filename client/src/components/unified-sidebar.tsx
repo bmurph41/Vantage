@@ -5,7 +5,7 @@ import {
   BarChart3, Users, Building, Handshake, Calendar, 
   Bot, Bell, Mail, PieChart, TrendingUp, Settings,
   LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight, ChevronLeft,
-  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock, Receipt, RefreshCcw, Percent, Search, Wrench, Ship, ShoppingCart, FileSpreadsheet, PanelLeftClose, PanelLeft
+  Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock, Receipt, RefreshCcw, Percent, Search, Wrench, Ship, ShoppingCart, PanelLeftClose, PanelLeft
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DetailDrawer } from "@/components/crm/detail-drawer";
@@ -66,7 +66,7 @@ const operationsModulesNav = [
 
 // Deal Workspace Navigation - Consolidated DD, VDR, and Modeling
 const dealWorkspaceNav = [
-  { name: "All Workspaces", href: "/workspaces", icon: Briefcase },
+  { name: "Projects", href: "/workspaces", icon: Briefcase },
   { name: "DD Projects", href: "/projects", icon: ClipboardList },
   { name: "Data Room", href: "/vdr", icon: FolderLock },
 ];
@@ -82,10 +82,9 @@ const getWorkspaceSubNav = (workspaceId: string) => [
 
 // Underwriting Tools Navigation (all users - modeling, analysis, and document processing)
 const underwritingToolsNav = [
-  { name: "Modeling Projects", href: "/modeling/projects", icon: Calculator },
+  { name: "Valuator", href: "/modeling/projects", icon: Calculator },
   { name: "Debt Scenarios", href: "/modeling/debt-scenarios", icon: Calculator },
   { name: "Exit Strategies", href: "/modeling/exit-strategies", icon: Target },
-  { name: "P&L Parser", href: "/modeling/pnl-parser", icon: FileSpreadsheet },
   { name: "OM Builder", href: "/om", icon: FileText },
   { name: "Modeling Settings", href: "/modeling/settings", icon: Settings },
 ];
@@ -107,7 +106,6 @@ const marketIntelligenceNav = [
   { name: "Rate Comps", href: "/analysis/rate-comps", icon: TrendingUp },
   { name: "Demographics", href: "/analysis/demographics", icon: Users },
   { name: "Capital Markets", href: "/analysis/benchmarks", icon: Target },
-  { name: "Projects", href: "/analysis/projects", icon: FolderKanban },
 ];
 
 type PendingItem = {
