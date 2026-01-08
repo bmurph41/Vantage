@@ -616,7 +616,7 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
                     name="domain"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Domain (Optional)</FormLabel>
+                        <FormLabel>Domain</FormLabel>
                         <FormControl>
                           <Input placeholder="acme.com" {...field} data-testid="input-domain" />
                         </FormControl>
@@ -630,7 +630,7 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
                     name="website"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Website (Optional)</FormLabel>
+                        <FormLabel>Website</FormLabel>
                         <FormControl>
                           <Input placeholder="https://acme.com" {...field} data-testid="input-website" />
                         </FormControl>
@@ -671,7 +671,7 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
                     name="size"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Company Size (Optional)</FormLabel>
+                        <FormLabel>Company Size</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger data-testid="select-size">
@@ -698,7 +698,7 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
                   name="phone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Phone (Optional)</FormLabel>
+                      <FormLabel>Phone</FormLabel>
                       <FormControl>
                         <Input placeholder="+1 (555) 123-4567" {...field} data-testid="input-phone" />
                       </FormControl>
@@ -732,7 +732,7 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="unit" className="text-sm">Unit/Suite (Optional)</Label>
+                      <Label htmlFor="unit" className="text-sm">Unit/Suite</Label>
                       <Input
                         id="unit"
                         value={unit}
@@ -779,7 +779,7 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
                   name="description"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Description (Optional)</FormLabel>
+                      <FormLabel>Description</FormLabel>
                       <FormControl>
                         <Textarea 
                           placeholder="Brief description of the company..." 
@@ -1017,7 +1017,7 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
                           />
                         </div>
                         <div>
-                          <label className="text-sm font-medium">Role (Optional)</label>
+                          <label className="text-sm font-medium">Role</label>
                           <Input
                             placeholder="e.g., CEO, Manager"
                             value={contactRole}
@@ -1106,7 +1106,7 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
                             name="phone"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Phone (Optional)</FormLabel>
+                                <FormLabel>Phone</FormLabel>
                                 <FormControl>
                                   <Input placeholder="+1 (555) 123-4567" {...field} data-testid="input-new-contact-phone" />
                                 </FormControl>
@@ -1119,7 +1119,7 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
                             name="position"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Position (Optional)</FormLabel>
+                                <FormLabel>Position</FormLabel>
                                 <FormControl>
                                   <Input placeholder="CEO, Manager, etc." {...field} data-testid="input-new-contact-position" />
                                 </FormControl>
@@ -1129,7 +1129,7 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
                           />
                         </div>
                         <div>
-                          <label className="text-sm font-medium">Role in Company (Optional)</label>
+                          <label className="text-sm font-medium">Role in Company</label>
                           <Input
                             placeholder="e.g., Decision Maker, Technical Contact"
                             value={contactRole}

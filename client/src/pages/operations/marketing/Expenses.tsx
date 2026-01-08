@@ -231,7 +231,7 @@ export default function Expenses() {
                     name="campaignId"
                     render={({ field }) => (
                       <FormItem className="col-span-2">
-                        <FormLabel>Campaign (Optional)</FormLabel>
+                        <FormLabel>Campaign</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger data-testid="select-campaign">

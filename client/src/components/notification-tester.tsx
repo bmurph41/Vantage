@@ -314,7 +314,7 @@ export function NotificationTester({ projectId, contacts, settings }: Notificati
                 name="customMessage"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Custom Message (Optional)</FormLabel>
+                    <FormLabel>Custom Message</FormLabel>
                     <FormControl>
                       <Textarea
                         placeholder="Add a custom message to include in the test notification..."

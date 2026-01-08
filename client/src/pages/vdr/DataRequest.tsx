@@ -618,7 +618,7 @@ export default function DataRequest() {
 
                   {!editingItem && (
                     <div className="border-t pt-4 mt-4">
-                      <Label className="text-base font-medium">Attach Files (Optional)</Label>
+                      <Label className="text-base font-medium">Attach Files</Label>
                       <p className="text-sm text-gray-500 mb-3">Upload documents directly to the VDR when creating this request</p>
                       
                       {selectedFiles.length > 0 && (

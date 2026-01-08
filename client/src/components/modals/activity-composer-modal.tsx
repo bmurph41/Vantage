@@ -116,7 +116,7 @@ export function ActivityComposerModal({
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           {templates.length > 0 && (
             <div className="space-y-2">
-              <label className="text-sm font-medium">Template (Optional)</label>
+              <label className="text-sm font-medium">Template</label>
               <Select value={selectedTemplate} onValueChange={handleTemplateSelect}>
                 <SelectTrigger data-testid="select-activity-template">
                   <SelectValue placeholder="Choose a template..." />

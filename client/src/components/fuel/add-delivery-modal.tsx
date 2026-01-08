@@ -218,7 +218,7 @@ export function AddDeliveryModal({ isOpen, onClose }: AddDeliveryModalProps) {
               name="invoiceNumber"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Invoice Number (Optional)</FormLabel>
+                  <FormLabel>Invoice Number</FormLabel>
                   <FormControl>
                     <Input 
                       placeholder="Enter invoice number"

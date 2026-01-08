@@ -417,7 +417,7 @@ function WorkflowFormModal({ isOpen, onClose, workflow, onSubmit, isPending }: W
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <FormLabel>Conditions (Optional)</FormLabel>
+                <FormLabel>Conditions</FormLabel>
                 <Button type="button" variant="outline" size="sm" onClick={addCondition} data-testid="button-add-condition">
                   <Plus className="h-4 w-4 mr-1" /> Add Condition
                 </Button>

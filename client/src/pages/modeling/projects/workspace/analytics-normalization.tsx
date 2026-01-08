@@ -671,7 +671,7 @@ export default function AnalyticsNormalization({ projectId }: AnalyticsNormaliza
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="adjustment-reason">Reason (Optional)</Label>
+              <Label htmlFor="adjustment-reason">Reason</Label>
               <Textarea
                 id="adjustment-reason"
                 placeholder="e.g., Non-recurring expense, owner salary normalization..."

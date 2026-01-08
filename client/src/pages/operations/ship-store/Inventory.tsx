@@ -610,7 +610,7 @@ export default function Inventory() {
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Description (Optional)</FormLabel>
+                    <FormLabel>Description</FormLabel>
                     <FormControl>
                       <Input placeholder="Product description" {...field} data-testid="edit-product-description" />
                     </FormControl>

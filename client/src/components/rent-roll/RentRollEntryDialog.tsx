@@ -279,7 +279,7 @@ export function RentRollEntryDialog({ open, onOpenChange, rentRollId, entry }: R
                 name="leaseStartDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Lease Start Date (Optional)</FormLabel>
+                    <FormLabel>Lease Start Date</FormLabel>
                     <FormControl>
                       <Input type="date" {...field} value={field.value || ""} data-testid="input-lease-start-date" />
                     </FormControl>
@@ -293,7 +293,7 @@ export function RentRollEntryDialog({ open, onOpenChange, rentRollId, entry }: R
                 name="leaseEndDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Lease End Date (Optional)</FormLabel>
+                    <FormLabel>Lease End Date</FormLabel>
                     <FormControl>
                       <Input type="date" {...field} value={field.value || ""} data-testid="input-lease-end-date" />
                     </FormControl>
@@ -308,7 +308,7 @@ export function RentRollEntryDialog({ open, onOpenChange, rentRollId, entry }: R
               name="notes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notes (Optional)</FormLabel>
+                  <FormLabel>Notes</FormLabel>
                   <FormControl>
                     <Input {...field} value={field.value || ""} placeholder="Additional notes..." data-testid="input-notes" />
                   </FormControl>

@@ -349,7 +349,7 @@ export function ProjectIntegrationSettings({ projectId }: ProjectIntegrationSett
                 </div>
 
                 <div>
-                  <Label htmlFor="description">Description (Optional)</Label>
+                  <Label htmlFor="description">Description</Label>
                   <Textarea
                     id="description"
                     placeholder="Brief description of this integration"

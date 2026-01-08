@@ -262,7 +262,7 @@ function FileUploadDialog({ taskId, isOpen, onClose }: FileUploadDialogProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="file-notes">Notes (Optional)</Label>
+                <Label htmlFor="file-notes">Notes</Label>
                 <Textarea
                   id="file-notes"
                   placeholder="Add notes about this file..."

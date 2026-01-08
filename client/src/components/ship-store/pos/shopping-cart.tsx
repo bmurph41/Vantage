@@ -212,7 +212,7 @@ export default function ShoppingCart({
         {/* Customer Selection */}
         {items.length > 0 && (
           <div className="mb-6 space-y-2">
-            <Label htmlFor="customer-select">Customer (Optional)</Label>
+            <Label htmlFor="customer-select">Customer</Label>
             <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
               <SelectTrigger id="customer-select" data-testid="customer-select">
                 <SelectValue placeholder="Select customer or leave blank" />

@@ -752,7 +752,7 @@ export default function NotificationPreferences({
                 name="criteria.search"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Keywords (Optional)</FormLabel>
+                    <FormLabel>Keywords</FormLabel>
                     <FormControl>
                       <Input placeholder="e.g., acquisition, merger, valuation" {...field} data-testid="input-search-keywords" />
                     </FormControl>
@@ -767,7 +767,7 @@ export default function NotificationPreferences({
                 name="criteria.categories"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Categories (Optional)</FormLabel>
+                    <FormLabel>Categories</FormLabel>
                     <FormDescription className="mb-2">
                       Select categories to monitor ({categories.length} available)
                     </FormDescription>

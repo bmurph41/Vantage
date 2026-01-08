@@ -266,7 +266,7 @@ export function QuickBooksExportDialog({ open, onOpenChange }: QuickBooksExportD
                   />
                 </div>
                 <div>
-                  <Label htmlFor="sales-tax-account">Sales Tax Account (Optional)</Label>
+                  <Label htmlFor="sales-tax-account">Sales Tax Account</Label>
                   <Input
                     id="sales-tax-account"
                     placeholder="2200"

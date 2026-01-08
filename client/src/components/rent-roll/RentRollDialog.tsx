@@ -216,7 +216,7 @@ export function RentRollDialog({ open, onOpenChange, rentRoll, defaultContext }:
               name="projectId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Project (Optional)</FormLabel>
+                  <FormLabel>Project</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value || ""}>
                     <FormControl>
                       <SelectTrigger data-testid="select-rent-roll-project">
@@ -245,7 +245,7 @@ export function RentRollDialog({ open, onOpenChange, rentRoll, defaultContext }:
               name="facilityId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Facility ID (Optional)</FormLabel>
+                  <FormLabel>Facility ID</FormLabel>
                   <FormControl>
                     <Input {...field} value={field.value || ""} placeholder="e.g., FAC-001" data-testid="input-rent-roll-facility-id" />
                   </FormControl>

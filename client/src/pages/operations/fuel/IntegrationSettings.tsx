@@ -386,7 +386,7 @@ export default function IntegrationSettings() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="refreshToken">Refresh Token (Optional)</Label>
+                      <Label htmlFor="refreshToken">Refresh Token</Label>
                       <div className="relative">
                         <Input
                           id="refreshToken"
@@ -666,7 +666,7 @@ export default function IntegrationSettings() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="new-refreshToken">Refresh Token (Optional)</Label>
+                      <Label htmlFor="new-refreshToken">Refresh Token</Label>
                       <Input
                         id="new-refreshToken"
                         type="password"

@@ -229,7 +229,7 @@ export function NewSaleModal({ isOpen, onClose }: NewSaleModalProps) {
                 name="customerName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Customer Name (Optional)</FormLabel>
+                    <FormLabel>Customer Name</FormLabel>
                     <FormControl>
                       <Input 
                         placeholder="Enter customer name"
@@ -246,7 +246,7 @@ export function NewSaleModal({ isOpen, onClose }: NewSaleModalProps) {
                 name="customerEmail"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Customer Email (Optional)</FormLabel>
+                    <FormLabel>Customer Email</FormLabel>
                     <FormControl>
                       <Input 
                         type="email"

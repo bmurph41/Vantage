@@ -445,7 +445,7 @@ export default function TargetDemographicsForm({ projectId, onTargetsChange, com
           <Button variant="ghost" size="sm" className="w-full justify-between" data-testid="button-toggle-weights">
             <span className="flex items-center gap-2">
               <Settings2 className="h-4 w-4" />
-              Criterion Weights (Optional)
+              Criterion Weights
             </span>
             {showWeights ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </Button>

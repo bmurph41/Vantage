@@ -456,7 +456,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="unit" className="text-sm">Unit/Suite (Optional)</Label>
+                  <Label htmlFor="unit" className="text-sm">Unit/Suite</Label>
                   <Input
                     id="unit"
                     value={unit}

@@ -985,7 +985,7 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Approval Notes (Optional)</label>
+              <label className="text-sm font-medium">Approval Notes</label>
               <Textarea
                 placeholder="Add any notes about this import for audit purposes..."
                 value={approvalNotes}

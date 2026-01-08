@@ -303,7 +303,7 @@ export default function ConvertToProjectModal({ isOpen, onClose, deal }: Convert
                 name="notes"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Additional Notes (Optional)</FormLabel>
+                    <FormLabel>Additional Notes</FormLabel>
                     <FormControl>
                       <Textarea
                         {...field}

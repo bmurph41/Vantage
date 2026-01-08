@@ -208,7 +208,7 @@ export function EmailManagement({ emails, isLoading }: EmailManagementProps) {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="calendarProvider" data-testid="label-calendar-provider">Calendar Provider (Optional)</Label>
+              <Label htmlFor="calendarProvider" data-testid="label-calendar-provider">Calendar Provider</Label>
               <Select value={newCalendarProvider} onValueChange={(value: "google" | "outlook" | "apple" | "") => setNewCalendarProvider(value)}>
                 <SelectTrigger data-testid="select-calendar-provider">
                   <SelectValue placeholder="Select calendar provider" />

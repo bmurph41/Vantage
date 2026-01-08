@@ -804,7 +804,7 @@ export default function CapitalStackWorkspace({ projectId }: CapitalStackWorkspa
                       
                       {selectedFundId && fundTemplates && fundTemplates.length > 0 && (
                         <div>
-                          <Label>Capital Stack Template (Optional)</Label>
+                          <Label>Capital Stack Template</Label>
                           <Select onValueChange={setSelectedTemplateId} value={selectedTemplateId || ''}>
                             <SelectTrigger>
                               <SelectValue placeholder="Use fund's default template" />

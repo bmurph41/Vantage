@@ -152,7 +152,7 @@ export function TemplatesView({ projectId }: TemplatesViewProps) {
                       name="description"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Description (Optional)</FormLabel>
+                          <FormLabel>Description</FormLabel>
                           <FormControl>
                             <Textarea
                               placeholder="Enter template description"

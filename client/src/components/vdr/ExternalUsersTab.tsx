@@ -181,7 +181,7 @@ export function ExternalUsersTab({ projectId }: ExternalUsersTabProps) {
                   name="company"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Company (Optional)</FormLabel>
+                      <FormLabel>Company</FormLabel>
                       <FormControl>
                         <Input
                           {...field}

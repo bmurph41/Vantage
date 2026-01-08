@@ -392,7 +392,7 @@ export default function SourcesPage() {
                   name="customKeywords"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Custom Keywords (Optional)</FormLabel>
+                      <FormLabel>Custom Keywords</FormLabel>
                       <FormControl>
                         <Input 
                           placeholder="marina, boat, dock, acquisition" 

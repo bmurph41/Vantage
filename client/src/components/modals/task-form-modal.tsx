@@ -276,7 +276,7 @@ export default function TaskFormModal({ isOpen, onClose, task }: TaskFormModalPr
               name="dueDate"
               render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel>Due Date (Optional)</FormLabel>
+                  <FormLabel>Due Date</FormLabel>
                   <Popover>
                     <PopoverTrigger asChild>
                       <FormControl>
@@ -317,7 +317,7 @@ export default function TaskFormModal({ isOpen, onClose, task }: TaskFormModalPr
                 name="dealId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Related Deal (Optional)</FormLabel>
+                    <FormLabel>Related Deal</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-deal">
@@ -343,7 +343,7 @@ export default function TaskFormModal({ isOpen, onClose, task }: TaskFormModalPr
                 name="contactId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Related Contact (Optional)</FormLabel>
+                    <FormLabel>Related Contact</FormLabel>
                     <FormControl>
                       <SearchableSelect
                         options={contactOptions}
@@ -365,7 +365,7 @@ export default function TaskFormModal({ isOpen, onClose, task }: TaskFormModalPr
                 name="companyId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Related Company (Optional)</FormLabel>
+                    <FormLabel>Related Company</FormLabel>
                     <FormControl>
                       <SearchableSelect
                         options={companyOptions}
@@ -388,7 +388,7 @@ export default function TaskFormModal({ isOpen, onClose, task }: TaskFormModalPr
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description (Optional)</FormLabel>
+                  <FormLabel>Description</FormLabel>
                   <FormControl>
                     <Textarea 
                       placeholder="Task description and notes..." 

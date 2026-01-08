@@ -344,7 +344,7 @@ function TierFormDialog({
             <div className="space-y-4 pb-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="tierLabel">Tier Label (Optional)</Label>
+                  <Label htmlFor="tierLabel">Tier Label</Label>
                   <Input
                     id="tierLabel"
                     value={formData.tierLabel}

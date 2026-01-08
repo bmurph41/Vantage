@@ -213,7 +213,7 @@ export function DiligenceRequestsTab({ projectId }: DiligenceRequestsTabProps) {
                   name="description"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Description (Optional)</FormLabel>
+                      <FormLabel>Description</FormLabel>
                       <FormControl>
                         <Textarea
                           {...field}
@@ -255,7 +255,7 @@ export function DiligenceRequestsTab({ projectId }: DiligenceRequestsTabProps) {
                     name="dueDate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Due Date (Optional)</FormLabel>
+                        <FormLabel>Due Date</FormLabel>
                         <FormControl>
                           <Input
                             {...field}

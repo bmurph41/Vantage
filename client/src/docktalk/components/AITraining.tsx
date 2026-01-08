@@ -1424,7 +1424,7 @@ export function AITraining() {
                             name="description"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Description (Optional)</FormLabel>
+                                <FormLabel>Description</FormLabel>
                                 <FormControl>
                                   <Textarea 
                                     placeholder="Brief description of what this tag covers" 
