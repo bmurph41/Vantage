@@ -10,6 +10,11 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import type { DocIntelUpload } from "@shared/schema";
 
+function getCsrfToken(): string {
+  const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
 interface UploadDropzoneProps {
   projectId: string;
   onUploadComplete: (upload: DocIntelUpload) => void;
@@ -26,9 +31,16 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
 
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
+      const csrfToken = getCsrfToken();
+      const headers: Record<string, string> = {};
+      if (csrfToken) {
+        headers['X-CSRF-Token'] = csrfToken;
+      }
       const response = await fetch(`/api/modeling/projects/${projectId}/documents`, {
         method: "POST",
         body: formData,
+        headers,
+        credentials: 'include',
       });
       if (!response.ok) {
         const error = await response.json();

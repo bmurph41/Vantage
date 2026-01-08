@@ -111,9 +111,19 @@ export const rateCompsApi = {
     const formData = new FormData();
     formData.append('file', file);
     
+    // Get CSRF token from cookie
+    const csrfMatch = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/);
+    const csrfToken = csrfMatch ? decodeURIComponent(csrfMatch[1]) : '';
+    
+    const headers: Record<string, string> = {};
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken;
+    }
+    
     const response = await fetch('/api/rate-comps/upload', {
       method: 'POST',
       body: formData,
+      headers,
       credentials: 'include',
     });
     
