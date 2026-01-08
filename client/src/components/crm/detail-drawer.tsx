@@ -1464,33 +1464,147 @@ export function DetailDrawer({
               {/* Company Tab - only for contacts */}
               {entityType === "contact" && (
                 <TabsContent value="company" className="mt-4">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-medium">Companies ({contactCompanies.length})</h3>
-                    </div>
+                  <div className="space-y-4">
                     {contactCompanies.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground">
                         <Building2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
                         <p>No companies linked to this contact</p>
                       </div>
                     ) : (
-                      <div className="space-y-2">
+                      <div className="space-y-6">
                         {contactCompanies.map((link: any) => {
                           const company = link.company || link;
                           return (
-                            <div key={link.id} className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors">
-                              <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900 flex items-center justify-center text-purple-700 dark:text-purple-300">
-                                <Building2 className="h-5 w-5" />
+                            <div key={link.id} className="rounded-lg border bg-card p-4 space-y-4">
+                              {/* Company Header */}
+                              <div className="flex items-start justify-between">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-12 h-12 rounded-lg bg-purple-100 dark:bg-purple-900 flex items-center justify-center text-purple-700 dark:text-purple-300">
+                                    <Building2 className="h-6 w-6" />
+                                  </div>
+                                  <div>
+                                    <h3 className="font-semibold text-lg">{company.name || "Unnamed Company"}</h3>
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                      {link.role && <span>{formatRole(link.role)}</span>}
+                                      {link.isPrimary && <Badge variant="default" className="text-xs">Primary</Badge>}
+                                    </div>
+                                  </div>
+                                </div>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    onOpenChange(false);
+                                    setTimeout(() => {
+                                      window.dispatchEvent(new CustomEvent('open-detail-drawer', {
+                                        detail: { entityType: 'company', entityId: company.id }
+                                      }));
+                                    }, 100);
+                                  }}
+                                  data-testid={`button-view-company-${company.id}`}
+                                >
+                                  <ExternalLink className="h-4 w-4 mr-1" />
+                                  View Company
+                                </Button>
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium truncate">{company.name || "Unnamed Company"}</div>
-                                <div className="text-sm text-muted-foreground truncate">
-                                  {link.role ? `${link.role} • ` : ""}{company.industry || company.website || "-"}
+
+                              {/* Contact Info */}
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                  <Label className="text-xs text-muted-foreground">Phone</Label>
+                                  <div className="text-sm flex items-center gap-1">
+                                    <Phone className="h-3 w-3 text-muted-foreground" />
+                                    {company.phone || "-"}
+                                  </div>
+                                </div>
+                                <div className="space-y-1">
+                                  <Label className="text-xs text-muted-foreground">Website</Label>
+                                  <div className="text-sm flex items-center gap-1 truncate">
+                                    <ExternalLink className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                    {company.website ? (
+                                      <a href={company.website.startsWith('http') ? company.website : `https://${company.website}`} 
+                                         target="_blank" 
+                                         rel="noopener noreferrer"
+                                         className="text-blue-600 hover:underline truncate">
+                                        {company.website}
+                                      </a>
+                                    ) : "-"}
+                                  </div>
                                 </div>
                               </div>
-                              {link.isPrimary && (
-                                <Badge variant="default" className="ml-2">Primary</Badge>
+
+                              {/* Address */}
+                              {company.address && (
+                                <div className="space-y-1">
+                                  <Label className="text-xs text-muted-foreground">Address</Label>
+                                  <div className="text-sm flex items-center gap-1">
+                                    <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                    {company.address}
+                                  </div>
+                                </div>
                               )}
+
+                              <Separator />
+
+                              {/* Financial Info */}
+                              <div>
+                                <h4 className="text-xs font-medium text-muted-foreground mb-2">Financial & Business</h4>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div className="space-y-1">
+                                    <Label className="text-xs text-muted-foreground">Annual Revenue</Label>
+                                    <div className="text-sm font-medium">
+                                      {company.annualRevenue ? `$${Number(company.annualRevenue).toLocaleString()}` : "-"}
+                                    </div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs text-muted-foreground">Marina Spend</Label>
+                                    <div className="text-sm font-medium">
+                                      {company.annualMarinaSpend ? `$${Number(company.annualMarinaSpend).toLocaleString()}` : "-"}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Acquisition & Portfolio */}
+                              <div>
+                                <h4 className="text-xs font-medium text-muted-foreground mb-2">Acquisition & Portfolio</h4>
+                                <div className="grid grid-cols-3 gap-4">
+                                  <div className="space-y-1">
+                                    <Label className="text-xs text-muted-foreground">Interest</Label>
+                                    <Badge variant={
+                                      company.acquisitionInterest === 'hot' ? 'default' :
+                                      company.acquisitionInterest === 'warm' ? 'secondary' : 'outline'
+                                    } className={
+                                      company.acquisitionInterest === 'hot' ? 'bg-red-500' :
+                                      company.acquisitionInterest === 'warm' ? 'bg-yellow-500' : ''
+                                    }>
+                                      {company.acquisitionInterest ? formatRole(company.acquisitionInterest) : "Unknown"}
+                                    </Badge>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs text-muted-foreground">Portfolio Size</Label>
+                                    <div className="text-sm font-medium">
+                                      {company.portfolioCount ? `${company.portfolioCount} properties` : "-"}
+                                    </div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs text-muted-foreground">Size Tier</Label>
+                                    <div className="text-sm font-medium capitalize">
+                                      {company.size || "-"}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Role/Industry */}
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                  <Label className="text-xs text-muted-foreground">Role</Label>
+                                  <div className="text-sm">
+                                    {company.industry ? formatRole(company.industry) : "-"}
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                           );
                         })}
@@ -1503,32 +1617,146 @@ export function DetailDrawer({
               {/* Properties Tab - only for contacts */}
               {entityType === "contact" && (
                 <TabsContent value="contact-properties" className="mt-4">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-medium">Properties ({contactProperties.length})</h3>
-                    </div>
+                  <div className="space-y-4">
                     {contactProperties.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground">
                         <Anchor className="h-8 w-8 mx-auto mb-2 opacity-50" />
                         <p>No properties linked to this contact</p>
                       </div>
                     ) : (
-                      <div className="space-y-2">
+                      <div className="space-y-6">
                         {contactProperties.map((link: any) => {
                           const property = link.property || link;
+                          const amenities = Array.isArray(property.amenities) ? property.amenities : [];
                           return (
-                            <div key={link.id} className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors">
-                              <div className="w-10 h-10 rounded-lg bg-cyan-100 dark:bg-cyan-900 flex items-center justify-center text-cyan-700 dark:text-cyan-300">
-                                <Anchor className="h-5 w-5" />
+                            <div key={link.id} className="rounded-lg border bg-card p-4 space-y-4">
+                              {/* Property Header */}
+                              <div className="flex items-start justify-between">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-12 h-12 rounded-lg bg-cyan-100 dark:bg-cyan-900 flex items-center justify-center text-cyan-700 dark:text-cyan-300">
+                                    <Anchor className="h-6 w-6" />
+                                  </div>
+                                  <div>
+                                    <h3 className="font-semibold text-lg">{property.title || property.name || property.address || "Unnamed Property"}</h3>
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                      {link.role && <span>{formatRole(link.role)}</span>}
+                                      <Badge variant={
+                                        property.status === 'available' ? 'default' :
+                                        property.status === 'under_contract' ? 'secondary' :
+                                        property.status === 'sold' ? 'outline' : 'destructive'
+                                      }>
+                                        {property.status ? formatRole(property.status) : "Unknown"}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                </div>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    onOpenChange(false);
+                                    setTimeout(() => {
+                                      window.dispatchEvent(new CustomEvent('open-detail-drawer', {
+                                        detail: { entityType: 'property', entityId: property.id }
+                                      }));
+                                    }, 100);
+                                  }}
+                                  data-testid={`button-view-property-${property.id}`}
+                                >
+                                  <ExternalLink className="h-4 w-4 mr-1" />
+                                  View Property
+                                </Button>
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium truncate">{property.name || property.address || "Unnamed Property"}</div>
-                                <div className="text-sm text-muted-foreground truncate">
-                                  {property.city && property.state ? `${property.city}, ${property.state}` : property.status || "-"}
+
+                              {/* Location */}
+                              <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">Location</Label>
+                                <div className="text-sm flex items-center gap-1">
+                                  <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                  {[property.address, property.city, property.state, property.zipCode]
+                                    .filter(Boolean)
+                                    .join(", ") || "-"}
                                 </div>
                               </div>
-                              {link.role && (
-                                <Badge variant="outline" className="ml-2">{link.role}</Badge>
+
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                  <Label className="text-xs text-muted-foreground">Listing Price</Label>
+                                  <div className="text-sm font-medium flex items-center gap-1">
+                                    <DollarSign className="h-3 w-3 text-muted-foreground" />
+                                    {property.listingPrice ? `${Number(property.listingPrice).toLocaleString()}` : "-"}
+                                  </div>
+                                </div>
+                                <div className="space-y-1">
+                                  <Label className="text-xs text-muted-foreground">Type</Label>
+                                  <div className="text-sm capitalize">
+                                    {property.type ? formatRole(property.type) : "-"}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <Separator />
+
+                              {/* Capacity */}
+                              <div>
+                                <h4 className="text-xs font-medium text-muted-foreground mb-2">Marina Capacity</h4>
+                                <div className="grid grid-cols-4 gap-3">
+                                  <div className="space-y-1">
+                                    <Label className="text-xs text-muted-foreground">Wet Slips</Label>
+                                    <div className="text-sm font-medium">{property.wetSlips ?? "-"}</div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs text-muted-foreground">Dry Slips</Label>
+                                    <div className="text-sm font-medium">{property.drySlips ?? "-"}</div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs text-muted-foreground">Moorings</Label>
+                                    <div className="text-sm font-medium">{property.moorings ?? "-"}</div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs text-muted-foreground">Total</Label>
+                                    <div className="text-sm font-medium">{property.totalCapacity ?? "-"}</div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Financials */}
+                              <div>
+                                <h4 className="text-xs font-medium text-muted-foreground mb-2">Financials</h4>
+                                <div className="grid grid-cols-3 gap-3">
+                                  <div className="space-y-1">
+                                    <Label className="text-xs text-muted-foreground">Occupancy</Label>
+                                    <div className="text-sm font-medium">
+                                      {property.occupancyRate ? `${Number(property.occupancyRate).toFixed(1)}%` : "-"}
+                                    </div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs text-muted-foreground">Annual Revenue</Label>
+                                    <div className="text-sm font-medium">
+                                      {property.annualRevenue ? `$${Number(property.annualRevenue).toLocaleString()}` : "-"}
+                                    </div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs text-muted-foreground">NOI Estimate</Label>
+                                    <div className="text-sm font-medium">
+                                      {property.noiEstimate ? `$${Number(property.noiEstimate).toLocaleString()}` : "-"}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Amenities */}
+                              {amenities.length > 0 && (
+                                <div>
+                                  <h4 className="text-xs font-medium text-muted-foreground mb-2">Amenities</h4>
+                                  <div className="flex flex-wrap gap-1">
+                                    {amenities.map((amenity: string) => (
+                                      <Badge key={amenity} variant="outline" className="text-xs">
+                                        {formatRole(amenity)}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
                               )}
                             </div>
                           );
