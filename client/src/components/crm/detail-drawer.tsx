@@ -65,9 +65,10 @@ export function DetailDrawer({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Helper to pluralize entity type correctly (property -> properties)
+  // Helper to pluralize entity type correctly (property -> properties, company -> companies)
   const getApiPath = (type: string) => {
     if (type === 'property') return 'properties';
+    if (type === 'company') return 'companies';
     return `${type}s`;
   };
 
@@ -97,13 +98,25 @@ export function DetailDrawer({
 
   // Fetch contacts for company
   const { data: companyContacts = [] } = useQuery<any[]>({
-    queryKey: ['/api/contacts', { companyId: entityId }],
+    queryKey: ['/api/companies', entityId, 'contacts'],
+    queryFn: async () => {
+      if (!entityId) return [];
+      const response = await fetch(`/api/companies/${entityId}/contacts`);
+      if (!response.ok) return [];
+      return response.json();
+    },
     enabled: entityType === 'company' && !!entityId,
   });
 
   // Fetch properties linked to company
   const { data: companyProperties = [] } = useQuery<any[]>({
     queryKey: ['/api/companies', entityId, 'properties'],
+    queryFn: async () => {
+      if (!entityId) return [];
+      const response = await fetch(`/api/companies/${entityId}/properties`);
+      if (!response.ok) return [];
+      return response.json();
+    },
     enabled: entityType === 'company' && !!entityId,
   });
 
