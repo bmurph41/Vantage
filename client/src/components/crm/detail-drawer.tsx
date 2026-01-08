@@ -321,7 +321,7 @@ export function DetailDrawer({
         </SheetHeader>
 
         <Tabs defaultValue="overview" className="flex-1 flex flex-col">
-          <TabsList className="mx-6 mt-4 justify-start">
+          <TabsList className="mx-6 mt-4 mb-4 justify-start">
             <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
             <TabsTrigger value="timeline" data-testid="tab-timeline">Timeline</TabsTrigger>
             <TabsTrigger value="files" data-testid="tab-files">Files</TabsTrigger>
