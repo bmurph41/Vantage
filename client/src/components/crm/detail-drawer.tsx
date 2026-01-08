@@ -85,10 +85,11 @@ export function DetailDrawer({
   const getCompanyPhone = () => {
     if (entity?.phone) return entity.phone;
     if (companyContacts && companyContacts.length > 0) {
-      const firstContact = companyContacts[0];
-      if (firstContact?.phone) {
-        const contactName = [firstContact.firstName, firstContact.lastName].filter(Boolean).join(' ');
-        return `${firstContact.phone} (${contactName})`;
+      const firstLink = companyContacts[0];
+      const contact = firstLink?.contact || firstLink;
+      if (contact?.phone) {
+        const contactName = [contact.firstName, contact.lastName].filter(Boolean).join(' ');
+        return `${contact.phone} (${contactName})`;
       }
     }
     return "-";
@@ -1359,27 +1360,32 @@ export function DetailDrawer({
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {companyContacts.map((contact: any) => (
-                          <div key={contact.id} className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors">
-                            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-700 dark:text-blue-300 font-medium">
-                              {(contact.firstName?.[0] || "").toUpperCase()}{(contact.lastName?.[0] || "").toUpperCase()}
+                        {companyContacts.map((link: any) => {
+                          const contact = link.contact || link;
+                          return (
+                            <div key={link.id} className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors">
+                              <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-700 dark:text-blue-300 font-medium">
+                                {(contact.firstName?.[0] || "").toUpperCase()}{(contact.lastName?.[0] || "").toUpperCase()}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium truncate">{contact.firstName} {contact.lastName}</div>
+                                <div className="text-sm text-muted-foreground truncate">
+                                  {link.role ? `${link.role} • ` : ""}{contact.title || contact.email || "-"}
+                                </div>
+                              </div>
+                              {contact.phone && (
+                                <a href={`tel:${contact.phone}`} className="text-muted-foreground hover:text-foreground">
+                                  <Phone className="h-4 w-4" />
+                                </a>
+                              )}
+                              {contact.email && (
+                                <a href={`mailto:${contact.email}`} className="text-muted-foreground hover:text-foreground">
+                                  <Mail className="h-4 w-4" />
+                                </a>
+                              )}
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium truncate">{contact.firstName} {contact.lastName}</div>
-                              <div className="text-sm text-muted-foreground truncate">{contact.title || contact.email || "-"}</div>
-                            </div>
-                            {contact.phone && (
-                              <a href={`tel:${contact.phone}`} className="text-muted-foreground hover:text-foreground">
-                                <Phone className="h-4 w-4" />
-                              </a>
-                            )}
-                            {contact.email && (
-                              <a href={`mailto:${contact.email}`} className="text-muted-foreground hover:text-foreground">
-                                <Mail className="h-4 w-4" />
-                              </a>
-                            )}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
