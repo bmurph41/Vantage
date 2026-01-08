@@ -9158,6 +9158,7 @@ Current context: Project ${req.params.projectId}`;
             name: company,
             status: 'pending',
             suggestedDuplicates: similarCompanies.length > 0 ? similarCompanies.map(c => c.id) : null,
+            createdBy: req.user.id,
           });
           pendingCompanyId = pendingCompany.id;
         }
