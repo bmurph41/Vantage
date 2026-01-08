@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Redirect } from "wouter";
 import DockTalkHeader from "../components/DockTalkHeader";
 import DockTalkTabs from "../components/DockTalkTabs";
 import { useQuery } from "@tanstack/react-query";
@@ -7,6 +7,53 @@ import { fetchSystemStats } from "../lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import NotificationsPage from "./notifications";
 import SourcesPage from "./sources";
+import { Loader2 } from "lucide-react";
+
+interface SourcesPageWrapperProps {
+  systemStats: { newArticlesToday?: number } | undefined;
+  handleArticlesClick: () => void;
+  handleNotificationClick: () => void;
+  handleSettingsClick: () => void;
+  handleArticleManagementClick: () => void;
+}
+
+function SourcesPageWrapper({
+  systemStats,
+  handleArticlesClick,
+  handleNotificationClick,
+  handleSettingsClick,
+  handleArticleManagementClick
+}: SourcesPageWrapperProps) {
+  const { hasPermission, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!hasPermission('manage:docktalk')) {
+    return <Redirect to="/docktalk" />;
+  }
+
+  return (
+    <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-950">
+      <DockTalkHeader
+        newArticlesCount={systemStats?.newArticlesToday || 0}
+        onArticlesClick={handleArticlesClick}
+        onNotificationClick={handleNotificationClick}
+        onSettingsClick={handleSettingsClick}
+        onArticleManagementClick={handleArticleManagementClick}
+        showArticlesButton={true}
+      />
+      <div className="flex-1 overflow-auto p-6">
+        <SourcesPage />
+      </div>
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const [newArticlesCount, setNewArticlesCount] = useState(0);
@@ -68,23 +115,15 @@ export default function Dashboard() {
     );
   }
 
-  // Show sources page for RSS/URL management
+  // Show sources page for RSS/URL management (Admin Only)
   if (location === "/docktalk/sources") {
-    return (
-      <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-950">
-        <DockTalkHeader
-          newArticlesCount={systemStats?.newArticlesToday || 0}
-          onArticlesClick={handleArticlesClick}
-          onNotificationClick={handleNotificationClick}
-          onSettingsClick={handleSettingsClick}
-          onArticleManagementClick={handleArticleManagementClick}
-          showArticlesButton={true}
-        />
-        <div className="flex-1 overflow-auto p-6">
-          <SourcesPage />
-        </div>
-      </div>
-    );
+    return <SourcesPageWrapper 
+      systemStats={systemStats}
+      handleArticlesClick={handleArticlesClick}
+      handleNotificationClick={handleNotificationClick}
+      handleSettingsClick={handleSettingsClick}
+      handleArticleManagementClick={handleArticleManagementClick}
+    />;
   }
 
   return (

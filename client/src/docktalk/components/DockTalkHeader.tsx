@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useAuth } from "@/hooks/useAuth";
 
 interface DockTalkHeaderProps {
   newArticlesCount: number;
@@ -23,6 +24,9 @@ export default function DockTalkHeader({
   notificationContent,
   showArticlesButton = false
 }: DockTalkHeaderProps) {
+  const { hasPermission } = useAuth();
+  const isAdmin = hasPermission('manage:docktalk');
+
   return (
     <TooltipProvider>
       <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
@@ -103,8 +107,8 @@ export default function DockTalkHeader({
             </TooltipContent>
           </Tooltip>
 
-          {/* AI Training - Article Management */}
-          {onArticleManagementClick && (
+          {/* AI Training - Article Management (Admin Only) */}
+          {isAdmin && onArticleManagementClick && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -122,22 +126,24 @@ export default function DockTalkHeader({
             </Tooltip>
           )}
 
-          {/* Settings Wheel - Sources Management */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onSettingsClick}
-                data-testid="button-settings"
-              >
-                <Settings className="h-5 w-5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Manage Sources</p>
-            </TooltipContent>
-          </Tooltip>
+          {/* Settings Wheel - Sources Management (Admin Only) */}
+          {isAdmin && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onSettingsClick}
+                  data-testid="button-settings"
+                >
+                  <Settings className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Manage Sources</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
         </div>
       </div>
     </TooltipProvider>

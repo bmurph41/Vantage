@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { Loader2 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 const Dashboard = lazy(() => import("./pages/dashboard"));
 const EntityProfile = lazy(() => import("./pages/entity-profile"));
@@ -16,6 +17,20 @@ function DockTalkLoader() {
   );
 }
 
+function AdminRoute({ component: Component }: { component: React.ComponentType }) {
+  const { hasPermission, isLoading } = useAuth();
+  
+  if (isLoading) {
+    return <DockTalkLoader />;
+  }
+  
+  if (!hasPermission('manage:docktalk')) {
+    return <Redirect to="/docktalk" />;
+  }
+  
+  return <Component />;
+}
+
 export default function DockTalkRouter() {
   return (
     <Suspense fallback={<DockTalkLoader />}>
@@ -28,8 +43,12 @@ export default function DockTalkRouter() {
         <Route path="/docktalk/saved-searches" component={Dashboard} />
         <Route path="/docktalk/notifications" component={Dashboard} />
         <Route path="/docktalk/sources" component={Dashboard} />
-        <Route path="/docktalk/article-management" component={ArticleManagement} />
-        <Route path="/docktalk/admin" component={Admin} />
+        <Route path="/docktalk/article-management">
+          {() => <AdminRoute component={ArticleManagement} />}
+        </Route>
+        <Route path="/docktalk/admin">
+          {() => <AdminRoute component={Admin} />}
+        </Route>
         <Route path="/docktalk/entities/:id" component={EntityProfile} />
         <Route component={NotFound} />
       </Switch>
