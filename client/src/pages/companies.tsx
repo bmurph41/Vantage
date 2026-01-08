@@ -26,7 +26,19 @@ const industryColors = {
   retail: 'bg-orange-100 text-orange-800',
   consulting: 'bg-indigo-100 text-indigo-800',
   education: 'bg-yellow-100 text-yellow-800',
+  marina_operator: 'bg-cyan-100 text-cyan-800',
+  marina_owner: 'bg-teal-100 text-teal-800',
+  investor: 'bg-emerald-100 text-emerald-800',
+  broker: 'bg-amber-100 text-amber-800',
   other: 'bg-gray-100 text-gray-800'
+};
+
+const formatRole = (role: string | null | undefined): string => {
+  if (!role) return "-";
+  return role
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
 };
 
 const sizeColors = {
@@ -51,6 +63,7 @@ const AVAILABLE_METRICS = [
   { value: 'portfolio_companies', label: 'Portfolio Companies (2+ properties)', icon: 'briefcase', color: 'purple' },
   { value: 'active_deals', label: 'Companies with Active Deals', icon: 'trendingUp', color: 'green' },
   { value: 'new_this_month', label: 'New This Month', icon: 'calendar', color: 'orange' },
+  { value: 'number_of_marinas', label: 'Number of Marinas', icon: 'home', color: 'teal' },
   { value: 'with_website', label: 'With Website', icon: 'globe', color: 'teal' },
   { value: 'with_contacts', label: 'With Contacts', icon: 'users', color: 'indigo' },
   { value: 'with_properties', label: 'With Properties', icon: 'home', color: 'blue' },
@@ -135,6 +148,8 @@ export default function Companies() {
       case 'with_contacts':
         return kpiStats?.withContacts ?? null;
       case 'with_properties':
+        return kpiStats?.withProperties ?? null;
+      case 'number_of_marinas':
         return kpiStats?.withProperties ?? null;
       default:
         return 0;
@@ -292,13 +307,12 @@ export default function Companies() {
   const getIndustryCategory = (industry?: string): string => {
     if (!industry) return 'other';
     const normalized = industry.toLowerCase();
+    if (normalized === 'marina_operator') return 'marina_operator';
+    if (normalized === 'marina_owner') return 'marina_owner';
+    if (normalized === 'investor') return 'investor';
+    if (normalized === 'broker') return 'broker';
     if (normalized.includes('tech') || normalized.includes('software') || normalized.includes('it')) return 'technology';
-    if (normalized.includes('health') || normalized.includes('medical')) return 'healthcare';
-    if (normalized.includes('finance') || normalized.includes('bank')) return 'finance';
-    if (normalized.includes('retail') || normalized.includes('store')) return 'retail';
-    if (normalized.includes('manufactur')) return 'manufacturing';
     if (normalized.includes('consult')) return 'consulting';
-    if (normalized.includes('educat') || normalized.includes('school')) return 'education';
     return 'other';
   };
 
@@ -354,20 +368,19 @@ export default function Companies() {
               />
             </div>
             
-            {/* Industry Filter */}
+            {/* Role Filter */}
             <Select value={industryFilter} onValueChange={setIndustryFilter}>
               <SelectTrigger className="w-32 h-9 text-sm" data-testid="filter-industry">
-                <SelectValue placeholder="Industry" />
+                <SelectValue placeholder="Role" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Industries</SelectItem>
+                <SelectItem value="all">All Roles</SelectItem>
+                <SelectItem value="marina_operator">Marina Operator</SelectItem>
+                <SelectItem value="marina_owner">Marina Owner</SelectItem>
+                <SelectItem value="investor">Investor</SelectItem>
+                <SelectItem value="broker">Broker</SelectItem>
                 <SelectItem value="technology">Technology</SelectItem>
-                <SelectItem value="healthcare">Healthcare</SelectItem>
-                <SelectItem value="finance">Finance</SelectItem>
-                <SelectItem value="retail">Retail</SelectItem>
-                <SelectItem value="manufacturing">Manufacturing</SelectItem>
                 <SelectItem value="consulting">Consulting</SelectItem>
-                <SelectItem value="education">Education</SelectItem>
                 <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
@@ -567,7 +580,7 @@ export default function Companies() {
                     />
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Company</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Industry</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Role</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Size</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Website</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Phone</th>
@@ -614,11 +627,11 @@ export default function Companies() {
                         </div>
                       </td>
                       
-                      {/* Industry */}
+                      {/* Role */}
                       <td className="px-6 py-4">
                         {company.industry ? (
-                          <Badge className={industryColors[industryCategory as keyof typeof industryColors] || 'bg-gray-100 text-gray-800'} data-testid={`badge-company-industry-${company.id}`}>
-                            {company.industry}
+                          <Badge className={industryColors[company.industry as keyof typeof industryColors] || industryColors[industryCategory as keyof typeof industryColors] || 'bg-gray-100 text-gray-800'} data-testid={`badge-company-industry-${company.id}`}>
+                            {formatRole(company.industry)}
                           </Badge>
                         ) : (
                           <span className="text-sm text-gray-400">-</span>
