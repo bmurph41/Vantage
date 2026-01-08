@@ -17,12 +17,14 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import DuplicateResolutionModal from "@/components/modals/duplicate-resolution-modal";
+import CompanyFormModal from "@/components/modals/company-form-modal";
 import type { PendingCompany, CrmCompany } from "@shared/schema";
 
 export default function PendingCompanies() {
   const [selectedPending, setSelectedPending] = useState<PendingCompany | null>(null);
   const [selectedExisting, setSelectedExisting] = useState<CrmCompany | null>(null);
   const [showDuplicatesDialog, setShowDuplicatesDialog] = useState(false);
+  const [showCompanyFormModal, setShowCompanyFormModal] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -106,6 +108,24 @@ export default function PendingCompanies() {
     if (selectedPending) {
       acceptMutation.mutate({ id: selectedPending.id, mode });
     }
+  };
+
+  const handleEditDetails = () => {
+    setShowDuplicatesDialog(false);
+    setShowCompanyFormModal(true);
+  };
+
+  const handleCompanyFormClose = () => {
+    setShowCompanyFormModal(false);
+    setSelectedPending(null);
+  };
+
+  const handleCompanyFormSuccess = () => {
+    setShowCompanyFormModal(false);
+    if (selectedPending) {
+      rejectMutation.mutate(selectedPending.id);
+    }
+    setSelectedPending(null);
   };
 
   const formatDate = (dateString: string) => {
@@ -318,7 +338,39 @@ export default function PendingCompanies() {
         existingEntity={selectedExisting}
         onAccept={handleAcceptWithMode}
         onReject={handleReject}
+        onEditDetails={handleEditDetails}
         isLoading={acceptMutation.isPending || rejectMutation.isPending}
+      />
+
+      <CompanyFormModal
+        isOpen={showCompanyFormModal}
+        onClose={handleCompanyFormClose}
+        onSuccess={handleCompanyFormSuccess}
+        company={selectedPending ? {
+          id: '',
+          orgId: '',
+          name: selectedPending.name || '',
+          domain: '',
+          industry: selectedPending.industry || '',
+          size: '',
+          address: selectedPending.address || '',
+          phone: selectedPending.phone || '',
+          website: selectedPending.website || '',
+          description: '',
+          city: selectedPending.city || '',
+          state: selectedPending.state || '',
+          zipCode: selectedPending.zipCode || '',
+          country: '',
+          linkedInUrl: '',
+          twitterHandle: '',
+          annualRevenue: null,
+          employeeCount: null,
+          tags: [],
+          metadata: {},
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          ownerId: null,
+        } : null}
       />
     </div>
   );

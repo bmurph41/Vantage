@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { AlertCircle, Check, X, ArrowRight } from "lucide-react";
+import { AlertCircle, Check, X, ArrowRight, Pencil } from "lucide-react";
 import type { PendingContact, PendingCompany, PendingProperty, CrmContact, CrmCompany, Property } from "@shared/schema";
 
 type EntityType = 'contact' | 'company' | 'property';
@@ -16,6 +16,7 @@ interface DuplicateResolutionModalProps {
   existingEntity: CrmContact | CrmCompany | Property | null;
   onAccept: (mode: 'replace' | 'add_new') => void;
   onReject: () => void;
+  onEditDetails?: () => void;
   isLoading?: boolean;
 }
 
@@ -101,93 +102,100 @@ export default function DuplicateResolutionModal({
   existingEntity,
   onAccept,
   onReject,
+  onEditDetails,
   isLoading = false,
 }: DuplicateResolutionModalProps) {
   if (!pendingEntity) return null;
 
   const hasDuplicate = existingEntity !== null;
+  const entityLabel = entityType.charAt(0).toUpperCase() + entityType.slice(1);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-yellow-600" />
-            Duplicate {entityType.charAt(0).toUpperCase() + entityType.slice(1)} Detected
+            {hasDuplicate ? (
+              <>
+                <AlertCircle className="h-5 w-5 text-yellow-600" />
+                Duplicate {entityLabel} Detected
+              </>
+            ) : (
+              <>
+                <Check className="h-5 w-5 text-green-600" />
+                Review New {entityLabel}
+              </>
+            )}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
-          {hasDuplicate && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <p className="text-sm text-yellow-800">
-                We found a potential duplicate in your CRM. Please review the comparison below and decide how to proceed.
+          {hasDuplicate ? (
+            <>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <p className="text-sm text-yellow-800">
+                  We found a potential duplicate in your CRM. Please review the comparison below and decide how to proceed.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4 mb-2">
+                <div className="text-sm font-semibold text-gray-500 uppercase">Field</div>
+                <div className="text-sm font-semibold text-gray-500 uppercase">Existing CRM Record</div>
+                <div className="text-sm font-semibold text-gray-500 uppercase">New Submission</div>
+              </div>
+
+              <Card className="border-2">
+                <div className="p-4">
+                  {entityType === 'contact' && (
+                    <ContactComparison 
+                      pending={pendingEntity as PendingContact} 
+                      existing={existingEntity as CrmContact | null} 
+                    />
+                  )}
+                  {entityType === 'company' && (
+                    <CompanyComparison 
+                      pending={pendingEntity as PendingCompany} 
+                      existing={existingEntity as CrmCompany | null} 
+                    />
+                  )}
+                  {entityType === 'property' && (
+                    <PropertyComparison 
+                      pending={pendingEntity as PendingProperty} 
+                      existing={existingEntity as Property | null} 
+                    />
+                  )}
+                </div>
+              </Card>
+
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold mb-3">Color Legend</h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-green-600"></div>
+                    <span className="text-gray-700">Values match</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-yellow-600"></div>
+                    <span className="text-gray-700">Values differ</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-blue-600"></div>
+                    <span className="text-gray-700">New value (no existing)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-gray-300"></div>
+                    <span className="text-gray-700">No value</span>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <p className="text-sm text-green-800">
+                This is a new {entityType}. You can add it to your CRM directly, or edit the details first.
               </p>
             </div>
           )}
-
-          {!hasDuplicate && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800">
-                No existing record found. This will be added as a new {entityType}.
-              </p>
-            </div>
-          )}
-
-          <div className="grid grid-cols-3 gap-4 mb-2">
-            <div className="text-sm font-semibold text-gray-500 uppercase">Field</div>
-            <div className="text-sm font-semibold text-gray-500 uppercase">
-              {hasDuplicate ? 'Existing CRM Record' : 'Current'}
-            </div>
-            <div className="text-sm font-semibold text-gray-500 uppercase">
-              New Submission
-            </div>
-          </div>
-
-          <Card className="border-2">
-            <div className="p-4">
-              {entityType === 'contact' && (
-                <ContactComparison 
-                  pending={pendingEntity as PendingContact} 
-                  existing={existingEntity as CrmContact | null} 
-                />
-              )}
-              {entityType === 'company' && (
-                <CompanyComparison 
-                  pending={pendingEntity as PendingCompany} 
-                  existing={existingEntity as CrmCompany | null} 
-                />
-              )}
-              {entityType === 'property' && (
-                <PropertyComparison 
-                  pending={pendingEntity as PendingProperty} 
-                  existing={existingEntity as Property | null} 
-                />
-              )}
-            </div>
-          </Card>
-
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="text-sm font-semibold mb-3">Color Legend</h3>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-green-600"></div>
-                <span className="text-gray-700">Values match</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-yellow-600"></div>
-                <span className="text-gray-700">Values differ</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-blue-600"></div>
-                <span className="text-gray-700">New value (no existing)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-gray-300"></div>
-                <span className="text-gray-700">No value</span>
-              </div>
-            </div>
-          </div>
 
           <Separator />
 
@@ -195,18 +203,36 @@ export default function DuplicateResolutionModal({
             <h3 className="text-sm font-semibold">How would you like to proceed?</h3>
             
             <div className="grid gap-3">
+              {onEditDetails && (
+                <Button
+                  variant="outline"
+                  className="w-full justify-start h-auto py-3 px-4 border-2 border-blue-300 hover:bg-blue-50"
+                  onClick={onEditDetails}
+                  disabled={isLoading}
+                  data-testid="button-edit-details"
+                >
+                  <Pencil className="h-5 w-5 mr-3 text-blue-600" />
+                  <div className="text-left">
+                    <div className="font-semibold">Edit Details First</div>
+                    <div className="text-xs text-gray-600">
+                      Add more information before saving to CRM
+                    </div>
+                  </div>
+                </Button>
+              )}
+
               <Button
-                variant="destructive"
-                className="w-full justify-start h-auto py-3 px-4"
-                onClick={onReject}
+                variant="outline"
+                className="w-full justify-start h-auto py-3 px-4 border-2 border-green-300 hover:bg-green-50"
+                onClick={() => onAccept('add_new')}
                 disabled={isLoading}
-                data-testid="button-reject-duplicate"
+                data-testid="button-add-as-new"
               >
-                <X className="h-5 w-5 mr-3" />
+                <Check className="h-5 w-5 mr-3 text-green-600" />
                 <div className="text-left">
-                  <div className="font-semibold">Discard Duplicate</div>
-                  <div className="text-xs opacity-90">
-                    Reject this submission and keep only the existing record
+                  <div className="font-semibold">{hasDuplicate ? 'Add as New' : 'Accept & Add to CRM'}</div>
+                  <div className="text-xs text-gray-600">
+                    {hasDuplicate ? `Create a new ${entityType} record (keep both)` : `Create this ${entityType} in your CRM`}
                   </div>
                 </div>
               </Button>
@@ -230,17 +256,17 @@ export default function DuplicateResolutionModal({
               )}
 
               <Button
-                variant="outline"
-                className="w-full justify-start h-auto py-3 px-4 border-2 border-green-300 hover:bg-green-50"
-                onClick={() => onAccept('add_new')}
+                variant="destructive"
+                className="w-full justify-start h-auto py-3 px-4"
+                onClick={onReject}
                 disabled={isLoading}
-                data-testid="button-add-as-new"
+                data-testid="button-reject-duplicate"
               >
-                <Check className="h-5 w-5 mr-3 text-green-600" />
+                <X className="h-5 w-5 mr-3" />
                 <div className="text-left">
-                  <div className="font-semibold">Add as New</div>
-                  <div className="text-xs text-gray-600">
-                    Create a new {entityType} record (keep both)
+                  <div className="font-semibold">{hasDuplicate ? 'Discard Duplicate' : 'Discard'}</div>
+                  <div className="text-xs opacity-90">
+                    {hasDuplicate ? 'Reject this submission and keep only the existing record' : 'Remove this pending item'}
                   </div>
                 </div>
               </Button>
