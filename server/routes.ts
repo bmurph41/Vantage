@@ -9097,7 +9097,19 @@ Current context: Project ${req.params.projectId}`;
         res.json(result);
       } else {
         const contacts = await storage.getCrmContactsForOrg(req.user.orgId);
-        res.json(contacts);
+        
+        // Fetch primary company for each contact via junction table
+        const contactsWithCompany = await Promise.all(
+          contacts.map(async (contact) => {
+            const companyLinks = await storage.getContactCompanies(contact.id);
+            // Find primary company or use first linked company
+            const primaryLink = companyLinks.find((link: any) => link.isPrimary) || companyLinks[0];
+            const company = primaryLink?.company || null;
+            return { ...contact, company };
+          })
+        );
+        
+        res.json(contactsWithCompany);
       }
     } catch (error: any) {
       console.error("Failed to get contacts:", error);
