@@ -114,6 +114,7 @@ const BoatSalesTabbed = lazy(() => import("@/pages/operations/BoatSalesTabbed"))
 const SalesCompsIndex = lazy(() => import("@/pages/analysis/sales-comps/Index"));
 const SalesCompsAnalytics = lazy(() => import("@/pages/analysis/sales-comps/Analytics"));
 const SalesCompsProjects = lazy(() => import("@/pages/analysis/sales-comps/Projects"));
+const SalesCompsMapView = lazy(() => import("@/pages/analysis/sales-comps/MapView"));
 const SalesCompsDetail = lazy(() => import("@/pages/analysis/sales-comps/Detail"));
 const SalesCompsUpload = lazy(() => import("@/pages/analysis/sales-comps/Upload"));
 const SalesCompsCompare = lazy(() => import("@/pages/analysis/sales-comps/Compare"));
@@ -993,6 +994,13 @@ function Router() {
       </Route>
 
       {/* Analysis / Sales Comps Routes */}
+      <Route path="/analysis/sales-comps/map">
+        {() => (
+          <UnifiedLayout>
+            <SalesCompsMapView />
+          </UnifiedLayout>
+        )}
+      </Route>
       <Route path="/analysis/sales-comps">
         {() => (
           <UnifiedLayout>
