@@ -9182,16 +9182,15 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: "Failed to create contact" });
     }
   });
-
-
-
-
-
-
-
-
-
   app.put("/api/contacts/:id", async (req: any, res) => {
+    try {
+      const contact = await storage.updateCrmContact(req.params.id, req.body);
+      res.json(contact);
+    } catch (error: any) {
+      console.error("Failed to update contact:", error);
+      res.status(500).json({ error: "Failed to update contact" });
+    }
+  });
 
   app.get("/api/contacts/:id", async (req: any, res) => {
     try {
@@ -9203,14 +9202,6 @@ Current context: Project ${req.params.projectId}`;
     } catch (error: any) {
       console.error("Failed to get contact:", error);
       res.status(500).json({ error: "Failed to retrieve contact" });
-    }
-  });
-    try {
-      const contact = await storage.updateCrmContact(req.params.id, req.body);
-      res.json(contact);
-    } catch (error: any) {
-      console.error("Failed to update contact:", error);
-      res.status(500).json({ error: "Failed to update contact" });
     }
   });
   app.delete("/api/contacts/:id", async (req: any, res) => {
