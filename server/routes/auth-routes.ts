@@ -320,6 +320,55 @@ router.post('/logout', async (req: Request, res: Response) => {
   }
 });
 
+router.get('/me', async (req: Request, res: Response) => {
+  try {
+    const sessionToken = req.cookies?.sessionToken;
+    
+    if (sessionToken) {
+      const sessionData = await enterpriseAuthService.validateSession(sessionToken);
+      
+      if (sessionData) {
+        const [user] = await db.select()
+          .from(users)
+          .where(eq(users.id, sessionData.user.id))
+          .limit(1);
+
+        if (user) {
+          const org = await db.query.organizations.findFirst({
+            where: eq(organizations.id, user.orgId)
+          });
+
+          return res.json({
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            orgId: user.orgId,
+            orgName: org?.name || 'Unknown Organization',
+          });
+        }
+      }
+    }
+    
+    // Development mode fallback - return demo user
+    if (process.env.NODE_ENV !== 'production') {
+      return res.json({
+        id: 'user-1',
+        email: 'brettmurphy41@gmail.com',
+        name: 'Demo User',
+        role: 'owner',
+        orgId: 'org-1',
+        orgName: 'Demo Organization',
+      });
+    }
+
+    return res.status(401).json({ error: 'Not authenticated' });
+  } catch (error) {
+    logger.error({ error }, 'Get current user error');
+    res.status(500).json({ error: 'Failed to get user info' });
+  }
+});
+
 router.get('/sessions', requireSession, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;

@@ -1,13 +1,14 @@
 import { lazy, Suspense } from "react";
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, useLocation, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Loader2 } from "lucide-react";
 import { CommandPalette } from "@/components/CommandPalette";
 import { Breadcrumb } from "@/components/Breadcrumb";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 
 // Eagerly load critical pages for instant navigation (no white screen)
 import Dashboard from "@/pages/dashboard";
@@ -26,6 +27,26 @@ function PageLoader() {
       <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   );
+}
+
+// Auth guard component - redirects to login if not authenticated
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth();
+  const [location] = useLocation();
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+  
+  if (!isAuthenticated) {
+    return <Redirect to="/login" />;
+  }
+  
+  return <>{children}</>;
 }
 
 // Code-split less frequently used pages
@@ -178,7 +199,22 @@ function SidebarLoader() {
 }
 
 // Unified Layout wrapper with sidebar for both DD Tracker and CRM
+// Includes auth guard to redirect unauthenticated users to login
 function UnifiedLayout({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth();
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+  
+  if (!isAuthenticated) {
+    return <Redirect to="/login" />;
+  }
+  
   return (
     <div className="flex h-screen bg-gray-50">
       <Suspense fallback={<SidebarLoader />}>
@@ -210,7 +246,7 @@ function Router() {
 
   return (
     <Switch>
-      {/* Auth pages - no sidebar */}
+      {/* Auth pages - no sidebar, no auth required */}
       <Route path="/login">
         {() => (
           <Suspense fallback={<PageLoader />}>
@@ -232,6 +268,7 @@ function Router() {
           return null;
         }}
       </Route>
+      {/* Protected routes - authentication handled by UnifiedLayout */}
       <Route path="/projects">
         {() => (
           <UnifiedLayout>
@@ -1384,12 +1421,14 @@ function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Toaster />
-          <Suspense fallback={<PageLoader />}>
-            <Router />
-          </Suspense>
-        </TooltipProvider>
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Suspense fallback={<PageLoader />}>
+              <Router />
+            </Suspense>
+          </TooltipProvider>
+        </AuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );
