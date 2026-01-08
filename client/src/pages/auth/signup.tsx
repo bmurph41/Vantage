@@ -98,6 +98,7 @@ export default function SignupPage() {
       return response.json();
     },
     onSuccess: async () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bootstrap"] });
       
       if (selectedPacks.length > 0) {

@@ -57,6 +57,7 @@ export default function LoginPage() {
         setMfaRequired(true);
         setMfaData({ userId: data.userId, mfaToken: data.mfaToken });
       } else {
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
         queryClient.invalidateQueries({ queryKey: ["/api/bootstrap"] });
         queryClient.invalidateQueries({ queryKey: ["/api/organization/packs"] });
         toast({
@@ -85,6 +86,7 @@ export default function LoginPage() {
       return response.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bootstrap"] });
       queryClient.invalidateQueries({ queryKey: ["/api/organization/packs"] });
       toast({
