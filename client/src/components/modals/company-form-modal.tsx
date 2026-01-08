@@ -7,6 +7,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +15,8 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, X, User, Building, Star, MapPin } from "lucide-react";
 import { AddressInput, type AddressComponents } from "@/components/address-input";
+import { StateSelect } from "@/components/ui/state-select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertCompanySchema, insertContactSchema, type Company, type Contact, type ContactCompany, type Property, type CompanyProperty } from "@shared/schema";
@@ -68,6 +71,13 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
   const [contactRole, setContactRole] = useState("");
   const [isLinkingProperty, setIsLinkingProperty] = useState(false);
   const [selectedPropertyId, setSelectedPropertyId] = useState("");
+  
+  // Address fields state
+  const [address, setAddress] = useState("");
+  const [unit, setUnit] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [zipCode, setZipCode] = useState("");
   
   // Pending relationships for new companies
   const [pendingContacts, setPendingContacts] = useState<Array<{contact: Contact, role?: string}>>([]);
@@ -143,22 +153,32 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
         domain: company.domain || "",
         industry: company.industry || "",
         size: company.size || "",
-        address: company.address || "",
         phone: company.phone || "",
         website: company.website || "",
         description: company.description || "",
       });
+      // Reset address fields from company data
+      setAddress(company.address || "");
+      setUnit("");
+      setCity(company.city || "");
+      setState(company.state || "");
+      setZipCode(company.zipCode || "");
     } else {
       form.reset({
         name: "",
         domain: "",
         industry: "",
         size: "",
-        address: "",
         phone: "",
         website: "",
         description: "",
       });
+      // Reset address fields
+      setAddress("");
+      setUnit("");
+      setCity("");
+      setState("");
+      setZipCode("");
       // Reset pending relationships when creating a new company
       setPendingContacts([]);
       setPendingContactsToCreate([]);
@@ -170,9 +190,15 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
 
   const createCompanyMutation = useMutation({
     mutationFn: async (data: any) => {
-      const cleanData = { ...data };
+      const cleanData = { 
+        ...data,
+        address: address.trim() || undefined,
+        city: city.trim() || undefined,
+        state: state.trim() || undefined,
+        zipCode: zipCode.trim() || undefined,
+      };
       Object.keys(cleanData).forEach(key => {
-        if (cleanData[key] === "") delete cleanData[key];
+        if (cleanData[key] === "" || cleanData[key] === undefined) delete cleanData[key];
       });
       
       const response = await apiRequest('POST', '/api/companies', cleanData);
@@ -240,9 +266,15 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
 
   const updateCompanyMutation = useMutation({
     mutationFn: async (data: any) => {
-      const cleanData = { ...data };
+      const cleanData = { 
+        ...data,
+        address: address.trim() || undefined,
+        city: city.trim() || undefined,
+        state: state.trim() || undefined,
+        zipCode: zipCode.trim() || undefined,
+      };
       Object.keys(cleanData).forEach(key => {
-        if (cleanData[key] === "") delete cleanData[key];
+        if (cleanData[key] === "" || cleanData[key] === undefined) delete cleanData[key];
       });
       
       return await apiRequest('PUT', `/api/companies/${company!.id}`, cleanData);
@@ -665,27 +697,72 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="address"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Address (Optional)</FormLabel>
-                      <FormControl>
-                        <AddressInput
-                          value={field.value || ''}
-                          onChange={(value) => field.onChange(value)}
-                          onAddressSelect={(components: AddressComponents) => {
-                            field.onChange(components.fullAddress || components.street || '');
-                          }}
-                          placeholder="123 Main St, City, State, ZIP"
-                          testId="input-address"
+                {/* Address Section */}
+                <Card className="border">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base font-medium flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      Address *
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <AddressInput
+                        value={address}
+                        onChange={(value) => setAddress(value)}
+                        onAddressSelect={(components: AddressComponents) => {
+                          if (components.street) setAddress(components.street);
+                          if (components.city) setCity(components.city);
+                          if (components.state) setState(components.state);
+                          if (components.zipCode) setZipCode(components.zipCode);
+                        }}
+                        label="Street Address *"
+                        placeholder="123 Main Street"
+                        testId="input-address"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="unit" className="text-sm">Unit/Suite (Optional)</Label>
+                      <Input
+                        id="unit"
+                        value={unit}
+                        onChange={(e) => setUnit(e.target.value)}
+                        placeholder="Apt 4B, Suite 100, etc."
+                        data-testid="input-unit"
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="city" className="text-sm">City *</Label>
+                        <Input
+                          id="city"
+                          value={city}
+                          onChange={(e) => setCity(e.target.value)}
+                          placeholder="City"
+                          data-testid="input-city"
                         />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="state" className="text-sm">State *</Label>
+                        <StateSelect
+                          value={state}
+                          onValueChange={setState}
+                          placeholder="Select state"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="zipCode" className="text-sm">Zip Code *</Label>
+                        <Input
+                          id="zipCode"
+                          value={zipCode}
+                          onChange={(e) => setZipCode(e.target.value)}
+                          placeholder="12345"
+                          data-testid="input-zip-code"
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
                 <FormField
                   control={form.control}

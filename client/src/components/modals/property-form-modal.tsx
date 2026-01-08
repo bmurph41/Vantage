@@ -7,11 +7,14 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Plus, X, User, Building, Link2, Search } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Plus, X, User, Building, Link2, Search, MapPin } from "lucide-react";
 import { AddressInput, type AddressComponents } from "@/components/address-input";
+import { StateSelect } from "@/components/ui/state-select";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
@@ -166,6 +169,13 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
     return company.name?.toLowerCase().includes(searchLower);
   }).filter(company => !linkedCompanies.some(lc => lc.companyId === company.id));
 
+  // Address fields state
+  const [address, setAddress] = useState("");
+  const [unit, setUnit] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [zipCode, setZipCode] = useState("");
+
   // Additional marina property fields
   const [wetSlips, setWetSlips] = useState("");
   const [dryStorage, setDryStorage] = useState("");
@@ -195,9 +205,15 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
         title: property.title,
         type: property.type,
         status: property.status,
-        address: property.address || "",
         description: property.description || "",
       });
+      
+      // Reset address fields from property data
+      setAddress(property.address || "");
+      setUnit("");
+      setCity(property.city || "");
+      setState(property.state || "");
+      setZipCode(property.zipCode || "");
       
       // Load marina specifications from specifications object
       if (property.specifications && typeof property.specifications === 'object') {
@@ -214,9 +230,14 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
         title: "",
         type: "marina",
         status: "target",
-        address: "",
         description: "",
       });
+      // Reset address fields
+      setAddress("");
+      setUnit("");
+      setCity("");
+      setState("");
+      setZipCode("");
       setWetSlips("");
       setDryStorage("");
       setTotalAcres("");
@@ -238,6 +259,10 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
 
       const cleanData = { 
         ...data,
+        address: address.trim() || undefined,
+        city: city.trim() || undefined,
+        state: state.trim() || undefined,
+        zipCode: zipCode.trim() || undefined,
         specifications: Object.keys(specifications).length > 0 ? specifications : {},
       };
       
@@ -282,6 +307,10 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
 
       const cleanData = { 
         ...data,
+        address: address.trim() || undefined,
+        city: city.trim() || undefined,
+        state: state.trim() || undefined,
+        zipCode: zipCode.trim() || undefined,
         specifications: Object.keys(specifications).length > 0 ? specifications : {},
       };
       
@@ -392,27 +421,72 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="address"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Address *</FormLabel>
-                  <FormControl>
-                    <AddressInput
-                      value={field.value || ''}
-                      onChange={(value) => field.onChange(value)}
-                      onAddressSelect={(components: AddressComponents) => {
-                        field.onChange(components.fullAddress || components.street || '');
-                      }}
-                      placeholder="123 Harbor Way, Marina City, FL 33000"
-                      testId="input-property-address"
+            {/* Address Section */}
+            <Card className="border">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-medium flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Address *
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <AddressInput
+                    value={address}
+                    onChange={(value) => setAddress(value)}
+                    onAddressSelect={(components: AddressComponents) => {
+                      if (components.street) setAddress(components.street);
+                      if (components.city) setCity(components.city);
+                      if (components.state) setState(components.state);
+                      if (components.zipCode) setZipCode(components.zipCode);
+                    }}
+                    label="Street Address *"
+                    placeholder="123 Harbor Way"
+                    testId="input-property-address"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="unit" className="text-sm">Unit/Suite (Optional)</Label>
+                  <Input
+                    id="unit"
+                    value={unit}
+                    onChange={(e) => setUnit(e.target.value)}
+                    placeholder="Dock A, Slip 12, etc."
+                    data-testid="input-unit"
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="city" className="text-sm">City *</Label>
+                    <Input
+                      id="city"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      placeholder="Marina City"
+                      data-testid="input-city"
                     />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="state" className="text-sm">State *</Label>
+                    <StateSelect
+                      value={state}
+                      onValueChange={setState}
+                      placeholder="Select state"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="zipCode" className="text-sm">Zip Code *</Label>
+                    <Input
+                      id="zipCode"
+                      value={zipCode}
+                      onChange={(e) => setZipCode(e.target.value)}
+                      placeholder="33000"
+                      data-testid="input-zip-code"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
             <FormField
               control={form.control}
