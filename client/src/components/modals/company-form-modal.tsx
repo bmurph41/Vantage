@@ -19,6 +19,7 @@ import { StateSelect } from "@/components/ui/state-select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
 import { insertCompanySchema, insertContactSchema, type Company, type Contact, type ContactCompany, type Property, type CompanyProperty } from "@shared/schema";
 
 // Type for joined ContactCompany data from API
@@ -109,15 +110,26 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
   });
 
   const form = useForm({
-    resolver: zodResolver(insertCompanySchema.extend({
-      name: insertCompanySchema.shape.name.min(1, "Company name is required"),
-      domain: insertCompanySchema.shape.domain.optional(),
-      industry: insertCompanySchema.shape.industry.optional(),
-      size: insertCompanySchema.shape.size.optional(),
-      address: insertCompanySchema.shape.address.optional(),
-      phone: insertCompanySchema.shape.phone.optional(),
-      website: insertCompanySchema.shape.website.optional(),
-      description: insertCompanySchema.shape.description.optional(),
+    resolver: zodResolver(insertCompanySchema.omit({
+      orgId: true,
+      ownerId: true,
+      labels: true,
+      annualRevenue: true,
+      annualMarinaSpend: true,
+      acquisitionInterest: true,
+      portfolioCount: true,
+      city: true,
+      state: true,
+      zipCode: true,
+    }).extend({
+      name: z.string().min(1, "Company name is required"),
+      domain: z.string().optional(),
+      industry: z.string().optional(),
+      size: z.string().optional(),
+      address: z.string().optional(),
+      phone: z.string().optional(),
+      website: z.string().optional(),
+      description: z.string().optional(),
     })),
     defaultValues: {
       name: "",
