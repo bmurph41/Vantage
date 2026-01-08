@@ -50,7 +50,7 @@ export default function LoginPage() {
   const loginMutation = useMutation({
     mutationFn: async (values: LoginFormValues) => {
       const response = await apiRequest("POST", "/api/auth/login", values);
-      return response;
+      return response.json();
     },
     onSuccess: (data) => {
       if (data.requiresMfa) {
@@ -82,7 +82,7 @@ export default function LoginPage() {
         token: values.token,
         mfaToken: mfaData?.mfaToken,
       });
-      return response;
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bootstrap"] });

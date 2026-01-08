@@ -95,7 +95,7 @@ export default function SignupPage() {
         password: values.password,
         orgName: values.orgName,
       });
-      return response;
+      return response.json();
     },
     onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bootstrap"] });
