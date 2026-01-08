@@ -220,6 +220,10 @@ export default function PendingCompanies() {
                       key={pending.id}
                       className="cursor-pointer hover:bg-muted/50"
                       data-testid={`row-pending-company-${pending.id}`}
+                      onClick={() => {
+                        setSelectedPending(pending);
+                        setShowCompanyFormModal(true);
+                      }}
                     >
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2" data-testid={`text-company-name-${pending.id}`}>
