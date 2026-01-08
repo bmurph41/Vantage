@@ -224,7 +224,7 @@ export function DetailDrawer({
       case "contact":
         return entity.title || entity.email || "";
       case "company":
-        return entity.domain || entity.industry || "";
+        return entity.domain || formatRole(entity.industry) || "";
       case "deal":
         return entity.amount ? `$${entity.amount.toLocaleString()}` : "";
       case "property":
@@ -238,7 +238,7 @@ export function DetailDrawer({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-2xl p-0 flex flex-col h-full overflow-hidden">
+      <SheetContent className="w-full sm:max-w-2xl p-0 flex flex-col max-h-screen overflow-hidden">
         <SheetHeader className="px-6 py-4 border-b">
           <div className="flex items-start justify-between">
             <div className="flex-1">
@@ -334,7 +334,7 @@ export function DetailDrawer({
             <TabsTrigger value="custom" data-testid="tab-custom">Custom Fields</TabsTrigger>
           </TabsList>
 
-          <ScrollArea className="flex-1 h-0 min-h-0">
+          <ScrollArea className="flex-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
             <div className="px-6 pb-6">
               <TabsContent value="overview" className="mt-4 space-y-4">
                 {isLoading ? (
