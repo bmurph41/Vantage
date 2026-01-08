@@ -282,13 +282,13 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
     mutationFn: async (data: any) => {
       const cleanData = { 
         ...data,
-        address: address.trim() || undefined,
-        city: city.trim() || undefined,
-        state: state.trim() || undefined,
-        zipCode: zipCode.trim() || undefined,
+        address: address.trim() || null,
+        city: city.trim() || null,
+        state: state.trim() || null,
+        zipCode: zipCode.trim() || null,
       };
       Object.keys(cleanData).forEach(key => {
-        if (cleanData[key] === "" || cleanData[key] === undefined) delete cleanData[key];
+        if (cleanData[key] === "") cleanData[key] = null;
       });
       
       return await apiRequest('PUT', `/api/companies/${company!.id}`, cleanData);

@@ -582,7 +582,7 @@ export default function Companies() {
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Company</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Role</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Size</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Website</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"># of Marinas</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Phone</th>
                   <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                 </tr>
@@ -649,18 +649,11 @@ export default function Companies() {
                         )}
                       </td>
                       
-                      {/* Website */}
+                      {/* # of Marinas */}
                       <td className="px-6 py-4">
-                        {company.website ? (
-                          <div className="flex items-center gap-2">
-                            <Globe className="w-4 h-4 text-gray-400" />
-                            <span className="text-sm text-gray-900" data-testid={`text-company-website-${company.id}`}>
-                              {company.website}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-gray-400">-</span>
-                        )}
+                        <span className="text-sm text-gray-900 font-medium" data-testid={`text-company-marina-count-${company.id}`}>
+                          {company.portfolioCount || 0}
+                        </span>
                       </td>
                       
                       {/* Phone */}
