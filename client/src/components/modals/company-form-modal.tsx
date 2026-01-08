@@ -309,7 +309,6 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
 
   const updatePendingCompanyMutation = useMutation({
     mutationFn: async (data: any) => {
-      console.log('[CompanyFormModal] updatePendingCompanyMutation.mutationFn called', { pendingCompanyId, data });
       const cleanData = { 
         ...data,
         address: address.trim() || undefined,
@@ -321,21 +320,17 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
         if (cleanData[key] === "" || cleanData[key] === undefined) delete cleanData[key];
       });
       
-      console.log('[CompanyFormModal] PATCH request to', `/api/pending-companies/${pendingCompanyId}`, cleanData);
       return await apiRequest('PATCH', `/api/pending-companies/${pendingCompanyId}`, cleanData);
     },
     onSuccess: () => {
-      console.log('[CompanyFormModal] updatePendingCompanyMutation.onSuccess');
       queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-companies'] });
       queryClient.invalidateQueries({ queryKey: ['/api/pending-companies'] });
       toast({ title: "Company details updated. You can now proceed to accept and add to CRM." });
       if (onSuccess) {
-        console.log('[CompanyFormModal] Calling onSuccess callback');
         onSuccess();
       }
     },
     onError: (error: any) => {
-      console.log('[CompanyFormModal] updatePendingCompanyMutation.onError', error);
       toast({ 
         title: "Failed to update pending company", 
         description: error.message,
@@ -457,11 +452,9 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
   });
 
   const onSubmit = (data: any) => {
-    console.log('[CompanyFormModal] onSubmit called', { pendingCompanyId, companyId: company?.id, data, address, city, state, zipCode });
     
     // Validate required address fields
     if (!address.trim() || !city.trim() || !state.trim() || !zipCode.trim()) {
-      console.log('[CompanyFormModal] Address validation failed', { address, city, state, zipCode });
       toast({
         title: "Address Required",
         description: "Please fill in all required address fields (street, city, state, zip code)",
@@ -471,13 +464,10 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
     }
     
     if (pendingCompanyId) {
-      console.log('[CompanyFormModal] Calling updatePendingCompanyMutation.mutate');
       updatePendingCompanyMutation.mutate(data);
     } else if (company?.id) {
-      console.log('[CompanyFormModal] Calling updateCompanyMutation.mutate');
       updateCompanyMutation.mutate(data);
     } else {
-      console.log('[CompanyFormModal] Calling createCompanyMutation.mutate');
       createCompanyMutation.mutate(data);
     }
   };

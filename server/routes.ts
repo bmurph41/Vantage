@@ -6968,7 +6968,8 @@ Current context: Project ${req.params.projectId}`;
       if (!mode || !['replace', 'add_new'].includes(mode)) {
         return res.status(400).json({ error: "Invalid mode. Must be 'replace' or 'add_new'" });
       }
-      const company = await storage.acceptPendingCompany(req.params.id, req.user.id, mode);
+      // Note: The storage.acceptPendingCompany signature is (id, orgId, userId)
+      const company = await storage.acceptPendingCompany(req.params.id, req.user.orgId, req.user.id);
       res.json(company);
     } catch (error: any) {
       console.error("Failed to accept pending company:", error);
