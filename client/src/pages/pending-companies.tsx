@@ -122,10 +122,10 @@ export default function PendingCompanies() {
 
   const handleCompanyFormSuccess = () => {
     setShowCompanyFormModal(false);
+    queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-companies'] });
     if (selectedPending) {
-      rejectMutation.mutate(selectedPending.id);
+      setShowDuplicatesDialog(true);
     }
-    setSelectedPending(null);
   };
 
   const formatDate = (dateString: string) => {
@@ -346,6 +346,7 @@ export default function PendingCompanies() {
         isOpen={showCompanyFormModal}
         onClose={handleCompanyFormClose}
         onSuccess={handleCompanyFormSuccess}
+        pendingCompanyId={selectedPending?.id}
         company={selectedPending ? {
           id: '',
           orgId: '',

@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -105,10 +107,21 @@ export default function DuplicateResolutionModal({
   onEditDetails,
   isLoading = false,
 }: DuplicateResolutionModalProps) {
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+
   if (!pendingEntity) return null;
 
   const hasDuplicate = existingEntity !== null;
   const entityLabel = entityType.charAt(0).toUpperCase() + entityType.slice(1);
+
+  const handleDiscardClick = () => {
+    setShowDiscardConfirm(true);
+  };
+
+  const handleConfirmDiscard = () => {
+    setShowDiscardConfirm(false);
+    onReject();
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -258,7 +271,7 @@ export default function DuplicateResolutionModal({
               <Button
                 variant="destructive"
                 className="w-full justify-start h-auto py-3 px-4"
-                onClick={onReject}
+                onClick={handleDiscardClick}
                 disabled={isLoading}
                 data-testid="button-reject-duplicate"
               >
@@ -274,6 +287,27 @@ export default function DuplicateResolutionModal({
           </div>
         </div>
       </DialogContent>
+
+      <AlertDialog open={showDiscardConfirm} onOpenChange={setShowDiscardConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Discard</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to discard this {entityType}? This will permanently remove it from the pending list without adding it to your CRM. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-discard">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDiscard}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-discard"
+            >
+              Yes, Discard
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

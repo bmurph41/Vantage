@@ -30,6 +30,8 @@ interface CompanyFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   company: Company | null;
+  pendingCompanyId?: string | null;
+  onSuccess?: () => void;
 }
 
 const companySizes = [
@@ -62,7 +64,7 @@ const companyTypes = [
   { value: "other", label: "Other" },
 ];
 
-export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFormModalProps) {
+export default function CompanyFormModal({ isOpen, onClose, company, pendingCompanyId, onSuccess }: CompanyFormModalProps) {
   const { toast} = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("basic");
@@ -305,6 +307,38 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
     },
   });
 
+  const updatePendingCompanyMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const cleanData = { 
+        ...data,
+        address: address.trim() || undefined,
+        city: city.trim() || undefined,
+        state: state.trim() || undefined,
+        zipCode: zipCode.trim() || undefined,
+      };
+      Object.keys(cleanData).forEach(key => {
+        if (cleanData[key] === "" || cleanData[key] === undefined) delete cleanData[key];
+      });
+      
+      return await apiRequest('PATCH', `/api/pending-companies/${pendingCompanyId}`, cleanData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-companies'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/pending-companies'] });
+      toast({ title: "Company details updated. You can now proceed to accept and add to CRM." });
+      if (onSuccess) {
+        onSuccess();
+      }
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to update pending company", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
   // Contact-Company relationship mutations
   const createContactMutation = useMutation<Contact, Error, any>({
     mutationFn: async (contactData: any) => {
@@ -428,7 +462,9 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
       return;
     }
     
-    if (company) {
+    if (pendingCompanyId) {
+      updatePendingCompanyMutation.mutate(data);
+    } else if (company?.id) {
       updateCompanyMutation.mutate(data);
     } else {
       createCompanyMutation.mutate(data);
@@ -561,7 +597,7 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
     setPendingProperties(pendingProperties.filter((_, i) => i !== index));
   };
 
-  const isLoading = createCompanyMutation.isPending || updateCompanyMutation.isPending;
+  const isLoading = createCompanyMutation.isPending || updateCompanyMutation.isPending || updatePendingCompanyMutation.isPending;
   const availableContacts = allContacts.filter((contact: Contact) => 
     !linkedContacts.some((linked: CompanyContactWithContact) => linked.contact.id === contact.id) &&
     !pendingContacts.some(pending => pending.contact.id === contact.id)
@@ -820,7 +856,7 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
                     disabled={isLoading}
                     data-testid="button-save-company"
                   >
-                    {isLoading ? 'Saving...' : (company ? 'Update Company' : 'Create Company')}
+                    {isLoading ? 'Saving...' : ((company?.id || pendingCompanyId) ? 'Update Company' : 'Create Company')}
                   </Button>
                 </div>
               </form>
