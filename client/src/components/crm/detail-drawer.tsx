@@ -30,6 +30,9 @@ import {
   Trash2,
   ExternalLink,
   FileText,
+  Users,
+  MapPin,
+  Anchor,
   Clock,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
@@ -90,6 +93,18 @@ export function DetailDrawer({
   const { data: relatedContact } = useQuery({
     queryKey: ['/api/contacts', entity?.primaryContactId || entity?.contactId],
     enabled: entityType === 'deal' && !!(entity?.primaryContactId || entity?.contactId),
+  });
+
+  // Fetch contacts for company
+  const { data: companyContacts = [] } = useQuery<any[]>({
+    queryKey: ['/api/contacts', { companyId: entityId }],
+    enabled: entityType === 'company' && !!entityId,
+  });
+
+  // Fetch properties linked to company
+  const { data: companyProperties = [] } = useQuery<any[]>({
+    queryKey: ['/api/companies', entityId, 'properties'],
+    enabled: entityType === 'company' && !!entityId,
   });
 
   // Update mutation
@@ -275,6 +290,12 @@ export function DetailDrawer({
             <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
             <TabsTrigger value="timeline" data-testid="tab-timeline">Timeline</TabsTrigger>
             <TabsTrigger value="files" data-testid="tab-files">Files</TabsTrigger>
+            {entityType === "company" && (
+              <>
+                <TabsTrigger value="contacts" data-testid="tab-contacts">Contacts</TabsTrigger>
+                <TabsTrigger value="properties" data-testid="tab-properties">Properties</TabsTrigger>
+              </>
+            )}
             <TabsTrigger value="custom" data-testid="tab-custom">Custom Fields</TabsTrigger>
           </TabsList>
 
@@ -1279,6 +1300,87 @@ export function DetailDrawer({
                   </>
                 )}
               </TabsContent>
+
+
+              {/* Contacts Tab - only for companies */}
+              {entityType === "company" && (
+                <TabsContent value="contacts" className="mt-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-medium">Contacts ({companyContacts.length})</h3>
+                    </div>
+                    {companyContacts.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p>No contacts linked to this company</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {companyContacts.map((contact: any) => (
+                          <div key={contact.id} className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors">
+                            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-700 dark:text-blue-300 font-medium">
+                              {(contact.firstName?.[0] || "").toUpperCase()}{(contact.lastName?.[0] || "").toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">{contact.firstName} {contact.lastName}</div>
+                              <div className="text-sm text-muted-foreground truncate">{contact.title || contact.email || "-"}</div>
+                            </div>
+                            {contact.phone && (
+                              <a href={`tel:${contact.phone}`} className="text-muted-foreground hover:text-foreground">
+                                <Phone className="h-4 w-4" />
+                              </a>
+                            )}
+                            {contact.email && (
+                              <a href={`mailto:${contact.email}`} className="text-muted-foreground hover:text-foreground">
+                                <Mail className="h-4 w-4" />
+                              </a>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+              )}
+
+              {/* Properties Tab - only for companies */}
+              {entityType === "company" && (
+                <TabsContent value="properties" className="mt-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-medium">Properties ({companyProperties.length})</h3>
+                    </div>
+                    {companyProperties.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Anchor className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p>No properties linked to this company</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {companyProperties.map((link: any) => {
+                          const property = link.property || link;
+                          return (
+                            <div key={property.id || link.id} className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors">
+                              <div className="w-10 h-10 rounded-lg bg-cyan-100 dark:bg-cyan-900 flex items-center justify-center text-cyan-700 dark:text-cyan-300">
+                                <Anchor className="h-5 w-5" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium truncate">{property.name || property.address || "Unnamed Property"}</div>
+                                <div className="text-sm text-muted-foreground truncate">
+                                  {property.city && property.state ? `${property.city}, ${property.state}` : property.status || "-"}
+                                </div>
+                              </div>
+                              {link.relationship && (
+                                <Badge variant="outline" className="ml-2">{link.relationship}</Badge>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+              )}
 
               <TabsContent value="custom" className="mt-4">
                 {entityId && entity && (
