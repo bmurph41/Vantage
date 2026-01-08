@@ -3401,6 +3401,17 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(pendingContacts.createdAt));
   }
 
+  async getPendingContacts(orgId: string, status?: string): Promise<PendingContact[]> {
+    const conditions = [eq(pendingContacts.orgId, orgId)];
+    if (status) {
+      conditions.push(eq(pendingContacts.status, status as any));
+    }
+    return await db.select()
+      .from(pendingContacts)
+      .where(and(...conditions))
+      .orderBy(desc(pendingContacts.createdAt));
+  }
+
   async createPendingContact(contact: InsertPendingContact): Promise<PendingContact> {
     const [created] = await db.insert(pendingContacts).values(contact).returning();
     return created;
@@ -5120,6 +5131,17 @@ export class DatabaseStorage implements IStorage {
   // ============================================================================
   // Pending Properties - Review queue for properties created from comps
   // ============================================================================
+
+  async getPendingProperties(orgId: string, status?: string): Promise<PendingProperty[]> {
+    const conditions = [eq(pendingProperties.orgId, orgId)];
+    if (status) {
+      conditions.push(eq(pendingProperties.status, status as any));
+    }
+    return await db.select()
+      .from(pendingProperties)
+      .where(and(...conditions))
+      .orderBy(desc(pendingProperties.createdAt));
+  }
 
   async updatePendingProperty(id: string, orgId: string, updates: Partial<PendingProperty>): Promise<PendingProperty | undefined> {
     // Only allow updating specific fields
