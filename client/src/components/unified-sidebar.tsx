@@ -4,12 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import { 
   BarChart3, Users, Building, Handshake, Calendar, 
   Bot, Bell, Mail, PieChart, TrendingUp, Settings,
-  LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight,
-  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock, Receipt, RefreshCcw, Percent, Search, Wrench, Ship, ShoppingCart, FileSpreadsheet
+  LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight, ChevronLeft,
+  FolderKanban, Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock, Receipt, RefreshCcw, Percent, Search, Wrench, Ship, ShoppingCart, FileSpreadsheet, PanelLeftClose, PanelLeft
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DetailDrawer } from "@/components/crm/detail-drawer";
 import { AppSettingsDialog } from "@/components/settings/AppSettingsDialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // CRM Navigation (Core CRM - Entity Management)
 const crmNav = [
@@ -142,6 +143,24 @@ export default function UnifiedSidebar() {
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
+  
+  // Sidebar collapse state with localStorage persistence
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('sidebar-collapsed');
+      return saved === 'true';
+    }
+    return false;
+  });
+  
+  // Persist collapse state to localStorage
+  useEffect(() => {
+    localStorage.setItem('sidebar-collapsed', String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
+  
+  const toggleSidebarCollapse = () => {
+    setSidebarCollapsed(!sidebarCollapsed);
+  };
   
   // Extract workspace ID from URL if viewing a specific workspace
   const workspaceMatch = location.match(/\/workspaces\/([^/?]+)/);
@@ -276,138 +295,228 @@ export default function UnifiedSidebar() {
     const isDisabled = item.disabled || false;
     
     if (isDisabled) {
-      return (
+      const content = (
         <div
-          className="flex items-center px-4 py-2.5 text-sm text-gray-400 cursor-not-allowed"
+          className={cn(
+            "flex items-center text-sm text-gray-400 cursor-not-allowed",
+            sidebarCollapsed ? "px-2 py-2.5 justify-center" : "px-4 py-2.5"
+          )}
           data-testid={`nav-${item.name.toLowerCase().replace(/ /g, '-')}`}
         >
-          <item.icon className="w-4 h-4 mr-3 flex-shrink-0" />
-          <span className="truncate">{item.name}</span>
+          <item.icon className={cn("w-4 h-4 flex-shrink-0", !sidebarCollapsed && "mr-3")} />
+          {!sidebarCollapsed && <span className="truncate">{item.name}</span>}
         </div>
       );
+      
+      if (sidebarCollapsed) {
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>{content}</TooltipTrigger>
+            <TooltipContent side="right" sideOffset={10}>
+              <p>{item.name}</p>
+            </TooltipContent>
+          </Tooltip>
+        );
+      }
+      return content;
     }
     
-    return (
+    const linkContent = (
       <Link 
         key={item.name} 
         href={item.href}
         onClick={handleNavClick}
         className={cn(
-          "flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors",
+          "flex items-center text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors",
+          sidebarCollapsed ? "px-2 py-2.5 justify-center" : "px-4 py-2.5",
           isActive && "bg-blue-50 border-r-3 border-blue-600 text-blue-600 font-medium"
         )}
         data-testid={`nav-${item.name.toLowerCase().replace(/ /g, '-')}`}
       >
-        <item.icon className={cn("w-4 h-4 mr-3 flex-shrink-0", isActive && "text-blue-600")} />
-        <span className="truncate">{item.name}</span>
-        {item.badge && (
-          <span className="ml-auto text-xs bg-blue-500 text-white rounded-full px-2 py-0.5" data-testid={`badge-${item.name.toLowerCase().replace(/ /g, '-')}`}>
-            {item.badge}
-          </span>
+        <item.icon className={cn("w-4 h-4 flex-shrink-0", !sidebarCollapsed && "mr-3", isActive && "text-blue-600")} />
+        {!sidebarCollapsed && (
+          <>
+            <span className="truncate">{item.name}</span>
+            {item.badge && (
+              <span className="ml-auto text-xs bg-blue-500 text-white rounded-full px-2 py-0.5" data-testid={`badge-${item.name.toLowerCase().replace(/ /g, '-')}`}>
+                {item.badge}
+              </span>
+            )}
+          </>
+        )}
+        {sidebarCollapsed && item.badge && (
+          <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full" />
         )}
       </Link>
     );
+    
+    if (sidebarCollapsed) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="relative">{linkContent}</div>
+          </TooltipTrigger>
+          <TooltipContent side="right" sideOffset={10}>
+            <p>{item.name}{item.badge ? ` (${item.badge})` : ''}</p>
+          </TooltipContent>
+        </Tooltip>
+      );
+    }
+    
+    return linkContent;
   };
 
   const SectionHeader = ({ 
     title, 
     expanded, 
     onToggle,
-    isActive = false
+    isActive = false,
+    icon
   }: { 
     title: string; 
     expanded: boolean; 
     onToggle: () => void;
     isActive?: boolean;
-  }) => (
-    <button
-      onClick={onToggle}
-      className={cn(
-        "flex items-center justify-between w-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-colors",
-        isActive 
-          ? "bg-blue-600 text-white hover:bg-blue-700" 
-          : "text-gray-500 hover:text-gray-700"
-      )}
-      data-testid={`toggle-${title.toLowerCase()}`}
-    >
-      <span>{title}</span>
-      {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-    </button>
-  );
+    icon?: any;
+  }) => {
+    const IconComponent = icon;
+    
+    if (sidebarCollapsed) {
+      // When collapsed, show just a divider line
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div 
+              className={cn(
+                "flex items-center justify-center py-2 mx-2 border-t border-gray-200 mt-2 cursor-pointer hover:bg-gray-50",
+                isActive && "bg-blue-50"
+              )}
+              onClick={onToggle}
+            >
+              {IconComponent && <IconComponent className={cn("w-4 h-4", isActive ? "text-blue-600" : "text-gray-400")} />}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="right" sideOffset={10}>
+            <p>{title}</p>
+          </TooltipContent>
+        </Tooltip>
+      );
+    }
+    
+    return (
+      <button
+        onClick={onToggle}
+        className={cn(
+          "flex items-center justify-between w-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-colors",
+          isActive 
+            ? "bg-blue-600 text-white hover:bg-blue-700" 
+            : "text-gray-500 hover:text-gray-700"
+        )}
+        data-testid={`toggle-${title.toLowerCase()}`}
+      >
+        <span>{title}</span>
+        {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+      </button>
+    );
+  };
 
   return (
-    <>
-      {/* Mobile Menu Button */}
-      <button
-        onClick={() => setMobileMenuOpen(true)}
-        className="fixed top-4 left-4 z-50 md:hidden bg-white p-2 rounded-lg shadow-lg hover:bg-gray-50 transition-colors"
-        data-testid="button-mobile-menu"
-        aria-label="Open menu"
-      >
-        <Menu className="w-6 h-6 text-gray-700" />
-      </button>
+    <TooltipProvider delayDuration={0}>
+      <>
+        {/* Mobile Menu Button */}
+        <button
+          onClick={() => setMobileMenuOpen(true)}
+          className="fixed top-4 left-4 z-50 md:hidden bg-white p-2 rounded-lg shadow-lg hover:bg-gray-50 transition-colors"
+          data-testid="button-mobile-menu"
+          aria-label="Open menu"
+        >
+          <Menu className="w-6 h-6 text-gray-700" />
+        </button>
 
-      {/* Mobile Overlay */}
-      {mobileMenuOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden transition-opacity"
-          onClick={() => setMobileMenuOpen(false)}
-          data-testid="mobile-menu-overlay"
-        />
-      )}
-
-      {/* Sidebar */}
-      <div 
-        className={cn(
-          "w-64 bg-white shadow-lg flex-shrink-0 flex flex-col h-screen",
-          "fixed md:static top-0 left-0 z-50",
-          "transition-transform duration-300 ease-in-out",
-          "md:translate-x-0",
-          mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        {/* Mobile Overlay */}
+        {mobileMenuOpen && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden transition-opacity"
+            onClick={() => setMobileMenuOpen(false)}
+            data-testid="mobile-menu-overlay"
+          />
         )}
-        data-testid="unified-sidebar"
-      >
-        {/* Header */}
-        <div className="py-4 border-b border-gray-200 flex-shrink-0 space-y-3">
-          <div className="flex items-center justify-between px-4">
-            <Link href="/" data-testid="sidebar-logo">
-              <div className="flex items-center space-x-2.5 cursor-pointer hover:opacity-80 transition-opacity">
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded flex items-center justify-center flex-shrink-0">
-                  <Anchor className="w-5 h-5 text-white" />
+
+        {/* Sidebar */}
+        <div 
+          className={cn(
+            "bg-white shadow-lg flex-shrink-0 flex flex-col h-screen",
+            "fixed md:static top-0 left-0 z-50",
+            "transition-all duration-300 ease-in-out",
+            "md:translate-x-0",
+            mobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
+            sidebarCollapsed ? "w-16" : "w-64"
+          )}
+          data-testid="unified-sidebar"
+        >
+          {/* Header */}
+          <div className={cn("py-4 border-b border-gray-200 flex-shrink-0", sidebarCollapsed ? "space-y-2" : "space-y-3")}>
+            <div className={cn("flex items-center", sidebarCollapsed ? "justify-center px-2" : "justify-between px-4")}>
+              <Link href="/" data-testid="sidebar-logo">
+                <div className="flex items-center space-x-2.5 cursor-pointer hover:opacity-80 transition-opacity">
+                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded flex items-center justify-center flex-shrink-0">
+                    <Anchor className="w-5 h-5 text-white" />
+                  </div>
+                  {!sidebarCollapsed && <h1 className="text-lg font-bold text-gray-900 truncate">MarinaMatch</h1>}
                 </div>
-                <h1 className="text-lg font-bold text-gray-900 truncate">MarinaMatch</h1>
+              </Link>
+              {/* Mobile Close Button */}
+              {!sidebarCollapsed && (
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="md:hidden text-gray-500 hover:text-gray-700 transition-colors"
+                  data-testid="button-close-mobile-menu"
+                  aria-label="Close menu"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+            {/* Command Palette Trigger */}
+            {!sidebarCollapsed ? (
+              <div className="w-full px-4">
+                <button
+                  onClick={() => {
+                    const event = new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true });
+                    document.dispatchEvent(event);
+                  }}
+                  className="flex items-center justify-between w-full px-3 py-2 text-sm text-gray-500 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-md transition-colors"
+                  data-testid="command-palette-trigger"
+                >
+                  <div className="flex items-center gap-2">
+                    <Search className="w-4 h-4" />
+                    <span>Search everything...</span>
+                  </div>
+                  <kbd className="pointer-events-none hidden md:inline-flex h-5 select-none items-center gap-0.5 rounded border border-gray-300 bg-white px-1.5 font-mono text-[10px] font-medium text-gray-500">
+                    <span className="text-xs">⌘</span>K
+                  </kbd>
+                </button>
               </div>
-            </Link>
-            {/* Mobile Close Button */}
-            <button
-              onClick={() => setMobileMenuOpen(false)}
-              className="md:hidden text-gray-500 hover:text-gray-700 transition-colors"
-              data-testid="button-close-mobile-menu"
-              aria-label="Close menu"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => {
+                      const event = new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true });
+                      document.dispatchEvent(event);
+                    }}
+                    className="flex items-center justify-center w-full py-2 text-gray-500 hover:bg-gray-100 transition-colors"
+                    data-testid="command-palette-trigger-collapsed"
+                  >
+                    <Search className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" sideOffset={10}>
+                  <p>Search (⌘K)</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
           </div>
-          {/* Command Palette Trigger */}
-          <div className="w-full px-4">
-            <button
-              onClick={() => {
-                const event = new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true });
-                document.dispatchEvent(event);
-              }}
-              className="flex items-center justify-between w-full px-3 py-2 text-sm text-gray-500 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-md transition-colors"
-              data-testid="command-palette-trigger"
-            >
-              <div className="flex items-center gap-2">
-                <Search className="w-4 h-4" />
-                <span>Search everything...</span>
-              </div>
-              <kbd className="pointer-events-none hidden md:inline-flex h-5 select-none items-center gap-0.5 rounded border border-gray-300 bg-white px-1.5 font-mono text-[10px] font-medium text-gray-500">
-                <span className="text-xs">⌘</span>K
-              </kbd>
-            </button>
-          </div>
-        </div>
       
       {/* Scrollable Navigation */}
       <nav className="flex-1 overflow-y-auto py-4" data-testid="sidebar-navigation">
@@ -654,31 +763,78 @@ export default function UnifiedSidebar() {
         )}
       </nav>
       
+      {/* Collapse Toggle Button */}
+      <div className={cn(
+        "border-t border-gray-200 bg-white flex-shrink-0 hidden md:flex",
+        sidebarCollapsed ? "justify-center p-2" : "justify-end px-4 py-2"
+      )}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={toggleSidebarCollapse}
+              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+              data-testid="button-toggle-sidebar"
+              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {sidebarCollapsed ? (
+                <PanelLeft className="w-4 h-4" />
+              ) : (
+                <PanelLeftClose className="w-4 h-4" />
+              )}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right" sideOffset={10}>
+            <p>{sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}</p>
+          </TooltipContent>
+        </Tooltip>
+      </div>
+      
       {/* User Profile - Fixed at bottom */}
-      <div className="p-4 border-t border-gray-200 bg-white flex-shrink-0" data-testid="user-profile">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-sm font-medium" data-testid="user-initials">U</span>
+      <div className={cn(
+        "border-t border-gray-200 bg-white flex-shrink-0",
+        sidebarCollapsed ? "p-2" : "p-4"
+      )} data-testid="user-profile">
+        {sidebarCollapsed ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => setSettingsDialogOpen(true)}
+                className="flex items-center justify-center w-full"
+              >
+                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0 hover:opacity-80 transition-opacity">
+                  <span className="text-white text-sm font-medium" data-testid="user-initials">U</span>
+                </div>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={10}>
+              <p>User Settings</p>
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+              <span className="text-white text-sm font-medium" data-testid="user-initials">U</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate" data-testid="user-name">User</p>
+              <p className="text-xs text-gray-500 truncate" data-testid="user-role">Admin</p>
+            </div>
+            <button 
+              className="text-gray-400 hover:text-gray-600 flex-shrink-0" 
+              data-testid="button-user-settings"
+              onClick={() => setSettingsDialogOpen(true)}
+            >
+              <Settings className="w-4 h-4" />
+            </button>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate" data-testid="user-name">User</p>
-            <p className="text-xs text-gray-500 truncate" data-testid="user-role">Admin</p>
-          </div>
-          <button 
-            className="text-gray-400 hover:text-gray-600 flex-shrink-0" 
-            data-testid="button-user-settings"
-            onClick={() => setSettingsDialogOpen(true)}
-          >
-            <Settings className="w-4 h-4" />
-          </button>
-        </div>
+        )}
       </div>
 
-      {/* App Settings Dialog */}
-      <AppSettingsDialog
-        open={settingsDialogOpen}
-        onOpenChange={setSettingsDialogOpen}
-      />
+        {/* App Settings Dialog */}
+        <AppSettingsDialog
+          open={settingsDialogOpen}
+          onOpenChange={setSettingsDialogOpen}
+        />
 
         {/* Global Detail Drawer for Search Results */}
         {selectedEntity && (
@@ -694,6 +850,7 @@ export default function UnifiedSidebar() {
           />
         )}
       </div>
-    </>
+      </>
+    </TooltipProvider>
   );
 }
