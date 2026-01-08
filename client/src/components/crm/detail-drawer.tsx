@@ -143,6 +143,30 @@ export function DetailDrawer({
     enabled: entityType === 'company' && !!entityId,
   });
 
+  // Fetch companies linked to contact
+  const { data: contactCompanies = [] } = useQuery<any[]>({
+    queryKey: ['/api/contacts', entityId, 'companies'],
+    queryFn: async () => {
+      if (!entityId) return [];
+      const response = await fetch(`/api/contacts/${entityId}/companies`);
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: entityType === 'contact' && !!entityId,
+  });
+
+  // Fetch properties linked to contact
+  const { data: contactProperties = [] } = useQuery<any[]>({
+    queryKey: ['/api/contacts', entityId, 'properties'],
+    queryFn: async () => {
+      if (!entityId) return [];
+      const response = await fetch(`/api/contacts/${entityId}/properties`);
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: entityType === 'contact' && !!entityId,
+  });
+
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -324,6 +348,12 @@ export function DetailDrawer({
         <Tabs defaultValue="overview" className="flex-1 flex flex-col">
           <TabsList className="mx-6 mt-4 mb-4 justify-start">
             <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
+            {entityType === "contact" && (
+              <>
+                <TabsTrigger value="company" data-testid="tab-company">Company</TabsTrigger>
+                <TabsTrigger value="contact-properties" data-testid="tab-contact-properties">Properties</TabsTrigger>
+              </>
+            )}
             <TabsTrigger value="timeline" data-testid="tab-timeline">Timeline</TabsTrigger>
             <TabsTrigger value="files" data-testid="tab-files">Files</TabsTrigger>
             {entityType === "company" && (
@@ -1421,6 +1451,84 @@ export function DetailDrawer({
                               </div>
                               {link.relationship && (
                                 <Badge variant="outline" className="ml-2">{link.relationship}</Badge>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+              )}
+
+              {/* Company Tab - only for contacts */}
+              {entityType === "contact" && (
+                <TabsContent value="company" className="mt-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-medium">Companies ({contactCompanies.length})</h3>
+                    </div>
+                    {contactCompanies.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Building2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p>No companies linked to this contact</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {contactCompanies.map((link: any) => {
+                          const company = link.company || link;
+                          return (
+                            <div key={link.id} className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors">
+                              <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900 flex items-center justify-center text-purple-700 dark:text-purple-300">
+                                <Building2 className="h-5 w-5" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium truncate">{company.name || "Unnamed Company"}</div>
+                                <div className="text-sm text-muted-foreground truncate">
+                                  {link.role ? `${link.role} • ` : ""}{company.industry || company.website || "-"}
+                                </div>
+                              </div>
+                              {link.isPrimary && (
+                                <Badge variant="default" className="ml-2">Primary</Badge>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+              )}
+
+              {/* Properties Tab - only for contacts */}
+              {entityType === "contact" && (
+                <TabsContent value="contact-properties" className="mt-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-medium">Properties ({contactProperties.length})</h3>
+                    </div>
+                    {contactProperties.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Anchor className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p>No properties linked to this contact</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {contactProperties.map((link: any) => {
+                          const property = link.property || link;
+                          return (
+                            <div key={link.id} className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors">
+                              <div className="w-10 h-10 rounded-lg bg-cyan-100 dark:bg-cyan-900 flex items-center justify-center text-cyan-700 dark:text-cyan-300">
+                                <Anchor className="h-5 w-5" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium truncate">{property.name || property.address || "Unnamed Property"}</div>
+                                <div className="text-sm text-muted-foreground truncate">
+                                  {property.city && property.state ? `${property.city}, ${property.state}` : property.status || "-"}
+                                </div>
+                              </div>
+                              {link.role && (
+                                <Badge variant="outline" className="ml-2">{link.role}</Badge>
                               )}
                             </div>
                           );
