@@ -395,7 +395,7 @@ export default function RateCompsIndex() {
 
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
             <div className="px-6 py-4 border-b border-border">
-              <div className="flex items-center justify-end mb-3">
+              <div className="flex items-center justify-start mb-3">
                 <Button
                   variant="ghost"
                   size="sm"

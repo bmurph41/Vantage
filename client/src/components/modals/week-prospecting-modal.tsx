@@ -1189,12 +1189,31 @@ export default function WeekProspectingModal({
   const selectedActivityType = ACTIVITY_TYPES.find(type => type.id === newActivity.type);
 
   const handleSave = async () => {
-    // TODO: Implement save functionality with backend API
-    toast({
-      title: "Week Updated",
-      description: "Your prospecting data has been saved",
-    });
-    onOpenChange(false);
+    const prospectingData = prepareDataForSave();
+    if (!prospectingData) {
+      toast({
+        title: "Error",
+        description: "Failed to prepare data for saving.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      await autosaveMutation.mutateAsync(prospectingData);
+      toast({
+        title: "Week Updated",
+        description: "Your prospecting data has been saved",
+      });
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Save failed:', error);
+      toast({
+        title: "Save Failed",
+        description: "Your changes couldn't be saved. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const getActivityIcon = (type: string) => {
