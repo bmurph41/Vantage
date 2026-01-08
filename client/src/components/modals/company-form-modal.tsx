@@ -125,7 +125,6 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
       zipCode: true,
     }).extend({
       name: z.string().min(1, "Company name is required"),
-      domain: z.string().optional(),
       industry: z.string().optional(),
       size: z.string().optional(),
       address: z.string().optional(),
@@ -135,7 +134,6 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
     })),
     defaultValues: {
       name: "",
-      domain: "",
       industry: "",
       size: "",
       address: "",
@@ -164,7 +162,6 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
     if (company) {
       form.reset({
         name: company.name,
-        domain: company.domain || "",
         industry: company.industry || "",
         size: company.size || "",
         phone: company.phone || "",
@@ -659,35 +656,19 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                   )}
                 />
 
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="domain"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Domain</FormLabel>
-                        <FormControl>
-                          <Input placeholder="acme.com" {...field} data-testid="input-domain" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="website"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Website</FormLabel>
-                        <FormControl>
-                          <Input placeholder="https://acme.com" {...field} data-testid="input-website" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                <FormField
+                  control={form.control}
+                  name="website"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Website</FormLabel>
+                      <FormControl>
+                        <Input placeholder="https://acme.com" {...field} data-testid="input-website" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <div className="grid grid-cols-2 gap-4">
                   <FormField

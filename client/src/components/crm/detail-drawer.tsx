@@ -272,7 +272,7 @@ export function DetailDrawer({
       case "contact":
         return entity.title || entity.email || "";
       case "company":
-        return entity.domain || formatRole(entity.industry) || "";
+        return entity.website || formatRole(entity.industry) || "";
       case "deal":
         return entity.amount ? `$${entity.amount.toLocaleString()}` : "";
       case "property":
@@ -758,15 +758,15 @@ export function DetailDrawer({
                           <Label>Website</Label>
                           {isEditing ? (
                             <Input
-                              value={editData.domain || ""}
+                              value={editData.website || ""}
                               onChange={(e) =>
-                                setEditData({ ...editData, domain: e.target.value })
+                                setEditData({ ...editData, website: e.target.value })
                               }
-                              data-testid="input-domain"
+                              data-testid="input-website"
                             />
                           ) : (
-                            <div className="text-sm" data-testid="text-domain">
-                              {entity?.domain || "-"}
+                            <div className="text-sm" data-testid="text-website">
+                              {entity?.website || "-"}
                             </div>
                           )}
                         </div>
