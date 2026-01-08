@@ -102,7 +102,7 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
     resolver: zodResolver(insertCompanySchema.extend({
       name: insertCompanySchema.shape.name.min(1, "Company name is required"),
       domain: insertCompanySchema.shape.domain.optional(),
-      industry: insertCompanySchema.shape.industry.min(1, "Company type is required"),
+      industry: insertCompanySchema.shape.industry.optional(),
       size: insertCompanySchema.shape.size.optional(),
       address: insertCompanySchema.shape.address.optional(),
       phone: insertCompanySchema.shape.phone.optional(),

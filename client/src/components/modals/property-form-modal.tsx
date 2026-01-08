@@ -177,7 +177,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
   const form = useForm({
     resolver: zodResolver(insertPropertySchema.extend({
       title: z.string().min(1, "Property name is required"),
-      address: z.string().min(1, "Address is required"),
+      address: z.string().optional(),
       description: z.string().optional(),
     })),
     defaultValues: {

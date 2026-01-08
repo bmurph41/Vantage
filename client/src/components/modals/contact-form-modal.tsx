@@ -225,23 +225,10 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
 
   const errors = useMemo(() => {
     const e: Record<string, string> = {};
+    // Only first name is truly required - all other fields are optional
     if (!firstName.trim()) e.firstName = "First name is required";
-    if (!lastName.trim()) e.lastName = "Last name is required";
-    if (!email.trim()) e.email = "Email is required";
-    // Validate phones array - at least one phone with a number
-    const hasValidPhone = phones.some(p => p.number && p.number.trim().length > 0);
-    if (!hasValidPhone) e.phones = "At least one phone number is required";
-    if (!company.trim()) e.company = "Company is required";
-    if (!role.trim()) e.role = "Role/Title is required";
-    if (!contactTag) e.contactTag = "Contact tag is required";
-    if (contactTag === 'lead' && !leadStatus) e.leadStatus = "Lead status is required for leads";
-    // Address fields are required
-    if (!address.trim()) e.address = "Street address is required";
-    if (!city.trim()) e.city = "City is required";
-    if (!state.trim()) e.state = "State is required";
-    if (!zipCode.trim()) e.zipCode = "Zip code is required";
     return e;
-  }, [firstName, lastName, email, phones, company, role, contactTag, leadStatus, address, city, state, zipCode]);
+  }, [firstName]);
 
   const createContactMutation = useMutation({
     mutationFn: async (data: any) => {
