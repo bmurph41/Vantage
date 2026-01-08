@@ -72,6 +72,28 @@ export function DetailDrawer({
     return `${type}s`;
   };
 
+  // Helper to format role/industry enum values (marina_operator -> Marina Operator)
+  const formatRole = (role: string | null | undefined) => {
+    if (!role) return "-";
+    return role
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  };
+
+  // Get first contact's phone for company display
+  const getCompanyPhone = () => {
+    if (entity?.phone) return entity.phone;
+    if (companyContacts && companyContacts.length > 0) {
+      const firstContact = companyContacts[0];
+      if (firstContact?.phone) {
+        const contactName = [firstContact.firstName, firstContact.lastName].filter(Boolean).join(' ');
+        return `${firstContact.phone} (${contactName})`;
+      }
+    }
+    return "-";
+  };
+
   // Fetch entity data
   const { data: entity, isLoading } = useQuery({
     queryKey: [`/api/${getApiPath(entityType)}`, entityId],
@@ -216,7 +238,7 @@ export function DetailDrawer({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-2xl p-0 flex flex-col">
+      <SheetContent className="w-full sm:max-w-2xl p-0 flex flex-col h-full overflow-hidden">
         <SheetHeader className="px-6 py-4 border-b">
           <div className="flex items-start justify-between">
             <div className="flex-1">
@@ -312,7 +334,7 @@ export function DetailDrawer({
             <TabsTrigger value="custom" data-testid="tab-custom">Custom Fields</TabsTrigger>
           </TabsList>
 
-          <ScrollArea className="flex-1">
+          <ScrollArea className="flex-1 h-0 min-h-0">
             <div className="px-6 pb-6">
               <TabsContent value="overview" className="mt-4 space-y-4">
                 {isLoading ? (
@@ -679,7 +701,7 @@ export function DetailDrawer({
                         </div>
 
                         <div className="space-y-2">
-                          <Label>Domain</Label>
+                          <Label>Website</Label>
                           {isEditing ? (
                             <Input
                               value={editData.domain || ""}
@@ -696,7 +718,7 @@ export function DetailDrawer({
                         </div>
 
                         <div className="space-y-2">
-                          <Label>Industry</Label>
+                          <Label>Role</Label>
                           {isEditing ? (
                             <Input
                               value={editData.industry || ""}
@@ -707,7 +729,7 @@ export function DetailDrawer({
                             />
                           ) : (
                             <div className="text-sm" data-testid="text-industry">
-                              {entity?.industry || "-"}
+                              {formatRole(entity?.industry)}
                             </div>
                           )}
                         </div>
@@ -724,7 +746,7 @@ export function DetailDrawer({
                             />
                           ) : (
                             <div className="text-sm" data-testid="text-phone">
-                              {entity?.phone || "-"}
+                              {getCompanyPhone()}
                             </div>
                           )}
                         </div>
