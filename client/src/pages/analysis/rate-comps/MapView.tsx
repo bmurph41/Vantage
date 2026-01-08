@@ -1,20 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CompsMap, SALE_COMPS_CONFIG } from '@/components/comps-map';
+import { CompsMap, RATE_COMPS_CONFIG } from '@/components/comps-map';
 import type { MapFilters, MapItem } from '@/components/comps-map/types';
-import SalesCompsHeader from '@/components/salescomps/sales-comps/SalesCompsHeader';
-import type { SalesComp } from '@shared/schema';
+import RateCompsHeader from '@/components/ratecomps/rate-comps/RateCompsHeader';
+import type { RateComp } from '@shared/schema';
 
-export default function SalesCompsMapView() {
+export default function RateCompsMapView() {
   const [filters, setFilters] = useState<MapFilters>(() => {
     const params = new URLSearchParams(window.location.search);
     return {
       states: params.get('states')?.split(',').filter(Boolean) || undefined,
       radius: params.get('radius') ? Number(params.get('radius')) : undefined,
-      minPrice: params.get('minPrice') ? Number(params.get('minPrice')) : undefined,
-      maxPrice: params.get('maxPrice') ? Number(params.get('maxPrice')) : undefined,
-      minYear: params.get('minYear') ? Number(params.get('minYear')) : undefined,
-      maxYear: params.get('maxYear') ? Number(params.get('maxYear')) : undefined,
       waterTypes: params.get('waterTypes')?.split(',').filter(Boolean) || undefined,
       regions: params.get('regions')?.split(',').filter(Boolean) || undefined,
       minWetSlips: params.get('minWetSlips') ? Number(params.get('minWetSlips')) : undefined,
@@ -28,10 +24,6 @@ export default function SalesCompsMapView() {
     const params = new URLSearchParams();
     if (filters.states?.length) params.set('states', filters.states.join(','));
     if (filters.radius) params.set('radius', String(filters.radius));
-    if (filters.minPrice) params.set('minPrice', String(filters.minPrice));
-    if (filters.maxPrice) params.set('maxPrice', String(filters.maxPrice));
-    if (filters.minYear) params.set('minYear', String(filters.minYear));
-    if (filters.maxYear) params.set('maxYear', String(filters.maxYear));
     if (filters.waterTypes?.length) params.set('waterTypes', filters.waterTypes.join(','));
     if (filters.regions?.length) params.set('regions', filters.regions.join(','));
     if (filters.minWetSlips) params.set('minWetSlips', String(filters.minWetSlips));
@@ -47,15 +39,11 @@ export default function SalesCompsMapView() {
     window.history.replaceState(null, '', newUrl);
   }, [filters]);
 
-  const { data: salesComps = [], isLoading } = useQuery<SalesComp[]>({
-    queryKey: ['/api/sales-comps', 'map', filters],
+  const { data: rateComps = [], isLoading } = useQuery<RateComp[]>({
+    queryKey: ['/api/rate-comps', 'map', filters],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (filters.states?.length) params.set('states', filters.states.join(','));
-      if (filters.minPrice) params.set('priceMin', String(filters.minPrice));
-      if (filters.maxPrice) params.set('priceMax', String(filters.maxPrice));
-      if (filters.minYear) params.set('saleYearMin', String(filters.minYear));
-      if (filters.maxYear) params.set('saleYearMax', String(filters.maxYear));
       if (filters.waterTypes?.length) params.set('waterTypes', filters.waterTypes.join(','));
       if (filters.regions?.length) params.set('regions', filters.regions.join(','));
       if (filters.minWetSlips) params.set('wetSlipsMin', String(filters.minWetSlips));
@@ -64,23 +52,23 @@ export default function SalesCompsMapView() {
       if (filters.maxDryRacks) params.set('dryRacksMax', String(filters.maxDryRacks));
       params.set('limit', '500');
 
-      const response = await fetch(`/api/sales-comps?${params.toString()}`, {
+      const response = await fetch(`/api/rate-comps?${params.toString()}`, {
         credentials: 'include',
       });
 
-      if (!response.ok) throw new Error('Failed to fetch sales comps');
+      if (!response.ok) throw new Error('Failed to fetch rate comps');
       const data = await response.json();
       return data.comps || [];
     },
     staleTime: 30000,
   });
 
-  const mapItems: MapItem[] = salesComps
+  const mapItems: MapItem[] = rateComps
     .filter(comp => comp.lat && comp.lng)
     .map(comp => ({
       id: comp.id,
-      module: 'sale_comps' as const,
-      layerType: 'sale_comp' as const,
+      module: 'rate_comps' as const,
+      layerType: 'rate_comp' as const,
       title: comp.marina,
       lat: Number(comp.lat),
       lng: Number(comp.lng),
@@ -89,32 +77,28 @@ export default function SalesCompsMapView() {
       state: comp.state || undefined,
       metrics: {
         marina: comp.marina,
-        salePrice: comp.salePrice,
-        capRate: comp.capRate,
-        noi: comp.noi,
         wetSlips: comp.wetSlips,
         dryRacks: comp.dryRacks,
-        saleYear: comp.saleYear,
-        saleMonth: comp.saleMonth,
         city: comp.city,
         state: comp.state,
         region: comp.region,
-        waterType: comp.waterType || comp.coastalType,
-        acres: comp.acres,
-        listPrice: comp.listPrice,
+        waterType: comp.waterType,
+        rateType: comp.rateType,
+        website: comp.website,
+        source: comp.source,
       },
     }));
 
   return (
-    <div className="flex flex-col h-screen" data-testid="sales-comps-map-page">
-      <SalesCompsHeader
-        total={salesComps.length}
-        hasData={salesComps.length > 0}
+    <div className="flex flex-col h-screen" data-testid="rate-comps-map-page">
+      <RateCompsHeader
+        total={rateComps.length}
+        hasData={rateComps.length > 0}
       />
 
       <div className="flex-1 overflow-hidden">
         <CompsMap
-          config={SALE_COMPS_CONFIG}
+          config={RATE_COMPS_CONFIG}
           items={mapItems}
           isLoading={isLoading}
           filters={filters}

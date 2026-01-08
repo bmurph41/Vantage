@@ -127,6 +127,7 @@ const RateCompsIndex = lazy(() => import("@/pages/analysis/rate-comps/Index"));
 const RateCompsAnalytics = lazy(() => import("@/pages/analysis/rate-comps/Analytics"));
 const RateCompsDetail = lazy(() => import("@/pages/analysis/rate-comps/Detail"));
 const RateCompsUpload = lazy(() => import("@/pages/analysis/rate-comps/Upload"));
+const RateCompsMapView = lazy(() => import("@/pages/analysis/rate-comps/MapView"));
 const RateCompsCompare = lazy(() => import("@/pages/analysis/rate-comps/Compare"));
 const RateCompsBulkEdit = lazy(() => import("@/pages/analysis/rate-comps/BulkEdit"));
 const RateCompsColumnManager = lazy(() => import("@/pages/analysis/rate-comps/ColumnManager"));
@@ -1075,6 +1076,13 @@ function Router() {
         {(params) => (
           <UnifiedLayout>
             <ScProjectsReport {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/rate-comps/map">
+        {() => (
+          <UnifiedLayout>
+            <RateCompsMapView />
           </UnifiedLayout>
         )}
       </Route>
