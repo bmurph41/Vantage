@@ -5406,6 +5406,17 @@ export class DatabaseStorage implements IStorage {
           eq(pendingCompanies.status, 'pending' as any)
         ));
 
+      // Auto-link creating contact to the new company if sourceMetadata contains creatingContactId
+      const sourceMetadata = pending.sourceMetadata as { creatingContactId?: string; creatingContactRole?: string } | null;
+      if (sourceMetadata?.creatingContactId) {
+        await tx.insert(crmContactCompanies).values({
+          contactId: sourceMetadata.creatingContactId,
+          companyId: newCompany.id,
+          role: sourceMetadata.creatingContactRole || null,
+          isPrimary: true,
+        }).onConflictDoNothing();
+      }
+
       return newCompany;
     });
   }
@@ -5437,6 +5448,7 @@ export class DatabaseStorage implements IStorage {
     if (updates.state !== undefined) allowedUpdates.state = updates.state;
     if (updates.zipCode !== undefined) allowedUpdates.zipCode = updates.zipCode;
     if (updates.industry !== undefined) allowedUpdates.industry = updates.industry;
+    if (updates.sourceMetadata !== undefined) allowedUpdates.sourceMetadata = updates.sourceMetadata;
 
     if (Object.keys(allowedUpdates).length === 0) {
       return this.getPendingCompany(id, orgId);
@@ -5488,6 +5500,17 @@ export class DatabaseStorage implements IStorage {
           eq(pendingCompanies.id, pendingId),
           eq(pendingCompanies.status, 'pending' as any)
         ));
+
+      // Auto-link creating contact to the existing company if sourceMetadata contains creatingContactId
+      const sourceMetadata = pending.sourceMetadata as { creatingContactId?: string; creatingContactRole?: string } | null;
+      if (sourceMetadata?.creatingContactId) {
+        await tx.insert(crmContactCompanies).values({
+          contactId: sourceMetadata.creatingContactId,
+          companyId: companyId,
+          role: sourceMetadata.creatingContactRole || null,
+          isPrimary: true,
+        }).onConflictDoNothing();
+      }
 
       return existingCompany;
     });

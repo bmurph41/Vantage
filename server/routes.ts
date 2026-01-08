@@ -9177,6 +9177,13 @@ Current context: Project ${req.params.projectId}`;
         await storage.linkContactToCompany(contact.id, linkedCompanyId, contactData.role || null, true);
       }
       
+      // If a pending company was created, update it with the creating contact's ID for auto-linking when accepted
+      if (pendingCompanyId) {
+        await storage.updatePendingCompany(pendingCompanyId, req.user.orgId, {
+          sourceMetadata: { creatingContactId: contact.id, creatingContactRole: contactData.role || null }
+        } as any);
+      }
+      
       res.json({ ...contact, linkedCompanyId, pendingCompanyId, exactMatchFound: !companyId && linkedCompanyId !== null });
     } catch (error: any) {
       console.error("Failed to create contact:", error);
