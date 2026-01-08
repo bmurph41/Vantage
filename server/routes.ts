@@ -7371,6 +7371,84 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // CRM Notes - Cross-entity note management
+  app.get("/api/crm/notes/:entityType/:entityId", async (req: any, res) => {
+    try {
+      const { entityType, entityId } = req.params;
+      const notes = await storage.getCrmNotesForEntity(entityType, entityId);
+      res.json(notes);
+    } catch (error: any) {
+      console.error("Failed to get notes:", error);
+      res.status(500).json({ error: "Failed to retrieve notes" });
+    }
+  });
+
+  app.post("/api/crm/notes", async (req: any, res) => {
+    try {
+      const { content, entityType, entityId, isPinned, linkedCompanyId } = req.body;
+      
+      // Create note for primary entity
+      const note = await storage.createCrmNote({
+        content,
+        entityType,
+        entityId,
+        isPinned: isPinned || false,
+        createdById: req.user.id,
+        ownerId: req.user.id,
+      });
+      
+      // If a linked company is provided, also create note for company
+      if (linkedCompanyId && entityType === "contact") {
+        await storage.createCrmNote({
+          content,
+          entityType: "company",
+          entityId: linkedCompanyId,
+          isPinned: isPinned || false,
+          createdById: req.user.id,
+          ownerId: req.user.id,
+        });
+      }
+      
+      // If entity is company, also create note for linked contacts
+      if (entityType === "company" && req.body.linkedContactIds?.length) {
+        for (const contactId of req.body.linkedContactIds) {
+          await storage.createCrmNote({
+            content,
+            entityType: "contact",
+            entityId: contactId,
+            isPinned: isPinned || false,
+            createdById: req.user.id,
+            ownerId: req.user.id,
+          });
+        }
+      }
+      
+      res.json(note);
+    } catch (error: any) {
+      console.error("Failed to create note:", error);
+      res.status(500).json({ error: "Failed to create note" });
+    }
+  });
+
+  app.put("/api/crm/notes/:id", async (req: any, res) => {
+    try {
+      const note = await storage.updateCrmNote(req.params.id, req.body);
+      res.json(note);
+    } catch (error: any) {
+      console.error("Failed to update note:", error);
+      res.status(500).json({ error: "Failed to update note" });
+    }
+  });
+
+  app.delete("/api/crm/notes/:id", async (req: any, res) => {
+    try {
+      await storage.deleteCrmNote(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Failed to delete note:", error);
+      res.status(500).json({ error: "Failed to delete note" });
+    }
+  });
   // CRM Tasks
   app.get("/api/crm/tasks", async (req: any, res) => {
     try {

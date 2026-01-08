@@ -4,7 +4,7 @@ import {
   contacts, projectContacts, projectPendingContacts, notificationSubscriptions, notificationsLog, calendarEvents,
   documentRequirements, projectIntegrations, taskDependencies, taskFiles, userEmails, calendarGuests,
   cddDocuments, docPages, kpis, findings, recommendations, vectorChunks, cddReports, comps, checklistItems,
-  crmDeals, crmLeads, crmContacts, crmCompanies, crmProperties, crmContactProperties, crmCompanyProperties, crmContactCompanies, pendingProperties, pendingContacts, pendingCompanies, crmPipelines, crmPipelineStages, crmActivities, crmDealContacts, crmDealCompanies,
+  crmDeals, crmLeads, crmContacts, crmCompanies, crmProperties, crmContactProperties, crmCompanyProperties, crmContactCompanies, pendingProperties, pendingContacts, pendingCompanies, crmPipelines, crmPipelineStages, crmActivities, crmNotes, crmDealContacts, crmDealCompanies,
   crmImportJobs, crmImportedRecords, crmProspectingEntries, crmProspectingUserSettings, crmProspectingGoalTemplates,
   crmEmailSequences, crmEmailTemplates, crmEmailSequenceSteps, crmEmailSequenceEnrollments, crmEmailSequenceStepExecutions,
   calendarSettings,
@@ -22,7 +22,7 @@ import {
   type TimelineNote, type ProjectShare, type Risk, type DDContact, type ProjectContact, type ProjectPendingContact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
   type DocumentRequirement, type ProjectIntegration, type TaskDependency, type TaskFile, type UserEmail, type CalendarGuest,
   type CddDocument, type DocPage, type Kpi, type Finding, type Recommendation, type VectorChunk, type CddReport, type Comp, type ChecklistItem,
-  type CrmDeal, type CrmLead, type CrmContact, type CrmCompany, type Property, type PendingProperty, type PendingContact, type PendingCompany, type CrmPipeline, type CrmPipelineStage, type CrmActivity,
+  type CrmDeal, type CrmLead, type CrmContact, type CrmCompany, type Property, type PendingProperty, type PendingContact, type PendingCompany, type CrmPipeline, type CrmPipelineStage, type CrmActivity, type CrmNote, type InsertCrmNote,
   type CrmImportJob, type CrmImportedRecord, type ProspectingEntry, type CrmProspectingUserSettings, type CrmProspectingGoalTemplate,
   type EmailSequence, type EmailTemplate, type EmailSequenceStep, type EmailSequenceEnrollment, type EmailSequenceStepExecution,
   type CalendarSettings,
@@ -455,6 +455,11 @@ export interface IStorage {
   createCrmActivity(activity: InsertCrmActivity): Promise<CrmActivity>;
   updateCrmActivity(id: string, updates: Partial<InsertCrmActivity>): Promise<CrmActivity>;
   deleteCrmActivity(id: string): Promise<void>;
+  // CRM - Notes
+  getCrmNotesForEntity(entityType: string, entityId: string): Promise<CrmNote[]>;
+  createCrmNote(note: InsertCrmNote): Promise<CrmNote>;
+  updateCrmNote(id: string, updates: Partial<InsertCrmNote>): Promise<CrmNote>;
+  deleteCrmNote(id: string): Promise<void>;
 
   // CRM - Import Jobs
   getImportJob(id: string): Promise<CrmImportJob | undefined>;
@@ -3749,6 +3754,33 @@ export class DatabaseStorage implements IStorage {
   }
 
   // CRM - Import Jobs
+  // CRM - Notes
+  async getCrmNotesForEntity(entityType: string, entityId: string): Promise<CrmNote[]> {
+    return db.select().from(crmNotes)
+      .where(and(
+        eq(crmNotes.entityType, entityType),
+        eq(crmNotes.entityId, entityId)
+      ))
+      .orderBy(desc(crmNotes.createdAt));
+  }
+
+  async createCrmNote(note: InsertCrmNote): Promise<CrmNote> {
+    const [created] = await db.insert(crmNotes).values(note).returning();
+    return created;
+  }
+
+  async updateCrmNote(id: string, updates: Partial<InsertCrmNote>): Promise<CrmNote> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    const [updated] = await db.update(crmNotes)
+      .set(updateData)
+      .where(eq(crmNotes.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCrmNote(id: string): Promise<void> {
+    await db.delete(crmNotes).where(eq(crmNotes.id, id));
+  }
   async getImportJob(id: string): Promise<CrmImportJob | undefined> {
     const [job] = await db.select().from(crmImportJobs).where(eq(crmImportJobs.id, id));
     return job || undefined;

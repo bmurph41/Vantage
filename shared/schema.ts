@@ -18009,3 +18009,13 @@ export const insertCrmNotificationPreferencesSchema = createInsertSchema(crmNoti
 });
 export type CrmNotificationPreference = typeof crmNotificationPreferences.$inferSelect;
 export type InsertCrmNotificationPreference = z.infer<typeof insertCrmNotificationPreferencesSchema>;
+
+// CRM Note types
+export type CrmNote = typeof crmNotes.$inferSelect;
+export const insertCrmNoteSchema = createInsertSchema(crmNotes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCrmNote = z.infer<typeof insertCrmNoteSchema>;
+

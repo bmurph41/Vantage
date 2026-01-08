@@ -44,6 +44,7 @@ import { FileList } from "./file-list";
 import UnifiedTimeline from "./unified-timeline";
 import { RelationshipStats } from "./relationship-stats";
 import { CustomFieldsEditor } from "./custom-fields-editor";
+import { NoteModal, TaskModal, CallModal, EmailRedirectModal } from "./action-modals";
 
 interface DetailDrawerProps {
   open: boolean;
@@ -61,6 +62,10 @@ export function DetailDrawer({
   onDelete,
 }: DetailDrawerProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [noteModalOpen, setNoteModalOpen] = useState(false);
+  const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const [callModalOpen, setCallModalOpen] = useState(false);
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [editData, setEditData] = useState<any>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -82,6 +87,24 @@ export function DetailDrawer({
   };
 
   // Get first contact's phone for company display
+  // Helper to get entity display name
+  const getEntityName = () => {
+    if (!entity) return "";
+    if (entityType === "contact") {
+      return [entity.firstName, entity.lastName].filter(Boolean).join(" ") || "Contact";
+    }
+    if (entityType === "company") {
+      return entity.name || "Company";
+    }
+    if (entityType === "deal") {
+      return entity.name || "Deal";
+    }
+    if (entityType === "property") {
+      return entity.name || "Property";
+    }
+    return "Entity";
+  };
+
   const getCompanyPhone = () => {
     if (entity?.phone) return entity.phone;
     if (companyContacts && companyContacts.length > 0) {
@@ -326,19 +349,19 @@ export function DetailDrawer({
 
           {/* Quick Actions */}
           <div className="flex gap-2 mt-4">
-            <Button size="sm" variant="outline" data-testid="button-email">
+            <Button size="sm" variant="outline" data-testid="button-email" onClick={() => setEmailModalOpen(true)}>
               <Mail className="h-4 w-4 mr-1" />
               Email
             </Button>
-            <Button size="sm" variant="outline" data-testid="button-call">
+            <Button size="sm" variant="outline" data-testid="button-call" onClick={() => setCallModalOpen(true)}>
               <Phone className="h-4 w-4 mr-1" />
               Call
             </Button>
-            <Button size="sm" variant="outline" data-testid="button-note">
+            <Button size="sm" variant="outline" data-testid="button-note" onClick={() => setNoteModalOpen(true)}>
               <StickyNote className="h-4 w-4 mr-1" />
               Note
             </Button>
-            <Button size="sm" variant="outline" data-testid="button-task">
+            <Button size="sm" variant="outline" data-testid="button-task" onClick={() => setTaskModalOpen(true)}>
               <CheckSquare className="h-4 w-4 mr-1" />
               Task
             </Button>
@@ -1780,6 +1803,45 @@ export function DetailDrawer({
           </ScrollArea>
         </Tabs>
       </SheetContent>
+      {/* Action Modals */}
+      {entityId && entity && (
+        <>
+          <NoteModal
+            open={noteModalOpen}
+            onOpenChange={setNoteModalOpen}
+            entityType={entityType}
+            entityId={entityId}
+            entityName={getEntityName()}
+            linkedCompanyId={entityType === "contact" ? contactCompanies?.[0]?.company?.id : undefined}
+            linkedCompanyName={entityType === "contact" ? contactCompanies?.[0]?.company?.name : undefined}
+          />
+          <TaskModal
+            open={taskModalOpen}
+            onOpenChange={setTaskModalOpen}
+            entityType={entityType}
+            entityId={entityId}
+            entityName={getEntityName()}
+            linkedCompanyId={entityType === "contact" ? contactCompanies?.[0]?.company?.id : undefined}
+            linkedCompanyName={entityType === "contact" ? contactCompanies?.[0]?.company?.name : undefined}
+          />
+          <CallModal
+            open={callModalOpen}
+            onOpenChange={setCallModalOpen}
+            entityType={entityType}
+            entityId={entityId}
+            entityName={getEntityName()}
+            phone={entity?.phone || entity?.phones?.[0]?.number}
+          />
+          <EmailRedirectModal
+            open={emailModalOpen}
+            onOpenChange={setEmailModalOpen}
+            entityType={entityType}
+            entityId={entityId}
+            entityName={getEntityName()}
+            email={entity?.email}
+          />
+        </>
+      )}
     </Sheet>
   );
 }
