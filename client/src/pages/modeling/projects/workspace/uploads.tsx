@@ -16,8 +16,11 @@ import {
   Eye,
   Trash2,
   Brain,
-  ArrowRight
+  ArrowRight,
+  BookKey,
+  Settings
 } from 'lucide-react';
+import { Link } from 'wouter';
 import { UploadDropzone } from '@/pages/modeling/doc-intel/UploadDropzone';
 import type { DocIntelUpload } from '@shared/schema';
 
@@ -99,11 +102,19 @@ export default function WorkspaceUploads({ projectId }: WorkspaceUploadsProps) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold">Document Uploads</h2>
-        <p className="text-sm text-muted-foreground">
-          Upload P&L statements and rent rolls for AI-powered parsing and categorization
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-xl font-semibold">Document Uploads</h2>
+          <p className="text-sm text-muted-foreground">
+            Upload P&L statements and rent rolls for AI-powered parsing and categorization
+          </p>
+        </div>
+        <Link href="/modeling/settings">
+          <Button variant="outline" size="sm" className="gap-2" data-testid="button-keyword-bank">
+            <BookKey className="h-4 w-4" />
+            Keyword Bank
+          </Button>
+        </Link>
       </div>
 
       <Card>

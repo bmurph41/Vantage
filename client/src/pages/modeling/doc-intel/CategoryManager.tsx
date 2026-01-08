@@ -151,6 +151,14 @@ export function CategoryManager() {
 
   const hierarchy = getCategoriesHierarchy();
 
+  const getColumnCategories = (types: CategoryType[]) => {
+    return hierarchy.filter(cat => types.includes(cat.categoryType as CategoryType));
+  };
+
+  const revenueCategories = getColumnCategories(["revenue", "other_income"]);
+  const cogsCategories = getColumnCategories(["cogs"]);
+  const expenseCategories = getColumnCategories(["opex", "payroll", "other_expense"]);
+
   if (isLoading) {
     return (
       <Card>
@@ -161,12 +169,129 @@ export function CategoryManager() {
     );
   }
 
+  const renderCategoryColumn = (columnCategories: CategoryWithChildren[], columnTitle: string, columnColor: string, defaultType: CategoryType) => (
+    <div className="space-y-3">
+      <div className={`flex items-center justify-between p-2 rounded-lg ${columnColor}`}>
+        <h3 className="font-semibold text-sm">{columnTitle}</h3>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-6 w-6"
+          onClick={() => openCreateDialog(undefined, defaultType)}
+          data-testid={`button-add-${defaultType}`}
+        >
+          <Plus className="h-3 w-3" />
+        </Button>
+      </div>
+      {columnCategories.length === 0 ? (
+        <div className="text-center py-4 text-muted-foreground text-sm border rounded-lg border-dashed">
+          No categories
+        </div>
+      ) : (
+        columnCategories.map((parent) => (
+          <Collapsible
+            key={parent.id}
+            open={expandedCategories.has(parent.id)}
+            onOpenChange={() => toggleExpanded(parent.id)}
+          >
+            <div className="border rounded-lg">
+              <div className="flex items-center justify-between p-2 hover:bg-muted/50">
+                <CollapsibleTrigger asChild>
+                  <div className="flex items-center gap-1 cursor-pointer flex-1 min-w-0">
+                    {parent.children.length > 0 ? (
+                      expandedCategories.has(parent.id) ? (
+                        <ChevronDown className="h-3 w-3 flex-shrink-0" />
+                      ) : (
+                        <ChevronRight className="h-3 w-3 flex-shrink-0" />
+                      )
+                    ) : (
+                      <div className="w-3" />
+                    )}
+                    <span className="text-sm font-medium truncate">{parent.name}</span>
+                    {parent.children.length > 0 && (
+                      <span className="text-xs text-muted-foreground">({parent.children.length})</span>
+                    )}
+                  </div>
+                </CollapsibleTrigger>
+                <div className="flex items-center gap-0.5 flex-shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => openCreateDialog(parent.id, parent.categoryType as CategoryType)}
+                    data-testid={`button-add-child-${parent.id}`}
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => openEditDialog(parent)}
+                    data-testid={`button-edit-${parent.id}`}
+                  >
+                    <Edit2 className="h-3 w-3" />
+                  </Button>
+                  {!parent.isDefault && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-destructive hover:text-destructive"
+                      onClick={() => deleteMutation.mutate(parent.id)}
+                      data-testid={`button-delete-${parent.id}`}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <CollapsibleContent>
+                <div className="border-t">
+                  {parent.children.map((child) => (
+                    <div
+                      key={child.id}
+                      className="flex items-center justify-between py-1.5 px-2 pl-6 hover:bg-muted/50 border-b last:border-b-0"
+                    >
+                      <span className="text-xs truncate">{child.name}</span>
+                      <div className="flex items-center gap-0.5 flex-shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5"
+                          onClick={() => openEditDialog(child)}
+                          data-testid={`button-edit-${child.id}`}
+                        >
+                          <Edit2 className="h-2.5 w-2.5" />
+                        </Button>
+                        {!child.isDefault && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5 text-destructive hover:text-destructive"
+                            onClick={() => deleteMutation.mutate(child.id)}
+                            data-testid={`button-delete-${child.id}`}
+                          >
+                            <Trash2 className="h-2.5 w-2.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CollapsibleContent>
+            </div>
+          </Collapsible>
+        ))
+      )}
+    </div>
+  );
+
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>P&L Categories</CardTitle>
+            <CardTitle>Chart of Accounts</CardTitle>
             <CardDescription>
               Manage your organization's P&L categories for document classification
             </CardDescription>
@@ -264,109 +389,10 @@ export function CategoryManager() {
             <p className="text-sm">Add categories or initialize default marina categories</p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {hierarchy.map((parent) => (
-              <Collapsible
-                key={parent.id}
-                open={expandedCategories.has(parent.id)}
-                onOpenChange={() => toggleExpanded(parent.id)}
-              >
-                <div className="border rounded-lg">
-                  <div className="flex items-center justify-between p-3 hover:bg-muted/50">
-                    <CollapsibleTrigger asChild>
-                      <div className="flex items-center gap-2 cursor-pointer flex-1">
-                        {parent.children.length > 0 ? (
-                          expandedCategories.has(parent.id) ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )
-                        ) : (
-                          <div className="w-4" />
-                        )}
-                        <span className="font-medium">{parent.name}</span>
-                        <Badge className={CATEGORY_TYPE_LABELS[parent.categoryType as CategoryType]?.color || "bg-gray-100"}>
-                          {CATEGORY_TYPE_LABELS[parent.categoryType as CategoryType]?.label || parent.categoryType}
-                        </Badge>
-                        {parent.isDefault && (
-                          <Badge variant="outline" className="text-xs">Default</Badge>
-                        )}
-                        <span className="text-sm text-muted-foreground">
-                          ({parent.children.length} subcategories)
-                        </span>
-                      </div>
-                    </CollapsibleTrigger>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openCreateDialog(parent.id, parent.categoryType as CategoryType)}
-                        data-testid={`button-add-child-${parent.id}`}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEditDialog(parent)}
-                        data-testid={`button-edit-${parent.id}`}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      {!parent.isDefault && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => deleteMutation.mutate(parent.id)}
-                          data-testid={`button-delete-${parent.id}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                  <CollapsibleContent>
-                    <div className="border-t">
-                      {parent.children.map((child) => (
-                        <div
-                          key={child.id}
-                          className="flex items-center justify-between p-3 pl-10 hover:bg-muted/50 border-b last:border-b-0"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span>{child.name}</span>
-                            {child.isDefault && (
-                              <Badge variant="outline" className="text-xs">Default</Badge>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => openEditDialog(child)}
-                              data-testid={`button-edit-${child.id}`}
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                            {!child.isDefault && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-destructive hover:text-destructive"
-                                onClick={() => deleteMutation.mutate(child.id)}
-                                data-testid={`button-delete-${child.id}`}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CollapsibleContent>
-                </div>
-              </Collapsible>
-            ))}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {renderCategoryColumn(revenueCategories, "Revenue", "bg-green-100 dark:bg-green-900/30", "revenue")}
+            {renderCategoryColumn(cogsCategories, "COGS", "bg-orange-100 dark:bg-orange-900/30", "cogs")}
+            {renderCategoryColumn(expenseCategories, "Expenses", "bg-blue-100 dark:bg-blue-900/30", "opex")}
           </div>
         )}
       </CardContent>
