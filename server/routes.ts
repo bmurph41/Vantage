@@ -9103,6 +9103,34 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: "Failed to retrieve contacts" });
     }
   });
+
+  // Check for duplicate contacts by first name and last name
+  app.get("/api/contacts/check-duplicates", async (req: any, res) => {
+    try {
+      const { firstName, lastName } = req.query;
+      
+      if (!firstName || !lastName) {
+        return res.json({ duplicates: [] });
+      }
+
+      const contacts = await storage.getCrmContactsForOrg(req.user.orgId);
+      const duplicates = contacts.filter(c => 
+        c.firstName?.toLowerCase().trim() === String(firstName).toLowerCase().trim() &&
+        c.lastName?.toLowerCase().trim() === String(lastName).toLowerCase().trim()
+      ).map(c => ({
+        id: c.id,
+        firstName: c.firstName,
+        lastName: c.lastName,
+        city: c.city,
+        state: c.state
+      }));
+
+      res.json({ duplicates });
+    } catch (error: any) {
+      console.error("Failed to check duplicate contacts:", error);
+      res.status(500).json({ error: "Failed to check duplicates" });
+    }
+  });
   app.post("/api/contacts", async (req: any, res) => {
     try {
       const { company, companyId, ...contactData } = req.body;

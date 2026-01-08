@@ -5,7 +5,6 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { CurrencyInput } from "@/components/ui/currency-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -26,16 +25,15 @@ interface PropertyFormModalProps {
 
 const propertyTypes = [
   { value: "marina", label: "Marina" },
-  { value: "boat", label: "Boat" },
-  { value: "slip", label: "Slip" },
-  { value: "dry_storage", label: "Dry Storage" },
+  { value: "boat_yard", label: "Boat Yard" },
+  { value: "marina_yard", label: "Marina & Yard" },
 ];
 
 const propertyStatuses = [
-  { value: "available", label: "Available" },
+  { value: "target", label: "Target" },
+  { value: "for_sale", label: "For Sale" },
+  { value: "under_loi", label: "Under LOI" },
   { value: "under_contract", label: "Under Contract" },
-  { value: "sold", label: "Sold" },
-  { value: "off_market", label: "Off Market" },
 ];
 
 const relationshipTypes = [
@@ -68,8 +66,6 @@ type LinkedCompany = {
 export default function PropertyFormModal({ isOpen, onClose, property }: PropertyFormModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [specificationKeys, setSpecificationKeys] = useState<string[]>([]);
-  const [specificationValues, setSpecificationValues] = useState<Record<string, string>>({});
   const [contactSearch, setContactSearch] = useState("");
   const [companySearch, setCompanySearch] = useState("");
   const [selectedContactRelationship, setSelectedContactRelationship] = useState("owner");
@@ -170,17 +166,24 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
     return company.name?.toLowerCase().includes(searchLower);
   }).filter(company => !linkedCompanies.some(lc => lc.companyId === company.id));
 
+  // Additional marina property fields
+  const [wetSlips, setWetSlips] = useState("");
+  const [dryStorage, setDryStorage] = useState("");
+  const [totalAcres, setTotalAcres] = useState("");
+  const [waterDepth, setWaterDepth] = useState("");
+  const [linearFeet, setLinearFeet] = useState("");
+  const [yearBuilt, setYearBuilt] = useState("");
+
   const form = useForm({
     resolver: zodResolver(insertPropertySchema.extend({
-      listingPrice: z.string().optional(),
-      address: z.string().optional(),
+      title: z.string().min(1, "Property name is required"),
+      address: z.string().min(1, "Address is required"),
       description: z.string().optional(),
     })),
     defaultValues: {
       title: "",
       type: "marina",
-      status: "available",
-      listingPrice: "",
+      status: "target",
       address: "",
       description: "",
     },
@@ -192,38 +195,50 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
         title: property.title,
         type: property.type,
         status: property.status,
-        listingPrice: property.listingPrice?.toString() || "",
         address: property.address || "",
         description: property.description || "",
       });
       
-      // Load specifications
+      // Load marina specifications from specifications object
       if (property.specifications && typeof property.specifications === 'object') {
         const specs = property.specifications as Record<string, any>;
-        const keys = Object.keys(specs);
-        setSpecificationKeys(keys);
-        setSpecificationValues(specs);
+        setWetSlips(specs.wetSlips || "");
+        setDryStorage(specs.dryStorage || "");
+        setTotalAcres(specs.totalAcres || "");
+        setWaterDepth(specs.waterDepth || "");
+        setLinearFeet(specs.linearFeet || "");
+        setYearBuilt(specs.yearBuilt || "");
       }
     } else {
       form.reset({
         title: "",
         type: "marina",
-        status: "available",
-        listingPrice: "",
+        status: "target",
         address: "",
         description: "",
       });
-      setSpecificationKeys([]);
-      setSpecificationValues({});
+      setWetSlips("");
+      setDryStorage("");
+      setTotalAcres("");
+      setWaterDepth("");
+      setLinearFeet("");
+      setYearBuilt("");
     }
   }, [property, form]);
 
   const createPropertyMutation = useMutation({
     mutationFn: async (data: any) => {
+      const specifications: Record<string, string> = {};
+      if (wetSlips) specifications.wetSlips = wetSlips;
+      if (dryStorage) specifications.dryStorage = dryStorage;
+      if (totalAcres) specifications.totalAcres = totalAcres;
+      if (waterDepth) specifications.waterDepth = waterDepth;
+      if (linearFeet) specifications.linearFeet = linearFeet;
+      if (yearBuilt) specifications.yearBuilt = yearBuilt;
+
       const cleanData = { 
         ...data,
-        listingPrice: data.listingPrice ? parseFloat(data.listingPrice) : undefined,
-        specifications: specificationKeys.length > 0 ? specificationValues : {},
+        specifications: Object.keys(specifications).length > 0 ? specifications : {},
       };
       
       Object.keys(cleanData).forEach(key => {
@@ -239,8 +254,12 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
       toast({ title: "Property created successfully" });
       onClose();
       form.reset();
-      setSpecificationKeys([]);
-      setSpecificationValues({});
+      setWetSlips("");
+      setDryStorage("");
+      setTotalAcres("");
+      setWaterDepth("");
+      setLinearFeet("");
+      setYearBuilt("");
     },
     onError: (error: any) => {
       toast({ 
@@ -253,10 +272,17 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
 
   const updatePropertyMutation = useMutation({
     mutationFn: async (data: any) => {
+      const specifications: Record<string, string> = {};
+      if (wetSlips) specifications.wetSlips = wetSlips;
+      if (dryStorage) specifications.dryStorage = dryStorage;
+      if (totalAcres) specifications.totalAcres = totalAcres;
+      if (waterDepth) specifications.waterDepth = waterDepth;
+      if (linearFeet) specifications.linearFeet = linearFeet;
+      if (yearBuilt) specifications.yearBuilt = yearBuilt;
+
       const cleanData = { 
         ...data,
-        listingPrice: data.listingPrice ? parseFloat(data.listingPrice) : undefined,
-        specifications: specificationKeys.length > 0 ? specificationValues : {},
+        specifications: Object.keys(specifications).length > 0 ? specifications : {},
       };
       
       Object.keys(cleanData).forEach(key => {
@@ -289,32 +315,6 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
     }
   };
 
-  const addSpecification = () => {
-    const newKey = `spec_${specificationKeys.length + 1}`;
-    setSpecificationKeys([...specificationKeys, newKey]);
-    setSpecificationValues({ ...specificationValues, [newKey]: "" });
-  };
-
-  const removeSpecification = (key: string) => {
-    setSpecificationKeys(specificationKeys.filter(k => k !== key));
-    const newValues = { ...specificationValues };
-    delete newValues[key];
-    setSpecificationValues(newValues);
-  };
-
-  const updateSpecificationKey = (oldKey: string, newKey: string) => {
-    const newKeys = specificationKeys.map(k => k === oldKey ? newKey : k);
-    setSpecificationKeys(newKeys);
-    const newValues = { ...specificationValues };
-    newValues[newKey] = newValues[oldKey];
-    delete newValues[oldKey];
-    setSpecificationValues(newValues);
-  };
-
-  const updateSpecificationValue = (key: string, value: string) => {
-    setSpecificationValues({ ...specificationValues, [key]: value });
-  };
-
   const isLoading = createPropertyMutation.isPending || updatePropertyMutation.isPending;
 
   return (
@@ -331,9 +331,9 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Property Title</FormLabel>
+                  <FormLabel>Property Name *</FormLabel>
                   <FormControl>
-                    <Input placeholder="Luxury Marina Slip" {...field} data-testid="input-property-title" />
+                    <Input placeholder="Property Name" {...field} data-testid="input-property-title" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -394,29 +394,10 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
 
             <FormField
               control={form.control}
-              name="listingPrice"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Listing Price (Optional)</FormLabel>
-                  <FormControl>
-                    <CurrencyInput
-                      value={field.value ? parseFloat(field.value) : undefined}
-                      onValueChange={(val) => field.onChange(val?.toString() || "")}
-                      onBlur={field.onBlur}
-                      data-testid="input-listing-price"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
               name="address"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Address (Optional)</FormLabel>
+                  <FormLabel>Address *</FormLabel>
                   <FormControl>
                     <AddressInput
                       value={field.value || ''}
@@ -438,7 +419,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description (Optional)</FormLabel>
+                  <FormLabel>Description</FormLabel>
                   <FormControl>
                     <Textarea 
                       placeholder="Detailed property description..." 
@@ -452,53 +433,74 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
               )}
             />
 
-            {/* Specifications Section */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <FormLabel>Specifications (Optional)</FormLabel>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={addSpecification}
-                  data-testid="button-add-specification"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Specification
-                </Button>
-              </div>
-
-              {specificationKeys.map((key) => (
-                <div key={key} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-start">
+            {/* Marina Property Details */}
+            <Separator className="my-4" />
+            <div className="space-y-4">
+              <FormLabel className="text-base font-medium">Property Details</FormLabel>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <FormLabel className="text-sm">Wet Slips</FormLabel>
                   <Input
-                    placeholder="Key (e.g., Length)"
-                    value={key}
-                    onChange={(e) => updateSpecificationKey(key, e.target.value)}
-                    data-testid={`input-spec-key-${key}`}
+                    type="number"
+                    placeholder="Number of wet slips"
+                    value={wetSlips}
+                    onChange={(e) => setWetSlips(e.target.value)}
+                    data-testid="input-wet-slips"
                   />
-                  <Input
-                    placeholder="Value (e.g., 40 feet)"
-                    value={specificationValues[key] || ""}
-                    onChange={(e) => updateSpecificationValue(key, e.target.value)}
-                    data-testid={`input-spec-value-${key}`}
-                  />
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => removeSpecification(key)}
-                    data-testid={`button-remove-spec-${key}`}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
                 </div>
-              ))}
-
-              {specificationKeys.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  No specifications added. Click "Add Specification" to add property details.
-                </p>
-              )}
+                <div className="space-y-2">
+                  <FormLabel className="text-sm">Dry Storage</FormLabel>
+                  <Input
+                    type="number"
+                    placeholder="Number of dry storage units"
+                    value={dryStorage}
+                    onChange={(e) => setDryStorage(e.target.value)}
+                    data-testid="input-dry-storage"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <FormLabel className="text-sm">Total Acres</FormLabel>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="Total acreage"
+                    value={totalAcres}
+                    onChange={(e) => setTotalAcres(e.target.value)}
+                    data-testid="input-total-acres"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <FormLabel className="text-sm">Water Depth (ft)</FormLabel>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    placeholder="Average water depth"
+                    value={waterDepth}
+                    onChange={(e) => setWaterDepth(e.target.value)}
+                    data-testid="input-water-depth"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <FormLabel className="text-sm">Linear Feet</FormLabel>
+                  <Input
+                    type="number"
+                    placeholder="Linear feet of dockage"
+                    value={linearFeet}
+                    onChange={(e) => setLinearFeet(e.target.value)}
+                    data-testid="input-linear-feet"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <FormLabel className="text-sm">Year Built</FormLabel>
+                  <Input
+                    type="number"
+                    placeholder="Year built"
+                    value={yearBuilt}
+                    onChange={(e) => setYearBuilt(e.target.value)}
+                    data-testid="input-year-built"
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Linked Contacts & Companies Section - Only for Edit Mode */}

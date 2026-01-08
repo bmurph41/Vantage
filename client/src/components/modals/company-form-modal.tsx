@@ -37,19 +37,25 @@ const companySizes = [
   { value: "1000+", label: "1000+ employees" },
 ];
 
-const industries = [
-  "Technology",
-  "Healthcare",
-  "Finance",
-  "Education",
-  "Manufacturing",
-  "Retail",
-  "Consulting",
-  "Real Estate",
-  "Media",
-  "Non-profit",
-  "Government",
-  "Other",
+const companyTypes = [
+  { value: "investor", label: "Investor" },
+  { value: "owner", label: "Owner" },
+  { value: "broker", label: "Broker" },
+  { value: "boat_dealer", label: "Boat Dealer" },
+  { value: "boat_broker", label: "Boat Broker" },
+  { value: "marina_operator", label: "Marina Operator" },
+  { value: "yacht_club", label: "Yacht Club" },
+  { value: "marine_contractor", label: "Marine Contractor" },
+  { value: "marine_supplier", label: "Marine Supplier" },
+  { value: "boat_manufacturer", label: "Boat Manufacturer" },
+  { value: "marine_services", label: "Marine Services" },
+  { value: "fuel_supplier", label: "Fuel Supplier" },
+  { value: "insurance", label: "Insurance" },
+  { value: "finance_lender", label: "Finance/Lender" },
+  { value: "legal", label: "Legal" },
+  { value: "environmental", label: "Environmental" },
+  { value: "government", label: "Government/Regulatory" },
+  { value: "other", label: "Other" },
 ];
 
 export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFormModalProps) {
@@ -94,8 +100,9 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
 
   const form = useForm({
     resolver: zodResolver(insertCompanySchema.extend({
+      name: insertCompanySchema.shape.name.min(1, "Company name is required"),
       domain: insertCompanySchema.shape.domain.optional(),
-      industry: insertCompanySchema.shape.industry.optional(),
+      industry: insertCompanySchema.shape.industry.min(1, "Company type is required"),
       size: insertCompanySchema.shape.size.optional(),
       address: insertCompanySchema.shape.address.optional(),
       phone: insertCompanySchema.shape.phone.optional(),
@@ -552,7 +559,7 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Company Name</FormLabel>
+                      <FormLabel>Company Name *</FormLabel>
                       <FormControl>
                         <Input placeholder="Acme Corporation" {...field} data-testid="input-company-name" />
                       </FormControl>
@@ -597,18 +604,17 @@ export default function CompanyFormModal({ isOpen, onClose, company }: CompanyFo
                     name="industry"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Industry (Optional)</FormLabel>
+                        <FormLabel>Company Type *</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
-                            <SelectTrigger data-testid="select-industry">
-                              <SelectValue placeholder="Select industry" />
+                            <SelectTrigger data-testid="select-company-type">
+                              <SelectValue placeholder="Select company type" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="none">No industry</SelectItem>
-                            {industries.map((industry) => (
-                              <SelectItem key={industry} value={industry}>
-                                {industry}
+                            {companyTypes.map((type) => (
+                              <SelectItem key={type.value} value={type.value}>
+                                {type.label}
                               </SelectItem>
                             ))}
                           </SelectContent>

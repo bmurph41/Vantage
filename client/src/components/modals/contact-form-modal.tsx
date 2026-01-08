@@ -169,9 +169,42 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
     if (contactTag !== 'lead') {
       setLeadStatus(undefined);
     } else if (contactTag === 'lead' && !leadStatus) {
-      setLeadStatus('new'); // Default to 'new' when switching to lead tag
+      setLeadStatus('hot'); // Default to 'hot' when switching to lead tag
     }
   }, [contactTag, leadStatus]);
+
+  // Duplicate contact detection state
+  const [duplicateContacts, setDuplicateContacts] = useState<Array<{ id: string; firstName: string; lastName: string; city?: string; state?: string }>>([]);
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+
+  // Check for duplicate contacts when first name and last name are both entered
+  useEffect(() => {
+    const checkDuplicates = async () => {
+      if (firstName.trim().length >= 2 && lastName.trim().length >= 2 && !isEdit) {
+        try {
+          const res = await fetch(`/api/contacts/check-duplicates?firstName=${encodeURIComponent(firstName.trim())}&lastName=${encodeURIComponent(lastName.trim())}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.duplicates && data.duplicates.length > 0) {
+              setDuplicateContacts(data.duplicates);
+              setShowDuplicateWarning(true);
+            } else {
+              setDuplicateContacts([]);
+              setShowDuplicateWarning(false);
+            }
+          }
+        } catch (e) {
+          // Silently fail - this is just a helpful feature
+        }
+      } else {
+        setDuplicateContacts([]);
+        setShowDuplicateWarning(false);
+      }
+    };
+    
+    const debounce = setTimeout(checkDuplicates, 500);
+    return () => clearTimeout(debounce);
+  }, [firstName, lastName, isEdit]);
 
   // Phone management functions
   const addPhone = () => {
@@ -202,8 +235,13 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
     if (!role.trim()) e.role = "Role/Title is required";
     if (!contactTag) e.contactTag = "Contact tag is required";
     if (contactTag === 'lead' && !leadStatus) e.leadStatus = "Lead status is required for leads";
+    // Address fields are required
+    if (!address.trim()) e.address = "Street address is required";
+    if (!city.trim()) e.city = "City is required";
+    if (!state.trim()) e.state = "State is required";
+    if (!zipCode.trim()) e.zipCode = "Zip code is required";
     return e;
-  }, [firstName, lastName, email, phones, company, role, contactTag, leadStatus]);
+  }, [firstName, lastName, email, phones, company, role, contactTag, leadStatus, address, city, state, zipCode]);
 
   const createContactMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -434,6 +472,33 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                   <p className="text-xs text-destructive">{errors.lastName}</p>
                 )}
               </div>
+              
+              {/* Duplicate Contact Warning */}
+              {showDuplicateWarning && duplicateContacts.length > 0 && (
+                <div className="col-span-2 p-3 bg-amber-50 border border-amber-200 rounded-lg" data-testid="duplicate-warning">
+                  <p className="text-sm font-medium text-amber-800 mb-2">
+                    Possible duplicate contact{duplicateContacts.length > 1 ? 's' : ''} found:
+                  </p>
+                  <ul className="space-y-1">
+                    {duplicateContacts.map((dup) => (
+                      <li key={dup.id} className="text-sm text-amber-700">
+                        {dup.firstName} {dup.lastName}
+                        {(dup.city || dup.state) && (
+                          <span className="text-amber-600"> - {[dup.city, dup.state].filter(Boolean).join(', ')}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  <button 
+                    type="button"
+                    onClick={() => setShowDuplicateWarning(false)}
+                    className="text-xs text-amber-600 hover:text-amber-800 mt-2 underline"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+              
               <div className="space-y-2">
                 <Label htmlFor="email">Email *</Label>
                 <Input 
@@ -638,6 +703,9 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                     <SelectItem value="insurance">Insurance</SelectItem>
                     <SelectItem value="lender">Lender</SelectItem>
                     <SelectItem value="attorney">Attorney</SelectItem>
+                    <SelectItem value="developer">Developer</SelectItem>
+                    <SelectItem value="manager">Manager</SelectItem>
+                    <SelectItem value="analyst">Analyst</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
@@ -658,12 +726,10 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                       <SelectValue placeholder="Select lead status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      <SelectItem value="new">New</SelectItem>
-                      <SelectItem value="contacted">Contacted</SelectItem>
-                      <SelectItem value="qualified">Qualified</SelectItem>
-                      <SelectItem value="unqualified">Unqualified</SelectItem>
-                      <SelectItem value="converted">Converted</SelectItem>
+                      <SelectItem value="hot">Hot</SelectItem>
+                      <SelectItem value="warm">Warm</SelectItem>
+                      <SelectItem value="cold">Cold</SelectItem>
+                      <SelectItem value="long-term">Long-Term</SelectItem>
                     </SelectContent>
                   </Select>
                   {touched && errors.leadStatus && (
@@ -681,25 +747,30 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
             <CardHeader className="pb-4">
               <div className="flex items-center gap-2">
                 <MapPin className="h-5 w-5 text-primary" />
-                <CardTitle className="text-lg font-medium">Address</CardTitle>
+                <CardTitle className="text-lg font-medium">Address *</CardTitle>
               </div>
             </CardHeader>
             <CardContent>
             <div className="space-y-4">
               <div className="space-y-4">
-                <AddressInput
-                  value={address}
-                  onChange={(value) => setAddress(value)}
-                  onAddressSelect={(components: AddressComponents) => {
-                    if (components.street) setAddress(components.street);
-                    if (components.city) setCity(components.city);
-                    if (components.state) setState(components.state);
-                    if (components.zipCode) setZipCode(components.zipCode);
-                  }}
-                  label="Street Address"
-                  placeholder="123 Marina Way"
-                  testId="input-address"
-                />
+                <div className="space-y-2">
+                  <AddressInput
+                    value={address}
+                    onChange={(value) => setAddress(value)}
+                    onAddressSelect={(components: AddressComponents) => {
+                      if (components.street) setAddress(components.street);
+                      if (components.city) setCity(components.city);
+                      if (components.state) setState(components.state);
+                      if (components.zipCode) setZipCode(components.zipCode);
+                    }}
+                    label="Street Address *"
+                    placeholder="123 Marina Way"
+                    testId="input-address"
+                  />
+                  {touched && errors.address && (
+                    <p className="text-xs text-destructive">{errors.address}</p>
+                  )}
+                </div>
                 <div>
                   <Label htmlFor="unit" className="text-sm">Unit/Suite/Apt</Label>
                   <Input 
@@ -711,34 +782,45 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="city" className="text-sm">City</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="city" className="text-sm">City *</Label>
                     <Input 
                       id="city" 
                       value={city} 
                       onChange={(e) => setCity(e.target.value)} 
-                      placeholder="Key West" 
+                      placeholder="Key West"
+                      className={classNames(touched && errors.city && "border-destructive focus-visible:ring-destructive")}
                       data-testid="input-city"
                     />
+                    {touched && errors.city && (
+                      <p className="text-xs text-destructive">{errors.city}</p>
+                    )}
                   </div>
-                  <div>
-                    <Label htmlFor="state" className="text-sm">State</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="state" className="text-sm">State *</Label>
                     <StateSelect
                       value={state}
                       onValueChange={setState}
                       placeholder="Select state"
                     />
+                    {touched && errors.state && (
+                      <p className="text-xs text-destructive">{errors.state}</p>
+                    )}
                   </div>
                 </div>
-                <div className="w-full max-w-[200px]">
-                  <Label htmlFor="zipCode" className="text-sm">Zip Code</Label>
+                <div className="w-full max-w-[200px] space-y-2">
+                  <Label htmlFor="zipCode" className="text-sm">Zip Code *</Label>
                   <Input 
                     id="zipCode" 
                     value={zipCode} 
                     onChange={(e) => setZipCode(e.target.value)} 
-                    placeholder="33040" 
+                    placeholder="33040"
+                    className={classNames(touched && errors.zipCode && "border-destructive focus-visible:ring-destructive")}
                     data-testid="input-zip-code"
                   />
+                  {touched && errors.zipCode && (
+                    <p className="text-xs text-destructive">{errors.zipCode}</p>
+                  )}
                 </div>
               </div>
             </div>
