@@ -71,14 +71,6 @@ type FunnelStage = {
   color: string;
 };
 
-const sourceData = [
-  { source: 'Cold Call', leads: 85, deals: 12, conversion: '14.1%' },
-  { source: 'Email Campaign', leads: 120, deals: 8, conversion: '6.7%' },
-  { source: 'LoopNet', leads: 45, deals: 6, conversion: '13.3%' },
-  { source: 'Crexi', leads: 38, deals: 5, conversion: '13.2%' },
-  { source: 'Broker Referral', leads: 28, deals: 8, conversion: '28.6%' },
-  { source: 'Direct Owner', leads: 22, deals: 3, conversion: '13.6%' },
-];
 
 export default function ProspectingOverview() {
   const [timeRange, setTimeRange] = useState('month');
@@ -137,6 +129,39 @@ export default function ProspectingOverview() {
   const dealsClosed = dealsArray.filter((d: any) => d.stage === 'closed_won').length;
 
   const pipelineValue = dealsArray.reduce((sum: number, deal: any) => sum + (deal.amount || 0), 0);
+
+  // Calculate lead source performance from real data
+  const sourceData = (() => {
+    const sourceStats: Record<string, { leads: number; deals: number }> = {};
+    
+    // Count leads by source
+    leadsArray.forEach((lead: any) => {
+      const source = lead.source || 'Unknown';
+      if (!sourceStats[source]) {
+        sourceStats[source] = { leads: 0, deals: 0 };
+      }
+      sourceStats[source].leads += 1;
+    });
+    
+    // Count deals by source (if deals have source info, or match to leads)
+    dealsArray.forEach((deal: any) => {
+      const source = deal.source || deal.leadSource || 'Unknown';
+      if (!sourceStats[source]) {
+        sourceStats[source] = { leads: 0, deals: 0 };
+      }
+      sourceStats[source].deals += 1;
+    });
+    
+    // Convert to array format
+    return Object.entries(sourceStats)
+      .map(([source, stats]) => ({
+        source,
+        leads: stats.leads,
+        deals: stats.deals,
+        conversion: stats.leads > 0 ? `${((stats.deals / stats.leads) * 100).toFixed(1)}%` : '0%'
+      }))
+      .sort((a, b) => b.leads - a.leads); // Sort by leads descending
+  })();
 
   const funnelData: FunnelStage[] = [
     { name: 'Total Touches', value: totalTouches, percentage: 100, color: 'bg-blue-500' },
@@ -311,32 +336,40 @@ export default function ProspectingOverview() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sourceData.map((row) => (
-                    <tr key={row.source} className="border-b last:border-b-0">
-                      <td className="py-3 px-4">
-                        <span className="font-medium text-gray-900">{row.source}</span>
-                      </td>
-                      <td className="py-3 px-4 text-right text-gray-600">{row.leads}</td>
-                      <td className="py-3 px-4 text-right text-gray-600">{row.deals}</td>
-                      <td className="py-3 px-4 text-right">
-                        <Badge variant={parseFloat(row.conversion) > 15 ? "default" : "secondary"}>
-                          {row.conversion}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full rounded-full ${
-                              parseFloat(row.conversion) > 20 ? 'bg-green-500' :
-                              parseFloat(row.conversion) > 10 ? 'bg-blue-500' :
-                              'bg-yellow-500'
-                            }`}
-                            style={{ width: `${Math.min(parseFloat(row.conversion) * 3, 100)}%` }}
-                          />
-                        </div>
+                  {sourceData.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-gray-500">
+                        No lead source data available yet. Start adding leads to see performance metrics.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    sourceData.map((row) => (
+                      <tr key={row.source} className="border-b last:border-b-0">
+                        <td className="py-3 px-4">
+                          <span className="font-medium text-gray-900">{row.source}</span>
+                        </td>
+                        <td className="py-3 px-4 text-right text-gray-600">{row.leads}</td>
+                        <td className="py-3 px-4 text-right text-gray-600">{row.deals}</td>
+                        <td className="py-3 px-4 text-right">
+                          <Badge variant={parseFloat(row.conversion) > 15 ? "default" : "secondary"}>
+                            {row.conversion}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full rounded-full ${
+                                parseFloat(row.conversion) > 20 ? 'bg-green-500' :
+                                parseFloat(row.conversion) > 10 ? 'bg-blue-500' :
+                                'bg-yellow-500'
+                              }`}
+                              style={{ width: `${Math.min(parseFloat(row.conversion) * 3, 100)}%` }}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
