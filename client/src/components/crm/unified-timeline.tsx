@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Phone, Mail, MessageSquare, Calendar, FileText, 
   Clock, PhoneIncoming, PhoneOutgoing, StickyNote, 
-  Upload, Filter, Image, File, Paperclip, Pin
+  Upload, Filter, Image, File, Paperclip, Pin, Building2
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { useState } from "react";
@@ -27,6 +27,7 @@ type TimelineItem = {
   description: string | null;
   timestamp: string;
   metadata: Record<string, any>;
+  sourceEntity?: { type: string; id: string; name?: string };
 };
 
 type TimelineResponse = {
@@ -37,6 +38,7 @@ type TimelineResponse = {
     files: number;
     total: number;
   };
+  linkedCompanies?: number;
 };
 
 export default function UnifiedTimeline({ 
@@ -198,6 +200,12 @@ export default function UnifiedTimeline({
                         {item.type === 'note' && item.metadata?.isPinned && (
                           <Badge variant="secondary" className="text-xs">
                             Pinned
+                          </Badge>
+                        )}
+                        {item.sourceEntity && (
+                          <Badge variant="outline" className="text-xs gap-1">
+                            <Building2 className="w-3 h-3" />
+                            {item.sourceEntity.name || 'Company'}
                           </Badge>
                         )}
                         {item.type === 'file' && item.metadata?.size && (

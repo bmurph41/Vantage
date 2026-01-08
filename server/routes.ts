@@ -7802,7 +7802,7 @@ Current context: Project ${req.params.projectId}`;
     try {
       const { entityType, entityId } = req.params;
       const orgId = req.user.orgId;
-      const { inArray } = await import('drizzle-orm');
+      const { inArray, or } = await import('drizzle-orm');
 
       // Get all user IDs in this organization for org-scoped queries
       const orgUserIds = db.select({ id: users.id }).from(users).where(eq(users.orgId, orgId));
@@ -7813,35 +7813,90 @@ Current context: Project ${req.params.projectId}`;
         return res.status(400).json({ error: `Invalid entity type. Must be one of: ${validTypes.join(', ')}` });
       }
 
-      // Fetch activities for this entity
-      const activities = await db.query.crmActivities.findMany({
-        where: and(
-          eq(crmActivities.entityType, entityType),
-          eq(crmActivities.entityId, entityId),
-          inArray(crmActivities.userId, orgUserIds)
-        ),
-        orderBy: [desc(crmActivities.createdAt)],
-      });
+      // For contacts, also fetch activities from linked companies
+      let linkedCompanyIds: string[] = [];
+      let linkedCompanyNames: Map<string, string> = new Map();
+      if (entityType === 'contact') {
+        const linkedCompanies = await storage.getContactCompanies(entityId);
+        linkedCompanyIds = linkedCompanies.map(link => link.companyId);
+        linkedCompanies.forEach(link => {
+          if (link.company?.name) {
+            linkedCompanyNames.set(link.companyId, link.company.name);
+          }
+        });
+      }
 
-      // Fetch notes for this entity
-      const notes = await db.query.crmNotes.findMany({
-        where: and(
-          eq(crmNotes.entityType, entityType),
-          eq(crmNotes.entityId, entityId),
-          inArray(crmNotes.ownerId, orgUserIds)
-        ),
-        orderBy: [desc(crmNotes.createdAt)],
-      });
+      // Fetch activities for this entity (and linked companies for contacts)
+      let activities: any[] = [];
+      if (entityType === 'contact' && linkedCompanyIds.length > 0) {
+        activities = await db.query.crmActivities.findMany({
+          where: and(
+            or(
+              and(eq(crmActivities.entityType, 'contact'), eq(crmActivities.entityId, entityId)),
+              and(eq(crmActivities.entityType, 'company'), inArray(crmActivities.entityId, linkedCompanyIds))
+            ),
+            inArray(crmActivities.userId, orgUserIds)
+          ),
+          orderBy: [desc(crmActivities.createdAt)],
+        });
+      } else {
+        activities = await db.query.crmActivities.findMany({
+          where: and(
+            eq(crmActivities.entityType, entityType),
+            eq(crmActivities.entityId, entityId),
+            inArray(crmActivities.userId, orgUserIds)
+          ),
+          orderBy: [desc(crmActivities.createdAt)],
+        });
+      }
 
-      // Fetch files for this entity
-      const files = await db.query.crmFiles.findMany({
-        where: and(
-          eq(crmFiles.entityType, entityType),
-          eq(crmFiles.entityId, entityId),
-          inArray(crmFiles.ownerId, orgUserIds)
-        ),
-        orderBy: [desc(crmFiles.createdAt)],
-      });
+      // Fetch notes for this entity (and linked companies for contacts)
+      let notes: any[] = [];
+      if (entityType === 'contact' && linkedCompanyIds.length > 0) {
+        notes = await db.query.crmNotes.findMany({
+          where: and(
+            or(
+              and(eq(crmNotes.entityType, 'contact'), eq(crmNotes.entityId, entityId)),
+              and(eq(crmNotes.entityType, 'company'), inArray(crmNotes.entityId, linkedCompanyIds))
+            ),
+            inArray(crmNotes.ownerId, orgUserIds)
+          ),
+          orderBy: [desc(crmNotes.createdAt)],
+        });
+      } else {
+        notes = await db.query.crmNotes.findMany({
+          where: and(
+            eq(crmNotes.entityType, entityType),
+            eq(crmNotes.entityId, entityId),
+            inArray(crmNotes.ownerId, orgUserIds)
+          ),
+          orderBy: [desc(crmNotes.createdAt)],
+        });
+      }
+
+      // Fetch files for this entity (and linked companies for contacts)
+      let files: any[] = [];
+      if (entityType === 'contact' && linkedCompanyIds.length > 0) {
+        files = await db.query.crmFiles.findMany({
+          where: and(
+            or(
+              and(eq(crmFiles.entityType, 'contact'), eq(crmFiles.entityId, entityId)),
+              and(eq(crmFiles.entityType, 'company'), inArray(crmFiles.entityId, linkedCompanyIds))
+            ),
+            inArray(crmFiles.ownerId, orgUserIds)
+          ),
+          orderBy: [desc(crmFiles.createdAt)],
+        });
+      } else {
+        files = await db.query.crmFiles.findMany({
+          where: and(
+            eq(crmFiles.entityType, entityType),
+            eq(crmFiles.entityId, entityId),
+            inArray(crmFiles.ownerId, orgUserIds)
+          ),
+          orderBy: [desc(crmFiles.createdAt)],
+        });
+      }
 
       // Normalize all items into a unified timeline format
       type TimelineItem = {
@@ -7852,9 +7907,22 @@ Current context: Project ${req.params.projectId}`;
         description: string | null;
         timestamp: Date;
         metadata: Record<string, any>;
+        sourceEntity?: { type: string; id: string; name?: string };
       };
 
       const timelineItems: TimelineItem[] = [];
+
+      // Helper to get source entity info
+      const getSourceEntity = (itemEntityType: string, itemEntityId: string) => {
+        if (entityType === 'contact' && itemEntityType === 'company') {
+          return {
+            type: 'company',
+            id: itemEntityId,
+            name: linkedCompanyNames.get(itemEntityId) || 'Company'
+          };
+        }
+        return undefined;
+      };
 
       // Add activities
       for (const activity of activities) {
@@ -7873,6 +7941,7 @@ Current context: Project ${req.params.projectId}`;
             scheduledAt: activity.scheduledAt,
             completedAt: activity.completedAt,
           },
+          sourceEntity: getSourceEntity(activity.entityType, activity.entityId),
         });
       }
 
@@ -7888,6 +7957,7 @@ Current context: Project ${req.params.projectId}`;
           metadata: {
             isPinned: note.isPinned,
           },
+          sourceEntity: getSourceEntity(note.entityType, note.entityId),
         });
       }
 
@@ -7906,6 +7976,7 @@ Current context: Project ${req.params.projectId}`;
             mimeType: file.mimeType,
             url: file.url,
           },
+          sourceEntity: getSourceEntity(file.entityType, file.entityId),
         });
       }
 
@@ -7920,6 +7991,7 @@ Current context: Project ${req.params.projectId}`;
           files: files.length,
           total: timelineItems.length,
         },
+        linkedCompanies: linkedCompanyIds.length,
       });
     } catch (error: any) {
       console.error("Failed to get unified timeline:", error);
