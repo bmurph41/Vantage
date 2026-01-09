@@ -96,9 +96,10 @@ export default function PendingContacts() {
     }
   };
 
-  const handleReject = () => {
-    if (selectedPending) {
-      rejectMutation.mutate(selectedPending.id);
+  const handleReject = (pendingId?: string) => {
+    const id = pendingId || selectedPending?.id;
+    if (id) {
+      rejectMutation.mutate(id);
     }
   };
 
@@ -267,9 +268,9 @@ export default function PendingContacts() {
                             variant="outline"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setSelectedPending(pending);
-                              handleReject();
+                              handleReject(pending.id);
                             }}
+                            disabled={rejectMutation.isPending}
                             data-testid={`button-reject-contact-${pending.id}`}
                           >
                             <X className="h-4 w-4 mr-1" />
