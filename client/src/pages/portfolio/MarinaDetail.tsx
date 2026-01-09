@@ -122,7 +122,7 @@ export default function MarinaDetail() {
   const [, navigate] = useLocation();
 
   const { data: marina, isLoading, error } = useQuery<MarinaDetails>({
-    queryKey: ["/api/portfolio/marinas", id],
+    queryKey: [`/api/portfolio/marinas/${id}`],
     enabled: !!id,
   });
 
