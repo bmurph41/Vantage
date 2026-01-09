@@ -61,7 +61,6 @@ const operationsModulesNav = [
   { name: "Boat Rentals", href: "/operations/boat-rentals", icon: Ship },
   { name: "Boat Club", href: "/operations/boat-club", icon: Users },
   { name: "Boat Sales", href: "/operations/boat-sales", icon: ShoppingCart },
-  { name: "Marketing", href: "/operations/marketing", icon: Megaphone },
 ];
 
 // Deal Workspace Navigation - Consolidated DD, VDR, and Modeling
