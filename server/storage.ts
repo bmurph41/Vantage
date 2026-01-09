@@ -5412,26 +5412,29 @@ export class DatabaseStorage implements IStorage {
     salesCompId: string;
     orgId: string;
     userId: string;
-    buyerCompany: string;
+    companyName: string;
+    role: 'buyer' | 'seller';
     city?: string;
     state?: string;
   }): Promise<{ created: boolean; pendingCompany?: PendingCompany; reason?: string }> {
-    const { salesCompId, orgId, userId, buyerCompany, city, state } = params;
+    const { salesCompId, orgId, userId, companyName: rawCompanyName, role, city, state } = params;
 
-    if (!buyerCompany || buyerCompany.trim() === '') {
-      return { created: false, reason: 'No buyer company name provided' };
+    if (!rawCompanyName || rawCompanyName.trim() === '') {
+      return { created: false, reason: `No ${role} company name provided` };
     }
 
-    const companyName = buyerCompany.trim();
+    const companyName = rawCompanyName.trim();
+    // Use unique sourceId per role to allow both buyer and seller pending companies for same comp
+    const roleSourceId = `${salesCompId}:${role}`;
 
-    // Check if ANY pending company record already exists for this sales comp (regardless of status)
+    // Check if ANY pending company record already exists for this sales comp + role (regardless of status)
     // This prevents re-creating records that have already been accepted or rejected
     const existingPending = await db.select()
       .from(pendingCompanies)
       .where(and(
         eq(pendingCompanies.orgId, orgId),
         eq(pendingCompanies.sourceType, 'sales_comp'),
-        eq(pendingCompanies.sourceId, salesCompId)
+        eq(pendingCompanies.sourceId, roleSourceId)
       ))
       .limit(1);
 
@@ -5439,7 +5442,7 @@ export class DatabaseStorage implements IStorage {
       return { 
         created: false, 
         pendingCompany: existingPending[0],
-        reason: `Pending company already processed for this comp (status: ${existingPending[0].status})` 
+        reason: `Pending ${role} company already processed for this comp (status: ${existingPending[0].status})` 
       };
     }
 
@@ -5450,13 +5453,13 @@ export class DatabaseStorage implements IStorage {
       const pendingCompany = await this.createPendingCompany({
         orgId,
         sourceType: 'sales_comp',
-        sourceId: salesCompId,
+        sourceId: roleSourceId,
         name: companyName,
         city,
         state,
         status: 'pending',
         suggestedDuplicates: similarCompanies.map(c => c.id),
-        sourceMetadata: { salesCompId, buyerCompany },
+        sourceMetadata: { salesCompId, role, companyName },
         createdBy: userId,
       });
       return { 
@@ -5470,12 +5473,12 @@ export class DatabaseStorage implements IStorage {
     const pendingCompany = await this.createPendingCompany({
       orgId,
       sourceType: 'sales_comp',
-      sourceId: salesCompId,
+      sourceId: roleSourceId,
       name: companyName,
       city,
       state,
       status: 'pending',
-      sourceMetadata: { salesCompId, buyerCompany },
+      sourceMetadata: { salesCompId, role, companyName },
       createdBy: userId,
     });
 

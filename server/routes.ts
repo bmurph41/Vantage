@@ -11546,25 +11546,41 @@ Current context: Project ${req.params.projectId}`;
       // Auto-create pending company if buyerCompany was provided
       if (compData.buyerCompany) {
         try {
-          const companyResult = await storage.autoCreatePendingCompanyFromSalesComp({
+          await storage.autoCreatePendingCompanyFromSalesComp({
             salesCompId: comp.id,
             orgId,
             userId,
-            buyerCompany: compData.buyerCompany,
+            companyName: compData.buyerCompany,
+            role: 'buyer',
             city: compData.city,
             state: compData.state,
           });
-          if (companyResult.created) {
-          }
         } catch (companyError) {
-          console.error('Error auto-creating pending company:', companyError);
+          console.error('Error auto-creating pending buyer company:', companyError);
+        }
+      }
+
+      // Auto-create pending company if sellerCompany was provided
+      if (compData.sellerCompany) {
+        try {
+          await storage.autoCreatePendingCompanyFromSalesComp({
+            salesCompId: comp.id,
+            orgId,
+            userId,
+            companyName: compData.sellerCompany,
+            role: 'seller',
+            city: compData.city,
+            state: compData.state,
+          });
+        } catch (companyError) {
+          console.error('Error auto-creating pending seller company:', companyError);
         }
       }
 
       // Auto-create pending contact if agent info was provided
       if (compData.agentFirstName || compData.agentLastName) {
         try {
-          const contactResult = await storage.autoCreatePendingContactFromSalesComp({
+          await storage.autoCreatePendingContactFromSalesComp({
             salesCompId: comp.id,
             orgId,
             userId,
@@ -11572,8 +11588,6 @@ Current context: Project ${req.params.projectId}`;
             agentLastName: compData.agentLastName,
             brokerage: compData.brokerage,
           });
-          if (contactResult.created) {
-          }
         } catch (contactError) {
           console.error('Error auto-creating pending contact:', contactError);
         }
@@ -11631,26 +11645,41 @@ Current context: Project ${req.params.projectId}`;
       // Auto-create pending company if buyerCompany was provided
       if (updates.buyerCompany) {
         try {
-          const companyResult = await storage.autoCreatePendingCompanyFromSalesComp({
+          await storage.autoCreatePendingCompanyFromSalesComp({
             salesCompId: req.params.id,
             orgId,
             userId,
-            buyerCompany: updates.buyerCompany,
+            companyName: updates.buyerCompany,
+            role: 'buyer',
             city: updates.city,
             state: updates.state,
           });
-          if (companyResult.created) {
-          } else {
-          }
         } catch (companyError) {
-          console.error('Error auto-creating pending company:', companyError);
+          console.error('Error auto-creating pending buyer company:', companyError);
+        }
+      }
+
+      // Auto-create pending company if sellerCompany was provided
+      if (updates.sellerCompany) {
+        try {
+          await storage.autoCreatePendingCompanyFromSalesComp({
+            salesCompId: req.params.id,
+            orgId,
+            userId,
+            companyName: updates.sellerCompany,
+            role: 'seller',
+            city: updates.city,
+            state: updates.state,
+          });
+        } catch (companyError) {
+          console.error('Error auto-creating pending seller company:', companyError);
         }
       }
 
       // Auto-create pending contact if agent info was provided
       if (updates.agentFirstName || updates.agentLastName) {
         try {
-          const contactResult = await storage.autoCreatePendingContactFromSalesComp({
+          await storage.autoCreatePendingContactFromSalesComp({
             salesCompId: req.params.id,
             orgId,
             userId,
@@ -11658,9 +11687,6 @@ Current context: Project ${req.params.projectId}`;
             agentLastName: updates.agentLastName,
             brokerage: updates.brokerage,
           });
-          if (contactResult.created) {
-          } else {
-          }
         } catch (contactError) {
           console.error('Error auto-creating pending contact:', contactError);
         }
