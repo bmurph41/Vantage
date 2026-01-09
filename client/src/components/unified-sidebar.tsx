@@ -232,9 +232,9 @@ export default function UnifiedSidebar() {
     const isPipelinePage = ['/deal-workspace', '/crm/activity', '/crm/tasks', '/crm/forecast'].includes(location) || location.startsWith('/deal-workspace');
     // Prospecting section: Overview and Workroom
     const isProspectingPage = location === '/prospecting' || location.startsWith('/prospecting/');
-    // Deal Workspace: consolidated DD, VDR, and Modeling project pages
-    const isDealWorkspacePage = location.startsWith('/workspaces') || location === '/projects' || location === '/progress-report' || location.startsWith('/vdr') || location.startsWith('/modeling/projects');
-    // Underwriting Tools: Modeling Projects, Debt Scenarios, Exit Strategies, P&L Parser, OM Builder, Modeling Settings
+    // Deal Workspace: consolidated DD, VDR pages (workspaces, DD projects, data room)
+    const isDealWorkspacePage = location.startsWith('/workspaces') || location === '/projects' || location === '/progress-report' || location.startsWith('/vdr');
+    // Underwriting Tools: Modeling Projects (Valuator), Debt Scenarios, Exit Strategies, P&L Parser, OM Builder, Modeling Settings
     const isUnderwritingToolsPage = location.startsWith('/modeling/projects') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/om') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings');
     // Investor Services: Fund Management, LP Portal (GP only)
     const isInvestorServicesPage = location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal');
