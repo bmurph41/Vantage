@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Minus, DollarSign, Home, Percent, Database } from "lucide-react";
+import { formatCurrency, formatPercent } from "@/lib/utils";
 
 interface OverallStats {
   count: number;
@@ -16,34 +17,6 @@ interface OverallStats {
 interface StatisticsPanelProps {
   stats: OverallStats;
   isLoading?: boolean;
-}
-
-function formatCurrency(value: number | null | undefined, compact: boolean = false): string {
-  if (value === null || value === undefined || isNaN(Number(value))) {
-    return 'N/A';
-  }
-  const numValue = Number(value);
-  if (numValue >= 1000000000) {
-    return `$${(numValue / 1000000000).toFixed(2)}B`;
-  }
-  if (numValue >= 1000000) {
-    return `$${(numValue / 1000000).toFixed(2)}M`;
-  }
-  if (compact && numValue >= 1000) {
-    return `$${(numValue / 1000).toFixed(1)}K`;
-  }
-  return `$${Math.round(numValue).toLocaleString('en-US')}`;
-}
-
-function formatPercent(value: number | null | undefined): string {
-  if (value === null || value === undefined || isNaN(Number(value))) {
-    return 'N/A';
-  }
-  const numValue = Number(value);
-  if (numValue > 1) {
-    return `${numValue.toFixed(2)}%`;
-  }
-  return `${(numValue * 100).toFixed(2)}%`;
 }
 
 export default function StatisticsPanel({ stats, isLoading }: StatisticsPanelProps) {

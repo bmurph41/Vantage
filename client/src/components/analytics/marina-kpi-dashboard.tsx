@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatCurrency, formatPercent } from "@/lib/utils";
 import { 
   Anchor, 
   TrendingUp, 
@@ -82,19 +83,6 @@ export default function MarinaKpiDashboard() {
     queryKey: ['/api/analytics/marina-kpis'],
     refetchInterval: 300000, // Refresh every 5 minutes
   });
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const formatPercentage = (value: number) => {
-    return `${value.toFixed(2)}%`;
-  };
 
   const getPerformanceColor = (value: number, threshold: number = 80) => {
     if (value >= threshold) return 'text-green-600';
@@ -197,7 +185,7 @@ export default function MarinaKpiDashboard() {
                 <TrendingUp className="w-5 h-5 text-orange-600" />
               </div>
               <div className="text-2xl font-bold text-orange-900">
-                {formatPercentage(kpiData.overview.seasonalGrowth)}
+                {formatPercent(kpiData.overview.seasonalGrowth)}
               </div>
               <div className="text-sm text-orange-700">Seasonal Growth</div>
             </div>
@@ -216,7 +204,7 @@ export default function MarinaKpiDashboard() {
             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
               <div>
                 <div className="text-sm text-gray-600">Market Share</div>
-                <div className="font-bold">{formatPercentage(kpiData.overview.marketShare)}</div>
+                <div className="font-bold">{formatPercent(kpiData.overview.marketShare)}</div>
               </div>
               <Activity className="w-5 h-5 text-gray-600" />
             </div>
@@ -224,7 +212,7 @@ export default function MarinaKpiDashboard() {
             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
               <div>
                 <div className="text-sm text-gray-600">Slip Utilization</div>
-                <div className="font-bold">{formatPercentage(kpiData.performance.slipUtilization)}</div>
+                <div className="font-bold">{formatPercent(kpiData.performance.slipUtilization)}</div>
               </div>
               <Building className="w-5 h-5 text-gray-600" />
             </div>
@@ -253,7 +241,7 @@ export default function MarinaKpiDashboard() {
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium">Customer Retention</span>
                         <span className={`font-bold ${getPerformanceColor(kpiData.performance.customerRetention)}`}>
-                          {formatPercentage(kpiData.performance.customerRetention)}
+                          {formatPercent(kpiData.performance.customerRetention)}
                         </span>
                       </div>
                       <Progress value={kpiData.performance.customerRetention} className="h-2" />
@@ -263,7 +251,7 @@ export default function MarinaKpiDashboard() {
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium">Referral Rate</span>
                         <span className={`font-bold ${getPerformanceColor(kpiData.performance.referralRate, 30)}`}>
-                          {formatPercentage(kpiData.performance.referralRate)}
+                          {formatPercent(kpiData.performance.referralRate)}
                         </span>
                       </div>
                       <Progress value={kpiData.performance.referralRate} className="h-2" />
@@ -273,7 +261,7 @@ export default function MarinaKpiDashboard() {
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium">Boat Show Conversion</span>
                         <span className={`font-bold ${getPerformanceColor(kpiData.performance.boatShowConversion, 25)}`}>
-                          {formatPercentage(kpiData.performance.boatShowConversion)}
+                          {formatPercent(kpiData.performance.boatShowConversion)}
                         </span>
                       </div>
                       <Progress value={kpiData.performance.boatShowConversion} className="h-2" />
@@ -285,7 +273,7 @@ export default function MarinaKpiDashboard() {
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium">Seasonal Efficiency</span>
                         <span className={`font-bold ${getPerformanceColor(kpiData.performance.seasonalEfficiency)}`}>
-                          {formatPercentage(kpiData.performance.seasonalEfficiency)}
+                          {formatPercent(kpiData.performance.seasonalEfficiency)}
                         </span>
                       </div>
                       <Progress value={kpiData.performance.seasonalEfficiency} className="h-2" />
@@ -295,7 +283,7 @@ export default function MarinaKpiDashboard() {
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium">Listing Turnover</span>
                         <span className={`font-bold ${getPerformanceColor(kpiData.performance.listingTurnover, 60)}`}>
-                          {formatPercentage(kpiData.performance.listingTurnover)}
+                          {formatPercent(kpiData.performance.listingTurnover)}
                         </span>
                       </div>
                       <Progress value={kpiData.performance.listingTurnover} className="h-2" />
@@ -455,7 +443,7 @@ export default function MarinaKpiDashboard() {
                               <div className="text-gray-500">Slips Sold</div>
                             </div>
                             <div>
-                              <div className="font-medium">{formatPercentage(marina.marketShare)}</div>
+                              <div className="font-medium">{formatPercent(marina.marketShare)}</div>
                               <div className="text-gray-500">Market Share</div>
                             </div>
                           </div>
@@ -490,7 +478,7 @@ export default function MarinaKpiDashboard() {
                         <div className="flex items-center justify-between mb-2">
                           <span className="font-medium">Show Conversion Rate</span>
                           <span className={`font-bold ${getPerformanceColor(kpiData.regionalData.boatShows.conversionRate, 25)}`}>
-                            {formatPercentage(kpiData.regionalData.boatShows.conversionRate)}
+                            {formatPercent(kpiData.regionalData.boatShows.conversionRate)}
                           </span>
                         </div>
                         <Progress value={kpiData.regionalData.boatShows.conversionRate} className="h-2" />
@@ -533,7 +521,7 @@ export default function MarinaKpiDashboard() {
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-medium">Year-over-Year Growth</span>
                         <span className={`font-bold ${kpiData.seasonalMetrics.yearOverYear >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {kpiData.seasonalMetrics.yearOverYear >= 0 ? '+' : ''}{formatPercentage(kpiData.seasonalMetrics.yearOverYear)}
+                          {kpiData.seasonalMetrics.yearOverYear >= 0 ? '+' : ''}{formatPercent(kpiData.seasonalMetrics.yearOverYear)}
                         </span>
                       </div>
                       <Progress 

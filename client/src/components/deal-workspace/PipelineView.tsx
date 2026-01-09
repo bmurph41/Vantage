@@ -29,6 +29,7 @@ import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Deal, Contact, Company, PipelineStage, Pipeline } from "@shared/schema";
+import { formatCurrency } from "@/lib/utils";
 
 type DealWithRelations = Deal & {
   contact?: Contact | null;
@@ -39,14 +40,6 @@ interface PipelineViewProps {
   searchQuery: string;
   onEditDeal: (deal: Deal) => void;
 }
-
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-  }).format(amount);
-};
 
 const getPriorityColor = (priority: string) => {
   switch (priority) {

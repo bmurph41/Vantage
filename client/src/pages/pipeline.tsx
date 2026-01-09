@@ -49,18 +49,11 @@ import { useToast } from "@/hooks/use-toast";
 import DealFormModal from "@/components/modals/deal-form-modal";
 import PipelineSettingsModal from "@/components/modals/pipeline-settings-modal";
 import type { Deal, Contact, Company, PipelineStage, Pipeline } from "@shared/schema";
+import { formatCurrency } from "@/lib/utils";
 
 type DealWithRelations = Deal & {
   contact?: Contact | null;
   company?: Company | null;
-};
-
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-  }).format(amount);
 };
 
 const getPriorityColor = (priority: string) => {

@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { apiRequest } from '@/lib/queryClient';
+import { formatCurrency, formatNumber, formatPercent } from '@/lib/utils';
 import { TrendChart } from './charts/TrendChart';
 import { PieChart } from './charts/PieChart';
 import { ComboChart } from './charts/ComboChart';
@@ -52,15 +53,15 @@ export function PreviewPanel({ title, visualizationType, moduleType, config }: P
 
     const formatValue = (value: number) => {
       const metric = config.metrics?.[0];
-      if (!metric) return value.toLocaleString();
+      if (!metric) return formatNumber(value);
       
       switch (metric.format) {
         case 'currency':
-          return `$${value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+          return formatCurrency(value);
         case 'percent':
-          return `${value.toFixed(2)}%`;
+          return formatPercent(value);
         default:
-          return value.toLocaleString();
+          return formatNumber(value);
       }
     };
 

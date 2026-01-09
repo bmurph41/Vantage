@@ -3,6 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Users } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
 import type { CustomerSegment } from "@/types/customer-analytics";
 
 interface Props {
@@ -55,15 +56,6 @@ export function SegmentBreakdown({ data, isLoading, error }: Props) {
       </Card>
     );
   }
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
 
   const chartData = data.map(segment => ({
     name: segment.segment.charAt(0).toUpperCase() + segment.segment.slice(1),

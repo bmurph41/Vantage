@@ -31,6 +31,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import type { Deal, Note, File as FileType, Product, DealProduct, Activity } from "@shared/schema";
+import { formatCurrency } from "@/lib/utils";
 
 type DealProductWithProduct = DealProduct & { product: Product };
 
@@ -53,7 +54,7 @@ export function DealDrawer({ deal, isOpen, onClose }: DealDrawerProps) {
               <Badge variant="outline">{deal.stage}</Badge>
               {deal.value && (
                 <span className="text-lg font-semibold text-green-600">
-                  ${parseFloat(deal.value).toLocaleString()}
+                  {formatCurrency(parseFloat(deal.value))}
                 </span>
               )}
             </div>

@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { MapPin, DollarSign, TrendingUp } from "lucide-react";
+import { formatCurrency, formatPercent } from "@/lib/utils";
 
 interface MetricResult {
   metric: string;
@@ -25,17 +26,6 @@ const COLORS = [
   'hsl(var(--secondary))',
   'hsl(var(--accent))',
 ];
-
-function formatCurrency(value: number): string {
-  if (value >= 1000000) {
-    return `$${(value / 1000000).toFixed(2)}M`;
-  }
-  return `$${value.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
-}
-
-function formatPercent(value: number): string {
-  return `${(value * 100).toFixed(2)}%`;
-}
 
 export default function RegionalComparisonView({ byState, byWaterType, isLoading }: RegionalComparisonViewProps) {
   if (isLoading) {

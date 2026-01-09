@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { apiRequest } from "@/lib/queryClient";
+import { formatCurrency, formatPercent } from "@/lib/utils";
 import { 
   RefreshCw, Search, MapPin, DollarSign, Anchor, 
   ExternalLink, Star, Clock, Filter, Fuel, Store,
@@ -595,10 +596,7 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
 
   const formatPrice = (price: string | undefined) => {
     if (!price) return "—";
-    const num = parseFloat(price);
-    if (num >= 1000000) return `$${(num / 1000000).toFixed(1)}M`;
-    if (num >= 1000) return `$${(num / 1000).toFixed(0)}K`;
-    return `$${num.toFixed(0)}`;
+    return formatCurrency(price);
   };
 
   const getScoreColor = (score: number | undefined) => {
@@ -1740,12 +1738,12 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
                               )}
                               {listing.capRate && (
                                 <span className="text-muted-foreground font-medium">
-                                  {parseFloat(listing.capRate).toFixed(1)}% cap
+                                  {formatPercent(parseFloat(listing.capRate))} cap
                                 </span>
                               )}
                               {listing.occupancyRate && (
                                 <span className="text-muted-foreground">
-                                  {parseFloat(listing.occupancyRate).toFixed(0)}% occupied
+                                  {formatPercent(parseFloat(listing.occupancyRate))} occupied
                                 </span>
                               )}
                             </div>
@@ -1918,7 +1916,7 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
                     </p>
                     {selectedListing.capRate && (
                       <p className="text-muted-foreground">
-                        {parseFloat(selectedListing.capRate).toFixed(2)}% Cap Rate
+                        {formatPercent(parseFloat(selectedListing.capRate))} Cap Rate
                       </p>
                     )}
                   </div>
@@ -1938,7 +1936,7 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
                   <div>
                     <h4 className="font-medium mb-1">Occupancy</h4>
                     <p className="text-lg">
-                      {selectedListing.occupancyRate ? `${parseFloat(selectedListing.occupancyRate).toFixed(0)}%` : "—"}
+                      {selectedListing.occupancyRate ? formatPercent(parseFloat(selectedListing.occupancyRate)) : "—"}
                     </p>
                   </div>
                 </div>

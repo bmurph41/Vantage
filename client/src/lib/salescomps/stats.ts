@@ -1,3 +1,5 @@
+import { formatCurrency as formatCurrencyBase, formatPercent as formatPercentBase } from "@/lib/utils";
+
 export interface StatSummary {
   count: number;
   sum: number;
@@ -130,23 +132,12 @@ export function createHistogram(
 
 export function formatCurrency(value: number | null | undefined): string {
   if (value == null || !isFinite(value)) return '—';
-  
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
+  return formatCurrencyBase(value);
 }
 
 export function formatPercent(value: number | null | undefined): string {
   if (value == null || !isFinite(value)) return '—';
-  
-  return new Intl.NumberFormat('en-US', {
-    style: 'percent',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value / 100);
+  return formatPercentBase(value);
 }
 
 export function formatNumber(value: number | null | undefined, decimals: number = 0): string {

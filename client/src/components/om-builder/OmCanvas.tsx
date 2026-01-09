@@ -1,7 +1,7 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
 import { Rnd, type RndResizeCallback, type RndDragCallback } from 'react-rnd';
 import { useOmEditorStore, type OmBlock, type OmPage } from '@/stores/om-editor-store';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency, formatPercent, formatNumber } from '@/lib/utils';
 
 const BLEED_PX = 9;
 const TRIM_PX = 0;
@@ -357,9 +357,9 @@ function ImageBlock({ data }: { data: { type: 'image'; src: string; alt?: string
 function KpiBlock({ data }: { data: { type: 'kpi'; label: string; value: string | number; format?: string; prefix?: string; suffix?: string } }) {
   const formatValue = (val: string | number) => {
     if (typeof val === 'number') {
-      if (data.format === 'currency') return `$${val.toLocaleString()}`;
-      if (data.format === 'percent') return `${(val * 100).toFixed(1)}%`;
-      return val.toLocaleString();
+      if (data.format === 'currency') return formatCurrency(val);
+      if (data.format === 'percent') return formatPercent(val * 100);
+      return formatNumber(val);
     }
     return val;
   };

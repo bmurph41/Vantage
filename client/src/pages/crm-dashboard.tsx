@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Users, Building2, DollarSign, TrendingUp, Phone, Mail, Calendar } from "lucide-react";
 import { Link } from "wouter";
+import { formatCurrency } from "@/lib/utils";
 
 export default function CRMDashboard() {
   const { data: dealsData, isLoading: dealsLoading } = useQuery({
@@ -41,7 +42,7 @@ export default function CRMDashboard() {
       title: "Total Deals",
       value: safeDeals.length,
       icon: DollarSign,
-      description: `$${totalDealValue.toLocaleString()} in pipeline`,
+      description: `${formatCurrency(totalDealValue)} in pipeline`,
       link: "/crm/deals",
       color: "text-green-600",
       bgColor: "bg-green-100",
@@ -167,7 +168,7 @@ export default function CRMDashboard() {
                   </div>
                   <div className="text-right">
                     <div className="font-semibold text-lg" data-testid={`text-deal-value-${deal.id}`}>
-                      ${parseFloat(deal.value || deal.amount || 0).toLocaleString()}
+                      {formatCurrency(parseFloat(deal.value || deal.amount || 0))}
                     </div>
                     <div className="text-sm text-muted-foreground capitalize">
                       {deal.stage || "New"}

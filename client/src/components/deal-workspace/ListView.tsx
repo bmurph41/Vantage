@@ -15,6 +15,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { DealDrawer } from "@/components/deal-drawer";
 import type { Deal, Contact, Company, PipelineStage } from "@shared/schema";
+import { formatCurrency } from "@/lib/utils";
 
 type DealWithRelations = Deal & { contact?: Contact | null; company?: Company | null };
 
@@ -22,14 +23,6 @@ interface ListViewProps {
   searchQuery: string;
   onEditDeal: (deal: Deal) => void;
 }
-
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-  }).format(amount);
-};
 
 const getPriorityColor = (priority: string) => {
   switch (priority) {

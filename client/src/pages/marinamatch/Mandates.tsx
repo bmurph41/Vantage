@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { Plus, Target, Edit, Trash2, RefreshCw, MapPin, DollarSign, Building, Anchor } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { formatCurrency } from "@/lib/utils";
 
 type InvestmentMandate = {
   id: string;
@@ -109,13 +110,9 @@ export function MandatesTab() {
     },
   });
 
-  const formatCurrency = (value: string | undefined) => {
+  const formatCurrencyValue = (value: string | undefined) => {
     if (!value) return null;
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      maximumFractionDigits: 0,
-    }).format(parseFloat(value));
+    return formatCurrency(value);
   };
 
   return (
@@ -199,7 +196,7 @@ export function MandatesTab() {
                     <div className="flex items-center gap-2">
                       <DollarSign className="h-4 w-4 text-muted-foreground" />
                       <span>
-                        {formatCurrency(mandate.minPrice)} - {formatCurrency(mandate.maxPrice)}
+                        {formatCurrencyValue(mandate.minPrice)} - {formatCurrencyValue(mandate.maxPrice)}
                       </span>
                     </div>
                   )}

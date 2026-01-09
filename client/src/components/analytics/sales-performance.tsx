@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { formatCurrency, formatPercent } from "@/lib/utils";
 
 interface SalesAgent {
   id: string;
@@ -116,19 +117,6 @@ export default function SalesPerformance({ dateRange }: SalesPerformanceProps) {
       return response.json();
     },
   });
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const formatPercent = (value: number) => {
-    return `${value.toFixed(2)}%`;
-  };
 
   const getPerformanceTier = (agent: SalesAgent) => {
     if (teamMetrics?.topPerformers.includes(agent)) return 'top';

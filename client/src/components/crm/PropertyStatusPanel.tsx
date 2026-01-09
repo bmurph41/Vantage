@@ -35,7 +35,7 @@ import {
   TrendingUp,
   User,
 } from 'lucide-react';
-import { formatCurrency } from '@/lib/formatUtils';
+import { formatCurrency } from '@/lib/utils';
 import { format } from 'date-fns';
 
 export type PipelineStage = 'lead' | 'opportunity' | 'under_contract' | 'closed';

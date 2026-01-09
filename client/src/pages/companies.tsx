@@ -16,6 +16,7 @@ import { FileUpload } from "@/components/file-upload";
 import KpiSettingsModal from "@/components/modals/kpi-settings-modal";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { formatNumber } from "@/lib/utils";
 import type { Company, Contact, Property, KpiConfigItem } from "@shared/schema";
 
 const industryColors = {
@@ -473,7 +474,7 @@ export default function Companies() {
                       </div>
                     ) : (
                       <p className="text-2xl font-bold text-gray-900 mt-1">
-                        {value?.toLocaleString() || 0}
+                        {formatNumber(value)}
                       </p>
                     )}
                   </div>

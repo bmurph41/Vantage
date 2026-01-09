@@ -16,21 +16,13 @@ import { useToast } from "@/hooks/use-toast";
 import DealFormModal from "@/components/modals/deal-form-modal";
 import LeadFormModal from "@/components/modals/lead-form-modal";
 import type { Deal, Contact, Company, PipelineStage, Lead } from "@shared/schema";
+import { formatCurrency } from "@/lib/utils";
 
 const PipelineView = lazy(() => import("@/components/deal-workspace/PipelineView"));
 const ListView = lazy(() => import("@/components/deal-workspace/ListView"));
 const LeadsView = lazy(() => import("@/components/deal-workspace/LeadsView"));
 
 type DealWithRelations = Deal & { contact?: Contact | null; company?: Company | null };
-
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
-};
 
 function KpiCard({ 
   title, 

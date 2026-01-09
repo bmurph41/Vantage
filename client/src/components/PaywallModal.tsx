@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Check, Sparkles, Building, Calculator, ChartLine, Anchor, Briefcase, Users, Target, BarChart3, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/lib/utils";
 
 type CorePackType = 'crm_pipeline' | 'modeling_tools' | 'analysis' | 'operations';
 type AddonPackType = 'fund_management' | 'lp_portal' | 'prospecting' | 'analytics_pro';
@@ -40,7 +41,7 @@ const PACK_ICONS: Record<PackType, typeof Briefcase> = {
 };
 
 function formatPrice(cents: number): string {
-  return `$${(cents / 100).toFixed(0)}`;
+  return formatCurrency(cents / 100);
 }
 
 interface PaywallModalProps {

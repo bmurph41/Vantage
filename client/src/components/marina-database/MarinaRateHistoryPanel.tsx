@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { TrendingUp, TrendingDown, Minus, DollarSign, Ship, Calendar } from "lucide-react";
+import { formatCurrency, formatPercent } from "@/lib/utils";
 import type { MarinaRate } from "@shared/schema";
 
 interface MarinaRateHistoryPanelProps {
@@ -44,16 +45,8 @@ export default function MarinaRateHistoryPanel({ marinaId, rates, showCurrentOnl
       }));
   }, [filteredRates]);
 
-  const formatCurrency = (value: number | null | undefined) => {
-    if (value === null || value === undefined) return "-";
-    return "$" + new Intl.NumberFormat("en-US", {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(Math.round(value));
-  };
-
-  const formatPercentage = (value: number) => {
-    return value.toFixed(2) + "%";
+  const formatPercentageLocal = (value: number) => {
+    return formatPercent(value);
   };
 
   const getTrend = (currentRate: MarinaRate) => {
@@ -144,12 +137,12 @@ export default function MarinaRateHistoryPanel({ marinaId, rates, showCurrentOnl
                         {trend.change > 0 ? (
                           <>
                             <TrendingUp className="h-3 w-3 text-green-500" />
-                            <span className="text-green-600">+{formatPercentage(trend.change)}</span>
+                            <span className="text-green-600">+{formatPercentageLocal(trend.change)}</span>
                           </>
                         ) : trend.change < 0 ? (
                           <>
                             <TrendingDown className="h-3 w-3 text-red-500" />
-                            <span className="text-red-600">{formatPercentage(trend.change)}</span>
+                            <span className="text-red-600">{formatPercentageLocal(trend.change)}</span>
                           </>
                         ) : (
                           <>

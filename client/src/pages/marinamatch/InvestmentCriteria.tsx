@@ -21,17 +21,13 @@ import {
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { formatCurrency, formatPercent } from "@/lib/utils";
 
-function formatCurrency(value: string | number | undefined): string {
+function formatCurrencyInput(value: string | number | undefined): string {
   if (value === undefined || value === "" || value === null) return "";
   const numValue = typeof value === "string" ? parseFloat(value.replace(/[^0-9.-]/g, "")) : value;
   if (isNaN(numValue)) return "";
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(numValue);
+  return formatCurrency(numValue);
 }
 
 function parseCurrency(value: string): number | undefined {
@@ -41,11 +37,11 @@ function parseCurrency(value: string): number | undefined {
   return isNaN(parsed) ? undefined : parsed;
 }
 
-function formatPercentage(value: string | number | undefined): string {
+function formatPercentageInput(value: string | number | undefined): string {
   if (value === undefined || value === "" || value === null) return "";
   const numValue = typeof value === "string" ? parseFloat(value.replace(/[^0-9.-]/g, "")) : value;
   if (isNaN(numValue)) return "";
-  return `${numValue.toFixed(2)}%`;
+  return formatPercent(numValue);
 }
 
 function parsePercentage(value: string): number | undefined {
@@ -68,7 +64,7 @@ function CurrencyInput({ value, onChange, placeholder, ...props }: {
   useEffect(() => {
     if (!isEditing && value !== lastSyncedValue.current) {
       lastSyncedValue.current = typeof value === "number" ? value : undefined;
-      setLocalValue(formatCurrency(value));
+      setLocalValue(formatCurrencyInput(value));
     }
   }, [value, isEditing]);
 
@@ -93,7 +89,7 @@ function CurrencyInput({ value, onChange, placeholder, ...props }: {
           const parsed = parseCurrency(localValue);
           lastSyncedValue.current = parsed;
           onChange(parsed);
-          setLocalValue(formatCurrency(parsed));
+          setLocalValue(formatCurrencyInput(parsed));
         }
       }}
       placeholder={placeholder || "$0"}
@@ -114,7 +110,7 @@ function PercentageInput({ value, onChange, placeholder, ...props }: {
   useEffect(() => {
     if (!isEditing && value !== lastSyncedValue.current) {
       lastSyncedValue.current = typeof value === "number" ? value : undefined;
-      setLocalValue(formatPercentage(value));
+      setLocalValue(formatPercentageInput(value));
     }
   }, [value, isEditing]);
 
@@ -139,7 +135,7 @@ function PercentageInput({ value, onChange, placeholder, ...props }: {
           const parsed = parsePercentage(localValue);
           lastSyncedValue.current = parsed;
           onChange(parsed);
-          setLocalValue(formatPercentage(parsed));
+          setLocalValue(formatPercentageInput(parsed));
         }
       }}
       placeholder={placeholder || "0.00%"}

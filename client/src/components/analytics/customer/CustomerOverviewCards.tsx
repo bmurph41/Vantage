@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Users, TrendingUp, DollarSign, Calendar, UserPlus, UserMinus, ArrowUpDown } from "lucide-react";
+import { formatCurrency, formatPercent } from "@/lib/utils";
 import type { CustomerOverview } from "@/types/customer-analytics";
 
 interface Props {
@@ -40,19 +41,6 @@ export function CustomerOverviewCards({ data, isLoading, error, periodLabel }: P
       </div>
     );
   }
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const formatPercent = (value: number) => {
-    return `${value.toFixed(2)}%`;
-  };
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

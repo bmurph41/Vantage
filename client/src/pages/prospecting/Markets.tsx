@@ -7,6 +7,7 @@ import {
   MapPin, Plus, Search, Filter, Target, TrendingUp, Building2,
   ChevronRight, Globe, Users, DollarSign
 } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
 
 type MarketTarget = {
   id: string;
@@ -59,14 +60,6 @@ export default function MarketTargets() {
     }
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
 
   return (
     <div className="flex-1 overflow-auto p-6 bg-gray-50">

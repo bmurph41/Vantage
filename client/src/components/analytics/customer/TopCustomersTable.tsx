@@ -3,6 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Trophy } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
 import type { TopCustomer } from "@/types/customer-analytics";
 import { formatDistanceToNow } from "date-fns";
 
@@ -52,15 +53,6 @@ export function TopCustomersTable({ data, isLoading, error }: Props) {
       </Card>
     );
   }
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
 
   const formatName = (customer: TopCustomer) => {
     if (customer.firstName && customer.lastName) {

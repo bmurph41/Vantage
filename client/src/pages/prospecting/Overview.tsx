@@ -11,6 +11,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { Link } from "wouter";
+import { formatCurrency, formatNumber } from "@/lib/utils";
 
 type KpiCardProps = {
   title: string;
@@ -220,7 +221,7 @@ export default function ProspectingOverview() {
           />
           <KpiCard
             title="Total Touches"
-            value={totalTouches.toLocaleString()}
+            value={formatNumber(totalTouches)}
             change={stats?.callsChange}
             icon={Phone}
             color="bg-green-500"
@@ -235,7 +236,7 @@ export default function ProspectingOverview() {
           />
           <KpiCard
             title="Pipeline Value"
-            value={`$${(pipelineValue / 1000000).toFixed(1)}M`}
+            value={formatCurrency(pipelineValue)}
             icon={DollarSign}
             color="bg-orange-500"
             isLoading={isLoadingStats}
@@ -255,7 +256,7 @@ export default function ProspectingOverview() {
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm text-gray-600">{stage.name}</span>
                       <div className="flex items-center space-x-2">
-                        <span className="text-sm font-medium">{stage.value.toLocaleString()}</span>
+                        <span className="text-sm font-medium">{formatNumber(stage.value)}</span>
                         <Badge variant="secondary" className="text-xs">{stage.percentage}%</Badge>
                       </div>
                     </div>

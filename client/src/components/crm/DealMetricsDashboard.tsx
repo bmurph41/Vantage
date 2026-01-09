@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { DollarSign, TrendingUp, Clock, Target, ArrowRight, BarChart3 } from "lucide-react";
 import type { CrmDeal, CrmPipelineStage } from "@shared/schema";
+import { formatCurrency } from "@/lib/utils";
 
 interface DealMetricsDashboardProps {
   pipelineId?: string;
@@ -80,11 +81,6 @@ export function DealMetricsDashboard({ pipelineId }: DealMetricsDashboardProps) 
       return { stage, dealCount: stageDeals.length, value };
     });
 
-  const formatCurrency = (value: number) => {
-    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
-    if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
-    return `$${value.toFixed(0)}`;
-  };
 
   return (
     <div className="space-y-6">

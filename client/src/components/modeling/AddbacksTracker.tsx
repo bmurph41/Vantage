@@ -45,7 +45,7 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react';
-import { formatCurrency } from '@/lib/formatUtils';
+import { formatCurrency } from '@/lib/utils';
 
 interface AddbacksTrackerProps {
   projectId: string;

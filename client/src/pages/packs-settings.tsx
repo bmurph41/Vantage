@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Check, Lock, Briefcase, Users, Target, BarChart3, Building, Calculator, ChartLine, Anchor, DollarSign, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useStripeStatus } from "@/hooks/useStripeStatus";
+import { formatCurrency } from "@/lib/utils";
 
 // Core packs that users purchase first
 type CorePackType = 'crm_pipeline' | 'modeling_tools' | 'analysis' | 'operations';
@@ -45,7 +46,7 @@ const PACK_ICONS: Record<PackType, typeof Briefcase> = {
 };
 
 function formatPrice(cents: number): string {
-  return `$${(cents / 100).toFixed(0)}`;
+  return formatCurrency(cents / 100);
 }
 
 export default function PacksSettingsPage() {

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatCurrency, formatPercent } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -171,24 +172,6 @@ interface Fund {
 }
 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
-
-function formatCurrency(value: number | string): string {
-  const num = typeof value === 'string' ? parseFloat(value) : value;
-  if (isNaN(num)) return '$0';
-  if (num >= 1000000) {
-    return `$${(num / 1000000).toFixed(1)}M`;
-  } else if (num >= 1000) {
-    return `$${(num / 1000).toFixed(0)}K`;
-  }
-  return `$${num.toFixed(0)}`;
-}
-
-function formatPercent(value: number | string | null): string {
-  if (value === null) return '-';
-  const num = typeof value === 'string' ? parseFloat(value) : value;
-  if (isNaN(num)) return '-';
-  return `${(num * 100).toFixed(2)}%`;
-}
 
 function formatMultiple(value: number | string | null): string {
   if (value === null) return '-';

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { format, addMonths, startOfMonth } from "date-fns";
+import { formatCurrency, formatPercent } from "@/lib/utils";
 
 interface ForecastData {
   period: string;
@@ -114,19 +115,6 @@ export default function ForecastingDashboard({ timeframe = 'month' }: Forecastin
       return response.json();
     },
   });
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const formatPercent = (value: number) => {
-    return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
-  };
 
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 80) return 'text-green-600 bg-green-100';

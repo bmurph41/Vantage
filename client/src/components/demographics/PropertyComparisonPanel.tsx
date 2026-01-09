@@ -8,6 +8,7 @@ import {
   MapPin, Lightbulb
 } from "lucide-react";
 import { useState } from "react";
+import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils";
 
 interface DemographicData {
   totalPopulation?: number;
@@ -32,19 +33,19 @@ interface PropertyComparisonPanelProps {
   onRemoveLocation?: (index: number) => void;
 }
 
-const formatCurrency = (value: number | null | undefined): string => {
+const formatCurrencyOrNA = (value: number | null | undefined): string => {
   if (value === null || value === undefined) return "N/A";
-  return `$${Math.round(value).toLocaleString('en-US')}`;
+  return formatCurrency(value);
 };
 
-const formatNumber = (value: number | null | undefined): string => {
+const formatNumberOrNA = (value: number | null | undefined): string => {
   if (value === null || value === undefined) return "N/A";
-  return new Intl.NumberFormat('en-US').format(Math.round(value));
+  return formatNumber(value);
 };
 
-const formatPercent = (value: number | null | undefined): string => {
+const formatPercentOrNA = (value: number | null | undefined): string => {
   if (value === null || value === undefined) return "N/A";
-  return `${value.toFixed(1)}%`;
+  return formatPercent(value);
 };
 
 function calculateBachelorsPercentage(educationLevels: Record<string, number> | undefined): number | null {
@@ -97,7 +98,7 @@ export default function PropertyComparisonPanel({ locations, onRemoveLocation }:
       const sorted = [...populations].sort((a, b) => (b.value || 0) - (a.value || 0));
       const highest = sorted[0];
       if (highest.value) {
-        generated.push(`${highest.label} serves the largest population base (${formatNumber(highest.value)})`);
+        generated.push(`${highest.label} serves the largest population base (${formatNumberOrNA(highest.value)})`);
       }
     }
     
@@ -139,7 +140,7 @@ export default function PropertyComparisonPanel({ locations, onRemoveLocation }:
         label: 'Population', 
         icon: Users, 
         getValue: (d: DemographicData) => d.totalPopulation,
-        format: formatNumber,
+        format: formatNumberOrNA,
         color: 'text-blue-600'
       },
       { 
@@ -155,7 +156,7 @@ export default function PropertyComparisonPanel({ locations, onRemoveLocation }:
         label: 'Median Income', 
         icon: DollarSign, 
         getValue: (d: DemographicData) => d.medianHouseholdIncome,
-        format: formatCurrency,
+        format: formatCurrencyOrNA,
         color: 'text-green-600'
       },
       { 
@@ -163,7 +164,7 @@ export default function PropertyComparisonPanel({ locations, onRemoveLocation }:
         label: 'Home Value', 
         icon: Home, 
         getValue: (d: DemographicData) => d.medianHomeValue,
-        format: formatCurrency,
+        format: formatCurrencyOrNA,
         color: 'text-purple-600'
       },
       { 
@@ -171,7 +172,7 @@ export default function PropertyComparisonPanel({ locations, onRemoveLocation }:
         label: 'Bachelor\'s+', 
         icon: GraduationCap, 
         getValue: (d: DemographicData) => calculateBachelorsPercentage(d.educationLevels),
-        format: formatPercent,
+        format: formatPercentOrNA,
         color: 'text-amber-600'
       },
       { 
@@ -179,7 +180,7 @@ export default function PropertyComparisonPanel({ locations, onRemoveLocation }:
         label: 'Employment', 
         icon: Briefcase, 
         getValue: (d: DemographicData) => calculateEmploymentRate(d.employmentStats),
-        format: formatPercent,
+        format: formatPercentOrNA,
         color: 'text-teal-600'
       },
     ];

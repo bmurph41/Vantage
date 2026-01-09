@@ -17,6 +17,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
+import { formatCurrency, formatPercent } from "@/lib/utils";
 
 type SourcedDeal = {
   id: string;
@@ -135,13 +136,9 @@ export function DealTrackerTab() {
     return true;
   });
 
-  const formatCurrency = (value: string | undefined) => {
+  const formatCurrencyValue = (value: string | undefined) => {
     if (!value) return "—";
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      maximumFractionDigits: 0,
-    }).format(parseFloat(value));
+    return formatCurrency(value);
   };
 
   return (
@@ -274,16 +271,16 @@ export function DealTrackerTab() {
                       <div className="mt-2 flex items-center gap-4 text-sm">
                         <div className="flex items-center gap-1">
                           <DollarSign className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{formatCurrency(deal.askingPrice)}</span>
+                          <span className="font-medium">{formatCurrencyValue(deal.askingPrice)}</span>
                         </div>
                         {deal.capRate && (
                           <span className="text-muted-foreground">
-                            Cap: {parseFloat(deal.capRate).toFixed(1)}%
+                            Cap: {formatPercent(parseFloat(deal.capRate))}
                           </span>
                         )}
                         {mandateScore > 0 && (
                           <Badge variant={mandateScore >= 70 ? "default" : "secondary"} className="text-xs">
-                            Match: {mandateScore.toFixed(0)}%
+                            Match: {formatPercent(mandateScore)}
                           </Badge>
                         )}
                       </div>
@@ -358,13 +355,13 @@ export function DealTrackerTab() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <Label className="text-muted-foreground">Asking Price</Label>
-                    <p className="font-semibold text-lg">{formatCurrency(selectedDeal.askingPrice)}</p>
+                    <p className="font-semibold text-lg">{formatCurrencyValue(selectedDeal.askingPrice)}</p>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-muted-foreground">Mandate Match</Label>
                     <p className="font-semibold text-lg">
                       {selectedDeal.bestMandateScore 
-                        ? `${parseFloat(selectedDeal.bestMandateScore).toFixed(0)}%`
+                        ? formatPercent(parseFloat(selectedDeal.bestMandateScore))
                         : "Not scored"}
                     </p>
                   </div>
@@ -378,20 +375,20 @@ export function DealTrackerTab() {
                   <div>
                     <Label className="text-muted-foreground">Cap Rate</Label>
                     <p className="font-medium">
-                      {selectedDeal.capRate ? `${parseFloat(selectedDeal.capRate).toFixed(1)}%` : "—"}
+                      {selectedDeal.capRate ? formatPercent(parseFloat(selectedDeal.capRate)) : "—"}
                     </p>
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Price/Slip</Label>
-                    <p className="font-medium">{formatCurrency(selectedDeal.pricePerSlip)}</p>
+                    <p className="font-medium">{formatCurrencyValue(selectedDeal.pricePerSlip)}</p>
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Gross Revenue</Label>
-                    <p className="font-medium">{formatCurrency(selectedDeal.grossRevenue)}</p>
+                    <p className="font-medium">{formatCurrencyValue(selectedDeal.grossRevenue)}</p>
                   </div>
                   <div>
                     <Label className="text-muted-foreground">NOI</Label>
-                    <p className="font-medium">{formatCurrency(selectedDeal.noi)}</p>
+                    <p className="font-medium">{formatCurrencyValue(selectedDeal.noi)}</p>
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Marina Type</Label>

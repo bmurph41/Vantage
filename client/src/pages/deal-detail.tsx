@@ -25,21 +25,13 @@ import { apiRequest } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
 import type { Deal, Contact, Company } from "@shared/schema";
 import ConvertToProjectModal from "@/components/modals/convert-to-project-modal";
+import { formatCurrency } from "@/lib/utils";
 
 // Deal with relations type
 type DealWithRelations = Deal & { 
   contact?: Contact | null; 
   company?: Company | null; 
 };
-
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
 
 function getStageColor(stage: string): string {
   const stageColors: Record<string, string> = {

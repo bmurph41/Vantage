@@ -4,6 +4,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle, AlertCircle, Target, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import type { TargetDemographics } from "@shared/schema";
+import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils";
 
 interface DemographicData {
   medianAge?: number;
@@ -194,24 +195,24 @@ export default function SiteSuitabilityScore({ demographics, targets, locationLa
   
   const scoreBadge = getScoreBadge(score);
   
-  const formatValue = (key: string, value: number | null): string => {
+  const formatValueByKey = (key: string, value: number | null): string => {
     if (value === null) return 'N/A';
     
     switch (key) {
       case 'medianIncome':
       case 'homeValue':
-        return `$${Math.round(value).toLocaleString()}`;
+        return formatCurrency(value);
       case 'medianAge':
         return `${value.toFixed(1)} yrs`;
       case 'householdSize':
         return value.toFixed(1);
       case 'populationDensity':
-        return `${Math.round(value).toLocaleString()}/sq mi`;
+        return `${formatNumber(value)}/sq mi`;
       case 'educationBachelors':
       case 'employmentRate':
-        return `${value.toFixed(1)}%`;
+        return formatPercent(value);
       default:
-        return value.toLocaleString();
+        return formatNumber(value);
     }
   };
   
@@ -329,7 +330,7 @@ export default function SiteSuitabilityScore({ demographics, targets, locationLa
                     Target: {formatRange(criterion.key, criterion.targetMin, criterion.targetMax)}
                   </span>
                   <span className={criterion.passes ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}>
-                    Actual: {formatValue(criterion.key, criterion.actual)}
+                    Actual: {formatValueByKey(criterion.key, criterion.actual)}
                   </span>
                   {!criterion.passes && criterion.deviation && criterion.deviation > 0 && (
                     <span className="flex items-center gap-1 text-red-600 dark:text-red-400">

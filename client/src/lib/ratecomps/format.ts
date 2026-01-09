@@ -1,16 +1,13 @@
+import { formatCurrency as formatCurrencyBase, formatPercent as formatPercentBase } from "@/lib/utils";
+
 export const formatCurrency = (value: number | null | undefined): string => {
   if (value === null || value === undefined) return '—';
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
+  return formatCurrencyBase(value);
 };
 
-export const formatPercent = (value: number | null | undefined, decimals: number = 2): string => {
+export const formatPercent = (value: number | null | undefined, decimals: number = 1): string => {
   if (value === null || value === undefined) return '—';
-  return `${value.toFixed(decimals)}%`;
+  return formatPercentBase(value);
 };
 
 export const formatNumber = (value: number | null | undefined, decimals: number = 0): string => {

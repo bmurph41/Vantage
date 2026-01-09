@@ -22,6 +22,7 @@ import { differenceInCalendarDays, parseISO, format, addDays, startOfWeek, endOf
 import { tzNow, setDeadlineTo5PM } from "@/lib/date-utils";
 import { ProgressBar, ProgressLegend } from "./progress-bar";
 import { TIMELINE_GRANULARITIES } from "@/types/dd";
+import { formatCurrency } from "@/lib/utils";
 
 interface ThirdPartyReportsProps {
   tasks: Task[];
@@ -288,30 +289,14 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
     return assignee.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
-  // Currency formatting utility
-  const formatCurrency = (value: string): string => {
+  const formatCurrencyDisplay = (value: string): string => {
     if (!value) return "-";
-    
-    // If already formatted with $, return as is
     if (value.startsWith("$")) return value;
-    
-    // Remove any non-numeric characters except decimal points
     const numericValue = value.replace(/[^\d.]/g, "");
-    
-    // If empty or just a decimal point, return dash
     if (!numericValue || numericValue === ".") return "-";
-    
-    // Parse as number and format with commas and dollar sign
     const number = parseFloat(numericValue);
-    if (isNaN(number)) return value; // Return original if can't parse
-    
-    // Format with dollar sign and commas, no decimal places for whole numbers
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: number % 1 === 0 ? 0 : 2,
-      maximumFractionDigits: 2
-    }).format(number);
+    if (isNaN(number)) return value;
+    return formatCurrency(number);
   };
 
   const getUserColor = (assignee: string | null) => {

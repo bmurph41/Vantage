@@ -8,21 +8,11 @@ import {
   CheckCircle2, AlertCircle, Clock, Link2, ArrowRight
 } from "lucide-react";
 import type { Deal } from "@shared/schema";
+import { formatCurrency } from "@/lib/utils";
 
 interface DealCrossModuleSummaryProps {
   deal: Deal;
 }
-
-const formatCurrency = (amount: number | string | null | undefined) => {
-  if (!amount) return "$0";
-  const num = typeof amount === "string" ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(num);
-};
 
 function StatCard({ 
   icon: Icon, 

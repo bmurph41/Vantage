@@ -34,8 +34,7 @@ import {
 } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { toast } from '@/hooks/use-toast';
-import { formatCurrency } from '@/lib/formatUtils';
-import { cn } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 
 interface RentRollDataTabProps {
   projectId: string;

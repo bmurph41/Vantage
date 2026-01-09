@@ -3,6 +3,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { TrendingUp } from "lucide-react";
 import { useState, useMemo } from "react";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, ReferenceLine, Tooltip } from "recharts";
+import { formatPercent, formatNumber } from "@/lib/utils";
 
 interface DemographicData {
   totalPopulation?: number;
@@ -219,19 +220,19 @@ export default function MarketTrendAnalysis({ demographics, locationLabel }: Mar
           <div className="text-center p-3 bg-muted/50 rounded-lg" data-testid="stat-population-growth">
             <p className="text-xs text-muted-foreground">{trendType === "10-year" ? "10" : "5"}-Yr Pop. Growth</p>
             <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">
-              +{growthStats.population.toFixed(1)}%
+              +{formatPercent(growthStats.population)}
             </p>
           </div>
           <div className="text-center p-3 bg-muted/50 rounded-lg" data-testid="stat-income-growth">
             <p className="text-xs text-muted-foreground">Income Growth</p>
             <p className="text-lg font-semibold text-green-600 dark:text-green-400">
-              +{growthStats.income.toFixed(1)}%
+              +{formatPercent(growthStats.income)}
             </p>
           </div>
           <div className="text-center p-3 bg-muted/50 rounded-lg" data-testid="stat-home-value-appreciation">
             <p className="text-xs text-muted-foreground">Home Appreciation</p>
             <p className="text-lg font-semibold text-amber-600 dark:text-amber-400">
-              +{growthStats.homeValue.toFixed(1)}%
+              +{formatPercent(growthStats.homeValue)}
             </p>
           </div>
         </div>
@@ -239,7 +240,7 @@ export default function MarketTrendAnalysis({ demographics, locationLabel }: Mar
         <div className="mt-4 p-3 bg-accent/10 rounded-lg">
           <h4 className="font-medium text-xs mb-2">Projections & Insights</h4>
           <div className="text-xs text-muted-foreground space-y-1">
-            <p>• Population density: {demographics.populationDensity?.toFixed(0) || 'N/A'} per sq mi</p>
+            <p>• Population density: {demographics.populationDensity ? formatNumber(demographics.populationDensity) : 'N/A'} per sq mi</p>
             <p>• Historical trends show {growthStats.income > 15 ? "strong" : "steady"} income growth</p>
             <p>• Projections based on {trendType === "10-year" ? "10" : "5"}-year CAGR</p>
             <p className="text-xs italic text-muted-foreground/70">Note: Dashed lines indicate estimates</p>

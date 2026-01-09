@@ -12,6 +12,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ShareProjectDialog } from "./share-project-dialog";
 import { AddToCalendarDialog } from "./add-to-calendar-dialog";
 import { generateWhitePaperPDF } from "./white-paper-export";
+import { formatCurrency } from "@/lib/utils";
 
 interface ProjectHeaderProps {
   project: Project;
@@ -73,16 +74,6 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
     }
     return sum;
   }, 0);
-
-  // Format total cost for display
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   const handleExportCSV = async () => {
     try {

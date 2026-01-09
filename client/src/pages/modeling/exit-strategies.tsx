@@ -19,27 +19,11 @@ import {
   Target,
   Info
 } from "lucide-react";
-
-const formatCurrency = (value: number | string): string => {
-  const num = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, '')) : value;
-  if (isNaN(num)) return '$0';
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(num);
-};
+import { formatCurrency, formatPercent } from "@/lib/utils";
 
 const parseCurrency = (value: string): string => {
   const num = value.replace(/[^0-9.-]/g, '');
   return num || '0';
-};
-
-const formatPercent = (value: number | string): string => {
-  const num = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, '')) : value;
-  if (isNaN(num)) return '0.00%';
-  return `${num.toFixed(2)}%`;
 };
 
 const parsePercent = (value: string): string => {

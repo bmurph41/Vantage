@@ -4,19 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TrendingUp, DollarSign, Target, Calendar, Award, Percent } from "lucide-react";
 import { format, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, isWithinInterval, addMonths } from "date-fns";
+import { formatCurrency, formatPercent } from "@/lib/utils";
 import type { Deal } from "@shared/schema";
 
 type DealWithRelations = Deal & {
   contact?: any;
   company?: any;
-};
-
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-  }).format(amount);
 };
 
 export default function Forecast() {
@@ -312,7 +305,7 @@ export default function Forecast() {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm text-gray-600">Win Rate</span>
-                    <span className="text-lg font-bold text-gray-900">{metrics.winRate.toFixed(2)}%</span>
+                    <span className="text-lg font-bold text-gray-900">{formatPercent(metrics.winRate)}</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div 
@@ -387,7 +380,7 @@ export default function Forecast() {
                         <td className="py-3 text-right text-gray-900">{source.count}</td>
                         <td className="py-3 text-right font-semibold text-gray-900">{formatCurrency(source.revenue)}</td>
                         <td className="py-3 text-right font-semibold text-green-600">{formatCurrency(source.commission)}</td>
-                        <td className="py-3 text-right text-gray-600">{source.avgCommissionRate.toFixed(2)}%</td>
+                        <td className="py-3 text-right text-gray-600">{formatPercent(source.avgCommissionRate)}</td>
                       </tr>
                     ))
                   )}

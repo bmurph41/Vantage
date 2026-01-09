@@ -42,6 +42,7 @@ import {
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { AddressInput, type AddressComponents } from "@/components/address-input";
+import { formatCurrency } from "@/lib/utils";
 
 type PendingProperty = {
   id: string;
@@ -236,14 +237,9 @@ export function PendingPropertyDetailDialog({
     }
   };
 
-  const formatCurrency = (amount: number | null | undefined) => {
+  const formatCurrencyDisplay = (amount: number | null | undefined) => {
     if (!amount) return 'N/A';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+    return formatCurrency(amount);
   };
 
   const formatSaleDate = (month: number | undefined, year: number | undefined) => {

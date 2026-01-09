@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
+import { formatCurrency, formatPercent, formatNumber } from "@/lib/utils";
 import type { OmBlock } from "../types";
 
 interface DataSource {
@@ -56,11 +57,11 @@ function formatValue(value: any, type: string): string {
   
   switch (type) {
     case 'currency':
-      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
+      return formatCurrency(value);
     case 'percent':
-      return typeof value === 'number' ? `${(value * 100).toFixed(1)}%` : value;
+      return typeof value === 'number' ? formatPercent(value * 100) : value;
     case 'number':
-      return new Intl.NumberFormat('en-US').format(value);
+      return formatNumber(value);
     default:
       return String(value);
   }

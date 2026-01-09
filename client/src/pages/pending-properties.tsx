@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PendingPropertyDetailDialog } from "@/components/pending-property-detail-dialog";
 import DuplicateResolutionModal from "@/components/modals/duplicate-resolution-modal";
+import { formatCurrency } from "@/lib/utils";
 import type { PendingProperty, Property } from "@shared/schema";
 
 interface DuplicateMatch {
@@ -149,14 +150,9 @@ export default function PendingProperties() {
     }
   };
 
-  const formatCurrency = (amount: number | null) => {
+  const formatCurrencyDisplay = (amount: number | null) => {
     if (!amount) return 'N/A';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+    return formatCurrency(amount);
   };
 
   const formatSaleDate = (month: number | undefined, year: number | undefined) => {
@@ -254,7 +250,7 @@ export default function PendingProperties() {
                         <div className="space-y-1">
                           <div className="flex items-center gap-1 text-sm">
                             <DollarSign className="h-3 w-3" />
-                            {formatCurrency(pending.salePrice)}
+                            {formatCurrencyDisplay(pending.salePrice)}
                           </div>
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             <Calendar className="h-3 w-3" />

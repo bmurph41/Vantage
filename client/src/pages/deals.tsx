@@ -21,6 +21,7 @@ import { DealDrawer } from "@/components/deal-drawer";
 import { DealKanbanBoard } from "@/components/deals/DealKanbanBoard";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/lib/utils";
 import type { Deal, Contact, Company, PipelineStage } from "@shared/schema";
 
 type DealWithRelations = Deal & { contact?: Contact | null; company?: Company | null };
@@ -467,13 +468,6 @@ export default function Deals() {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
 
   const getContactInitials = (contact?: Contact | null) => {
     if (!contact) return 'D';

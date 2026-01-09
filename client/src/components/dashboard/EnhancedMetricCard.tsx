@@ -1,7 +1,6 @@
-import { formatCurrency, formatNumber, formatPercent, getTrendColor, getTrendIcon } from "@/lib/formatUtils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { TrendingUp, TrendingDown, Minus, Info } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency, formatNumber, formatPercent } from "@/lib/utils";
 
 export type MetricSize = 'sm' | 'md' | 'lg';
 export type MetricType = 'currency' | 'number' | 'percent';
@@ -69,31 +68,20 @@ export function EnhancedMetricCard({
     return Number.isInteger(val) ? val / 100 : val;
   };
 
-  const formatValue = (val: number, metricType: MetricType, format: PercentFormat = percentFormat) => {
+  const formatMetricValue = (val: number, metricType: MetricType, format: PercentFormat = percentFormat) => {
     switch (metricType) {
       case 'currency':
-        return formatCurrency(val, compact);
+        return formatCurrency(val);
       case 'percent':
         const normalizedVal = normalizePercent(val, format);
-        return new Intl.NumberFormat('en-US', {
-          style: 'percent',
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 1,
-        }).format(normalizedVal);
+        return formatPercent(normalizedVal * 100);
       default:
-        return formatNumber(val, compact);
+        return formatNumber(val);
     }
   };
 
   const formatTrendValue = (trendVal: number): string => {
-    // Backend returns trend as a percentage value (e.g., 21.43 for 21.43% change)
-    // Convert to decimal for Intl.NumberFormat percentage style
-    const decimal = trendVal / 100;
-    return new Intl.NumberFormat('en-US', {
-      style: 'percent',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 1,
-    }).format(Math.abs(decimal));
+    return formatPercent(Math.abs(trendVal));
   };
 
   const sizeClasses = {
@@ -206,7 +194,7 @@ export function EnhancedMetricCard({
           sizeClasses[size].value,
           variantClasses[variant]
         )}>
-          {formatValue(value, type)}
+          {formatMetricValue(value, type)}
         </p>
 
         {trend !== undefined && (
@@ -229,7 +217,7 @@ export function EnhancedMetricCard({
           <div className="flex items-center justify-between text-[11px]">
             <span className="text-gray-500">{comparison.label}</span>
             <span className="font-semibold text-gray-700">
-              {formatValue(comparison.value, comparison.type)}
+              {formatMetricValue(comparison.value, comparison.type)}
             </span>
           </div>
         </div>

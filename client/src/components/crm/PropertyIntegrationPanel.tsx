@@ -25,28 +25,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { SalesComp, RateComp } from "@shared/schema";
+import { formatCurrency, formatPercent } from "@/lib/utils";
 
 interface PropertyIntegrationPanelProps {
   propertyId: string;
   propertyTitle: string;
 }
-
-const formatCurrency = (amount: number | string | null | undefined) => {
-  if (!amount) return "$0";
-  const num = typeof amount === "string" ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(num);
-};
-
-const formatPercent = (value: number | string | null | undefined) => {
-  if (!value) return "0.00%";
-  const num = typeof value === "string" ? parseFloat(value) : value;
-  return `${num.toFixed(2)}%`;
-};
 
 function SalesCompCard({ comp, linkMetadata, onUnlink }: { 
   comp: SalesComp & { linkMetadata?: any }; 

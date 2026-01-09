@@ -18,6 +18,7 @@ import { Progress } from "@/components/ui/progress";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { formatCurrency } from "@/lib/utils";
 import type { Risk } from "@shared/schema";
 
 const riskFormSchema = z.object({
@@ -215,7 +216,7 @@ export function RiskManagement({ projectId }: RiskManagementProps) {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold" data-testid="cost-at-risk">
-                ${analytics.totalCostAtRisk.toLocaleString()}
+                {formatCurrency(analytics.totalCostAtRisk)}
               </div>
               <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                 <DollarSign className="h-4 w-4" />
@@ -398,7 +399,7 @@ export function RiskManagement({ projectId }: RiskManagementProps) {
                     <div>
                       <span className="font-medium">Cost Impact:</span>
                       <p data-testid={`risk-cost-${risk.id}`}>
-                        ${(risk.impactCostUSD || 0).toLocaleString()}
+                        {formatCurrency(risk.impactCostUSD || 0)}
                       </p>
                     </div>
                   </div>

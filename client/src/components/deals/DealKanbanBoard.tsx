@@ -8,6 +8,7 @@ import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import type { Deal, Contact, Company, PipelineStage } from '@shared/schema';
 import { format, differenceInDays } from 'date-fns';
+import { formatCurrency } from '@/lib/utils';
 
 type DealWithRelations = Deal & { contact?: Contact | null; company?: Company | null };
 
@@ -15,15 +16,6 @@ interface DealKanbanBoardProps {
   deals: DealWithRelations[];
   stages: PipelineStage[];
   onDealClick: (deal: DealWithRelations) => void;
-}
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
 }
 
 function DealCard({ deal, onDealClick }: { deal: DealWithRelations; onDealClick: (deal: DealWithRelations) => void }) {

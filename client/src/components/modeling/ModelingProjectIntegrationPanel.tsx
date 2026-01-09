@@ -25,29 +25,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { formatCurrency, formatPercent } from "@/lib/utils";
 import type { SalesComp, RateComp, ModelingProjectComp } from "@shared/schema";
 
 interface ModelingProjectIntegrationPanelProps {
   projectId: string;
   projectName: string;
 }
-
-const formatCurrency = (amount: number | string | null | undefined) => {
-  if (!amount) return "$0";
-  const num = typeof amount === "string" ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(num);
-};
-
-const formatPercent = (value: number | string | null | undefined) => {
-  if (!value) return "0.00%";
-  const num = typeof value === "string" ? parseFloat(value) : value;
-  return `${num.toFixed(2)}%`;
-};
 
 function LinkedCompCard({ compLink, onUnlink }: { 
   compLink: ModelingProjectComp & { salesComp?: SalesComp; rateComp?: RateComp }; 

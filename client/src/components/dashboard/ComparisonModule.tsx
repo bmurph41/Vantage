@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp } from "lucide-react";
-import { formatCurrency, formatNumber, formatPercent } from "@/lib/formatUtils";
+import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils";
 import { type TimeRange } from "./TimeRangeSelector";
 
 interface ComparisonModuleProps {
@@ -63,11 +63,11 @@ export function ComparisonModule({ isCollapsed = false, onToggleCollapse }: Comp
   const formatValue = (value: number, type: ComparisonMetric['type']): string => {
     switch (type) {
       case 'currency':
-        return formatCurrency(value, true);
+        return formatCurrency(value);
       case 'percent':
-        return formatPercent(value, 1);
+        return formatPercent(value);
       default:
-        return formatNumber(value, true);
+        return formatNumber(value);
     }
   };
 

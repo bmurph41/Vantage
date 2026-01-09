@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Edit, ExternalLink, MapPin, Calendar, Anchor, Ship, Users, FileText, Droplets, Building } from "lucide-react";
 import type { SalesComp } from "@shared/schema";
-import { formatCurrency } from "@/lib/salescomps/format";
+import { formatCurrency, formatPercent } from "@/lib/salescomps/format";
 
 interface ViewCompModalProps {
   open: boolean;
@@ -71,7 +71,7 @@ export default function ViewCompModal({ open, onClose, comp, onEdit }: ViewCompM
           <div className="p-3 text-center border-r border-border/50">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Cap Rate</p>
             <p className="text-base font-bold" data-testid="text-cap-rate-hero">
-              {comp.capRate ? `${(Number(comp.capRate) / 100).toFixed(2)}%` : '—'}
+              {comp.capRate ? formatPercent(Number(comp.capRate) / 100) : '—'}
             </p>
           </div>
           <div className="p-3 text-center border-r border-border/50">
@@ -99,7 +99,7 @@ export default function ViewCompModal({ open, onClose, comp, onEdit }: ViewCompM
                 <DataRow label="Sale Price" value={comp.salePrice ? formatCurrency(comp.salePrice) : '—'} testId="text-sale-price" />
                 <DataRow label="List Price" value={comp.listPrice ? formatCurrency(comp.listPrice) : '—'} testId="text-list-price" />
                 <DataRow label="NOI" value={comp.noi ? formatCurrency(comp.noi) : '—'} testId="text-noi" />
-                <DataRow label="Cap Rate" value={comp.capRate ? `${(Number(comp.capRate) / 100).toFixed(2)}%` : '—'} testId="text-cap-rate" />
+                <DataRow label="Cap Rate" value={comp.capRate ? formatPercent(Number(comp.capRate) / 100) : '—'} testId="text-cap-rate" />
                 <DataRow label="$/Unit" value={pricePerUnit ? formatCurrency(pricePerUnit) : '—'} testId="text-price-per-unit" />
                 <DataRow label="Days on Market" value={formatValue(comp.daysOnMarket)} testId="text-dom" />
               </div>

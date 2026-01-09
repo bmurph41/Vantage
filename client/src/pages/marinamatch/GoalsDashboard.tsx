@@ -18,6 +18,7 @@ import {
 import { useForm } from "react-hook-form";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { format } from "date-fns";
+import { formatCurrency, formatNumber } from "@/lib/utils";
 
 interface MarinaMatchGoal {
   id: string;
@@ -122,11 +123,9 @@ export function GoalsDashboard() {
     if (isNaN(num)) return "—";
     
     if (format === "currency") {
-      if (num >= 1000000) return `$${(num / 1000000).toFixed(1)}M`;
-      if (num >= 1000) return `$${(num / 1000).toFixed(0)}K`;
-      return `$${num.toFixed(0)}`;
+      return formatCurrency(num);
     }
-    return num.toLocaleString();
+    return formatNumber(num);
   };
 
   const getGoalIcon = (goalType: string) => {

@@ -9,7 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { formatCurrency, formatPercent } from '@/lib/formatUtils';
+import { formatCurrency, formatPercent } from '@/lib/utils';
 import { PackGate } from '@/contexts/PackContext';
 import {
   Briefcase,

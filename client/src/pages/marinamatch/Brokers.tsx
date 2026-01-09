@@ -16,6 +16,7 @@ import { Plus, Users, Edit, Trash2, RefreshCw, Phone, Mail, Building2, DollarSig
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
+import { formatCurrency } from "@/lib/utils";
 
 type BrokerRelationship = {
   id: string;
@@ -199,13 +200,9 @@ export function BrokersTab() {
     },
   });
 
-  const formatCurrency = (value: string | undefined) => {
+  const formatCurrencyValue = (value: string | undefined) => {
     if (!value) return "$0";
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      maximumFractionDigits: 0,
-    }).format(parseFloat(value));
+    return formatCurrency(value);
   };
 
   return (
@@ -298,7 +295,7 @@ export function BrokersTab() {
                   </div>
                   <div>
                     <span className="text-muted-foreground text-sm">Total Value</span>
-                    <p className="font-semibold">{formatCurrency(broker.totalDealValue)}</p>
+                    <p className="font-semibold">{formatCurrencyValue(broker.totalDealValue)}</p>
                   </div>
                   {broker.specialty && (
                     <Badge variant="outline" className="text-xs">
@@ -382,7 +379,7 @@ export function BrokersTab() {
                     <p className="text-xs text-muted-foreground">Converted</p>
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{formatCurrency(selectedBroker.totalDealValue)}</p>
+                    <p className="text-2xl font-bold">{formatCurrencyValue(selectedBroker.totalDealValue)}</p>
                     <p className="text-xs text-muted-foreground">Total Value</p>
                   </div>
                 </div>

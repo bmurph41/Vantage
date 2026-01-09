@@ -7,6 +7,7 @@ import {
   Target, Handshake, Users, DollarSign, Download, RefreshCcw
 } from "lucide-react";
 import { useState } from "react";
+import { formatNumber } from "@/lib/utils";
 
 type MetricCardProps = {
   title: string;
@@ -157,7 +158,7 @@ export default function DealSourcingAnalytics() {
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm text-gray-600">{stage.name}</span>
                       <div className="flex items-center space-x-2">
-                        <span className="text-sm font-medium">{stage.value.toLocaleString()}</span>
+                        <span className="text-sm font-medium">{formatNumber(stage.value)}</span>
                         <Badge variant="secondary" className="text-xs">{stage.percentage}%</Badge>
                       </div>
                     </div>

@@ -4,6 +4,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
 import type { ChurnRiskCustomer } from "@/types/customer-analytics";
 
 interface Props {
@@ -52,15 +53,6 @@ export function ChurnRiskTable({ data, isLoading, error }: Props) {
       </Card>
     );
   }
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
 
   const formatName = (customer: ChurnRiskCustomer) => {
     if (customer.firstName && customer.lastName) {

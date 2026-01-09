@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn, formatPercent } from "@/lib/utils";
 
 interface ModuleSectionProps {
   title?: string;
@@ -136,7 +136,7 @@ export function StatBar({ label, value, total, color = 'blue', showPercentage = 
         <span className="text-gray-900 font-semibold">
           {value}
           {showPercentage && (
-            <span className="text-gray-400 ml-1">({percentage.toFixed(2)}%)</span>
+            <span className="text-gray-400 ml-1">({formatPercent(percentage)})</span>
           )}
         </span>
       </div>

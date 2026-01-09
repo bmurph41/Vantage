@@ -16,6 +16,7 @@ import {
   RefreshCw, Repeat, Users, Lightbulb, ChevronRight
 } from "lucide-react";
 import TrendsFiltersPanel, { type TrendsFilters } from "./TrendsFiltersPanel";
+import { formatCurrency, formatPercent } from "@/lib/utils";
 
 interface YearlyTrendData {
   year: number;
@@ -85,20 +86,6 @@ interface MarketTrendsData {
 }
 
 const CHART_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
-
-function formatCurrency(value: number | null | undefined): string {
-  if (value === null || value === undefined || isNaN(Number(value))) return 'N/A';
-  const numValue = Number(value);
-  if (numValue >= 1000000000) return `$${(numValue / 1000000000).toFixed(2)}B`;
-  if (numValue >= 1000000) return `$${(numValue / 1000000).toFixed(2)}M`;
-  if (numValue >= 1000) return `$${(numValue / 1000).toFixed(1)}K`;
-  return `$${Math.round(numValue).toLocaleString()}`;
-}
-
-function formatPercent(value: number | null | undefined): string {
-  if (value === null || value === undefined || isNaN(Number(value))) return 'N/A';
-  return `${Number(value).toFixed(2)}%`;
-}
 
 export default function TrendsView() {
   const [filters, setFilters] = useState<TrendsFilters>({});

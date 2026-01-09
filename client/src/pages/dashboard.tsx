@@ -16,7 +16,7 @@ import { ComparisonModule } from "@/components/dashboard/ComparisonModule";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { EnhancedMetricCard } from "@/components/dashboard/EnhancedMetricCard";
 import { ModuleSection, MetricGrid, DataList, StatBar } from "@/components/dashboard/ModuleSection";
-import { formatCurrency, formatNumber } from "@/lib/formatUtils";
+import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils";
 import { CRMCharts } from "@/components/dashboard/CRMCharts";
 import { RevenueCharts } from "@/components/dashboard/RevenueCharts";
 import { AddModuleModal } from "@/components/dashboard/AddModuleModal";
@@ -233,15 +233,15 @@ function CustomModuleContent({
   // Render based on visualization type
   const formatValue = (value: number) => {
     const metric = chartConfig?.metrics?.[0];
-    if (!metric) return value.toLocaleString();
+    if (!metric) return formatNumber(value);
     
     switch (metric.format) {
       case 'currency':
-        return `$${value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+        return formatCurrency(value);
       case 'percent':
-        return `${value.toFixed(2)}%`;
+        return formatPercent(value);
       default:
-        return value.toLocaleString();
+        return formatNumber(value);
     }
   };
 

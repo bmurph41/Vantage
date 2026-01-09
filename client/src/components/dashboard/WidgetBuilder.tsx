@@ -20,8 +20,7 @@ import {
   Calendar, Filter, Settings2, Eye, Save, Plus, X, 
   Layers, Clock, ArrowUpRight, ArrowDownRight, Minus, AlertTriangle 
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { formatCurrency, formatNumber } from '@/lib/formatUtils';
+import { cn, formatCurrency, formatNumber, formatPercent } from '@/lib/utils';
 import { useToast } from "@/hooks/use-toast";
 
 const widgetFormSchema = z.object({
@@ -182,7 +181,7 @@ export function WidgetBuilder({
       case 'currency':
         return formatCurrency(value);
       case 'percent':
-        return `${value.toFixed(2)}%`;
+        return formatPercent(value);
       default:
         return formatNumber(value);
     }

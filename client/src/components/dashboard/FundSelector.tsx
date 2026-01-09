@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
+import { formatCurrency, formatPercent } from "@/lib/utils";
 
 interface Fund {
   id: string;
@@ -29,22 +30,11 @@ interface Fund {
   dpi: string | null;
 }
 
-function formatCurrency(value: number | string): string {
-  const num = typeof value === 'string' ? parseFloat(value) : value;
-  if (isNaN(num) || num === 0) return '$0';
-  if (num >= 1000000) {
-    return `$${(num / 1000000).toFixed(1)}M`;
-  } else if (num >= 1000) {
-    return `$${(num / 1000).toFixed(0)}K`;
-  }
-  return `$${num.toFixed(0)}`;
-}
-
-function formatPercent(value: number | string | null): string {
+function formatPercentFromDecimal(value: number | string | null): string {
   if (value === null || value === undefined) return '-';
   const num = typeof value === 'string' ? parseFloat(value) : value;
   if (isNaN(num)) return '-';
-  return `${(num * 100).toFixed(1)}%`;
+  return formatPercent(num * 100);
 }
 
 function formatMultiple(value: number | string | null): string {
@@ -175,7 +165,7 @@ export function FundSelector() {
                 {fund.netIrr && (
                   <>
                     <span>•</span>
-                    <span className="text-green-600 dark:text-green-400">IRR: {formatPercent(fund.netIrr)}</span>
+                    <span className="text-green-600 dark:text-green-400">IRR: {formatPercentFromDecimal(fund.netIrr)}</span>
                   </>
                 )}
               </div>
@@ -197,7 +187,7 @@ export function FundSelector() {
             <TrendingUp className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
             <span className="text-xs text-muted-foreground">Net IRR</span>
             <span className="text-sm font-semibold text-green-600 dark:text-green-400">
-              {formatPercent(selectedFund.netIrr)}
+              {formatPercentFromDecimal(selectedFund.netIrr)}
             </span>
           </div>
           <div className="flex items-center gap-1.5">

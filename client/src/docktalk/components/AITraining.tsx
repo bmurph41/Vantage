@@ -85,6 +85,7 @@ import {
   PieChart,
   Activity
 } from "lucide-react";
+import { formatPercent } from "@/lib/utils";
 
 interface UserTag {
   id: number;
@@ -262,7 +263,6 @@ function TrainingAnalyticsDashboard() {
     }
   };
 
-  const formatPercent = (value: number) => `${value.toFixed(1)}%`;
 
   if (analyticsLoading) {
     return (
