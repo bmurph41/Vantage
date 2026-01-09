@@ -137,7 +137,15 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
   }, [activeCaseId, cases]);
 
   const createCaseMutation = useMutation({
-    mutationFn: async (data: { name: string; color: string; description: string }) => {
+    mutationFn: async (data: { 
+      name: string; 
+      color: string; 
+      description: string;
+      revenueGrowthRate?: string;
+      expenseGrowthRate?: string;
+      exitCapRate?: string;
+      occupancyRate?: string;
+    }) => {
       const response = await apiRequest('POST', `/api/modeling/projects/${projectId}/cases`, {
         name: data.name,
         color: data.color,
@@ -145,6 +153,10 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
         sortOrder: cases.length,
         isDefault: cases.length === 0,
         isEnabled: true,
+        revenueGrowthRate: data.revenueGrowthRate,
+        expenseGrowthRate: data.expenseGrowthRate,
+        exitCapRate: data.exitCapRate,
+        occupancyRate: data.occupancyRate,
       });
       return response.json();
     },
@@ -263,6 +275,10 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
       name: template.name,
       color: template.color,
       description: '',
+      revenueGrowthRate: template.revenueGrowthRate,
+      expenseGrowthRate: template.expenseGrowthRate,
+      exitCapRate: template.exitCapRate,
+      occupancyRate: template.occupancyRate,
     });
   };
 
