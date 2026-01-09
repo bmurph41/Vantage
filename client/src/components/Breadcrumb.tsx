@@ -21,7 +21,7 @@ const CATEGORIES = {
   OPERATIONS: { label: 'Operations', icon: SettingsIcon },
   DUE_DILIGENCE: { label: 'Due Diligence', href: '/projects', icon: FolderKanban },
   VDR: { label: 'VDR', href: '/vdr', icon: FolderLock },
-  MODELING: { label: 'Modeling', href: '/modeling/projects', icon: TrendingUp },
+  MODELING: { label: 'Valuator', href: '/modeling/projects', icon: TrendingUp },
   DOCKTALK: { label: 'DockTalk', href: '/docktalk', icon: MessageSquare },
   ANALYSIS: { label: 'Marinalytics', href: '/analysis/sales-comps', icon: BarChart3 },
   MARINAMATCH: { label: 'MarinaMatch', href: '/marinamatch', icon: Target },
@@ -132,7 +132,6 @@ const ROUTE_MAPPINGS: Record<string, BreadcrumbItem[]> = {
   
   '/modeling/projects': [
     CATEGORIES.MODELING,
-    { label: 'Projects' },
   ],
   '/modeling/portfolio': [
     CATEGORIES.MODELING,
@@ -640,7 +639,6 @@ function getBreadcrumbsForPath(path: string): BreadcrumbItem[] {
     
     items = [
       CATEGORIES.MODELING,
-      { label: 'Projects', href: '/modeling/projects' },
       { label: projectId, isDynamic: true, dynamicType: 'modeling-project', dynamicId: projectId },
     ];
     

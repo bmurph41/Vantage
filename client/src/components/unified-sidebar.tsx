@@ -667,7 +667,7 @@ export default function UnifiedSidebar() {
               title="Deal Workspace" 
               expanded={dealWorkspaceExpanded} 
               onToggle={() => setDealWorkspaceExpanded(!dealWorkspaceExpanded)}
-              isActive={location.startsWith('/workspaces') || location === '/projects' || location === '/progress-report' || location.startsWith('/vdr') || location.startsWith('/modeling/projects')}
+              isActive={location.startsWith('/workspaces') || location === '/projects' || location === '/progress-report' || location.startsWith('/vdr')}
             />
             {dealWorkspaceExpanded && (
               <>
