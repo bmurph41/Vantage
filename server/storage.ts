@@ -653,32 +653,6 @@ export interface IStorage {
   updateDocktalkDeal(id: string, deal: UpdateDocktalkDeal, orgId: string): Promise<DocktalkDeal | undefined>;
   deleteDocktalkDeal(id: string, orgId: string): Promise<boolean>;
   upsertDocktalkDealByExternalId(externalId: string, orgId: string, deal: InsertDocktalkDeal): Promise<DocktalkDeal>;
-  getPendingProperty(id: string, orgId: string): Promise<PendingProperty | undefined>;
-  createPendingProperty(data: InsertPendingProperty): Promise<PendingProperty>;
-  acceptPendingProperty(id: string, orgId: string, userId: string): Promise<Property | undefined>;
-  rejectPendingProperty(id: string, orgId: string, userId: string): Promise<boolean>;
-  updatePendingProperty(id: string, orgId: string, updates: Partial<PendingProperty>): Promise<PendingProperty | undefined>;
-  mergePendingPropertyWithExisting(pendingId: string, propertyId: string, orgId: string, userId: string): Promise<Property | undefined>;
-
-  // Pending Contacts - Review queue for contacts created from sales comps or DD projects
-  getPendingContacts(orgId: string, status?: string): Promise<PendingContact[]>;
-  getPendingContact(id: string, orgId: string): Promise<PendingContact | undefined>;
-  createPendingContact(data: InsertPendingContact): Promise<PendingContact>;
-  acceptPendingContact(id: string, orgId: string, userId: string): Promise<CrmContact | undefined>;
-  rejectPendingContact(id: string, orgId: string, userId: string): Promise<boolean>;
-  updatePendingContact(id: string, orgId: string, updates: Partial<PendingContact>): Promise<PendingContact | undefined>;
-  mergePendingContactWithExisting(pendingId: string, contactId: string, orgId: string, userId: string): Promise<CrmContact | undefined>;
-
-  // Project Pending Contacts - Linking pending contacts to DD projects
-  addPendingContactToProject(data: InsertProjectPendingContact): Promise<ProjectPendingContact>;
-  getProjectPendingContacts(projectId: string): Promise<Array<ProjectPendingContact & { pendingContact: PendingContact }>>;
-  removePendingContactFromProject(projectId: string, pendingContactId: string, role: string): Promise<void>;
-
-
-  // Generic pending entity resolution (delegates to type-specific methods)
-  mergePendingWithExisting(entityType: 'property' | 'contact' | 'company', pendingId: string, targetEntityId: string, orgId: string, userId: string): Promise<any>;
-  rejectPendingEntity(entityType: 'property' | 'contact' | 'company', pendingId: string, orgId: string, userId: string): Promise<boolean>;
-  acceptPendingEntity(entityType: 'property' | 'contact' | 'company', pendingId: string, orgId: string, userId: string): Promise<any>;
 
   // Auto-create pending records from sales comps with deduplication
   autoCreatePendingCompanyFromSalesComp(params: {
