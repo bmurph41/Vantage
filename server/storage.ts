@@ -3558,7 +3558,7 @@ export class DatabaseStorage implements IStorage {
     if (mode === 'replace' && pending.suggestedDuplicates && Array.isArray(pending.suggestedDuplicates) && pending.suggestedDuplicates.length > 0) {
       const duplicateId = pending.suggestedDuplicates[0] as string;
       const updateData: Partial<InsertProperty> = {
-        marinaName: pending.marinaName,
+        title: pending.marinaName,
         city: pending.city || undefined,
         state: pending.state || undefined,
         address: pending.address || undefined,
@@ -3568,14 +3568,15 @@ export class DatabaseStorage implements IStorage {
       createdProperty = await this.updateCrmProperty(duplicateId, updateData);
     } else {
       const propertyData: InsertProperty = {
-        ownerId: pending.orgId,
-        marinaName: pending.marinaName,
+        orgId: pending.orgId,
+        ownerId: userId,
+        title: pending.marinaName,
         city: pending.city || undefined,
         state: pending.state || undefined,
         address: pending.address || undefined,
         listingPrice: pending.salePrice || undefined,
-        status: 'For Sale',
-        createdBy: userId
+        status: 'available',
+        type: 'marina'
       };
       createdProperty = await this.createCrmProperty(propertyData);
     }
