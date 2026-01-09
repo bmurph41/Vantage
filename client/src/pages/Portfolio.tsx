@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useLocation, useSearch } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,21 +16,43 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Building2,
   DollarSign,
   TrendingUp,
   MapPin,
-  Calendar,
   Anchor,
   Users,
-  BarChart3,
   Plus,
   ExternalLink,
   PieChart,
   Wallet,
   ArrowUpRight,
   ArrowDownRight,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  Eye,
+  Briefcase,
 } from "lucide-react";
+import { MarinaModal } from "@/components/portfolio/MarinaModal";
+import { useToast } from "@/hooks/use-toast";
 
 interface OwnedMarina {
   id: string;
@@ -157,6 +180,13 @@ export default function Portfolio() {
   const searchParams = new URLSearchParams(searchString);
   const initialTab = searchParams.get("tab") || "overview";
   const [activeTab, setActiveTab] = useState(initialTab);
+  const { toast } = useToast();
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<"create" | "edit">("create");
+  const [selectedMarina, setSelectedMarina] = useState<OwnedMarina | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [marinaToDelete, setMarinaToDelete] = useState<OwnedMarina | null>(null);
 
   useEffect(() => {
     const newTab = searchParams.get("tab");
@@ -177,6 +207,45 @@ export default function Portfolio() {
   const { data: marinas, isLoading } = useQuery<OwnedMarina[]>({
     queryKey: ["/api/portfolio/marinas"],
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest(`/api/portfolio/marinas/${id}`, { method: "DELETE" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/portfolio/marinas"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/portfolio/available-properties"] });
+      toast({ title: "Marina removed from portfolio" });
+      setDeleteDialogOpen(false);
+      setMarinaToDelete(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to remove marina", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleAddMarina = () => {
+    setSelectedMarina(null);
+    setModalMode("create");
+    setModalOpen(true);
+  };
+
+  const handleEditMarina = (marina: OwnedMarina) => {
+    setSelectedMarina(marina);
+    setModalMode("edit");
+    setModalOpen(true);
+  };
+
+  const handleDeleteMarina = (marina: OwnedMarina) => {
+    setMarinaToDelete(marina);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (marinaToDelete) {
+      deleteMutation.mutate(marinaToDelete.id);
+    }
+  };
 
   const summary: PortfolioSummary = {
     totalMarinas: marinas?.length || 0,
@@ -227,13 +296,13 @@ export default function Portfolio() {
         <div className="flex gap-2">
           <Button
             variant="outline"
-            onClick={() => navigate("/crm/deals")}
+            onClick={() => navigate("/deal-workspace")}
             data-testid="button-view-deals"
           >
             <Briefcase className="h-4 w-4 mr-2" />
             Active Deals
           </Button>
-          <Button onClick={() => navigate("/crm/properties/new")} data-testid="button-add-marina">
+          <Button onClick={handleAddMarina} data-testid="button-add-marina">
             <Plus className="h-4 w-4 mr-2" />
             Add Marina
           </Button>
@@ -302,9 +371,9 @@ export default function Portfolio() {
                   <Building2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p className="text-lg font-medium mb-2">No owned marinas yet</p>
                   <p className="mb-4">Add properties to your portfolio to see them here</p>
-                  <Button onClick={() => navigate("/crm/properties")}>
+                  <Button onClick={handleAddMarina}>
                     <Plus className="h-4 w-4 mr-2" />
-                    Browse Properties
+                    Add Marina
                   </Button>
                 </div>
               ) : (
@@ -320,7 +389,7 @@ export default function Portfolio() {
                         <TableHead className="text-right">Slips</TableHead>
                         <TableHead className="text-right">Occupancy</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead></TableHead>
+                        <TableHead className="w-[50px]"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -351,21 +420,45 @@ export default function Portfolio() {
                           </TableCell>
                           <TableCell>
                             <Badge
-                              variant={marina.status === "active" ? "default" : "secondary"}
+                              variant={marina.status === "under_management" ? "default" : "secondary"}
                             >
-                              {marina.status}
+                              {marina.status?.replace(/_/g, " ")}
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            {marina.projectId && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => navigate(`/modeling/projects/${marina.projectId}`)}
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                              </Button>
-                            )}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {marina.propertyId && (
+                                  <DropdownMenuItem onClick={() => navigate(`/crm/properties/${marina.propertyId}`)}>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View Property
+                                  </DropdownMenuItem>
+                                )}
+                                {marina.projectId && (
+                                  <DropdownMenuItem onClick={() => navigate(`/modeling/projects/${marina.projectId}`)}>
+                                    <ExternalLink className="h-4 w-4 mr-2" />
+                                    View Model
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuItem onClick={() => handleEditMarina(marina)}>
+                                  <Pencil className="h-4 w-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  onClick={() => handleDeleteMarina(marina)}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Remove from Portfolio
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -540,8 +633,8 @@ export default function Portfolio() {
                             <TableCell className="text-right">{vacantSlips}</TableCell>
                             <TableCell className="text-right">{formatCurrency(revPerSlip)}</TableCell>
                             <TableCell>
-                              <Badge variant={marina.status === "active" ? "default" : "secondary"}>
-                                {marina.status}
+                              <Badge variant={marina.status === "under_management" ? "default" : "secondary"}>
+                                {marina.status?.replace(/_/g, " ")}
                               </Badge>
                             </TableCell>
                           </TableRow>
@@ -555,13 +648,33 @@ export default function Portfolio() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <MarinaModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        marina={selectedMarina}
+        mode={modalMode}
+      />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Marina from Portfolio?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove "{marinaToDelete?.name}" from your portfolio. The property will still exist in your CRM but won't be tracked as an owned asset.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? "Removing..." : "Remove"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
-
-const Briefcase = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect width="20" height="14" x="2" y="7" rx="2" ry="2"/>
-    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
-  </svg>
-);

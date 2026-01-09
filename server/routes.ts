@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { eq, and, or, desc, asc, gte, lte, sql, gt, inArray } from "drizzle-orm";
+import { eq, and, or, desc, asc, gte, lte, sql, gt, inArray, notInArray } from "drizzle-orm";
 import { resolveRecipient } from "@shared/recipient-utils";
 import { AIRiskAnalyzer } from "./ai-risk-analyzer";
 import { AINotesEnhancer } from "./ai-notes-enhancer";
@@ -13700,6 +13700,189 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+
+
+  // Get single portfolio marina by ID
+  app.get('/api/portfolio/marinas/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      
+      const assetWithDetails = await ownedAssetsService.getOwnedAssetWithDetails(id, orgId);
+      if (!assetWithDetails) {
+        return res.status(404).json({ error: 'Marina not found' });
+      }
+      
+      const { asset, property } = assetWithDetails;
+      const specs = (property?.specifications || {}) as Record<string, any>;
+      const storedMetrics = (asset.keyMetrics || {}) as Record<string, any>;
+      
+      res.json({
+        id: asset.id,
+        propertyId: asset.propertyId,
+        projectId: asset.projectId,
+        name: property?.title || 'Unknown Marina',
+        address: property?.address || '',
+        city: property?.city || '',
+        state: property?.state || '',
+        zip: property?.zip || '',
+        slips: specs.slips || storedMetrics.slips || 0,
+        status: asset.status,
+        holdStrategy: asset.holdStrategy,
+        acquisitionDate: asset.acquisitionDate,
+        acquisitionPrice: asset.acquisitionPrice,
+        exitTargetDate: asset.exitTargetDate,
+        keyMetrics: storedMetrics,
+        notes: asset.notes,
+        currentValue: storedMetrics.currentValue || asset.acquisitionPrice,
+        annualRevenue: storedMetrics.annualRevenue,
+        annualEbitda: storedMetrics.annualEbitda,
+        occupancy: storedMetrics.occupancy,
+        createdAt: asset.createdAt,
+        updatedAt: asset.updatedAt,
+      });
+    } catch (error: any) {
+      console.error('Failed to fetch portfolio marina:', error);
+      res.status(500).json({ error: 'Failed to fetch marina details' });
+    }
+  });
+
+  // Create a new portfolio marina (owned asset)
+  app.post('/api/portfolio/marinas', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      
+      const { propertyId, projectId, acquisitionDate, acquisitionPrice, status, holdStrategy, exitTargetDate, keyMetrics, notes } = req.body;
+      
+      if (!propertyId) {
+        return res.status(400).json({ error: 'propertyId is required' });
+      }
+      if (!acquisitionDate) {
+        return res.status(400).json({ error: 'acquisitionDate is required' });
+      }
+      
+      // Verify property exists and belongs to org
+      const [property] = await db.select().from(crmProperties).where(and(eq(crmProperties.id, propertyId), eq(crmProperties.orgId, orgId))).limit(1);
+      if (!property) {
+        return res.status(404).json({ error: 'Property not found' });
+      }
+      
+      // Check if property is already in portfolio
+      const [existingAsset] = await db.select().from(ownedAssets).where(and(eq(ownedAssets.propertyId, propertyId), eq(ownedAssets.orgId, orgId))).limit(1);
+      if (existingAsset) {
+        return res.status(409).json({ error: 'Property is already in portfolio' });
+      }
+      
+      const asset = await ownedAssetsService.createOwnedAsset(orgId, userId, {
+        propertyId,
+        projectId: projectId || null,
+        acquisitionDate,
+        acquisitionPrice: acquisitionPrice ? parseInt(acquisitionPrice) : null,
+        status: status || 'under_management',
+        holdStrategy: holdStrategy || null,
+        exitTargetDate: exitTargetDate || null,
+        keyMetrics: keyMetrics || {},
+        notes: notes || null,
+      });
+      
+      res.status(201).json(asset);
+    } catch (error: any) {
+      console.error('Failed to create portfolio marina:', error);
+      res.status(500).json({ error: 'Failed to add marina to portfolio' });
+    }
+  });
+
+  // Update a portfolio marina
+  app.patch('/api/portfolio/marinas/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      
+      const { acquisitionDate, acquisitionPrice, status, holdStrategy, exitTargetDate, keyMetrics, notes, projectId } = req.body;
+      
+      const updateData: any = {};
+      if (acquisitionDate !== undefined) updateData.acquisitionDate = acquisitionDate;
+      if (acquisitionPrice !== undefined) updateData.acquisitionPrice = acquisitionPrice ? parseInt(acquisitionPrice) : null;
+      if (status !== undefined) updateData.status = status;
+      if (holdStrategy !== undefined) updateData.holdStrategy = holdStrategy;
+      if (exitTargetDate !== undefined) updateData.exitTargetDate = exitTargetDate;
+      if (keyMetrics !== undefined) updateData.keyMetrics = keyMetrics;
+      if (notes !== undefined) updateData.notes = notes;
+      if (projectId !== undefined) updateData.projectId = projectId;
+      
+      const asset = await ownedAssetsService.updateOwnedAsset(id, orgId, updateData);
+      if (!asset) {
+        return res.status(404).json({ error: 'Marina not found' });
+      }
+      
+      res.json(asset);
+    } catch (error: any) {
+      console.error('Failed to update portfolio marina:', error);
+      res.status(500).json({ error: 'Failed to update marina' });
+    }
+  });
+
+  // Delete a portfolio marina (remove from portfolio)
+  app.delete('/api/portfolio/marinas/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      
+      const deleted = await ownedAssetsService.deleteOwnedAsset(id, orgId);
+      if (!deleted) {
+        return res.status(404).json({ error: 'Marina not found' });
+      }
+      
+      res.json({ success: true, message: 'Marina removed from portfolio' });
+    } catch (error: any) {
+      console.error('Failed to delete portfolio marina:', error);
+      res.status(500).json({ error: 'Failed to remove marina from portfolio' });
+    }
+  });
+
+  // Get CRM properties that can be added to portfolio (not already owned)
+  app.get('/api/portfolio/available-properties', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      
+      // Get all property IDs already in portfolio
+      const ownedPropertyIds = await db
+        .select({ propertyId: ownedAssets.propertyId })
+        .from(ownedAssets)
+        .where(eq(ownedAssets.orgId, orgId));
+      
+      const ownedIds = ownedPropertyIds.map(o => o.propertyId);
+      
+      // Get properties not in portfolio
+      let conditions: any = eq(crmProperties.orgId, orgId);
+      if (ownedIds.length > 0) {
+        conditions = and(eq(crmProperties.orgId, orgId), notInArray(crmProperties.id, ownedIds));
+      }
+      
+      const properties = await db
+        .select({
+          id: crmProperties.id,
+          title: crmProperties.title,
+          address: crmProperties.address,
+          city: crmProperties.city,
+          state: crmProperties.state,
+          status: crmProperties.status,
+          specifications: crmProperties.specifications,
+        })
+        .from(crmProperties)
+        .where(conditions)
+        .orderBy(desc(crmProperties.createdAt));
+      
+      res.json(properties.map(p => ({
+        ...p,
+        slips: (p.specifications as any)?.slips || 0,
+      })));
+    } catch (error: any) {
+      console.error('Failed to fetch available properties:', error);
+      res.status(500).json({ error: 'Failed to fetch available properties' });
+    }
+  });
 
   // Get portfolio summary
   app.get('/api/portfolio/summary', authenticateUser, async (req: any, res) => {
