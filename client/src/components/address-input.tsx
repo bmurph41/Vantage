@@ -16,6 +16,137 @@ export interface AddressComponents {
   lng?: number;
 }
 
+const US_STATES: Record<string, string> = {
+  'alabama': 'AL', 'alaska': 'AK', 'arizona': 'AZ', 'arkansas': 'AR', 'california': 'CA',
+  'colorado': 'CO', 'connecticut': 'CT', 'delaware': 'DE', 'florida': 'FL', 'georgia': 'GA',
+  'hawaii': 'HI', 'idaho': 'ID', 'illinois': 'IL', 'indiana': 'IN', 'iowa': 'IA',
+  'kansas': 'KS', 'kentucky': 'KY', 'louisiana': 'LA', 'maine': 'ME', 'maryland': 'MD',
+  'massachusetts': 'MA', 'michigan': 'MI', 'minnesota': 'MN', 'mississippi': 'MS', 'missouri': 'MO',
+  'montana': 'MT', 'nebraska': 'NE', 'nevada': 'NV', 'new hampshire': 'NH', 'new jersey': 'NJ',
+  'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND', 'ohio': 'OH',
+  'oklahoma': 'OK', 'oregon': 'OR', 'pennsylvania': 'PA', 'rhode island': 'RI', 'south carolina': 'SC',
+  'south dakota': 'SD', 'tennessee': 'TN', 'texas': 'TX', 'utah': 'UT', 'vermont': 'VT',
+  'virginia': 'VA', 'washington': 'WA', 'west virginia': 'WV', 'wisconsin': 'WI', 'wyoming': 'WY',
+  'district of columbia': 'DC'
+};
+
+const STATE_ABBREVS = new Set(Object.values(US_STATES));
+
+function normalizeState(input: string): string | undefined {
+  const trimmed = input.trim();
+  const upper = trimmed.toUpperCase();
+  if (STATE_ABBREVS.has(upper)) return upper;
+  const lower = trimmed.toLowerCase();
+  return US_STATES[lower];
+}
+
+function parseCityStateZip(segment: string): { city?: string; state?: string; zipCode?: string } {
+  const trimmed = segment.trim();
+  
+  const zipMatch = trimmed.match(/\b(\d{5})(?:-\d{4})?\s*$/);
+  let zipCode: string | undefined;
+  let remainder = trimmed;
+  
+  if (zipMatch) {
+    zipCode = zipMatch[1];
+    remainder = trimmed.substring(0, zipMatch.index).trim();
+  }
+  
+  const words = remainder.split(/\s+/).filter(Boolean);
+  if (words.length === 0) {
+    return { zipCode };
+  }
+  
+  for (let i = words.length - 1; i >= 0; i--) {
+    const potentialState = words[i];
+    const stateAbbrev = normalizeState(potentialState);
+    if (stateAbbrev) {
+      const city = i > 0 ? words.slice(0, i).join(' ') : undefined;
+      return { city, state: stateAbbrev, zipCode };
+    }
+  }
+  
+  return { city: remainder, zipCode };
+}
+
+export function parseAddressString(fullAddress: string): AddressComponents {
+  const result: AddressComponents = { fullAddress };
+  if (!fullAddress || !fullAddress.trim()) return result;
+  
+  const parts = fullAddress.split(',').map(p => p.trim()).filter(Boolean);
+  if (parts.length === 0) return result;
+  
+  if (parts.length === 1) {
+    const parsed = parseCityStateZip(parts[0]);
+    if (parsed.state || parsed.zipCode) {
+      result.city = parsed.city;
+      result.state = parsed.state;
+      result.zipCode = parsed.zipCode;
+    }
+    return result;
+  }
+  
+  result.street = parts[0];
+  result.streetAddress = parts[0];
+  
+  if (parts.length === 2) {
+    const parsed = parseCityStateZip(parts[1]);
+    result.city = parsed.city;
+    result.state = parsed.state;
+    result.zipCode = parsed.zipCode;
+  } else if (parts.length === 3) {
+    const lastPart = parts[2];
+    const parsed = parseCityStateZip(lastPart);
+    
+    if (parsed.state || parsed.zipCode) {
+      if (parsed.city) {
+        result.city = parsed.city;
+      } else {
+        result.city = parts[1];
+      }
+      result.state = parsed.state;
+      result.zipCode = parsed.zipCode;
+    } else {
+      result.city = parts[1];
+      const stateAbbrev = normalizeState(lastPart);
+      if (stateAbbrev) {
+        result.state = stateAbbrev;
+      }
+    }
+  } else if (parts.length >= 4) {
+    const lastPart = parts[parts.length - 1];
+    const secondLast = parts[parts.length - 2];
+    
+    const lastParsed = parseCityStateZip(lastPart);
+    
+    if (lastParsed.state && lastParsed.zipCode) {
+      result.city = lastParsed.city || secondLast;
+      result.state = lastParsed.state;
+      result.zipCode = lastParsed.zipCode;
+    } else if (lastParsed.zipCode && !lastParsed.state) {
+      const stateAbbrev = normalizeState(secondLast);
+      if (stateAbbrev) {
+        result.state = stateAbbrev;
+        result.city = parts.length >= 5 ? parts[parts.length - 3] : parts[1];
+      } else {
+        result.city = secondLast;
+      }
+      result.zipCode = lastParsed.zipCode;
+    } else if (lastParsed.state && !lastParsed.zipCode) {
+      result.state = lastParsed.state;
+      result.city = lastParsed.city || secondLast;
+    } else {
+      result.city = parts[parts.length - 2];
+      const stateAbbrev = normalizeState(lastPart);
+      if (stateAbbrev) {
+        result.state = stateAbbrev;
+      }
+    }
+  }
+  
+  return result;
+}
+
 interface AddressInputProps {
   value?: string;
   onChange?: (address: string, components?: AddressComponents) => void;
@@ -210,11 +341,33 @@ export function AddressInput({
   }, [apiReady, disabled, handlePlaceChanged, countries]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Allow manual typing even when autocomplete is active
     if (onChange) {
       onChange(e.target.value);
     }
   };
+
+  const handleBlur = useCallback(() => {
+    const currentValue = inputRef.current?.value || value;
+    if (!currentValue || currentValue.trim().length < 5) return;
+    
+    const hasComma = currentValue.includes(',');
+    const hasZip = /\d{5}/.test(currentValue);
+    
+    if (hasComma || hasZip) {
+      const parsed = parseAddressString(currentValue);
+      
+      if (parsed.city || parsed.state || parsed.zipCode) {
+        if (parsed.street) {
+          if (onChangeRef.current) {
+            onChangeRef.current(parsed.street, parsed);
+          }
+        }
+        if (onAddressSelectRef.current) {
+          onAddressSelectRef.current(parsed);
+        }
+      }
+    }
+  }, [value]);
 
   return (
     <div className={className}>
@@ -238,17 +391,18 @@ export function AddressInput({
           id={testId}
           value={value}
           onChange={handleInputChange}
+          onBlur={handleBlur}
           placeholder={placeholder}
           disabled={disabled}
           required={required}
           className="pl-10"
           data-testid={testId}
-          autoComplete="off" // Disable browser autocomplete to avoid conflicts
+          autoComplete="off"
         />
       </div>
       {!apiReady && !isLoading && (
-        <p className="text-xs text-gray-500 mt-1">
-          Address autocomplete disabled. Enter address manually.
+        <p className="text-xs text-muted-foreground mt-1">
+          Enter full address with city, state and zip. Fields will auto-fill on blur.
         </p>
       )}
     </div>
