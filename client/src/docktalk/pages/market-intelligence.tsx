@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -332,6 +333,7 @@ function GenerateSummariesButton() {
 
 export default function MarketIntelligence() {
   const { isAuthenticated, user } = useAuth();
+  const [, navigate] = useLocation();
   const [periodFilter, setPeriodFilter] = useState<"daily" | "weekly" | "">("");
   
   // Admins always get Pro access for building/testing
@@ -426,7 +428,7 @@ export default function MarketIntelligence() {
                   <div className="bg-white dark:bg-gray-900 p-4 rounded-lg">
                     <Sparkles className="h-8 w-8 text-amber-500 mx-auto mb-2" />
                     <p className="font-medium text-foreground">AI Summaries</p>
-                    <p className="text-sm text-muted-foreground">Claude-powered insights</p>
+                    <p className="text-sm text-muted-foreground">AI-powered insights</p>
                   </div>
                   <div className="bg-white dark:bg-gray-900 p-4 rounded-lg">
                     <TrendingUp className="h-8 w-8 text-amber-500 mx-auto mb-2" />
@@ -439,7 +441,12 @@ export default function MarketIntelligence() {
                     <p className="text-sm text-muted-foreground">Strategic intelligence</p>
                   </div>
                 </div>
-                <Button size="lg" className="bg-amber-500 hover:bg-amber-600" data-testid="button-upgrade-pro">
+                <Button 
+                  size="lg" 
+                  className="bg-amber-500 hover:bg-amber-600"
+                  onClick={() => navigate("/packs-settings")}
+                  data-testid="button-upgrade-pro"
+                >
                   <Crown className="h-5 w-5 mr-2" />
                   Upgrade to Pro
                 </Button>

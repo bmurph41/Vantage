@@ -1,14 +1,10 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { db } from "../db";
 import { articles, categorySummaries, summaryEdits } from "@shared/docktalk-schema";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import type { CategorySummary, InsertCategorySummary } from "@shared/docktalk-schema";
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY_ENV_VAR || "";
-
-const anthropic = ANTHROPIC_API_KEY ? new Anthropic({
-  apiKey: ANTHROPIC_API_KEY,
-}) : null;
+const openai = new OpenAI();
 
 const CATEGORIES = [
   'Macro',
@@ -88,21 +84,11 @@ async function getArticlesForPeriod(
   };
 }
 
-async function generateSummaryWithClaude(
+async function generateSummaryWithAI(
   categoryData: CategoryArticles,
   previousPeriodCount: number,
   period: "daily" | "weekly"
 ): Promise<SummaryResponse> {
-  if (!anthropic) {
-    return {
-      executiveSummary: `${categoryData.articles.length} articles analyzed for ${categoryData.category}.`,
-      keyTrends: ["AI service not configured"],
-      topSources: [],
-      insights: "Configure Anthropic API to enable AI summaries.",
-      comparisonWithPrevious: ""
-    };
-  }
-
   const articlesList = categoryData.articles
     .slice(0, 50)
     .map((a, i) => `${i + 1}. [${a.source}] ${a.title}\n   Summary: ${a.summary || "No summary"}`)
@@ -136,25 +122,25 @@ Focus on:
 - Regulatory changes and compliance
 - Technology adoption and innovation
 - Market growth indicators
-- Investment opportunities and risks`;
+- Investment opportunities and risks
+
+Return ONLY valid JSON, no other text.`;
 
   try {
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-3-5-20241022",
-      max_tokens: 2000,
-      temperature: 0.7,
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
       messages: [{
         role: "user",
         content: prompt
-      }]
+      }],
+      max_tokens: 2000,
+      temperature: 0.7,
+      response_format: { type: "json_object" }
     });
 
-    const content = response.content[0];
-    if (content.type === "text") {
-      const jsonMatch = content.text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
+    const content = response.choices[0]?.message?.content;
+    if (content) {
+      return JSON.parse(content);
     }
 
     return {
@@ -165,7 +151,7 @@ Focus on:
       comparisonWithPrevious: ""
     };
   } catch (error) {
-    console.error("Claude API error:", error);
+    console.error("OpenAI API error:", error);
     return {
       executiveSummary: `${categoryData.articles.length} articles analyzed for ${categoryData.category}.`,
       keyTrends: ["AI generation failed"],
@@ -215,7 +201,7 @@ export async function generateCategorySummary(
     return null;
   }
 
-  const aiSummary = await generateSummaryWithClaude(
+  const aiSummary = await generateSummaryWithAI(
     currentArticles,
     previousArticles.articles.length,
     period
