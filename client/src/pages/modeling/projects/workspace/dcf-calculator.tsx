@@ -378,66 +378,47 @@ export default function DCFCalculatorPage() {
         </CardContent>
       </Card>
 
-      {/* Key Metrics from Base Scenario */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card data-testid="card-irr">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Levered IRR</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {formatPercent(baseScenario?.leveredIRR || 0)}
-                </p>
-              </div>
-              <TrendingUp className="h-8 w-8 text-green-600 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
+      {/* Key Metrics - Zilculator Style KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="finance-kpi-card variant-green" data-testid="card-irr">
+          <div className="kpi-icon">
+            <TrendingUp className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="kpi-label">Levered IRR</div>
+            <div className="kpi-value">{formatPercent(baseScenario?.leveredIRR || 0)}</div>
+          </div>
+        </div>
 
-        <Card data-testid="card-equity-multiple">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Equity Multiple</p>
-                <p className="text-2xl font-bold">
-                  {(baseScenario?.equityMultiple || 0).toFixed(2)}x
-                </p>
-              </div>
-              <Target className="h-8 w-8 text-blue-600 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
+        <div className="finance-kpi-card variant-blue" data-testid="card-equity-multiple">
+          <div className="kpi-icon">
+            <Target className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="kpi-label">Equity Multiple</div>
+            <div className="kpi-value">{(baseScenario?.equityMultiple || 0).toFixed(2)}x</div>
+          </div>
+        </div>
 
-        <Card data-testid="card-npv">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">NPV</p>
-                <p className={cn(
-                  "text-2xl font-bold",
-                  (baseScenario?.npv || 0) >= 0 ? "text-green-600" : "text-red-600"
-                )}>
-                  {formatCompactCurrency(baseScenario?.npv || 0)}
-                </p>
-              </div>
-              <DollarSign className="h-8 w-8 text-purple-600 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
+        <div className="finance-kpi-card" data-testid="card-npv">
+          <div className="kpi-icon">
+            <DollarSign className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="kpi-label">NPV</div>
+            <div className="kpi-value">{formatCompactCurrency(baseScenario?.npv || 0)}</div>
+          </div>
+        </div>
 
-        <Card data-testid="card-coc">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Avg Cash-on-Cash</p>
-                <p className="text-2xl font-bold">
-                  {formatPercent(baseScenario?.avgCashOnCash || 0)}
-                </p>
-              </div>
-              <Percent className="h-8 w-8 text-orange-600 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
+        <div className="finance-kpi-card variant-orange" data-testid="card-coc">
+          <div className="kpi-icon">
+            <Percent className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="kpi-label">Cash-on-Cash</div>
+            <div className="kpi-value">{formatPercent(baseScenario?.avgCashOnCash || 0)}</div>
+          </div>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -500,25 +481,24 @@ export default function DCFCalculatorPage() {
             {/* Scenario Comparison */}
             <Card>
               <CardHeader>
-                <CardTitle>Scenario Comparison</CardTitle>
-                <CardDescription>Key metrics across scenarios</CardDescription>
+                <CardTitle className="finance-section-header">Scenario Comparison</CardTitle>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Metric</TableHead>
+                <table className="finance-table">
+                  <thead>
+                    <tr>
+                      <th>Metric</th>
                       {comparison?.scenarios.map((s) => (
-                        <TableHead key={s} className="text-right">{s}</TableHead>
+                        <th key={s}>{s}</th>
                       ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {comparison?.metrics.slice(0, 6).map((m) => (
-                      <TableRow key={m.name}>
-                        <TableCell className="font-medium">{m.name}</TableCell>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {comparison?.metrics.slice(0, 6).map((m, idx) => (
+                      <tr key={m.name} className={['IRR', 'NPV', 'Equity Multiple'].includes(m.name) ? 'highlight-row' : ''}>
+                        <td>{m.name}</td>
                         {comparison.scenarios.map((s) => (
-                          <TableCell key={s} className="text-right">
+                          <td key={s}>
                             {m.unit === '$' 
                               ? formatCompactCurrency(m.values[s] || 0)
                               : m.unit === '%'
@@ -527,12 +507,12 @@ export default function DCFCalculatorPage() {
                               ? `${(m.values[s] || 0).toFixed(2)}x`
                               : `${(m.values[s] || 0).toFixed(1)} ${m.unit}`
                             }
-                          </TableCell>
+                          </td>
                         ))}
-                      </TableRow>
+                      </tr>
                     ))}
-                  </TableBody>
-                </Table>
+                  </tbody>
+                </table>
               </CardContent>
             </Card>
           </div>
@@ -693,49 +673,45 @@ export default function DCFCalculatorPage() {
         <TabsContent value="cashflows" className="mt-4">
           <Card>
             <CardHeader>
-              <CardTitle>Projected Cash Flows - {baseScenario?.name || 'Base Case'}</CardTitle>
+              <CardTitle className="finance-section-header">Projected Cash Flows - {baseScenario?.name || 'Base Case'}</CardTitle>
             </CardHeader>
             <CardContent>
               <ScrollArea className="w-full">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Year</TableHead>
-                      <TableHead className="text-right">NOI</TableHead>
-                      <TableHead className="text-right">CF Before Debt</TableHead>
-                      <TableHead className="text-right">CF After Debt</TableHead>
-                      <TableHead className="text-right">Present Value</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <table className="finance-table">
+                  <thead>
+                    <tr>
+                      <th>Year</th>
+                      <th>NOI</th>
+                      <th>CF Before Debt</th>
+                      <th>CF After Debt</th>
+                      <th>Present Value</th>
+                    </tr>
+                  </thead>
+                  <tbody>
                     {baseScenario?.cashFlows.map((cf) => (
-                      <TableRow key={cf.period}>
-                        <TableCell className="font-medium">Year {cf.period}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(cf.noi)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(cf.cashFlowBeforeDebt)}</TableCell>
-                        <TableCell className="text-right">
-                          <span className={cf.cashFlowAfterDebt >= 0 ? "text-green-600" : "text-red-600"}>
+                      <tr key={cf.period}>
+                        <td>Year {cf.period}</td>
+                        <td>{formatCurrency(cf.noi)}</td>
+                        <td>{formatCurrency(cf.cashFlowBeforeDebt)}</td>
+                        <td>
+                          <span className={cf.cashFlowAfterDebt >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
                             {formatCurrency(cf.cashFlowAfterDebt)}
                           </span>
-                        </TableCell>
-                        <TableCell className="text-right text-muted-foreground">
-                          {formatCurrency(cf.presentValue)}
-                        </TableCell>
-                      </TableRow>
+                        </td>
+                        <td className="text-muted-foreground">{formatCurrency(cf.presentValue)}</td>
+                      </tr>
                     ))}
-                    <TableRow className="font-bold border-t-2">
-                      <TableCell>Terminal Value</TableCell>
-                      <TableCell colSpan={2} />
-                      <TableCell className="text-right text-green-600">
-                        {formatCurrency(baseScenario?.terminalValueAmount || 0)}
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
+                    <tr className="highlight-row">
+                      <td>Terminal Value</td>
+                      <td colSpan={2}></td>
+                      <td>{formatCurrency(baseScenario?.terminalValueAmount || 0)}</td>
+                      <td>
                         {formatCurrency((baseScenario?.terminalValueAmount || 0) / 
                           Math.pow(1.1, baseScenario?.cashFlows.length || 10))}
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
             </CardContent>

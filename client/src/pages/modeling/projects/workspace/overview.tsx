@@ -153,51 +153,44 @@ export default function WorkspaceOverview({ project, onTabChange }: WorkspaceOve
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Purchase Price</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-overview-price">
-              {formatCurrency(project.purchasePrice)}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Year 1 Cap Rate</CardTitle>
-            <Percent className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-overview-caprate">
-              {formatPercent(project.year1CapRate)}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Units</CardTitle>
-            <Layers className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-overview-units">
-              {project.totalStorageUnits?.toLocaleString() ?? '-'}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">EBITDA</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-overview-ebitda">
-              {formatCurrency(project.ebitda)}
-            </div>
-          </CardContent>
-        </Card>
+      {/* Zilculator-Style KPI Cards */}
+      <div className="grid gap-3 md:grid-cols-4">
+        <div className="finance-kpi-card" data-testid="card-overview-price">
+          <div className="kpi-icon">
+            <DollarSign className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="kpi-label">Purchase Price</div>
+            <div className="kpi-value">{formatCurrency(project.purchasePrice)}</div>
+          </div>
+        </div>
+        <div className="finance-kpi-card variant-green" data-testid="card-overview-caprate">
+          <div className="kpi-icon">
+            <Percent className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="kpi-label">Year 1 Cap Rate</div>
+            <div className="kpi-value">{formatPercent(project.year1CapRate)}</div>
+          </div>
+        </div>
+        <div className="finance-kpi-card variant-blue" data-testid="card-overview-units">
+          <div className="kpi-icon">
+            <Layers className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="kpi-label">Total Units</div>
+            <div className="kpi-value">{project.totalStorageUnits?.toLocaleString() ?? '-'}</div>
+          </div>
+        </div>
+        <div className="finance-kpi-card variant-orange" data-testid="card-overview-ebitda">
+          <div className="kpi-icon">
+            <TrendingUp className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="kpi-label">EBITDA</div>
+            <div className="kpi-value">{formatCurrency(project.ebitda)}</div>
+          </div>
+        </div>
       </div>
 
       <Card>
