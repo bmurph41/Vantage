@@ -622,14 +622,14 @@ export default function UnifiedSidebar() {
           </div>
         )}
         
-        {/* Marketing - Operations Marketing Hub */}
+        {/* Marketing - Standalone Section */}
         {canViewSection('crm') && (
           <div className="mb-2">
-            <Link href="/operations/marketing">
+            <Link href="/marketing">
               <div 
                 className={cn(
                   "flex items-center px-4 py-2.5 text-sm font-medium transition-colors rounded-md mx-2",
-                  location.startsWith('/operations/marketing')
+                  location.startsWith('/marketing')
                     ? "bg-primary/10 text-primary"
                     : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
                 )}

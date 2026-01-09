@@ -496,12 +496,21 @@ function Router() {
           </UnifiedLayout>
         )}
       </Route>
-      <Route path="/operations/marketing">
+      {/* Marketing - Standalone Route */}
+      <Route path="/marketing">
         {() => (
           <UnifiedLayout>
             <MarketingTabbed />
           </UnifiedLayout>
         )}
+      </Route>
+      
+      {/* Legacy redirect from /operations/marketing to /marketing */}
+      <Route path="/operations/marketing">
+        {() => {
+          window.location.replace('/marketing');
+          return null;
+        }}
       </Route>
       
       {/* Legacy Operations Routes - Redirect to new tab-based URLs */}
@@ -675,37 +684,37 @@ function Router() {
       </Route>
       <Route path="/operations/marketing/dashboard">
         {() => {
-          window.location.replace('/operations/marketing?tab=dashboard');
+          window.location.replace('/marketing?tab=dashboard');
           return null;
         }}
       </Route>
       <Route path="/operations/marketing/campaigns">
         {() => {
-          window.location.replace('/operations/marketing?tab=campaigns');
+          window.location.replace('/marketing?tab=campaigns');
           return null;
         }}
       </Route>
       <Route path="/operations/marketing/expenses">
         {() => {
-          window.location.replace('/operations/marketing?tab=expenses');
+          window.location.replace('/marketing?tab=expenses');
           return null;
         }}
       </Route>
       <Route path="/operations/marketing/attribution">
         {() => {
-          window.location.replace('/operations/marketing?tab=attribution');
+          window.location.replace('/marketing?tab=attribution');
           return null;
         }}
       </Route>
       <Route path="/operations/marketing/email-campaigns">
         {() => {
-          window.location.replace('/operations/marketing?tab=email-campaigns');
+          window.location.replace('/marketing?tab=email-campaigns');
           return null;
         }}
       </Route>
       <Route path="/operations/marketing/settings">
         {() => {
-          window.location.replace('/operations/marketing?tab=settings');
+          window.location.replace('/marketing?tab=settings');
           return null;
         }}
       </Route>
@@ -828,7 +837,7 @@ function Router() {
       </Route>
       <Route path="/crm/marketing-automation">
         {() => {
-          window.location.replace('/operations/marketing?tab=automation');
+          window.location.replace('/marketing?tab=automation');
           return null;
         }}
       </Route>
