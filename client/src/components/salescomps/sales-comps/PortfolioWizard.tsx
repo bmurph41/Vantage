@@ -1083,13 +1083,24 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>Sale Condition</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    {...field} 
-                                    placeholder="Good condition"
-                                    data-testid="input-sale-condition"
-                                  />
-                                </FormControl>
+                                <Select 
+                                  value={field.value || ""} 
+                                  onValueChange={field.onChange}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-sale-condition">
+                                      <SelectValue placeholder="Select sale condition" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="On-Market">On-Market</SelectItem>
+                                    <SelectItem value="Off-Market">Off-Market</SelectItem>
+                                    <SelectItem value="Pocket Listing">Pocket Listing</SelectItem>
+                                    <SelectItem value="Auction">Auction</SelectItem>
+                                    <SelectItem value="REO/Foreclosure">REO/Foreclosure</SelectItem>
+                                    <SelectItem value="Short Sale">Short Sale</SelectItem>
+                                  </SelectContent>
+                                </Select>
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -1098,56 +1109,71 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                           <FormField
                             control={marinaForm.control}
                             name="brokerage"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Brokerage</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    {...field} 
-                                    placeholder="e.g., Transworld Business Advisors"
-                                    data-testid="input-brokerage"
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
+                            render={({ field }) => {
+                              const isOffMarket = marinaForm.watch("saleCondition") === "Off-Market";
+                              return (
+                                <FormItem>
+                                  <FormLabel className={isOffMarket ? "text-muted-foreground" : ""}>Brokerage</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      {...field} 
+                                      placeholder="Brokerage Company Name"
+                                      data-testid="input-brokerage"
+                                      disabled={isOffMarket}
+                                      className={isOffMarket ? "bg-muted text-muted-foreground" : ""}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              );
+                            }}
                           />
                           
                           <div className="grid grid-cols-2 gap-4">
                             <FormField
                               control={marinaForm.control}
                               name="agentFirstName"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Agent First Name</FormLabel>
-                                  <FormControl>
-                                    <Input 
-                                      {...field} 
-                                      placeholder="First name"
-                                      data-testid="input-agent-first-name"
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
+                              render={({ field }) => {
+                                const isOffMarket = marinaForm.watch("saleCondition") === "Off-Market";
+                                return (
+                                  <FormItem>
+                                    <FormLabel className={isOffMarket ? "text-muted-foreground" : ""}>Agent First Name</FormLabel>
+                                    <FormControl>
+                                      <Input 
+                                        {...field} 
+                                        placeholder="First name"
+                                        data-testid="input-agent-first-name"
+                                        disabled={isOffMarket}
+                                        className={isOffMarket ? "bg-muted text-muted-foreground" : ""}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                );
+                              }}
                             />
                             
                             <FormField
                               control={marinaForm.control}
                               name="agentLastName"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Agent Last Name</FormLabel>
-                                  <FormControl>
-                                    <Input 
-                                      {...field} 
-                                      placeholder="Last name"
-                                      data-testid="input-agent-last-name"
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
+                              render={({ field }) => {
+                                const isOffMarket = marinaForm.watch("saleCondition") === "Off-Market";
+                                return (
+                                  <FormItem>
+                                    <FormLabel className={isOffMarket ? "text-muted-foreground" : ""}>Agent Last Name</FormLabel>
+                                    <FormControl>
+                                      <Input 
+                                        {...field} 
+                                        placeholder="Last name"
+                                        data-testid="input-agent-last-name"
+                                        disabled={isOffMarket}
+                                        className={isOffMarket ? "bg-muted text-muted-foreground" : ""}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                );
+                              }}
                             />
                           </div>
                         </CardContent>
