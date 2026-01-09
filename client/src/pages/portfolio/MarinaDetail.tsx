@@ -27,6 +27,7 @@ import {
   FileText,
   Waves,
 } from "lucide-react";
+import { formatCurrency, formatPercent } from "@/lib/utils";
 
 interface MarinaDetails {
   id: string;
@@ -75,13 +76,6 @@ interface RateComp {
   amenities: string[] | null;
   notes: string | null;
 }
-
-const formatCurrency = (value: number | null | undefined): string => {
-  if (!value) return "-";
-  if (value >= 1000000) return `$${(value / 1000000).toFixed(2)}M`;
-  if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
-  return `$${value.toFixed(0)}`;
-};
 
 const formatDate = (date: string | null): string => {
   if (!date) return "-";

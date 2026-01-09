@@ -53,6 +53,7 @@ import {
 } from "lucide-react";
 import { MarinaModal } from "@/components/portfolio/MarinaModal";
 import { useToast } from "@/hooks/use-toast";
+import { formatCurrency, formatPercent } from "@/lib/utils";
 
 interface OwnedMarina {
   id: string;
@@ -79,18 +80,6 @@ interface PortfolioSummary {
   avgOccupancy: number;
   totalRevenue: number;
 }
-
-const formatCurrency = (value: number | null | undefined): string => {
-  if (!value) return "$0";
-  if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
-  if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
-  return `$${value.toFixed(0)}`;
-};
-
-const formatPercent = (value: number | null | undefined): string => {
-  if (!value) return "0%";
-  return `${value.toFixed(1)}%`;
-};
 
 const formatDate = (date: string | null): string => {
   if (!date) return "-";
