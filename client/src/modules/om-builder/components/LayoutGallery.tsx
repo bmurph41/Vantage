@@ -192,6 +192,91 @@ const DEFAULT_LAYOUTS: OmPageLayoutDefinition[] = [
       ],
     },
   },
+  {
+    id: 'zilculator-exec-summary',
+    name: 'Zilculator Executive Summary',
+    description: 'Professional OM-style executive summary with hero KPIs, investment thesis, and property description',
+    layoutType: 'execSummary',
+    isSystemDefault: true,
+    structure: {
+      gridColumns: 1,
+      gridGap: '1rem',
+      placeholders: [
+        { id: 'hero-kpis', blockType: 'heroKpiGrid', x: 50, y: 60, width: 700, height: 100, label: 'Hero KPI Cards (Purchase Price, Rent, Cash Flow, CoC)' },
+        { id: 'exec-summary', blockType: 'executiveSummary', x: 50, y: 180, width: 700, height: 350, label: 'Executive Summary with Investment Thesis' },
+        { id: 'property-image', blockType: 'image', x: 50, y: 550, width: 700, height: 300, label: 'Property Hero Image' },
+      ],
+    },
+  },
+  {
+    id: 'zilculator-financial-analysis',
+    name: 'Zilculator Financial Analysis',
+    description: 'Comprehensive financial metrics with analysis tables and return ratios',
+    layoutType: 'financials',
+    isSystemDefault: true,
+    structure: {
+      gridColumns: 2,
+      gridGap: '1rem',
+      placeholders: [
+        { id: 'financial-measures', blockType: 'financialAnalysis', x: 50, y: 60, width: 340, height: 200, label: 'Financial Measures (NPV, IRR, PI)' },
+        { id: 'investment-returns', blockType: 'investmentReturns', x: 410, y: 60, width: 340, height: 200, label: 'Investment Return Ratios' },
+        { id: 'financial-breakdown', blockType: 'financialBreakdown', x: 50, y: 280, width: 340, height: 280, label: 'Financial Breakdown' },
+        { id: 'financing-overview', blockType: 'financingOverview', x: 410, y: 280, width: 340, height: 280, label: 'Financing Overview' },
+        { id: 'goi-chart', blockType: 'combo-chart', x: 50, y: 580, width: 700, height: 250, label: 'GOI, NOI and CF Over Holding Period' },
+      ],
+    },
+  },
+  {
+    id: 'zilculator-operating-analysis',
+    name: 'Zilculator Operating Analysis',
+    description: 'Detailed income and expense breakdown with operating ratios',
+    layoutType: 'financials',
+    isSystemDefault: true,
+    structure: {
+      gridColumns: 2,
+      gridGap: '1rem',
+      placeholders: [
+        { id: 'operating-analysis', blockType: 'operatingAnalysis', x: 50, y: 60, width: 450, height: 400, label: 'Annual Property Operating Data' },
+        { id: 'income-pie', blockType: 'pie-chart', x: 520, y: 60, width: 230, height: 200, label: 'GOI Distribution' },
+        { id: 'operating-ratios', blockType: 'financialAnalysis', x: 520, y: 280, width: 230, height: 180, label: 'Operating Ratios (OER, BER)' },
+        { id: 'cashflow-year1', blockType: 'financialAnalysis', x: 50, y: 480, width: 700, height: 200, label: 'Cash Flow Year 1' },
+      ],
+    },
+  },
+  {
+    id: 'zilculator-cash-flow-forecast',
+    name: 'Zilculator Cash Flow Forecast',
+    description: '5-year cash flow projection with annual breakdown',
+    layoutType: 'financials',
+    isSystemDefault: true,
+    structure: {
+      gridColumns: 1,
+      gridGap: '1rem',
+      placeholders: [
+        { id: 'forecast-heading', blockType: 'heading', x: 50, y: 60, width: 700, height: 50, label: 'Long-term Cash Flow Forecast' },
+        { id: 'cash-flow-table', blockType: 'cashFlowForecast', x: 50, y: 130, width: 700, height: 400, label: '5-Year Cash Flow Forecast Table' },
+        { id: 'equity-chart', blockType: 'area-chart', x: 50, y: 550, width: 700, height: 280, label: 'Cumulative Equity vs Debt Chart' },
+      ],
+    },
+  },
+  {
+    id: 'zilculator-marina-kpis',
+    name: 'Marina Performance Metrics',
+    description: 'Marina-specific KPIs including slip occupancy, REVPS, and ancillary revenue',
+    layoutType: 'financials',
+    isSystemDefault: true,
+    structure: {
+      gridColumns: 1,
+      gridGap: '1rem',
+      placeholders: [
+        { id: 'marina-heading', blockType: 'heading', x: 50, y: 60, width: 700, height: 50, label: 'Marina Performance Overview' },
+        { id: 'marina-kpis', blockType: 'marinaKpis', x: 50, y: 130, width: 700, height: 180, label: 'Marina KPIs (Occupancy, REVPS, Ancillary, Fuel)' },
+        { id: 'slip-mix-chart', blockType: 'pie-chart', x: 50, y: 330, width: 340, height: 200, label: 'Slip Mix by Size' },
+        { id: 'revenue-mix-chart', blockType: 'pie-chart', x: 410, y: 330, width: 340, height: 200, label: 'Revenue Mix' },
+        { id: 'marina-description', blockType: 'text', x: 50, y: 550, width: 700, height: 280, label: 'Marina Description & Amenities' },
+      ],
+    },
+  },
 ];
 
 export function LayoutGallery({ open, onClose, onSelectLayout }: LayoutGalleryProps) {

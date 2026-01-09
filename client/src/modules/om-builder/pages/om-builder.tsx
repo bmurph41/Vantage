@@ -5,7 +5,8 @@ import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useSensor, useSe
 import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { toast } from "@/hooks/use-toast";
-import { FileDown, ArrowLeft, FileText, Plus, Trash2, GripVertical, Settings, Sparkles, Type, BarChart3, Table, Image, Gauge, Database, History, AlertCircle, Info, CheckCircle, AlertTriangle, Lightbulb, StickyNote, LayoutTemplate, Link2, Palette, AlignLeft, AlignCenter, AlignRight, Minus, RotateCcw, PenTool, Layers, TrendingUp, LayoutGrid, MapPin, Users, Building2, ScrollText } from "lucide-react";
+import { FileDown, ArrowLeft, FileText, Plus, Trash2, GripVertical, Settings, Sparkles, Type, BarChart3, Table, Image, Gauge, Database, History, AlertCircle, Info, CheckCircle, AlertTriangle, Lightbulb, StickyNote, LayoutTemplate, Link2, Palette, AlignLeft, AlignCenter, AlignRight, Minus, RotateCcw, PenTool, Layers, TrendingUp, LayoutGrid, MapPin, Users, Building2, ScrollText, Landmark, Calendar, Wallet, DollarSign, Percent, Activity } from "lucide-react";
+import { HeroKpiCard, ExecutiveSummaryBlock, FinancialAnalysisBlock, OperatingAnalysisBlock, FinancingOverviewBlock, CashFlowForecastBlock, MarinaKpiBlock, FinancialBreakdownBlock, InvestmentReturnRatiosBlock, GoiNoiCfChart, IncomeDistributionPie, EquityVsDebtChart } from "../components/blocks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -121,6 +122,104 @@ function SortableBlock({ block, isSelected, onSelect, onUpdate }: SortableBlockP
         return (
           <div className="h-8 flex items-center justify-center text-muted-foreground/50">
             <Minus className="w-4 h-4" />
+          </div>
+        );
+      case 'heroKpiGrid':
+        return (
+          <div className="p-4">
+            <div className="grid grid-cols-4 gap-3">
+              {(block.content?.items || []).map((item: any, i: number) => (
+                <HeroKpiCard key={i} {...item} />
+              ))}
+            </div>
+          </div>
+        );
+      case 'executiveSummary':
+        return (
+          <div className="p-2">
+            <ExecutiveSummaryBlock {...(block.content || {})} />
+          </div>
+        );
+      case 'financialAnalysis':
+        return (
+          <div className="p-2">
+            <FinancialAnalysisBlock 
+              title={block.content?.title || "Financial Analysis"}
+              items={block.content?.items || []}
+              columns={block.content?.columns || 2}
+            />
+          </div>
+        );
+      case 'operatingAnalysis':
+        return (
+          <div className="p-2">
+            <OperatingAnalysisBlock 
+              title={block.content?.title || "Operating Analysis"}
+              goi={block.content?.goi || 0}
+              items={block.content?.items || []}
+            />
+          </div>
+        );
+      case 'financingOverview':
+        return (
+          <div className="p-2">
+            <FinancingOverviewBlock {...(block.content || {})} />
+          </div>
+        );
+      case 'cashFlowForecast':
+        return (
+          <div className="p-2">
+            <CashFlowForecastBlock 
+              title={block.content?.title || "Cash Flow Forecast"}
+              rows={block.content?.rows || []}
+              showCfat={block.content?.showCfat}
+            />
+          </div>
+        );
+      case 'marinaKpis':
+        return (
+          <div className="p-2">
+            <MarinaKpiBlock {...(block.content || {})} />
+          </div>
+        );
+      case 'financialBreakdown':
+        return (
+          <div className="p-2">
+            <FinancialBreakdownBlock {...(block.content || {})} />
+          </div>
+        );
+      case 'investmentReturns':
+        return (
+          <div className="p-2">
+            <InvestmentReturnRatiosBlock {...(block.content || {})} />
+          </div>
+        );
+      case 'combo-chart':
+        return (
+          <div className="p-2">
+            <GoiNoiCfChart 
+              data={block.content?.data || []}
+              title={block.content?.title}
+              showCfat={block.content?.showCfat}
+            />
+          </div>
+        );
+      case 'pie-chart':
+        return (
+          <div className="p-2">
+            <IncomeDistributionPie 
+              data={block.content?.data || []}
+              title={block.content?.title}
+            />
+          </div>
+        );
+      case 'area-chart':
+        return (
+          <div className="p-2">
+            <EquityVsDebtChart 
+              data={block.content?.data || []}
+              title={block.content?.title}
+            />
           </div>
         );
       default:
@@ -364,6 +463,126 @@ export default function OMBuilder() {
       case 'callout': return { text: "Add your callout text here..." };
       case 'divider': return {};
       case 'spacer': return { height: '2rem' };
+      case 'heroKpiGrid': return {
+        items: [
+          { label: 'Purchase Price', value: '$1,300,000', variant: 'teal', icon: 'dollar' },
+          { label: 'Rent', value: '$16,000/mo', variant: 'green', icon: 'building' },
+          { label: 'Monthly Cash Flow', value: '$3,087', variant: 'blue', icon: 'trending' },
+          { label: 'Cash on Cash Return', value: '38.79%', variant: 'orange', icon: 'percent' },
+        ]
+      };
+      case 'executiveSummary': return {
+        purchasePrice: 1300000,
+        rent: 16000,
+        monthlyCashFlow: 3087,
+        cashOnCash: 38.79,
+        investmentStrategy: 'Rental Property',
+        description: 'This fully stabilized short-term rental portfolio consists of four high-performing properties strategically located across some of the most desirable rental markets in Tampa Bay.'
+      };
+      case 'financialAnalysis': return {
+        title: 'Financial Measures',
+        columns: 2,
+        items: [
+          { label: 'Net Present Value (NPV)', value: 246254, format: 'currency' },
+          { label: 'Internal Rate of Return', value: 47.18, format: 'percent' },
+          { label: 'Profitability Index', value: '3.58', format: 'text' },
+          { label: 'Annual Depreciation', value: 26667, format: 'currency' },
+        ]
+      };
+      case 'operatingAnalysis': return {
+        title: 'Annual Property Operating Data',
+        goi: 186240,
+        items: [
+          { label: 'Gross Scheduled Income', value: 192000 },
+          { label: 'Vacancy Loss', value: 5760, isExpense: true },
+          { label: 'Gross Operating Income', value: 186240, isTotal: true },
+          { label: 'Property Manager', value: 27936, isExpense: true },
+          { label: 'Utilities', value: 24000, isExpense: true },
+          { label: 'Insurance', value: 4000, isExpense: true },
+          { label: 'Property Tax', value: 3000, isExpense: true },
+          { label: 'Total Expenses', value: 58936, isTotal: true },
+          { label: 'Net Operating Income', value: 127304, isTotal: true },
+        ]
+      };
+      case 'financingOverview': return {
+        loanAmount: 1254500,
+        downPayment: 45500,
+        ltv: 96.5,
+        interestRate: 6.0,
+        amortizationYears: 30,
+        monthlyPayment: 7521.36,
+        dcr: 1.41
+      };
+      case 'cashFlowForecast': return {
+        title: 'Long-term Cash Flow Forecast',
+        showCfat: true,
+        rows: [
+          { year: 1, goi: 186240, expenses: 58936, noi: 127304, debtService: 90256, cfbt: 37048, cfat: 30601 },
+          { year: 2, goi: 191827, expenses: 60704, noi: 131123, debtService: 90256, cfbt: 40867, cfat: 33819 },
+          { year: 3, goi: 197582, expenses: 62525, noi: 135057, debtService: 90256, cfbt: 44801, cfat: 37132 },
+          { year: 4, goi: 203509, expenses: 64401, noi: 139108, debtService: 90256, cfbt: 48852, cfat: 40541 },
+          { year: 5, goi: 209614, expenses: 66333, noi: 143281, debtService: 90256, cfbt: 53025, cfat: 44049 },
+        ]
+      };
+      case 'marinaKpis': return {
+        slipOccupancy: 92.5,
+        revps: 8500,
+        ancillaryRevenueMix: 28.5,
+        fuelMargin: 12.3,
+        wetSlips: 150,
+        dryStorage: 200,
+        totalLinearFeet: 12500
+      };
+      case 'financialBreakdown': return {
+        purchasePrice: 1300000,
+        purchaseCosts: 50000,
+        repairCosts: 0,
+        totalCapitalNeeded: 1350000,
+        financing: 1254500,
+        totalCashNeeded: 95500,
+        cashAtClosing: 45500,
+        cashDuringRehab: 50000
+      };
+      case 'investmentReturns': return {
+        cashOnCash: 38.79,
+        roi: 79.63,
+        capRate: 9.79,
+        grossRentalYield: 14.77,
+        grm: 6.77
+      };
+      case 'combo-chart': return {
+        title: 'GOI, NOI and CF Over Holding Period',
+        showCfat: true,
+        data: [
+          { year: 1, goi: 186240, noi: 127304, cfbt: 37048, cfat: 30601 },
+          { year: 2, goi: 191827, noi: 131123, cfbt: 40867, cfat: 33819 },
+          { year: 3, goi: 197582, noi: 135057, cfbt: 44801, cfat: 37132 },
+          { year: 4, goi: 203509, noi: 139108, cfbt: 48852, cfat: 40541 },
+          { year: 5, goi: 209614, noi: 143281, cfbt: 53025, cfat: 44049 },
+        ]
+      };
+      case 'pie-chart': return {
+        title: 'Gross Operating Income Distribution',
+        data: [
+          { name: 'Cash Flow', value: 37048 },
+          { name: 'Loan Payment', value: 90256 },
+          { name: 'Property Manager', value: 27936 },
+          { name: 'Utilities', value: 24000 },
+          { name: 'Insurance', value: 4000 },
+          { name: 'Property Tax', value: 3000 },
+        ]
+      };
+      case 'area-chart': return {
+        title: 'Cumulative Equity vs Debt',
+        data: [
+          { year: 0, loanBalance: 1254500, principalPaid: 0, cashOutlay: 95500, appreciation: 0 },
+          { year: 1, loanBalance: 1237000, principalPaid: 17500, cashOutlay: 95500, appreciation: 39000 },
+          { year: 2, loanBalance: 1218500, principalPaid: 36000, cashOutlay: 95500, appreciation: 79560 },
+          { year: 3, loanBalance: 1199000, principalPaid: 55500, cashOutlay: 95500, appreciation: 121710 },
+          { year: 4, loanBalance: 1178500, principalPaid: 76000, cashOutlay: 95500, appreciation: 165485 },
+          { year: 5, loanBalance: 1157000, principalPaid: 97500, cashOutlay: 95500, appreciation: 210920 },
+        ]
+      };
       default: return {};
     }
   };
@@ -563,35 +782,83 @@ export default function OMBuilder() {
                 </ScrollArea>
               </div>
 
-              <div className="p-3 border-b">
+              <div className="p-3 border-b flex-1 overflow-y-auto">
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">Add Block</span>
-                <div className="grid grid-cols-3 gap-1">
-                  {[
-                    { type: 'text' as BlockType, icon: Type, label: 'Text' },
-                    { type: 'kpi' as BlockType, icon: Gauge, label: 'KPI' },
-                    { type: 'chart' as BlockType, icon: BarChart3, label: 'Chart' },
-                    { type: 'table' as BlockType, icon: Table, label: 'Table' },
-                    { type: 'image' as BlockType, icon: Image, label: 'Image' },
-                    { type: 'callout' as BlockType, icon: AlertCircle, label: 'Callout' },
-                    { type: 'divider' as BlockType, icon: Minus, label: 'Divider' },
-                    { type: 'metricStrip' as BlockType, icon: TrendingUp, label: 'Metrics' },
-                    { type: 'imageGrid' as BlockType, icon: LayoutGrid, label: 'Gallery' },
-                    { type: 'mapPage' as BlockType, icon: MapPin, label: 'Map' },
-                    { type: 'sectionDivider' as BlockType, icon: Layers, label: 'Section' },
-                    { type: 'teamGrid' as BlockType, icon: Users, label: 'Team' },
-                    { type: 'disclaimer' as BlockType, icon: ScrollText, label: 'Disclaimer' },
-                    { type: 'portfolioTable' as BlockType, icon: Building2, label: 'Portfolio' },
-                  ].map(({ type, icon: Icon, label }) => (
-                    <button
-                      key={type}
-                      onClick={() => addBlock(type)}
-                      className="flex flex-col items-center justify-center p-2 rounded-md border border-border hover:bg-muted/50 transition-colors"
-                      data-testid={`button-add-${type}`}
-                    >
-                      <Icon className="w-4 h-4 mb-1" />
-                      <span className="text-[10px]">{label}</span>
-                    </button>
-                  ))}
+                <div className="space-y-3">
+                  <div>
+                    <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide mb-1 block">Basic</span>
+                    <div className="grid grid-cols-3 gap-1">
+                      {[
+                        { type: 'text' as BlockType, icon: Type, label: 'Text' },
+                        { type: 'kpi' as BlockType, icon: Gauge, label: 'KPI' },
+                        { type: 'chart' as BlockType, icon: BarChart3, label: 'Chart' },
+                        { type: 'table' as BlockType, icon: Table, label: 'Table' },
+                        { type: 'image' as BlockType, icon: Image, label: 'Image' },
+                        { type: 'callout' as BlockType, icon: AlertCircle, label: 'Callout' },
+                      ].map(({ type, icon: Icon, label }) => (
+                        <button
+                          key={type}
+                          onClick={() => addBlock(type)}
+                          className="flex flex-col items-center justify-center p-2 rounded-md border border-border hover:bg-muted/50 transition-colors"
+                          data-testid={`button-add-${type}`}
+                        >
+                          <Icon className="w-4 h-4 mb-1" />
+                          <span className="text-[10px]">{label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-teal-600 font-medium uppercase tracking-wide mb-1 block">Zilculator Financial</span>
+                    <div className="grid grid-cols-3 gap-1">
+                      {[
+                        { type: 'heroKpiGrid' as BlockType, icon: TrendingUp, label: 'Hero KPIs' },
+                        { type: 'executiveSummary' as BlockType, icon: FileText, label: 'Exec Sum' },
+                        { type: 'financialAnalysis' as BlockType, icon: BarChart3, label: 'Financial' },
+                        { type: 'operatingAnalysis' as BlockType, icon: Table, label: 'Operating' },
+                        { type: 'financingOverview' as BlockType, icon: Landmark, label: 'Financing' },
+                        { type: 'cashFlowForecast' as BlockType, icon: Calendar, label: 'Cash Flow' },
+                        { type: 'financialBreakdown' as BlockType, icon: Wallet, label: 'Breakdown' },
+                        { type: 'investmentReturns' as BlockType, icon: TrendingUp, label: 'Returns' },
+                        { type: 'marinaKpis' as BlockType, icon: Building2, label: 'Marina' },
+                      ].map(({ type, icon: Icon, label }) => (
+                        <button
+                          key={type}
+                          onClick={() => addBlock(type)}
+                          className="flex flex-col items-center justify-center p-2 rounded-md border border-teal-200 bg-teal-50/50 hover:bg-teal-100/50 transition-colors"
+                          data-testid={`button-add-${type}`}
+                        >
+                          <Icon className="w-4 h-4 mb-1 text-teal-600" />
+                          <span className="text-[10px] text-teal-700">{label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide mb-1 block">Layout</span>
+                    <div className="grid grid-cols-3 gap-1">
+                      {[
+                        { type: 'divider' as BlockType, icon: Minus, label: 'Divider' },
+                        { type: 'metricStrip' as BlockType, icon: TrendingUp, label: 'Metrics' },
+                        { type: 'imageGrid' as BlockType, icon: LayoutGrid, label: 'Gallery' },
+                        { type: 'mapPage' as BlockType, icon: MapPin, label: 'Map' },
+                        { type: 'sectionDivider' as BlockType, icon: Layers, label: 'Section' },
+                        { type: 'teamGrid' as BlockType, icon: Users, label: 'Team' },
+                        { type: 'disclaimer' as BlockType, icon: ScrollText, label: 'Disclaimer' },
+                        { type: 'portfolioTable' as BlockType, icon: Building2, label: 'Portfolio' },
+                      ].map(({ type, icon: Icon, label }) => (
+                        <button
+                          key={type}
+                          onClick={() => addBlock(type)}
+                          className="flex flex-col items-center justify-center p-2 rounded-md border border-border hover:bg-muted/50 transition-colors"
+                          data-testid={`button-add-${type}`}
+                        >
+                          <Icon className="w-4 h-4 mb-1" />
+                          <span className="text-[10px]">{label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
 

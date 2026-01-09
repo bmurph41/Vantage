@@ -6,7 +6,9 @@ export type BlockType =
   | 'image' | 'gallery' | 'map'
   | 'divider' | 'spacer'
   | 'shape' | 'icon' | 'group'
-  | 'metricStrip' | 'imageGrid' | 'mapPage' | 'sectionDivider' | 'teamGrid' | 'disclaimer' | 'portfolioTable';
+  | 'metricStrip' | 'imageGrid' | 'mapPage' | 'sectionDivider' | 'teamGrid' | 'disclaimer' | 'portfolioTable'
+  | 'heroKpiGrid' | 'executiveSummary' | 'financialAnalysis' | 'operatingAnalysis' 
+  | 'financingOverview' | 'cashFlowForecast' | 'marinaKpis' | 'financialBreakdown' | 'investmentReturns';
 
 export type ShapeType = 'rect' | 'circle' | 'line' | 'triangle';
 
