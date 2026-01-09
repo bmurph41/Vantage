@@ -135,11 +135,13 @@ export const STATES_AND_COUNTRIES = [
 // US Regions for geographic classification
 export const US_REGIONS = [
   'Northeast',
-  'Southeast',
   'Mid-Atlantic',
+  'Southeast',
+  'South',
   'Mid-West',
-  'Northwest',
-  'Southwest'
+  'Southwest',
+  'West',
+  'Pacific Northwest',
 ] as const;
 export type USRegion = typeof US_REGIONS[number];
 

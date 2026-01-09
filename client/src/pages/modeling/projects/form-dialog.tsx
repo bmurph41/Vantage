@@ -49,6 +49,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { normalizeState } from '@shared/utils/state-normalization';
 import { AddressInput, type AddressComponents } from '@/components/address-input';
+import { US_REGIONS } from '@shared/salescomps-constants';
 
 const formSchema = z.object({
   marinaName: z.string().min(1, 'Marina name is required'),
@@ -327,9 +328,9 @@ export default function ModelingProjectFormDialog({
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
-  const sortedRegions = [...regions]
-    .filter(r => r.isActive)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+  const sortedRegions = regions.length > 0 
+    ? [...regions].filter(r => r.isActive).sort((a, b) => a.sortOrder - b.sortOrder)
+    : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -452,11 +453,18 @@ export default function ModelingProjectFormDialog({
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="none">No region</SelectItem>
-                      {sortedRegions.map((region) => (
-                        <SelectItem key={region.id} value={region.name}>
-                          {region.name}
-                        </SelectItem>
-                      ))}
+                      {sortedRegions 
+                        ? sortedRegions.map((region) => (
+                            <SelectItem key={region.id} value={region.name}>
+                              {region.name}
+                            </SelectItem>
+                          ))
+                        : US_REGIONS.map((region) => (
+                            <SelectItem key={region} value={region}>
+                              {region}
+                            </SelectItem>
+                          ))
+                      }
                     </SelectContent>
                   </Select>
                   <FormMessage />

@@ -15,6 +15,15 @@ function getCsrfToken(): string {
   return match ? decodeURIComponent(match[1]) : '';
 }
 
+async function ensureCsrfToken(): Promise<string> {
+  let token = getCsrfToken();
+  if (!token) {
+    await fetch('/api/auth/me', { credentials: 'include' });
+    token = getCsrfToken();
+  }
+  return token;
+}
+
 interface UploadDropzoneProps {
   projectId: string;
   onUploadComplete: (upload: DocIntelUpload) => void;
@@ -31,7 +40,7 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
 
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      const csrfToken = getCsrfToken();
+      const csrfToken = await ensureCsrfToken();
       const headers: Record<string, string> = {};
       if (csrfToken) {
         headers['X-CSRF-Token'] = csrfToken;

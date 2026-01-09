@@ -15224,6 +15224,35 @@ Current context: Project ${req.params.projectId}`;
         return project;
       });
       
+      // Check if a CRM property exists with this marina name
+      // If not found, create a pending property for review
+      try {
+        const existingProperty = await storage.findPropertyByLocation(
+          orgId, 
+          data.marinaName, 
+          data.city || undefined, 
+          data.state || undefined
+        );
+        
+        if (!existingProperty) {
+          await storage.createPendingProperty({
+            orgId,
+            sourceType: 'modeling_project',
+            marinaName: data.marinaName,
+            city: data.city || null,
+            state: data.state || null,
+            address: data.address || null,
+            createdBy: userId,
+            compMetadata: { 
+              fromModelingProjectId: result.id,
+              fromModelingProjectName: data.marinaName 
+            },
+          });
+        }
+      } catch (pendingError) {
+        console.error('Failed to create pending property (non-blocking):', pendingError);
+      }
+      
       res.status(201).json(result);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
