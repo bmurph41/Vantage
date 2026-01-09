@@ -93,6 +93,7 @@ const CalendarSettings = lazy(() => import("@/pages/calendar-settings"));
 const CustomerAnalytics = lazy(() => import("@/pages/operations/CustomerAnalytics"));
 const OwnedMarinas = lazy(() => import("@/pages/operations/OwnedMarinas"));
 const Portfolio = lazy(() => import("@/pages/Portfolio"));
+const MarinaDetail = lazy(() => import("@/pages/portfolio/MarinaDetail"));
 const RentRoll = lazy(() => import("@/pages/operations/RentRoll"));
 const RentRollPortfolio = lazy(() => import("@/pages/operations/rent-roll/Portfolio"));
 const RentRollProjects = lazy(() => import("@/pages/operations/rent-roll/Projects"));
@@ -414,11 +415,18 @@ function Router() {
         )}
       </Route>
       
-      {/* Portfolio Route */}
+      {/* Portfolio Routes */}
       <Route path="/portfolio">
         {() => (
           <UnifiedLayout>
             <Portfolio />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/portfolio/:id">
+        {() => (
+          <UnifiedLayout>
+            <MarinaDetail />
           </UnifiedLayout>
         )}
       </Route>

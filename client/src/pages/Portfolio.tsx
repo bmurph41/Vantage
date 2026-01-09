@@ -395,7 +395,12 @@ export default function Portfolio() {
                     <TableBody>
                       {marinas.map((marina) => (
                         <TableRow key={marina.id} data-testid={`row-marina-${marina.id}`}>
-                          <TableCell className="font-medium">{marina.name}</TableCell>
+                          <TableCell 
+                            className="font-medium cursor-pointer hover:text-primary hover:underline" 
+                            onClick={() => navigate(`/portfolio/${marina.id}`)}
+                          >
+                            {marina.name}
+                          </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1 text-muted-foreground">
                               <MapPin className="h-3 w-3" />
@@ -433,9 +438,13 @@ export default function Portfolio() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => navigate(`/portfolio/${marina.id}`)}>
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
                                 {marina.propertyId && (
                                   <DropdownMenuItem onClick={() => navigate(`/crm/properties/${marina.propertyId}`)}>
-                                    <Eye className="h-4 w-4 mr-2" />
+                                    <Building2 className="h-4 w-4 mr-2" />
                                     View Property
                                   </DropdownMenuItem>
                                 )}
