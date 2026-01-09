@@ -221,7 +221,9 @@ export default function AddEditMarinaDialog({ open, onOpenChange, marina, onSucc
                           value={field.value || ""}
                           onChange={(value) => field.onChange(value)}
                           onAddressSelect={(components: AddressComponents) => {
-                            if (components.street) field.onChange(components.street);
+                            if (components.source === 'google' && components.street) {
+                              field.onChange(components.street);
+                            }
                             if (components.city) form.setValue("city", components.city);
                             if (components.state) form.setValue("state", components.state);
                             if (components.zipCode) form.setValue("zip", components.zipCode);

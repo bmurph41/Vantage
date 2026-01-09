@@ -183,7 +183,7 @@ export default function ModelingProjectFormDialog({
   const dealSource = form.watch('dealSource');
 
   const handleAddressSelect = useCallback((components: AddressComponents) => {
-    if (components.street) {
+    if (components.source === 'google' && components.street) {
       form.setValue('address', components.street);
     }
     if (components.city) {

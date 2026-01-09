@@ -749,7 +749,9 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                     value={address}
                     onChange={(value) => setAddress(value)}
                     onAddressSelect={(components: AddressComponents) => {
-                      if (components.street) setAddress(components.street);
+                      if (components.source === 'google' && components.street) {
+                        setAddress(components.street);
+                      }
                       if (components.city) setCity(components.city);
                       if (components.state) setState(components.state);
                       if (components.zipCode) setZipCode(components.zipCode);

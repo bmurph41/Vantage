@@ -14,6 +14,7 @@ export interface AddressComponents {
   fullAddress?: string;
   lat?: number;
   lng?: number;
+  source?: 'google' | 'manual';
 }
 
 const US_STATES: Record<string, string> = {
@@ -31,6 +32,15 @@ const US_STATES: Record<string, string> = {
 };
 
 const STATE_ABBREVS = new Set(Object.values(US_STATES));
+
+const COUNTRY_TOKENS = new Set([
+  'united states', 'usa', 'us', 'u.s.', 'u.s.a.', 'america',
+  'canada', 'ca', 'can'
+]);
+
+function isCountryToken(str: string): boolean {
+  return COUNTRY_TOKENS.has(str.toLowerCase().trim());
+}
 
 function normalizeState(input: string): string | undefined {
   const trimmed = input.trim();
@@ -73,8 +83,12 @@ export function parseAddressString(fullAddress: string): AddressComponents {
   const result: AddressComponents = { fullAddress };
   if (!fullAddress || !fullAddress.trim()) return result;
   
-  const parts = fullAddress.split(',').map(p => p.trim()).filter(Boolean);
+  let parts = fullAddress.split(',').map(p => p.trim()).filter(Boolean);
   if (parts.length === 0) return result;
+  
+  while (parts.length > 1 && isCountryToken(parts[parts.length - 1])) {
+    parts = parts.slice(0, -1);
+  }
   
   if (parts.length === 1) {
     const parsed = parseCityStateZip(parts[0]);
@@ -115,31 +129,33 @@ export function parseAddressString(fullAddress: string): AddressComponents {
     }
   } else if (parts.length >= 4) {
     const lastPart = parts[parts.length - 1];
-    const secondLast = parts[parts.length - 2];
+    const parsed = parseCityStateZip(lastPart);
     
-    const lastParsed = parseCityStateZip(lastPart);
-    
-    if (lastParsed.state && lastParsed.zipCode) {
-      result.city = lastParsed.city || secondLast;
-      result.state = lastParsed.state;
-      result.zipCode = lastParsed.zipCode;
-    } else if (lastParsed.zipCode && !lastParsed.state) {
-      const stateAbbrev = normalizeState(secondLast);
+    if (parsed.state && parsed.zipCode) {
+      result.state = parsed.state;
+      result.zipCode = parsed.zipCode;
+      if (parsed.city) {
+        result.city = parsed.city;
+      } else if (parts.length > 2) {
+        result.city = parts[parts.length - 2];
+      }
+    } else if (parsed.zipCode) {
+      result.zipCode = parsed.zipCode;
+      const stateCandidate = parts[parts.length - 2];
+      const stateAbbrev = normalizeState(stateCandidate);
       if (stateAbbrev) {
         result.state = stateAbbrev;
-        result.city = parts.length >= 5 ? parts[parts.length - 3] : parts[1];
-      } else {
-        result.city = secondLast;
+        if (parts.length > 3) {
+          result.city = parts[parts.length - 3];
+        }
       }
-      result.zipCode = lastParsed.zipCode;
-    } else if (lastParsed.state && !lastParsed.zipCode) {
-      result.state = lastParsed.state;
-      result.city = lastParsed.city || secondLast;
     } else {
-      result.city = parts[parts.length - 2];
       const stateAbbrev = normalizeState(lastPart);
       if (stateAbbrev) {
         result.state = stateAbbrev;
+        if (parts.length > 2) {
+          result.city = parts[parts.length - 2];
+        }
       }
     }
   }
@@ -267,6 +283,7 @@ export function AddressInput({
       fullAddress: place.formatted_address || '',
       lat: place.geometry?.location?.lat(),
       lng: place.geometry?.location?.lng(),
+      source: 'google',
     };
 
     // Parse address components
@@ -355,13 +372,9 @@ export function AddressInput({
     
     if (hasComma || hasZip) {
       const parsed = parseAddressString(currentValue);
+      parsed.source = 'manual';
       
       if (parsed.city || parsed.state || parsed.zipCode) {
-        if (parsed.street) {
-          if (onChangeRef.current) {
-            onChangeRef.current(parsed.street, parsed);
-          }
-        }
         if (onAddressSelectRef.current) {
           onAddressSelectRef.current(parsed);
         }
