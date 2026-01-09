@@ -62,10 +62,6 @@ export default function WorkspaceUploads({ projectId }: WorkspaceUploadsProps) {
 
   const handleUploadComplete = (upload: DocIntelUpload) => {
     queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'documents'] });
-    toast({ 
-      title: 'Upload successful', 
-      description: `${upload.originalName} is ready for AI processing.` 
-    });
   };
 
   const handleReview = (uploadId: string) => {
@@ -117,23 +113,10 @@ export default function WorkspaceUploads({ projectId }: WorkspaceUploadsProps) {
         </Link>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Upload className="h-5 w-5" />
-            Upload New Document
-          </CardTitle>
-          <CardDescription>
-            Drag and drop files or click to browse. Supports PDF, Excel, and CSV formats.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <UploadDropzone 
-            projectId={projectId} 
-            onUploadComplete={handleUploadComplete}
-          />
-        </CardContent>
-      </Card>
+      <UploadDropzone 
+        projectId={projectId} 
+        onUploadComplete={handleUploadComplete}
+      />
 
       {pendingUploads.length > 0 && (
         <Card>

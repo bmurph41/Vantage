@@ -1,13 +1,14 @@
 import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import { useMutation } from "@tanstack/react-query";
-import { Upload, FileSpreadsheet, X, AlertCircle } from "lucide-react";
+import { Upload, FileSpreadsheet, X, AlertCircle, Loader2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import type { DocIntelUpload } from "@shared/schema";
 
 function getCsrfToken(): string {
@@ -30,13 +31,35 @@ interface UploadDropzoneProps {
 }
 
 type DocType = "pnl" | "rent_roll" | "balance_sheet" | "rate_sheet" | "invoice" | "other";
+type ProcessingStage = "idle" | "uploading" | "parsing" | "categorizing" | "complete" | "error";
 
 export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzoneProps) {
   const { toast } = useToast();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [docType, setDocType] = useState<DocType>("pnl");
   const [year, setYear] = useState<string>(new Date().getFullYear().toString());
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [processingStage, setProcessingStage] = useState<ProcessingStage>("idle");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const getProgressValue = () => {
+    switch (processingStage) {
+      case "uploading": return 25;
+      case "parsing": return 50;
+      case "categorizing": return 75;
+      case "complete": return 100;
+      default: return 0;
+    }
+  };
+
+  const getStageLabel = () => {
+    switch (processingStage) {
+      case "uploading": return "Uploading document...";
+      case "parsing": return "Extracting data with AI...";
+      case "categorizing": return "Categorizing line items...";
+      case "complete": return "Processing complete!";
+      default: return "";
+    }
+  };
 
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
@@ -57,24 +80,98 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
       }
       return response.json();
     },
-    onSuccess: (upload: DocIntelUpload) => {
-      setSelectedFile(null);
-      setUploadProgress(0);
-      onUploadComplete(upload);
+  });
+
+  const parseMutation = useMutation({
+    mutationFn: async (uploadId: string) => {
+      return apiRequest('POST', `/api/modeling/projects/${projectId}/documents/${uploadId}/parse`);
     },
-    onError: (error: Error) => {
-      setUploadProgress(0);
+  });
+
+  const categorizeMutation = useMutation({
+    mutationFn: async (uploadId: string) => {
+      return apiRequest('POST', `/api/modeling/projects/${projectId}/documents/${uploadId}/categorize`);
+    },
+  });
+
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+
+    setErrorMessage(null);
+    setProcessingStage("uploading");
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+    formData.append("docType", docType);
+    if (year) {
+      formData.append("year", year);
+    }
+
+    let upload: DocIntelUpload | null = null;
+    
+    try {
+      upload = await uploadMutation.mutateAsync(formData);
+      
+      if (docType === "pnl" || docType === "rent_roll") {
+        setProcessingStage("parsing");
+        try {
+          await parseMutation.mutateAsync(upload.id);
+        } catch (parseError: any) {
+          setProcessingStage("complete");
+          setSelectedFile(null);
+          onUploadComplete(upload);
+          toast({ 
+            title: "Document uploaded", 
+            description: `${upload.originalName} uploaded. Parsing can be triggered manually.`,
+            variant: "default"
+          });
+          return;
+        }
+        
+        setProcessingStage("categorizing");
+        try {
+          await categorizeMutation.mutateAsync(upload.id);
+        } catch (catError: any) {
+          setProcessingStage("complete");
+          setSelectedFile(null);
+          onUploadComplete(upload);
+          toast({ 
+            title: "Document parsed", 
+            description: `${upload.originalName} parsed. Categorization can be completed during review.`,
+            variant: "default"
+          });
+          return;
+        }
+      }
+      
+      setProcessingStage("complete");
+      
+      setTimeout(() => {
+        setSelectedFile(null);
+        setProcessingStage("idle");
+        onUploadComplete(upload!);
+        toast({ 
+          title: "Document processed", 
+          description: `${upload!.originalName} is ready for review.` 
+        });
+      }, 1000);
+      
+    } catch (error: any) {
+      setProcessingStage("error");
+      setErrorMessage(error.message || "Upload failed");
       toast({ 
         title: "Upload failed", 
         description: error.message, 
         variant: "destructive" 
       });
-    },
-  });
+    }
+  };
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
       setSelectedFile(acceptedFiles[0]);
+      setProcessingStage("idle");
+      setErrorMessage(null);
     }
   }, []);
 
@@ -87,28 +184,16 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
       "application/pdf": [".pdf"],
     },
     maxFiles: 1,
-    maxSize: 50 * 1024 * 1024, // 50MB
+    maxSize: 50 * 1024 * 1024,
   });
-
-  const handleUpload = () => {
-    if (!selectedFile) return;
-
-    const formData = new FormData();
-    formData.append("file", selectedFile);
-    formData.append("docType", docType);
-    if (year) {
-      formData.append("year", year);
-    }
-
-    setUploadProgress(30);
-    uploadMutation.mutate(formData);
-    setUploadProgress(70);
-  };
 
   const clearFile = () => {
     setSelectedFile(null);
-    setUploadProgress(0);
+    setProcessingStage("idle");
+    setErrorMessage(null);
   };
+
+  const isProcessing = ["uploading", "parsing", "categorizing"].includes(processingStage);
 
   return (
     <div className="space-y-4">
@@ -150,15 +235,21 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
                 </p>
               </div>
             </div>
-            <Button variant="ghost" size="icon" onClick={clearFile} data-testid="button-clear-file">
-              <X className="h-4 w-4" />
-            </Button>
+            {!isProcessing && (
+              <Button variant="ghost" size="icon" onClick={clearFile} data-testid="button-clear-file">
+                <X className="h-4 w-4" />
+              </Button>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="docType">Document Type</Label>
-              <Select value={docType} onValueChange={(v) => setDocType(v as DocType)}>
+              <Select 
+                value={docType} 
+                onValueChange={(v) => setDocType(v as DocType)}
+                disabled={isProcessing}
+              >
                 <SelectTrigger id="docType" data-testid="select-doc-type">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
@@ -182,32 +273,55 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
                 placeholder="e.g., 2024"
                 min={2000}
                 max={2099}
+                disabled={isProcessing}
                 data-testid="input-year"
               />
             </div>
           </div>
 
-          {uploadProgress > 0 && (
-            <Progress value={uploadProgress} className="h-2" />
+          {processingStage !== "idle" && processingStage !== "error" && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                {processingStage === "complete" ? (
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                ) : (
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                )}
+                <span className="text-sm font-medium">{getStageLabel()}</span>
+              </div>
+              <Progress value={getProgressValue()} className="h-2" />
+            </div>
           )}
 
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={clearFile} data-testid="button-cancel">
+            <Button 
+              variant="outline" 
+              onClick={clearFile} 
+              disabled={isProcessing}
+              data-testid="button-cancel"
+            >
               Cancel
             </Button>
             <Button 
               onClick={handleUpload} 
-              disabled={uploadMutation.isPending}
+              disabled={isProcessing}
               data-testid="button-upload"
             >
-              {uploadMutation.isPending ? "Uploading..." : "Upload & Process"}
+              {isProcessing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                "Upload & Process"
+              )}
             </Button>
           </div>
 
-          {uploadMutation.isError && (
+          {processingStage === "error" && errorMessage && (
             <div className="flex items-center gap-2 text-destructive text-sm">
               <AlertCircle className="h-4 w-4" />
-              {uploadMutation.error?.message || "Upload failed"}
+              {errorMessage}
             </div>
           )}
         </div>
