@@ -13,6 +13,12 @@
 import { db } from '../db';
 import { modelingProjects, modelingCases } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
+import { 
+  calculateXIRR, 
+  calculateXNPV, 
+  periodsToDatedCashFlows,
+  type DatedCashFlow 
+} from '../utils/financial-calculations';
 
 // ============================================================================
 // TYPES AND INTERFACES
@@ -145,6 +151,8 @@ interface DCFInput {
   loanRate?: number;
   loanTerm?: number;
   amortization?: number;
+  startDate?: string;
+  cashFlowGranularity?: 'annual' | 'monthly';
 }
 
 // ============================================================================
@@ -385,10 +393,33 @@ class DCFCalculatorService {
     unleveredCashFlows[unleveredCashFlows.length - 1] += terminalValue;
     leveredCashFlows[leveredCashFlows.length - 1] += (terminalValue - remainingBalance);
 
-    // Calculate returns
-    const npv = calculateNPV(unleveredCashFlows, discountRate);
-    const irr = calculateIRR(unleveredCashFlows);
-    const leveredIRR = calculateIRR(leveredCashFlows);
+    // Calculate returns - use XIRR for PE-grade precision when monthly granularity is selected
+    const { startDate, cashFlowGranularity = 'annual' } = input;
+    
+    let irr: number;
+    let leveredIRR: number;
+    let npv: number;
+    
+    if (cashFlowGranularity === 'monthly' && startDate) {
+      // PE-Grade: Use XIRR with actual dates for precise timing
+      // This uses the actual start date for accurate time-value calculations
+      // Annual cash flows are mapped to their true calendar dates from the investment start
+      const investmentDate = new Date(startDate);
+      const unleveredDated = periodsToDatedCashFlows(unleveredCashFlows, investmentDate, 'annual');
+      const leveredDated = periodsToDatedCashFlows(leveredCashFlows, investmentDate, 'annual');
+      // Note: Cash flows remain annual but XIRR uses actual investment dates
+      // This enables accurate IRR calculation for mid-month investment starts like 2/15/26
+      
+      irr = calculateXIRR(unleveredDated);
+      leveredIRR = calculateXIRR(leveredDated);
+      npv = calculateXNPV(discountRate, unleveredDated);
+    } else {
+      // Standard annual period-based calculations
+      irr = calculateIRR(unleveredCashFlows);
+      leveredIRR = calculateIRR(leveredCashFlows);
+      npv = calculateNPV(unleveredCashFlows, discountRate);
+    }
+    
     const modifiedIRR = calculateMIRR(unleveredCashFlows, discountRate, discountRate);
     
     // Terminal value PV

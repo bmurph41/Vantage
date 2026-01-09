@@ -700,14 +700,14 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-4">
               {storageGrowth.mode === 'universal' && (
                 <div className="max-w-xs">
-                  <Label htmlFor="storage-universal-rate" className="flex items-center gap-2 mb-2">
+                  <Label htmlFor="storage-universal-rate" className="flex items-center gap-1.5 text-sm mb-1.5">
                     <Globe className="h-4 w-4" />
                     Universal Growth Rate
                   </Label>
-                  <p className="text-sm text-muted-foreground mb-3">
+                  <p className="text-xs text-muted-foreground mb-2">
                     Apply this rate to all storage types and locations
                   </p>
                   <div className="relative">
@@ -717,10 +717,10 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
                       step="0.1"
                       value={storageGrowth.universalRate}
                       onChange={(e) => updateStorageUniversalRate(e.target.value)}
-                      className="pr-8"
+                      className="pr-7 h-9"
                       data-testid="input-storage-universal-rate"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
                       %
                     </span>
                   </div>
@@ -728,10 +728,10 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
               )}
 
               {storageGrowth.mode === 'per_type' && (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
                   {storageTypesConfig.map((storageType) => (
-                    <div key={storageType.id} className="space-y-2">
-                      <Label htmlFor={`storage-type-${storageType.id}`} className="flex items-center gap-2">
+                    <div key={storageType.id} className="space-y-1">
+                      <Label htmlFor={`storage-type-${storageType.id}`} className="flex items-center gap-1.5 text-sm">
                         {storageType.icon}
                         {storageType.name}
                       </Label>
@@ -742,10 +742,10 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
                           step="0.1"
                           value={storageGrowth.typeRates[storageType.id] ?? 3}
                           onChange={(e) => updateStorageTypeRate(storageType.id, e.target.value)}
-                          className="pr-8"
+                          className="pr-7 h-9"
                           data-testid={`input-storage-type-${storageType.id}`}
                         />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
                           %
                         </span>
                       </div>
@@ -848,11 +848,11 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
                 Annual percentage increase applied to trailing 12-month actuals
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <CardContent className="pt-4">
+              <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
                 {revenueCategories.map((category) => (
-                  <div key={category.id} className="space-y-2">
-                    <Label htmlFor={`growth-${category.id}`} className="flex items-center gap-2">
+                  <div key={category.id} className="space-y-1">
+                    <Label htmlFor={`growth-${category.id}`} className="flex items-center gap-1.5 text-sm">
                       {category.icon}
                       {category.name}
                     </Label>
@@ -863,10 +863,10 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
                         step="0.1"
                         value={growthRates[category.id] ?? 3}
                         onChange={(e) => updateGrowthRate(category.id, e.target.value)}
-                        className="pr-8"
+                        className="pr-7 h-9"
                         data-testid={`input-growth-${category.id}`}
                       />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
                         %
                       </span>
                     </div>
@@ -883,11 +883,11 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
                 Annual percentage increase for operating expenses
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <CardContent className="pt-4">
+              <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
                 {expenseCategories.map((category) => (
-                  <div key={category.id} className="space-y-2">
-                    <Label htmlFor={`expense-${category.id}`}>{category.name}</Label>
+                  <div key={category.id} className="space-y-1">
+                    <Label htmlFor={`expense-${category.id}`} className="text-sm">{category.name}</Label>
                     <div className="relative">
                       <Input
                         id={`expense-${category.id}`}
@@ -895,10 +895,10 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
                         step="0.1"
                         value={expenseGrowth[category.id] ?? 2}
                         onChange={(e) => updateExpenseGrowth(category.id, e.target.value)}
-                        className="pr-8"
+                        className="pr-7 h-9"
                         data-testid={`input-expense-${category.id}`}
                       />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
                         %
                       </span>
                     </div>

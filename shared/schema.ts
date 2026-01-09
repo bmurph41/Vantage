@@ -10687,6 +10687,7 @@ export const modelingProjectConfig = pgTable('modeling_project_config', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id),
   holdPeriod: integer('hold_period').notNull().default(5),
+  cashFlowGranularity: varchar('cash_flow_granularity', { length: 20 }).notNull().default('annual'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

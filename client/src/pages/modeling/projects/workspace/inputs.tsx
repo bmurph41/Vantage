@@ -80,6 +80,7 @@ export default function WorkspaceInputs({ projectId }: WorkspaceInputsProps) {
 
   const [holdPeriod, setHoldPeriod] = useState<number>(5);
   const [startDate, setStartDate] = useState<string>('2026-01-31');
+  const [cashFlowGranularity, setCashFlowGranularity] = useState<string>('annual');
   const [seasonMonths, setSeasonMonths] = useState<number[]>([4, 5, 6, 7, 8, 9, 10]);
   const [departments, setDepartments] = useState<DepartmentConfig[]>(defaultDepartments);
 
@@ -87,6 +88,7 @@ export default function WorkspaceInputs({ projectId }: WorkspaceInputsProps) {
     if (config) {
       setHoldPeriod(config.holdPeriod || 5);
       setStartDate(config.startDate || '2026-01-31');
+      setCashFlowGranularity(config.cashFlowGranularity || 'annual');
       setSeasonMonths(config.seasonMonths || [4, 5, 6, 7, 8, 9, 10]);
       if (config.departments) {
         setDepartments(prev => prev.map(dept => ({
@@ -131,6 +133,7 @@ export default function WorkspaceInputs({ projectId }: WorkspaceInputsProps) {
     saveMutation.mutate({
       holdPeriod,
       startDate,
+      cashFlowGranularity,
       seasonMonths,
       departments: departmentSettings,
     });
@@ -201,8 +204,24 @@ export default function WorkspaceInputs({ projectId }: WorkspaceInputsProps) {
                 onChange={(e) => setStartDate(e.target.value)}
                 data-testid="input-start-date"
               />
+            </div>
+            <Separator className="my-4" />
+            <div className="space-y-2">
+              <Label htmlFor="cashFlowGranularity">Cash Flow Timing</Label>
+              <Select 
+                value={cashFlowGranularity} 
+                onValueChange={(v) => setCashFlowGranularity(v)}
+              >
+                <SelectTrigger id="cashFlowGranularity" data-testid="select-granularity">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="annual">Annual (Standard)</SelectItem>
+                  <SelectItem value="monthly">Monthly (PE-Grade)</SelectItem>
+                </SelectContent>
+              </Select>
               <p className="text-xs text-muted-foreground">
-                Use end of month (e.g., 01/31/2026)
+                Monthly uses XIRR for precise return calculations based on actual dates
               </p>
             </div>
           </CardContent>

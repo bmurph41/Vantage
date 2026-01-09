@@ -16205,12 +16205,8 @@ Current context: Project ${req.params.projectId}`;
       }
       
       // Return config from customMetrics or defaults
-      const config = (project.customMetrics as any)?.config || {
-        holdPeriod: 5,
-        startDate: '2026-01-31',
-        seasonMonths: [4, 5, 6, 7, 8, 9, 10],
-        departments: {}
-      };
+      const configDefault = { holdPeriod: 5, startDate: '2026-01-31', cashFlowGranularity: 'annual', seasonMonths: [4, 5, 6, 7, 8, 9, 10], departments: {} };
+      const config = { ...configDefault, ...((project.customMetrics as any)?.config || {}) };
       
       res.json(config);
     } catch (error: any) {
