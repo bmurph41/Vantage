@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -19,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   TrendingUp, DollarSign, Building2, MapPin, Calendar, Trash2, Plus, Search,
-  Link2, Star, Anchor, PercentIcon, Weight, CheckCircle
+  Link2, Star, Anchor, PercentIcon, Weight, CheckCircle, ExternalLink
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,6 +45,10 @@ function LinkedCompCard({ compLink, onUnlink }: {
     return null;
   }
 
+  const compDetailUrl = isSalesComp 
+    ? `/analysis/sales-comps/${comp.id}` 
+    : `/analysis/rate-comps/${comp.id}`;
+
   return (
     <Card className="border shadow-sm hover:shadow-md transition-shadow" data-testid={`modeling-comp-${compLink.id}`}>
       <CardContent className="p-4">
@@ -55,7 +60,9 @@ function LinkedCompCard({ compLink, onUnlink }: {
               ) : (
                 <TrendingUp className="w-4 h-4 text-green-600" />
               )}
-              <span className="font-semibold text-sm">{(comp as any).marinaName || "Unnamed Marina"}</span>
+              <Link href={compDetailUrl} className="font-semibold text-sm hover:text-primary hover:underline">
+                {(comp as any).marinaName || "Unnamed Marina"}
+              </Link>
               <Badge variant="outline" className="text-xs">
                 {isSalesComp ? "Sales" : "Rate"}
               </Badge>
@@ -118,15 +125,27 @@ function LinkedCompCard({ compLink, onUnlink }: {
               <p className="mt-2 text-xs text-gray-500 italic">{compLink.notes}</p>
             )}
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onUnlink}
-            className="text-gray-400 hover:text-red-600"
-            data-testid={`unlink-modeling-comp-${compLink.id}`}
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Link href={compDetailUrl}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-gray-400 hover:text-primary"
+                data-testid={`view-modeling-comp-${compLink.id}`}
+              >
+                <ExternalLink className="w-4 h-4" />
+              </Button>
+            </Link>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onUnlink}
+              className="text-gray-400 hover:text-red-600"
+              data-testid={`unlink-modeling-comp-${compLink.id}`}
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
