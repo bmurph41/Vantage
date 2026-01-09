@@ -180,11 +180,11 @@ function LinkCompModal({ isOpen, onClose, projectId, compType }: {
   const comps = compType === "sales" ? salesComps : rateComps;
   const isLoading = compType === "sales" ? salesLoading : rateLoading;
 
-  const filteredComps = comps.filter((comp: any) =>
+  const filteredComps = Array.isArray(comps) ? comps.filter((comp: any) =>
     (comp.marinaName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
     (comp.city || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
     (comp.state || "").toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ) : [];
 
   const linkMutation = useMutation({
     mutationFn: async () => {
@@ -436,18 +436,18 @@ export default function ModelingProjectIntegrationPanel({ projectId, projectName
               </div>
               <div className="flex gap-2">
                 <Button
-                  variant="outline"
                   size="sm"
                   onClick={() => openLinkModal("sales")}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
                   data-testid="button-link-sales-comp-modeling"
                 >
                   <Plus className="w-4 h-4 mr-1" />
                   Sales Comp
                 </Button>
                 <Button
-                  variant="outline"
                   size="sm"
                   onClick={() => openLinkModal("rate")}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
                   data-testid="button-link-rate-comp-modeling"
                 >
                   <Plus className="w-4 h-4 mr-1" />
