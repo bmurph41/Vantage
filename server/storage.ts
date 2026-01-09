@@ -5645,26 +5645,6 @@ export class DatabaseStorage implements IStorage {
     return this.updateCompImport(id, updates, orgId);
   }
 
-  // Project Operations - Aliases
-  async getProjects(orgId: string, userId: string): Promise<ScProject[]> {
-    return this.getScProjects(orgId, userId);
-  }
-
-  async getProject(id: string, orgId: string): Promise<ScProject | undefined> {
-    return this.getScProject(id, orgId);
-  }
-
-  async createProject(data: InsertScProject): Promise<ScProject> {
-    return this.createScProject(data);
-  }
-
-  async updateProject(id: string, data: UpdateScProject, orgId: string): Promise<ScProject | undefined> {
-    return this.updateScProject(id, data, orgId);
-  }
-
-  async deleteProject(id: string, orgId: string, deletedBy: string): Promise<boolean> {
-    return this.deleteScProject(id, orgId, deletedBy);
-  }
 
   // Project-Comp Operations - Aliases
   async getProjectComps(projectId: string, orgId: string): Promise<(ScProjectComp & { salesComp: SalesComp })[]> {
