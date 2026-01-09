@@ -99,8 +99,8 @@ const dockTalkNav = [
   { name: "DockTalk", href: "/docktalk", icon: MessageSquare },
 ];
 
-// Market Intelligence Navigation (Sales Comps)
-const marketIntelligenceNav = [
+// Marinalytics Navigation (Sales Comps)
+const marinalyticsNav = [
   { name: "Sales Comps", href: "/analysis/sales-comps", icon: BarChart3 },
   { name: "Rate Comps", href: "/analysis/rate-comps", icon: TrendingUp },
   { name: "Demographics", href: "/analysis/demographics", icon: Users },
@@ -134,7 +134,7 @@ export default function UnifiedSidebar() {
   const [dealWorkspaceExpanded, setDealWorkspaceExpanded] = useState(false); // Consolidated DD, VDR, Modeling
   const [underwritingToolsExpanded, setUnderwritingToolsExpanded] = useState(false);
   const [investorServicesExpanded, setInvestorServicesExpanded] = useState(false);
-  const [marketIntelligenceExpanded, setMarketIntelligenceExpanded] = useState(false);
+  const [marinalyticsExpanded, setMarinalyticsExpanded] = useState(false);
   const [pendingExpanded, setPendingExpanded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
@@ -238,7 +238,7 @@ export default function UnifiedSidebar() {
     const isUnderwritingToolsPage = location.startsWith('/modeling/projects') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/om') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings');
     // Investor Services: Fund Management, LP Portal (GP only)
     const isInvestorServicesPage = location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal');
-    const isMarketIntelligencePage = location.startsWith('/analysis/') || location.startsWith('/docktalk');
+    const isMarinalyticsPage = location.startsWith('/analysis/') || location.startsWith('/docktalk');
 
     // Set expanded states - Operations stays expanded by default, others expand when active
     if (isOperationsPage) {
@@ -251,7 +251,7 @@ export default function UnifiedSidebar() {
     setDealWorkspaceExpanded(isDealWorkspacePage);
     setUnderwritingToolsExpanded(isUnderwritingToolsPage);
     setInvestorServicesExpanded(isInvestorServicesPage);
-    setMarketIntelligenceExpanded(isMarketIntelligencePage);
+    setMarinalyticsExpanded(isMarinalyticsPage);
   }, [location]);
 
   // Check if there are any pending items to show the Pending section
@@ -724,16 +724,16 @@ export default function UnifiedSidebar() {
           </div>
         )}
         
-        {/* Market Intelligence Section */}
+        {/* Marinalytics Section */}
         {canViewSection('market_intelligence') && (
           <div className="mb-2">
             <SectionHeader 
-              title="Market Intelligence" 
-              expanded={marketIntelligenceExpanded} 
-              onToggle={() => setMarketIntelligenceExpanded(!marketIntelligenceExpanded)}
+              title="Marinalytics" 
+              expanded={marinalyticsExpanded} 
+              onToggle={() => setMarinalyticsExpanded(!marinalyticsExpanded)}
               isActive={location.startsWith('/analysis/') || location.startsWith('/docktalk')}
             />
-            {marketIntelligenceExpanded && (
+            {marinalyticsExpanded && (
               <div className="ml-4 mt-1 mb-2">
                 {/* DockTalk - Always visible above Sales Comps */}
                 <Link 
@@ -748,9 +748,9 @@ export default function UnifiedSidebar() {
                   <MessageSquare className={cn("w-4 h-4 mr-3 flex-shrink-0", location.startsWith('/docktalk') && "text-blue-600")} />
                   <span className="truncate">DockTalk</span>
                 </Link>
-                {/* Other Market Intelligence Pages - Sales Comps, Rate Comps, etc. */}
+                {/* Other Marinalytics Pages - Sales Comps, Rate Comps, etc. */}
                 <div>
-                  {marketIntelligenceNav.map((item) => (
+                  {marinalyticsNav.map((item) => (
                     <NavLink key={item.name} item={item} />
                   ))}
                 </div>
