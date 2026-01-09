@@ -129,7 +129,18 @@ export default function ModelingProjectsPage() {
 
   const formatPercent = (value: number | null) => {
     if (value === null || value === undefined) return '-';
-    return `${value.toFixed(2)}%`;
+    return `${value.toFixed(1)}%`;
+  };
+  
+  const formatOutcome = (outcome: string) => {
+    const outcomeMap: Record<string, string> = {
+      'under_review': 'Under Review',
+      'active': 'Active',
+      'won': 'Won',
+      'lost': 'Lost',
+      'passed': 'Passed',
+    };
+    return outcomeMap[outcome] || outcome.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
   const formatNumber = (value: number | null) => {
@@ -244,7 +255,7 @@ export default function ModelingProjectsPage() {
                             className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getOutcomeBadgeColor(project.dealOutcome)}`}
                             data-testid={`badge-outcome-${project.id}`}
                           >
-                            {project.dealOutcome.replace('_', ' ')}
+                            {formatOutcome(project.dealOutcome)}
                           </span>
                         </TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
