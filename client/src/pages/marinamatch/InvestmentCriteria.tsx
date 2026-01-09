@@ -677,7 +677,6 @@ function CreateProfileForm({
       criteria: cleanedCriteria,
     };
     
-    console.log("[Investment Criteria] Submitting profile with criteria:", JSON.stringify(payload, null, 2));
     onSubmit(payload);
   };
 

@@ -1709,7 +1709,6 @@ export default function Dashboard() {
         onCreateCustomModule={(data) => createCustomModuleMutation.mutate(data)}
         onDeleteCustomModule={(id) => deleteCustomModuleMutation.mutate(id)}
         onSaveWidget={async (widgetData) => {
-          console.log('Widget saved:', widgetData);
           toast({
             title: 'Widget Created',
             description: `Your custom widget "${widgetData.title}" has been created.`,
