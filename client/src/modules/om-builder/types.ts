@@ -14,6 +14,14 @@ export type ShapeType = 'rect' | 'circle' | 'line' | 'triangle';
 
 export type OmPageOrientation = 'portrait' | 'landscape';
 
+export type OmDocumentDimension = 'portrait' | 'landscape' | '16:9';
+
+export const OM_DIMENSION_SIZES: Record<OmDocumentDimension, { width: number; height: number; label: string }> = {
+  portrait: { width: 816, height: 1056, label: 'Portrait (8.5 x 11)' },
+  landscape: { width: 1056, height: 816, label: 'Landscape (11 x 8.5)' },
+  '16:9': { width: 1280, height: 720, label: 'Presentation (16:9)' },
+};
+
 export type OmPageLayoutType = 'single-column' | 'two-column' | 'cover' | 'hero-with-body' | 'freeform' | 'grid';
 
 export type FontFamily = 'sans' | 'serif' | 'mono' | 'display';
@@ -325,6 +333,7 @@ export interface OmDocumentSettings {
   defaultOrientation?: OmPageOrientation;
   defaultFontFamily?: FontFamily;
   pageSize?: 'letter' | 'a4' | 'legal';
+  dimension?: OmDocumentDimension;
   margins?: {
     top?: string;
     bottom?: string;

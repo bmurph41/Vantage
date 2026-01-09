@@ -16,6 +16,8 @@ interface FreeformCanvasProps {
   zoom: number;
   showGrid: boolean;
   gridSize: number;
+  canvasWidth?: number;
+  canvasHeight?: number;
   onSelectBlock: (blockId: string, addToSelection?: boolean) => void;
   onClearSelection: () => void;
   onUpdateBlock: (blockId: string, updates: Partial<OmBlock>) => void;
@@ -23,8 +25,8 @@ interface FreeformCanvasProps {
   onUpdateBlockSize: (blockId: string, width: number, height: number) => void;
 }
 
-const CANVAS_WIDTH = 816;
-const CANVAS_HEIGHT = 1056;
+const DEFAULT_CANVAS_WIDTH = 816;
+const DEFAULT_CANVAS_HEIGHT = 1056;
 
 export function FreeformCanvas({
   page,
@@ -33,6 +35,8 @@ export function FreeformCanvas({
   zoom,
   showGrid,
   gridSize,
+  canvasWidth = DEFAULT_CANVAS_WIDTH,
+  canvasHeight = DEFAULT_CANVAS_HEIGHT,
   onSelectBlock,
   onClearSelection,
   onUpdateBlock,
@@ -338,8 +342,8 @@ export function FreeformCanvas({
     <div 
       className="relative bg-white shadow-lg border border-gray-200"
       style={{ 
-        width: CANVAS_WIDTH, 
-        height: CANVAS_HEIGHT,
+        width: canvasWidth, 
+        height: canvasHeight,
         transform: `scale(${zoom})`,
         transformOrigin: 'top left',
       }}

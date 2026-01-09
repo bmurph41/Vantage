@@ -18,6 +18,8 @@ interface OmEditorShellProps {
   pages: OmPage[];
   activePageId: string | null;
   blocks: OmBlock[];
+  canvasWidth?: number;
+  canvasHeight?: number;
   onUpdateBlocks: (blocks: OmBlock[]) => void;
   onAddBlock: (type: BlockType) => void;
   onSelectPage: (pageId: string) => void;
@@ -41,6 +43,8 @@ export function OmEditorShell({
   pages,
   activePageId,
   blocks,
+  canvasWidth = 816,
+  canvasHeight = 1056,
   onUpdateBlocks,
   onAddBlock,
   onSelectPage,
@@ -321,6 +325,8 @@ export function OmEditorShell({
                   zoom={zoom}
                   showGrid={showGrid}
                   gridSize={8}
+                  canvasWidth={canvasWidth}
+                  canvasHeight={canvasHeight}
                   onSelectBlock={handleSelectBlock}
                   onClearSelection={handleClearSelection}
                   onUpdateBlock={handleUpdateBlock}

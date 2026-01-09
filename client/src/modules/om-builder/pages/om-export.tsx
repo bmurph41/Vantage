@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useRoute } from "wouter";
-import { ArrowLeft, Download, Printer, FileText, Mail, Share2, FolderLock, Check, FolderOpen } from "lucide-react";
+import { ArrowLeft, Download, Printer, FileText, Mail, Share2, FolderLock, Check, FolderOpen, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,7 +12,9 @@ import { toast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { VdrFolderPicker } from "../components/vdr-folder-picker";
+import { generatePdf, downloadPdf } from "../components/OmPdfDocument";
 import type { Om, VdrFolder } from "@shared/schema";
+import type { OmPage, OmDocumentDimension } from "../types";
 
 export default function OMExport() {
   const [, params] = useRoute("/om/export/:omId");
@@ -28,19 +30,59 @@ export default function OMExport() {
   const [includeToc, setIncludeToc] = useState(true);
   const [selectedVdrFolder, setSelectedVdrFolder] = useState<VdrFolder | null>(null);
   const [vdrExportSuccess, setVdrExportSuccess] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
-  const handleExport = () => {
+  const pages: OmPage[] = om?.pages as OmPage[] || [];
+  const dimension: OmDocumentDimension = (om?.dimension as OmDocumentDimension) || 'portrait';
+
+  const handleExport = async () => {
+    if (exportFormat !== 'pdf') {
+      toast({ 
+        title: "Coming Soon", 
+        description: `${exportFormat.toUpperCase()} export will be available in a future update.` 
+      });
+      return;
+    }
+
+    if (pages.length === 0) {
+      toast({ 
+        title: "No Pages", 
+        description: "This document has no pages to export.",
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    setIsExporting(true);
     toast({ 
       title: "Export Started", 
-      description: `Your ${exportFormat.toUpperCase()} is being generated...` 
+      description: "Your PDF is being generated..." 
     });
     
-    setTimeout(() => {
+    try {
+      const blob = await generatePdf(pages, om?.name || 'Offering Memorandum', {
+        dimension,
+        includePageNumbers: true,
+        includeHeader: true,
+      });
+      
+      const filename = `${om?.name || 'Offering_Memorandum'}.pdf`.replace(/\s+/g, '_');
+      downloadPdf(blob, filename);
+      
       toast({ 
         title: "Export Complete", 
-        description: "Your document is ready for download." 
+        description: "Your PDF has been downloaded." 
       });
-    }, 2000);
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      toast({ 
+        title: "Export Failed", 
+        description: "There was an error generating the PDF. Please try again.",
+        variant: "destructive" 
+      });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handlePrint = () => {
@@ -179,9 +221,13 @@ export default function OMExport() {
                   </div>
                 </div>
 
-                <Button className="w-full" onClick={handleExport} data-testid="button-export">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export {exportFormat.toUpperCase()}
+                <Button className="w-full" onClick={handleExport} disabled={isExporting} data-testid="button-export">
+                  {isExporting ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4 mr-2" />
+                  )}
+                  {isExporting ? 'Generating...' : `Export ${exportFormat.toUpperCase()}`}
                 </Button>
               </CardContent>
             </Card>

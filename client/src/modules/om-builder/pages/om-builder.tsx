@@ -22,14 +22,15 @@ import type { ModelingProject } from "@shared/schema";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { Om, OmPage as OmPageDb, OmBlock as OmBlockDb } from "@shared/schema";
-import type { OmPage, OmBlock, BlockType, OmTheme, OmPageOrientation, CalloutVariant, FontFamily, ElementPosition } from "../types";
-import { defaultThemes, CALLOUT_COLORS, FONT_FAMILIES, FONT_SIZES } from "../types";
+import type { OmPage, OmBlock, BlockType, OmTheme, OmPageOrientation, CalloutVariant, FontFamily, ElementPosition, OmDocumentDimension } from "../types";
+import { defaultThemes, CALLOUT_COLORS, FONT_FAMILIES, FONT_SIZES, OM_DIMENSION_SIZES } from "../types";
 import { DataBindingPanel } from "../components/data-binding-panel";
 import { VersionHistoryPanel } from "../components/version-history-panel";
 import { OmEditorShell } from "../components/OmEditorShell";
 import { ThemeSelector } from "../components/ThemeSelector";
 import { LayoutGallery } from "../components/LayoutGallery";
 import { AIContentGenerator } from "../components/AIContentGenerator";
+import { TemplateSelector } from "../components/TemplateSelector";
 
 interface SortableBlockProps {
   block: OmBlock;
@@ -266,6 +267,10 @@ export default function OMBuilder() {
   const [activeTheme, setActiveTheme] = useState<OmTheme | null>(null);
   const [layoutGalleryOpen, setLayoutGalleryOpen] = useState(false);
   const [aiGeneratorOpen, setAiGeneratorOpen] = useState(false);
+  const [templateSelectorOpen, setTemplateSelectorOpen] = useState(false);
+  const [documentDimension, setDocumentDimension] = useState<OmDocumentDimension>('portrait');
+  
+  const canvasDimensions = OM_DIMENSION_SIZES[documentDimension];
 
   const { data: om, isLoading: omLoading } = useQuery<Om>({
     queryKey: ['/api/om/oms', omId],
@@ -648,6 +653,10 @@ export default function OMBuilder() {
               Design
             </Button>
           </div>
+          <Button variant="outline" size="sm" onClick={() => setTemplateSelectorOpen(true)} data-testid="button-templates">
+            <LayoutTemplate className="w-4 h-4 mr-1" />
+            Templates
+          </Button>
           <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm" data-testid="button-doc-settings">
@@ -704,6 +713,31 @@ export default function OMBuilder() {
                     data-testid="input-doc-name"
                   />
                 </div>
+                <Separator />
+                <div>
+                  <Label className="text-sm font-medium">Document Dimensions</Label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Choose the layout format for your document
+                  </p>
+                  <Select 
+                    value={documentDimension}
+                    onValueChange={(value) => setDocumentDimension(value as OmDocumentDimension)}
+                  >
+                    <SelectTrigger data-testid="select-dimension">
+                      <SelectValue placeholder="Select dimensions..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(OM_DIMENSION_SIZES) as OmDocumentDimension[]).map((dim) => (
+                        <SelectItem key={dim} value={dim}>
+                          {OM_DIMENSION_SIZES[dim].label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="mt-2 p-2 bg-muted rounded-md text-xs text-muted-foreground">
+                    Canvas: {canvasDimensions.width} × {canvasDimensions.height}px
+                  </div>
+                </div>
               </div>
             </DialogContent>
           </Dialog>
@@ -722,6 +756,8 @@ export default function OMBuilder() {
           pages={pages}
           activePageId={activePageId}
           blocks={activePage?.blocks || []}
+          canvasWidth={canvasDimensions.width}
+          canvasHeight={canvasDimensions.height}
           onUpdateBlocks={(newBlocks) => {
             setPages(prev => prev.map(p => 
               p.id === activePageId ? { ...p, blocks: newBlocks } : p
@@ -809,7 +845,7 @@ export default function OMBuilder() {
                     </div>
                   </div>
                   <div>
-                    <span className="text-[10px] text-teal-600 font-medium uppercase tracking-wide mb-1 block">Zilculator Financial</span>
+                    <span className="text-[10px] text-teal-600 font-medium uppercase tracking-wide mb-1 block">Professional Financial</span>
                     <div className="grid grid-cols-3 gap-1">
                       {[
                         { type: 'heroKpiGrid' as BlockType, icon: TrendingUp, label: 'Hero KPIs' },
@@ -1487,6 +1523,22 @@ export default function OMBuilder() {
               p.id === activePageId ? { ...p, blocks: [...p.blocks, newBlock] } : p
             ));
           }
+        }}
+      />
+
+      <TemplateSelector
+        open={templateSelectorOpen}
+        onClose={() => setTemplateSelectorOpen(false)}
+        onSelectTemplate={(templatePages) => {
+          setPages(prev => [...prev, ...templatePages]);
+          if (templatePages.length > 0) {
+            setActivePageId(templatePages[0].id);
+          }
+          setTemplateSelectorOpen(false);
+          toast({
+            title: "Template Applied",
+            description: `Added ${templatePages.length} page${templatePages.length > 1 ? 's' : ''} from template.`,
+          });
         }}
       />
     </div>

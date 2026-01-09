@@ -193,8 +193,8 @@ const DEFAULT_LAYOUTS: OmPageLayoutDefinition[] = [
     },
   },
   {
-    id: 'zilculator-exec-summary',
-    name: 'Zilculator Executive Summary',
+    id: 'pro-exec-summary',
+    name: 'Professional Executive Summary',
     description: 'Professional OM-style executive summary with hero KPIs, investment thesis, and property description',
     layoutType: 'execSummary',
     isSystemDefault: true,
@@ -209,8 +209,8 @@ const DEFAULT_LAYOUTS: OmPageLayoutDefinition[] = [
     },
   },
   {
-    id: 'zilculator-financial-analysis',
-    name: 'Zilculator Financial Analysis',
+    id: 'pro-financial-analysis',
+    name: 'Financial Analysis',
     description: 'Comprehensive financial metrics with analysis tables and return ratios',
     layoutType: 'financials',
     isSystemDefault: true,
@@ -227,8 +227,8 @@ const DEFAULT_LAYOUTS: OmPageLayoutDefinition[] = [
     },
   },
   {
-    id: 'zilculator-operating-analysis',
-    name: 'Zilculator Operating Analysis',
+    id: 'pro-operating-analysis',
+    name: 'Operating Analysis',
     description: 'Detailed income and expense breakdown with operating ratios',
     layoutType: 'financials',
     isSystemDefault: true,
@@ -244,8 +244,8 @@ const DEFAULT_LAYOUTS: OmPageLayoutDefinition[] = [
     },
   },
   {
-    id: 'zilculator-cash-flow-forecast',
-    name: 'Zilculator Cash Flow Forecast',
+    id: 'pro-cash-flow-forecast',
+    name: 'Cash Flow Forecast',
     description: '5-year cash flow projection with annual breakdown',
     layoutType: 'financials',
     isSystemDefault: true,
@@ -260,7 +260,7 @@ const DEFAULT_LAYOUTS: OmPageLayoutDefinition[] = [
     },
   },
   {
-    id: 'zilculator-marina-kpis',
+    id: 'marina-performance-metrics',
     name: 'Marina Performance Metrics',
     description: 'Marina-specific KPIs including slip occupancy, REVPS, and ancillary revenue',
     layoutType: 'financials',
