@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { DndContext, DragEndEvent, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Settings, GripVertical, ExternalLink, TrendingUp, Users, FileText, Database, Radio, Fuel, DollarSign, ShoppingCart, Home, BarChart3, ChevronDown, ChevronUp, Plus, Calendar, Activity } from "lucide-react";
+import { Settings, GripVertical, ExternalLink, TrendingUp, Users, FileText, Database, Radio, Fuel, DollarSign, ShoppingCart, Home, BarChart3, ChevronDown, ChevronUp, Plus, Calendar, Activity, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -49,11 +49,13 @@ type DashboardModule = {
 function SortableModule({ 
   module, 
   isCollapsed, 
-  onToggleCollapse 
+  onToggleCollapse,
+  onRemove
 }: { 
   module: DashboardModule;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  onRemove: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: module.id,
@@ -69,7 +71,7 @@ function SortableModule({
 
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
-      <Card className="h-full hover:shadow-lg transition-all">
+      <Card className="h-full hover:shadow-lg transition-all group">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <Icon className="h-4 w-4 text-blue-600" />
@@ -90,6 +92,16 @@ function SortableModule({
                 <ExternalLink className="h-3.5 w-3.5" />
               </Button>
             </Link>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-red-600" 
+              onClick={onRemove}
+              title="Remove from dashboard"
+              data-testid={`remove-${module.id}`}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
             <div {...listeners} className="hidden sm:block cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded">
               <GripVertical className="h-4 w-4 text-gray-400" />
             </div>
@@ -470,6 +482,50 @@ export default function Dashboard() {
         newSet.add(moduleId);
       }
       return newSet;
+    });
+  };
+
+  // Hidden modules state with localStorage persistence
+  const [hiddenModules, setHiddenModules] = useState<Set<string>>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dashboardHiddenModules');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    }
+    return new Set();
+  });
+
+  // Save hidden modules to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dashboardHiddenModules', JSON.stringify(Array.from(hiddenModules)));
+    }
+  }, [hiddenModules]);
+
+  const handleRemoveModule = (moduleId: string) => {
+    setHiddenModules(prev => {
+      const newSet = new Set(prev);
+      newSet.add(moduleId);
+      return newSet;
+    });
+    toast({
+      title: 'Card removed',
+      description: 'You can restore it from Settings.',
+    });
+  };
+
+  const handleRestoreModule = (moduleId: string) => {
+    setHiddenModules(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(moduleId);
+      return newSet;
+    });
+  };
+
+  const handleRestoreAllModules = () => {
+    setHiddenModules(new Set());
+    toast({
+      title: 'All cards restored',
+      description: 'Your dashboard has been reset.',
     });
   };
 
@@ -1532,7 +1588,8 @@ export default function Dashboard() {
 
   const orderedModules = extendedModuleOrder
     .map(id => visibleModules.find(m => m.id === id))
-    .filter(Boolean) as DashboardModule[];
+    .filter(Boolean)
+    .filter(m => !hiddenModules.has(m!.id)) as DashboardModule[];
 
   return (
     <div className="flex-1 overflow-auto bg-gray-50" data-testid="page-dashboard">
@@ -1605,6 +1662,7 @@ export default function Dashboard() {
                   module={module} 
                   isCollapsed={collapsedModules.has(module.id)}
                   onToggleCollapse={() => toggleModuleCollapse(module.id)}
+                  onRemove={() => handleRemoveModule(module.id)}
                 />
               ))}
             </div>
@@ -1619,9 +1677,25 @@ export default function Dashboard() {
           />
         </div>
 
+        {hiddenModules.size > 0 && (
+          <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between">
+            <p className="text-xs sm:text-sm text-amber-800">
+              <strong>{hiddenModules.size} card{hiddenModules.size > 1 ? 's' : ''} hidden.</strong> You can restore them to your dashboard.
+            </p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleRestoreAllModules}
+              className="border-amber-300 text-amber-800 hover:bg-amber-100"
+            >
+              Restore All
+            </Button>
+          </div>
+        )}
+
         <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-xs sm:text-sm text-blue-800">
-            <strong>Tip:</strong> <span className="hidden sm:inline">Drag and drop modules to rearrange your dashboard.</span> Click the external link icon to navigate to the full page for detailed analysis.
+            <strong>Tip:</strong> <span className="hidden sm:inline">Drag and drop modules to rearrange your dashboard. Hover over a card and click the X to hide it.</span> Click the external link icon to navigate to the full page for detailed analysis.
           </p>
         </div>
       </div>
