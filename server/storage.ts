@@ -421,6 +421,7 @@ export interface IStorage {
   getPendingCompany(id: string): Promise<PendingCompany | undefined>;
   getPendingCompaniesForOrg(orgId: string): Promise<PendingCompany[]>;
   createPendingCompany(company: InsertPendingCompany): Promise<PendingCompany>;
+  updatePendingCompany(id: string, orgId: string, updates: Partial<InsertPendingCompany>): Promise<PendingCompany | undefined>;
   acceptPendingCompany(id: string, userId: string, mode: 'replace' | 'add_new'): Promise<CrmCompany>;
   rejectPendingCompany(id: string, userId: string): Promise<void>;
 
@@ -3466,6 +3467,17 @@ export class DatabaseStorage implements IStorage {
   async createPendingCompany(company: InsertPendingCompany): Promise<PendingCompany> {
     const [created] = await db.insert(pendingCompanies).values(company).returning();
     return created;
+  }
+
+  async updatePendingCompany(id: string, orgId: string, updates: Partial<InsertPendingCompany>): Promise<PendingCompany | undefined> {
+    const [updated] = await db.update(pendingCompanies)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(
+        eq(pendingCompanies.id, id),
+        eq(pendingCompanies.orgId, orgId)
+      ))
+      .returning();
+    return updated || undefined;
   }
 
   async acceptPendingCompany(id: string, userId: string, mode: 'replace' | 'add_new'): Promise<CrmCompany> {
