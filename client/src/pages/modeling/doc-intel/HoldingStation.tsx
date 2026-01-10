@@ -51,6 +51,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -112,6 +122,8 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
   const [newCustomTypeName, setNewCustomTypeName] = useState("");
   const [showAddTypeDialog, setShowAddTypeDialog] = useState(false);
   const [parsingDocId, setParsingDocId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteConfirmName, setDeleteConfirmName] = useState<string>("");
 
   const { data: holdingQueue = [], isLoading, refetch } = useQuery<DocIntelUpload[]>({
     queryKey: ["/api/modeling/projects", projectId, "documents", "holding"],
@@ -175,8 +187,16 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
       return apiRequest("DELETE", `/api/modeling/projects/${projectId}/documents/${id}`);
     },
     onSuccess: () => {
-      refetch();
+      queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", "holding"] });
+      setDeleteConfirmId(null);
+      setDeleteConfirmName("");
       toast({ title: "Deleted", description: "Document has been removed." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Delete failed", description: error.message || "Could not delete document", variant: "destructive" });
+      setDeleteConfirmId(null);
+      setDeleteConfirmName("");
     },
   });
 
@@ -578,7 +598,10 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => deleteDocumentMutation.mutate(doc.id)}>
+                        <DropdownMenuItem onClick={() => {
+                          setDeleteConfirmId(doc.id);
+                          setDeleteConfirmName(doc.originalFileName || doc.displayName || "this document");
+                        }}>
                           <Trash2 className="h-4 w-4 mr-2" />
                           Delete
                         </DropdownMenuItem>
@@ -631,6 +654,42 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => {
+        if (!open) {
+          setDeleteConfirmId(null);
+          setDeleteConfirmName("");
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Document</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deleteConfirmName}"? This action cannot be undone and will permanently remove the document and all its extracted data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteConfirmId) {
+                  deleteDocumentMutation.mutate(deleteConfirmId);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteDocumentMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
