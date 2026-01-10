@@ -211,7 +211,7 @@ export default function ArticleManagementPage() {
         queryClient.setQueryData<Article[]>(['/api/docktalk/articles', filters], (old) =>
           old?.map(article => 
             article.id === id 
-              ? { ...article, categories, isReviewed: true }
+              ? { ...article, categories, manuallyReviewed: true }
               : article
           )
         );
@@ -230,7 +230,7 @@ export default function ArticleManagementPage() {
       
       // Update local editing state to reflect saved changes
       if (editingArticle && editingArticle.id === id) {
-        setEditingArticle({ ...editingArticle, categories, isReviewed: true });
+        setEditingArticle({ ...editingArticle, categories, manuallyReviewed: true });
       }
       
       setIsEditDialogOpen(false);
