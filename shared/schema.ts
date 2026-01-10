@@ -13451,6 +13451,26 @@ export const pnlCategoryTypeEnum = pgEnum("pnl_category_type", ["revenue", "cogs
 export const holdingStationStatusEnum = pgEnum("holding_station_status", ["staging", "validated", "ready_to_process", "processing", "processed"]);
 export const docIntelDepartmentEnum = pgEnum("doc_intel_department", ["marina_ops", "fuel_dock", "ship_store", "restaurant", "boat_sales", "service_dept", "storage", "admin", "other"]);
 
+// Custom Document Types - Organization-wide custom document type definitions
+export const customDocumentTypes = pgTable('custom_document_types', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  name: text('name').notNull(),
+  description: text('description'),
+  isActive: boolean('is_active').default(true).notNull(),
+  sortOrder: integer('sort_order').default(0),
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('custom_doc_types_org_idx').on(table.orgId),
+  nameIdx: index('custom_doc_types_name_idx').on(table.name),
+}));
+
+export const insertCustomDocumentTypeSchema = createInsertSchema(customDocumentTypes).omit({ id: true, createdAt: true, updatedAt: true });
+export type CustomDocumentType = typeof customDocumentTypes.$inferSelect;
+export type InsertCustomDocumentType = z.infer<typeof insertCustomDocumentTypeSchema>;
+
 // P&L Categories - Hierarchical marina-specific categories (org-configurable)
 export const pnlCategories = pgTable('pnl_categories', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),

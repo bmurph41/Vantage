@@ -19024,6 +19024,72 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Initialize organization with default categories and patterns
+// Custom Document Types Routes - to be added to routes.ts
+
+// --- CUSTOM DOCUMENT TYPES ---
+
+// Get all custom document types for organization
+app.get('/api/doc-intel/custom-document-types', authenticateUser, async (req: any, res) => {
+  try {
+    const orgId = req.user.orgId;
+    const { customDocumentTypes } = await import('@shared/schema');
+    const types = await db.select().from(customDocumentTypes).where(eq(customDocumentTypes.orgId, orgId)).orderBy(customDocumentTypes.sortOrder);
+    res.json(types);
+  } catch (error: any) {
+    console.error('Failed to fetch custom document types:', error);
+    res.status(500).json({ error: 'Failed to fetch custom document types' });
+  }
+});
+
+// Create custom document type
+app.post('/api/doc-intel/custom-document-types', authenticateUser, async (req: any, res) => {
+  try {
+    const orgId = req.user.orgId;
+    const userId = req.user.id;
+    const { name, description } = req.body;
+
+    if (!name?.trim()) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+
+    const { customDocumentTypes } = await import('@shared/schema');
+    
+    // Check for duplicates
+    const existing = await db.select().from(customDocumentTypes)
+      .where(and(eq(customDocumentTypes.orgId, orgId), eq(customDocumentTypes.name, name.trim())));
+    
+    if (existing.length > 0) {
+      return res.status(400).json({ error: 'A document type with this name already exists' });
+    }
+
+    const [newType] = await db.insert(customDocumentTypes).values({
+      orgId,
+      name: name.trim(),
+      description: description || null,
+      createdBy: userId,
+    }).returning();
+
+    res.status(201).json(newType);
+  } catch (error: any) {
+    console.error('Failed to create custom document type:', error);
+    res.status(500).json({ error: 'Failed to create custom document type' });
+  }
+});
+
+// Delete custom document type
+app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (req: any, res) => {
+  try {
+    const orgId = req.user.orgId;
+    const { id } = req.params;
+
+    const { customDocumentTypes } = await import('@shared/schema');
+    await db.delete(customDocumentTypes).where(and(eq(customDocumentTypes.id, id), eq(customDocumentTypes.orgId, orgId)));
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Failed to delete custom document type:', error);
+    res.status(500).json({ error: 'Failed to delete custom document type' });
+  }
+});
   app.post('/api/modeling/doc-intel/init', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
