@@ -72,6 +72,60 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 
+function PercentInput({
+  value,
+  onChange,
+  className = '',
+  id,
+  'data-testid': dataTestId,
+}: {
+  value: number;
+  onChange: (value: string) => void;
+  className?: string;
+  id?: string;
+  'data-testid'?: string;
+}) {
+  const [isFocused, setIsFocused] = useState(false);
+  const [localValue, setLocalValue] = useState(String(value));
+
+  useEffect(() => {
+    if (!isFocused) {
+      setLocalValue(String(value));
+    }
+  }, [value, isFocused]);
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    setLocalValue(String(value));
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    const parsed = parseFloat(localValue) || 0;
+    onChange(String(parsed));
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLocalValue(e.target.value);
+    onChange(e.target.value);
+  };
+
+  const displayValue = isFocused ? localValue : `${(parseFloat(String(value)) || 0).toFixed(1)}%`;
+
+  return (
+    <Input
+      id={id}
+      type="text"
+      value={displayValue}
+      onChange={handleChange}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      className={`text-right ${className}`}
+      data-testid={dataTestId}
+    />
+  );
+}
+
 interface WorkspaceAssumptionsProps {
   projectId: string;
 }
@@ -710,20 +764,13 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
                   <p className="text-xs text-muted-foreground mb-2">
                     Apply this rate to all storage types and locations
                   </p>
-                  <div className="relative">
-                    <Input
-                      id="storage-universal-rate"
-                      type="number"
-                      step="0.1"
-                      value={storageGrowth.universalRate}
-                      onChange={(e) => updateStorageUniversalRate(e.target.value)}
-                      className="pr-7 h-9"
-                      data-testid="input-storage-universal-rate"
-                    />
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                      %
-                    </span>
-                  </div>
+                  <PercentInput
+                    id="storage-universal-rate"
+                    value={storageGrowth.universalRate}
+                    onChange={(val) => updateStorageUniversalRate(val)}
+                    className="h-9 w-24"
+                    data-testid="input-storage-universal-rate"
+                  />
                 </div>
               )}
 
@@ -735,20 +782,13 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
                         {storageType.icon}
                         {storageType.name}
                       </Label>
-                      <div className="relative">
-                        <Input
-                          id={`storage-type-${storageType.id}`}
-                          type="number"
-                          step="0.1"
-                          value={storageGrowth.typeRates[storageType.id] ?? 3}
-                          onChange={(e) => updateStorageTypeRate(storageType.id, e.target.value)}
-                          className="pr-7 h-9"
-                          data-testid={`input-storage-type-${storageType.id}`}
-                        />
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                          %
-                        </span>
-                      </div>
+                      <PercentInput
+                        id={`storage-type-${storageType.id}`}
+                        value={storageGrowth.typeRates[storageType.id] ?? 3}
+                        onChange={(val) => updateStorageTypeRate(storageType.id, val)}
+                        className="h-9 w-24"
+                        data-testid={`input-storage-type-${storageType.id}`}
+                      />
                       <p className="text-xs text-muted-foreground">
                         {storageType.locations.length} location{storageType.locations.length !== 1 ? 's' : ''}
                       </p>
@@ -795,19 +835,12 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
                         <div className="border-t p-4 bg-muted/20">
                           <div className="flex items-center gap-4 mb-4 pb-3 border-b">
                             <Label className="text-sm font-medium">Set all locations:</Label>
-                            <div className="relative w-24">
-                              <Input
-                                type="number"
-                                step="0.1"
-                                value={storageGrowth.typeRates[storageType.id] ?? 3}
-                                onChange={(e) => updateStorageTypeRate(storageType.id, e.target.value)}
-                                className="pr-6 h-8"
-                                data-testid={`input-set-all-${storageType.id}`}
-                              />
-                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                                %
-                              </span>
-                            </div>
+                            <PercentInput
+                              value={storageGrowth.typeRates[storageType.id] ?? 3}
+                              onChange={(val) => updateStorageTypeRate(storageType.id, val)}
+                              className="h-8 w-20"
+                              data-testid={`input-set-all-${storageType.id}`}
+                            />
                           </div>
                           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                             {storageType.locations.map((location) => (
@@ -816,19 +849,12 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
                                   <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />
                                   <span className="text-sm truncate">{location.name}</span>
                                 </div>
-                                <div className="relative w-20">
-                                  <Input
-                                    type="number"
-                                    step="0.1"
-                                    value={storageGrowth.locationRates[location.id] ?? 3}
-                                    onChange={(e) => updateStorageLocationRate(location.id, e.target.value)}
-                                    className="pr-6 h-8"
-                                    data-testid={`input-location-${location.id}`}
-                                  />
-                                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                                    %
-                                  </span>
-                                </div>
+                                <PercentInput
+                                  value={storageGrowth.locationRates[location.id] ?? 3}
+                                  onChange={(val) => updateStorageLocationRate(location.id, val)}
+                                  className="h-8 w-20"
+                                  data-testid={`input-location-${location.id}`}
+                                />
                               </div>
                             ))}
                           </div>
@@ -856,18 +882,13 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
                       {category.icon}
                       <span className="truncate">{category.name}</span>
                     </Label>
-                    <div className="relative w-16">
-                      <Input
-                        id={`growth-${category.id}`}
-                        type="number"
-                        step="0.1"
-                        value={growthRates[category.id] ?? 3}
-                        onChange={(e) => updateGrowthRate(category.id, e.target.value)}
-                        className="h-7 text-xs text-right pr-5 px-2"
-                        data-testid={`input-growth-${category.id}`}
-                      />
-                      <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">%</span>
-                    </div>
+                    <PercentInput
+                      id={`growth-${category.id}`}
+                      value={growthRates[category.id] ?? 3}
+                      onChange={(val) => updateGrowthRate(category.id, val)}
+                      className="h-7 text-xs w-16 px-2"
+                      data-testid={`input-growth-${category.id}`}
+                    />
                   </div>
                 ))}
               </div>
@@ -888,18 +909,13 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
                     <Label htmlFor={`expense-${category.id}`} className="text-xs whitespace-nowrap min-w-0 flex-1 truncate">
                       {category.name}
                     </Label>
-                    <div className="relative w-16">
-                      <Input
-                        id={`expense-${category.id}`}
-                        type="number"
-                        step="0.1"
-                        value={expenseGrowth[category.id] ?? 2}
-                        onChange={(e) => updateExpenseGrowth(category.id, e.target.value)}
-                        className="h-7 text-xs text-right pr-5 px-2"
-                        data-testid={`input-expense-${category.id}`}
-                      />
-                      <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">%</span>
-                    </div>
+                    <PercentInput
+                      id={`expense-${category.id}`}
+                      value={expenseGrowth[category.id] ?? 2}
+                      onChange={(val) => updateExpenseGrowth(category.id, val)}
+                      className="h-7 text-xs w-16 px-2"
+                      data-testid={`input-expense-${category.id}`}
+                    />
                   </div>
                 ))}
               </div>
@@ -937,21 +953,12 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
                         </TableCell>
                         {years.map(year => (
                           <TableCell key={year} className="p-1">
-                            <div className="relative">
-                              <Input
-                                type="number"
-                                step="1"
-                                min="0"
-                                max="100"
-                                value={occupancy[storage.id]?.[year] ?? 85}
-                                onChange={(e) => updateOccupancy(storage.id, year, e.target.value)}
-                                className="w-full text-center pr-6"
-                                data-testid={`input-occupancy-${storage.id}-${year}`}
-                              />
-                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                                %
-                              </span>
-                            </div>
+                            <PercentInput
+                              value={occupancy[storage.id]?.[year] ?? 85}
+                              onChange={(val) => updateOccupancy(storage.id, year, val)}
+                              className="w-full"
+                              data-testid={`input-occupancy-${storage.id}-${year}`}
+                            />
                           </TableCell>
                         ))}
                       </TableRow>
@@ -993,19 +1000,12 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
                             <Info className="h-3 w-3 text-muted-foreground" />
                             Historical Average
                           </Label>
-                          <div className="relative">
-                            <Input
-                              type="number"
-                              step="0.1"
-                              value={margin.historical}
-                              onChange={(e) => updateMargin(categoryId, 'historical', e.target.value)}
-                              className="pr-8"
-                              data-testid={`input-margin-historical-${categoryId}`}
-                            />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                              %
-                            </span>
-                          </div>
+                          <PercentInput
+                            value={margin.historical}
+                            onChange={(val) => updateMargin(categoryId, 'historical', val)}
+                            className="w-32"
+                            data-testid={`input-margin-historical-${categoryId}`}
+                          />
                           <p className="text-xs text-muted-foreground">
                             Based on actual P&L data
                           </p>
@@ -1013,19 +1013,12 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
                         
                         <div className="space-y-2">
                           <Label>Projected Margin</Label>
-                          <div className="relative">
-                            <Input
-                              type="number"
-                              step="0.1"
-                              value={margin.projected}
-                              onChange={(e) => updateMargin(categoryId, 'projected', e.target.value)}
-                              className="pr-8"
-                              data-testid={`input-margin-projected-${categoryId}`}
-                            />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                              %
-                            </span>
-                          </div>
+                          <PercentInput
+                            value={margin.projected}
+                            onChange={(val) => updateMargin(categoryId, 'projected', val)}
+                            className="w-32"
+                            data-testid={`input-margin-projected-${categoryId}`}
+                          />
                           <p className="text-xs text-muted-foreground">
                             Applied to Pro Forma projections
                           </p>

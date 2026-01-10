@@ -47,7 +47,6 @@ import {
   Settings2,
   Tag,
   TrendingUp,
-  Percent,
   Target,
   Loader2,
   Trash2,
@@ -93,6 +92,56 @@ const DEFAULT_CASE_TEMPLATES = [
 function getCaseColorClass(color: string | null): { bg: string; text: string; bgLight: string; border: string } {
   const found = CASE_COLORS.find(c => c.value === color);
   return found || CASE_COLORS[0];
+}
+
+function PercentInput({
+  value,
+  onChange,
+  className = '',
+  'data-testid': dataTestId,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+  className?: string;
+  'data-testid'?: string;
+}) {
+  const [isFocused, setIsFocused] = useState(false);
+  const [localValue, setLocalValue] = useState(String(value));
+
+  useEffect(() => {
+    if (!isFocused) {
+      setLocalValue(String(value));
+    }
+  }, [value, isFocused]);
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    setLocalValue(String(value));
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    const parsed = parseFloat(localValue) || 0;
+    onChange(parsed);
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLocalValue(e.target.value);
+  };
+
+  const displayValue = isFocused ? localValue : `${(parseFloat(String(value)) || 0).toFixed(1)}%`;
+
+  return (
+    <Input
+      type="text"
+      value={displayValue}
+      onChange={handleChange}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      className={`text-right ${className}`}
+      data-testid={dataTestId}
+    />
+  );
 }
 
 export default function CaseConfiguration({ projectId }: CaseConfigurationProps) {
@@ -637,20 +686,15 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
                             <Label>Revenue Growth Rate</Label>
                             <p className="text-sm text-muted-foreground">Annual growth</p>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              type="number"
-                              value={parseFloat(editedCase.revenueGrowthRate || '0') * 100}
-                              onChange={(e) => setEditedCase({
-                                ...editedCase,
-                                revenueGrowthRate: (parseFloat(e.target.value) / 100).toFixed(4)
-                              })}
-                              className="w-20 text-right"
-                              step="0.1"
-                              data-testid="input-revenue-growth"
-                            />
-                            <Percent className="h-4 w-4 text-muted-foreground" />
-                          </div>
+                          <PercentInput
+                            value={parseFloat(editedCase.revenueGrowthRate || '0') * 100}
+                            onChange={(val) => setEditedCase({
+                              ...editedCase,
+                              revenueGrowthRate: (val / 100).toFixed(4)
+                            })}
+                            className="w-24"
+                            data-testid="input-revenue-growth"
+                          />
                         </div>
                         <Slider
                           value={[parseFloat(editedCase.revenueGrowthRate || '0') * 100]}
@@ -671,20 +715,15 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
                             <Label>Expense Growth Rate</Label>
                             <p className="text-sm text-muted-foreground">Annual growth</p>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              type="number"
-                              value={parseFloat(editedCase.expenseGrowthRate || '0') * 100}
-                              onChange={(e) => setEditedCase({
-                                ...editedCase,
-                                expenseGrowthRate: (parseFloat(e.target.value) / 100).toFixed(4)
-                              })}
-                              className="w-20 text-right"
-                              step="0.1"
-                              data-testid="input-expense-growth"
-                            />
-                            <Percent className="h-4 w-4 text-muted-foreground" />
-                          </div>
+                          <PercentInput
+                            value={parseFloat(editedCase.expenseGrowthRate || '0') * 100}
+                            onChange={(val) => setEditedCase({
+                              ...editedCase,
+                              expenseGrowthRate: (val / 100).toFixed(4)
+                            })}
+                            className="w-24"
+                            data-testid="input-expense-growth"
+                          />
                         </div>
                         <Slider
                           value={[parseFloat(editedCase.expenseGrowthRate || '0') * 100]}
@@ -705,20 +744,15 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
                             <Label>Exit Cap Rate</Label>
                             <p className="text-sm text-muted-foreground">At disposition</p>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              type="number"
-                              value={parseFloat(editedCase.exitCapRate || '0') * 100}
-                              onChange={(e) => setEditedCase({
-                                ...editedCase,
-                                exitCapRate: (parseFloat(e.target.value) / 100).toFixed(4)
-                              })}
-                              className="w-20 text-right"
-                              step="0.1"
-                              data-testid="input-exit-cap"
-                            />
-                            <Percent className="h-4 w-4 text-muted-foreground" />
-                          </div>
+                          <PercentInput
+                            value={parseFloat(editedCase.exitCapRate || '0') * 100}
+                            onChange={(val) => setEditedCase({
+                              ...editedCase,
+                              exitCapRate: (val / 100).toFixed(4)
+                            })}
+                            className="w-24"
+                            data-testid="input-exit-cap"
+                          />
                         </div>
                         <Slider
                           value={[parseFloat(editedCase.exitCapRate || '0') * 100]}
@@ -739,20 +773,15 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
                             <Label>Occupancy Rate</Label>
                             <p className="text-sm text-muted-foreground">Target stabilized</p>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              type="number"
-                              value={parseFloat(editedCase.occupancyRate || '0') * 100}
-                              onChange={(e) => setEditedCase({
-                                ...editedCase,
-                                occupancyRate: (parseFloat(e.target.value) / 100).toFixed(4)
-                              })}
-                              className="w-20 text-right"
-                              step="1"
-                              data-testid="input-occupancy"
-                            />
-                            <Percent className="h-4 w-4 text-muted-foreground" />
-                          </div>
+                          <PercentInput
+                            value={parseFloat(editedCase.occupancyRate || '0') * 100}
+                            onChange={(val) => setEditedCase({
+                              ...editedCase,
+                              occupancyRate: (val / 100).toFixed(4)
+                            })}
+                            className="w-24"
+                            data-testid="input-occupancy"
+                          />
                         </div>
                         <Slider
                           value={[parseFloat(editedCase.occupancyRate || '0') * 100]}
