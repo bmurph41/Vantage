@@ -19252,6 +19252,22 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
           createdAt: result.originalUpload.createdAt,
         } : null,
       });
+      
+      // Trigger AI parsing in background (non-blocking)
+      setImmediate(async () => {
+        try {
+          console.log(`[DocIntel] Starting automatic AI parsing for upload ${result.upload.id}`);
+          await docIntelService.parseAndExtract(orgId, result.upload.id);
+          console.log(`[DocIntel] Parsing complete for upload ${result.upload.id}, categorizing...`);
+          await docIntelService.categorizeItems(orgId, result.upload.id);
+          console.log(`[DocIntel] Categorization complete for upload ${result.upload.id}`);
+          // Update to reviewing status so user can see it is ready
+          await docIntelService.updateUpload(orgId, result.upload.id, { status: 'reviewing' });
+        } catch (parseError: any) {
+          console.error(`[DocIntel] Background parsing failed for upload ${result.upload.id}:`, parseError.message);
+          // Error status is already set by parseAndExtract on failure
+        }
+      });
     } catch (error: any) {
       console.error('Failed to upload document:', error);
       res.status(500).json({ error: 'Failed to upload document' });

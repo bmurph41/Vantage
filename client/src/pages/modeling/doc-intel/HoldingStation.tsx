@@ -132,6 +132,12 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
       if (!res.ok) throw new Error("Failed to fetch holding queue");
       return res.json();
     },
+    refetchInterval: (data) => {
+      const hasProcessingDocs = data?.state?.data?.some(
+        (doc) => doc.status === "uploaded" || doc.status === "processing"
+      );
+      return hasProcessingDocs ? 3000 : false;
+    },
   });
 
   const { data: customDocTypes = [] } = useQuery<CustomDocumentType[]>({
@@ -556,13 +562,19 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant={doc.status === "parsed" ? "default" : "secondary"} className="text-xs">
+                    <Badge variant={doc.status === "parsed" || doc.status === "reviewing" ? "default" : "secondary"} className="text-xs">
                       {doc.status === "uploaded" && <Clock className="h-3 w-3 mr-1" />}
+                      {doc.status === "processing" && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
                       {doc.status === "parsed" && <CheckCircle2 className="h-3 w-3 mr-1" />}
                       {doc.status === "reviewing" && <Brain className="h-3 w-3 mr-1" />}
-                      {doc.status === "uploaded" ? "Pending" : doc.status}
+                      {doc.status === "error" && <AlertTriangle className="h-3 w-3 mr-1" />}
+                      {doc.status === "uploaded" ? "Pending" : 
+                       doc.status === "processing" ? "Processing..." : 
+                       doc.status === "reviewing" ? "Ready for Review" :
+                       doc.status === "error" ? "Error" :
+                       doc.status}
                     </Badge>
-                    {doc.status === "uploaded" && (
+                    {doc.status === "uploaded" && !(doc.status as string).includes("process") && (
                       <Button
                         size="sm"
                         onClick={() => parseDocumentMutation.mutate(doc.id)}
