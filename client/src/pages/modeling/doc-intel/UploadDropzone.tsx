@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Upload, FileSpreadsheet, X, AlertCircle, Loader2, CheckCircle2, FileText } from "lucide-react";
+import { Upload, FileSpreadsheet, X, AlertCircle, Loader2, CheckCircle2, FileText, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,10 +38,13 @@ interface CustomDocumentType {
   createdAt: string;
 }
 
+type DocTypeEnum = "pnl" | "rent_roll" | "balance_sheet" | "rate_sheet" | "invoice" | "other";
+
 interface StagedFile {
   id: string;
   file: File;
-  docType: string;
+  docType: DocTypeEnum;
+  customTypeId: string | null;
   customTypeName: string;
   year: string;
   status: "pending" | "uploading" | "complete" | "error";
@@ -49,16 +52,16 @@ interface StagedFile {
   errorMessage?: string;
 }
 
-const BUILT_IN_DOC_TYPES = [
-  { value: "pnl", label: "P&L Statement" },
-  { value: "rent_roll", label: "Rent Roll" },
-  { value: "balance_sheet", label: "Balance Sheet" },
-  { value: "rate_sheet", label: "Rate Sheet" },
-  { value: "invoice", label: "Invoice" },
-  { value: "other", label: "Other" },
-];
+const BUILT_IN_DOC_TYPES: Record<DocTypeEnum, { label: string }> = {
+  pnl: { label: "P&L Statement" },
+  rent_roll: { label: "Rent Roll" },
+  balance_sheet: { label: "Balance Sheet" },
+  rate_sheet: { label: "Rate Sheet" },
+  invoice: { label: "Invoice" },
+  other: { label: "Other" },
+};
 
-function guessDocType(filename: string): string {
+function guessDocType(filename: string): DocTypeEnum {
   const lower = filename.toLowerCase();
   if (lower.includes("p&l") || lower.includes("pnl") || lower.includes("profit") || lower.includes("income")) {
     return "pnl";
@@ -89,7 +92,7 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
-  const { data: customTypes = [] } = useQuery<CustomDocumentType[]>({
+  const { data: customTypes = [], refetch: refetchCustomTypes } = useQuery<CustomDocumentType[]>({
     queryKey: ['/api/doc-intel/custom-document-types'],
   });
 
@@ -106,11 +109,6 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
     },
   });
 
-  const allDocTypeOptions = [
-    ...BUILT_IN_DOC_TYPES,
-    ...customTypes.map((ct) => ({ value: `custom_${ct.id}`, label: ct.name })),
-  ];
-
   const updateStagedFile = (id: string, updates: Partial<StagedFile>) => {
     setStagedFiles((prev) => prev.map((f) => (f.id === id ? { ...f, ...updates } : f)));
   };
@@ -119,37 +117,79 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
     setStagedFiles((prev) => prev.filter((f) => f.id !== id));
   };
 
-  const saveCustomTypeIfNeeded = async (staged: StagedFile): Promise<string> => {
-    if (staged.docType === "other" && staged.customTypeName.trim()) {
-      const existingCustom = customTypes.find(
-        (ct) => ct.name.toLowerCase() === staged.customTypeName.trim().toLowerCase()
-      );
-      if (existingCustom) {
-        return `custom_${existingCustom.id}`;
-      }
-      try {
-        const newType = await createCustomTypeMutation.mutateAsync(staged.customTypeName.trim());
-        return `custom_${newType.id}`;
-      } catch {
-        return staged.customTypeName.trim();
-      }
+  const getDocTypeLabel = (staged: StagedFile): string => {
+    if (staged.customTypeId) {
+      const customType = customTypes.find((ct) => ct.id.toString() === staged.customTypeId);
+      return customType?.name || "Other";
+    }
+    return BUILT_IN_DOC_TYPES[staged.docType]?.label || "Other";
+  };
+
+  const handleDocTypeChange = (stagedId: string, value: string) => {
+    if (value.startsWith("custom_")) {
+      const customId = value.replace("custom_", "");
+      updateStagedFile(stagedId, { docType: "other", customTypeId: customId, customTypeName: "" });
+    } else {
+      updateStagedFile(stagedId, { docType: value as DocTypeEnum, customTypeId: null, customTypeName: "" });
+    }
+  };
+
+  const getCurrentSelectValue = (staged: StagedFile): string => {
+    if (staged.customTypeId) {
+      return `custom_${staged.customTypeId}`;
     }
     return staged.docType;
+  };
+
+  const saveCustomTypeIfNeeded = async (typeName: string): Promise<string | null> => {
+    const existingCustom = customTypes.find(
+      (ct) => ct.name.toLowerCase() === typeName.toLowerCase()
+    );
+    if (existingCustom) {
+      return existingCustom.id.toString();
+    }
+    try {
+      const newType = await createCustomTypeMutation.mutateAsync(typeName);
+      await refetchCustomTypes();
+      return newType.id?.toString() || null;
+    } catch (error: any) {
+      toast({ 
+        title: "Failed to save custom type", 
+        description: error.message || "Please try again.",
+        variant: "destructive" 
+      });
+      return null;
+    }
   };
 
   const uploadSingleFile = async (staged: StagedFile): Promise<DocIntelUpload | null> => {
     try {
       updateStagedFile(staged.id, { status: "uploading", progress: 20 });
 
-      const finalDocType = await saveCustomTypeIfNeeded(staged);
+      if (staged.docType === "other" && staged.customTypeName.trim() && !staged.customTypeId) {
+        const newId = await saveCustomTypeIfNeeded(staged.customTypeName.trim());
+        if (newId) {
+          updateStagedFile(staged.id, { customTypeId: newId });
+        }
+      }
       
       updateStagedFile(staged.id, { progress: 40 });
       
       const csrfToken = await ensureCsrfToken();
       const formData = new FormData();
       formData.append("file", staged.file);
-      formData.append("docType", finalDocType);
+      formData.append("docType", staged.docType);
       formData.append("year", staged.year);
+      
+      if (staged.customTypeId) {
+        const customType = customTypes.find((ct) => ct.id.toString() === staged.customTypeId);
+        if (customType) {
+          formData.append("customTypeName", customType.name);
+          formData.append("customTypeId", staged.customTypeId);
+        }
+      } else if (staged.docType === "other" && staged.customTypeName.trim()) {
+        formData.append("customTypeName", staged.customTypeName.trim());
+      }
 
       const headers: Record<string, string> = {};
       if (csrfToken) {
@@ -228,6 +268,7 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
       id: crypto.randomUUID(),
       file,
       docType: guessDocType(file.name),
+      customTypeId: null,
       customTypeName: "",
       year: new Date().getFullYear().toString(),
       status: "pending" as const,
@@ -250,6 +291,30 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
 
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 10 }, (_, i) => (currentYear - i).toString());
+
+  const handleSaveCustomType = async (stagedId: string, typeName: string) => {
+    if (!typeName.trim()) return;
+    
+    const normalizedName = typeName.trim();
+    const existingCustom = customTypes.find(
+      (ct) => ct.name.toLowerCase() === normalizedName.toLowerCase()
+    );
+    
+    if (existingCustom) {
+      updateStagedFile(stagedId, { customTypeId: existingCustom.id.toString(), customTypeName: "" });
+      toast({ title: "Type already exists", description: `Using existing "${existingCustom.name}" type.` });
+      return;
+    }
+    
+    try {
+      const newType = await createCustomTypeMutation.mutateAsync(normalizedName);
+      await refetchCustomTypes();
+      updateStagedFile(stagedId, { customTypeId: newType.id?.toString() || null, customTypeName: "" });
+      toast({ title: "Custom type saved", description: `"${normalizedName}" is now available in the dropdown.` });
+    } catch {
+      toast({ title: "Failed to save custom type", variant: "destructive" });
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -355,18 +420,33 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
                       <div>
                         <Label className="text-xs">Type</Label>
                         <Select
-                          value={staged.docType}
-                          onValueChange={(v) => updateStagedFile(staged.id, { docType: v, customTypeName: "" })}
+                          value={getCurrentSelectValue(staged)}
+                          onValueChange={(v) => handleDocTypeChange(staged.id, v)}
                         >
                           <SelectTrigger className="h-8 text-xs">
-                            <SelectValue />
+                            <SelectValue>{getDocTypeLabel(staged)}</SelectValue>
                           </SelectTrigger>
                           <SelectContent>
-                            {allDocTypeOptions.map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value}>
-                                {opt.label}
+                            {Object.entries(BUILT_IN_DOC_TYPES).filter(([k]) => k !== "other").map(([value, { label }]) => (
+                              <SelectItem key={value} value={value}>
+                                {label}
                               </SelectItem>
                             ))}
+                            {customTypes.length > 0 && (
+                              <>
+                                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground border-t mt-1 pt-1">
+                                  Custom Types
+                                </div>
+                                {customTypes.map((ct) => (
+                                  <SelectItem key={ct.id} value={`custom_${ct.id}`}>
+                                    {ct.name}
+                                  </SelectItem>
+                                ))}
+                              </>
+                            )}
+                            <div className="border-t mt-1 pt-1">
+                              <SelectItem value="other">Other (Add New)</SelectItem>
+                            </div>
                           </SelectContent>
                         </Select>
                       </div>
@@ -389,14 +469,26 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
                         </Select>
                       </div>
                     </div>
-                    {staged.docType === "other" && (
+                    {staged.docType === "other" && !staged.customTypeId && (
                       <div>
-                        <Input
-                          className="h-8 text-xs"
-                          placeholder="Document Type"
-                          value={staged.customTypeName}
-                          onChange={(e) => updateStagedFile(staged.id, { customTypeName: e.target.value })}
-                        />
+                        <div className="flex gap-1">
+                          <Input
+                            className="h-8 text-xs flex-1"
+                            placeholder="Document Type"
+                            value={staged.customTypeName}
+                            onChange={(e) => updateStagedFile(staged.id, { customTypeName: e.target.value })}
+                          />
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleSaveCustomType(staged.id, staged.customTypeName)}
+                            disabled={!staged.customTypeName.trim() || createCustomTypeMutation.isPending}
+                            title="Save as custom type"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>
