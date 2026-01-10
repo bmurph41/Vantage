@@ -82,7 +82,7 @@ export default function Dashboard() {
   };
 
   const handleNotificationClick = () => {
-    setLocation('/docktalk/notifications');
+    setLocation('/docktalk/email-alerts');
   };
 
   const handleSettingsClick = () => {

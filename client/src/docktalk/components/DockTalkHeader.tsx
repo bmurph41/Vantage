@@ -103,7 +103,7 @@ export default function DockTalkHeader({
               )}
             </TooltipTrigger>
             <TooltipContent>
-              <p>Email Notifications</p>
+              <p>Email Alerts</p>
             </TooltipContent>
           </Tooltip>
 
