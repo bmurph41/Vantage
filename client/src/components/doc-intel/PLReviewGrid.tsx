@@ -135,6 +135,49 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
     },
   });
 
+  const applyToModelingMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/modeling/projects/${projectId}/documents/${uploadId}/import`, {
+        method: "POST",
+        body: JSON.stringify({}),
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        if (res.status === 403) {
+          throw new Error("You don't have permission to perform this action.");
+        }
+        if (res.status === 401) {
+          throw new Error("Please log in to continue.");
+        }
+        throw new Error(errorData.message || errorData.error || `Failed to import (${res.status})`);
+      }
+      
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/doc-intel/uploads", uploadId, "items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "pnl"] });
+      const count = Array.isArray(data) ? data.length : 0;
+      toast({ 
+        title: "Applied to Modeling", 
+        description: count > 0 
+          ? `${count} confirmed items imported to your P&L model.`
+          : "Items imported successfully."
+      });
+      onApplyToModeling?.();
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Import Failed", 
+        description: error.message || "Failed to apply data to modeling.", 
+        variant: "destructive" 
+      });
+    },
+  });
+
   const getEffectiveValue = (item: ExtractedItem, field: keyof ExtractedItem) => {
     const local = localEdits[item.id];
     if (local && field in local) return local[field];
@@ -589,9 +632,23 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
               </Button>
             </>
           )}
-          {onApplyToModeling && confirmedCount > 0 && (
-            <Button size="sm" onClick={onApplyToModeling}>
-              Apply to Modeling ({confirmedCount} items)
+          {confirmedCount > 0 && (
+            <Button 
+              size="sm" 
+              onClick={() => applyToModelingMutation.mutate()}
+              disabled={applyToModelingMutation.isPending}
+            >
+              {applyToModelingMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  Applying...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4 mr-1" />
+                  Apply to Modeling ({confirmedCount} items)
+                </>
+              )}
             </Button>
           )}
         </div>

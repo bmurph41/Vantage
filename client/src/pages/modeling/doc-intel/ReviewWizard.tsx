@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, FileSpreadsheet, Brain, Check, X, Zap, Download, ListChecks, Eye, CheckCircle2, AlertTriangle, Building2, ChevronDown, ChevronRight, Pencil, Table2, List } from "lucide-react";
+import { ArrowLeft, ArrowRight, FileSpreadsheet, Brain, Check, X, Zap, Download, ListChecks, Eye, CheckCircle2, AlertTriangle, Building2, ChevronDown, ChevronRight, Pencil, Table2, List, LayoutGrid } from "lucide-react";
 import { PLTableView } from "@/components/doc-intel/PLTableView";
+import { PLReviewGrid } from "@/components/doc-intel/PLReviewGrid";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -112,7 +113,7 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [approvalNotes, setApprovalNotes] = useState("");
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
-  const [viewMode, setViewMode] = useState<'list' | 'table'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'table' | 'spreadsheet'>('spreadsheet');
   
   const maxAllowedStep = getMaxAllowedStep(upload.status);
   
@@ -499,11 +500,22 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
               <div className="flex gap-2">
                 <div className="flex border rounded-md">
                   <Button
+                    variant={viewMode === 'spreadsheet' ? 'secondary' : 'ghost'}
+                    size="sm"
+                    onClick={() => setViewMode('spreadsheet')}
+                    className="rounded-r-none"
+                    data-testid="button-spreadsheet-view"
+                    title="Spreadsheet View (Recommended)"
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </Button>
+                  <Button
                     variant={viewMode === 'list' ? 'secondary' : 'ghost'}
                     size="sm"
                     onClick={() => setViewMode('list')}
-                    className="rounded-r-none"
+                    className="rounded-none border-x"
                     data-testid="button-list-view"
+                    title="List View"
                   >
                     <List className="h-4 w-4" />
                   </Button>
@@ -513,6 +525,7 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
                     onClick={() => setViewMode('table')}
                     className="rounded-l-none"
                     data-testid="button-table-view"
+                    title="Table View"
                   >
                     <Table2 className="h-4 w-4" />
                   </Button>
@@ -553,7 +566,15 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
               )}
             </div>
 
-            {viewMode === 'table' ? (
+            {viewMode === 'spreadsheet' ? (
+              <div className="min-h-[500px]">
+                <PLReviewGrid
+                  projectId={projectId}
+                  uploadId={upload.id}
+                  onApplyToModeling={() => setCurrentStep(4)}
+                />
+              </div>
+            ) : viewMode === 'table' ? (
               <div className="border rounded-lg overflow-hidden">
                 <table className="w-full">
                   <thead className="bg-muted/50">

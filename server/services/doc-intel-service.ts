@@ -72,6 +72,9 @@ interface CategoryMatch {
   confidenceScore: number;
   matchedRuleId?: string;
   ruleType: 'pattern' | 'learning' | 'ai';
+  categoryTier?: 'revenue' | 'cogs' | 'expense';
+  revenueCogsDept?: string;
+  expenseDept?: string;
 }
 
 function sanitizeText(value: string | null | undefined): string {
@@ -710,14 +713,27 @@ class DocIntelService {
       const match = this.findBestMatch(item.rawText, mappings, learningRules);
       
       if (match) {
+        const updateData: Record<string, any> = {
+          categorySuggested: match.categoryId,
+          confidenceScore: match.confidenceScore.toString(),
+          matchedRuleId: match.matchedRuleId,
+          updatedAt: new Date(),
+        };
+
+        // Apply tier/department suggestions from learning rules
+        if (match.categoryTier) {
+          updateData.categoryTierSuggested = match.categoryTier;
+        }
+        if (match.revenueCogsDept) {
+          updateData.revenueCogsDeptSuggested = match.revenueCogsDept;
+        }
+        if (match.expenseDept) {
+          updateData.expenseDeptSuggested = match.expenseDept;
+        }
+
         const [updated] = await db
           .update(docIntelExtractedItems)
-          .set({
-            categorySuggested: match.categoryId,
-            confidenceScore: match.confidenceScore.toString(),
-            matchedRuleId: match.matchedRuleId,
-            updatedAt: new Date(),
-          })
+          .set(updateData)
           .where(eq(docIntelExtractedItems.id, item.id))
           .returning();
         
@@ -759,6 +775,27 @@ class DocIntelService {
       }
     }
 
+    // Priority 1: Check for exact matches from learning rules (highest confidence)
+    for (const rule of learningRules) {
+      const ruleData = rule.ruleJson as any;
+      if (!ruleData) continue;
+
+      // Exact match check (user confirmed this exact line item before)
+      if (ruleData.exactMatch && lowerText === ruleData.exactMatch.toLowerCase()) {
+        return {
+          categoryId: rule.categoryId || '',
+          categoryName: rule.name,
+          confidenceScore: 0.99, // Highest confidence for exact match
+          matchedRuleId: rule.id,
+          ruleType: 'learning',
+          categoryTier: ruleData.categoryTier,
+          revenueCogsDept: ruleData.revenueCogsDept,
+          expenseDept: ruleData.expenseDept,
+        };
+      }
+    }
+
+    // Priority 2: Check keyword matches from learning rules
     for (const rule of learningRules) {
       const ruleData = rule.ruleJson as any;
       if (!ruleData || !ruleData.keywords) continue;
@@ -771,11 +808,14 @@ class DocIntelService {
         
         if (!bestMatch || keywordConfidence > bestMatch.confidenceScore) {
           bestMatch = {
-            categoryId: rule.categoryId,
+            categoryId: rule.categoryId || '',
             categoryName: rule.name,
             confidenceScore: keywordConfidence,
             matchedRuleId: rule.id,
             ruleType: 'learning',
+            categoryTier: ruleData.categoryTier,
+            revenueCogsDept: ruleData.revenueCogsDept,
+            expenseDept: ruleData.expenseDept,
           };
         }
       }
