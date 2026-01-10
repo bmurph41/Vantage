@@ -1533,6 +1533,121 @@ class DocIntelService {
 
     return { matched, unmatched };
   }
+  
+  async updateExtractedItem(
+    orgId: string,
+    itemId: string,
+    updates: Record<string, any>,
+    userId: string
+  ): Promise<DocIntelExtractedItem | null> {
+    const [item] = await db
+      .select()
+      .from(docIntelExtractedItems)
+      .where(and(
+        eq(docIntelExtractedItems.id, itemId),
+        eq(docIntelExtractedItems.orgId, orgId)
+      ));
+    
+    if (!item) return null;
+    
+    const updateData: Record<string, any> = { updatedAt: new Date() };
+    
+    if (updates.rawText !== undefined) updateData.rawText = updates.rawText;
+    if (updates.amountConfirmed !== undefined) updateData.amountConfirmed = updates.amountConfirmed;
+    if (updates.status !== undefined) updateData.status = updates.status;
+    if (updates.categoryTierConfirmed !== undefined) updateData.categoryTierConfirmed = updates.categoryTierConfirmed;
+    if (updates.revenueCogsDeptConfirmed !== undefined) updateData.revenueCogsDeptConfirmed = updates.revenueCogsDeptConfirmed;
+    if (updates.expenseDeptConfirmed !== undefined) updateData.expenseDeptConfirmed = updates.expenseDeptConfirmed;
+    if (updates.reviewNotes !== undefined) updateData.reviewNotes = updates.reviewNotes;
+    
+    if (updates.status === 'confirmed') {
+      updateData.confirmedBy = userId;
+      updateData.confirmedAt = new Date();
+    }
+    
+    const [updated] = await db
+      .update(docIntelExtractedItems)
+      .set(updateData)
+      .where(eq(docIntelExtractedItems.id, itemId))
+      .returning();
+    
+    // Create learning rule from user confirmation
+    if (updates.status === 'confirmed' && (updates.categoryTierConfirmed || updates.revenueCogsDeptConfirmed || updates.expenseDeptConfirmed)) {
+      await this.createLearningRuleFromConfirmation(orgId, item.rawText, updates, userId);
+    }
+    
+    return updated;
+  }
+  
+  async bulkUpdateExtractedItems(
+    orgId: string,
+    itemIds: string[],
+    updates: Record<string, any>,
+    userId: string
+  ): Promise<DocIntelExtractedItem[]> {
+    const results: DocIntelExtractedItem[] = [];
+    
+    for (const itemId of itemIds) {
+      const updated = await this.updateExtractedItem(orgId, itemId, updates, userId);
+      if (updated) results.push(updated);
+    }
+    
+    return results;
+  }
+  
+  async createLearningRuleFromConfirmation(
+    orgId: string,
+    rawText: string,
+    updates: Record<string, any>,
+    userId: string
+  ): Promise<void> {
+    try {
+      const normalizedText = rawText.toLowerCase().trim();
+      
+      // Check if a similar rule already exists
+      const existingRules = await db
+        .select()
+        .from(docIntelLearningRules)
+        .where(and(
+          eq(docIntelLearningRules.orgId, orgId),
+          eq(docIntelLearningRules.isActive, true)
+        ));
+      
+      const hasSimilar = existingRules.some(rule => {
+        const ruleData = rule.ruleJson as any;
+        if (ruleData?.exactMatch === normalizedText) return true;
+        if (ruleData?.keywords?.some((k: string) => normalizedText.includes(k))) return true;
+        return false;
+      });
+      
+      if (hasSimilar) return;
+      
+      // Create new learning rule
+      const ruleJson = {
+        exactMatch: normalizedText,
+        keywords: normalizedText.split(/\s+/).filter(w => w.length > 3),
+        categoryTier: updates.categoryTierConfirmed,
+        revenueCogsDept: updates.revenueCogsDeptConfirmed,
+        expenseDept: updates.expenseDeptConfirmed,
+        sourceText: rawText,
+        learnedAt: new Date().toISOString(),
+      };
+      
+      await db.insert(docIntelLearningRules).values({
+        orgId,
+        name: `Learned: ${rawText.substring(0, 50)}...`,
+        ruleJson,
+        ruleType: 'learned_confirmation',
+        confidenceScore: '0.95',
+        createdBy: userId,
+        isActive: true,
+      });
+      
+      console.log(`[DocIntel Learning] Created rule from confirmation: "${rawText.substring(0, 30)}..."`);
+    } catch (error) {
+      console.error('[DocIntel Learning] Failed to create learning rule:', error);
+    }
+  }
 }
 
 export const docIntelService = new DocIntelService();

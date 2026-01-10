@@ -13451,6 +13451,15 @@ export const pnlCategoryTypeEnum = pgEnum("pnl_category_type", ["revenue", "cogs
 export const holdingStationStatusEnum = pgEnum("holding_station_status", ["staging", "validated", "ready_to_process", "processing", "processed"]);
 export const docIntelDepartmentEnum = pgEnum("doc_intel_department", ["marina_ops", "fuel_dock", "ship_store", "restaurant", "boat_sales", "service_dept", "storage", "admin", "other"]);
 
+// Category tier for P&L line items (user-facing categories)
+export const pnlCategoryTierEnum = pgEnum("pnl_category_tier", ["revenue", "cogs", "expense"]);
+
+// Revenue and COGS departments (marina-specific)
+export const revenueCogsDeptEnum = pgEnum("revenue_cogs_dept", ["storage", "fuel", "marina_amenities", "ship_store_retail", "service", "parts", "third_party_leases", "boat_club", "boat_rentals", "boat_sales", "boat_brokerage", "boat_finance", "fb", "rv_park", "hospitality_lodging", "miscellaneous"]);
+
+// Expense departments (marina-specific)
+export const expenseDeptEnum = pgEnum("expense_dept", ["payroll", "general_admin", "advertising", "repairs_maintenance", "utilities", "licenses_permits", "security_contract_services", "bank_cc_fees", "professional_services", "insurance", "taxes", "leases", "fb", "service", "parts", "rv_park", "hospitality_lodging", "miscellaneous"]);
+
 // Custom Document Types - Organization-wide custom document type definitions
 export const customDocumentTypes = pgTable('custom_document_types', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
@@ -13576,6 +13585,20 @@ export const docIntelExtractedItems = pgTable('doc_intel_extracted_items', {
   departmentSuggested: docIntelDepartmentEnum('department_suggested'),
   departmentConfirmed: docIntelDepartmentEnum('department_confirmed'),
   
+  
+  // Category tier (Revenue, COGS, Expense) for simplified P&L categorization
+  categoryTierSuggested: pnlCategoryTierEnum('category_tier_suggested'),
+  categoryTierConfirmed: pnlCategoryTierEnum('category_tier_confirmed'),
+  
+  // Marina-specific departments (different options for Revenue/COGS vs Expense)
+  revenueCogsDeptSuggested: revenueCogsDeptEnum('revenue_cogs_dept_suggested'),
+  revenueCogsDeptConfirmed: revenueCogsDeptEnum('revenue_cogs_dept_confirmed'),
+  expenseDeptSuggested: expenseDeptEnum('expense_dept_suggested'),
+  expenseDeptConfirmed: expenseDeptEnum('expense_dept_confirmed'),
+  
+  // Period mapping for multi-column P&L extraction
+  periodKey: text('period_key'), // e.g., "2024", "Q1 2024", "Jan 2024"
+  columnIndex: integer('column_index'), // Column position in source spreadsheet
   // User confirmation
   status: docIntelItemStatusEnum('status').notNull().default('pending'),
   categoryConfirmed: varchar('category_confirmed').references(() => pnlCategories.id),

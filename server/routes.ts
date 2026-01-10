@@ -19487,6 +19487,66 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   });
 
+  // --- Simplified routes for PLReviewGrid component ---
+  
+  // Get extracted items by upload ID (simpler route)
+  app.get('/api/doc-intel/uploads/:uploadId/items', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { uploadId } = req.params;
+      
+      const upload = await docIntelService.getUpload(orgId, uploadId);
+      if (!upload) {
+        return res.status(404).json({ error: 'Upload not found' });
+      }
+      
+      const items = await docIntelService.getExtractedItemsWithCategories(orgId, uploadId);
+      res.json(items);
+    } catch (error: any) {
+      console.error('Failed to fetch items:', error);
+      res.status(500).json({ error: 'Failed to fetch items' });
+    }
+  });
+  
+  // Update a single extracted item
+  app.patch('/api/doc-intel/items/:itemId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { itemId } = req.params;
+      const updates = req.body;
+      
+      const item = await docIntelService.updateExtractedItem(orgId, itemId, updates, userId);
+      if (!item) {
+        return res.status(404).json({ error: 'Item not found' });
+      }
+      res.json(item);
+    } catch (error: any) {
+      console.error('Failed to update item:', error);
+      res.status(500).json({ error: 'Failed to update item' });
+    }
+  });
+  
+  // Bulk update extracted items
+  app.patch('/api/doc-intel/uploads/:uploadId/items/bulk', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { uploadId } = req.params;
+      const { itemIds, updates } = req.body;
+      
+      if (!Array.isArray(itemIds) || itemIds.length === 0) {
+        return res.status(400).json({ error: 'itemIds array required' });
+      }
+      
+      const results = await docIntelService.bulkUpdateExtractedItems(orgId, itemIds, updates, userId);
+      res.json({ updated: results.length });
+    } catch (error: any) {
+      console.error('Failed to bulk update items:', error);
+      res.status(500).json({ error: 'Failed to bulk update items' });
+    }
+  });
+
   // Auto-confirm high confidence items
   app.post('/api/modeling/projects/:projectId/documents/:uploadId/items/confirm-high-confidence', authenticateUser, async (req: any, res) => {
     try {
