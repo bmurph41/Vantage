@@ -44,6 +44,16 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
@@ -97,6 +107,11 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
   const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
   const [localEdits, setLocalEdits] = useState<Record<string, Partial<ExtractedItem>>>({});
   const [showExcluded, setShowExcluded] = useState(false);
+  const [excludeDialog, setExcludeDialog] = useState<{ open: boolean; item: ExtractedItem | null; reason: string }>({
+    open: false,
+    item: null,
+    reason: "",
+  });
 
   const { data: items = [], isLoading, refetch } = useQuery<ExtractedItem[]>({
     queryKey: ["/api/doc-intel/uploads", uploadId, "items"],
@@ -109,11 +124,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
 
   const updateItemMutation = useMutation({
     mutationFn: async ({ itemId, updates }: { itemId: string; updates: Partial<ExtractedItem> }) => {
-      return apiRequest(`/api/doc-intel/items/${itemId}`, {
-        method: "PATCH",
-        body: JSON.stringify(updates),
-        headers: { "Content-Type": "application/json" },
-      });
+      return apiRequest("PATCH", `/api/doc-intel/items/${itemId}`, updates);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/doc-intel/uploads", uploadId, "items"] });
@@ -122,11 +133,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
 
   const bulkUpdateMutation = useMutation({
     mutationFn: async (updates: { itemIds: string[]; updates: Partial<ExtractedItem> }) => {
-      return apiRequest(`/api/doc-intel/uploads/${uploadId}/items/bulk`, {
-        method: "PATCH",
-        body: JSON.stringify(updates),
-        headers: { "Content-Type": "application/json" },
-      });
+      return apiRequest("PATCH", `/api/doc-intel/uploads/${uploadId}/items/bulk`, updates);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/doc-intel/uploads", uploadId, "items"] });
@@ -231,11 +238,32 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
     });
   };
 
-  const handleExclude = async (itemId: string) => {
+  const openExcludeDialog = (item: ExtractedItem) => {
+    setExcludeDialog({ open: true, item, reason: "" });
+  };
+
+  const confirmExclude = async () => {
+    if (!excludeDialog.item) return;
+    
+    const itemId = excludeDialog.item.id;
+    const reason = excludeDialog.reason.trim();
+    
     await updateItemMutation.mutateAsync({
       itemId,
-      updates: { status: "excluded" },
+      updates: { 
+        status: "excluded",
+        reviewNotes: reason || undefined,
+      },
     });
+    
+    toast({ 
+      title: "Excluded", 
+      description: reason 
+        ? "Item excluded. Reason saved for future AI training." 
+        : "Item excluded from import." 
+    });
+    
+    setExcludeDialog({ open: false, item: null, reason: "" });
   };
 
   const handleBulkConfirm = () => {
@@ -530,7 +558,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => handleExclude(item.id)}
+                      onClick={() => openExcludeDialog(item)}
                       disabled={updateItemMutation.isPending || item.status === "excluded"}
                     >
                       <X className="h-4 w-4" />
@@ -703,6 +731,58 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
           </TableBody>
         </Table>
       </div>
+
+      <Dialog open={excludeDialog.open} onOpenChange={(open) => !open && setExcludeDialog({ open: false, item: null, reason: "" })}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Exclude Line Item</DialogTitle>
+            <DialogDescription>
+              Why are you excluding this item? This helps train the AI to recognize similar items in the future.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="bg-muted/50 p-3 rounded-md">
+              <p className="text-sm font-medium">"{excludeDialog.item?.rawText}"</p>
+              {excludeDialog.item?.amount && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Amount: {formatCurrency(excludeDialog.item.amount)}
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="exclude-reason">Reason (optional)</Label>
+              <Textarea
+                id="exclude-reason"
+                placeholder="e.g., This is a subtotal row, not an actual expense"
+                value={excludeDialog.reason}
+                onChange={(e) => setExcludeDialog((prev) => ({ ...prev, reason: e.target.value }))}
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground">
+                Adding a reason helps the AI learn to automatically exclude similar items.
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setExcludeDialog({ open: false, item: null, reason: "" })}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmExclude}
+              disabled={updateItemMutation.isPending}
+            >
+              {updateItemMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              Exclude Item
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
