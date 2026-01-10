@@ -161,6 +161,328 @@ router.post("/oms/:id/clone", async (req, res) => {
   }
 });
 
+// Create OM from template with modeling project data binding
+const createFromTemplateSchema = z.object({
+  projectId: z.string().uuid(),
+  templateId: z.string().uuid().optional(),
+  name: z.string().min(1),
+  docType: z.enum(['om', 'executive_summary', 'ic_memo', 'pitch_deck']),
+  organizationId: z.string().optional(),
+});
+
+router.post("/oms/create-from-template", async (req, res) => {
+  try {
+    const parsed = createFromTemplateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: fromZodError(parsed.error).toString() });
+    }
+
+    const { projectId, templateId, name, docType, organizationId } = parsed.data;
+
+    // Fetch modeling project data
+    const [project] = await db.select().from(modelingProjects).where(eq(modelingProjects.id, projectId));
+    if (!project) {
+      return res.status(404).json({ error: "Modeling project not found" });
+    }
+
+    // Create base OM
+    const om = await omStorage.createOm({
+      projectId,
+      name,
+      docType,
+      status: 'draft',
+      organizationId: organizationId || project.orgId || undefined,
+      modelingProjectId: projectId,
+    });
+
+    // If a template is specified, apply it with data binding
+    if (templateId) {
+      const template = await omStorage.getTemplateById(templateId);
+      if (template && template.templateData) {
+        const templateData = template.templateData as any;
+        
+        // Create pages and blocks from template
+        if (templateData.pages && Array.isArray(templateData.pages)) {
+          for (let pageIndex = 0; pageIndex < templateData.pages.length; pageIndex++) {
+            const pageTemplate = templateData.pages[pageIndex];
+            
+            // Create page
+            const page = await omStorage.createPage({
+              omId: om.id,
+              name: pageTemplate.title || `Page ${pageIndex + 1}`,
+              order: pageTemplate.sortOrder || pageIndex,
+              pageSize: 'letter',
+              orientation: 'portrait',
+              width: 612,
+              height: 792,
+              content: { backgroundColor: '#ffffff' },
+            });
+
+            // Create blocks with data binding
+            if (pageTemplate.blocks && Array.isArray(pageTemplate.blocks)) {
+              for (let blockIndex = 0; blockIndex < pageTemplate.blocks.length; blockIndex++) {
+                const blockTemplate = pageTemplate.blocks[blockIndex];
+                const blockContent = resolveBlockContent(blockTemplate, project);
+                
+                await omStorage.createBlock({
+                  pageId: page.id,
+                  blockType: blockTemplate.type,
+                  order: blockIndex,
+                  content: blockContent,
+                  config: {
+                    position: { x: 50, y: 50 + blockIndex * 120, width: 500, height: 100, zIndex: blockIndex },
+                    binding: blockTemplate.config?.binding,
+                  },
+                  dataBinding: blockTemplate.config?.binding ? { field: blockTemplate.config.binding, source: 'modeling' } : null,
+                });
+              }
+            }
+          }
+        }
+      }
+    } else {
+      // No template - create default page with KPI block populated from project data
+      const page = await omStorage.createPage({
+        omId: om.id,
+        name: 'Executive Summary',
+        order: 0,
+        pageSize: 'letter',
+        orientation: 'portrait',
+        width: 612,
+        height: 792,
+        content: { backgroundColor: '#ffffff' },
+      });
+
+      // Add hero KPI block with project data
+      const assumptions = (project.assumptions as any) || {};
+      const purchasePrice = assumptions.purchasePrice || 0;
+      const slipCount = assumptions.slipCount || project.slipCount || 0;
+      
+      await omStorage.createBlock({
+        pageId: page.id,
+        blockType: 'heroKpiGrid',
+        order: 0,
+        content: {
+          items: [
+            { label: 'Purchase Price', value: formatCurrencyOM(purchasePrice), trend: 'up' },
+            { label: 'Total Slips', value: formatNumberOM(slipCount), trend: 'neutral' },
+            { label: 'Property', value: project.name || 'Marina Property', trend: 'neutral' },
+            { label: 'Location', value: `${project.city || ''}, ${project.state || ''}`.trim() || 'TBD', trend: 'neutral' },
+          ],
+        },
+        config: { position: { x: 50, y: 50, width: 500, height: 120, zIndex: 0 } },
+        dataBinding: { source: 'modeling', projectId },
+      });
+
+      // Add executive summary text block
+      await omStorage.createBlock({
+        pageId: page.id,
+        blockType: 'text',
+        order: 1,
+        content: {
+          markdown: `# ${project.name || 'Investment Opportunity'}\n\n${project.description || 'This marina represents a compelling investment opportunity. Add your executive summary here.'}`,
+        },
+        config: { position: { x: 50, y: 180, width: 500, height: 150, zIndex: 1 } },
+        dataBinding: null,
+      });
+
+      // Add income distribution pie chart
+      const revenueBreakdown = assumptions.revenueBreakdown || [
+        { name: 'Wet Slips', value: 45 },
+        { name: 'Dry Storage', value: 20 },
+        { name: 'Fuel Sales', value: 15 },
+        { name: 'Ship Store', value: 10 },
+        { name: 'Other', value: 10 },
+      ];
+      await omStorage.createBlock({
+        pageId: page.id,
+        blockType: 'pie-chart',
+        order: 2,
+        content: {
+          data: revenueBreakdown,
+          title: 'Revenue Distribution',
+        },
+        config: { position: { x: 50, y: 340, width: 240, height: 200, zIndex: 2 } },
+        dataBinding: { source: 'modeling', field: 'revenueBreakdown', projectId },
+      });
+
+      // Add cash flow combo chart
+      const holdPeriod = assumptions.holdPeriod || 5;
+      const baseNoi = assumptions.noi || 100000;
+      const growthRate = assumptions.revenueGrowthRate || 0.03;
+      const chartData = [];
+      for (let year = 1; year <= holdPeriod; year++) {
+        const noi = baseNoi * Math.pow(1 + growthRate, year - 1);
+        const goi = noi * 1.4;
+        const cfbt = noi * 0.7;
+        const cfat = cfbt * 0.75;
+        chartData.push({ year, goi: Math.round(goi), noi: Math.round(noi), cfbt: Math.round(cfbt), cfat: Math.round(cfat) });
+      }
+      await omStorage.createBlock({
+        pageId: page.id,
+        blockType: 'combo-chart',
+        order: 3,
+        content: {
+          data: chartData,
+          title: 'Cash Flow Projections',
+          showCfat: true,
+        },
+        config: { position: { x: 310, y: 340, width: 280, height: 200, zIndex: 3 } },
+        dataBinding: { source: 'modeling', field: 'cashFlowProjections', projectId },
+      });
+    }
+
+    res.status(201).json(om);
+  } catch (error) {
+    console.error("Error creating OM from template:", error);
+    res.status(500).json({ error: "Failed to create OM from template" });
+  }
+});
+
+// Helper to resolve template placeholders with project data
+function resolveBlockContent(blockTemplate: any, project: any): any {
+  const config = blockTemplate.config || {};
+  const assumptions = (project.assumptions as any) || {};
+  
+  switch (blockTemplate.type) {
+    case 'text': {
+      let content = config.content || '';
+      // Replace placeholders
+      content = content.replace(/\{\{marinaName\}\}/g, project.name || 'Marina Property');
+      content = content.replace(/\{\{companyName\}\}/g, 'MarinaMatch');
+      content = content.replace(/\{\{location\}\}/g, `${project.city || ''}, ${project.state || ''}`.trim());
+      return { markdown: content, style: config.style };
+    }
+    
+    case 'kpi': {
+      const kpis = config.kpis || [];
+      const items = kpis.map((kpi: any) => {
+        const value = resolveBinding(kpi.binding, project, assumptions);
+        return {
+          label: kpi.label,
+          value: formatValueOM(value, kpi.format),
+          trend: 'neutral',
+        };
+      });
+      return { items };
+    }
+    
+    case 'heroKpiGrid': {
+      return {
+        items: [
+          { label: 'Purchase Price', value: formatCurrencyOM(assumptions.purchasePrice || 0), trend: 'up' },
+          { label: 'Total Slips', value: formatNumberOM(assumptions.slipCount || project.slipCount || 0), trend: 'neutral' },
+          { label: 'Cap Rate', value: formatPercentOM(assumptions.capRate || 0), trend: 'neutral' },
+          { label: 'NOI', value: formatCurrencyOM(assumptions.noi || 0), trend: 'up' },
+        ],
+      };
+    }
+    
+    case 'combo-chart': {
+      const holdPeriod = assumptions.holdPeriod || 5;
+      const baseNoi = assumptions.noi || 100000;
+      const growthRate = assumptions.revenueGrowthRate || 0.03;
+      
+      const chartData = [];
+      for (let year = 1; year <= holdPeriod; year++) {
+        const noi = baseNoi * Math.pow(1 + growthRate, year - 1);
+        const goi = noi * 1.4;
+        const cfbt = noi * 0.7;
+        const cfat = cfbt * 0.75;
+        chartData.push({ year, goi: Math.round(goi), noi: Math.round(noi), cfbt: Math.round(cfbt), cfat: Math.round(cfat) });
+      }
+      
+      return { data: chartData, title: config.title || 'GOI, NOI and CF Over Holding Period', showCfat: true };
+    }
+    
+    case 'pie-chart': {
+      const revenueBreakdown = assumptions.revenueBreakdown || [
+        { name: 'Wet Slips', value: 45 },
+        { name: 'Dry Storage', value: 20 },
+        { name: 'Fuel Sales', value: 15 },
+        { name: 'Ship Store', value: 10 },
+        { name: 'Other', value: 10 },
+      ];
+      return { data: revenueBreakdown, title: config.title || 'Revenue Distribution' };
+    }
+    
+    case 'area-chart': {
+      const holdPeriod = assumptions.holdPeriod || 5;
+      const purchasePrice = assumptions.purchasePrice || 1000000;
+      const ltvRatio = assumptions.ltvRatio || 0.65;
+      const loanAmount = purchasePrice * ltvRatio;
+      const appreciationRate = assumptions.appreciationRate || 0.03;
+      
+      const chartData = [];
+      for (let year = 0; year <= holdPeriod; year++) {
+        const loanBalance = loanAmount * (1 - (year / (holdPeriod * 4)));
+        const principalPaid = loanAmount - loanBalance;
+        const cashOutlay = purchasePrice * (1 - ltvRatio);
+        const appreciation = purchasePrice * Math.pow(1 + appreciationRate, year) - purchasePrice;
+        chartData.push({
+          year,
+          loanBalance: Math.round(loanBalance),
+          principalPaid: Math.round(principalPaid),
+          cashOutlay: Math.round(cashOutlay),
+          appreciation: Math.round(appreciation),
+        });
+      }
+      
+      return { data: chartData, title: config.title || 'Cumulative Equity vs Debt' };
+    }
+    
+    case 'chart': {
+      return { type: config.type || 'bar', title: config.title || 'Financial Chart', binding: config.binding };
+    }
+    
+    default:
+      return config;
+  }
+}
+
+function resolveBinding(binding: string, project: any, assumptions: any): any {
+  if (!binding) return null;
+  
+  const parts = binding.split('.');
+  if (parts[0] === 'underwriting') {
+    const key = parts[1];
+    return assumptions[key] ?? project[key] ?? null;
+  }
+  return project[binding] ?? null;
+}
+
+function formatCurrencyOM(value: number): string {
+  if (!value && value !== 0) return '$0';
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
+}
+
+function formatNumberOM(value: number): string {
+  if (!value && value !== 0) return '0';
+  return new Intl.NumberFormat('en-US').format(value);
+}
+
+function formatPercentOM(value: number): string {
+  if (!value && value !== 0) return '0.0%';
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function formatValueOM(value: any, format: string): string {
+  if (value === null || value === undefined) return '—';
+  
+  switch (format) {
+    case 'currency':
+      return formatCurrencyOM(value);
+    case 'number':
+      return formatNumberOM(value);
+    case 'percent':
+      return formatPercentOM(value);
+    case 'years':
+      return `${value} years`;
+    default:
+      return String(value);
+  }
+}
+
 // ============================================================================
 // Page Routes
 // ============================================================================

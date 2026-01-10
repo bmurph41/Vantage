@@ -46,13 +46,17 @@ export default function ProjectOms() {
   });
   
   const createOmMutation = useMutation({
-    mutationFn: async (data: { projectId: string; name: string; status: string; docType?: string }) => {
-      const res = await apiRequest('POST', '/api/om/oms', data);
+    mutationFn: async (data: { projectId: string; name: string; docType: string; templateId?: string }) => {
+      const res = await apiRequest('POST', '/api/om/oms/create-from-template', data);
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/om/oms/project', projectId] });
     },
+  });
+  
+  const { data: templates = [] } = useQuery<{ id: string; name: string; category: string }[]>({
+    queryKey: ['/api/om/templates'],
   });
 
   const cloneOmMutation = useMutation({
@@ -78,6 +82,8 @@ export default function ProjectOms() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newOmName, setNewOmName] = useState("");
   const [newOmDocType, setNewOmDocType] = useState<string>("om");
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+  const [useProjectData, setUseProjectData] = useState(true);
 
   const docTypeConfig: Record<string, { label: string; shortLabel: string; description: string; defaultName: string; icon: typeof FileText }> = {
     om: { label: "Offering Memorandum", shortLabel: "OM", description: "Full investment package for buyers", defaultName: "New Offering Memorandum", icon: FileText },
@@ -97,7 +103,6 @@ export default function ProjectOms() {
     
     // Validate title is required - show error if empty but still allow default
     if (!trimmedName) {
-      // Auto-fill with default name and show a brief toast
       setNewOmName(docTypeConfig[newOmDocType]?.defaultName || "New Document");
     }
     setNameError("");
@@ -107,13 +112,16 @@ export default function ProjectOms() {
         projectId,
         name: finalName,
         docType: newOmDocType,
-        status: "draft",
+        templateId: selectedTemplateId || undefined,
       });
       
       setIsCreateOpen(false);
       setNewOmName("");
       setNewOmDocType("om");
-      toast({ title: "Document Created", description: `${docTypeConfig[newOmDocType]?.label} created successfully.` });
+      setSelectedTemplateId("");
+      
+      const dataBindingMessage = useProjectData ? " Data from your modeling project has been pre-populated." : "";
+      toast({ title: "Document Created", description: `${docTypeConfig[newOmDocType]?.label} created successfully.${dataBindingMessage}` });
       
       if (newOm?.id) {
         setLocation(`/om/builder/${newOm.id}`);
@@ -230,6 +238,15 @@ export default function ProjectOms() {
                       {nameError && (
                         <p className="text-sm text-destructive">{nameError}</p>
                       )}
+                    </div>
+                    <div className="bg-muted/50 border rounded-lg p-3">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-primary" />
+                        <span className="text-sm font-medium">Auto-populate from Modeling Project</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Financial data, property details, and KPIs will be automatically populated from your modeling project.
+                      </p>
                     </div>
                   </div>
                   <DialogFooter>
