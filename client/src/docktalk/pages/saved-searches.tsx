@@ -683,13 +683,13 @@ export default function SavedSearchesPage() {
                     <CardDescription className="mt-2">
                       Keywords: {search.queryText}
                     </CardDescription>
-                    <div className="flex items-center gap-2 mt-2">
-                      {search.categories.map((category, idx) => (
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      {(search.categories || []).map((category, idx) => (
                         <Badge key={idx} variant="secondary" data-testid={`badge-category-${search.id}-${idx}`}>
                           {category}
                         </Badge>
                       ))}
-                      {search.entities.map((entity, idx) => (
+                      {(search.entities || []).map((entity, idx) => (
                         <Badge key={idx} variant="outline" data-testid={`badge-entity-${search.id}-${idx}`}>
                           {entity}
                         </Badge>
@@ -709,8 +709,8 @@ export default function SavedSearchesPage() {
                           const normalizedData = normalizeSavedSearchData({
                             emailAlerts: checked,
                             alertFrequency: checked ? (search.alertFrequency || 'daily') : null,
-                            categories: search.categories,
-                            entities: search.entities,
+                            categories: search.categories || [],
+                            entities: search.entities || [],
                           });
                           updateMutation.mutate({
                             id: search.id,
