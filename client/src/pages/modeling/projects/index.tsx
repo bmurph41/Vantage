@@ -220,7 +220,7 @@ export default function ModelingProjectsPage() {
                       <TableHead className="text-right">Year 1 Cap Rate</TableHead>
                       <TableHead className="text-right">Size (Units)</TableHead>
                       <TableHead className="text-right">EBITDA</TableHead>
-                      <TableHead>Outcome</TableHead>
+                      <TableHead className="text-center">Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -250,10 +250,10 @@ export default function ModelingProjectsPage() {
                         <TableCell className="text-right" data-testid={`text-ebitda-${project.id}`}>
                           {formatCurrency(project.ebitda)}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-center">
                           <span
                             className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getOutcomeBadgeColor(project.dealOutcome)}`}
-                            data-testid={`badge-outcome-${project.id}`}
+                            data-testid={`badge-status-${project.id}`}
                           >
                             {formatOutcome(project.dealOutcome)}
                           </span>

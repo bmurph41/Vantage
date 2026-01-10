@@ -216,8 +216,8 @@ export default function WorkspaceInputs({ projectId }: WorkspaceInputsProps) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="annual">Annual (Standard)</SelectItem>
-                  <SelectItem value="monthly">Monthly (PE-Grade)</SelectItem>
+                  <SelectItem value="annual">Annual</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
@@ -238,11 +238,20 @@ export default function WorkspaceInputs({ projectId }: WorkspaceInputsProps) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex items-center justify-between">
               <Badge variant="outline" className="gap-1">
                 <Sun className="h-3 w-3" />
                 {getSeasonLabel()}
               </Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSeasonMonths([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])}
+                data-testid="button-year-round"
+              >
+                <Calendar className="h-3 w-3 mr-1" />
+                Year-Round
+              </Button>
             </div>
             <div className="grid grid-cols-4 gap-2">
               {months.map((month) => (
@@ -279,36 +288,23 @@ export default function WorkspaceInputs({ projectId }: WorkspaceInputsProps) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {departments.map((dept) => (
               <div
                 key={dept.id}
-                className="flex items-center justify-between p-4 rounded-lg border"
+                className="flex items-center justify-between p-3 rounded-lg border bg-muted/30"
                 data-testid={`department-${dept.id}`}
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-7 h-7 rounded-full bg-background flex items-center justify-center flex-shrink-0">
                     {dept.icon}
                   </div>
-                  <div>
-                    <div className="font-medium">{dept.name}</div>
-                    <div className="text-sm text-muted-foreground">{dept.description}</div>
-                  </div>
+                  <span className="font-medium text-sm truncate">{dept.name}</span>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-sm text-muted-foreground">
-                    {dept.isYearRound ? (
-                      <Badge variant="outline" className="gap-1">
-                        <Calendar className="h-3 w-3" />
-                        Year-Round
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary" className="gap-1">
-                        <Sun className="h-3 w-3" />
-                        Seasonal
-                      </Badge>
-                    )}
-                  </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-xs text-muted-foreground">
+                    {dept.isYearRound ? 'Year-Round' : 'Seasonal'}
+                  </span>
                   <Switch
                     checked={dept.isYearRound}
                     onCheckedChange={() => toggleDepartmentYearRound(dept.id)}

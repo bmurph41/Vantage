@@ -222,8 +222,8 @@ export default function ProjectWorkspace() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <div className="overflow-x-auto">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <div className="overflow-x-auto mb-4">
           <TabsList className="inline-flex min-w-full lg:min-w-0" data-testid="tabs-workspace">
             <TabsTrigger value="overview" className="gap-2" data-testid="tab-overview">
               <Home className="h-4 w-4" />
@@ -233,9 +233,9 @@ export default function ProjectWorkspace() {
               <Settings2 className="h-4 w-4" />
               <span className="hidden sm:inline">Inputs</span>
             </TabsTrigger>
-            <TabsTrigger value="cases" className="gap-2" data-testid="tab-cases">
+            <TabsTrigger value="cases" className="gap-2" data-testid="tab-scenarios">
               <Layers className="h-4 w-4" />
-              <span className="hidden sm:inline">Cases</span>
+              <span className="hidden sm:inline">Scenario Analysis</span>
             </TabsTrigger>
             <TabsTrigger value="uploads" className="gap-2" data-testid="tab-uploads">
               <Upload className="h-4 w-4" />

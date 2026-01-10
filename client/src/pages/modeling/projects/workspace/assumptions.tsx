@@ -842,33 +842,31 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Revenue Growth Rates</CardTitle>
-              <CardDescription>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Revenue Growth Rates</CardTitle>
+              <CardDescription className="text-xs">
                 Annual percentage increase applied to trailing 12-month actuals
               </CardDescription>
             </CardHeader>
-            <CardContent className="pt-4">
-              <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+            <CardContent className="pt-0">
+              <div className="grid gap-x-3 gap-y-2 grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {revenueCategories.map((category) => (
-                  <div key={category.id} className="space-y-1">
-                    <Label htmlFor={`growth-${category.id}`} className="flex items-center gap-1.5 text-sm">
+                  <div key={category.id} className="flex items-center gap-2">
+                    <Label htmlFor={`growth-${category.id}`} className="flex items-center gap-1 text-xs whitespace-nowrap min-w-0 flex-1">
                       {category.icon}
-                      {category.name}
+                      <span className="truncate">{category.name}</span>
                     </Label>
-                    <div className="relative">
+                    <div className="relative w-16">
                       <Input
                         id={`growth-${category.id}`}
                         type="number"
                         step="0.1"
                         value={growthRates[category.id] ?? 3}
                         onChange={(e) => updateGrowthRate(category.id, e.target.value)}
-                        className="pr-7 h-9"
+                        className="h-7 text-xs text-right pr-5 px-2"
                         data-testid={`input-growth-${category.id}`}
                       />
-                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                        %
-                      </span>
+                      <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">%</span>
                     </div>
                   </div>
                 ))}
@@ -877,30 +875,30 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Expense Growth Rates</CardTitle>
-              <CardDescription>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Expense Growth Rates</CardTitle>
+              <CardDescription className="text-xs">
                 Annual percentage increase for operating expenses
               </CardDescription>
             </CardHeader>
-            <CardContent className="pt-4">
-              <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+            <CardContent className="pt-0">
+              <div className="grid gap-x-3 gap-y-2 grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {expenseCategories.map((category) => (
-                  <div key={category.id} className="space-y-1">
-                    <Label htmlFor={`expense-${category.id}`} className="text-sm">{category.name}</Label>
-                    <div className="relative">
+                  <div key={category.id} className="flex items-center gap-2">
+                    <Label htmlFor={`expense-${category.id}`} className="text-xs whitespace-nowrap min-w-0 flex-1 truncate">
+                      {category.name}
+                    </Label>
+                    <div className="relative w-16">
                       <Input
                         id={`expense-${category.id}`}
                         type="number"
                         step="0.1"
                         value={expenseGrowth[category.id] ?? 2}
                         onChange={(e) => updateExpenseGrowth(category.id, e.target.value)}
-                        className="pr-7 h-9"
+                        className="h-7 text-xs text-right pr-5 px-2"
                         data-testid={`input-expense-${category.id}`}
                       />
-                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                        %
-                      </span>
+                      <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">%</span>
                     </div>
                   </div>
                 ))}

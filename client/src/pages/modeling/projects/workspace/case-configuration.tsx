@@ -167,7 +167,7 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
       setNewCaseColor('blue');
       setNewCaseDescription('');
       setActiveCaseId(newCase.id);
-      toast({ title: 'Case Created', description: `"${newCase.name}" has been created.` });
+      toast({ title: 'Scenario Created', description: `"${newCase.name}" has been created.` });
     },
     onError: (error: any) => {
       toast({ title: 'Error', description: error.message || 'Failed to create case.', variant: 'destructive' });
@@ -182,7 +182,7 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'cases'] });
-      toast({ title: 'Case Updated', description: 'Changes have been saved.' });
+      toast({ title: 'Scenario Updated', description: 'Changes have been saved.' });
     },
     onError: (error: any) => {
       toast({ title: 'Error', description: error.message || 'Failed to update case.', variant: 'destructive' });
@@ -201,7 +201,7 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
         const remaining = cases.filter(c => c.id !== caseToDelete?.id);
         setActiveCaseId(remaining[0]?.id || null);
       }
-      toast({ title: 'Case Deleted', description: 'The case has been removed.' });
+      toast({ title: 'Scenario Deleted', description: 'The scenario has been removed.' });
     },
     onError: (error: any) => {
       toast({ title: 'Error', description: error.message || 'Failed to delete case.', variant: 'destructive' });
@@ -215,7 +215,7 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'cases'] });
-      toast({ title: 'Default Case Updated', description: 'This case is now the default.' });
+      toast({ title: 'Default Scenario Updated', description: 'This scenario is now the default.' });
     },
     onError: (error: any) => {
       toast({ title: 'Error', description: error.message || 'Failed to set default.', variant: 'destructive' });
@@ -230,7 +230,7 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
     onSuccess: (clonedCase) => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'cases'] });
       setActiveCaseId(clonedCase.id);
-      toast({ title: 'Case Cloned', description: `Created "${clonedCase.name}".` });
+      toast({ title: 'Scenario Cloned', description: `Created "${clonedCase.name}".` });
     },
     onError: (error: any) => {
       toast({ title: 'Error', description: error.message || 'Failed to clone case.', variant: 'destructive' });
@@ -299,7 +299,7 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
         <div>
           <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
             <Settings2 className="h-6 w-6" />
-            Case Configuration
+            Scenario Analysis
           </h2>
           <p className="text-muted-foreground">
             Create and customize modeling scenarios with unique assumptions and lease-up schedules.
@@ -308,27 +308,27 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
         <div className="flex items-center gap-2">
           <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
             <DialogTrigger asChild>
-              <Button data-testid="button-add-case">
+              <Button data-testid="button-add-scenario">
                 <Plus className="h-4 w-4 mr-2" />
-                Add Case
+                Add Scenario
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Create New Case</DialogTitle>
+                <DialogTitle>Create New Scenario</DialogTitle>
                 <DialogDescription>
                   Add a new modeling scenario with custom assumptions.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="new-case-name">Case Name</Label>
+                  <Label htmlFor="new-case-name">Scenario Name</Label>
                   <Input
                     id="new-case-name"
                     value={newCaseName}
                     onChange={(e) => setNewCaseName(e.target.value)}
                     placeholder="e.g., Optimistic Scenario"
-                    data-testid="input-new-case-name"
+                    data-testid="input-new-scenario-name"
                   />
                 </div>
                 <div className="space-y-2">

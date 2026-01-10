@@ -500,7 +500,27 @@ export default function WorkspaceHistoricalPL({ projectId }: WorkspaceHistorical
                 Click category rows to expand/collapse line items
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              <Select value={selectedYear} onValueChange={setSelectedYear}>
+                <SelectTrigger className="w-24 h-8" data-testid="select-year-detail">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="2022">2022</SelectItem>
+                  <SelectItem value="2023">2023</SelectItem>
+                  <SelectItem value="2024">2024</SelectItem>
+                  <SelectItem value="2025">2025</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="sm" onClick={() => setShowSyncDialog(true)}>
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                Sync
+              </Button>
+              <Button variant="outline" size="sm">
+                <Download className="h-3.5 w-3.5 mr-1.5" />
+                Export
+              </Button>
+              <div className="h-4 w-px bg-border" />
               <Badge variant="outline" className="gap-1">
                 <div className="w-2 h-2 rounded-full bg-blue-500" />
                 In-Season
