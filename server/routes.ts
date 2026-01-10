@@ -6968,8 +6968,8 @@ Current context: Project ${req.params.projectId}`;
       if (!mode || !['replace', 'add_new'].includes(mode)) {
         return res.status(400).json({ error: "Invalid mode. Must be 'replace' or 'add_new'" });
       }
-      // Note: The storage.acceptPendingCompany signature is (id, orgId, userId)
-      const company = await storage.acceptPendingCompany(req.params.id, req.user.orgId, req.user.id);
+      // Storage signature: acceptPendingCompany(id, userId, mode)
+      const company = await storage.acceptPendingCompany(req.params.id, req.user.id, mode);
       res.json(company);
     } catch (error: any) {
       console.error("Failed to accept pending company:", error);
@@ -12855,7 +12855,11 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const { id } = req.params;
 
-      const property = await storage.acceptPendingProperty(id, orgId, userId);
+      const { mode = 'add_new' } = req.body;
+      if (mode && !['replace', 'add_new'].includes(mode)) {
+        return res.status(400).json({ error: "Invalid mode. Must be 'replace' or 'add_new'" });
+      }
+      const property = await storage.acceptPendingProperty(id, userId, mode);
       if (!property) {
         return res.status(404).json({ message: "Pending property not found or already processed" });
       }
@@ -13288,7 +13292,11 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const { id } = req.params;
 
-      const contact = await storage.acceptPendingContact(id, orgId, userId);
+      const { mode = 'add_new' } = req.body;
+      if (mode && !['replace', 'add_new'].includes(mode)) {
+        return res.status(400).json({ error: "Invalid mode. Must be 'replace' or 'add_new'" });
+      }
+      const contact = await storage.acceptPendingContact(id, userId, mode);
       if (!contact) {
         return res.status(404).json({ message: "Pending contact not found or already processed" });
       }
@@ -13430,7 +13438,11 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const { id } = req.params;
 
-      const company = await storage.acceptPendingCompany(id, orgId, userId);
+      const { mode = 'add_new' } = req.body;
+      if (mode && !['replace', 'add_new'].includes(mode)) {
+        return res.status(400).json({ error: "Invalid mode. Must be 'replace' or 'add_new'" });
+      }
+      const company = await storage.acceptPendingCompany(id, userId, mode);
       if (!company) {
         return res.status(404).json({ message: "Pending company not found or already processed" });
       }
