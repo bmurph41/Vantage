@@ -39,7 +39,9 @@ const VALID_CATEGORIES = [
   'People Moves',
   'Company Earnings',
   'Awards',
-  'Business Planning'
+  'Business Planning',
+  'International',
+  'Interview'
 ] as const;
 
 // Extend Express session types

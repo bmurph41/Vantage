@@ -97,7 +97,9 @@ const FALLBACK_CATEGORIES = [
   "People Moves",
   "Company Earnings",
   "Awards",
-  "Business Planning"
+  "Business Planning",
+  "International",
+  "Interview"
 ];
 
 const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
@@ -120,7 +122,9 @@ const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
   "People Moves": { bg: "bg-teal-100", text: "text-teal-700" },
   "Company Earnings": { bg: "bg-lime-100", text: "text-lime-700" },
   "Awards": { bg: "bg-amber-100", text: "text-amber-700" },
-  "Business Planning": { bg: "bg-violet-100", text: "text-violet-700" }
+  "Business Planning": { bg: "bg-violet-100", text: "text-violet-700" },
+  "International": { bg: "bg-sky-100", text: "text-sky-700" },
+  "Interview": { bg: "bg-orange-100", text: "text-orange-800" }
 };
 
 const PAGE_SIZE = 25;
