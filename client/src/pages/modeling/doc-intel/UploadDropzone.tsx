@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Upload, FileSpreadsheet, X, AlertCircle, Loader2, CheckCircle2, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { DocIntelUpload } from "@shared/schema";
 
 function getCsrfToken(): string {
@@ -29,19 +30,26 @@ interface UploadDropzoneProps {
   onUploadComplete: (upload: DocIntelUpload) => void;
 }
 
-type DocType = "pnl" | "rent_roll" | "balance_sheet" | "rate_sheet" | "invoice" | "other";
+interface CustomDocumentType {
+  id: number;
+  name: string;
+  orgId: number;
+  sortOrder: number;
+  createdAt: string;
+}
 
 interface StagedFile {
   id: string;
   file: File;
-  docType: DocType;
+  docType: string;
+  customTypeName: string;
   year: string;
   status: "pending" | "uploading" | "complete" | "error";
   progress: number;
   errorMessage?: string;
 }
 
-const DOC_TYPE_OPTIONS = [
+const BUILT_IN_DOC_TYPES = [
   { value: "pnl", label: "P&L Statement" },
   { value: "rent_roll", label: "Rent Roll" },
   { value: "balance_sheet", label: "Balance Sheet" },
@@ -50,7 +58,7 @@ const DOC_TYPE_OPTIONS = [
   { value: "other", label: "Other" },
 ];
 
-function guessDocType(filename: string): DocType {
+function guessDocType(filename: string): string {
   const lower = filename.toLowerCase();
   if (lower.includes("p&l") || lower.includes("pnl") || lower.includes("profit") || lower.includes("income")) {
     return "pnl";
@@ -81,6 +89,28 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
+  const { data: customTypes = [] } = useQuery<CustomDocumentType[]>({
+    queryKey: ['/api/doc-intel/custom-document-types'],
+  });
+
+  const createCustomTypeMutation = useMutation({
+    mutationFn: async (name: string) => {
+      return apiRequest('/api/doc-intel/custom-document-types', {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/doc-intel/custom-document-types'] });
+    },
+  });
+
+  const allDocTypeOptions = [
+    ...BUILT_IN_DOC_TYPES,
+    ...customTypes.map((ct) => ({ value: `custom_${ct.id}`, label: ct.name })),
+  ];
+
   const updateStagedFile = (id: string, updates: Partial<StagedFile>) => {
     setStagedFiles((prev) => prev.map((f) => (f.id === id ? { ...f, ...updates } : f)));
   };
@@ -89,14 +119,36 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
     setStagedFiles((prev) => prev.filter((f) => f.id !== id));
   };
 
+  const saveCustomTypeIfNeeded = async (staged: StagedFile): Promise<string> => {
+    if (staged.docType === "other" && staged.customTypeName.trim()) {
+      const existingCustom = customTypes.find(
+        (ct) => ct.name.toLowerCase() === staged.customTypeName.trim().toLowerCase()
+      );
+      if (existingCustom) {
+        return `custom_${existingCustom.id}`;
+      }
+      try {
+        const newType = await createCustomTypeMutation.mutateAsync(staged.customTypeName.trim());
+        return `custom_${newType.id}`;
+      } catch {
+        return staged.customTypeName.trim();
+      }
+    }
+    return staged.docType;
+  };
+
   const uploadSingleFile = async (staged: StagedFile): Promise<DocIntelUpload | null> => {
     try {
-      updateStagedFile(staged.id, { status: "uploading", progress: 30 });
+      updateStagedFile(staged.id, { status: "uploading", progress: 20 });
+
+      const finalDocType = await saveCustomTypeIfNeeded(staged);
+      
+      updateStagedFile(staged.id, { progress: 40 });
       
       const csrfToken = await ensureCsrfToken();
       const formData = new FormData();
       formData.append("file", staged.file);
-      formData.append("docType", staged.docType);
+      formData.append("docType", finalDocType);
       formData.append("year", staged.year);
 
       const headers: Record<string, string> = {};
@@ -137,11 +189,16 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
     if (pendingFiles.length === 0) return;
 
     setIsUploading(true);
+    let successCount = 0;
+    let errorCount = 0;
 
     for (const staged of pendingFiles) {
       const upload = await uploadSingleFile(staged);
       if (upload) {
         onUploadComplete(upload);
+        successCount++;
+      } else {
+        errorCount++;
       }
     }
 
@@ -150,9 +207,6 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
     setTimeout(() => {
       setStagedFiles((prev) => prev.filter((f) => f.status !== "complete"));
     }, 2000);
-
-    const successCount = stagedFiles.filter((f) => f.status === "complete").length;
-    const errorCount = stagedFiles.filter((f) => f.status === "error").length;
     
     if (successCount > 0) {
       toast({ 
@@ -174,6 +228,7 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
       id: crypto.randomUUID(),
       file,
       docType: guessDocType(file.name),
+      customTypeName: "",
       year: new Date().getFullYear().toString(),
       status: "pending" as const,
       progress: 0,
@@ -295,43 +350,55 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
                 </div>
 
                 {staged.status === "pending" && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-xs">Type</Label>
-                      <Select
-                        value={staged.docType}
-                        onValueChange={(v) => updateStagedFile(staged.id, { docType: v as DocType })}
-                      >
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {DOC_TYPE_OPTIONS.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-xs">Type</Label>
+                        <Select
+                          value={staged.docType}
+                          onValueChange={(v) => updateStagedFile(staged.id, { docType: v, customTypeName: "" })}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {allDocTypeOptions.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Year</Label>
+                        <Select
+                          value={staged.year}
+                          onValueChange={(v) => updateStagedFile(staged.id, { year: v })}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {yearOptions.map((y) => (
+                              <SelectItem key={y} value={y}>
+                                {y}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                    <div>
-                      <Label className="text-xs">Year</Label>
-                      <Select
-                        value={staged.year}
-                        onValueChange={(v) => updateStagedFile(staged.id, { year: v })}
-                      >
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {yearOptions.map((y) => (
-                            <SelectItem key={y} value={y}>
-                              {y}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {staged.docType === "other" && (
+                      <div>
+                        <Input
+                          className="h-8 text-xs"
+                          placeholder="Document Type"
+                          value={staged.customTypeName}
+                          onChange={(e) => updateStagedFile(staged.id, { customTypeName: e.target.value })}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
 
