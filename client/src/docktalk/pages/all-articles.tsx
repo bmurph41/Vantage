@@ -378,12 +378,12 @@ export default function AllArticles() {
             />
 
             {articlesLoading ? (
-              <div className="space-y-8 mt-6">
-                <div className="w-full h-[500px] bg-gray-200 dark:bg-gray-800 rounded-xl animate-pulse" />
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  <div className="lg:col-span-2 space-y-6">
-                    {Array.from({ length: 3 }).map((_, i) => (
-                      <div key={i} className="h-80 bg-gray-200 dark:bg-gray-800 rounded-lg animate-pulse" />
+              <div className="space-y-4 mt-6">
+                <div className="w-full h-48 bg-gray-200 dark:bg-gray-800 rounded-xl animate-pulse" />
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-2 space-y-3">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div key={i} className="h-32 bg-gray-200 dark:bg-gray-800 rounded-lg animate-pulse" />
                     ))}
                   </div>
                   <div className="h-96 bg-gray-200 dark:bg-gray-800 rounded-lg animate-pulse" />
@@ -396,16 +396,16 @@ export default function AllArticles() {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
                 {/* Main Content */}
-                <div className="lg:col-span-2 space-y-8">
+                <div className="lg:col-span-2 space-y-4">
                   {/* Hero Article */}
                   {heroArticle && (
                     <HeroArticle article={heroArticle} data-testid="hero-article" />
                   )}
 
                   {/* Regular Articles */}
-                  <div className="space-y-6">
+                  <div className="space-y-3">
                     {regularArticles.map((article) => (
                       <ArticleCard 
                         key={article.id} 
