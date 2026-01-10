@@ -42,7 +42,34 @@ interface ParsedLineItem {
   extractedDate?: string;
   sourcePage?: number;
   sourceRow: number;
+  periodKey?: string;
+  columnIndex?: number;
 }
+
+interface MonthHeader {
+  columnIndex: number;
+  month: number;
+  year: number;
+  periodKey: string;
+  rawLabel: string;
+}
+
+const MONTH_PATTERNS: Record<string, number> = {
+  'jan': 1, 'january': 1,
+  'feb': 2, 'february': 2,
+  'mar': 3, 'march': 3,
+  'apr': 4, 'april': 4,
+  'may': 5,
+  'jun': 6, 'june': 6,
+  'jul': 7, 'july': 7,
+  'aug': 8, 'august': 8,
+  'sep': 9, 'sept': 9, 'september': 9,
+  'oct': 10, 'october': 10,
+  'nov': 11, 'november': 11,
+  'dec': 12, 'december': 12,
+};
+
+const TOTAL_COLUMN_PATTERNS = /^(total|ytd|year[\s-]?to[\s-]?date|annual|full[\s-]?year|fy|grand[\s-]?total)$/i;
 
 interface ParsedRentRollEntry {
   unitNumber: string;
@@ -480,52 +507,240 @@ class DocIntelService {
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }) as any[][];
 
+      if (jsonData.length === 0) continue;
+
+      const monthHeaders = this.detectMonthHeaders(jsonData);
+      const isMultiColumnPnl = monthHeaders.length >= 3;
+      let headerRowIndex = -1;
+
+      if (isMultiColumnPnl) {
+        headerRowIndex = this.findHeaderRowIndex(jsonData, monthHeaders);
+        console.log(`[DocIntelService] Detected multi-column P&L with ${monthHeaders.length} month columns, header at row ${headerRowIndex + 1}`);
+      }
+
       for (let rowIndex = 0; rowIndex < jsonData.length; rowIndex++) {
         const row = jsonData[rowIndex];
         globalRow++;
 
         if (!row || row.length === 0) continue;
 
-        const textColumns: string[] = [];
-        let amount: number | null = null;
-        let dateValue: string | undefined;
-
-        for (const cell of row) {
-          if (cell === null || cell === undefined || cell === '') continue;
-
-          if (typeof cell === 'number') {
-            if (amount === null) {
-              amount = cell;
-            }
-          } else if (typeof cell === 'string') {
-            const trimmed = sanitizeText(cell);
-            
-            const numericValue = this.parseNumericString(trimmed);
-            if (numericValue !== null && amount === null) {
-              amount = numericValue;
-            } else if (this.isDateString(trimmed)) {
-              dateValue = trimmed;
-            } else if (trimmed.length > 0 && !this.isNumericOnly(trimmed)) {
-              textColumns.push(trimmed);
-            }
-          }
+        if (isMultiColumnPnl && rowIndex === headerRowIndex) {
+          console.log(`[DocIntelService] Skipping header row ${rowIndex + 1}`);
+          continue;
         }
 
-        const rawText = sanitizeText(textColumns.join(' '));
-        
-        if (rawText.length > 2 || amount !== null) {
-          items.push({
-            rawText: rawText || '(no description)',
-            amount,
-            extractedDate: dateValue,
-            sourcePage: sheetIndex + 1,
-            sourceRow: globalRow,
-          });
+        if (isMultiColumnPnl) {
+          const lineItemName = this.extractLineItemName(row);
+          
+          if (!lineItemName || this.isHeaderOrSubtotalRow(lineItemName)) {
+            continue;
+          }
+
+          for (const header of monthHeaders) {
+            const cellValue = row[header.columnIndex];
+            const amount = this.extractCellAmount(cellValue);
+            
+            if (amount !== null && amount !== 0) {
+              items.push({
+                rawText: lineItemName,
+                amount,
+                sourcePage: sheetIndex + 1,
+                sourceRow: globalRow,
+                periodKey: header.periodKey,
+                columnIndex: header.columnIndex,
+              });
+            }
+          }
+        } else {
+          const textColumns: string[] = [];
+          let amount: number | null = null;
+          let dateValue: string | undefined;
+
+          for (const cell of row) {
+            if (cell === null || cell === undefined || cell === '') continue;
+
+            if (typeof cell === 'number') {
+              if (amount === null) {
+                amount = cell;
+              }
+            } else if (typeof cell === 'string') {
+              const trimmed = sanitizeText(cell);
+              
+              const numericValue = this.parseNumericString(trimmed);
+              if (numericValue !== null && amount === null) {
+                amount = numericValue;
+              } else if (this.isDateString(trimmed)) {
+                dateValue = trimmed;
+              } else if (trimmed.length > 0 && !this.isNumericOnly(trimmed)) {
+                textColumns.push(trimmed);
+              }
+            }
+          }
+
+          const rawText = sanitizeText(textColumns.join(' '));
+          
+          if (rawText.length > 2 || amount !== null) {
+            items.push({
+              rawText: rawText || '(no description)',
+              amount,
+              extractedDate: dateValue,
+              sourcePage: sheetIndex + 1,
+              sourceRow: globalRow,
+            });
+          }
         }
       }
     }
 
     return items;
+  }
+
+  private detectMonthHeaders(jsonData: any[][]): MonthHeader[] {
+    const headers: MonthHeader[] = [];
+    
+    for (let rowIdx = 0; rowIdx < Math.min(5, jsonData.length); rowIdx++) {
+      const row = jsonData[rowIdx];
+      if (!row) continue;
+      
+      const rowHeaders: MonthHeader[] = [];
+      let defaultYear = new Date().getFullYear();
+      
+      for (let colIdx = 0; colIdx < row.length; colIdx++) {
+        const cell = row[colIdx];
+        if (!cell) continue;
+        
+        const cellStr = String(cell).trim().toLowerCase();
+        
+        if (TOTAL_COLUMN_PATTERNS.test(cellStr)) {
+          continue;
+        }
+        
+        const monthHeader = this.parseMonthHeader(cellStr, colIdx, defaultYear);
+        if (monthHeader) {
+          rowHeaders.push(monthHeader);
+          if (monthHeader.year !== defaultYear) {
+            defaultYear = monthHeader.year;
+          }
+        }
+      }
+      
+      if (rowHeaders.length >= 3) {
+        return rowHeaders;
+      }
+    }
+    
+    return headers;
+  }
+
+  private parseMonthHeader(cellStr: string, colIdx: number, defaultYear: number): MonthHeader | null {
+    const patterns = [
+      /^(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s\-']*('?\d{2}|\d{4})?$/i,
+      /^(\d{1,2})[\/-](\d{2}|\d{4})$/,
+      /^(january|february|march|april|may|june|july|august|september|october|november|december)[\s\-']*(\d{2}|\d{4})?$/i,
+    ];
+    
+    for (const pattern of patterns) {
+      const match = cellStr.match(pattern);
+      if (match) {
+        let month: number | undefined;
+        let year = defaultYear;
+        
+        const monthPart = match[1].toLowerCase();
+        month = MONTH_PATTERNS[monthPart];
+        
+        if (month === undefined) {
+          const monthNum = parseInt(monthPart, 10);
+          if (monthNum >= 1 && monthNum <= 12) {
+            month = monthNum;
+          }
+        }
+        
+        if (month === undefined) continue;
+        
+        if (match[2]) {
+          const yearPart = match[2].replace(/'/g, '');
+          year = parseInt(yearPart, 10);
+          if (year < 100) {
+            year += year > 50 ? 1900 : 2000;
+          }
+        }
+        
+        const periodKey = `${year}-${String(month).padStart(2, '0')}`;
+        
+        return {
+          columnIndex: colIdx,
+          month,
+          year,
+          periodKey,
+          rawLabel: cellStr,
+        };
+      }
+    }
+    
+    return null;
+  }
+
+  private findHeaderRowIndex(jsonData: any[][], monthHeaders: MonthHeader[]): number {
+    if (monthHeaders.length === 0) return -1;
+    
+    const firstHeaderCol = monthHeaders[0].columnIndex;
+    
+    for (let rowIdx = 0; rowIdx < Math.min(5, jsonData.length); rowIdx++) {
+      const row = jsonData[rowIdx];
+      if (!row || !row[firstHeaderCol]) continue;
+      
+      const cellStr = String(row[firstHeaderCol]).trim().toLowerCase();
+      if (this.parseMonthHeader(cellStr, firstHeaderCol, 2000)) {
+        return rowIdx;
+      }
+    }
+    
+    return 0;
+  }
+
+  private extractLineItemName(row: any[]): string {
+    for (let i = 0; i < Math.min(3, row.length); i++) {
+      const cell = row[i];
+      if (cell === null || cell === undefined || cell === '') continue;
+      
+      if (typeof cell === 'string') {
+        const trimmed = sanitizeText(cell);
+        if (trimmed.length > 1 && !this.isNumericOnly(trimmed)) {
+          return trimmed;
+        }
+      }
+    }
+    return '';
+  }
+
+  private extractCellAmount(cell: any): number | null {
+    if (cell === null || cell === undefined || cell === '') return null;
+    
+    if (typeof cell === 'number') {
+      return cell;
+    }
+    
+    if (typeof cell === 'string') {
+      return this.parseNumericString(cell);
+    }
+    
+    return null;
+  }
+
+  private isHeaderOrSubtotalRow(text: string): boolean {
+    const patterns = [
+      /^(total|subtotal|net|gross|summary|header|income|expense|revenue|cogs|cost\s*of\s*(goods\s*)?sold)s?$/i,
+      /^(ordinary\s*income|operating\s*expense|other\s*income|other\s*expense)s?$/i,
+      /^\s*$/,
+    ];
+    
+    const lowerText = text.toLowerCase().trim();
+    
+    if (patterns.some(p => p.test(lowerText))) {
+      return true;
+    }
+    
+    return false;
   }
 
   private parseNumericString(str: string): number | null {
@@ -596,6 +811,8 @@ class DocIntelService {
             extractedDate: cleanedDate || undefined,
             sourcePage: item.sourcePage,
             sourceRow: item.sourceRow,
+            periodKey: item.periodKey || undefined,
+            columnIndex: item.columnIndex ?? undefined,
             status: 'pending',
           })
           .returning();
@@ -845,6 +1062,119 @@ class DocIntelService {
       suggestedCategory: item.categorySuggested ? categoryMap.get(item.categorySuggested) : undefined,
       confirmedCategory: item.categoryConfirmed ? categoryMap.get(item.categoryConfirmed) : undefined,
     }));
+  }
+
+  async getExtractedItemsGrouped(orgId: string, uploadId: string): Promise<{
+    lineItems: Array<{
+      lineItemName: string;
+      sourceRow: number;
+      monthlyData: Array<{
+        id: string;
+        periodKey: string;
+        amount: number | null;
+        status: string;
+        categoryConfirmed?: string | null;
+        categorySuggested?: string | null;
+        confidenceScore?: string | null;
+      }>;
+      totalAmount: number;
+      status: 'pending' | 'confirmed' | 'excluded' | 'mixed';
+      suggestedCategory?: PnlCategory;
+      confirmedCategory?: PnlCategory;
+    }>;
+    periods: string[];
+    isMultiColumn: boolean;
+  }> {
+    const items = await this.getExtractedItemsWithCategories(orgId, uploadId);
+    
+    const hasMultipleColumns = items.some(item => item.periodKey);
+    
+    if (!hasMultipleColumns) {
+      return {
+        lineItems: items.map(item => ({
+          lineItemName: item.rawText,
+          sourceRow: item.sourceRow,
+          monthlyData: [{
+            id: item.id,
+            periodKey: item.periodKey || 'single',
+            amount: item.amount ? parseFloat(item.amount) : null,
+            status: item.status,
+            categoryConfirmed: item.categoryConfirmed,
+            categorySuggested: item.categorySuggested,
+            confidenceScore: item.confidenceScore,
+          }],
+          totalAmount: item.amount ? parseFloat(item.amount) : 0,
+          status: item.status as 'pending' | 'confirmed' | 'excluded',
+          suggestedCategory: (item as any).suggestedCategory,
+          confirmedCategory: (item as any).confirmedCategory,
+        })),
+        periods: ['single'],
+        isMultiColumn: false,
+      };
+    }
+    
+    const periodSet = new Set<string>();
+    const lineItemMap = new Map<string, {
+      sourceRow: number;
+      items: typeof items;
+    }>();
+    
+    for (const item of items) {
+      if (item.periodKey) {
+        periodSet.add(item.periodKey);
+      }
+      
+      const key = `${item.rawText}__${item.sourceRow}`;
+      if (!lineItemMap.has(key)) {
+        lineItemMap.set(key, { sourceRow: item.sourceRow, items: [] });
+      }
+      lineItemMap.get(key)!.items.push(item);
+    }
+    
+    const periods = Array.from(periodSet).sort();
+    
+    const lineItems = Array.from(lineItemMap.entries()).map(([key, data]) => {
+      const lineItemName = key.split('__')[0];
+      const monthlyData = data.items.map(item => ({
+        id: item.id,
+        periodKey: item.periodKey || 'unknown',
+        amount: item.amount ? parseFloat(item.amount) : null,
+        status: item.status,
+        categoryConfirmed: item.categoryConfirmed,
+        categorySuggested: item.categorySuggested,
+        confidenceScore: item.confidenceScore,
+      }));
+      
+      const totalAmount = monthlyData.reduce((sum, m) => sum + (m.amount || 0), 0);
+      
+      const statuses = new Set(monthlyData.map(m => m.status));
+      let status: 'pending' | 'confirmed' | 'excluded' | 'mixed';
+      if (statuses.size === 1) {
+        status = monthlyData[0].status as 'pending' | 'confirmed' | 'excluded';
+      } else {
+        status = 'mixed';
+      }
+      
+      const firstItem = data.items[0];
+      
+      return {
+        lineItemName,
+        sourceRow: data.sourceRow,
+        monthlyData,
+        totalAmount,
+        status,
+        suggestedCategory: (firstItem as any).suggestedCategory,
+        confirmedCategory: (firstItem as any).confirmedCategory,
+      };
+    });
+    
+    lineItems.sort((a, b) => a.sourceRow - b.sourceRow);
+    
+    return {
+      lineItems,
+      periods,
+      isMultiColumn: true,
+    };
   }
 
   async confirmItem(

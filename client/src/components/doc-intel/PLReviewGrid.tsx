@@ -16,8 +16,12 @@ import {
   Eye,
   EyeOff,
   ChevronDown,
+  ChevronRight,
   Save,
-  RefreshCw
+  RefreshCw,
+  LayoutGrid,
+  List,
+  Calendar,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,6 +86,34 @@ interface ExtractedItem {
   amountConfirmed: string | null;
 }
 
+interface MonthlyDataItem {
+  id: string;
+  periodKey: string;
+  amount: number | null;
+  status: string;
+  categoryConfirmed?: string | null;
+  categorySuggested?: string | null;
+  confidenceScore?: string | null;
+}
+
+interface GroupedLineItem {
+  lineItemName: string;
+  sourceRow: number;
+  monthlyData: MonthlyDataItem[];
+  totalAmount: number;
+  status: "pending" | "confirmed" | "excluded" | "mixed";
+  suggestedCategory?: any;
+  confirmedCategory?: any;
+}
+
+interface GroupedItemsResponse {
+  lineItems: GroupedLineItem[];
+  periods: string[];
+  isMultiColumn: boolean;
+}
+
+type ViewMode = "flat" | "grouped";
+
 interface PLReviewGridProps {
   projectId: string;
   uploadId: string;
@@ -107,6 +139,8 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
   const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
   const [localEdits, setLocalEdits] = useState<Record<string, Partial<ExtractedItem>>>({});
   const [showExcluded, setShowExcluded] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("flat");
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [excludeDialog, setExcludeDialog] = useState<{ open: boolean; item: ExtractedItem | null; reason: string }>({
     open: false,
     item: null,
@@ -122,12 +156,43 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
     },
   });
 
+  const { data: groupedData, isLoading: isLoadingGrouped } = useQuery<GroupedItemsResponse>({
+    queryKey: ["/api/doc-intel/uploads", uploadId, "items", "grouped"],
+    queryFn: async () => {
+      const res = await fetch(`/api/doc-intel/uploads/${uploadId}/items?grouped=true`);
+      if (!res.ok) throw new Error("Failed to fetch grouped items");
+      return res.json();
+    },
+    enabled: viewMode === "grouped",
+  });
+
+  const toggleRowExpanded = (key: string) => {
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const formatPeriodLabel = (periodKey: string): string => {
+    if (periodKey === "single") return "";
+    const [year, month] = periodKey.split("-");
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const monthIdx = parseInt(month, 10) - 1;
+    return `${months[monthIdx] || month} '${year?.slice(-2) || year}`;
+  };
+
   const updateItemMutation = useMutation({
     mutationFn: async ({ itemId, updates }: { itemId: string; updates: Partial<ExtractedItem> }) => {
       return apiRequest("PATCH", `/api/doc-intel/items/${itemId}`, updates);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/doc-intel/uploads", uploadId, "items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/doc-intel/uploads", uploadId, "items", "grouped"] });
     },
   });
 
@@ -137,6 +202,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/doc-intel/uploads", uploadId, "items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/doc-intel/uploads", uploadId, "items", "grouped"] });
       setSelectedIds(new Set());
       toast({ title: "Updated", description: "Selected items have been updated." });
     },
@@ -633,6 +699,26 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
             <RefreshCw className="h-4 w-4 mr-1" />
             Refresh
           </Button>
+          <div className="flex items-center border rounded-md">
+            <Button
+              variant={viewMode === "flat" ? "secondary" : "ghost"}
+              size="sm"
+              className="rounded-r-none"
+              onClick={() => setViewMode("flat")}
+            >
+              <List className="h-4 w-4 mr-1" />
+              Flat
+            </Button>
+            <Button
+              variant={viewMode === "grouped" ? "secondary" : "ghost"}
+              size="sm"
+              className="rounded-l-none"
+              onClick={() => setViewMode("grouped")}
+            >
+              <LayoutGrid className="h-4 w-4 mr-1" />
+              Grouped
+            </Button>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {selectedIds.size > 0 && (
@@ -682,55 +768,255 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
         </div>
       </div>
 
-      <div className="border rounded-lg overflow-hidden">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead
-                    key={header.id}
-                    style={{ width: header.getSize() }}
-                    className="bg-muted/50"
-                  >
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
-                  No line items found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  className={
-                    row.original.status === "excluded"
-                      ? "opacity-50 bg-muted/30"
-                      : row.original.status === "confirmed"
-                      ? "bg-green-50/30 dark:bg-green-950/20"
-                      : ""
-                  }
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} style={{ width: cell.column.getSize() }}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
+      {viewMode === "flat" ? (
+        <div className="border rounded-lg overflow-hidden">
+          <Table>
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => (
+                    <TableHead
+                      key={header.id}
+                      style={{ width: header.getSize() }}
+                      className="bg-muted/50"
+                    >
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(header.column.columnDef.header, header.getContext())}
+                    </TableHead>
                   ))}
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {table.getRowModel().rows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="h-24 text-center">
+                    No line items found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    className={
+                      row.original.status === "excluded"
+                        ? "opacity-50 bg-muted/30"
+                        : row.original.status === "confirmed"
+                        ? "bg-green-50/30 dark:bg-green-950/20"
+                        : ""
+                    }
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id} style={{ width: cell.column.getSize() }}>
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      ) : (
+        <div className="border rounded-lg overflow-hidden">
+          {isLoadingGrouped ? (
+            <div className="flex items-center justify-center h-48">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : !groupedData?.isMultiColumn ? (
+            <div className="p-8 text-center text-muted-foreground">
+              <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p className="font-medium">Single Column Data</p>
+              <p className="text-sm">This document doesn't have monthly columns. Use the Flat view instead.</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-8 bg-muted/50"></TableHead>
+                  <TableHead className="bg-muted/50">Line Item</TableHead>
+                  {groupedData.periods.map((period) => (
+                    <TableHead key={period} className="bg-muted/50 text-center w-24">
+                      {formatPeriodLabel(period)}
+                    </TableHead>
+                  ))}
+                  <TableHead className="bg-muted/50 text-right w-28">Total</TableHead>
+                  <TableHead className="bg-muted/50 text-center w-24">Status</TableHead>
+                  <TableHead className="bg-muted/50 text-center w-20">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {groupedData.lineItems.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={groupedData.periods.length + 5} className="h-24 text-center">
+                      No line items found.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  groupedData.lineItems.map((lineItem) => {
+                    const rowKey = `${lineItem.lineItemName}__${lineItem.sourceRow}`;
+                    const isExpanded = expandedRows.has(rowKey);
+                    
+                    return (
+                      <>
+                        <TableRow
+                          key={rowKey}
+                          className={
+                            lineItem.status === "excluded"
+                              ? "opacity-50 bg-muted/30"
+                              : lineItem.status === "confirmed"
+                              ? "bg-green-50/30 dark:bg-green-950/20"
+                              : ""
+                          }
+                        >
+                          <TableCell className="p-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0"
+                              onClick={() => toggleRowExpanded(rowKey)}
+                            >
+                              {isExpanded ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {lineItem.lineItemName}
+                          </TableCell>
+                          {groupedData.periods.map((period) => {
+                            const monthData = lineItem.monthlyData.find(
+                              (m) => m.periodKey === period
+                            );
+                            return (
+                              <TableCell key={period} className="text-center text-sm">
+                                {monthData?.amount != null
+                                  ? formatCurrency(monthData.amount)
+                                  : "-"}
+                              </TableCell>
+                            );
+                          })}
+                          <TableCell className="text-right font-semibold">
+                            {formatCurrency(lineItem.totalAmount)}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge
+                              variant={
+                                lineItem.status === "confirmed"
+                                  ? "default"
+                                  : lineItem.status === "excluded"
+                                  ? "secondary"
+                                  : lineItem.status === "mixed"
+                                  ? "outline"
+                                  : "secondary"
+                              }
+                              className={
+                                lineItem.status === "confirmed"
+                                  ? "bg-green-100 text-green-800"
+                                  : lineItem.status === "pending"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : ""
+                              }
+                            >
+                              {lineItem.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                      onClick={() => {
+                                        const itemIds = lineItem.monthlyData.map((m) => m.id);
+                                        bulkUpdateMutation.mutate({
+                                          itemIds,
+                                          updates: { status: "confirmed" },
+                                        });
+                                      }}
+                                      disabled={bulkUpdateMutation.isPending || lineItem.status === "confirmed"}
+                                    >
+                                      <Check className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Confirm all months</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                      onClick={() => {
+                                        const itemIds = lineItem.monthlyData.map((m) => m.id);
+                                        bulkUpdateMutation.mutate({
+                                          itemIds,
+                                          updates: { status: "excluded" },
+                                        });
+                                      }}
+                                      disabled={bulkUpdateMutation.isPending || lineItem.status === "excluded"}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Exclude all months</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        {isExpanded && (
+                          <TableRow className="bg-muted/20">
+                            <TableCell colSpan={groupedData.periods.length + 5} className="p-4">
+                              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                                {lineItem.monthlyData.map((month) => (
+                                  <div
+                                    key={month.id}
+                                    className="p-3 bg-background rounded-md border"
+                                  >
+                                    <div className="text-xs text-muted-foreground mb-1">
+                                      {formatPeriodLabel(month.periodKey)}
+                                    </div>
+                                    <div className="font-medium">
+                                      {month.amount != null
+                                        ? formatCurrency(month.amount)
+                                        : "-"}
+                                    </div>
+                                    <Badge
+                                      variant="outline"
+                                      className={`mt-1 text-xs ${
+                                        month.status === "confirmed"
+                                          ? "border-green-500 text-green-700"
+                                          : month.status === "excluded"
+                                          ? "border-gray-400 text-gray-500"
+                                          : "border-yellow-500 text-yellow-700"
+                                      }`}
+                                    >
+                                      {month.status}
+                                    </Badge>
+                                  </div>
+                                ))}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+      )}
 
       <Dialog open={excludeDialog.open} onOpenChange={(open) => !open && setExcludeDialog({ open: false, item: null, reason: "" })}>
         <DialogContent className="sm:max-w-md">

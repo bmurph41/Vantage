@@ -19494,10 +19494,16 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { uploadId } = req.params;
+      const grouped = req.query.grouped === 'true';
       
       const upload = await docIntelService.getUpload(orgId, uploadId);
       if (!upload) {
         return res.status(404).json({ error: 'Upload not found' });
+      }
+      
+      if (grouped) {
+        const groupedItems = await docIntelService.getExtractedItemsGrouped(orgId, uploadId);
+        return res.json(groupedItems);
       }
       
       const items = await docIntelService.getExtractedItemsWithCategories(orgId, uploadId);
