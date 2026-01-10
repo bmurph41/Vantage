@@ -17,11 +17,11 @@ import {
   EyeOff,
   ChevronDown,
   ChevronRight,
-  Save,
   RefreshCw,
   LayoutGrid,
   List,
   Calendar,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -130,6 +130,63 @@ function formatCurrency(value: string | number | null): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(num);
+}
+
+function BulkDepartmentSelect({ 
+  items, 
+  selectedIds, 
+  onDeptChange, 
+  disabled 
+}: { 
+  items: ExtractedItem[];
+  selectedIds: Set<string>;
+  onDeptChange: (tier: CategoryTier, dept: string) => void;
+  disabled: boolean;
+}) {
+  const commonTier = useMemo(() => {
+    const selectedItems = items.filter(i => selectedIds.has(i.id));
+    if (selectedItems.length === 0) return null;
+    
+    const tiers = selectedItems.map(i => i.categoryTierConfirmed || i.categoryTierSuggested);
+    const uniqueTiers = [...new Set(tiers.filter(Boolean))];
+    
+    if (uniqueTiers.length === 1) return uniqueTiers[0] as CategoryTier;
+    return null;
+  }, [items, selectedIds]);
+
+  if (!commonTier) {
+    return (
+      <Select disabled>
+        <SelectTrigger className="h-8 w-[140px]">
+          <SelectValue placeholder="Set Dept..." />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="_">Select same category first</SelectItem>
+        </SelectContent>
+      </Select>
+    );
+  }
+
+  const deptOptions = getDeptOptionsForTier(commonTier);
+
+  return (
+    <Select
+      value=""
+      onValueChange={(v) => onDeptChange(commonTier, v)}
+      disabled={disabled}
+    >
+      <SelectTrigger className="h-8 w-[140px]">
+        <SelectValue placeholder="Set Dept..." />
+      </SelectTrigger>
+      <SelectContent>
+        {deptOptions.map((opt) => (
+          <SelectItem key={opt.value} value={opt.value}>
+            {opt.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
 }
 
 export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLReviewGridProps) {
@@ -277,18 +334,35 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
     setEditingCell(null);
   };
 
-  const handleCategoryTierChange = (itemId: string, tier: CategoryTier) => {
-    handleLocalEdit(itemId, "categoryTierConfirmed", tier);
-    handleLocalEdit(itemId, "revenueCogsDeptConfirmed", null);
-    handleLocalEdit(itemId, "expenseDeptConfirmed", null);
+  const handleCategoryTierChange = async (itemId: string, tier: CategoryTier) => {
+    const updates: Partial<ExtractedItem> = {
+      categoryTierConfirmed: tier,
+      revenueCogsDeptConfirmed: null,
+      expenseDeptConfirmed: null,
+    };
+    await updateItemMutation.mutateAsync({ itemId, updates });
   };
 
-  const handleDeptChange = (itemId: string, tier: CategoryTier, dept: string) => {
-    if (tier === "revenue" || tier === "cogs") {
-      handleLocalEdit(itemId, "revenueCogsDeptConfirmed", dept);
-    } else {
-      handleLocalEdit(itemId, "expenseDeptConfirmed", dept);
-    }
+  const handleDeptChange = async (itemId: string, tier: CategoryTier, dept: string) => {
+    const updates: Partial<ExtractedItem> = tier === "expense"
+      ? { expenseDeptConfirmed: dept }
+      : { revenueCogsDeptConfirmed: dept };
+    await updateItemMutation.mutateAsync({ itemId, updates });
+  };
+
+  const hasValidCategorization = (item: ExtractedItem): boolean => {
+    const tier = (item.categoryTierConfirmed || item.categoryTierSuggested) as CategoryTier | null;
+    if (!tier) return false;
+    
+    const dept = tier === "expense"
+      ? (item.expenseDeptConfirmed || item.expenseDeptSuggested)
+      : (item.revenueCogsDeptConfirmed || item.revenueCogsDeptSuggested);
+    
+    return !!dept;
+  };
+
+  const canConfirmItem = (item: ExtractedItem): boolean => {
+    return hasValidCategorization(item) && item.status !== "confirmed";
   };
 
   const handleConfirm = async (itemId: string) => {
@@ -332,9 +406,25 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
     setExcludeDialog({ open: false, item: null, reason: "" });
   };
 
+  const getConfirmableSelectedIds = (): string[] => {
+    return Array.from(selectedIds).filter((id) => {
+      const item = items.find((i) => i.id === id);
+      return item && hasValidCategorization(item) && item.status !== "confirmed";
+    });
+  };
+
   const handleBulkConfirm = () => {
+    const confirmableIds = getConfirmableSelectedIds();
+    if (confirmableIds.length === 0) {
+      toast({ 
+        title: "Cannot Confirm", 
+        description: "All selected items need category and department set first.",
+        variant: "destructive"
+      });
+      return;
+    }
     bulkUpdateMutation.mutate({
-      itemIds: Array.from(selectedIds),
+      itemIds: confirmableIds,
       updates: { status: "confirmed" },
     });
   };
@@ -343,6 +433,27 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
     bulkUpdateMutation.mutate({
       itemIds: Array.from(selectedIds),
       updates: { status: "excluded" },
+    });
+  };
+
+  const handleBulkCategoryChange = (tier: CategoryTier) => {
+    bulkUpdateMutation.mutate({
+      itemIds: Array.from(selectedIds),
+      updates: { 
+        categoryTierConfirmed: tier,
+        revenueCogsDeptConfirmed: null,
+        expenseDeptConfirmed: null,
+      },
+    });
+  };
+
+  const handleBulkDeptChange = (tier: CategoryTier, dept: string) => {
+    const updates: Partial<ExtractedItem> = tier === "expense"
+      ? { expenseDeptConfirmed: dept }
+      : { revenueCogsDeptConfirmed: dept };
+    bulkUpdateMutation.mutate({
+      itemIds: Array.from(selectedIds),
+      updates,
     });
   };
 
@@ -474,13 +585,14 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
         header: "Category",
         cell: ({ row }) => {
           const item = row.original;
-          const currentTier = (getEffectiveValue(item, "categoryTierConfirmed") ||
+          const currentTier = (item.categoryTierConfirmed ||
             item.categoryTierSuggested) as CategoryTier | null;
 
           return (
             <Select
               value={currentTier || ""}
               onValueChange={(v) => handleCategoryTierChange(item.id, v as CategoryTier)}
+              disabled={updateItemMutation.isPending}
             >
               <SelectTrigger className="h-8 w-[140px]">
                 <SelectValue placeholder="Select...">
@@ -504,7 +616,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
         header: "Department",
         cell: ({ row }) => {
           const item = row.original;
-          const currentTier = (getEffectiveValue(item, "categoryTierConfirmed") ||
+          const currentTier = (item.categoryTierConfirmed ||
             item.categoryTierSuggested) as CategoryTier | null;
 
           if (!currentTier) {
@@ -514,13 +626,14 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
           const deptOptions = getDeptOptionsForTier(currentTier);
           const currentDept =
             currentTier === "expense"
-              ? (getEffectiveValue(item, "expenseDeptConfirmed") || item.expenseDeptSuggested)
-              : (getEffectiveValue(item, "revenueCogsDeptConfirmed") || item.revenueCogsDeptSuggested);
+              ? (item.expenseDeptConfirmed || item.expenseDeptSuggested)
+              : (item.revenueCogsDeptConfirmed || item.revenueCogsDeptSuggested);
 
           return (
             <Select
               value={(currentDept as string) || ""}
               onValueChange={(v) => handleDeptChange(item.id, currentTier, v)}
+              disabled={updateItemMutation.isPending}
             >
               <SelectTrigger className="h-8 w-[160px]">
                 <SelectValue placeholder="Select...">
@@ -579,42 +692,27 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
         header: "Actions",
         cell: ({ row }) => {
           const item = row.original;
-          const hasEdits = !!localEdits[item.id];
+          const canConfirm = canConfirmItem(item);
+          const missingCategory = !hasValidCategorization(item);
 
           return (
             <div className="flex items-center gap-1">
-              {hasEdits && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => saveLocalEdits(item.id)}
-                        disabled={updateItemMutation.isPending}
-                      >
-                        <Save className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Save changes</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50"
+                      className={`h-7 w-7 ${canConfirm ? "text-green-600 hover:text-green-700 hover:bg-green-50" : "text-gray-300"}`}
                       onClick={() => handleConfirm(item.id)}
-                      disabled={updateItemMutation.isPending || item.status === "confirmed"}
+                      disabled={updateItemMutation.isPending || !canConfirm}
                     >
                       <Check className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Confirm</TooltipContent>
+                  <TooltipContent>
+                    {missingCategory ? "Select category & department first" : "Confirm"}
+                  </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
               <TooltipProvider>
@@ -636,7 +734,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
             </div>
           );
         },
-        size: 120,
+        size: 100,
       },
     ],
     [selectedIds, editingCell, localEdits, filteredItems, updateItemMutation.isPending]
@@ -726,6 +824,28 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
               <span className="text-sm text-muted-foreground">
                 {selectedIds.size} selected
               </span>
+              <Select
+                value=""
+                onValueChange={(v) => handleBulkCategoryChange(v as CategoryTier)}
+                disabled={bulkUpdateMutation.isPending}
+              >
+                <SelectTrigger className="h-8 w-[130px]">
+                  <SelectValue placeholder="Set Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORY_TIER_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <BulkDepartmentSelect 
+                items={items} 
+                selectedIds={selectedIds}
+                onDeptChange={handleBulkDeptChange}
+                disabled={bulkUpdateMutation.isPending}
+              />
               <Button
                 size="sm"
                 variant="outline"
@@ -733,7 +853,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
                 disabled={bulkUpdateMutation.isPending}
               >
                 <Check className="h-4 w-4 mr-1" />
-                Confirm All
+                Confirm
               </Button>
               <Button
                 size="sm"
@@ -742,7 +862,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
                 disabled={bulkUpdateMutation.isPending}
               >
                 <X className="h-4 w-4 mr-1" />
-                Exclude All
+                Exclude
               </Button>
             </>
           )}

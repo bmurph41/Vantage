@@ -44,6 +44,7 @@ interface ParsedLineItem {
   sourceRow: number;
   periodKey?: string;
   columnIndex?: number;
+  isZeroValueSubtotal?: boolean;
 }
 
 interface MonthHeader {
@@ -580,12 +581,14 @@ class DocIntelService {
           const rawText = sanitizeText(textColumns.join(' '));
           
           if (rawText.length > 2 || amount !== null) {
+            const isZeroValueSubtotal = amount === null || amount === 0;
             items.push({
               rawText: rawText || '(no description)',
               amount,
               extractedDate: dateValue,
               sourcePage: sheetIndex + 1,
               sourceRow: globalRow,
+              isZeroValueSubtotal,
             });
           }
         }
@@ -801,6 +804,8 @@ class DocIntelService {
           continue;
         }
 
+        const isAutoExcluded = item.isZeroValueSubtotal === true;
+          
         const [extracted] = await db
           .insert(docIntelExtractedItems)
           .values({
@@ -813,7 +818,8 @@ class DocIntelService {
             sourceRow: item.sourceRow,
             periodKey: item.periodKey || undefined,
             columnIndex: item.columnIndex ?? undefined,
-            status: 'pending',
+            status: isAutoExcluded ? 'excluded' : 'pending',
+            reviewNotes: isAutoExcluded ? 'Auto-excluded: subtotal row with no value' : undefined,
           })
           .returning();
 
