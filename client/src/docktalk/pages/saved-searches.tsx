@@ -1,5 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   Card,
   CardContent,
@@ -23,9 +26,52 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Plus, Trash2, Bell, BellOff, ChevronDown, ChevronRight, FileText } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Mail, Search, Plus, Trash2, Bell, BellOff, ChevronDown, ChevronRight, FileText, Clock, Calendar as CalendarIcon } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { normalizeSavedSearchData } from "../lib/normalization";
+
+const TIMEZONES = [
+  { value: "America/New_York", label: "Eastern Time (ET)" },
+  { value: "America/Chicago", label: "Central Time (CT)" },
+  { value: "America/Denver", label: "Mountain Time (MT)" },
+  { value: "America/Phoenix", label: "Arizona (no DST)" },
+  { value: "America/Los_Angeles", label: "Pacific Time (PT)" },
+  { value: "America/Anchorage", label: "Alaska Time (AKT)" },
+  { value: "Pacific/Honolulu", label: "Hawaii Time (HT)" },
+  { value: "America/Toronto", label: "Toronto (ET)" },
+  { value: "America/Vancouver", label: "Vancouver (PT)" },
+  { value: "Europe/London", label: "London (GMT/BST)" },
+  { value: "Europe/Paris", label: "Paris (CET/CEST)" },
+  { value: "Asia/Tokyo", label: "Tokyo (JST)" },
+  { value: "Asia/Shanghai", label: "Shanghai (CST)" },
+  { value: "Asia/Dubai", label: "Dubai (GST)" },
+  { value: "Australia/Sydney", label: "Sydney (AEDT/AEST)" },
+] as const;
+
+const emailSettingsSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  deliveryTime: z.string().optional(),
+  timezone: z.string().default("America/New_York"),
+});
+
+type EmailSettingsForm = z.infer<typeof emailSettingsSchema>;
 
 interface SavedSearch {
   id: string;
@@ -62,12 +108,107 @@ export default function SavedSearchesPage() {
   const [alertFrequency, setAlertFrequency] = useState("daily");
   const [expandedSearch, setExpandedSearch] = useState<string | null>(null);
 
-  // Fetch saved searches
+  const form = useForm<EmailSettingsForm>({
+    resolver: zodResolver(emailSettingsSchema),
+    defaultValues: {
+      email: "",
+      deliveryTime: "09:00",
+      timezone: "America/New_York",
+    },
+  });
+
+  const { data: currentUser, isLoading: userLoading } = useQuery<any>({
+    queryKey: ["/api/docktalk/user/current"],
+  });
+
+  useEffect(() => {
+    if (currentUser) {
+      const prefs = currentUser.notificationPreferences;
+      form.reset({
+        email: prefs?.emailAddress || currentUser.email || "",
+        deliveryTime: prefs?.deliveryTime || "09:00",
+        timezone: prefs?.timezone || "America/New_York",
+      });
+    }
+  }, [currentUser, form]);
+
+  const updatePreferencesMutation = useMutation({
+    mutationFn: async (data: EmailSettingsForm) => {
+      const response = await fetch("/api/docktalk/user/notification-preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          email: data.email,
+          deliveryTime: data.deliveryTime,
+          timezone: data.timezone,
+          categories: currentUser?.notificationPreferences?.categories || [],
+          frequency: currentUser?.notificationPreferences?.frequency || "none",
+          enabled: true,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to update preferences");
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/docktalk/user/current"] });
+      toast({
+        title: "Email Settings Saved",
+        description: "Your email delivery settings have been updated.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const testEmailMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/docktalk/test-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to send test email");
+      }
+
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Test Email Sent!",
+        description: data.message || "Check your inbox for the test email.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Email Test Failed",
+        description: error.message || "Failed to send test email. Please check your notification settings.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onEmailSettingsSubmit = (data: EmailSettingsForm) => {
+    updatePreferencesMutation.mutate(data);
+  };
+
   const { data: searches = [], isLoading } = useQuery<SavedSearch[]>({
     queryKey: ['/api/docktalk/saved-searches'],
   });
 
-  // Fetch articles for expanded search
   const { data: searchResults = [] } = useQuery<Article[]>({
     queryKey: ['/api/docktalk/saved-searches', expandedSearch, 'results'],
     queryFn: async () => {
@@ -81,7 +222,6 @@ export default function SavedSearchesPage() {
     enabled: !!expandedSearch,
   });
 
-  // Create saved search mutation
   const createMutation = useMutation({
     mutationFn: async (data: {
       searchName: string;
@@ -107,20 +247,19 @@ export default function SavedSearchesPage() {
       setIsAddDialogOpen(false);
       resetForm();
       toast({
-        title: "Search Saved",
-        description: "Your search has been saved successfully.",
+        title: "Alert Created",
+        description: "Your email alert has been saved successfully.",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to save search",
+        description: "Failed to save alert",
         variant: "destructive",
       });
     },
   });
 
-  // Update saved search mutation
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<SavedSearch> }) => {
       const response = await fetch(`/api/docktalk/saved-searches/${id}`, {
@@ -137,20 +276,19 @@ export default function SavedSearchesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/docktalk/saved-searches'] });
       toast({
-        title: "Search Updated",
-        description: "Search alert settings have been updated.",
+        title: "Alert Updated",
+        description: "Alert settings have been updated.",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to update saved search",
+        description: "Failed to update alert",
         variant: "destructive",
       });
     },
   });
 
-  // Delete saved search mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const response = await fetch(`/api/docktalk/saved-searches/${id}`, {
@@ -164,14 +302,14 @@ export default function SavedSearchesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/docktalk/saved-searches'] });
       toast({
-        title: "Search Deleted",
-        description: "Saved search has been removed.",
+        title: "Alert Deleted",
+        description: "Email alert has been removed.",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to delete saved search",
+        description: "Failed to delete alert",
         variant: "destructive",
       });
     },
@@ -192,7 +330,7 @@ export default function SavedSearchesPage() {
     if (!searchName.trim() || !queryText.trim()) {
       toast({
         title: "Validation Error",
-        description: "Search name and query text are required",
+        description: "Alert name and keywords are required",
         variant: "destructive",
       });
       return;
@@ -228,30 +366,174 @@ export default function SavedSearchesPage() {
 
   return (
     <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+          <Mail className="h-8 w-8 text-primary" />
+          Email Alerts
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          Configure email delivery settings and create alerts to receive notifications when matching articles are published
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mail className="h-5 w-5" />
+            Email Delivery Settings
+          </CardTitle>
+          <CardDescription>
+            Configure where and when to receive email alerts
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {userLoading ? (
+            <div className="space-y-4">
+              <Skeleton className="h-10 w-full" />
+              <div className="grid grid-cols-2 gap-4">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            </div>
+          ) : (
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onEmailSettingsSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email Address</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="your.email@company.com"
+                          {...field}
+                          data-testid="input-notification-email"
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Email address where you'll receive article alerts
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="timezone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-2">
+                          <CalendarIcon className="h-4 w-4" />
+                          Timezone
+                        </FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-timezone">
+                              <SelectValue placeholder="Select timezone" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {TIMEZONES.map((tz) => (
+                              <SelectItem key={tz.value} value={tz.value}>
+                                {tz.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          Your local timezone
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="deliveryTime"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          Delivery Time
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="time"
+                            {...field}
+                            data-testid="input-delivery-time"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Daily/weekly digest time
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="flex justify-between items-center pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => testEmailMutation.mutate()}
+                    disabled={testEmailMutation.isPending || !form.watch("email")}
+                    data-testid="button-test-email"
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    {testEmailMutation.isPending ? "Sending..." : "Send Test Email"}
+                  </Button>
+                  
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={updatePreferencesMutation.isPending}
+                    data-testid="button-save-preferences"
+                  >
+                    {updatePreferencesMutation.isPending ? "Saving..." : "Save Settings"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          )}
+        </CardContent>
+      </Card>
+
+      <Separator />
+
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Saved Searches</h1>
+          <h2 className="text-2xl font-bold tracking-tight">Alert Rules</h2>
           <p className="text-muted-foreground mt-1">
-            Save search queries and receive automated alerts when matching articles are published
+            Create keyword-based alerts to track marina industry news and M&A activity
           </p>
         </div>
         <Button onClick={() => setIsAddDialogOpen(true)} data-testid="button-add-search">
           <Plus className="h-4 w-4 mr-2" />
-          New Search
+          New Alert
         </Button>
 
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogContent className="max-w-2xl">
             <form onSubmit={handleSubmit}>
               <DialogHeader>
-                <DialogTitle>Create Saved Search</DialogTitle>
+                <DialogTitle>Create Email Alert</DialogTitle>
                 <DialogDescription>
-                  Define search criteria to track marina industry news and M&A activity
+                  Define search criteria to receive email notifications when matching articles are published
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="searchName">Search Name *</Label>
+                  <Label htmlFor="searchName">Alert Name *</Label>
                   <Input
                     id="searchName"
                     data-testid="input-search-name"
@@ -263,7 +545,7 @@ export default function SavedSearchesPage() {
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="queryText">Query Text *</Label>
+                  <Label htmlFor="queryText">Keywords *</Label>
                   <Textarea
                     id="queryText"
                     data-testid="input-query-text"
@@ -274,7 +556,7 @@ export default function SavedSearchesPage() {
                     required
                   />
                   <p className="text-xs text-muted-foreground">
-                    Search articles matching these keywords
+                    You'll receive alerts for articles matching these keywords
                   </p>
                 </div>
 
@@ -307,9 +589,9 @@ export default function SavedSearchesPage() {
                 <div className="border-t pt-4 space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="emailAlerts">Email Alerts</Label>
+                      <Label htmlFor="emailAlerts">Enable Email Alerts</Label>
                       <p className="text-xs text-muted-foreground">
-                        Receive notifications when matching articles are published
+                        Receive email notifications when matching articles are published
                       </p>
                     </div>
                     <Switch
@@ -355,7 +637,7 @@ export default function SavedSearchesPage() {
                   disabled={createMutation.isPending}
                   data-testid="button-submit-add"
                 >
-                  {createMutation.isPending ? "Saving..." : "Save Search"}
+                  {createMutation.isPending ? "Saving..." : "Create Alert"}
                 </Button>
               </DialogFooter>
             </form>
@@ -373,16 +655,16 @@ export default function SavedSearchesPage() {
         <Card>
           <CardHeader className="text-center py-12">
             <div className="flex justify-center mb-4">
-              <Search className="h-16 w-16 text-muted-foreground/50" />
+              <Bell className="h-16 w-16 text-muted-foreground/50" />
             </div>
-            <CardTitle className="text-2xl">No Saved Searches Yet</CardTitle>
+            <CardTitle className="text-2xl">No Email Alerts Yet</CardTitle>
             <CardDescription className="text-base mt-2">
-              Create automated search queries to track marina industry news, M&A deals, and portfolio companies
+              Create keyword-based alerts to automatically receive emails when matching marina industry news is published
             </CardDescription>
             <div className="mt-6">
               <Button onClick={() => setIsAddDialogOpen(true)} data-testid="button-add-first-search">
                 <Plus className="h-4 w-4 mr-2" />
-                Create Your First Search
+                Create Your First Alert
               </Button>
             </div>
           </CardHeader>
@@ -395,11 +677,11 @@ export default function SavedSearchesPage() {
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <CardTitle className="text-xl flex items-center gap-2">
-                      <Search className="h-5 w-5 text-primary" />
+                      <Bell className="h-5 w-5 text-primary" />
                       {search.searchName}
                     </CardTitle>
                     <CardDescription className="mt-2">
-                      {search.queryText}
+                      Keywords: {search.queryText}
                     </CardDescription>
                     <div className="flex items-center gap-2 mt-2">
                       {search.categories.map((category, idx) => (
@@ -455,7 +737,7 @@ export default function SavedSearchesPage() {
               <CardContent className="space-y-3">
                 {search.emailAlerts && search.alertFrequency && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Bell className="h-4 w-4" />
+                    <Mail className="h-4 w-4" />
                     <span>Alert frequency: {search.alertFrequency}</span>
                   </div>
                 )}

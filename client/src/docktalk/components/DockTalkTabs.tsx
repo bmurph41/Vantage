@@ -1,5 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Handshake, Bookmark, Newspaper, Search, Eye } from "lucide-react";
+import { BarChart3, Handshake, Bookmark, Newspaper, Mail, Eye } from "lucide-react";
 import { Link } from "wouter";
 import AllArticlesPage from "../pages/all-articles";
 import MarketIntelligencePage from "../pages/market-intelligence";
@@ -66,14 +66,14 @@ export default function DockTalkTabs({ activeTab }: DockTalkTabsProps) {
             <span>Watchlist</span>
           </TabsTrigger>
         </Link>
-        <Link href="/docktalk/saved-searches">
+        <Link href="/docktalk/email-alerts">
           <TabsTrigger 
-            value="saved-searches" 
+            value="email-alerts" 
             className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent px-6 py-3"
-            data-testid="tab-saved-searches"
+            data-testid="tab-email-alerts"
           >
-            <Search className="w-4 h-4" />
-            <span>Saved Searches</span>
+            <Mail className="w-4 h-4" />
+            <span>Email Alerts</span>
           </TabsTrigger>
         </Link>
       </TabsList>
@@ -98,7 +98,7 @@ export default function DockTalkTabs({ activeTab }: DockTalkTabsProps) {
         <WatchlistPage />
       </TabsContent>
 
-      <TabsContent value="saved-searches" className="mt-0 h-[calc(100vh-140px)] overflow-auto">
+      <TabsContent value="email-alerts" className="mt-0 h-[calc(100vh-140px)] overflow-auto">
         <SavedSearchesPage />
       </TabsContent>
     </Tabs>

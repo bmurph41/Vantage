@@ -66,7 +66,7 @@ export default function Dashboard() {
     if (location === "/docktalk/m&a-spotlight") return "m&a-spotlight";
     if (location === "/docktalk/saved") return "saved";
     if (location === "/docktalk/watchlist") return "watchlist";
-    if (location === "/docktalk/saved-searches") return "saved-searches";
+    if (location === "/docktalk/email-alerts") return "email-alerts";
     return "all-articles"; // default
   };
 

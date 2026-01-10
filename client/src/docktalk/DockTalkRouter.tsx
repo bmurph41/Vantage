@@ -40,7 +40,7 @@ export default function DockTalkRouter() {
         <Route path="/docktalk/m&a-spotlight" component={Dashboard} />
         <Route path="/docktalk/saved" component={Dashboard} />
         <Route path="/docktalk/watchlist" component={Dashboard} />
-        <Route path="/docktalk/saved-searches" component={Dashboard} />
+        <Route path="/docktalk/email-alerts" component={Dashboard} />
         <Route path="/docktalk/notifications" component={Dashboard} />
         <Route path="/docktalk/sources" component={Dashboard} />
         <Route path="/docktalk/article-management">
