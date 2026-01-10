@@ -238,7 +238,7 @@ export interface IStorage {
   createArticleFeedback(feedback: InsertArticleFeedback): Promise<ArticleFeedback>;
   getUnprocessedFeedback(limit?: number): Promise<ArticleFeedback[]>;
   markFeedbackProcessed(id: number): Promise<void>;
-  getFeedbackStats(userId: string, orgId: string): Promise<{ total: number; byType: Array<{ type: string; count: number }> }>;
+  getFeedbackStats(userId: string, orgId: string): Promise<{ totalFeedback: number; helpfulCount: number; irrelevantCount: number; duplicateCount: number; lowQualityCount: number; byType: Array<{ type: string; count: number }> }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2340,22 +2340,40 @@ export class DatabaseStorage implements IStorage {
       .where(eq(articleFeedback.id, id));
   }
 
-  async getFeedbackStats(userId: string, orgId: string): Promise<{ total: number; byType: Array<{ type: string; count: number }> }> {
+  async getFeedbackStats(userId: string, orgId: string): Promise<{ 
+    totalFeedback: number; 
+    helpfulCount: number;
+    irrelevantCount: number;
+    duplicateCount: number;
+    lowQualityCount: number;
+    byType: Array<{ type: string; count: number }> 
+  }> {
     const allFeedback = await db
       .select()
       .from(articleFeedback)
-      .where(and(
-        eq(articleFeedback.userId, userId),
-        eq(articleFeedback.orgId, orgId)
-      ));
+      .where(eq(articleFeedback.orgId, orgId));
     
     const byType: Record<string, number> = {};
     allFeedback.forEach(f => {
       byType[f.feedbackType] = (byType[f.feedbackType] || 0) + 1;
     });
+
+    const manuallyReviewedArticles = await db
+      .select({ id: articles.id })
+      .from(articles)
+      .where(eq(articles.manuallyReviewed, true));
+
+    const removedArticles = await db
+      .select({ id: articles.id })
+      .from(articles)
+      .where(eq(articles.isRemoved, true));
     
     return {
-      total: allFeedback.length,
+      totalFeedback: allFeedback.length + manuallyReviewedArticles.length + removedArticles.length,
+      helpfulCount: (byType['helpful'] || 0) + manuallyReviewedArticles.length,
+      irrelevantCount: (byType['irrelevant'] || 0) + removedArticles.length,
+      duplicateCount: byType['duplicate'] || 0,
+      lowQualityCount: byType['low_quality'] || 0,
       byType: Object.entries(byType).map(([type, count]) => ({ type, count }))
     };
   }

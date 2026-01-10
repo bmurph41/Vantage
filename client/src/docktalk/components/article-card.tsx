@@ -196,73 +196,80 @@ export default function ArticleCard({ article, featured = false }: ArticleCardPr
               </p>
             )}
 
-            <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-500">
-              <span className="flex items-center gap-1.5 font-medium text-gray-700 dark:text-gray-300">
-                <Building2 className="h-3.5 w-3.5" />
-                {article.source}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Clock className="h-3.5 w-3.5" />
-                {article.publishedAt 
-                  ? formatDistanceToNow(new Date(article.publishedAt), { addSuffix: true })
-                  : "Unknown date"
-                }
-              </span>
-              {article.relevanceScore && article.relevanceScore >= 70 && (
-                <span className="text-green-600 dark:text-green-400 font-medium">
-                  {article.relevanceScore}% relevant
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+              <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-500">
+                <span className="flex items-center gap-1.5 font-medium text-gray-700 dark:text-gray-300">
+                  <Building2 className="h-3.5 w-3.5" />
+                  {article.source}
                 </span>
-              )}
+                <span className="flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5" />
+                  {article.publishedAt 
+                    ? formatDistanceToNow(new Date(article.publishedAt), { addSuffix: true })
+                    : "Unknown date"
+                  }
+                </span>
+                {article.relevanceScore && article.relevanceScore >= 70 && (
+                  <span className="text-green-600 dark:text-green-400 font-medium">
+                    {article.relevanceScore}% relevant
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleLike}
+                  disabled={likeMutation.isPending}
+                  className={cn(
+                    "h-7 w-7",
+                    isLiked ? "text-red-500 hover:text-red-600" : "text-gray-400 hover:text-gray-600"
+                  )}
+                  data-testid={`button-like-${article.id}`}
+                >
+                  <Heart className={cn("h-3.5 w-3.5", isLiked && "fill-current")} />
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleBookmark}
+                  disabled={bookmarkMutation.isPending}
+                  className={cn(
+                    "h-7 w-7",
+                    article.isBookmarked ? "text-amber-500 hover:text-amber-600" : "text-gray-400 hover:text-gray-600"
+                  )}
+                  data-testid={`button-bookmark-${article.id}`}
+                >
+                  <Bookmark className={cn("h-3.5 w-3.5", article.isBookmarked && "fill-current")} />
+                </Button>
+                
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleShare}
+                  className="h-7 w-7 text-gray-400 hover:text-gray-600"
+                  data-testid={`button-share-${article.id}`}
+                >
+                  <Share2 className="h-3.5 w-3.5" />
+                </Button>
+                
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="ml-2 h-7 text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleClick();
+                  }}
+                  data-testid={`button-read-${article.id}`}
+                >
+                  Read Full Story
+                  <ExternalLink className="h-3 w-3 ml-1.5" />
+                </Button>
+              </div>
             </div>
-          </div>
-
-          <div className="flex items-center gap-0.5 flex-shrink-0">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleLike}
-              disabled={likeMutation.isPending}
-              className={cn(
-                "h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity",
-                isLiked && "opacity-100 text-red-500 hover:text-red-600"
-              )}
-              data-testid={`button-like-${article.id}`}
-            >
-              <Heart className={cn("h-4 w-4", isLiked && "fill-current")} />
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleBookmark}
-              disabled={bookmarkMutation.isPending}
-              className={cn(
-                "h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity",
-                article.isBookmarked && "opacity-100 text-amber-500 hover:text-amber-600"
-              )}
-              data-testid={`button-bookmark-${article.id}`}
-            >
-              <Bookmark className={cn("h-4 w-4", article.isBookmarked && "fill-current")} />
-            </Button>
-            
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleShare}
-              className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-              data-testid={`button-share-${article.id}`}
-            >
-              <Share2 className="h-4 w-4" />
-            </Button>
-            
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-              data-testid={`button-external-${article.id}`}
-            >
-              <ExternalLink className="h-4 w-4" />
-            </Button>
           </div>
         </div>
       </div>
