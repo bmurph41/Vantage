@@ -170,8 +170,13 @@ const createFromTemplateSchema = z.object({
   organizationId: z.string().optional(),
 });
 
-router.post("/oms/create-from-template", async (req, res) => {
+router.post("/oms/create-from-template", async (req: any, res) => {
   try {
+    // Require authentication
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    
     const parsed = createFromTemplateSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: fromZodError(parsed.error).toString() });
@@ -183,6 +188,11 @@ router.post("/oms/create-from-template", async (req, res) => {
     const [project] = await db.select().from(modelingProjects).where(eq(modelingProjects.id, projectId));
     if (!project) {
       return res.status(404).json({ error: "Modeling project not found" });
+    }
+
+    // Verify user has access to the project's organization
+    if (project.orgId && req.user.orgId !== project.orgId) {
+      return res.status(403).json({ error: "Access denied to this project" });
     }
 
     // Create base OM
@@ -233,7 +243,9 @@ router.post("/oms/create-from-template", async (req, res) => {
                     position: { x: 50, y: 50 + blockIndex * 120, width: 500, height: 100, zIndex: blockIndex },
                     binding: blockTemplate.config?.binding,
                   },
-                  dataBinding: blockTemplate.config?.binding ? { field: blockTemplate.config.binding, source: 'modeling' } : null,
+                  dataBinding: blockTemplate.config?.binding 
+                    ? { field: blockTemplate.config.binding, source: 'modeling', projectId } 
+                    : { source: 'modeling', projectId },
                 });
               }
             }
@@ -306,16 +318,44 @@ router.post("/oms/create-from-template", async (req, res) => {
         dataBinding: { source: 'modeling', field: 'revenueBreakdown', projectId },
       });
 
-      // Add cash flow combo chart
+      // Add cash flow combo chart using proper amortization
       const holdPeriod = assumptions.holdPeriod || 5;
       const baseNoi = assumptions.noi || 100000;
+      const baseGoi = assumptions.goi || assumptions.grossOperatingIncome || baseNoi / 0.65;
       const growthRate = assumptions.revenueGrowthRate || 0.03;
+      const expenseGrowthRate = assumptions.expenseGrowthRate || 0.02;
+      const opexRatio = baseGoi > 0 ? (baseGoi - baseNoi) / baseGoi : 0.35;
+      const loanAmount = (assumptions.purchasePrice || 0) * (assumptions.ltvRatio || 0.65);
+      const interestRate = assumptions.interestRate || 0.06;
+      const loanTerm = assumptions.loanTerm || 25;
+      const effectiveTaxRate = assumptions.effectiveTaxRate || 0.25;
+      const monthlyRate = interestRate / 12;
+      const totalPayments = loanTerm * 12;
+      const monthlyPayment = loanAmount > 0 
+        ? (loanAmount * monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / 
+          (Math.pow(1 + monthlyRate, totalPayments) - 1)
+        : 0;
+      
       const chartData = [];
+      let remainingBalance = loanAmount;
       for (let year = 1; year <= holdPeriod; year++) {
-        const noi = baseNoi * Math.pow(1 + growthRate, year - 1);
-        const goi = noi * 1.4;
-        const cfbt = noi * 0.7;
-        const cfat = cfbt * 0.75;
+        let annualDebtService = 0;
+        for (let month = 0; month < 12; month++) {
+          if (remainingBalance <= 0) break;
+          
+          const interestPayment = remainingBalance * monthlyRate;
+          const principalPayment = Math.min(monthlyPayment - interestPayment, remainingBalance);
+          const actualPayment = interestPayment + principalPayment;
+          annualDebtService += actualPayment;
+          remainingBalance = Math.max(0, remainingBalance - principalPayment);
+        }
+        const goi = baseGoi * Math.pow(1 + growthRate, year - 1);
+        const opex = goi * opexRatio * Math.pow(1 + expenseGrowthRate, year - 1);
+        const noi = goi - opex;
+        const cfbt = noi - annualDebtService;
+        const taxableIncome = cfbt > 0 ? cfbt : 0;
+        const taxes = taxableIncome * effectiveTaxRate;
+        const cfat = cfbt - taxes;
         chartData.push({ year, goi: Math.round(goi), noi: Math.round(noi), cfbt: Math.round(cfbt), cfat: Math.round(cfat) });
       }
       await omStorage.createBlock({
@@ -342,16 +382,33 @@ router.post("/oms/create-from-template", async (req, res) => {
 // Helper to resolve template placeholders with project data
 function resolveBlockContent(blockTemplate: any, project: any): any {
   const config = blockTemplate.config || {};
+  const content = blockTemplate.content || {};
   const assumptions = (project.assumptions as any) || {};
+  
+  // Helper to replace placeholders in a string
+  const resolvePlaceholders = (str: string): string => {
+    if (!str) return '';
+    return str
+      .replace(/\{\{marinaName\}\}/g, project.name || 'Marina Property')
+      .replace(/\{\{companyName\}\}/g, 'MarinaMatch')
+      .replace(/\{\{location\}\}/g, `${project.city || ''}, ${project.state || ''}`.trim())
+      .replace(/\{\{yearBuilt\}\}/g, assumptions.yearBuilt || 'N/A')
+      .replace(/\{\{purchasePrice\}\}/g, formatCurrencyOM(assumptions.purchasePrice || 0))
+      .replace(/\{\{slipCount\}\}/g, String(assumptions.slipCount || project.slipCount || 0))
+      .replace(/\{\{totalUnits\}\}/g, String(assumptions.totalUnits || project.totalUnits || 0))
+      .replace(/\{\{acreage\}\}/g, String(assumptions.acreage || project.acreage || 0))
+      .replace(/\{\{noi\}\}/g, formatCurrencyOM(assumptions.noi || 0))
+      .replace(/\{\{goingInCapRate\}\}/g, formatPercentOM(assumptions.goingInCapRate || 0))
+      .replace(/\{\{exitCapRate\}\}/g, formatPercentOM(assumptions.exitCapRate || 0))
+      .replace(/\{\{holdPeriod\}\}/g, String(assumptions.holdPeriod || 5));
+  };
   
   switch (blockTemplate.type) {
     case 'text': {
-      let content = config.content || '';
-      // Replace placeholders
-      content = content.replace(/\{\{marinaName\}\}/g, project.name || 'Marina Property');
-      content = content.replace(/\{\{companyName\}\}/g, 'MarinaMatch');
-      content = content.replace(/\{\{location\}\}/g, `${project.city || ''}, ${project.state || ''}`.trim());
-      return { markdown: content, style: config.style };
+      // Check both content.markdown and config.content for the text
+      let markdown = content.markdown || config.content || '';
+      markdown = resolvePlaceholders(markdown);
+      return { markdown, style: config.style || content.style };
     }
     
     case 'kpi': {
@@ -381,15 +438,55 @@ function resolveBlockContent(blockTemplate: any, project: any): any {
     case 'combo-chart': {
       const holdPeriod = assumptions.holdPeriod || 5;
       const baseNoi = assumptions.noi || 100000;
+      const baseGoi = assumptions.goi || assumptions.grossOperatingIncome || baseNoi / 0.65;
       const growthRate = assumptions.revenueGrowthRate || 0.03;
+      const expenseGrowthRate = assumptions.expenseGrowthRate || 0.02;
+      const opexRatio = baseGoi > 0 ? (baseGoi - baseNoi) / baseGoi : 0.35;
+      
+      const purchasePrice = assumptions.purchasePrice || 0;
+      const ltvRatio = assumptions.ltvRatio || 0.65;
+      const loanAmount = purchasePrice * ltvRatio;
+      const interestRate = assumptions.interestRate || 0.06;
+      const loanTerm = assumptions.loanTerm || 25;
+      const effectiveTaxRate = assumptions.effectiveTaxRate || 0.25;
+      
+      const monthlyRate = interestRate / 12;
+      const totalPayments = loanTerm * 12;
+      const monthlyPayment = loanAmount > 0 
+        ? (loanAmount * monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / 
+          (Math.pow(1 + monthlyRate, totalPayments) - 1)
+        : 0;
       
       const chartData = [];
+      let remainingBalance = loanAmount;
+      
       for (let year = 1; year <= holdPeriod; year++) {
-        const noi = baseNoi * Math.pow(1 + growthRate, year - 1);
-        const goi = noi * 1.4;
-        const cfbt = noi * 0.7;
-        const cfat = cfbt * 0.75;
-        chartData.push({ year, goi: Math.round(goi), noi: Math.round(noi), cfbt: Math.round(cfbt), cfat: Math.round(cfat) });
+        let annualDebtService = 0;
+        
+        for (let month = 0; month < 12; month++) {
+          if (remainingBalance <= 0) break;
+          
+          const interestPayment = remainingBalance * monthlyRate;
+          const principalPayment = Math.min(monthlyPayment - interestPayment, remainingBalance);
+          const actualPayment = interestPayment + principalPayment;
+          annualDebtService += actualPayment;
+          remainingBalance = Math.max(0, remainingBalance - principalPayment);
+        }
+        
+        const goi = baseGoi * Math.pow(1 + growthRate, year - 1);
+        const opex = goi * opexRatio * Math.pow(1 + expenseGrowthRate, year - 1);
+        const noi = goi - opex;
+        const cfbt = noi - annualDebtService;
+        const taxableIncome = cfbt > 0 ? cfbt : 0;
+        const taxes = taxableIncome * effectiveTaxRate;
+        const cfat = cfbt - taxes;
+        chartData.push({ 
+          year, 
+          goi: Math.round(goi), 
+          noi: Math.round(noi), 
+          cfbt: Math.round(cfbt), 
+          cfat: Math.round(cfat) 
+        });
       }
       
       return { data: chartData, title: config.title || 'GOI, NOI and CF Over Holding Period', showCfat: true };
@@ -412,19 +509,42 @@ function resolveBlockContent(blockTemplate: any, project: any): any {
       const ltvRatio = assumptions.ltvRatio || 0.65;
       const loanAmount = purchasePrice * ltvRatio;
       const appreciationRate = assumptions.appreciationRate || 0.03;
+      const interestRate = assumptions.interestRate || 0.06;
+      const loanTerm = assumptions.loanTerm || 25;
+      
+      const monthlyRate = interestRate / 12;
+      const totalPayments = loanTerm * 12;
+      const monthlyPayment = loanAmount > 0 
+        ? (loanAmount * monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / 
+          (Math.pow(1 + monthlyRate, totalPayments) - 1)
+        : 0;
       
       const chartData = [];
+      let remainingBalance = loanAmount;
+      
       for (let year = 0; year <= holdPeriod; year++) {
-        const loanBalance = loanAmount * (1 - (year / (holdPeriod * 4)));
-        const principalPaid = loanAmount - loanBalance;
+        if (year > 0 && remainingBalance > 0) {
+          for (let month = 0; month < 12; month++) {
+            const interestPayment = remainingBalance * monthlyRate;
+            const principalPayment = Math.min(monthlyPayment - interestPayment, remainingBalance);
+            remainingBalance = Math.max(0, remainingBalance - principalPayment);
+          }
+        }
+        
+        const principalPaid = loanAmount - remainingBalance;
         const cashOutlay = purchasePrice * (1 - ltvRatio);
-        const appreciation = purchasePrice * Math.pow(1 + appreciationRate, year) - purchasePrice;
+        const propertyValue = purchasePrice * Math.pow(1 + appreciationRate, year);
+        const appreciation = propertyValue - purchasePrice;
+        const totalEquity = cashOutlay + principalPaid + appreciation;
+        
         chartData.push({
           year,
-          loanBalance: Math.round(loanBalance),
+          loanBalance: Math.round(remainingBalance),
           principalPaid: Math.round(principalPaid),
           cashOutlay: Math.round(cashOutlay),
           appreciation: Math.round(appreciation),
+          totalEquity: Math.round(totalEquity),
+          propertyValue: Math.round(propertyValue),
         });
       }
       
