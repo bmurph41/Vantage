@@ -8,6 +8,16 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Upload,
   FileSpreadsheet,
   CheckCircle2,
@@ -18,7 +28,8 @@ import {
   Brain,
   ArrowRight,
   BookKey,
-  Settings
+  Settings,
+  Loader2
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { UploadDropzone } from '@/pages/modeling/doc-intel/UploadDropzone';
@@ -43,6 +54,8 @@ interface UploadWithStats extends DocIntelUpload {
 export default function WorkspaceUploads({ projectId }: WorkspaceUploadsProps) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteConfirmName, setDeleteConfirmName] = useState<string>("");
 
   const { data: uploads = [], isLoading } = useQuery<UploadWithStats[]>({
     queryKey: ['/api/modeling/projects', projectId, 'documents'],
@@ -50,15 +63,30 @@ export default function WorkspaceUploads({ projectId }: WorkspaceUploadsProps) {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (uploadId: string) => apiRequest('DELETE', `/api/modeling/doc-intel/uploads/${uploadId}`),
+    mutationFn: (uploadId: string) => apiRequest('DELETE', `/api/modeling/projects/${projectId}/documents/${uploadId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'documents'] });
+      setDeleteConfirmId(null);
+      setDeleteConfirmName("");
       toast({ title: 'Deleted', description: 'Document has been removed.' });
     },
     onError: () => {
+      setDeleteConfirmId(null);
+      setDeleteConfirmName("");
       toast({ title: 'Error', description: 'Failed to delete document.', variant: 'destructive' });
     },
   });
+
+  const handleDeleteClick = (upload: UploadWithStats) => {
+    setDeleteConfirmId(upload.id);
+    setDeleteConfirmName(upload.originalName || upload.displayName || "this document");
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmId) {
+      deleteMutation.mutate(deleteConfirmId);
+    }
+  };
 
   const handleUploadComplete = (upload: DocIntelUpload) => {
     queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'documents'] });
@@ -173,7 +201,7 @@ export default function WorkspaceUploads({ projectId }: WorkspaceUploadsProps) {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => deleteMutation.mutate(upload.id)}
+                      onClick={() => handleDeleteClick(upload)}
                       disabled={deleteMutation.isPending}
                       data-testid={`button-delete-${upload.id}`}
                     >
@@ -218,7 +246,7 @@ export default function WorkspaceUploads({ projectId }: WorkspaceUploadsProps) {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => deleteMutation.mutate(upload.id)}
+                    onClick={() => handleDeleteClick(upload)}
                     disabled={deleteMutation.isPending}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -239,6 +267,38 @@ export default function WorkspaceUploads({ projectId }: WorkspaceUploadsProps) {
           </p>
         </Card>
       )}
+
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => {
+        if (!open) {
+          setDeleteConfirmId(null);
+          setDeleteConfirmName("");
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Document</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deleteConfirmName}"? This action cannot be undone and will permanently remove the document and all its extracted data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
