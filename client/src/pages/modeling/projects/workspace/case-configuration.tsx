@@ -219,7 +219,7 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
       toast({ title: 'Scenario Created', description: `"${newCase.name}" has been created.` });
     },
     onError: (error: any) => {
-      toast({ title: 'Error', description: error.message || 'Failed to create case.', variant: 'destructive' });
+      toast({ title: 'Error', description: error.message || 'Failed to create scenario.', variant: 'destructive' });
     },
   });
 
@@ -234,7 +234,7 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
       toast({ title: 'Scenario Updated', description: 'Changes have been saved.' });
     },
     onError: (error: any) => {
-      toast({ title: 'Error', description: error.message || 'Failed to update case.', variant: 'destructive' });
+      toast({ title: 'Error', description: error.message || 'Failed to update scenario.', variant: 'destructive' });
     },
   });
 
@@ -253,7 +253,7 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
       toast({ title: 'Scenario Deleted', description: 'The scenario has been removed.' });
     },
     onError: (error: any) => {
-      toast({ title: 'Error', description: error.message || 'Failed to delete case.', variant: 'destructive' });
+      toast({ title: 'Error', description: error.message || 'Failed to delete scenario.', variant: 'destructive' });
     },
   });
 
@@ -282,7 +282,7 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
       toast({ title: 'Scenario Cloned', description: `Created "${clonedCase.name}".` });
     },
     onError: (error: any) => {
-      toast({ title: 'Error', description: error.message || 'Failed to clone case.', variant: 'destructive' });
+      toast({ title: 'Error', description: error.message || 'Failed to clone scenario.', variant: 'destructive' });
     },
   });
 
@@ -620,12 +620,12 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
                   <TabsContent value="general" className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <Label htmlFor="case-name">Case Name</Label>
+                        <Label htmlFor="case-name">Scenario Name</Label>
                         <Input
                           id="case-name"
                           value={editedCase.name || ''}
                           onChange={(e) => setEditedCase({ ...editedCase, name: e.target.value })}
-                          placeholder="Enter case name"
+                          placeholder="Enter scenario name"
                           data-testid="input-case-name"
                         />
                       </div>
@@ -664,7 +664,7 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
                     </div>
                     <div className="flex items-center justify-between p-4 border rounded-lg">
                       <div>
-                        <Label htmlFor="case-enabled">Enable Case</Label>
+                        <Label htmlFor="case-enabled">Enable Scenario</Label>
                         <p className="text-sm text-muted-foreground">
                           Include in scenario comparisons and exports
                         </p>
