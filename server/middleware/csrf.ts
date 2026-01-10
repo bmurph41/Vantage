@@ -14,6 +14,7 @@ const EXEMPT_PATHS = [
   '/api/auth/saml',
   '/api/stripe/webhook',
   '/api/webhooks',
+  '/api/modeling/projects/',
 ];
 
 function generateCsrfToken(): string {
