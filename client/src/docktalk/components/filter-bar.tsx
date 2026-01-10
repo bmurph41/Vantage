@@ -118,36 +118,42 @@ export default function FilterBar({
         {/* Multi-Category Dropdown */}
         <MultiSelectDropdown
           label="Category"
+          placeholder="Select Categories"
           icon={<Filter className="h-4 w-4" />}
           options={toMultiSelectOptions(availableCategories)}
           value={selectedCategories}
           onChange={(categories) => 
             onFilterChange({ categories: categories.length > 0 ? categories : undefined })
           }
+          triggerClassName="w-48"
           testId="button-category-filter"
         />
 
         {/* Multi-Source Dropdown */}
         <MultiSelectDropdown
           label="Source"
+          placeholder="Select Sources"
           icon={<Building2 className="h-4 w-4" />}
           options={toMultiSelectOptions(availableSources)}
           value={selectedSources}
           onChange={(sources) => 
             onFilterChange({ sources: sources.length > 0 ? sources : undefined })
           }
+          triggerClassName="w-48"
           testId="button-source-filter"
         />
 
         {/* Multi-Region Dropdown */}
         <MultiSelectDropdown
           label="Region"
+          placeholder="Select Region"
           icon={<Globe className="h-4 w-4" />}
           options={toMultiSelectOptions(availableRegions)}
           value={selectedRegions}
           onChange={(regions) => 
             onFilterChange({ regions: regions.length > 0 ? regions : undefined })
           }
+          triggerClassName="w-44"
           testId="button-region-filter"
         />
         
