@@ -930,10 +930,35 @@ class DocIntelService {
       ))
       .orderBy(desc(docIntelLearningRules.confidenceScore));
 
+    // Separate exclusion rules from categorization rules
+    const exclusionRules = learningRules.filter(r => r.ruleType === 'learned_exclusion');
+    const categorizationRules = learningRules.filter(r => r.ruleType !== 'learned_exclusion');
+
     const categorizedItems: DocIntelExtractedItem[] = [];
 
     for (const item of items) {
-      const match = this.findBestMatch(item.rawText, mappings, learningRules);
+      const amountNum = parseFloat(item.amount || '0');
+      const itemHasValue = !isNaN(amountNum) && amountNum !== 0;
+      
+      // Check exclusion rules with has_value context
+      const exclusionMatch = this.findExclusionMatch(item.rawText, itemHasValue, exclusionRules);
+      if (exclusionMatch) {
+        const [updated] = await db
+          .update(docIntelExtractedItems)
+          .set({
+            status: 'excluded',
+            reviewNotes: `Auto-excluded: ${exclusionMatch.reason}`,
+            confidenceScore: exclusionMatch.confidence.toString(),
+            updatedAt: new Date(),
+          })
+          .where(eq(docIntelExtractedItems.id, item.id))
+          .returning();
+        
+        categorizedItems.push(updated);
+        continue;
+      }
+      
+      const match = this.findBestMatch(item.rawText, mappings, categorizationRules);
       
       if (match) {
         const updateData: Record<string, any> = {
@@ -967,6 +992,36 @@ class DocIntelService {
     }
 
     return categorizedItems;
+  }
+
+  private findExclusionMatch(
+    text: string,
+    itemHasValue: boolean,
+    exclusionRules: DocIntelLearningRule[]
+  ): { confidence: number; reason: string } | null {
+    const lowerText = text.toLowerCase().trim();
+    
+    for (const rule of exclusionRules) {
+      const ruleData = rule.ruleJson as any;
+      if (!ruleData) continue;
+      
+      // Exact match check with has_value context
+      if (ruleData.exactMatch && lowerText === ruleData.exactMatch.toLowerCase()) {
+        // If this item was excluded when it had NO value, only apply exclusion to items with NO value
+        // If this item was excluded when it HAD value, apply to both (stronger signal)
+        if (ruleData.hasValue === false && itemHasValue) {
+          // Skip: this was a "no value = subtotal" exclusion, but current item has a value
+          continue;
+        }
+        
+        return {
+          confidence: parseFloat(rule.confidenceScore || '0.85'),
+          reason: ruleData.reason || 'Previously excluded by user',
+        };
+      }
+    }
+    
+    return null;
   }
 
   private findBestMatch(
@@ -1952,6 +2007,13 @@ class DocIntelService {
       await this.createLearningRuleFromConfirmation(orgId, item.rawText, updates, userId);
     }
     
+    // Create learning rule from user exclusion (with has_value context)
+    if (updates.status === 'excluded' && updates.reviewNotes) {
+      const amountNum = parseFloat(item.amount || item.amountConfirmed || '0');
+      const hasValue = !isNaN(amountNum) && amountNum !== 0;
+      await this.createLearningRuleFromExclusion(orgId, item.rawText, updates.reviewNotes, hasValue, userId);
+    }
+    
     return updated;
   }
   
@@ -2022,6 +2084,62 @@ class DocIntelService {
       console.log(`[DocIntel Learning] Created rule from confirmation: "${rawText.substring(0, 30)}..."`);
     } catch (error) {
       console.error('[DocIntel Learning] Failed to create learning rule:', error);
+    }
+  }
+
+  async createLearningRuleFromExclusion(
+    orgId: string,
+    rawText: string,
+    reason: string,
+    hasValue: boolean,
+    userId: string
+  ): Promise<void> {
+    try {
+      const normalizedText = rawText.toLowerCase().trim();
+      
+      // Check if a similar exclusion rule already exists
+      const existingRules = await db
+        .select()
+        .from(docIntelLearningRules)
+        .where(and(
+          eq(docIntelLearningRules.orgId, orgId),
+          eq(docIntelLearningRules.isActive, true),
+          eq(docIntelLearningRules.ruleType, 'learned_exclusion')
+        ));
+      
+      const hasSimilar = existingRules.some(rule => {
+        const ruleData = rule.ruleJson as any;
+        // Only consider it similar if both the text AND hasValue context match
+        if (ruleData?.exactMatch === normalizedText && ruleData?.hasValue === hasValue) return true;
+        return false;
+      });
+      
+      if (hasSimilar) return;
+      
+      // Create new exclusion learning rule with has_value context
+      const ruleJson = {
+        exactMatch: normalizedText,
+        keywords: normalizedText.split(/\s+/).filter(w => w.length > 3),
+        action: 'exclude',
+        hasValue,  // Context: true = this was excluded WITH a value, false = excluded because no value
+        reason,
+        sourceText: rawText,
+        learnedAt: new Date().toISOString(),
+      };
+      
+      await db.insert(docIntelLearningRules).values({
+        orgId,
+        name: `Exclusion: ${rawText.substring(0, 50)}${hasValue ? ' (with value)' : ' (no value)'}`,
+        ruleJson,
+        ruleType: 'learned_exclusion',
+        confidenceScore: hasValue ? '0.80' : '0.95',  // Higher confidence for no-value exclusions
+        createdBy: userId,
+        isActive: true,
+      });
+      
+      console.log(`[DocIntel Learning] Created exclusion rule: "${rawText.substring(0, 30)}..." hasValue=${hasValue}`);
+    } catch (error) {
+      console.error('[DocIntel Learning] Failed to create exclusion rule:', error);
     }
   }
 }
