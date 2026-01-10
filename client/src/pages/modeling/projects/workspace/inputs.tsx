@@ -40,20 +40,21 @@ type DepartmentConfig = {
   name: string;
   category: 'revenue' | 'expense' | 'cogs';
   isYearRound: boolean;
+  isEnabled: boolean;
   icon: React.ReactNode;
   description: string;
 };
 
 const defaultDepartments: DepartmentConfig[] = [
-  { id: 'wet_slips', name: 'Wet Slips', category: 'revenue', isYearRound: false, icon: <Anchor className="h-4 w-4" />, description: 'Marina dock and slip rentals' },
-  { id: 'dry_storage', name: 'Dry Storage', category: 'revenue', isYearRound: false, icon: <Warehouse className="h-4 w-4" />, description: 'Dry rack and indoor storage' },
-  { id: 'annual_storage', name: 'Annual Storage', category: 'revenue', isYearRound: true, icon: <Calendar className="h-4 w-4" />, description: 'Year-round storage contracts' },
-  { id: 'rental_boats', name: 'Rental Boats', category: 'revenue', isYearRound: false, icon: <Ship className="h-4 w-4" />, description: 'Boat rental operations' },
-  { id: 'fuel', name: 'Fuel Sales', category: 'revenue', isYearRound: false, icon: <Fuel className="h-4 w-4" />, description: 'Marine fuel operations' },
-  { id: 'ship_store', name: 'Ship Store', category: 'revenue', isYearRound: false, icon: <ShoppingCart className="h-4 w-4" />, description: 'Retail and convenience store' },
-  { id: 'service_repair', name: 'Service & Repair', category: 'revenue', isYearRound: false, icon: <RefreshCw className="h-4 w-4" />, description: 'Boat service and repair' },
-  { id: 'third_party_leases', name: 'Third-Party Leases', category: 'revenue', isYearRound: true, icon: <FileText className="h-4 w-4" />, description: 'Restaurant, retail tenant leases' },
-  { id: 'other_revenue', name: 'Other Revenue', category: 'revenue', isYearRound: true, icon: <Building2 className="h-4 w-4" />, description: 'Miscellaneous income' },
+  { id: 'wet_slips', name: 'Wet Slips', category: 'revenue', isYearRound: false, isEnabled: true, icon: <Anchor className="h-4 w-4" />, description: 'Marina dock and slip rentals' },
+  { id: 'dry_storage', name: 'Dry Storage', category: 'revenue', isYearRound: false, isEnabled: true, icon: <Warehouse className="h-4 w-4" />, description: 'Dry rack and indoor storage' },
+  { id: 'annual_storage', name: 'Annual Storage', category: 'revenue', isYearRound: true, isEnabled: false, icon: <Calendar className="h-4 w-4" />, description: 'Year-round storage contracts' },
+  { id: 'rental_boats', name: 'Rental Boats', category: 'revenue', isYearRound: false, isEnabled: false, icon: <Ship className="h-4 w-4" />, description: 'Boat rental operations' },
+  { id: 'fuel', name: 'Fuel Sales', category: 'revenue', isYearRound: false, isEnabled: true, icon: <Fuel className="h-4 w-4" />, description: 'Marine fuel operations' },
+  { id: 'ship_store', name: 'Ship Store', category: 'revenue', isYearRound: false, isEnabled: true, icon: <ShoppingCart className="h-4 w-4" />, description: 'Retail and convenience store' },
+  { id: 'service_repair', name: 'Service & Repair', category: 'revenue', isYearRound: false, isEnabled: false, icon: <RefreshCw className="h-4 w-4" />, description: 'Boat service and repair' },
+  { id: 'third_party_leases', name: 'Third-Party Leases', category: 'revenue', isYearRound: true, isEnabled: false, icon: <FileText className="h-4 w-4" />, description: 'Restaurant, retail tenant leases' },
+  { id: 'other_revenue', name: 'Other Revenue', category: 'revenue', isYearRound: true, isEnabled: false, icon: <Building2 className="h-4 w-4" />, description: 'Miscellaneous income' },
 ];
 
 const months = [
@@ -93,7 +94,8 @@ export default function WorkspaceInputs({ projectId }: WorkspaceInputsProps) {
       if (config.departments) {
         setDepartments(prev => prev.map(dept => ({
           ...dept,
-          isYearRound: config.departments[dept.id]?.isYearRound ?? dept.isYearRound
+          isYearRound: config.departments[dept.id]?.isYearRound ?? dept.isYearRound,
+          isEnabled: config.departments[dept.id]?.isEnabled ?? dept.isEnabled
         })));
       }
     }
@@ -124,10 +126,16 @@ export default function WorkspaceInputs({ projectId }: WorkspaceInputsProps) {
     ));
   };
 
+  const toggleDepartmentEnabled = (deptId: string) => {
+    setDepartments(prev => prev.map(dept => 
+      dept.id === deptId ? { ...dept, isEnabled: !dept.isEnabled } : dept
+    ));
+  };
+
   const handleSave = () => {
-    const departmentSettings: Record<string, { isYearRound: boolean }> = {};
+    const departmentSettings: Record<string, { isYearRound: boolean; isEnabled: boolean }> = {};
     departments.forEach(dept => {
-      departmentSettings[dept.id] = { isYearRound: dept.isYearRound };
+      departmentSettings[dept.id] = { isYearRound: dept.isYearRound, isEnabled: dept.isEnabled };
     });
 
     saveMutation.mutate({
@@ -283,8 +291,8 @@ export default function WorkspaceInputs({ projectId }: WorkspaceInputsProps) {
         <CardHeader>
           <CardTitle>Department Configuration</CardTitle>
           <CardDescription>
-            Configure which revenue streams operate year-round vs. seasonally. 
-            Seasonal departments will only show revenue during in-season months.
+            Enable departments that apply to this property and configure seasonality. 
+            Only enabled departments will appear in Growth Rates and Pro Forma.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -292,25 +300,43 @@ export default function WorkspaceInputs({ projectId }: WorkspaceInputsProps) {
             {departments.map((dept) => (
               <div
                 key={dept.id}
-                className="flex items-center justify-between p-3 rounded-lg border bg-muted/30"
+                className={`flex items-center justify-between p-3 rounded-lg border ${
+                  dept.isEnabled 
+                    ? 'bg-muted/30 border-border' 
+                    : 'bg-muted/10 border-dashed opacity-60'
+                }`}
                 data-testid={`department-${dept.id}`}
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-7 h-7 rounded-full bg-background flex items-center justify-center flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={dept.isEnabled}
+                    onChange={() => toggleDepartmentEnabled(dept.id)}
+                    className="h-4 w-4 rounded border-muted-foreground/50 text-primary focus:ring-primary cursor-pointer"
+                    data-testid={`checkbox-${dept.id}-enabled`}
+                  />
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    dept.isEnabled ? 'bg-background' : 'bg-muted/30'
+                  }`}>
                     {dept.icon}
                   </div>
-                  <span className="font-medium text-sm truncate">{dept.name}</span>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-xs text-muted-foreground">
-                    {dept.isYearRound ? 'Year-Round' : 'Seasonal'}
+                  <span className={`font-medium text-sm truncate ${!dept.isEnabled && 'text-muted-foreground'}`}>
+                    {dept.name}
                   </span>
-                  <Switch
-                    checked={dept.isYearRound}
-                    onCheckedChange={() => toggleDepartmentYearRound(dept.id)}
-                    data-testid={`switch-${dept.id}-year-round`}
-                  />
                 </div>
+                {dept.isEnabled && (
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <span className="text-xs text-muted-foreground">
+                      {dept.isYearRound ? 'Year-Round' : 'Seasonal'}
+                    </span>
+                    <Switch
+                      checked={dept.isYearRound}
+                      onCheckedChange={() => toggleDepartmentYearRound(dept.id)}
+                      className="scale-75"
+                      data-testid={`switch-${dept.id}-year-round`}
+                    />
+                  </div>
+                )}
               </div>
             ))}
           </div>

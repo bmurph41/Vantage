@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -196,7 +196,7 @@ const storageTypesConfig = [
   ]},
 ];
 
-const revenueCategories = [
+const allRevenueCategories = [
   { id: 'wet_slips', name: 'Wet Slips', icon: <Anchor className="h-4 w-4" /> },
   { id: 'dry_storage', name: 'Dry Storage', icon: <Warehouse className="h-4 w-4" /> },
   { id: 'annual_storage', name: 'Annual Storage', icon: <Warehouse className="h-4 w-4" /> },
@@ -291,6 +291,13 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
   const holdPeriod = config?.holdPeriod || 5;
   const years = Array.from({ length: holdPeriod }, (_, i) => 2026 + i);
 
+  const revenueCategories = useMemo(() => {
+    if (!config?.departments) return allRevenueCategories;
+    return allRevenueCategories.filter(cat => 
+      config.departments[cat.id]?.isEnabled !== false
+    );
+  }, [config]);
+
   const [growthRates, setGrowthRates] = useState<GrowthRates>({});
   const [expenseGrowth, setExpenseGrowth] = useState<GrowthRates>({});
   const [occupancy, setOccupancy] = useState<OccupancyData>({});
@@ -331,7 +338,7 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
     };
     const rate = baseRates[scenarioType];
     const defaultGrowth: GrowthRates = {};
-    revenueCategories.forEach(cat => { defaultGrowth[cat.id] = rate; });
+    allRevenueCategories.forEach(cat => { defaultGrowth[cat.id] = rate; });
     return defaultGrowth;
   }
 
