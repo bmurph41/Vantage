@@ -589,6 +589,14 @@ export interface IStorage {
     after?: any;
   }): Promise<ScAuditLog>;
 
+  // SalesComps - Location-Based Matching
+  getSalesCompsByLocation(params: {
+    orgId: string;
+    city?: string;
+    state?: string;
+    limit?: number;
+  }): Promise<SalesComp[]>;
+
   // SalesComps - Recommendation System
   getSalesCompsForRecommendation(params: {
     orgId: string;
@@ -705,6 +713,14 @@ export interface IStorage {
 
   // RateComps - Duplicate Detection
   findPotentialRateCompDuplicates(orgId: string, marina: string, state?: string, saleYear?: number): Promise<RateComp[]>;
+
+  // RateComps - Location-Based Matching
+  getRateCompsByLocation(params: {
+    orgId: string;
+    city?: string;
+    state?: string;
+    limit?: number;
+  }): Promise<RateComp[]>;
 
   // RateComps - Project Operations
   getRcProjects(orgId: string, userId: string): Promise<RcProject[]>;
