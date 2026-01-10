@@ -151,9 +151,14 @@ export default function PendingProperties() {
     }
   };
 
-  const formatCurrencyDisplay = (amount: number | null) => {
-    if (!amount) return 'N/A';
-    return formatCurrency(amount);
+  const formatSalePriceDisplay = (salePrice: number | null | undefined, estimatedPrice: number | null | undefined) => {
+    if (salePrice) {
+      return formatCurrency(salePrice);
+    }
+    if (estimatedPrice) {
+      return `Est. ${formatCurrency(estimatedPrice)}`;
+    }
+    return 'N/A';
   };
 
   const formatSaleDate = (month: number | undefined, year: number | undefined) => {
@@ -209,8 +214,8 @@ export default function PendingProperties() {
                 <TableRow>
                   <TableHead>Marina Name</TableHead>
                   <TableHead>Location</TableHead>
-                  <TableHead>Sale Info</TableHead>
-                  <TableHead>Comp Details</TableHead>
+                  <TableHead>Sale Price</TableHead>
+                  <TableHead>Sale Date</TableHead>
                   <TableHead className="text-center">Potential Duplicates</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -248,30 +253,15 @@ export default function PendingProperties() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-1 text-sm">
-                            <DollarSign className="h-3 w-3" />
-                            {formatCurrencyDisplay(pending.salePrice)}
-                          </div>
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Calendar className="h-3 w-3" />
-                            {formatSaleDate(pending.compMetadata?.saleMonth, pending.compMetadata?.saleYear)}
-                          </div>
+                        <div className="flex items-center gap-1 text-sm">
+                          <DollarSign className="h-3 w-3" />
+                          {formatSalePriceDisplay(pending.salePrice, pending.compMetadata?.estimatedPrice)}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm text-muted-foreground space-y-0.5">
-                          {pending.compMetadata?.wetSlips && (
-                            <div>Wet Slips: {pending.compMetadata.wetSlips}</div>
-                          )}
-                          {pending.compMetadata?.dryRacks && (
-                            <div>Dry Racks: {pending.compMetadata.dryRacks}</div>
-                          )}
-                          {pending.compMetadata?.bodyOfWater && (
-                            <div className="truncate max-w-[150px]" title={pending.compMetadata.bodyOfWater}>
-                              {pending.compMetadata.bodyOfWater}
-                            </div>
-                          )}
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Calendar className="h-3 w-3" />
+                          {formatSaleDate(pending.compMetadata?.saleMonth, pending.compMetadata?.saleYear)}
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
