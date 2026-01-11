@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import TimePeriodSelector, { type SuggestedContractTerm } from "../components/TimePeriodSelector";
+import TimePeriodSelector, { type SuggestedContractTerm } from "../components/rent-roll/TimePeriodSelector";
 import DashboardNav from "../components/navigation/DashboardNav";
 import LeaseCalculator from "../components/LeaseCalculator";
 import { MoveEventsModal } from "../components/executive/MoveEventsModal";

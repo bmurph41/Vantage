@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, AlertTriangle, Info } from "lucide-react";
-import type { DataQualitySummary, DataQualitySeverity } from "@/lib/rentRollApi";
+import type { DataQualitySummary, DataQualitySeverity } from "../lib/rentRollApi";
 
 interface RentRollDataQualityPanelProps {
   data: DataQualitySummary | undefined;

@@ -11,8 +11,8 @@ import {
   Users,
   AlertTriangle
 } from "lucide-react";
-import { ProjectProvider } from "@/contexts/ProjectContext";
-import UserMenu from "@/components/navigation/UserMenu";
+import { ProjectProvider } from "../contexts/ProjectContext";
+import UserMenu from "../components/navigation/UserMenu";
 
 interface ProjectDetails {
   id: string;

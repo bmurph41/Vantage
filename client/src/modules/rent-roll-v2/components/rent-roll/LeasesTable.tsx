@@ -32,7 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { getLeases, deleteLease, bulkDeleteLeases, bulkUpdateLeases, type BulkUpdateLeaseData } from "@/lib/rentRollApi";
+import { getLeases, deleteLease, bulkDeleteLeases, bulkUpdateLeases, type BulkUpdateLeaseData } from "../lib/rentRollApi";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Search, 

@@ -9,8 +9,8 @@ import {
   LayoutDashboard,
   TrendingUp
 } from "lucide-react";
-import { PortfolioProvider } from "@/contexts/ProjectContext";
-import UserMenu from "@/components/navigation/UserMenu";
+import { PortfolioProvider } from "../contexts/ProjectContext";
+import UserMenu from "../components/navigation/UserMenu";
 
 interface PortfolioLayoutProps {
   children: React.ReactNode;

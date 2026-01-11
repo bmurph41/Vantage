@@ -13,7 +13,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { useQuery } from "@tanstack/react-query";
-import { getAddressHeatMap } from "@/lib/rentRollApi";
+import { getAddressHeatMap } from "../lib/rentRollApi";
 import { MapPin, Download } from "lucide-react";
 
 interface AddressHeatMapTableProps {

@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { createLease, updateLease, getLease } from "@/lib/rentRollApi";
+import { createLease, updateLease, getLease } from "../lib/rentRollApi";
 import { useToast } from "@/hooks/use-toast";
 import { addYears, addMonths, subDays, format } from "date-fns";
 import {
@@ -38,8 +38,8 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { CommentsSection } from "@/components/comments/CommentsSection";
-import LeaseEconomicsSection from "@/components/rent-roll/LeaseEconomicsSection";
+import { CommentsSection } from "../components/comments/CommentsSection";
+import LeaseEconomicsSection from "../components/rent-roll/LeaseEconomicsSection";
 import type { LeaseLineItem } from "@shared/schema";
 
 interface LeaseFormDrawerProps {

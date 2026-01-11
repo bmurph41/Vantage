@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
-import { getMonthlySummary } from "@/lib/rentRollApi";
+import { getMonthlySummary } from "../lib/rentRollApi";
 import { format } from "date-fns";
 import { 
   DollarSign, 

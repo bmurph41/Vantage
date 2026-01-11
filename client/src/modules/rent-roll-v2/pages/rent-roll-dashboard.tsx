@@ -36,15 +36,15 @@ import {
 } from "@/components/ui/select";
 import { queryClient } from "@/lib/queryClient";
 import DashboardNav from "../components/navigation/DashboardNav";
-import RentRollSummaryCards from "../components/RentRollSummaryCards";
-import RentRollCashFlowGrid from "../components/RentRollCashFlowGrid";
-import LeasesTable from "../components/LeasesTable";
-import AddressHeatMapTable from "../components/AddressHeatMapTable";
-import LeaseFormDrawer from "../components/LeaseFormDrawer";
-import FileImportDrawer from "../components/FileImportDrawer";
-import ProjectOverview from "../components/ProjectOverview";
-import { ProjectDetailsTab } from "../components/ProjectDetailsTab";
-import UploadedFilesTab from "../components/UploadedFilesTab";
+import RentRollSummaryCards from "../components/rent-roll/RentRollSummaryCards";
+import RentRollCashFlowGrid from "../components/rent-roll/RentRollCashFlowGrid";
+import LeasesTable from "../components/rent-roll/LeasesTable";
+import AddressHeatMapTable from "../components/rent-roll/AddressHeatMapTable";
+import LeaseFormDrawer from "../components/rent-roll/LeaseFormDrawer";
+import FileImportDrawer from "../components/rent-roll/FileImportDrawer";
+import ProjectOverview from "../components/rent-roll/ProjectOverview";
+import { ProjectDetailsTab } from "../components/rent-roll/ProjectDetailsTab";
+import UploadedFilesTab from "../components/rent-roll/UploadedFilesTab";
 import { type TimePeriodFilter, type TimePeriodType, getAvailableMonths, getAvailableQuarters } from "@shared/timePeriodUtils";
 import { deleteLocation } from "../lib/locationApi";
 

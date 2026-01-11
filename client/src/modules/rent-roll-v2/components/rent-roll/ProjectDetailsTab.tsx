@@ -8,9 +8,9 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Loader2, Plus, Trash2, RefreshCw } from "lucide-react";
-import LocationsTable from "@/components/locations/LocationsTable";
-import LocationFormDrawer from "@/components/locations/LocationFormDrawer";
-import CustomTypesManagement from "@/components/rent-roll/CustomTypesManagement";
+import LocationsTable from "../components/locations/LocationsTable";
+import LocationFormDrawer from "../components/locations/LocationFormDrawer";
+import CustomTypesManagement from "../components/rent-roll/CustomTypesManagement";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,7 +22,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { resetProject, type ResetProjectResult } from "@/lib/rentRollApi";
+import { resetProject, type ResetProjectResult } from "../lib/rentRollApi";
 
 interface ProjectDetailsTabProps {
   locationId: string;

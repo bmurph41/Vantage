@@ -42,7 +42,7 @@ import {
   Cell,
 } from "recharts";
 import DashboardNav from "../components/navigation/DashboardNav";
-import TimePeriodSelector from "../components/TimePeriodSelector";
+import TimePeriodSelector from "../components/rent-roll/TimePeriodSelector";
 import type { TimePeriodFilter } from "@shared/timePeriodUtils";
 import { calculateDateRange } from "@shared/timePeriodUtils";
 import { useProjectContext } from "../contexts/ProjectContext";

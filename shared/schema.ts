@@ -18355,3 +18355,136 @@ export const insertCrmNoteSchema = createInsertSchema(crmNotes).omit({
 });
 export type InsertCrmNote = z.infer<typeof insertCrmNoteSchema>;
 
+// ================================================================================
+// RENT ROLL ANALYSIS V2 TYPES (Aliases for module compatibility)
+// ================================================================================
+
+// Type aliases for RRA module compatibility
+export type MarinaLocation = RraMarinaLocation;
+export type InsertMarinaLocation = InsertRraMarinaLocation;
+
+// Lease with tenant data (for display)
+export type LeaseWithTenant = RraLease & {
+  tenant: RraTenant;
+  lineItems?: RraLeaseLineItem[];
+};
+
+// Rent Roll Table Configuration
+export interface RentRollColumnConfig {
+  id: string;
+  label: string;
+  visible: boolean;
+  order: number;
+  sortable: boolean;
+  align?: 'left' | 'center' | 'right';
+  width?: number;
+}
+
+export interface RentRollColumnSort {
+  columnId: string | null;
+  direction: 'asc' | 'desc' | null;
+}
+
+export interface RentRollTableConfig {
+  columns: RentRollColumnConfig[];
+  sort: RentRollColumnSort;
+  version?: number;
+}
+
+export const RENT_ROLL_CONFIG_VERSION = 11;
+
+export const DEFAULT_RENT_ROLL_COLUMNS: RentRollColumnConfig[] = [
+  { id: 'tenant', label: 'Tenant', visible: true, order: 0, sortable: true, align: 'left' },
+  { id: 'commencement', label: 'Commencement', visible: true, order: 1, sortable: true, align: 'left' },
+  { id: 'expiration', label: 'Expiration', visible: true, order: 2, sortable: true, align: 'left' },
+  { id: 'daysUntilExpiration', label: 'Days to Expire', visible: true, order: 3, sortable: true, align: 'right' },
+  { id: 'monthlyRent', label: 'Monthly Rent', visible: true, order: 4, sortable: true, align: 'right' },
+  { id: 'ratePerFtMo', label: '$/ft./mo.', visible: false, order: 5, sortable: true, align: 'right' },
+  { id: 'ratePerFtYr', label: '$/ft./yr.', visible: false, order: 6, sortable: true, align: 'right' },
+  { id: 'ratePerFtSeason', label: '$/ft/season', visible: false, order: 7, sortable: true, align: 'right' },
+  { id: 'baseRent2', label: 'Base Rent 2', visible: false, order: 8, sortable: true, align: 'right' },
+  { id: 'baseRent3', label: 'Base Rent 3', visible: false, order: 9, sortable: true, align: 'right' },
+  { id: 'customerTotal', label: 'Customer Total', visible: false, order: 10, sortable: true, align: 'right' },
+  { id: 'seasonSummary', label: 'Season Summary', visible: false, order: 11, sortable: false, align: 'left' },
+  { id: 'lineItems', label: 'Fee Breakdown', visible: false, order: 12, sortable: false, align: 'left' },
+  { id: 'term', label: 'Term', visible: true, order: 13, sortable: true, align: 'center' },
+  { id: 'location', label: 'Location', visible: true, order: 14, sortable: true, align: 'left' },
+  { id: 'unitNumber', label: 'Unit/Slip #', visible: false, order: 15, sortable: true, align: 'left' },
+  { id: 'storageType', label: 'Storage Type', visible: false, order: 16, sortable: true, align: 'left' },
+  { id: 'slipStatus', label: 'Slip Status', visible: false, order: 17, sortable: true, align: 'center' },
+  { id: 'rateType', label: 'Rate Type', visible: false, order: 18, sortable: true, align: 'left' },
+  { id: 'contractTerm', label: 'Contract Term', visible: false, order: 19, sortable: true, align: 'left' },
+  { id: 'boatType', label: 'Boat Type', visible: false, order: 20, sortable: true, align: 'left' },
+  { id: 'boatLength', label: 'Boat Length', visible: true, order: 21, sortable: true, align: 'right' },
+  { id: 'boatWidth', label: 'Boat Width', visible: false, order: 22, sortable: true, align: 'right' },
+  { id: 'slipLength', label: 'Slip Length', visible: true, order: 23, sortable: true, align: 'right' },
+  { id: 'slipWidth', label: 'Slip Width', visible: true, order: 24, sortable: true, align: 'right' },
+  { id: 'slipUtilization', label: 'Slip Utilization', visible: true, order: 25, sortable: true, align: 'right' },
+  { id: 'boat', label: 'Boat', visible: true, order: 26, sortable: true, align: 'left' },
+  { id: 'numMonths', label: '# Months', visible: true, order: 27, sortable: true, align: 'right' },
+  { id: 'totalStorageRevenue', label: 'Total Storage Revenue', visible: true, order: 28, sortable: true, align: 'right' },
+  { id: 'totalContractValue', label: 'Total Contract Value', visible: true, order: 29, sortable: true, align: 'right' },
+  { id: 'leaseOnFile', label: 'Lease On File', visible: false, order: 30, sortable: true, align: 'center' },
+  { id: 'coiOnFile', label: 'COI On File', visible: false, order: 31, sortable: true, align: 'center' },
+  { id: 'coiExpiration', label: 'COI Expiration', visible: false, order: 32, sortable: true, align: 'left' },
+  { id: 'additionalCharge1', label: "Add'l Charge 1", visible: false, order: 33, sortable: true, align: 'right' },
+  { id: 'additionalCharge2', label: "Add'l Charge 2", visible: false, order: 34, sortable: true, align: 'right' },
+  { id: 'additionalCharge3', label: "Add'l Charge 3", visible: false, order: 35, sortable: true, align: 'right' },
+  { id: 'liveaboard', label: 'Liveaboard', visible: false, order: 36, sortable: true, align: 'right' },
+  { id: 'electric', label: 'Electric', visible: false, order: 37, sortable: true, align: 'right' },
+  { id: 'discount', label: 'Discount', visible: false, order: 38, sortable: true, align: 'right' },
+  { id: 'status', label: 'Status', visible: true, order: 39, sortable: true, align: 'center' },
+  { id: 'actions', label: 'Actions', visible: true, order: 40, sortable: false, align: 'right' },
+];
+
+// Note: Scenario type already defined at line 11933 as ShipStoreScenario
+
+// Report types for Rent Roll module
+export interface ReportFilters {
+  projectIds?: string[];
+  startDate?: string;
+  endDate?: string;
+  storageTypes?: string[];
+  contractTerms?: string[];
+  status?: string[];
+}
+
+export interface ReportOptions {
+  includeCharts?: boolean;
+  includeRawData?: boolean;
+  groupBy?: 'project' | 'storageType' | 'contractTerm' | 'month';
+  sortBy?: string;
+  sortDirection?: 'asc' | 'desc';
+}
+
+export interface ReportData {
+  title: string;
+  generatedAt: string;
+  filters: ReportFilters;
+  metrics: Record<string, number | string>;
+  data: Record<string, unknown>[];
+  charts?: Record<string, unknown>[];
+}
+
+// SavedReport type - use placeholder until RRA saved reports table is created
+export interface SavedReport {
+  id: string;
+  orgId: string;
+  name: string;
+  reportType: string;
+  filters: ReportFilters;
+  options: ReportOptions;
+  createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+export type InsertSavedReport = Omit<SavedReport, 'id' | 'createdAt' | 'updatedAt'>;
+
+// ParsedImportRow for bulk import
+export interface ParsedImportRow {
+  rowNumber: number;
+  data: Record<string, unknown>;
+  errors?: string[];
+  warnings?: string[];
+}
+
