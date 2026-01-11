@@ -62,7 +62,31 @@ const addProjectSchema = z.object({
   operationType: z.enum(["ANNUAL", "SEASONAL"]).default("ANNUAL"),
   storageTypeConfigs: z.array(storageTypeConfigSchema).default([]),
   includeInExecutive: z.boolean().default(true),
+  dealId: z.string().optional(),
+  propertyId: z.string().optional(),
 });
+
+type LinkType = 'deal' | 'property' | 'new';
+
+interface CrmDeal {
+  id: string;
+  title: string;
+  marinaName: string | null;
+  city: string | null;
+  state: string | null;
+  status: string | null;
+}
+
+interface CrmProperty {
+  id: string;
+  title: string;
+  city: string | null;
+  state: string | null;
+  address: string | null;
+  wetSlips: number | null;
+  drySlips: number | null;
+  totalCapacity: number | null;
+}
 
 interface ProjectHubMetrics {
   locationId: string;
@@ -123,6 +147,11 @@ export default function ProjectHub() {
   const [canModifyDuplicate, setCanModifyDuplicate] = useState(false);
 
   const [addDialogStep, setAddDialogStep] = useState<1 | 2 | 3>(1);
+  const [linkType, setLinkType] = useState<LinkType>('new');
+  const [selectedDeal, setSelectedDeal] = useState<CrmDeal | null>(null);
+  const [selectedProperty, setSelectedProperty] = useState<CrmProperty | null>(null);
+  const [dealSearch, setDealSearch] = useState('');
+  const [propertySearch, setPropertySearch] = useState('');
 
   const form = useForm<z.infer<typeof addProjectSchema>>({
     resolver: zodResolver(addProjectSchema),
@@ -144,6 +173,16 @@ export default function ProjectHub() {
       if (!response.ok) throw new Error('Failed to fetch project hub metrics');
       return response.json();
     },
+  });
+
+  const { data: dealsSearchResults = [], isLoading: isSearchingDeals } = useQuery<CrmDeal[]>({
+    queryKey: [`/api/rent-roll/crm/deals/search?search=${encodeURIComponent(dealSearch)}&limit=20`],
+    enabled: addDialogOpen && linkType === 'deal',
+  });
+
+  const { data: propertiesSearchResults = [], isLoading: isSearchingProperties } = useQuery<CrmProperty[]>({
+    queryKey: [`/api/rent-roll/crm/properties/search?search=${encodeURIComponent(propertySearch)}&limit=20`],
+    enabled: addDialogOpen && linkType === 'property',
   });
 
   const updateProjectMutation = useMutation({
@@ -374,6 +413,11 @@ export default function ProjectHub() {
     if (!addDialogOpen) {
       form.reset();
       setAddDialogStep(1);
+      setLinkType('new');
+      setSelectedDeal(null);
+      setSelectedProperty(null);
+      setDealSearch('');
+      setPropertySearch('');
     }
   }, [addDialogOpen, form]);
 
@@ -746,7 +790,7 @@ export default function ProjectHub() {
               {addDialogStep === 3 && "Project Details"}
             </DialogTitle>
             <DialogDescription data-testid="text-dialog-description">
-              {addDialogStep === 1 && "Enter your project name to get started"}
+              {addDialogStep === 1 && "Link to an existing deal, property, or create a new entry"}
               {addDialogStep === 2 && "Choose how this project will be used"}
               {addDialogStep === 3 && "Complete the project configuration"}
             </DialogDescription>
@@ -780,26 +824,221 @@ export default function ProjectHub() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleAddProject)} className="space-y-4 py-4">
               {addDialogStep === 1 && (
-                <div className="py-4">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-base">Project Name *</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="e.g., Marina A - Downtown Location"
-                            data-testid="input-project-name"
-                            autoFocus
-                            className="h-11 text-base"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <div className="space-y-4">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div
+                      className={`cursor-pointer rounded-xl border-2 p-4 transition-all hover:shadow-md ${
+                        linkType === 'deal'
+                          ? "border-primary bg-primary/5 shadow-sm"
+                          : "border-muted hover:border-primary/50"
+                      }`}
+                      onClick={() => {
+                        setLinkType('deal');
+                        setSelectedProperty(null);
+                        setSelectedDeal(null);
+                        form.setValue('name', '');
+                        form.setValue('dealId', undefined);
+                        form.setValue('propertyId', undefined);
+                      }}
+                      data-testid="link-type-deal"
+                    >
+                      <div className="flex flex-col items-center gap-2 text-center">
+                        <div className={`rounded-full p-2 ${linkType === 'deal' ? "bg-primary/10" : "bg-muted"}`}>
+                          <TrendingUp className={`h-5 w-5 ${linkType === 'deal' ? "text-primary" : "text-muted-foreground"}`} />
+                        </div>
+                        <div className="font-medium text-sm">Link to Deal</div>
+                      </div>
+                    </div>
+                    <div
+                      className={`cursor-pointer rounded-xl border-2 p-4 transition-all hover:shadow-md ${
+                        linkType === 'property'
+                          ? "border-primary bg-primary/5 shadow-sm"
+                          : "border-muted hover:border-primary/50"
+                      }`}
+                      onClick={() => {
+                        setLinkType('property');
+                        setSelectedDeal(null);
+                        setSelectedProperty(null);
+                        form.setValue('name', '');
+                        form.setValue('dealId', undefined);
+                        form.setValue('propertyId', undefined);
+                      }}
+                      data-testid="link-type-property"
+                    >
+                      <div className="flex flex-col items-center gap-2 text-center">
+                        <div className={`rounded-full p-2 ${linkType === 'property' ? "bg-primary/10" : "bg-muted"}`}>
+                          <Building2 className={`h-5 w-5 ${linkType === 'property' ? "text-primary" : "text-muted-foreground"}`} />
+                        </div>
+                        <div className="font-medium text-sm">Link to Property</div>
+                      </div>
+                    </div>
+                    <div
+                      className={`cursor-pointer rounded-xl border-2 p-4 transition-all hover:shadow-md ${
+                        linkType === 'new'
+                          ? "border-primary bg-primary/5 shadow-sm"
+                          : "border-muted hover:border-primary/50"
+                      }`}
+                      onClick={() => {
+                        setLinkType('new');
+                        setSelectedDeal(null);
+                        setSelectedProperty(null);
+                        form.setValue('name', '');
+                        form.setValue('dealId', undefined);
+                        form.setValue('propertyId', undefined);
+                      }}
+                      data-testid="link-type-new"
+                    >
+                      <div className="flex flex-col items-center gap-2 text-center">
+                        <div className={`rounded-full p-2 ${linkType === 'new' ? "bg-primary/10" : "bg-muted"}`}>
+                          <Plus className={`h-5 w-5 ${linkType === 'new' ? "text-primary" : "text-muted-foreground"}`} />
+                        </div>
+                        <div className="font-medium text-sm">New Entry</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {linkType === 'deal' && (
+                    <div className="space-y-3 pt-2">
+                      <Label className="text-sm font-medium">Search Deals</Label>
+                      <Input
+                        placeholder="Type to search deals..."
+                        value={dealSearch}
+                        onChange={(e) => setDealSearch(e.target.value)}
+                        className="h-10"
+                        autoFocus
+                      />
+                      <div className="max-h-48 overflow-y-auto border rounded-lg">
+                        {isSearchingDeals ? (
+                          <div className="flex items-center justify-center p-4">
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            <span className="text-sm text-muted-foreground">Searching...</span>
+                          </div>
+                        ) : dealsSearchResults.length === 0 ? (
+                          <div className="p-4 text-center text-sm text-muted-foreground">
+                            {dealSearch ? 'No deals found' : 'Enter a search term'}
+                          </div>
+                        ) : (
+                          dealsSearchResults.map((deal) => (
+                            <div
+                              key={deal.id}
+                              className={`p-3 border-b last:border-b-0 cursor-pointer transition-colors ${
+                                selectedDeal?.id === deal.id ? 'bg-primary/10' : 'hover:bg-muted/50'
+                              }`}
+                              onClick={() => {
+                                setSelectedDeal(deal);
+                                form.setValue('name', deal.marinaName || deal.title);
+                                form.setValue('dealId', deal.id);
+                              }}
+                            >
+                              <div className="font-medium text-sm">{deal.title}</div>
+                              {deal.marinaName && deal.marinaName !== deal.title && (
+                                <div className="text-xs text-muted-foreground">{deal.marinaName}</div>
+                              )}
+                              {(deal.city || deal.state) && (
+                                <div className="text-xs text-muted-foreground mt-0.5">
+                                  {[deal.city, deal.state].filter(Boolean).join(', ')}
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                      {selectedDeal && (
+                        <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <Check className="h-4 w-4 text-primary" />
+                            <span className="text-sm font-medium">Selected: {selectedDeal.title}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {linkType === 'property' && (
+                    <div className="space-y-3 pt-2">
+                      <Label className="text-sm font-medium">Search Properties</Label>
+                      <Input
+                        placeholder="Type to search properties..."
+                        value={propertySearch}
+                        onChange={(e) => setPropertySearch(e.target.value)}
+                        className="h-10"
+                        autoFocus
+                      />
+                      <div className="max-h-48 overflow-y-auto border rounded-lg">
+                        {isSearchingProperties ? (
+                          <div className="flex items-center justify-center p-4">
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            <span className="text-sm text-muted-foreground">Searching...</span>
+                          </div>
+                        ) : propertiesSearchResults.length === 0 ? (
+                          <div className="p-4 text-center text-sm text-muted-foreground">
+                            {propertySearch ? 'No properties found' : 'Enter a search term'}
+                          </div>
+                        ) : (
+                          propertiesSearchResults.map((property) => (
+                            <div
+                              key={property.id}
+                              className={`p-3 border-b last:border-b-0 cursor-pointer transition-colors ${
+                                selectedProperty?.id === property.id ? 'bg-primary/10' : 'hover:bg-muted/50'
+                              }`}
+                              onClick={() => {
+                                setSelectedProperty(property);
+                                form.setValue('name', property.title);
+                                form.setValue('propertyId', property.id);
+                              }}
+                            >
+                              <div className="font-medium text-sm">{property.title}</div>
+                              {(property.city || property.state) && (
+                                <div className="text-xs text-muted-foreground">
+                                  {[property.city, property.state].filter(Boolean).join(', ')}
+                                </div>
+                              )}
+                              {property.totalCapacity && (
+                                <div className="text-xs text-muted-foreground mt-0.5">
+                                  Capacity: {property.totalCapacity} slips
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                      {selectedProperty && (
+                        <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <Check className="h-4 w-4 text-primary" />
+                            <span className="text-sm font-medium">Selected: {selectedProperty.title}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {linkType === 'new' && (
+                    <div className="pt-2">
+                      <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium">Project Name *</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="e.g., Marina A - Downtown Location"
+                                data-testid="input-project-name"
+                                autoFocus
+                                className="h-10"
+                                {...field}
+                              />
+                            </FormControl>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              A new property entry will be created in your CRM
+                            </p>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1049,14 +1288,34 @@ export default function ProjectHub() {
                     <Button
                       type="button"
                       onClick={() => {
-                        const name = form.getValues("name");
-                        if (name.trim()) {
-                          setAddDialogStep(2);
+                        if (linkType === 'deal') {
+                          if (selectedDeal) {
+                            form.setValue('dealId', selectedDeal.id);
+                            form.setValue('propertyId', undefined);
+                            setAddDialogStep(2);
+                          }
+                        } else if (linkType === 'property') {
+                          if (selectedProperty) {
+                            form.setValue('propertyId', selectedProperty.id);
+                            form.setValue('dealId', undefined);
+                            setAddDialogStep(2);
+                          }
                         } else {
-                          form.setError("name", { message: "Project name is required" });
+                          const name = form.getValues("name");
+                          if (name.trim()) {
+                            form.setValue('dealId', undefined);
+                            form.setValue('propertyId', undefined);
+                            setAddDialogStep(2);
+                          } else {
+                            form.setError("name", { message: "Project name is required" });
+                          }
                         }
                       }}
-                      disabled={!form.watch("name").trim()}
+                      disabled={
+                        (linkType === 'deal' && !selectedDeal) ||
+                        (linkType === 'property' && !selectedProperty) ||
+                        (linkType === 'new' && !form.watch("name").trim())
+                      }
                       data-testid="button-next-step"
                       className="gap-1"
                     >
@@ -1071,7 +1330,14 @@ export default function ProjectHub() {
                     <Button
                       type="button"
                       variant="ghost"
-                      onClick={() => setAddDialogStep(1)}
+                      onClick={() => {
+                        setAddDialogStep(1);
+                        setSelectedDeal(null);
+                        setSelectedProperty(null);
+                        form.setValue('name', '');
+                        form.setValue('dealId', undefined);
+                        form.setValue('propertyId', undefined);
+                      }}
                       data-testid="button-back"
                     >
                       Back
