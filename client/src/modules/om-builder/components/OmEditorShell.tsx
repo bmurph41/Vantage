@@ -1,20 +1,33 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef, useLayoutEffect } from "react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Plus, Layers, Type, BarChart3, Table, Image, Gauge, 
-  Square, Circle, Minus, Star, FileText, AlertCircle, Palette,
-  Undo2, Redo2, Trash2
+  Square, Circle, Minus, Star, FileText, AlertCircle, Palette
 } from "lucide-react";
 import type { OmBlock, OmPage, BlockType, ElementPosition } from "../types";
 import { FreeformCanvas } from "./FreeformCanvas";
 import { LayersPanel } from "./LayersPanel";
 import { ZoomControls } from "./ZoomControls";
+import { EditorToolbar } from "./EditorToolbar";
+import { CanvasRulers } from "./CanvasRulers";
+import { PrintMarginOverlay } from "./PrintMarginOverlay";
+import { MarqueeSelection } from "./MarqueeSelection";
+import { useEditorStore } from "../store/editor-store";
+import { useEditorKeyboard } from "../hooks/useEditorKeyboard";
+import { useAutosave } from "../hooks/useAutosave";
 import { toast } from "@/hooks/use-toast";
 
+function areBlocksEqual(a: OmBlock[], b: OmBlock[] | null): boolean {
+  if (b === null) return false;
+  if (a.length !== b.length) return false;
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 interface OmEditorShellProps {
+  omId?: string;
   pages: OmPage[];
   activePageId: string | null;
   blocks: OmBlock[];
@@ -40,9 +53,10 @@ const BLOCK_PALETTE = [
 ];
 
 export function OmEditorShell({
+  omId,
   pages,
   activePageId,
-  blocks,
+  blocks: externalBlocks,
   canvasWidth = 816,
   canvasHeight = 1056,
   onUpdateBlocks,
@@ -50,168 +64,128 @@ export function OmEditorShell({
   onSelectPage,
   onAddPage,
 }: OmEditorShellProps) {
-  const [selectedBlockIds, setSelectedBlockIds] = useState<string[]>([]);
-  const [zoom, setZoom] = useState(0.75);
-  const [showGrid, setShowGrid] = useState(true);
   const [leftTab, setLeftTab] = useState<'pages' | 'blocks' | 'layers'>('blocks');
+  const lastSyncedBlocksRef = useRef<OmBlock[] | null>(null);
+  const isSyncingFromExternalRef = useRef(true);
+  
+  const {
+    blocks,
+    selectedBlockIds,
+    zoom,
+    showGrid,
+    showRulers,
+    showBleedMargins,
+    snapToGrid,
+    gridSize,
+    autosave,
+    setBlocks,
+    setPages,
+    setSelectedBlockIds,
+    selectBlock,
+    clearSelection,
+    updateBlock,
+    updateBlockPosition,
+    updateBlockSize,
+    deleteBlock,
+    duplicateBlock,
+    bringForward,
+    sendBackward,
+    pushToHistory,
+    setZoom,
+    setShowGrid,
+    setShowRulers,
+    setShowBleedMargins,
+    setSnapToGrid,
+  } = useEditorStore();
+  
+  useEditorKeyboard();
+  
+  const { isSaving, lastSavedAt, hasUnsavedChanges, error: autosaveError } = useAutosave({
+    omId: omId || null,
+    enabled: !!omId,
+  });
+
+  useLayoutEffect(() => {
+    if (!areBlocksEqual(externalBlocks, lastSyncedBlocksRef.current)) {
+      isSyncingFromExternalRef.current = true;
+      lastSyncedBlocksRef.current = externalBlocks;
+      setBlocks(externalBlocks);
+    }
+  }, [externalBlocks, setBlocks]);
+
+  useEffect(() => {
+    if (isSyncingFromExternalRef.current) {
+      isSyncingFromExternalRef.current = false;
+      return;
+    }
+    if (!areBlocksEqual(blocks, lastSyncedBlocksRef.current)) {
+      lastSyncedBlocksRef.current = blocks;
+      onUpdateBlocks(blocks);
+    }
+  }, [blocks, onUpdateBlocks]);
+
+  useEffect(() => {
+    setPages(pages);
+  }, [pages, setPages]);
 
   const activePage = pages.find(p => p.id === activePageId) || null;
 
   const handleSelectBlock = useCallback((blockId: string, addToSelection = false) => {
-    if (addToSelection) {
-      setSelectedBlockIds(prev => 
-        prev.includes(blockId) 
-          ? prev.filter(id => id !== blockId)
-          : [...prev, blockId]
-      );
-    } else {
-      setSelectedBlockIds([blockId]);
-    }
-  }, []);
+    selectBlock(blockId, addToSelection);
+  }, [selectBlock]);
 
   const handleClearSelection = useCallback(() => {
-    setSelectedBlockIds([]);
-  }, []);
+    clearSelection();
+  }, [clearSelection]);
 
   const handleUpdateBlock = useCallback((blockId: string, updates: Partial<OmBlock>) => {
-    const updatedBlocks = blocks.map(b => 
-      b.id === blockId ? { ...b, ...updates } : b
-    );
-    onUpdateBlocks(updatedBlocks);
-  }, [blocks, onUpdateBlocks]);
+    updateBlock(blockId, updates);
+  }, [updateBlock]);
 
   const handleUpdateBlockPosition = useCallback((blockId: string, x: number, y: number) => {
-    const block = blocks.find(b => b.id === blockId);
-    if (!block) return;
-    
-    const updatedBlocks = blocks.map(b => 
-      b.id === blockId 
-        ? { ...b, position: { ...b.position, x, y, width: b.position?.width || 200, height: b.position?.height || 100 } }
-        : b
-    );
-    onUpdateBlocks(updatedBlocks);
-  }, [blocks, onUpdateBlocks]);
+    updateBlockPosition(blockId, x, y);
+  }, [updateBlockPosition]);
 
   const handleUpdateBlockSize = useCallback((blockId: string, width: number, height: number) => {
-    const block = blocks.find(b => b.id === blockId);
-    if (!block) return;
-    
-    const updatedBlocks = blocks.map(b => 
-      b.id === blockId 
-        ? { ...b, position: { ...b.position, x: b.position?.x || 50, y: b.position?.y || 50, width, height } }
-        : b
-    );
-    onUpdateBlocks(updatedBlocks);
-  }, [blocks, onUpdateBlocks]);
+    updateBlockSize(blockId, width, height);
+  }, [updateBlockSize]);
 
   const handleDeleteBlock = useCallback((blockId: string) => {
-    const updatedBlocks = blocks.filter(b => b.id !== blockId);
-    onUpdateBlocks(updatedBlocks);
-    setSelectedBlockIds(prev => prev.filter(id => id !== blockId));
+    deleteBlock(blockId);
     toast({ title: "Element deleted" });
-  }, [blocks, onUpdateBlocks]);
+  }, [deleteBlock]);
 
   const handleDuplicateBlock = useCallback((blockId: string) => {
-    const block = blocks.find(b => b.id === blockId);
-    if (!block) return;
-    
-    const newBlock: OmBlock = {
-      ...block,
-      id: `block_${Date.now()}`,
-      position: {
-        x: (block.position?.x || 50) + 20,
-        y: (block.position?.y || 50) + 20,
-        width: block.position?.width || 200,
-        height: block.position?.height || 100,
-      },
-      meta: {
-        ...block.meta,
-        name: `${block.meta?.name || block.type} copy`,
-        zIndex: Math.max(...blocks.map(b => b.meta?.zIndex || 0)) + 1,
-      }
-    };
-    
-    onUpdateBlocks([...blocks, newBlock]);
-    setSelectedBlockIds([newBlock.id]);
+    duplicateBlock(blockId);
     toast({ title: "Element duplicated" });
-  }, [blocks, onUpdateBlocks]);
+  }, [duplicateBlock]);
 
   const handleReorderBlocks = useCallback((reorderedBlocks: OmBlock[]) => {
-    onUpdateBlocks(reorderedBlocks);
-  }, [onUpdateBlocks]);
+    setBlocks(reorderedBlocks);
+  }, [setBlocks]);
 
   const handleBringForward = useCallback((blockId: string) => {
-    const block = blocks.find(b => b.id === blockId);
-    if (!block) return;
-    
-    const currentZ = block.meta?.zIndex || 0;
-    const maxZ = Math.max(...blocks.map(b => b.meta?.zIndex || 0));
-    
-    if (currentZ < maxZ) {
-      const updatedBlocks = blocks.map(b => 
-        b.id === blockId 
-          ? { ...b, meta: { ...b.meta, zIndex: maxZ + 1 } }
-          : b
-      );
-      onUpdateBlocks(updatedBlocks);
-    }
-  }, [blocks, onUpdateBlocks]);
+    bringForward(blockId);
+  }, [bringForward]);
 
   const handleSendBackward = useCallback((blockId: string) => {
-    const block = blocks.find(b => b.id === blockId);
-    if (!block) return;
-    
-    const currentZ = block.meta?.zIndex || 0;
-    const minZ = Math.min(...blocks.map(b => b.meta?.zIndex || 0));
-    
-    if (currentZ > minZ) {
-      const updatedBlocks = blocks.map(b => 
-        b.id === blockId 
-          ? { ...b, meta: { ...b.meta, zIndex: minZ - 1 } }
-          : b
-      );
-      onUpdateBlocks(updatedBlocks);
-    }
-  }, [blocks, onUpdateBlocks]);
+    sendBackward(blockId);
+  }, [sendBackward]);
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (selectedBlockIds.length === 0) return;
-    
-    if (e.key === 'Delete' || e.key === 'Backspace') {
-      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
-      selectedBlockIds.forEach(id => handleDeleteBlock(id));
-    }
-    
-    const nudgeAmount = e.shiftKey ? 10 : 1;
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-      e.preventDefault();
-      selectedBlockIds.forEach(blockId => {
-        const block = blocks.find(b => b.id === blockId);
-        if (!block || block.meta?.locked) return;
-        
-        const pos = block.position || { x: 50, y: 50, width: 200, height: 100 };
-        let newX = pos.x;
-        let newY = pos.y;
-        
-        switch (e.key) {
-          case 'ArrowUp': newY -= nudgeAmount; break;
-          case 'ArrowDown': newY += nudgeAmount; break;
-          case 'ArrowLeft': newX -= nudgeAmount; break;
-          case 'ArrowRight': newX += nudgeAmount; break;
-        }
-        
-        handleUpdateBlockPosition(blockId, newX, newY);
-      });
-    }
-  }, [selectedBlockIds, blocks, handleDeleteBlock, handleUpdateBlockPosition]);
-
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
+  const handleMarqueeSelect = useCallback((blockIds: string[]) => {
+    setSelectedBlockIds(blockIds);
+  }, [setSelectedBlockIds]);
 
   return (
     <div className="h-full flex flex-col">
+      <EditorToolbar
+        omId={omId}
+        isSaving={isSaving}
+        lastSavedAt={lastSavedAt}
+        hasUnsavedChanges={hasUnsavedChanges}
+        autosaveError={autosaveError}
+      />
+      
       <div className="flex-1 overflow-hidden">
         <ResizablePanelGroup direction="horizontal">
           <ResizablePanel defaultSize={20} minSize={15} maxSize={30} className="bg-sidebar">
@@ -306,8 +280,14 @@ export function OmEditorShell({
               <ZoomControls
                 zoom={zoom}
                 showGrid={showGrid}
+                showRulers={showRulers}
+                showBleedMargins={showBleedMargins}
+                snapToGrid={snapToGrid}
                 onZoomChange={setZoom}
                 onToggleGrid={() => setShowGrid(!showGrid)}
+                onToggleRulers={() => setShowRulers(!showRulers)}
+                onToggleBleedMargins={() => setShowBleedMargins(!showBleedMargins)}
+                onToggleSnapToGrid={() => setSnapToGrid(!snapToGrid)}
                 onFitToScreen={() => setZoom(0.6)}
                 onResetZoom={() => setZoom(1)}
               />
@@ -315,24 +295,58 @@ export function OmEditorShell({
             
             <ScrollArea className="h-full">
               <div 
-                className="p-12 flex justify-center"
+                className="p-12 flex justify-center relative"
                 style={{ minHeight: '100%' }}
               >
-                <FreeformCanvas
-                  page={activePage}
-                  blocks={blocks}
-                  selectedBlockIds={selectedBlockIds}
-                  zoom={zoom}
-                  showGrid={showGrid}
-                  gridSize={8}
-                  canvasWidth={canvasWidth}
-                  canvasHeight={canvasHeight}
-                  onSelectBlock={handleSelectBlock}
-                  onClearSelection={handleClearSelection}
-                  onUpdateBlock={handleUpdateBlock}
-                  onUpdateBlockPosition={handleUpdateBlockPosition}
-                  onUpdateBlockSize={handleUpdateBlockSize}
-                />
+                <div className="relative">
+                  {showRulers && (
+                    <CanvasRulers
+                      width={canvasWidth}
+                      height={canvasHeight}
+                      zoom={zoom}
+                    />
+                  )}
+                  
+                  <div style={{ marginLeft: showRulers ? 20 : 0, marginTop: showRulers ? 20 : 0 }}>
+                    <MarqueeSelection
+                      blocks={blocks}
+                      zoom={zoom}
+                      onSelectionComplete={handleMarqueeSelect}
+                    >
+                      <div className="relative">
+                        <FreeformCanvas
+                          page={activePage}
+                          blocks={blocks}
+                          selectedBlockIds={selectedBlockIds}
+                          zoom={zoom}
+                          showGrid={showGrid}
+                          gridSize={gridSize}
+                          canvasWidth={canvasWidth}
+                          canvasHeight={canvasHeight}
+                          showGuides={true}
+                          snapToGrid={snapToGrid}
+                          onSelectBlock={handleSelectBlock}
+                          onClearSelection={handleClearSelection}
+                          onUpdateBlock={handleUpdateBlock}
+                          onUpdateBlockPosition={handleUpdateBlockPosition}
+                          onUpdateBlockSize={handleUpdateBlockSize}
+                          onHistoryPush={pushToHistory}
+                        />
+                        
+                        {showBleedMargins && (
+                          <PrintMarginOverlay
+                            canvasWidth={canvasWidth}
+                            canvasHeight={canvasHeight}
+                            zoom={zoom}
+                            showBleed={true}
+                            showTrim={true}
+                            showSafety={true}
+                          />
+                        )}
+                      </div>
+                    </MarqueeSelection>
+                  </div>
+                </div>
               </div>
             </ScrollArea>
           </ResizablePanel>
@@ -361,16 +375,9 @@ export function OmEditorShell({
                 ) : (
                   <div className="text-center text-muted-foreground py-8">
                     <p className="text-sm">{selectedBlockIds.length} elements selected</p>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="mt-2"
-                      onClick={() => selectedBlockIds.forEach(id => handleDeleteBlock(id))}
-                      data-testid="button-delete-selected"
-                    >
-                      <Trash2 className="w-3 h-3 mr-1" />
-                      Delete All
-                    </Button>
+                    <p className="text-xs mt-1 text-muted-foreground/70">
+                      Ctrl+G to group
+                    </p>
                   </div>
                 )}
               </div>

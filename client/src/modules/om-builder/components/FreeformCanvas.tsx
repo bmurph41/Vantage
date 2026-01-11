@@ -8,6 +8,12 @@ import {
 } from "lucide-react";
 import type { MetricStripContent, ImageGridContent, TeamGridContent, DisclaimerContent, PortfolioTableContent, SectionDividerContent, MapPageContent } from "../types";
 import { CALLOUT_COLORS, type CalloutVariant } from "../types";
+import { AlignmentGuides, calculateAlignmentGuides } from "./AlignmentGuides";
+
+interface AlignmentGuide {
+  type: 'horizontal' | 'vertical';
+  position: number;
+}
 
 interface FreeformCanvasProps {
   page: OmPage | null;
@@ -18,11 +24,14 @@ interface FreeformCanvasProps {
   gridSize: number;
   canvasWidth?: number;
   canvasHeight?: number;
+  showGuides?: boolean;
+  snapToGrid?: boolean;
   onSelectBlock: (blockId: string, addToSelection?: boolean) => void;
   onClearSelection: () => void;
   onUpdateBlock: (blockId: string, updates: Partial<OmBlock>) => void;
   onUpdateBlockPosition: (blockId: string, x: number, y: number) => void;
   onUpdateBlockSize: (blockId: string, width: number, height: number) => void;
+  onHistoryPush?: () => void;
 }
 
 const DEFAULT_CANVAS_WIDTH = 816;
@@ -37,16 +46,21 @@ export function FreeformCanvas({
   gridSize,
   canvasWidth = DEFAULT_CANVAS_WIDTH,
   canvasHeight = DEFAULT_CANVAS_HEIGHT,
+  showGuides = true,
+  snapToGrid: enableSnapToGrid = true,
   onSelectBlock,
   onClearSelection,
   onUpdateBlock,
   onUpdateBlockPosition,
   onUpdateBlockSize,
+  onHistoryPush,
 }: FreeformCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
+  const [activeGuides, setActiveGuides] = useState<AlignmentGuide[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
 
-  const snapToGrid = (value: number) => {
-    if (!showGrid) return value;
+  const snapToGridValue = (value: number) => {
+    if (!enableSnapToGrid || !showGrid) return value;
     return Math.round(value / gridSize) * gridSize;
   };
 
@@ -54,6 +68,42 @@ export function FreeformCanvas({
     if (e.target === canvasRef.current) {
       onClearSelection();
     }
+  };
+  
+  const handleDragStart = () => {
+    setIsDragging(true);
+    if (onHistoryPush) {
+      onHistoryPush();
+    }
+  };
+  
+  const handleDrag = (blockId: string, x: number, y: number) => {
+    if (!showGuides) {
+      setActiveGuides([]);
+      return;
+    }
+    
+    const block = blocks.find(b => b.id === blockId);
+    if (!block) return;
+    
+    const tempBlock = {
+      ...block,
+      position: {
+        ...block.position,
+        x,
+        y,
+        width: block.position?.width || 200,
+        height: block.position?.height || 100,
+      },
+    };
+    
+    const { guides } = calculateAlignmentGuides(tempBlock, blocks);
+    setActiveGuides(guides);
+  };
+  
+  const handleDragStop = () => {
+    setIsDragging(false);
+    setActiveGuides([]);
   };
 
   const renderBlockContent = (block: OmBlock) => {
@@ -364,6 +414,15 @@ export function FreeformCanvas({
         />
       )}
       
+      {showGuides && activeGuides.length > 0 && (
+        <AlignmentGuides
+          guides={activeGuides}
+          canvasWidth={canvasWidth}
+          canvasHeight={canvasHeight}
+          zoom={1}
+        />
+      )}
+      
       {sortedBlocks.map((block) => {
         if (block.meta?.hidden) return null;
         
@@ -376,26 +435,34 @@ export function FreeformCanvas({
             key={block.id}
             position={{ x: position.x, y: position.y }}
             size={{ width: position.width, height: position.height }}
+            onDragStart={handleDragStart}
+            onDrag={(e, d) => {
+              if (isLocked) return;
+              handleDrag(block.id, d.x, d.y);
+            }}
             onDragStop={(e, d) => {
               if (isLocked) return;
-              onUpdateBlockPosition(block.id, snapToGrid(d.x), snapToGrid(d.y));
+              handleDragStop();
+              onUpdateBlockPosition(block.id, snapToGridValue(d.x), snapToGridValue(d.y));
             }}
+            onResizeStart={handleDragStart}
             onResizeStop={(e, direction, ref, delta, pos) => {
               if (isLocked) return;
+              handleDragStop();
               onUpdateBlockSize(
                 block.id,
-                snapToGrid(parseInt(ref.style.width)),
-                snapToGrid(parseInt(ref.style.height))
+                snapToGridValue(parseInt(ref.style.width)),
+                snapToGridValue(parseInt(ref.style.height))
               );
-              onUpdateBlockPosition(block.id, snapToGrid(pos.x), snapToGrid(pos.y));
+              onUpdateBlockPosition(block.id, snapToGridValue(pos.x), snapToGridValue(pos.y));
             }}
             disableDragging={isLocked}
             enableResizing={!isLocked}
             bounds="parent"
             minWidth={40}
             minHeight={30}
-            dragGrid={showGrid ? [gridSize, gridSize] : undefined}
-            resizeGrid={showGrid ? [gridSize, gridSize] : undefined}
+            dragGrid={showGrid && enableSnapToGrid ? [gridSize, gridSize] : undefined}
+            resizeGrid={showGrid && enableSnapToGrid ? [gridSize, gridSize] : undefined}
             className={`
               ${isSelected ? 'ring-2 ring-primary ring-offset-1' : ''}
               ${isLocked ? 'cursor-not-allowed opacity-80' : 'cursor-move'}
@@ -405,6 +472,7 @@ export function FreeformCanvas({
               e.stopPropagation();
               onSelectBlock(block.id, e.shiftKey);
             }}
+            data-block-id={block.id}
             data-testid={`canvas-block-${block.id}`}
           >
             <div className="w-full h-full bg-background border border-border rounded overflow-hidden">

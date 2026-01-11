@@ -1,14 +1,21 @@
-import { ZoomIn, ZoomOut, Maximize, Grid3X3, RotateCcw } from "lucide-react";
+import { ZoomIn, ZoomOut, Maximize, Grid3X3, RotateCcw, Ruler, Layout, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Toggle } from "@/components/ui/toggle";
+import { Separator } from "@/components/ui/separator";
 
 interface ZoomControlsProps {
   zoom: number;
   showGrid: boolean;
+  showRulers?: boolean;
+  showBleedMargins?: boolean;
+  snapToGrid?: boolean;
   onZoomChange: (zoom: number) => void;
   onToggleGrid: () => void;
+  onToggleRulers?: () => void;
+  onToggleBleedMargins?: () => void;
+  onToggleSnapToGrid?: () => void;
   onFitToScreen: () => void;
   onResetZoom: () => void;
 }
@@ -18,8 +25,14 @@ const ZOOM_PRESETS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
 export function ZoomControls({
   zoom,
   showGrid,
+  showRulers = true,
+  showBleedMargins = false,
+  snapToGrid = true,
   onZoomChange,
   onToggleGrid,
+  onToggleRulers,
+  onToggleBleedMargins,
+  onToggleSnapToGrid,
   onFitToScreen,
   onResetZoom,
 }: ZoomControlsProps) {
@@ -37,7 +50,7 @@ export function ZoomControls({
 
   return (
     <TooltipProvider>
-      <div className="flex items-center gap-2 bg-background/95 backdrop-blur border rounded-lg px-2 py-1 shadow-sm">
+      <div className="flex items-center gap-1 bg-background/95 backdrop-blur border rounded-lg px-2 py-1 shadow-sm">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -54,7 +67,7 @@ export function ZoomControls({
           <TooltipContent>Zoom Out</TooltipContent>
         </Tooltip>
 
-        <div className="w-24">
+        <div className="w-20">
           <Slider
             value={[zoom]}
             min={0.25}
@@ -81,11 +94,11 @@ export function ZoomControls({
           <TooltipContent>Zoom In</TooltipContent>
         </Tooltip>
 
-        <span className="text-xs text-muted-foreground w-10 text-center" data-testid="text-zoom-percent">
+        <span className="text-xs text-muted-foreground w-9 text-center" data-testid="text-zoom-percent">
           {zoomPercent}%
         </span>
 
-        <div className="h-4 w-px bg-border" />
+        <Separator orientation="vertical" className="h-4 mx-1" />
 
         <Tooltip>
           <TooltipTrigger asChild>
@@ -117,7 +130,7 @@ export function ZoomControls({
           <TooltipContent>Fit to Screen</TooltipContent>
         </Tooltip>
 
-        <div className="h-4 w-px bg-border" />
+        <Separator orientation="vertical" className="h-4 mx-1" />
 
         <Tooltip>
           <TooltipTrigger asChild>
@@ -131,8 +144,42 @@ export function ZoomControls({
               <Grid3X3 className="h-4 w-4" />
             </Toggle>
           </TooltipTrigger>
-          <TooltipContent>Toggle Grid</TooltipContent>
+          <TooltipContent>Toggle Grid {snapToGrid ? '(Snap On)' : '(Snap Off)'}</TooltipContent>
         </Tooltip>
+
+        {onToggleRulers && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Toggle
+                pressed={showRulers}
+                onPressedChange={onToggleRulers}
+                size="sm"
+                className="h-7 w-7 p-0"
+                data-testid="toggle-rulers"
+              >
+                <Ruler className="h-4 w-4" />
+              </Toggle>
+            </TooltipTrigger>
+            <TooltipContent>Toggle Rulers</TooltipContent>
+          </Tooltip>
+        )}
+
+        {onToggleBleedMargins && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Toggle
+                pressed={showBleedMargins}
+                onPressedChange={onToggleBleedMargins}
+                size="sm"
+                className="h-7 w-7 p-0"
+                data-testid="toggle-bleed"
+              >
+                <Layout className="h-4 w-4" />
+              </Toggle>
+            </TooltipTrigger>
+            <TooltipContent>Toggle Print Margins</TooltipContent>
+          </Tooltip>
+        )}
       </div>
     </TooltipProvider>
   );
