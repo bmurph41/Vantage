@@ -23,7 +23,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 router.use(requireRentRoll());
 
 function getOrgId(req: Request): string {
-  return (req as any).session?.orgId || 'default-org';
+  return (req as any).user?.orgId || (req as any).session?.user?.orgId || (req as any).session?.orgId || 'default-org';
 }
 
 function getUserId(req: Request): string {
