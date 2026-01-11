@@ -517,6 +517,13 @@ class DocIntelService {
       if (isMultiColumnPnl) {
         headerRowIndex = this.findHeaderRowIndex(jsonData, monthHeaders);
         console.log(`[DocIntelService] Detected multi-column P&L with ${monthHeaders.length} month columns, header at row ${headerRowIndex + 1}`);
+      } else {
+        // Log first few rows for debugging when month headers aren't detected
+        console.log(`[DocIntelService] Single-column mode - no month headers found. First row samples:`);
+        const firstRow = jsonData[0];
+        if (firstRow) {
+          console.log(`[DocIntelService] Row 1:`, firstRow.slice(0, 15).map((c: any) => `${typeof c === 'number' ? 'NUM:' : ''}${String(c).substring(0, 20)}`).join(' | '));
+        }
       }
 
       for (let rowIndex = 0; rowIndex < jsonData.length; rowIndex++) {
@@ -601,7 +608,8 @@ class DocIntelService {
   private detectMonthHeaders(jsonData: any[][]): MonthHeader[] {
     const headers: MonthHeader[] = [];
     
-    for (let rowIdx = 0; rowIdx < Math.min(5, jsonData.length); rowIdx++) {
+    // Scan first 10 rows for month headers (some files have multiple header rows)
+    for (let rowIdx = 0; rowIdx < Math.min(10, jsonData.length); rowIdx++) {
       const row = jsonData[rowIdx];
       if (!row) continue;
       
@@ -610,7 +618,26 @@ class DocIntelService {
       
       for (let colIdx = 0; colIdx < row.length; colIdx++) {
         const cell = row[colIdx];
-        if (!cell) continue;
+        if (cell === null || cell === undefined || cell === '') continue;
+        
+        // Handle Excel date serial numbers (e.g., 45292 = Jan 1, 2024)
+        if (typeof cell === 'number' && cell > 25569 && cell < 60000) {
+          const excelDate = this.excelSerialToDate(cell);
+          if (excelDate) {
+            const month = excelDate.getMonth() + 1;
+            const year = excelDate.getFullYear();
+            const periodKey = `${year}-${String(month).padStart(2, '0')}`;
+            rowHeaders.push({
+              columnIndex: colIdx,
+              month,
+              year,
+              periodKey,
+              rawLabel: String(cell),
+            });
+            defaultYear = year;
+            continue;
+          }
+        }
         
         const cellStr = String(cell).trim().toLowerCase();
         
@@ -627,44 +654,83 @@ class DocIntelService {
         }
       }
       
+      // Accept if we found at least 3 consecutive month-like headers
       if (rowHeaders.length >= 3) {
+        console.log(`[DocIntelService] Found ${rowHeaders.length} month headers in row ${rowIdx + 1}:`, 
+          rowHeaders.map(h => `${h.periodKey} (col ${h.columnIndex})`).join(', '));
         return rowHeaders;
       }
     }
     
     return headers;
   }
+  
+  private excelSerialToDate(serial: number): Date | null {
+    // Excel serial date: days since Dec 30, 1899
+    // Subtract 25569 to convert to Unix timestamp (days since Jan 1, 1970)
+    try {
+      const unixTime = (serial - 25569) * 86400 * 1000;
+      const date = new Date(unixTime);
+      if (date.getFullYear() >= 2000 && date.getFullYear() <= 2100) {
+        return date;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
 
   private parseMonthHeader(cellStr: string, colIdx: number, defaultYear: number): MonthHeader | null {
     const patterns = [
-      /^(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s\-']*('?\d{2}|\d{4})?$/i,
+      /^(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s\-'.,]*('?\d{2}|\d{4})?$/i,
       /^(\d{1,2})[\/-](\d{2}|\d{4})$/,
-      /^(january|february|march|april|may|june|july|august|september|october|november|december)[\s\-']*(\d{2}|\d{4})?$/i,
+      /^(january|february|march|april|may|june|july|august|september|october|november|december)[\s\-'.,]*(\d{2}|\d{4})?$/i,
+      /^(\d{4})[\/-](\d{1,2})$/, // ISO format: 2025-01, 2025/01
+      /^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/, // MM/DD/YY or MM/DD/YYYY (use first as month)
     ];
     
-    for (const pattern of patterns) {
+    for (let i = 0; i < patterns.length; i++) {
+      const pattern = patterns[i];
       const match = cellStr.match(pattern);
       if (match) {
         let month: number | undefined;
         let year = defaultYear;
         
-        const monthPart = match[1].toLowerCase();
-        month = MONTH_PATTERNS[monthPart];
-        
-        if (month === undefined) {
-          const monthNum = parseInt(monthPart, 10);
-          if (monthNum >= 1 && monthNum <= 12) {
-            month = monthNum;
-          }
+        // Handle ISO format (YYYY-MM) differently
+        if (i === 3) {
+          year = parseInt(match[1], 10);
+          month = parseInt(match[2], 10);
+          if (month < 1 || month > 12) continue;
         }
-        
-        if (month === undefined) continue;
-        
-        if (match[2]) {
-          const yearPart = match[2].replace(/'/g, '');
+        // Handle MM/DD/YYYY format - extract month from first group
+        else if (i === 4) {
+          month = parseInt(match[1], 10);
+          if (month < 1 || month > 12) continue;
+          const yearPart = match[3];
           year = parseInt(yearPart, 10);
           if (year < 100) {
             year += year > 50 ? 1900 : 2000;
+          }
+        }
+        else {
+          const monthPart = match[1].toLowerCase();
+          month = MONTH_PATTERNS[monthPart];
+          
+          if (month === undefined) {
+            const monthNum = parseInt(monthPart, 10);
+            if (monthNum >= 1 && monthNum <= 12) {
+              month = monthNum;
+            }
+          }
+          
+          if (month === undefined) continue;
+          
+          if (match[2]) {
+            const yearPart = match[2].replace(/'/g, '');
+            year = parseInt(yearPart, 10);
+            if (year < 100) {
+              year += year > 50 ? 1900 : 2000;
+            }
           }
         }
         
