@@ -19,7 +19,6 @@ import {
   ChevronRight,
   RefreshCw,
   LayoutGrid,
-  List,
   Calendar,
   AlertCircle,
 } from "lucide-react";
@@ -112,7 +111,6 @@ interface GroupedItemsResponse {
   isMultiColumn: boolean;
 }
 
-type ViewMode = "flat" | "grouped";
 
 interface PLReviewGridProps {
   projectId: string;
@@ -197,7 +195,6 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
   const [localEdits, setLocalEdits] = useState<Record<string, Partial<ExtractedItem>>>({});
   const [pendingMonthlyEdits, setPendingMonthlyEdits] = useState<Record<string, number>>({});
   const [showExcluded, setShowExcluded] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>("flat");
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [excludeDialog, setExcludeDialog] = useState<{ open: boolean; item: ExtractedItem | null; reason: string }>({
     open: false,
@@ -221,7 +218,6 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
       if (!res.ok) throw new Error("Failed to fetch grouped items");
       return res.json();
     },
-    enabled: viewMode === "grouped",
   });
 
   const toggleRowExpanded = (key: string) => {
@@ -805,26 +801,6 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
             <RefreshCw className="h-4 w-4 mr-1" />
             Refresh
           </Button>
-          <div className="flex items-center border rounded-md">
-            <Button
-              variant={viewMode === "flat" ? "secondary" : "ghost"}
-              size="sm"
-              className="rounded-r-none"
-              onClick={() => setViewMode("flat")}
-            >
-              <List className="h-4 w-4 mr-1" />
-              Flat
-            </Button>
-            <Button
-              variant={viewMode === "grouped" ? "secondary" : "ghost"}
-              size="sm"
-              className="rounded-l-none"
-              onClick={() => setViewMode("grouped")}
-            >
-              <LayoutGrid className="h-4 w-4 mr-1" />
-              Grouped
-            </Button>
-          </div>
         </div>
         <div className="flex items-center gap-2">
           {selectedIds.size > 0 && (
@@ -896,84 +872,34 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
         </div>
       </div>
 
-      {viewMode === "flat" ? (
-        <div className="border rounded-lg overflow-hidden">
-          <Table>
-            <TableHeader>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => (
-                    <TableHead
-                      key={header.id}
-                      style={{ width: header.getSize() }}
-                      className="bg-muted/50"
-                    >
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(header.column.columnDef.header, header.getContext())}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              ))}
-            </TableHeader>
-            <TableBody>
-              {table.getRowModel().rows.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={columns.length} className="h-24 text-center">
-                    No line items found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                table.getRowModel().rows.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    className={
-                      row.original.status === "excluded"
-                        ? "opacity-50 bg-muted/30"
-                        : row.original.status === "confirmed"
-                        ? "bg-green-50/30 dark:bg-green-950/20"
-                        : ""
-                    }
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id} style={{ width: cell.column.getSize() }}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      ) : (
-        <div className="border rounded-lg overflow-hidden">
-          {isLoadingGrouped ? (
-            <div className="flex items-center justify-center h-48">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : !groupedData?.isMultiColumn ? (
-            <div className="p-8 text-center text-muted-foreground">
-              <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="font-medium">Single Column Data</p>
-              <p className="text-sm">This document doesn't have monthly columns. Use the Flat view instead.</p>
-              <p className="text-xs mt-2 text-muted-foreground/70">
-                Re-upload a file with month columns (e.g., Jan, Feb, Mar...) to see monthly data.
-              </p>
-            </div>
-          ) : (
+      <div className="border rounded-lg overflow-hidden">
+        {isLoadingGrouped ? (
+          <div className="flex items-center justify-center h-48">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : !groupedData ? (
+          <div className="flex items-center justify-center h-48">
+            <p className="text-muted-foreground">No data available.</p>
+          </div>
+        ) : (
             <div className="overflow-x-auto">
               <Table className="min-w-max">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-8 bg-muted/50 sticky left-0 z-20"></TableHead>
                     <TableHead className="bg-muted/50 sticky left-8 z-20 min-w-[200px]">Line Item</TableHead>
-                    {groupedData.periods.map((period) => (
-                      <TableHead key={period} className="bg-muted/50 text-center min-w-[90px]">
-                        {formatPeriodLabel(period)}
-                      </TableHead>
-                    ))}
-                    <TableHead className="bg-muted/50 text-right min-w-[100px] sticky right-[180px] z-20">Total</TableHead>
+                    {groupedData.isMultiColumn ? (
+                      groupedData.periods.map((period) => (
+                        <TableHead key={period} className="bg-muted/50 text-center min-w-[90px]">
+                          {formatPeriodLabel(period)}
+                        </TableHead>
+                      ))
+                    ) : (
+                      <TableHead className="bg-muted/50 text-right min-w-[100px]">Amount</TableHead>
+                    )}
+                    {groupedData.isMultiColumn && (
+                      <TableHead className="bg-muted/50 text-right min-w-[100px] sticky right-[180px] z-20">Total</TableHead>
+                    )}
                     <TableHead className="bg-muted/50 text-center min-w-[90px] sticky right-[90px] z-20">Status</TableHead>
                     <TableHead className="bg-muted/50 text-center min-w-[90px] sticky right-0 z-20">Actions</TableHead>
                   </TableRow>
@@ -981,7 +907,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
               <TableBody>
                 {groupedData.lineItems.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={groupedData.periods.length + 5} className="h-24 text-center">
+                    <TableCell colSpan={groupedData.isMultiColumn ? groupedData.periods.length + 5 : 5} className="h-24 text-center">
                       No line items found.
                     </TableCell>
                   </TableRow>
@@ -1021,78 +947,145 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
                               {lineItem.lineItemName}
                             </span>
                           </TableCell>
-                          {groupedData.periods.map((period) => {
-                            const monthData = lineItem.monthlyData.find(
-                              (m) => m.periodKey === period
-                            );
-                            const statusColor = monthData?.status === "confirmed" 
-                              ? "bg-green-50 dark:bg-green-950/30" 
-                              : monthData?.status === "excluded"
-                              ? "bg-gray-100 dark:bg-gray-800/50"
-                              : "";
-                            const isEditingThisCell = editingCell?.id === monthData?.id && editingCell?.field === "amount";
-                            
-                            return (
-                              <TableCell 
-                                key={period} 
-                                className={`text-center text-sm font-mono ${statusColor} ${!isEditingThisCell ? 'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/30' : ''}`}
-                                onClick={() => {
-                                  if (monthData && !isEditingThisCell) {
-                                    setEditingCell({ id: monthData.id, field: "amount" });
-                                  }
-                                }}
-                              >
-                                {isEditingThisCell && monthData ? (
-                                  <Input
-                                    type="number"
-                                    defaultValue={monthData.amount || ""}
-                                    className="h-7 w-20 text-center text-sm"
-                                    autoFocus
-                                    onBlur={(e) => {
-                                      const newAmount = e.target.value;
-                                      const newAmountNum = parseFloat(newAmount) || 0;
-                                      if (newAmount !== String(monthData.amount || "")) {
-                                        // Set pending edit for immediate visual feedback
-                                        setPendingMonthlyEdits(prev => ({
-                                          ...prev,
-                                          [monthData.id]: newAmountNum,
-                                        }));
-                                        updateItemMutation.mutate({
-                                          itemId: monthData.id,
-                                          updates: { amountConfirmed: newAmount },
-                                        });
-                                      }
-                                      setEditingCell(null);
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter") {
-                                        (e.target as HTMLInputElement).blur();
-                                      } else if (e.key === "Escape") {
+                          {groupedData.isMultiColumn ? (
+                            groupedData.periods.map((period) => {
+                              const monthData = lineItem.monthlyData.find(
+                                (m) => m.periodKey === period
+                              );
+                              const statusColor = monthData?.status === "confirmed" 
+                                ? "bg-green-50 dark:bg-green-950/30" 
+                                : monthData?.status === "excluded"
+                                ? "bg-gray-100 dark:bg-gray-800/50"
+                                : "";
+                              const isEditingThisCell = editingCell?.id === monthData?.id && editingCell?.field === "amount";
+                              
+                              return (
+                                <TableCell 
+                                  key={period} 
+                                  className={`text-center text-sm font-mono ${statusColor} ${!isEditingThisCell ? 'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/30' : ''}`}
+                                  onClick={() => {
+                                    if (monthData && !isEditingThisCell) {
+                                      setEditingCell({ id: monthData.id, field: "amount" });
+                                    }
+                                  }}
+                                >
+                                  {isEditingThisCell && monthData ? (
+                                    <Input
+                                      type="number"
+                                      defaultValue={monthData.amount || ""}
+                                      className="h-7 w-20 text-center text-sm"
+                                      autoFocus
+                                      onBlur={(e) => {
+                                        const newAmount = e.target.value;
+                                        const newAmountNum = parseFloat(newAmount) || 0;
+                                        if (newAmount !== String(monthData.amount || "")) {
+                                          setPendingMonthlyEdits(prev => ({
+                                            ...prev,
+                                            [monthData.id]: newAmountNum,
+                                          }));
+                                          updateItemMutation.mutate({
+                                            itemId: monthData.id,
+                                            updates: { amountConfirmed: newAmount },
+                                          });
+                                        }
                                         setEditingCell(null);
-                                      }
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
-                                  />
-                                ) : (
-                                  (() => {
-                                    // Show pending edit value if exists, otherwise show server value
-                                    const pendingValue = monthData ? pendingMonthlyEdits[monthData.id] : undefined;
-                                    const displayValue = pendingValue !== undefined ? pendingValue : monthData?.amount;
-                                    const isPending = pendingValue !== undefined;
-                                    return displayValue != null ? (
-                                      <span className={isPending ? "opacity-70" : ""}>
-                                        {formatCurrency(displayValue)}
-                                        {isPending && <Loader2 className="h-3 w-3 ml-1 inline animate-spin" />}
-                                      </span>
-                                    ) : "-";
-                                  })()
-                                )}
-                              </TableCell>
-                            );
-                          })}
-                          <TableCell className="text-right font-semibold sticky right-[180px] z-10 bg-background">
-                            {formatCurrency(lineItem.totalAmount)}
-                          </TableCell>
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                          (e.target as HTMLInputElement).blur();
+                                        } else if (e.key === "Escape") {
+                                          setEditingCell(null);
+                                        }
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                  ) : (
+                                    (() => {
+                                      const pendingValue = monthData ? pendingMonthlyEdits[monthData.id] : undefined;
+                                      const displayValue = pendingValue !== undefined ? pendingValue : monthData?.amount;
+                                      const isPending = pendingValue !== undefined;
+                                      return displayValue != null ? (
+                                        <span className={isPending ? "opacity-70" : ""}>
+                                          {formatCurrency(displayValue)}
+                                          {isPending && <Loader2 className="h-3 w-3 ml-1 inline animate-spin" />}
+                                        </span>
+                                      ) : "-";
+                                    })()
+                                  )}
+                                </TableCell>
+                              );
+                            })
+                          ) : (
+                            (() => {
+                              const singleItem = lineItem.monthlyData[0];
+                              const isEditingThisCell = singleItem && editingCell?.id === singleItem.id && editingCell?.field === "amount";
+                              const statusColor = singleItem?.status === "confirmed" 
+                                ? "bg-green-50 dark:bg-green-950/30" 
+                                : singleItem?.status === "excluded"
+                                ? "bg-gray-100 dark:bg-gray-800/50"
+                                : "";
+                              
+                              return (
+                                <TableCell 
+                                  className={`text-right font-mono ${statusColor} ${!isEditingThisCell ? 'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/30' : ''}`}
+                                  onClick={() => {
+                                    if (singleItem && !isEditingThisCell) {
+                                      setEditingCell({ id: singleItem.id, field: "amount" });
+                                    }
+                                  }}
+                                >
+                                  {isEditingThisCell && singleItem ? (
+                                    <Input
+                                      type="number"
+                                      defaultValue={singleItem.amount || ""}
+                                      className="h-7 w-24 text-right text-sm ml-auto"
+                                      autoFocus
+                                      onBlur={(e) => {
+                                        const newAmount = e.target.value;
+                                        const newAmountNum = parseFloat(newAmount) || 0;
+                                        if (newAmount !== String(singleItem.amount || "")) {
+                                          setPendingMonthlyEdits(prev => ({
+                                            ...prev,
+                                            [singleItem.id]: newAmountNum,
+                                          }));
+                                          updateItemMutation.mutate({
+                                            itemId: singleItem.id,
+                                            updates: { amountConfirmed: newAmount },
+                                          });
+                                        }
+                                        setEditingCell(null);
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                          (e.target as HTMLInputElement).blur();
+                                        } else if (e.key === "Escape") {
+                                          setEditingCell(null);
+                                        }
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                  ) : (
+                                    (() => {
+                                      const pendingValue = singleItem ? pendingMonthlyEdits[singleItem.id] : undefined;
+                                      const displayValue = pendingValue !== undefined ? pendingValue : singleItem?.amount;
+                                      const isPending = pendingValue !== undefined;
+                                      return displayValue != null ? (
+                                        <span className={isPending ? "opacity-70" : ""}>
+                                          {formatCurrency(displayValue)}
+                                          {isPending && <Loader2 className="h-3 w-3 ml-1 inline animate-spin" />}
+                                        </span>
+                                      ) : "-";
+                                    })()
+                                  )}
+                                </TableCell>
+                              );
+                            })()
+                          )}
+                          {groupedData.isMultiColumn && (
+                            <TableCell className="text-right font-semibold sticky right-[180px] z-10 bg-background">
+                              {formatCurrency(lineItem.totalAmount)}
+                            </TableCell>
+                          )}
                           <TableCell className="text-center sticky right-[90px] z-10 bg-background">
                             <Badge
                               variant={
@@ -1166,7 +1159,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
                         </TableRow>
                         {isExpanded && (
                           <TableRow className="bg-muted/20">
-                            <TableCell colSpan={groupedData.periods.length + 5} className="p-4">
+                            <TableCell colSpan={groupedData.isMultiColumn ? groupedData.periods.length + 5 : 5} className="p-4">
                               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
                                 {lineItem.monthlyData.map((month) => (
                                   <div
@@ -1207,8 +1200,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
               </Table>
             </div>
           )}
-        </div>
-      )}
+      </div>
 
       <Dialog open={excludeDialog.open} onOpenChange={(open) => !open && setExcludeDialog({ open: false, item: null, reason: "" })}>
         <DialogContent className="sm:max-w-md">

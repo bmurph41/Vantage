@@ -692,11 +692,22 @@ class DocIntelService {
 
   private parseMonthHeader(cellStr: string, colIdx: number, defaultYear: number): MonthHeader | null {
     // Patterns for month column headers (not full dates like MM/DD/YYYY)
+    // Order matters - more specific patterns first
     const patterns = [
-      /^(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s\-'.,]*('?\d{2}|\d{4})?$/i,
-      /^(\d{1,2})[\/-](\d{2}|\d{4})$/, // M/YY or M/YYYY (month/year only)
+      // "Jan 24", "Feb 24" - abbreviated month with space and 2-digit year
+      /^(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\s+(\d{2})$/i,
+      // "Jan-24", "Feb-24" - abbreviated month with hyphen and 2-digit year
+      /^(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)-(\d{2})$/i,
+      // "Jan '24", "Feb'24" - abbreviated month with quote and 2-digit year
+      /^(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s\-.,]*'(\d{2})$/i,
+      // General pattern for abbreviated months with optional year
+      /^(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s\-'.,]*(\d{2}|\d{4})?$/i,
+      // M/YY or M/YYYY (month/year only)
+      /^(\d{1,2})[\/-](\d{2}|\d{4})$/,
+      // Full month names with optional year
       /^(january|february|march|april|may|june|july|august|september|october|november|december)[\s\-'.,]*(\d{2}|\d{4})?$/i,
-      /^(\d{4})[\/-](\d{1,2})$/, // ISO format: 2025-01, 2025/01
+      // ISO format: 2025-01, 2025/01
+      /^(\d{4})[\/-](\d{1,2})$/,
     ];
     
     for (let i = 0; i < patterns.length; i++) {
@@ -706,13 +717,24 @@ class DocIntelService {
         let month: number | undefined;
         let year = defaultYear;
         
-        // Handle ISO format (YYYY-MM) differently
-        if (i === 3) {
+        // Handle ISO format (YYYY-MM) at index 6
+        if (i === 6) {
           year = parseInt(match[1], 10);
           month = parseInt(match[2], 10);
           if (month < 1 || month > 12) continue;
         }
+        // Handle M/YY or M/YYYY at index 4
+        else if (i === 4) {
+          month = parseInt(match[1], 10);
+          if (month < 1 || month > 12) continue;
+          const yearPart = match[2];
+          year = parseInt(yearPart, 10);
+          if (year < 100) {
+            year += year > 50 ? 1900 : 2000;
+          }
+        }
         else {
+          // Month name patterns (indices 0-3, 5)
           const monthPart = match[1].toLowerCase();
           month = MONTH_PATTERNS[monthPart];
           
@@ -735,6 +757,8 @@ class DocIntelService {
         }
         
         const periodKey = `${year}-${String(month).padStart(2, '0')}`;
+        
+        console.log(`[DocIntelService] Parsed month header "${cellStr}" -> ${periodKey} (pattern ${i})`);
         
         return {
           columnIndex: colIdx,
