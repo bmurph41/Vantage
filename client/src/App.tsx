@@ -108,6 +108,12 @@ const RentRollV2Dashboard = lazy(() => import("@/modules/rent-roll-v2/pages/rent
 const RentRollV2Cohorts = lazy(() => import("@/modules/rent-roll-v2/pages/cohort-analysis"));
 const RentRollV2Reports = lazy(() => import("@/modules/rent-roll-v2/pages/reports"));
 const RentRollV2Scenarios = lazy(() => import("@/modules/rent-roll-v2/pages/scenarios"));
+const RentRollV2AdminTypes = lazy(() => import("@/modules/rent-roll-v2/pages/AdminTypeManagement"));
+const RentRollV2GLReconciliation = lazy(() => import("@/modules/rent-roll-v2/pages/gl-reconciliation"));
+const RentRollV2Integrations = lazy(() => import("@/modules/rent-roll-v2/pages/integrations"));
+const RentRollV2Reconciliation = lazy(() => import("@/modules/rent-roll-v2/pages/reconciliation"));
+const RentRollV2ReportPackages = lazy(() => import("@/modules/rent-roll-v2/pages/report-packages"));
+const RentRollV2Snapshots = lazy(() => import("@/modules/rent-roll-v2/pages/snapshots"));
 
 // Operations - Tabbed Module Pages
 const FuelSalesTabbed = lazy(() => import("@/pages/operations/FuelSalesTabbed"));
@@ -508,6 +514,72 @@ function Router() {
             <UnifiedLayout>
               <Suspense fallback={<PageLoader />}>
                 <RentRollV2Scenarios />
+              </Suspense>
+            </UnifiedLayout>
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/rent-roll/admin-types">
+        {() => (
+          <AuthGuard>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <RentRollV2AdminTypes />
+              </Suspense>
+            </UnifiedLayout>
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/rent-roll/gl-reconciliation">
+        {() => (
+          <AuthGuard>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <RentRollV2GLReconciliation />
+              </Suspense>
+            </UnifiedLayout>
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/rent-roll/integrations">
+        {() => (
+          <AuthGuard>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <RentRollV2Integrations />
+              </Suspense>
+            </UnifiedLayout>
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/rent-roll/reconciliation">
+        {() => (
+          <AuthGuard>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <RentRollV2Reconciliation />
+              </Suspense>
+            </UnifiedLayout>
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/rent-roll/report-packages">
+        {() => (
+          <AuthGuard>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <RentRollV2ReportPackages />
+              </Suspense>
+            </UnifiedLayout>
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/rent-roll/snapshots">
+        {() => (
+          <AuthGuard>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <RentRollV2Snapshots />
               </Suspense>
             </UnifiedLayout>
           </AuthGuard>
