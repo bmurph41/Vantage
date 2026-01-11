@@ -2,6 +2,9 @@ import { Router, Request, Response, NextFunction } from "express";
 import { rraService } from "../services/rra-service";
 import { requireRentRoll } from "../middleware/pack-guard";
 import { z } from "zod";
+import multer from "multer";
+import * as pdfParseModule from "pdf-parse";
+const pdfParse = (pdfParseModule as any).default || pdfParseModule;
 import {
   insertRraMarinaLocationSchema,
   insertRraStorageLocationSchema,
@@ -15,6 +18,7 @@ import {
 } from "@shared/schema";
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 router.use(requireRentRoll());
 
@@ -33,6 +37,50 @@ router.get("/dashboard", async (req: Request, res: Response, next: NextFunction)
     res.json(metrics);
   } catch (error) {
     next(error);
+  }
+});
+
+// PDF parsing endpoint for rent roll import
+router.post("/parse-pdf", upload.single('file'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const pdfData = await pdfParse(req.file.buffer);
+    const text = pdfData.text;
+    
+    // Split text into lines and parse table structure
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    
+    // Find lines that look like data rows (contain multiple values separated by spaces/tabs)
+    const dataLines = lines.filter(line => {
+      const parts = line.split(/\s{2,}|\t/).filter(p => p.trim());
+      return parts.length >= 3; // At least 3 columns of data
+    });
+    
+    if (dataLines.length < 2) {
+      return res.status(400).json({ 
+        error: "Could not extract table data from PDF. Please use Excel or CSV format." 
+      });
+    }
+    
+    // First qualifying line is likely headers
+    const headerLine = dataLines[0];
+    const headers = headerLine.split(/\s{2,}|\t/).map(h => h.trim()).filter(h => h);
+    
+    // Remaining lines are data rows
+    const rows = dataLines.slice(1).map(line => {
+      const cells = line.split(/\s{2,}|\t/).map(c => c.trim());
+      // Pad or trim to match header length
+      while (cells.length < headers.length) cells.push('');
+      return cells.slice(0, headers.length);
+    });
+    
+    res.json({ headers, rows });
+  } catch (error) {
+    console.error('PDF parse error:', error);
+    res.status(500).json({ error: "Failed to parse PDF file" });
   }
 });
 

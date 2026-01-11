@@ -135,6 +135,7 @@ export function FileImportDrawer({
       'text/csv': ['.csv'],
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
       'application/vnd.ms-excel': ['.xls'],
+      'application/pdf': ['.pdf'],
     },
     maxFiles: 1,
     multiple: false,
@@ -142,14 +143,46 @@ export function FileImportDrawer({
 
   const parsedDataRef = useRef<{ headers: string[]; allRows: string[][] }>({ headers: [], allRows: [] });
 
+  // Helper to find the header row (first row with multiple non-empty cells)
+  const findHeaderRowIndex = (rows: string[][]): number => {
+    for (let i = 0; i < Math.min(rows.length, 10); i++) {
+      const row = rows[i];
+      const nonEmptyCells = row.filter(cell => cell && cell.trim().length > 0);
+      // A header row typically has at least 3 non-empty cells
+      if (nonEmptyCells.length >= 3) {
+        return i;
+      }
+    }
+    return 0; // Default to first row
+  };
+
   const parseFile = async (file: File) => {
     try {
       const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+      const isPDF = file.name.endsWith('.pdf');
       
       let headers: string[] = [];
       let allRows: string[][] = [];
 
-      if (isExcel) {
+      if (isPDF) {
+        // Send PDF to server for parsing
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const response = await fetch('/api/rent-roll/parse-pdf', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to parse PDF');
+        }
+        
+        const { headers: pdfHeaders, rows: pdfRows } = await response.json();
+        headers = pdfHeaders;
+        allRows = pdfRows;
+      } else if (isExcel) {
         const buffer = await file.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: 'array' });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -164,9 +197,16 @@ export function FileImportDrawer({
           return;
         }
         
-        headers = (jsonData[0] as string[]).map(h => String(h || '').trim());
-        allRows = jsonData.slice(1).map(row => 
-          (row as string[]).map(cell => String(cell || '').trim())
+        // Convert all rows to string arrays
+        const allRowsRaw = jsonData.map(row => 
+          (row as any[]).map(cell => String(cell ?? '').trim())
+        );
+        
+        // Find the actual header row (skip title rows, empty rows)
+        const headerRowIndex = findHeaderRowIndex(allRowsRaw);
+        headers = allRowsRaw[headerRowIndex];
+        allRows = allRowsRaw.slice(headerRowIndex + 1).filter(row => 
+          row.some(cell => cell && cell.trim().length > 0) // Skip completely empty rows
         );
       } else {
         const text = await file.text();
@@ -363,7 +403,7 @@ export function FileImportDrawer({
         <SheetHeader>
           <SheetTitle>Import Leases</SheetTitle>
           <SheetDescription>
-            Upload a CSV or Excel file to import lease data into the rent roll.
+            Upload a CSV, Excel, or PDF file to import lease data into the rent roll.
           </SheetDescription>
         </SheetHeader>
 
