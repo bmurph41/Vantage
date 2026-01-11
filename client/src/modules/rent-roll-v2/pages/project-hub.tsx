@@ -18,13 +18,15 @@ import {
   AlertTriangle,
   GitMerge,
   Trash2,
-  FileEdit
+  FileEdit,
+  X
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -152,6 +154,8 @@ export default function ProjectHub() {
   const [selectedProperty, setSelectedProperty] = useState<CrmProperty | null>(null);
   const [dealSearch, setDealSearch] = useState('');
   const [propertySearch, setPropertySearch] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<ProjectHubMetrics | null>(null);
 
   const form = useForm<z.infer<typeof addProjectSchema>>({
     resolver: zodResolver(addProjectSchema),
@@ -384,6 +388,33 @@ export default function ProjectHub() {
     form.reset();
   };
 
+  const handleDeleteClick = (project: ProjectHubMetrics, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setProjectToDelete(project);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!projectToDelete) return;
+    try {
+      await deleteProjectMutation.mutateAsync(projectToDelete.locationId);
+      toast({
+        title: "Success",
+        description: "Project and all associated data have been removed",
+      });
+      setDeleteDialogOpen(false);
+      setProjectToDelete(null);
+    } catch (error) {
+      // Error toast is handled in mutation
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteDialogOpen(false);
+    setProjectToDelete(null);
+  };
+
   const isStep3Valid = () => {
     const status = form.watch("status");
     const operationType = form.watch("operationType");
@@ -486,12 +517,21 @@ export default function ProjectHub() {
           </div>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {activeProjects.map((project) => (
-              <Link key={project.locationId} href={`/projects/${project.locationId}`}>
+              <Link key={project.locationId} href={`/rent-roll/projects/${project.locationId}`}>
                 <Card 
-                  className="hover-elevate active-elevate-2 cursor-pointer transition-all h-full"
+                  className="hover-elevate active-elevate-2 cursor-pointer transition-all h-full relative"
                   data-testid={`card-project-${project.locationId}`}
                 >
-                  <CardHeader className="space-y-1 pb-3">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={(e) => handleDeleteClick(project, e)}
+                    data-testid={`button-delete-${project.locationId}`}
+                    className="h-6 w-6 absolute top-2 right-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 z-10"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                  <CardHeader className="space-y-1 pb-3 pr-10">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <CardTitle className="text-xl truncate" data-testid={`text-project-name-${project.locationId}`}>
@@ -599,12 +639,21 @@ export default function ProjectHub() {
           </div>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {dealProjects.map((project) => (
-              <Link key={project.locationId} href={`/projects/${project.locationId}`}>
+              <Link key={project.locationId} href={`/rent-roll/projects/${project.locationId}`}>
                 <Card 
-                  className="hover-elevate active-elevate-2 cursor-pointer transition-all h-full border-dashed"
+                  className="hover-elevate active-elevate-2 cursor-pointer transition-all h-full border-dashed relative"
                   data-testid={`card-project-${project.locationId}`}
                 >
-                  <CardHeader className="space-y-1 pb-3">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={(e) => handleDeleteClick(project, e)}
+                    data-testid={`button-delete-${project.locationId}`}
+                    className="h-6 w-6 absolute top-2 right-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 z-10"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                  <CardHeader className="space-y-1 pb-3 pr-10">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <CardTitle className="text-xl truncate" data-testid={`text-project-name-${project.locationId}`}>
@@ -1463,6 +1512,36 @@ export default function ProjectHub() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Project</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove <strong>{projectToDelete?.name}</strong>? 
+              This will permanently delete the project and erase all associated data including leases, tenants, cash flows, and snapshots. 
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelDelete}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteProjectMutation.isPending}
+            >
+              {deleteProjectMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Removing...
+                </>
+              ) : (
+                "Remove Project"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       </div>
     </div>
   );

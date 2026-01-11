@@ -132,11 +132,122 @@ export class RRAService {
   }
 
   async deleteLocation(orgId: string, locationId: string): Promise<boolean> {
-    const result = await db.delete(rraMarinaLocations)
+    // SECURITY: First verify the location belongs to the caller's organization
+    const [location] = await db.select()
+      .from(rraMarinaLocations)
       .where(and(
         eq(rraMarinaLocations.id, locationId),
         eq(rraMarinaLocations.orgId, orgId)
       ));
+    
+    if (!location) {
+      throw new Error('Location not found or access denied');
+    }
+    
+    // Cascade delete all related data before deleting the location
+    // Delete in order of dependencies (children first)
+    
+    // 1. Delete budget cash flow mappings for this location's cash flows
+    const cashFlows = await db.select({ id: rraLeaseCashFlows.id })
+      .from(rraLeaseCashFlows)
+      .where(and(
+        eq(rraLeaseCashFlows.locationId, locationId),
+        eq(rraLeaseCashFlows.orgId, orgId)
+      ));
+    
+    if (cashFlows.length > 0) {
+      const cashFlowIds = cashFlows.map(cf => cf.id);
+      for (const cfId of cashFlowIds) {
+        await db.delete(rraBudgetCashFlowMap)
+          .where(eq(rraBudgetCashFlowMap.rraCashFlowId, cfId));
+      }
+    }
+    
+    // 2. Delete lease cash flows
+    await db.delete(rraLeaseCashFlows)
+      .where(eq(rraLeaseCashFlows.locationId, locationId));
+    
+    // 3. Delete move events
+    await db.delete(rraMoveEvents)
+      .where(eq(rraMoveEvents.locationId, locationId));
+    
+    // 4. Delete snapshot versions and lease snapshots
+    const snapshots = await db.select({ id: rraSnapshotVersions.id })
+      .from(rraSnapshotVersions)
+      .where(eq(rraSnapshotVersions.locationId, locationId));
+    
+    if (snapshots.length > 0) {
+      const snapshotIds = snapshots.map(s => s.id);
+      for (const snapId of snapshotIds) {
+        await db.delete(rraLeaseSnapshots)
+          .where(eq(rraLeaseSnapshots.snapshotId, snapId));
+      }
+    }
+    
+    await db.delete(rraSnapshotVersions)
+      .where(eq(rraSnapshotVersions.locationId, locationId));
+    
+    // 5. Get all leases for this location to delete their children
+    const leases = await db.select({ id: rraLeases.id })
+      .from(rraLeases)
+      .where(eq(rraLeases.locationId, locationId));
+    
+    if (leases.length > 0) {
+      const leaseIds = leases.map(l => l.id);
+      for (const leaseId of leaseIds) {
+        // Delete lease line items
+        await db.delete(rraLeaseLineItems)
+          .where(eq(rraLeaseLineItems.leaseId, leaseId));
+        
+        // Delete contract charges
+        await db.delete(rraContractCharges)
+          .where(eq(rraContractCharges.leaseId, leaseId));
+        
+        // Delete lease terms
+        await db.delete(rraLeaseTerms)
+          .where(eq(rraLeaseTerms.leaseId, leaseId));
+        
+        // Delete lease rent steps
+        await db.delete(rraLeaseRentSteps)
+          .where(eq(rraLeaseRentSteps.leaseId, leaseId));
+        
+        // Delete lease escalations
+        await db.delete(rraLeaseEscalations)
+          .where(eq(rraLeaseEscalations.leaseId, leaseId));
+        
+        // Delete lease concessions
+        await db.delete(rraLeaseConcessions)
+          .where(eq(rraLeaseConcessions.leaseId, leaseId));
+        
+        // Delete lease document bindings
+        await db.delete(rraLeaseDocumentBindings)
+          .where(eq(rraLeaseDocumentBindings.leaseId, leaseId));
+      }
+    }
+    
+    // 6. Delete leases
+    await db.delete(rraLeases)
+      .where(eq(rraLeases.locationId, locationId));
+    
+    // 7. Delete storage locations
+    await db.delete(rraStorageLocations)
+      .where(eq(rraStorageLocations.projectId, locationId));
+    
+    // 8. Delete modeling project links
+    await db.delete(rraModelingProjectLinks)
+      .where(eq(rraModelingProjectLinks.rraLocationId, locationId));
+    
+    // 9. Delete deal links
+    await db.delete(rraDealLinks)
+      .where(eq(rraDealLinks.rraLocationId, locationId));
+    
+    // 10. Finally delete the location itself
+    await db.delete(rraMarinaLocations)
+      .where(and(
+        eq(rraMarinaLocations.id, locationId),
+        eq(rraMarinaLocations.orgId, orgId)
+      ));
+    
     return true;
   }
 
