@@ -365,6 +365,27 @@ export default function ProjectHub() {
     form.reset();
   };
 
+  const isStep3Valid = () => {
+    const status = form.watch("status");
+    const operationType = form.watch("operationType");
+    const storageTypeConfigs = form.watch("storageTypeConfigs") || [];
+
+    if (!status || !operationType) {
+      return false;
+    }
+
+    for (const config of storageTypeConfigs) {
+      if (config.unitCount === null || config.unitCount === undefined || config.unitCount < 0) {
+        return false;
+      }
+      if (!config.targetOccupancy || config.targetOccupancy.trim() === "") {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
   useEffect(() => {
     if (!addDialogOpen) {
       form.reset();
@@ -852,7 +873,7 @@ export default function ProjectHub() {
                       name="status"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Status</FormLabel>
+                          <FormLabel>Status *</FormLabel>
                           <Select value={field.value || ""} onValueChange={field.onChange}>
                             <FormControl>
                               <SelectTrigger data-testid="select-project-status">
@@ -878,7 +899,7 @@ export default function ProjectHub() {
                       name="operationType"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Operation Type</FormLabel>
+                          <FormLabel>Operation Type *</FormLabel>
                           <Select value={field.value} onValueChange={field.onChange}>
                             <FormControl>
                               <SelectTrigger data-testid="select-operation-type">
@@ -898,7 +919,13 @@ export default function ProjectHub() {
 
                   <div className="space-y-3">
                     <FormLabel>Storage Types</FormLabel>
-                    <p className="text-xs text-muted-foreground">Select storage types and set unit count and target occupancy for each</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">Select storage types and set unit count and target occupancy for each</p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span className="w-20 text-center">Capacity</span>
+                        <span className="w-24 text-center">Target Occ. %</span>
+                      </div>
+                    </div>
                     <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
                       {STORAGE_TYPES.map((storageType) => {
                         const configs = form.watch("storageTypeConfigs") || [];
@@ -1066,7 +1093,7 @@ export default function ProjectHub() {
                     </Button>
                     <Button
                       type="submit"
-                      disabled={createProjectMutation.isPending || isCheckingDuplicate}
+                      disabled={createProjectMutation.isPending || isCheckingDuplicate || !isStep3Valid()}
                       data-testid="button-create"
                     >
                       {(createProjectMutation.isPending || isCheckingDuplicate) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
