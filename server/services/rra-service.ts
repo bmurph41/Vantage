@@ -824,6 +824,87 @@ export class RRAService {
       syncedFields: ['occupancyRate', 'totalUnits', 'occupiedUnits', 'totalAnnualRevenue', 'averageRentPerUnit'],
     };
   }
+
+  async getProjectHubMetrics(orgId: string): Promise<any[]> {
+    const locations = await db.select()
+      .from(rraMarinaLocations)
+      .where(eq(rraMarinaLocations.orgId, orgId))
+      .orderBy(asc(rraMarinaLocations.name));
+
+    const results = [];
+    const now = new Date();
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
+    for (const location of locations) {
+      const allLeases = await db.select()
+        .from(rraLeases)
+        .where(eq(rraLeases.locationId, location.id));
+      
+      const activeLeases = allLeases.filter(l => l.isActive);
+      
+      const currentMonthCashFlows = await db.select()
+        .from(rraLeaseCashFlows)
+        .where(and(
+          eq(rraLeaseCashFlows.locationId, location.id),
+          eq(rraLeaseCashFlows.year, now.getFullYear()),
+          eq(rraLeaseCashFlows.month, now.getMonth() + 1)
+        ));
+      
+      const monthlyRevenue = currentMonthCashFlows.reduce((sum, cf) => 
+        sum + parseFloat(cf.amount || '0'), 0);
+      
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+      const currentPeriod = now.getFullYear() * 12 + (now.getMonth() + 1);
+      const startPeriod = twelveMonthsAgo.getFullYear() * 12 + (twelveMonthsAgo.getMonth() + 1);
+      const trailing12CashFlows = await db.select()
+        .from(rraLeaseCashFlows)
+        .where(and(
+          eq(rraLeaseCashFlows.locationId, location.id),
+          sql`(${rraLeaseCashFlows.year} * 12 + ${rraLeaseCashFlows.month}) >= ${startPeriod}`,
+          sql`(${rraLeaseCashFlows.year} * 12 + ${rraLeaseCashFlows.month}) <= ${currentPeriod}`
+        ));
+      
+      const trailing12MonthRevenue = trailing12CashFlows.reduce((sum, cf) => 
+        sum + parseFloat(cf.amount || '0'), 0);
+      
+      const expiringLeases = activeLeases.filter(l => {
+        if (!l.leaseExpiration) return false;
+        const expDate = new Date(l.leaseExpiration);
+        return expDate >= now && expDate <= thirtyDaysFromNow;
+      });
+      
+      const upcomingExpirations = expiringLeases.length;
+      const nextExpirationDate = activeLeases
+        .filter(l => l.leaseExpiration && new Date(l.leaseExpiration) >= now)
+        .sort((a, b) => new Date(a.leaseExpiration!).getTime() - new Date(b.leaseExpiration!).getTime())[0]?.leaseExpiration || null;
+      
+      const capacity = location.capacity || 0;
+      const occupancyRate = capacity > 0 ? activeLeases.length / capacity : 0;
+
+      results.push({
+        locationId: location.id,
+        name: location.name,
+        code: location.code || null,
+        description: location.description || null,
+        projectType: location.projectType,
+        status: location.status || null,
+        targetNOI: location.targetNOI || null,
+        capacity: location.capacity || null,
+        activeLeaseCount: activeLeases.length,
+        totalLeaseCount: allLeases.length,
+        occupancyRate,
+        monthlyRevenue: monthlyRevenue.toFixed(2),
+        trailing12MonthRevenue: trailing12MonthRevenue.toFixed(2),
+        nextExpirationDate: nextExpirationDate ? new Date(nextExpirationDate).toISOString().split('T')[0] : null,
+        upcomingExpirations,
+        includeInExecutive: location.includeInExecutive,
+      });
+    }
+
+    return results;
+  }
 }
 
 export const rraService = new RRAService();

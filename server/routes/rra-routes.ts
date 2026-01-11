@@ -44,6 +44,16 @@ router.get("/dashboard", async (req: Request, res: Response, next: NextFunction)
   }
 });
 
+router.get("/project-hub-metrics", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const metrics = await rraService.getProjectHubMetrics(orgId);
+    res.json(metrics);
+  } catch (error) {
+    next(error);
+  }
+});
+
 // PDF parsing endpoint for rent roll import
 router.post("/parse-pdf", upload.single('file'), async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -892,7 +902,16 @@ router.get("/crm/deals/search", async (req: Request, res: Response, next: NextFu
     const search = (req.query.search as string) || '';
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
     
-    let query = db.select({
+    const conditions = [eq(crmDeals.orgId, orgId)];
+    if (search) {
+      conditions.push(or(
+        ilike(crmDeals.title, `%${search}%`),
+        ilike(crmDeals.marinaName, `%${search}%`),
+        ilike(crmDeals.city, `%${search}%`)
+      )!);
+    }
+    
+    const deals = await db.select({
       id: crmDeals.id,
       title: crmDeals.title,
       marinaName: crmDeals.marinaName,
@@ -900,20 +919,11 @@ router.get("/crm/deals/search", async (req: Request, res: Response, next: NextFu
       state: crmDeals.state,
       status: crmDeals.status,
       createdAt: crmDeals.createdAt,
-    }).from(crmDeals).where(eq(crmDeals.orgId, orgId));
+    }).from(crmDeals)
+      .where(and(...conditions))
+      .orderBy(desc(crmDeals.createdAt))
+      .limit(limit);
     
-    if (search) {
-      query = query.where(and(
-        eq(crmDeals.orgId, orgId),
-        or(
-          ilike(crmDeals.title, `%${search}%`),
-          ilike(crmDeals.marinaName, `%${search}%`),
-          ilike(crmDeals.city, `%${search}%`)
-        )
-      ));
-    }
-    
-    const deals = await query.orderBy(desc(crmDeals.createdAt)).limit(limit);
     res.json(deals);
   } catch (error) {
     next(error);
@@ -926,7 +936,16 @@ router.get("/crm/properties/search", async (req: Request, res: Response, next: N
     const search = (req.query.search as string) || '';
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
     
-    let query = db.select({
+    const conditions = [eq(crmProperties.orgId, orgId)];
+    if (search) {
+      conditions.push(or(
+        ilike(crmProperties.title, `%${search}%`),
+        ilike(crmProperties.city, `%${search}%`),
+        ilike(crmProperties.address, `%${search}%`)
+      )!);
+    }
+    
+    const properties = await db.select({
       id: crmProperties.id,
       title: crmProperties.title,
       city: crmProperties.city,
@@ -937,20 +956,11 @@ router.get("/crm/properties/search", async (req: Request, res: Response, next: N
       drySlips: crmProperties.drySlips,
       totalCapacity: crmProperties.totalCapacity,
       createdAt: crmProperties.createdAt,
-    }).from(crmProperties).where(eq(crmProperties.orgId, orgId));
+    }).from(crmProperties)
+      .where(and(...conditions))
+      .orderBy(desc(crmProperties.createdAt))
+      .limit(limit);
     
-    if (search) {
-      query = query.where(and(
-        eq(crmProperties.orgId, orgId),
-        or(
-          ilike(crmProperties.title, `%${search}%`),
-          ilike(crmProperties.city, `%${search}%`),
-          ilike(crmProperties.address, `%${search}%`)
-        )
-      ));
-    }
-    
-    const properties = await query.orderBy(desc(crmProperties.createdAt)).limit(limit);
     res.json(properties);
   } catch (error) {
     next(error);
