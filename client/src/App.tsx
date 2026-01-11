@@ -94,13 +94,23 @@ const CustomerAnalytics = lazy(() => import("@/pages/operations/CustomerAnalytic
 const OwnedMarinas = lazy(() => import("@/pages/operations/OwnedMarinas"));
 const Portfolio = lazy(() => import("@/pages/Portfolio"));
 const MarinaDetail = lazy(() => import("@/pages/portfolio/MarinaDetail"));
-const RentRoll = lazy(() => import("@/pages/operations/RentRoll"));
-const RentRollPortfolio = lazy(() => import("@/pages/operations/rent-roll/Portfolio"));
-const RentRollProjects = lazy(() => import("@/pages/operations/rent-roll/Projects"));
-const RentRollLeases = lazy(() => import("@/pages/operations/rent-roll/Leases"));
-const RentRollProjectDetails = lazy(() => import("@/pages/operations/rent-roll/ProjectDetails"));
+// Rent Roll V2 - Layouts (lazy with preloading)
+const RentRollV2ProjectLayout = lazy(() => import("@/modules/rent-roll-v2/layouts/ProjectLayout"));
+const RentRollV2PortfolioLayout = lazy(() => import("@/modules/rent-roll-v2/layouts/PortfolioLayout"));
 
-// Rent Roll V2 - Marina-centric module
+// Preload rent roll layouts on app start for faster navigation
+const preloadRentRollLayouts = () => {
+  import("@/modules/rent-roll-v2/layouts/ProjectLayout");
+  import("@/modules/rent-roll-v2/layouts/PortfolioLayout");
+  import("@/modules/rent-roll-v2/pages/executive-dashboard");
+  import("@/modules/rent-roll-v2/pages/project-hub");
+  import("@/modules/rent-roll-v2/pages/portfolio");
+};
+if (typeof window !== 'undefined') {
+  setTimeout(preloadRentRollLayouts, 100);
+}
+
+// Rent Roll V2 - Marina-centric module (lazy load pages)
 const RentRollV2Executive = lazy(() => import("@/modules/rent-roll-v2/pages/executive-dashboard"));
 const RentRollV2Projects = lazy(() => import("@/modules/rent-roll-v2/pages/project-hub"));
 const RentRollV2Portfolio = lazy(() => import("@/modules/rent-roll-v2/pages/portfolio"));
@@ -114,9 +124,6 @@ const RentRollV2Integrations = lazy(() => import("@/modules/rent-roll-v2/pages/i
 const RentRollV2Reconciliation = lazy(() => import("@/modules/rent-roll-v2/pages/reconciliation"));
 const RentRollV2ReportPackages = lazy(() => import("@/modules/rent-roll-v2/pages/report-packages"));
 const RentRollV2Snapshots = lazy(() => import("@/modules/rent-roll-v2/pages/snapshots"));
-// Rent Roll V2 - Layouts
-const RentRollV2ProjectLayout = lazy(() => import("@/modules/rent-roll-v2/layouts/ProjectLayout"));
-const RentRollV2PortfolioLayout = lazy(() => import("@/modules/rent-roll-v2/layouts/PortfolioLayout"));
 // Rent Roll V2 - Data Quality pages
 const RentRollV2DataQuality = lazy(() => import("@/modules/rent-roll-v2/pages/data-quality"));
 const RentRollV2PortfolioDataQuality = lazy(() => import("@/modules/rent-roll-v2/pages/portfolio-data-quality"));
@@ -127,7 +134,6 @@ const ShipStoreTabbed = lazy(() => import("@/pages/operations/ShipStoreTabbed"))
 const DockitTabbed = lazy(() => import("@/pages/operations/DockitTabbed"));
 const WorkspacesList = lazy(() => import("@/pages/workspaces/index"));
 const WorkspaceDetail = lazy(() => import("@/pages/workspaces/[workspaceId]"));
-const RentRollTabbed = lazy(() => import("@/pages/operations/RentRollTabbed"));
 const MarketingTabbed = lazy(() => import("@/pages/operations/MarketingTabbed"));
 const ServiceTabbed = lazy(() => import("@/pages/operations/ServiceTabbed"));
 const BoatRentalsTabbed = lazy(() => import("@/pages/operations/BoatRentalsTabbed"));
@@ -705,10 +711,7 @@ function Router() {
 
       {/* Legacy redirect for old owned-marinas route */}
       <Route path="/operations/owned-marinas">
-        {() => {
-          window.location.replace('/portfolio');
-          return null;
-        }}
+        {() => <Redirect to="/portfolio" />}
       </Route>
 
       {/* Operations Routes - Tabbed Module Pages */}
@@ -721,10 +724,7 @@ function Router() {
       </Route>
       {/* Redirect old rent-roll route to new V2 module */}
       <Route path="/operations/rent-roll">
-        {() => {
-          window.location.replace('/rent-roll/executive');
-          return null;
-        }}
+        {() => <Redirect to="/rent-roll/executive" />}
       </Route>
       <Route path="/operations/fuel">
         {() => (
@@ -805,28 +805,16 @@ function Router() {
         }}
       </Route>
       <Route path="/operations/rent-roll/portfolio">
-        {() => {
-          window.location.replace('/rent-roll/portfolio');
-          return null;
-        }}
+        {() => <Redirect to="/rent-roll/portfolio" />}
       </Route>
       <Route path="/operations/rent-roll/projects">
-        {() => {
-          window.location.replace('/rent-roll/projects');
-          return null;
-        }}
+        {() => <Redirect to="/rent-roll/projects" />}
       </Route>
       <Route path="/operations/rent-roll/leases">
-        {() => {
-          window.location.replace('/rent-roll/dashboard');
-          return null;
-        }}
+        {() => <Redirect to="/rent-roll/executive" />}
       </Route>
       <Route path="/operations/rent-roll/projects/:id">
-        {() => {
-          window.location.replace('/rent-roll/projects');
-          return null;
-        }}
+        {() => <Redirect to="/rent-roll/projects" />}
       </Route>
       <Route path="/operations/fuel/dashboard">
         {() => {
