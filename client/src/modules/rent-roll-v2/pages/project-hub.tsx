@@ -9,6 +9,7 @@ import {
   TrendingUp, 
   Users, 
   Calendar,
+  Check,
   ChevronRight,
   DollarSign,
   Pencil,
@@ -759,51 +760,71 @@ export default function ProjectHub() {
 
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
         <DialogContent data-testid="dialog-add-rent-roll" className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle data-testid="text-dialog-title">
+          <DialogHeader className="pb-2">
+            <DialogTitle data-testid="text-dialog-title" className="text-xl">
               {addDialogStep === 1 && "Add New Rent Roll"}
               {addDialogStep === 2 && "Select Project Type"}
               {addDialogStep === 3 && "Project Details"}
             </DialogTitle>
             <DialogDescription data-testid="text-dialog-description">
-              {addDialogStep === 1 && "Step 1 of 3: Enter your project name"}
-              {addDialogStep === 2 && "Step 2 of 3: Choose the project type"}
-              {addDialogStep === 3 && "Step 3 of 3: Complete the project details"}
+              {addDialogStep === 1 && "Enter your project name to get started"}
+              {addDialogStep === 2 && "Choose how this project will be used"}
+              {addDialogStep === 3 && "Complete the project configuration"}
             </DialogDescription>
           </DialogHeader>
           
-          <div className="flex items-center justify-center gap-2 py-2">
+          <div className="flex items-center justify-center gap-3 py-3">
             {[1, 2, 3].map((step) => (
-              <div
-                key={step}
-                className={`h-2 w-12 rounded-full transition-colors ${
-                  step <= addDialogStep ? "bg-primary" : "bg-muted"
-                }`}
-              />
+              <div key={step} className="flex items-center gap-2">
+                <div
+                  className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold transition-all ${
+                    step < addDialogStep
+                      ? "bg-primary text-primary-foreground"
+                      : step === addDialogStep
+                      ? "bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {step < addDialogStep ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    step
+                  )}
+                </div>
+                {step < 3 && (
+                  <div className={`h-0.5 w-8 transition-colors ${step < addDialogStep ? "bg-primary" : "bg-muted"}`} />
+                )}
+              </div>
             ))}
           </div>
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleAddProject)} className="space-y-4 py-4">
               {addDialogStep === 1 && (
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Project Name *</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="e.g., Marina A - Downtown Location"
-                          data-testid="input-project-name"
-                          autoFocus
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="py-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base">Project Name *</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g., Marina A - Downtown Location"
+                            data-testid="input-project-name"
+                            autoFocus
+                            className="h-11 text-base"
+                            {...field}
+                          />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Choose a descriptive name that helps you identify this marina project
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               )}
 
               {addDialogStep === 2 && (
@@ -811,37 +832,44 @@ export default function ProjectHub() {
                   control={form.control}
                   name="projectType"
                   render={({ field }) => (
-                    <FormItem className="space-y-4">
-                      <FormLabel>Project Type *</FormLabel>
+                    <FormItem className="space-y-4 py-2">
                       <div className="grid grid-cols-2 gap-4">
                         <div
-                          className={`cursor-pointer rounded-lg border-2 p-4 transition-colors ${
+                          className={`cursor-pointer rounded-xl border-2 p-6 transition-all hover:shadow-md ${
                             field.value === "OWNED"
-                              ? "border-primary bg-primary/5"
-                              : "border-muted hover-elevate"
+                              ? "border-primary bg-primary/5 shadow-sm"
+                              : "border-muted hover:border-primary/50"
                           }`}
                           onClick={() => field.onChange("OWNED")}
                           data-testid="select-type-owned"
                         >
-                          <div className="flex flex-col items-center gap-2 text-center">
-                            <Building2 className={`h-8 w-8 ${field.value === "OWNED" ? "text-primary" : "text-muted-foreground"}`} />
-                            <div className="font-medium">My Marina</div>
-                            <div className="text-xs text-muted-foreground">Actively managed property</div>
+                          <div className="flex flex-col items-center gap-3 text-center">
+                            <div className={`rounded-full p-3 ${field.value === "OWNED" ? "bg-primary/10" : "bg-muted"}`}>
+                              <Building2 className={`h-8 w-8 ${field.value === "OWNED" ? "text-primary" : "text-muted-foreground"}`} />
+                            </div>
+                            <div>
+                              <div className="font-semibold text-base">My Marina</div>
+                              <div className="text-xs text-muted-foreground mt-1">Actively managed property in your portfolio</div>
+                            </div>
                           </div>
                         </div>
                         <div
-                          className={`cursor-pointer rounded-lg border-2 p-4 transition-colors ${
+                          className={`cursor-pointer rounded-xl border-2 p-6 transition-all hover:shadow-md ${
                             field.value === "DEAL"
-                              ? "border-primary bg-primary/5"
-                              : "border-muted hover-elevate"
+                              ? "border-primary bg-primary/5 shadow-sm"
+                              : "border-muted hover:border-primary/50"
                           }`}
                           onClick={() => field.onChange("DEAL")}
                           data-testid="select-type-deal"
                         >
-                          <div className="flex flex-col items-center gap-2 text-center">
-                            <TrendingUp className={`h-8 w-8 ${field.value === "DEAL" ? "text-primary" : "text-muted-foreground"}`} />
-                            <div className="font-medium">Deal Pipeline</div>
-                            <div className="text-xs text-muted-foreground">Property under evaluation</div>
+                          <div className="flex flex-col items-center gap-3 text-center">
+                            <div className={`rounded-full p-3 ${field.value === "DEAL" ? "bg-primary/10" : "bg-muted"}`}>
+                              <TrendingUp className={`h-8 w-8 ${field.value === "DEAL" ? "text-primary" : "text-muted-foreground"}`} />
+                            </div>
+                            <div>
+                              <div className="font-semibold text-base">Deal Pipeline</div>
+                              <div className="text-xs text-muted-foreground mt-1">Property under evaluation or acquisition</div>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -922,15 +950,17 @@ export default function ProjectHub() {
                   </div>
 
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between pr-1">
-                      <FormLabel>Storage Types *</FormLabel>
-                      <div className="flex items-center gap-2 mr-3">
-                        <FormLabel className="w-20 text-center font-medium">Capacity</FormLabel>
-                        <FormLabel className="w-24 text-center font-medium">Target Occ. %</FormLabel>
+                    <div className="flex items-baseline justify-between">
+                      <div>
+                        <FormLabel>Storage Types *</FormLabel>
+                        <p className="text-xs text-muted-foreground mt-1">Select storage types and set capacity details</p>
+                      </div>
+                      <div className="flex items-center gap-2" style={{ marginRight: '15px' }}>
+                        <span className="w-20 text-center text-xs font-medium text-muted-foreground">Capacity</span>
+                        <span className="w-24 text-center text-xs font-medium text-muted-foreground">Target Occ.</span>
                       </div>
                     </div>
-                    <p className="text-xs text-muted-foreground">Select storage types and set unit count and target occupancy for each</p>
-                    <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
                       {STORAGE_TYPES.map((storageType) => {
                         const configs = form.watch("storageTypeConfigs") || [];
                         const existingConfig = configs.find((c) => c.storageType === storageType);
@@ -1035,12 +1065,12 @@ export default function ProjectHub() {
                 </div>
               )}
 
-              <DialogFooter className="gap-2 sm:gap-0">
+              <DialogFooter className="gap-2 sm:gap-0 pt-4 border-t">
                 {addDialogStep === 1 && (
                   <>
                     <Button
                       type="button"
-                      variant="outline"
+                      variant="ghost"
                       onClick={() => setAddDialogOpen(false)}
                       data-testid="button-cancel"
                     >
@@ -1058,8 +1088,10 @@ export default function ProjectHub() {
                       }}
                       disabled={!form.watch("name").trim()}
                       data-testid="button-next-step"
+                      className="gap-1"
                     >
-                      Next
+                      Continue
+                      <ChevronRight className="h-4 w-4" />
                     </Button>
                   </>
                 )}
@@ -1068,7 +1100,7 @@ export default function ProjectHub() {
                   <>
                     <Button
                       type="button"
-                      variant="outline"
+                      variant="ghost"
                       onClick={() => setAddDialogStep(1)}
                       data-testid="button-back"
                     >
@@ -1078,8 +1110,10 @@ export default function ProjectHub() {
                       type="button"
                       onClick={() => setAddDialogStep(3)}
                       data-testid="button-next-step"
+                      className="gap-1"
                     >
-                      Next
+                      Continue
+                      <ChevronRight className="h-4 w-4" />
                     </Button>
                   </>
                 )}
@@ -1088,7 +1122,7 @@ export default function ProjectHub() {
                   <>
                     <Button
                       type="button"
-                      variant="outline"
+                      variant="ghost"
                       onClick={() => setAddDialogStep(2)}
                       data-testid="button-back"
                       disabled={createProjectMutation.isPending}
@@ -1099,9 +1133,10 @@ export default function ProjectHub() {
                       type="submit"
                       disabled={createProjectMutation.isPending || isCheckingDuplicate || !isStep3Valid()}
                       data-testid="button-create"
+                      className="gap-1"
                     >
-                      {(createProjectMutation.isPending || isCheckingDuplicate) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                      {isCheckingDuplicate ? "Checking..." : createProjectMutation.isPending ? "Creating..." : "Add Project"}
+                      {(createProjectMutation.isPending || isCheckingDuplicate) && <Loader2 className="w-4 h-4 animate-spin" />}
+                      {isCheckingDuplicate ? "Checking..." : createProjectMutation.isPending ? "Creating..." : "Create Project"}
                     </Button>
                   </>
                 )}
