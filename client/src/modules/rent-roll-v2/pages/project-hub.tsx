@@ -922,14 +922,14 @@ export default function ProjectHub() {
                   </div>
 
                   <div className="space-y-3">
-                    <FormLabel>Storage Types</FormLabel>
                     <div className="flex items-center justify-between">
-                      <p className="text-xs text-muted-foreground">Select storage types and set unit count and target occupancy for each</p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="w-20 text-center">Capacity</span>
-                        <span className="w-24 text-center">Target Occ. %</span>
+                      <FormLabel>Storage Types *</FormLabel>
+                      <div className="flex items-center gap-2">
+                        <FormLabel className="w-20 text-center font-medium">Capacity</FormLabel>
+                        <FormLabel className="w-24 text-center font-medium">Target Occ. %</FormLabel>
                       </div>
                     </div>
+                    <p className="text-xs text-muted-foreground">Select storage types and set unit count and target occupancy for each</p>
                     <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
                       {STORAGE_TYPES.map((storageType) => {
                         const configs = form.watch("storageTypeConfigs") || [];
