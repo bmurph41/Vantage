@@ -58,6 +58,7 @@ const addProjectSchema = z.object({
   projectType: z.enum(["OWNED", "DEAL"]),
   description: z.string().optional(),
   status: z.string().optional(),
+  operationType: z.enum(["ANNUAL", "SEASONAL"]).default("ANNUAL"),
   storageTypeConfigs: z.array(storageTypeConfigSchema).default([]),
   includeInExecutive: z.boolean().default(true),
 });
@@ -129,6 +130,7 @@ export default function ProjectHub() {
       projectType: "OWNED",
       description: "",
       status: "",
+      operationType: "ANNUAL",
       storageTypeConfigs: [],
       includeInExecutive: true,
     },
@@ -286,32 +288,12 @@ export default function ProjectHub() {
   };
 
   const handleAddProject = async (data: z.infer<typeof addProjectSchema>) => {
-    setIsCheckingDuplicate(true);
-    try {
-      const cleanedData = {
-        ...data,
-        description: data.description?.trim() || undefined,
-        status: data.status?.trim() || undefined,
-      };
-      const result = await checkDuplicateName(data.name);
-      if (result.isDuplicate && result.existingProject) {
-        setPendingProjectData(cleanedData);
-        setDuplicateInfo(result.existingProject);
-        setCanModifyDuplicate(result.canModify ?? false);
-        setDuplicateDialogOpen(true);
-        setAddDialogOpen(false);
-      } else {
-        createProjectMutation.mutate(cleanedData);
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to check for duplicate project name",
-        variant: "destructive",
-      });
-    } finally {
-      setIsCheckingDuplicate(false);
-    }
+    const cleanedData = {
+      ...data,
+      description: data.description?.trim() || undefined,
+      status: data.status?.trim() || undefined,
+    };
+    createProjectMutation.mutate(cleanedData);
   };
 
   const handleDuplicateRename = () => {
@@ -864,31 +846,55 @@ export default function ProjectHub() {
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Status</FormLabel>
-                        <Select value={field.value || ""} onValueChange={field.onChange}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-project-status">
-                              <SelectValue placeholder="Select status..." />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="Operating">Operating</SelectItem>
-                            <SelectItem value="Analyzing">Analyzing</SelectItem>
-                            <SelectItem value="Under LOI">Under LOI</SelectItem>
-                            <SelectItem value="Due Diligence">Due Diligence</SelectItem>
-                            <SelectItem value="Closed">Closed</SelectItem>
-                            <SelectItem value="On Hold">On Hold</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="status"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Status</FormLabel>
+                          <Select value={field.value || ""} onValueChange={field.onChange}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-project-status">
+                                <SelectValue placeholder="Select status..." />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="Operating">Operating</SelectItem>
+                              <SelectItem value="Analyzing">Analyzing</SelectItem>
+                              <SelectItem value="Under LOI">Under LOI</SelectItem>
+                              <SelectItem value="Due Diligence">Due Diligence</SelectItem>
+                              <SelectItem value="Closed">Closed</SelectItem>
+                              <SelectItem value="On Hold">On Hold</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="operationType"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Operation Type</FormLabel>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-operation-type">
+                                <SelectValue placeholder="Select type..." />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="ANNUAL">Year-Round</SelectItem>
+                              <SelectItem value="SEASONAL">Seasonal</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
                   <div className="space-y-3">
                     <FormLabel>Storage Types</FormLabel>
