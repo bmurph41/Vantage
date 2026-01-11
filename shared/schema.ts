@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, integer, timestamp, date, boolean, jsonb, pgEnum, primaryKey, unique, index, customType, decimal, numeric, real, time } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
+import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 
@@ -69,6 +69,12 @@ export const serviceTypeEnum = pgEnum("service_type", ["fuel", "maintenance", "d
 export const contactMethodEnum = pgEnum("contact_method", ["email", "phone", "sms", "mail"]);
 export const rentRollContextEnum = pgEnum("rent_roll_context", ["operational", "valuation"]);
 export const rentRollEntryTypeEnum = pgEnum("rent_roll_entry_type", ["slip", "rack", "commercial", "seasonal"]);
+export const marinaSeasonTypeEnum = pgEnum("marina_season_type", ["year_round", "seasonal", "winter"]);
+export const contractTermGroupEnum = pgEnum("contract_term_group", ["annual", "seasonal", "winter", "short_term"]);
+export const leaseStatusV2Enum = pgEnum("lease_status_v2", ["draft", "active", "expired", "terminated", "renewed"]);
+export const moveEventTypeEnum = pgEnum("move_event_type", ["move_in", "move_out"]);
+export const storageLocationTypeEnum = pgEnum("storage_location_type", ["wet_slip", "dry_rack", "dry_slip", "mooring", "anchorage", "indoor_rack", "outdoor_rack"]);
+export const billingFrequencyEnum = pgEnum("billing_frequency", ["monthly", "quarterly", "semi_annual", "annual"]);
 export const marketingCampaignStatusEnum = pgEnum("marketing_campaign_status", ["planning", "active", "paused", "completed", "archived"]);
 export const marketingChannelEnum = pgEnum("marketing_channel", ["email", "paid_ads", "social_media", "content", "events", "direct_mail", "seo", "partnerships", "referral", "other"]);
 export const expenseCategoryEnum = pgEnum("expense_category", ["advertising", "software", "agency_fees", "content_creation", "events", "sponsorships", "tools", "other"]);
@@ -9147,6 +9153,291 @@ export const rentRollEntries = pgTable('rent_roll_entries', {
   statusIdx: index('rent_roll_entries_status_idx').on(table.status),
   entryTypeIdx: index('rent_roll_entries_entry_type_idx').on(table.entryType),
 }));
+
+// ================================================================================
+// RENT ROLL V2 - MARINA-CENTRIC LEASE MANAGEMENT
+// ================================================================================
+
+// Marina Projects (formerly marinaLocations) - Individual marina properties
+export const marinaProjects = pgTable('marina_projects', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  code: varchar('code', { length: 20 }), // Short code like "OHM", "YHM"
+  name: text('name').notNull(),
+  address: text('address'),
+  city: text('city'),
+  state: varchar('state', { length: 2 }),
+  zipCode: varchar('zip_code', { length: 10 }),
+  latitude: decimal('latitude', { precision: 10, scale: 7 }),
+  longitude: decimal('longitude', { precision: 10, scale: 7 }),
+  seasonType: marinaSeasonTypeEnum('season_type').notNull().default('year_round'),
+  seasonStartMonth: integer('season_start_month'), // 1-12 for seasonal marinas
+  seasonEndMonth: integer('season_end_month'),
+  winterStartMonth: integer('winter_start_month'), // For winter storage
+  winterEndMonth: integer('winter_end_month'),
+  totalCapacity: integer('total_capacity').default(0),
+  defaultRatePerFoot: decimal('default_rate_per_foot', { precision: 8, scale: 2 }),
+  linkedDdProjectId: varchar('linked_dd_project_id').references(() => projects.id),
+  linkedModelingProjectId: varchar('linked_modeling_project_id').references(() => modelingProjects.id),
+  isActive: boolean('is_active').default(true),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('marina_projects_org_idx').on(table.orgId),
+  codeIdx: index('marina_projects_code_idx').on(table.code),
+  seasonTypeIdx: index('marina_projects_season_type_idx').on(table.seasonType),
+  activeIdx: index('marina_projects_active_idx').on(table.isActive),
+}));
+
+// Storage Locations - Individual slips, racks, docks within a marina
+export const storageLocations = pgTable('storage_locations', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  marinaProjectId: varchar('marina_project_id').notNull().references(() => marinaProjects.id, { onDelete: 'cascade' }),
+  code: varchar('code', { length: 20 }).notNull(), // Slip/dock number like "A-12"
+  name: text('name'),
+  locationType: storageLocationTypeEnum('location_type').notNull(),
+  length: decimal('length', { precision: 6, scale: 2 }), // In feet
+  width: decimal('width', { precision: 6, scale: 2 }),
+  depth: decimal('depth', { precision: 6, scale: 2 }),
+  maxBoatLength: decimal('max_boat_length', { precision: 6, scale: 2 }),
+  maxBoatBeam: decimal('max_boat_beam', { precision: 6, scale: 2 }),
+  dock: varchar('dock', { length: 20 }), // Dock identifier (A, B, C)
+  section: varchar('section', { length: 20 }),
+  hasElectric: boolean('has_electric').default(false),
+  electricAmps: integer('electric_amps'), // 30A, 50A, 100A
+  hasWater: boolean('has_water').default(false),
+  hasPumpout: boolean('has_pumpout').default(false),
+  monthlyRate: decimal('monthly_rate', { precision: 10, scale: 2 }),
+  annualRate: decimal('annual_rate', { precision: 10, scale: 2 }),
+  seasonalRate: decimal('seasonal_rate', { precision: 10, scale: 2 }),
+  ratePerFoot: decimal('rate_per_foot', { precision: 8, scale: 2 }),
+  isAvailable: boolean('is_available').default(true),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('storage_locations_org_idx').on(table.orgId),
+  marinaIdx: index('storage_locations_marina_idx').on(table.marinaProjectId),
+  codeIdx: index('storage_locations_code_idx').on(table.code),
+  typeIdx: index('storage_locations_type_idx').on(table.locationType),
+  availableIdx: index('storage_locations_available_idx').on(table.isAvailable),
+  dockIdx: index('storage_locations_dock_idx').on(table.dock),
+}));
+
+// Marina Tenants - Boat owners/renters
+export const marinaTenants = pgTable('marina_tenants', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  marinaProjectId: varchar('marina_project_id').references(() => marinaProjects.id),
+  firstName: text('first_name').notNull(),
+  lastName: text('last_name').notNull(),
+  companyName: text('company_name'),
+  email: text('email'),
+  phone: varchar('phone', { length: 20 }),
+  address: text('address'),
+  city: text('city'),
+  state: varchar('state', { length: 2 }),
+  zipCode: varchar('zip_code', { length: 10 }),
+  country: varchar('country', { length: 50 }).default('USA'),
+  boatName: text('boat_name'),
+  boatMake: text('boat_make'),
+  boatModel: text('boat_model'),
+  boatYear: integer('boat_year'),
+  boatLength: decimal('boat_length', { precision: 6, scale: 2 }),
+  boatBeam: decimal('boat_beam', { precision: 6, scale: 2 }),
+  boatDraft: decimal('boat_draft', { precision: 6, scale: 2 }),
+  registrationNumber: varchar('registration_number', { length: 50 }),
+  linkedCrmContactId: varchar('linked_crm_contact_id').references(() => contacts.id),
+  isActive: boolean('is_active').default(true),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('marina_tenants_org_idx').on(table.orgId),
+  marinaIdx: index('marina_tenants_marina_idx').on(table.marinaProjectId),
+  nameIdx: index('marina_tenants_name_idx').on(table.lastName, table.firstName),
+  emailIdx: index('marina_tenants_email_idx').on(table.email),
+  activeIdx: index('marina_tenants_active_idx').on(table.isActive),
+  stateIdx: index('marina_tenants_state_idx').on(table.state),
+  cityIdx: index('marina_tenants_city_idx').on(table.city),
+}));
+
+// Marina Leases - Rental agreements
+export const marinaLeases = pgTable('marina_leases', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  marinaProjectId: varchar('marina_project_id').notNull().references(() => marinaProjects.id),
+  storageLocationId: varchar('storage_location_id').references(() => storageLocations.id),
+  tenantId: varchar('tenant_id').notNull().references(() => marinaTenants.id),
+  leaseNumber: varchar('lease_number', { length: 50 }),
+  status: leaseStatusV2Enum('status').notNull().default('active'),
+  contractTermGroup: contractTermGroupEnum('contract_term_group').notNull().default('annual'),
+  startDate: date('start_date').notNull(),
+  endDate: date('end_date').notNull(),
+  signedDate: date('signed_date'),
+  renewalDate: date('renewal_date'),
+  billingFrequency: billingFrequencyEnum('billing_frequency').notNull().default('monthly'),
+  monthlyRent: decimal('monthly_rent', { precision: 10, scale: 2 }).notNull(),
+  annualRent: decimal('annual_rent', { precision: 12, scale: 2 }),
+  securityDeposit: decimal('security_deposit', { precision: 10, scale: 2 }),
+  prorationAmount: decimal('proration_amount', { precision: 10, scale: 2 }),
+  ratePerFoot: decimal('rate_per_foot', { precision: 8, scale: 2 }),
+  billedLength: decimal('billed_length', { precision: 6, scale: 2 }), // Length used for billing
+  isAutoRenew: boolean('is_auto_renew').default(false),
+  renewalTermMonths: integer('renewal_term_months'),
+  escalationRate: decimal('escalation_rate', { precision: 5, scale: 2 }), // Annual escalation %
+  previousLeaseId: varchar('previous_lease_id').references((): any => marinaLeases.id),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('marina_leases_org_idx').on(table.orgId),
+  marinaIdx: index('marina_leases_marina_idx').on(table.marinaProjectId),
+  storageIdx: index('marina_leases_storage_idx').on(table.storageLocationId),
+  tenantIdx: index('marina_leases_tenant_idx').on(table.tenantId),
+  statusIdx: index('marina_leases_status_idx').on(table.status),
+  termGroupIdx: index('marina_leases_term_group_idx').on(table.contractTermGroup),
+  datesIdx: index('marina_leases_dates_idx').on(table.startDate, table.endDate),
+  leaseNumIdx: index('marina_leases_num_idx').on(table.leaseNumber),
+}));
+
+// Lease Line Items - Individual charges/fees per lease
+export const leaseLineItems = pgTable('lease_line_items', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  leaseId: varchar('lease_id').notNull().references(() => marinaLeases.id, { onDelete: 'cascade' }),
+  description: text('description').notNull(),
+  category: text('category'), // dockage, electric, water, pump_out, wifi, etc.
+  amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
+  frequency: billingFrequencyEnum('frequency').notNull().default('monthly'),
+  isRecurring: boolean('is_recurring').default(true),
+  startDate: date('start_date'),
+  endDate: date('end_date'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('lease_line_items_org_idx').on(table.orgId),
+  leaseIdx: index('lease_line_items_lease_idx').on(table.leaseId),
+  categoryIdx: index('lease_line_items_category_idx').on(table.category),
+}));
+
+// Lease Cash Flows - Monthly projected/actual cash flows
+export const leaseCashFlows = pgTable('lease_cash_flows', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  leaseId: varchar('lease_id').notNull().references(() => marinaLeases.id, { onDelete: 'cascade' }),
+  periodYear: integer('period_year').notNull(),
+  periodMonth: integer('period_month').notNull(), // 1-12
+  projectedAmount: decimal('projected_amount', { precision: 12, scale: 2 }).notNull(),
+  actualAmount: decimal('actual_amount', { precision: 12, scale: 2 }),
+  variance: decimal('variance', { precision: 12, scale: 2 }),
+  isPaid: boolean('is_paid').default(false),
+  paidDate: date('paid_date'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('lease_cash_flows_org_idx').on(table.orgId),
+  leaseIdx: index('lease_cash_flows_lease_idx').on(table.leaseId),
+  periodIdx: index('lease_cash_flows_period_idx').on(table.periodYear, table.periodMonth),
+  paidIdx: index('lease_cash_flows_paid_idx').on(table.isPaid),
+}));
+
+// Move Events - Track tenant move-ins and move-outs
+export const moveEvents = pgTable('move_events', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  marinaProjectId: varchar('marina_project_id').notNull().references(() => marinaProjects.id),
+  leaseId: varchar('lease_id').references(() => marinaLeases.id),
+  tenantId: varchar('tenant_id').notNull().references(() => marinaTenants.id),
+  storageLocationId: varchar('storage_location_id').references(() => storageLocations.id),
+  eventType: moveEventTypeEnum('event_type').notNull(),
+  eventDate: date('event_date').notNull(),
+  reason: text('reason'),
+  previousLocationId: varchar('previous_location_id').references(() => storageLocations.id),
+  newLocationId: varchar('new_location_id').references(() => storageLocations.id),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('move_events_org_idx').on(table.orgId),
+  marinaIdx: index('move_events_marina_idx').on(table.marinaProjectId),
+  leaseIdx: index('move_events_lease_idx').on(table.leaseId),
+  tenantIdx: index('move_events_tenant_idx').on(table.tenantId),
+  typeIdx: index('move_events_type_idx').on(table.eventType),
+  dateIdx: index('move_events_date_idx').on(table.eventDate),
+}));
+
+// Rent Roll V2 Periods - Monthly snapshot periods for reporting
+export const rentRollPeriods = pgTable('rent_roll_periods', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  marinaProjectId: varchar('marina_project_id').notNull().references(() => marinaProjects.id),
+  periodYear: integer('period_year').notNull(),
+  periodMonth: integer('period_month').notNull(),
+  totalUnits: integer('total_units').default(0),
+  occupiedUnits: integer('occupied_units').default(0),
+  vacantUnits: integer('vacant_units').default(0),
+  occupancyRate: decimal('occupancy_rate', { precision: 5, scale: 2 }),
+  totalRevenue: decimal('total_revenue', { precision: 12, scale: 2 }),
+  averageRent: decimal('average_rent', { precision: 10, scale: 2 }),
+  moveIns: integer('move_ins').default(0),
+  moveOuts: integer('move_outs').default(0),
+  netAbsorption: integer('net_absorption').default(0),
+  isClosed: boolean('is_closed').default(false),
+  closedAt: timestamp('closed_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('rent_roll_periods_org_idx').on(table.orgId),
+  marinaIdx: index('rent_roll_periods_marina_idx').on(table.marinaProjectId),
+  periodIdx: index('rent_roll_periods_period_idx').on(table.periodYear, table.periodMonth),
+  uniquePeriod: unique('rent_roll_periods_unique').on(table.marinaProjectId, table.periodYear, table.periodMonth),
+}));
+
+// ================================================================================
+// RENT ROLL V2 INSERT/SELECT SCHEMAS
+// ================================================================================
+
+export const insertMarinaProjectSchema = createInsertSchema(marinaProjects).omit({ id: true, createdAt: true, updatedAt: true });
+export const selectMarinaProjectSchema = createSelectSchema(marinaProjects);
+export type InsertMarinaProject = z.infer<typeof insertMarinaProjectSchema>;
+export type MarinaProject = typeof marinaProjects.$inferSelect;
+
+export const insertStorageLocationSchema = createInsertSchema(storageLocations).omit({ id: true, createdAt: true, updatedAt: true });
+export const selectStorageLocationSchema = createSelectSchema(storageLocations);
+export type InsertStorageLocation = z.infer<typeof insertStorageLocationSchema>;
+export type StorageLocation = typeof storageLocations.$inferSelect;
+
+export const insertMarinaTenantSchema = createInsertSchema(marinaTenants).omit({ id: true, createdAt: true, updatedAt: true });
+export const selectMarinaTenantSchema = createSelectSchema(marinaTenants);
+export type InsertMarinaTenant = z.infer<typeof insertMarinaTenantSchema>;
+export type MarinaTenant = typeof marinaTenants.$inferSelect;
+
+export const insertMarinaLeaseSchema = createInsertSchema(marinaLeases).omit({ id: true, createdAt: true, updatedAt: true });
+export const selectMarinaLeaseSchema = createSelectSchema(marinaLeases);
+export type InsertMarinaLease = z.infer<typeof insertMarinaLeaseSchema>;
+export type MarinaLease = typeof marinaLeases.$inferSelect;
+
+export const insertLeaseLineItemSchema = createInsertSchema(leaseLineItems).omit({ id: true, createdAt: true, updatedAt: true });
+export const selectLeaseLineItemSchema = createSelectSchema(leaseLineItems);
+export type InsertLeaseLineItem = z.infer<typeof insertLeaseLineItemSchema>;
+export type LeaseLineItem = typeof leaseLineItems.$inferSelect;
+
+export const insertLeaseCashFlowSchema = createInsertSchema(leaseCashFlows).omit({ id: true, createdAt: true });
+export const selectLeaseCashFlowSchema = createSelectSchema(leaseCashFlows);
+export type InsertLeaseCashFlow = z.infer<typeof insertLeaseCashFlowSchema>;
+export type LeaseCashFlow = typeof leaseCashFlows.$inferSelect;
+
+export const insertMoveEventSchema = createInsertSchema(moveEvents).omit({ id: true, createdAt: true });
+export const selectMoveEventSchema = createSelectSchema(moveEvents);
+export type InsertMoveEvent = z.infer<typeof insertMoveEventSchema>;
+export type MoveEvent = typeof moveEvents.$inferSelect;
+
+export const insertRentRollPeriodSchema = createInsertSchema(rentRollPeriods).omit({ id: true, createdAt: true, updatedAt: true });
+export const selectRentRollPeriodSchema = createSelectSchema(rentRollPeriods);
+export type InsertRentRollPeriod = z.infer<typeof insertRentRollPeriodSchema>;
+export type RentRollPeriod = typeof rentRollPeriods.$inferSelect;
 
 // ================================================================================
 // MARKETING OPERATIONS MODULE

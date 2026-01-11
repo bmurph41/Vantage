@@ -30,7 +30,7 @@ The platform uses React 18 with TypeScript and Wouter for routing. The UI is bui
 ### Feature Specifications
 - **CRM**: Deals, leads, contacts, pipelines, activities, email sequences, marketing automation, user-defined lists, property status tracking, entity relationship management, and Comment Threads with @mentions and notifications.
 - **Due Diligence**: Project management, task tracking, template management, and DD Fees Tracker.
-- **Rent Roll**: Unit occupancy, rental income, and customer analytics.
+- **Rent Roll V2**: Marina-centric lease management with normalized schema including marina projects, storage locations, tenants, leases with line items, cash flows, move events, and period snapshots. Supports seasonal/year-round operations, contract term groups (annual/seasonal/winter/short-term), and CRM/DD integrations.
 - **SalesComps**: Marina sales comparables with import/export, Google Maps integration, validation, and history tracking.
 - **Modeling Projects**: Marina valuation, dynamic year selection, operations data sync, Exit Strategy Suite, AI-powered Document Intelligence, Scenario Versioning, QuickBooks Integration, Capital Stack Builder, Pro Forma Engine, Portfolio Roll-ups, Multi-Case Modeling, Addbacks System, and Excel Model Export.
 - **Operations Modules**: Fuel Sales, Ship Store, Dockit (scheduling), and Marketing.
