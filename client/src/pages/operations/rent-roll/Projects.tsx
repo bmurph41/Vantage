@@ -996,8 +996,7 @@ export default function RentRollProjects() {
           <SelectContent>
             <SelectItem value="all">All Types</SelectItem>
             <SelectItem value="OWNED">Owned</SelectItem>
-            <SelectItem value="ACQUISITION">Acquisition</SelectItem>
-            <SelectItem value="MANAGED">Managed</SelectItem>
+            <SelectItem value="UNDERWRITING">Underwriting</SelectItem>
             <SelectItem value="DEVELOPMENT">Development</SelectItem>
           </SelectContent>
         </Select>
