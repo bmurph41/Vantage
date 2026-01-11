@@ -117,7 +117,8 @@ export function FileImportDrawer({
   const [step, setStep] = useState<ImportStep>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
-  const [mappings, setMappings] = useState<Record<string, string>>({});
+  // Use column index as key instead of header name to prevent empty headers from sharing state
+  const [mappings, setMappings] = useState<Record<number, string>>({});
   const [importProgress, setImportProgress] = useState(0);
   const [importResults, setImportResults] = useState<{ success: number; errors: number; errorDetails: string[] }>({ success: 0, errors: 0, errorDetails: [] });
 
@@ -234,9 +235,10 @@ export function FileImportDrawer({
       parsedDataRef.current = { headers, allRows };
       const previewRows = allRows.slice(0, 5);
       
-      const initialMappings: Record<string, string> = {};
-      headers.forEach(header => {
-        initialMappings[header] = guessFieldMapping(header);
+      // Use column index as key instead of header name to prevent empty headers from sharing state
+      const initialMappings: Record<number, string> = {};
+      headers.forEach((header, idx) => {
+        initialMappings[idx] = guessFieldMapping(header);
       });
       
       setMappings(initialMappings);
@@ -282,10 +284,10 @@ export function FileImportDrawer({
     return result;
   };
 
-  const updateMapping = (sourceColumn: string, targetField: string) => {
+  const updateMapping = (columnIndex: number, targetField: string) => {
     setMappings(prev => ({
       ...prev,
-      [sourceColumn]: targetField,
+      [columnIndex]: targetField,
     }));
   };
 
@@ -309,7 +311,7 @@ export function FileImportDrawer({
           const vesselData: Record<string, any> = {};
           
           headers.forEach((header, idx) => {
-            const targetField = mappings[header];
+            const targetField = mappings[idx];
             const value = row[idx] || '';
             
             if (targetField === 'skip' || !value) return;
@@ -491,12 +493,12 @@ export function FileImportDrawer({
                   </TableHeader>
                   <TableBody>
                     {preview.headers.map((header, idx) => (
-                      <TableRow key={header}>
-                        <TableCell className="font-medium">{header}</TableCell>
+                      <TableRow key={`col-${idx}`}>
+                        <TableCell className="font-medium">{header || `Column ${idx + 1}`}</TableCell>
                         <TableCell>
                           <Select 
-                            value={mappings[header]} 
-                            onValueChange={(value) => updateMapping(header, value)}
+                            value={mappings[idx]} 
+                            onValueChange={(value) => updateMapping(idx, value)}
                           >
                             <SelectTrigger className="w-full" data-testid={`mapping-${idx}`}>
                               <SelectValue />

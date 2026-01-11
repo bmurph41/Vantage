@@ -100,6 +100,15 @@ const RentRollProjects = lazy(() => import("@/pages/operations/rent-roll/Project
 const RentRollLeases = lazy(() => import("@/pages/operations/rent-roll/Leases"));
 const RentRollProjectDetails = lazy(() => import("@/pages/operations/rent-roll/ProjectDetails"));
 
+// Rent Roll V2 - Marina-centric module
+const RentRollV2Executive = lazy(() => import("@/modules/rent-roll-v2/pages/executive-dashboard"));
+const RentRollV2Projects = lazy(() => import("@/modules/rent-roll-v2/pages/project-hub"));
+const RentRollV2Portfolio = lazy(() => import("@/modules/rent-roll-v2/pages/portfolio"));
+const RentRollV2Dashboard = lazy(() => import("@/modules/rent-roll-v2/pages/rent-roll-dashboard"));
+const RentRollV2Cohorts = lazy(() => import("@/modules/rent-roll-v2/pages/cohort-analysis"));
+const RentRollV2Reports = lazy(() => import("@/modules/rent-roll-v2/pages/reports"));
+const RentRollV2Scenarios = lazy(() => import("@/modules/rent-roll-v2/pages/scenarios"));
+
 // Operations - Tabbed Module Pages
 const FuelSalesTabbed = lazy(() => import("@/pages/operations/FuelSalesTabbed"));
 const ShipStoreTabbed = lazy(() => import("@/pages/operations/ShipStoreTabbed"));
@@ -415,6 +424,96 @@ function Router() {
         )}
       </Route>
       
+      {/* Rent Roll V2 Routes - Marina-centric module */}
+      <Route path="/rent-roll">
+        {() => (
+          <AuthGuard>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <RentRollV2Executive />
+              </Suspense>
+            </UnifiedLayout>
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/rent-roll/executive">
+        {() => (
+          <AuthGuard>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <RentRollV2Executive />
+              </Suspense>
+            </UnifiedLayout>
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/rent-roll/projects">
+        {() => (
+          <AuthGuard>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <RentRollV2Projects />
+              </Suspense>
+            </UnifiedLayout>
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/rent-roll/projects/:id">
+        {() => (
+          <AuthGuard>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <RentRollV2Dashboard />
+              </Suspense>
+            </UnifiedLayout>
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/rent-roll/portfolio">
+        {() => (
+          <AuthGuard>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <RentRollV2Portfolio />
+              </Suspense>
+            </UnifiedLayout>
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/rent-roll/cohorts">
+        {() => (
+          <AuthGuard>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <RentRollV2Cohorts />
+              </Suspense>
+            </UnifiedLayout>
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/rent-roll/reports">
+        {() => (
+          <AuthGuard>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <RentRollV2Reports />
+              </Suspense>
+            </UnifiedLayout>
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/rent-roll/scenarios">
+        {() => (
+          <AuthGuard>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <RentRollV2Scenarios />
+              </Suspense>
+            </UnifiedLayout>
+          </AuthGuard>
+        )}
+      </Route>
+
       {/* Portfolio Routes */}
       <Route path="/portfolio">
         {() => (
