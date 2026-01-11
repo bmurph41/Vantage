@@ -743,17 +743,14 @@ function LocationFormDrawer({
                             {type}
                           </label>
                           {isSelected && (
-                            <div className="flex items-center gap-2">
-                              <Input
-                                type="number"
-                                min="0"
-                                value={currentCapacity}
-                                onChange={(e) => updateStorageCapacity(type, parseInt(e.target.value) || 0)}
-                                className="w-24 h-8"
-                                placeholder="Qty"
-                              />
-                              <span className="text-sm text-muted-foreground">units</span>
-                            </div>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={currentCapacity || ""}
+                              onChange={(e) => updateStorageCapacity(type, parseInt(e.target.value) || 0)}
+                              className="w-24 h-8"
+                              placeholder="Qty"
+                            />
                           )}
                         </div>
                       );
