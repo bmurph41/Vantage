@@ -5,13 +5,13 @@ import { LayoutDashboard, Table2, Briefcase } from "lucide-react";
 export default function DashboardNav() {
   const [location] = useLocation();
 
-  const isExecutiveActive = location === "/" || location === "/executive" || location === "/executive-dashboard";
-  const isProjectsActive = location.startsWith("/rent-roll") || location.startsWith("/projects");
-  const isPortfolioActive = location.startsWith("/portfolio");
+  const isExecutiveActive = location === "/rent-roll/executive" || location === "/rent-roll";
+  const isProjectsActive = location === "/rent-roll/projects" || location.startsWith("/rent-roll/projects/");
+  const isPortfolioActive = location === "/rent-roll/portfolio";
 
   return (
     <div className="flex gap-3">
-      <Link href="/">
+      <Link href="/rent-roll/executive">
         <Button
           variant="outline"
           size="default"
@@ -26,7 +26,7 @@ export default function DashboardNav() {
           Executive Summary
         </Button>
       </Link>
-      <Link href="/rent-roll">
+      <Link href="/rent-roll/projects">
         <Button
           variant="outline"
           size="default"
@@ -41,7 +41,7 @@ export default function DashboardNav() {
           Projects
         </Button>
       </Link>
-      <Link href="/portfolio">
+      <Link href="/rent-roll/portfolio">
         <Button
           variant="outline"
           size="default"
