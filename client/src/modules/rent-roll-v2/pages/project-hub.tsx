@@ -987,15 +987,15 @@ export default function ProjectHub() {
                                   <Input
                                     type="number"
                                     placeholder="Capacity"
-                                    className="w-20 h-8 text-sm text-center"
+                                    className="w-20 h-8 text-xs text-center placeholder:text-xs"
                                     value={existingConfig?.unitCount ?? ""}
                                     onChange={(e) => updateConfig("unitCount", e.target.value)}
                                     data-testid={`input-units-${storageType.toLowerCase().replace(/\s+/g, "-")}`}
                                   />
                                   <Input
                                     type="text"
-                                    placeholder="Target Occ. %"
-                                    className="w-24 h-8 text-sm text-center"
+                                    placeholder="Occ. %"
+                                    className="w-16 h-8 text-xs text-center placeholder:text-xs"
                                     value={existingConfig?.targetOccupancy ?? ""}
                                     onChange={(e) => updateConfig("targetOccupancy", e.target.value)}
                                     data-testid={`input-occupancy-${storageType.toLowerCase().replace(/\s+/g, "-")}`}
