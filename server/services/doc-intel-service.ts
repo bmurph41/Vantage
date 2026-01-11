@@ -608,13 +608,22 @@ class DocIntelService {
   private detectMonthHeaders(jsonData: any[][]): MonthHeader[] {
     const headers: MonthHeader[] = [];
     
-    // Scan first 10 rows for month headers (some files have multiple header rows)
-    for (let rowIdx = 0; rowIdx < Math.min(10, jsonData.length); rowIdx++) {
+    // Scan entire document for month headers (up to first 100 rows to handle any header position)
+    const maxRowsToScan = Math.min(100, jsonData.length);
+    console.log(`[DocIntelService] Scanning ${maxRowsToScan} rows for month headers...`);
+    
+    for (let rowIdx = 0; rowIdx < maxRowsToScan; rowIdx++) {
       const row = jsonData[rowIdx];
       if (!row) continue;
       
       const rowHeaders: MonthHeader[] = [];
       let defaultYear = new Date().getFullYear();
+      
+      // Log first few rows for debugging
+      if (rowIdx < 5) {
+        const cellSamples = row.slice(0, 15).map((c: any, i: number) => `[${i}]=${c}`).join(', ');
+        console.log(`[DocIntelService] Row ${rowIdx + 1} cells: ${cellSamples}`);
+      }
       
       for (let colIdx = 0; colIdx < row.length; colIdx++) {
         const cell = row[colIdx];
@@ -662,6 +671,7 @@ class DocIntelService {
       }
     }
     
+    console.log(`[DocIntelService] No month headers detected after scanning ${maxRowsToScan} rows`);
     return headers;
   }
   
@@ -743,13 +753,17 @@ class DocIntelService {
     if (monthHeaders.length === 0) return -1;
     
     const firstHeaderCol = monthHeaders[0].columnIndex;
+    const firstHeaderLabel = monthHeaders[0].rawLabel.toLowerCase();
     
-    for (let rowIdx = 0; rowIdx < Math.min(5, jsonData.length); rowIdx++) {
+    // Scan up to 100 rows to find the header row that matches our detected headers
+    for (let rowIdx = 0; rowIdx < Math.min(100, jsonData.length); rowIdx++) {
       const row = jsonData[rowIdx];
       if (!row || !row[firstHeaderCol]) continue;
       
       const cellStr = String(row[firstHeaderCol]).trim().toLowerCase();
-      if (this.parseMonthHeader(cellStr, firstHeaderCol, 2000)) {
+      // Match either by parseMonthHeader or by raw label comparison
+      if (this.parseMonthHeader(cellStr, firstHeaderCol, 2000) || cellStr === firstHeaderLabel) {
+        console.log(`[DocIntelService] Header row found at index ${rowIdx}`);
         return rowIdx;
       }
     }

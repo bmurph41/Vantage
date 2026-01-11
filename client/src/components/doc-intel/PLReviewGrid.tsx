@@ -676,21 +676,6 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
         size: 180,
       },
       {
-        accessorKey: "confidenceScore",
-        header: "Confidence",
-        cell: ({ row }) => {
-          const score = row.original.confidenceScore;
-          if (!score) return <span className="text-muted-foreground">-</span>;
-          const pct = (parseFloat(score) * 100).toFixed(0);
-          return (
-            <Badge variant={parseFloat(score) >= 0.8 ? "default" : "secondary"}>
-              {pct}%
-            </Badge>
-          );
-        },
-        size: 90,
-      },
-      {
         accessorKey: "status",
         header: "Status",
         cell: ({ row }) => {

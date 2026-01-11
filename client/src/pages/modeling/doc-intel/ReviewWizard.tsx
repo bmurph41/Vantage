@@ -548,23 +548,6 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
               value={(confirmedItems.length / Math.max(items.length, 1)) * 100} 
               className="mb-4 h-2"
             />
-            
-            <div className="flex gap-2 mb-4">
-              <Badge variant="outline" className="bg-green-50 dark:bg-green-950">
-                <Check className="h-3 w-3 mr-1" /> {confirmedItems.length} Confirmed
-              </Badge>
-              <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-950">
-                {pendingItems.length} Pending
-              </Badge>
-              <Badge variant="outline" className="bg-red-50 dark:bg-red-950">
-                <X className="h-3 w-3 mr-1" /> {rejectedItems.length} Rejected
-              </Badge>
-              {excludedItems.length > 0 && (
-                <Badge variant="outline" className="bg-gray-50 dark:bg-gray-950">
-                  {excludedItems.length} Excluded
-                </Badge>
-              )}
-            </div>
 
             {viewMode === 'spreadsheet' ? (
               <div className="min-h-[500px]">
