@@ -817,9 +817,6 @@ export default function ProjectHub() {
                             {...field}
                           />
                         </FormControl>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Choose a descriptive name that helps you identify this marina project
-                        </p>
                         <FormMessage />
                       </FormItem>
                     )}
