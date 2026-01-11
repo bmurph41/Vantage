@@ -195,6 +195,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
   const [localEdits, setLocalEdits] = useState<Record<string, Partial<ExtractedItem>>>({});
+  const [pendingMonthlyEdits, setPendingMonthlyEdits] = useState<Record<string, number>>({});
   const [showExcluded, setShowExcluded] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("flat");
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -247,9 +248,31 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
     mutationFn: async ({ itemId, updates }: { itemId: string; updates: Partial<ExtractedItem> }) => {
       return apiRequest("PATCH", `/api/doc-intel/items/${itemId}`, updates);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/doc-intel/uploads", uploadId, "items"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/doc-intel/uploads", uploadId, "items", "grouped"] });
+    onSuccess: async (_, variables) => {
+      // Invalidate and wait for refetch to complete before clearing pending state
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/doc-intel/uploads", uploadId, "items"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/doc-intel/uploads", uploadId, "items", "grouped"] }),
+      ]);
+      // Now clear pending edit - fresh data is already in cache
+      setPendingMonthlyEdits(prev => {
+        const next = { ...prev };
+        delete next[variables.itemId];
+        return next;
+      });
+    },
+    onError: (error: any, variables) => {
+      // Clear pending edit on error immediately
+      setPendingMonthlyEdits(prev => {
+        const next = { ...prev };
+        delete next[variables.itemId];
+        return next;
+      });
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to save changes. Please try again.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -949,23 +972,27 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
               <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p className="font-medium">Single Column Data</p>
               <p className="text-sm">This document doesn't have monthly columns. Use the Flat view instead.</p>
+              <p className="text-xs mt-2 text-muted-foreground/70">
+                Re-upload a file with month columns (e.g., Jan, Feb, Mar...) to see monthly data.
+              </p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-8 bg-muted/50"></TableHead>
-                  <TableHead className="bg-muted/50">Line Item</TableHead>
-                  {groupedData.periods.map((period) => (
-                    <TableHead key={period} className="bg-muted/50 text-center w-24">
-                      {formatPeriodLabel(period)}
-                    </TableHead>
-                  ))}
-                  <TableHead className="bg-muted/50 text-right w-28">Total</TableHead>
-                  <TableHead className="bg-muted/50 text-center w-24">Status</TableHead>
-                  <TableHead className="bg-muted/50 text-center w-20">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
+            <div className="overflow-x-auto">
+              <Table className="min-w-max">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-8 bg-muted/50 sticky left-0 z-20"></TableHead>
+                    <TableHead className="bg-muted/50 sticky left-8 z-20 min-w-[200px]">Line Item</TableHead>
+                    {groupedData.periods.map((period) => (
+                      <TableHead key={period} className="bg-muted/50 text-center min-w-[90px]">
+                        {formatPeriodLabel(period)}
+                      </TableHead>
+                    ))}
+                    <TableHead className="bg-muted/50 text-right min-w-[100px] sticky right-[180px] z-20">Total</TableHead>
+                    <TableHead className="bg-muted/50 text-center min-w-[90px] sticky right-[90px] z-20">Status</TableHead>
+                    <TableHead className="bg-muted/50 text-center min-w-[90px] sticky right-0 z-20">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
               <TableBody>
                 {groupedData.lineItems.length === 0 ? (
                   <TableRow>
@@ -990,7 +1017,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
                               : ""
                           }
                         >
-                          <TableCell className="p-2">
+                          <TableCell className="p-2 sticky left-0 z-10 bg-background">
                             <Button
                               variant="ghost"
                               size="sm"
@@ -1004,25 +1031,84 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
                               )}
                             </Button>
                           </TableCell>
-                          <TableCell className="font-medium">
-                            {lineItem.lineItemName}
+                          <TableCell className="font-medium sticky left-8 z-10 bg-background min-w-[200px]">
+                            <span className="truncate block max-w-[250px]" title={lineItem.lineItemName}>
+                              {lineItem.lineItemName}
+                            </span>
                           </TableCell>
                           {groupedData.periods.map((period) => {
                             const monthData = lineItem.monthlyData.find(
                               (m) => m.periodKey === period
                             );
+                            const statusColor = monthData?.status === "confirmed" 
+                              ? "bg-green-50 dark:bg-green-950/30" 
+                              : monthData?.status === "excluded"
+                              ? "bg-gray-100 dark:bg-gray-800/50"
+                              : "";
+                            const isEditingThisCell = editingCell?.id === monthData?.id && editingCell?.field === "amount";
+                            
                             return (
-                              <TableCell key={period} className="text-center text-sm">
-                                {monthData?.amount != null
-                                  ? formatCurrency(monthData.amount)
-                                  : "-"}
+                              <TableCell 
+                                key={period} 
+                                className={`text-center text-sm font-mono ${statusColor} ${!isEditingThisCell ? 'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/30' : ''}`}
+                                onClick={() => {
+                                  if (monthData && !isEditingThisCell) {
+                                    setEditingCell({ id: monthData.id, field: "amount" });
+                                  }
+                                }}
+                              >
+                                {isEditingThisCell && monthData ? (
+                                  <Input
+                                    type="number"
+                                    defaultValue={monthData.amount || ""}
+                                    className="h-7 w-20 text-center text-sm"
+                                    autoFocus
+                                    onBlur={(e) => {
+                                      const newAmount = e.target.value;
+                                      const newAmountNum = parseFloat(newAmount) || 0;
+                                      if (newAmount !== String(monthData.amount || "")) {
+                                        // Set pending edit for immediate visual feedback
+                                        setPendingMonthlyEdits(prev => ({
+                                          ...prev,
+                                          [monthData.id]: newAmountNum,
+                                        }));
+                                        updateItemMutation.mutate({
+                                          itemId: monthData.id,
+                                          updates: { amountConfirmed: newAmount },
+                                        });
+                                      }
+                                      setEditingCell(null);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        (e.target as HTMLInputElement).blur();
+                                      } else if (e.key === "Escape") {
+                                        setEditingCell(null);
+                                      }
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                ) : (
+                                  (() => {
+                                    // Show pending edit value if exists, otherwise show server value
+                                    const pendingValue = monthData ? pendingMonthlyEdits[monthData.id] : undefined;
+                                    const displayValue = pendingValue !== undefined ? pendingValue : monthData?.amount;
+                                    const isPending = pendingValue !== undefined;
+                                    return displayValue != null ? (
+                                      <span className={isPending ? "opacity-70" : ""}>
+                                        {formatCurrency(displayValue)}
+                                        {isPending && <Loader2 className="h-3 w-3 ml-1 inline animate-spin" />}
+                                      </span>
+                                    ) : "-";
+                                  })()
+                                )}
                               </TableCell>
                             );
                           })}
-                          <TableCell className="text-right font-semibold">
+                          <TableCell className="text-right font-semibold sticky right-[180px] z-10 bg-background">
                             {formatCurrency(lineItem.totalAmount)}
                           </TableCell>
-                          <TableCell className="text-center">
+                          <TableCell className="text-center sticky right-[90px] z-10 bg-background">
                             <Badge
                               variant={
                                 lineItem.status === "confirmed"
@@ -1044,7 +1130,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
                               {lineItem.status}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-center">
+                          <TableCell className="text-center sticky right-0 z-10 bg-background">
                             <div className="flex items-center justify-center gap-1">
                               <TooltipProvider>
                                 <Tooltip>
@@ -1133,7 +1219,8 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
                   })
                 )}
               </TableBody>
-            </Table>
+              </Table>
+            </div>
           )}
         </div>
       )}

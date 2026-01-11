@@ -681,12 +681,12 @@ class DocIntelService {
   }
 
   private parseMonthHeader(cellStr: string, colIdx: number, defaultYear: number): MonthHeader | null {
+    // Patterns for month column headers (not full dates like MM/DD/YYYY)
     const patterns = [
       /^(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[\s\-'.,]*('?\d{2}|\d{4})?$/i,
-      /^(\d{1,2})[\/-](\d{2}|\d{4})$/,
+      /^(\d{1,2})[\/-](\d{2}|\d{4})$/, // M/YY or M/YYYY (month/year only)
       /^(january|february|march|april|may|june|july|august|september|october|november|december)[\s\-'.,]*(\d{2}|\d{4})?$/i,
       /^(\d{4})[\/-](\d{1,2})$/, // ISO format: 2025-01, 2025/01
-      /^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/, // MM/DD/YY or MM/DD/YYYY (use first as month)
     ];
     
     for (let i = 0; i < patterns.length; i++) {
@@ -701,16 +701,6 @@ class DocIntelService {
           year = parseInt(match[1], 10);
           month = parseInt(match[2], 10);
           if (month < 1 || month > 12) continue;
-        }
-        // Handle MM/DD/YYYY format - extract month from first group
-        else if (i === 4) {
-          month = parseInt(match[1], 10);
-          if (month < 1 || month > 12) continue;
-          const yearPart = match[3];
-          year = parseInt(yearPart, 10);
-          if (year < 100) {
-            year += year > 50 ? 1900 : 2000;
-          }
         }
         else {
           const monthPart = match[1].toLowerCase();
@@ -1224,13 +1214,13 @@ class DocIntelService {
           monthlyData: [{
             id: item.id,
             periodKey: item.periodKey || 'single',
-            amount: item.amount ? parseFloat(item.amount) : null,
+            amount: item.amountConfirmed ? parseFloat(item.amountConfirmed) : (item.amount ? parseFloat(item.amount) : null),
             status: item.status,
             categoryConfirmed: item.categoryConfirmed,
             categorySuggested: item.categorySuggested,
             confidenceScore: item.confidenceScore,
           }],
-          totalAmount: item.amount ? parseFloat(item.amount) : 0,
+          totalAmount: item.amountConfirmed ? parseFloat(item.amountConfirmed) : (item.amount ? parseFloat(item.amount) : 0),
           status: item.status as 'pending' | 'confirmed' | 'excluded',
           suggestedCategory: (item as any).suggestedCategory,
           confirmedCategory: (item as any).confirmedCategory,
@@ -1265,7 +1255,7 @@ class DocIntelService {
       const monthlyData = data.items.map(item => ({
         id: item.id,
         periodKey: item.periodKey || 'unknown',
-        amount: item.amount ? parseFloat(item.amount) : null,
+        amount: item.amountConfirmed ? parseFloat(item.amountConfirmed) : (item.amount ? parseFloat(item.amount) : null),
         status: item.status,
         categoryConfirmed: item.categoryConfirmed,
         categorySuggested: item.categorySuggested,
