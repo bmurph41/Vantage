@@ -374,6 +374,10 @@ export default function ProjectHub() {
       return false;
     }
 
+    if (storageTypeConfigs.length === 0) {
+      return false;
+    }
+
     for (const config of storageTypeConfigs) {
       if (config.unitCount === null || config.unitCount === undefined || config.unitCount < 0) {
         return false;
