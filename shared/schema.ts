@@ -2692,6 +2692,10 @@ export const rraMarinaLocations = pgTable("rra_marina_locations", {
   projectType: rraProjectTypeEnum("project_type").default("OWNED").notNull(),
   seasonType: rraSeasonTypeEnum("season_type").default("ANNUAL"),
   status: text("status"),
+  // CRM Linking
+  dealId: varchar("deal_id").references(() => crmDeals.id, { onDelete: "set null" }),
+  propertyId: varchar("property_id").references(() => crmProperties.id, { onDelete: "set null" }),
+  pendingPropertyId: varchar("pending_property_id").references(() => pendingProperties.id, { onDelete: "set null" }),
   targetNOI: numeric("target_noi", { precision: 14, scale: 2 }),
   includeInExecutive: boolean("include_in_executive").default(true).notNull(),
   baseRent1Label: text("base_rent_1_label").default("Base Rent 1"),
