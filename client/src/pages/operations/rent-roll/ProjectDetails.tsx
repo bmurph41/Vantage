@@ -52,6 +52,11 @@ import {
   ExpiringLeasesModal
 } from "@/components/rent-roll/ExecutiveModals";
 
+type StorageMixItem = {
+  type: string;
+  capacity: number;
+};
+
 type ProjectDetails = {
   id: string;
   name: string;
@@ -75,6 +80,7 @@ type ProjectDetails = {
   totalGrossRent: number;
   tenantCount: number;
   leaseCount: number;
+  storageMix?: StorageMixItem[];
 };
 
 type LeaseItem = {
@@ -153,7 +159,7 @@ function SummaryCard({
   );
 }
 
-function OverviewTab({ project, loading }: { project?: ProjectDetails; loading: boolean }) {
+function OverviewTab({ project, leases, loading }: { project?: ProjectDetails; leases?: LeaseItem[]; loading: boolean }) {
   const [occupancyModalOpen, setOccupancyModalOpen] = useState(false);
   const [revenueModalOpen, setRevenueModalOpen] = useState(false);
   const [activeLeasesModalOpen, setActiveLeasesModalOpen] = useState(false);
@@ -163,6 +169,23 @@ function OverviewTab({ project, loading }: { project?: ProjectDetails; loading: 
   const occupancyRate = project && project.totalUnits > 0 
     ? ((project.occupiedUnits / project.totalUnits) * 100) 
     : 0;
+
+  // Calculate occupancy per storage type
+  const storageTypeOccupancy = (project?.storageMix || [])
+    .filter(item => item.capacity > 0)
+    .map(item => {
+      const occupiedCount = (leases || []).filter(
+        lease => lease.storageType === item.type && lease.status === 'active'
+      ).length;
+      const rate = item.capacity > 0 ? (occupiedCount / item.capacity) * 100 : 0;
+      return {
+        type: item.type,
+        capacity: item.capacity,
+        occupied: occupiedCount,
+        vacant: item.capacity - occupiedCount,
+        rate: Math.min(rate, 100)
+      };
+    });
 
   return (
     <div className="space-y-6">
@@ -208,17 +231,33 @@ function OverviewTab({ project, loading }: { project?: ProjectDetails; loading: 
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">Occupancy</span>
-                  <span className="text-sm text-muted-foreground">{occupancyRate.toFixed(1)}%</span>
+              {storageTypeOccupancy.length > 0 ? (
+                storageTypeOccupancy.map(item => (
+                  <div key={item.type}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">{item.type}</span>
+                      <span className="text-sm text-muted-foreground">{item.rate.toFixed(1)}%</span>
+                    </div>
+                    <Progress value={item.rate} className="h-2" />
+                    <div className="flex items-center justify-between mt-1 text-xs text-muted-foreground">
+                      <span>{item.occupied} occupied</span>
+                      <span>{item.vacant} vacant</span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">Occupancy</span>
+                    <span className="text-sm text-muted-foreground">{occupancyRate.toFixed(1)}%</span>
+                  </div>
+                  <Progress value={occupancyRate} className="h-2" />
+                  <div className="flex items-center justify-between mt-1 text-xs text-muted-foreground">
+                    <span>{project?.occupiedUnits || 0} occupied</span>
+                    <span>{(project?.totalUnits || 0) - (project?.occupiedUnits || 0)} vacant</span>
+                  </div>
                 </div>
-                <Progress value={occupancyRate} className="h-2" />
-                <div className="flex items-center justify-between mt-1 text-xs text-muted-foreground">
-                  <span>{project?.occupiedUnits || 0} occupied</span>
-                  <span>{(project?.totalUnits || 0) - (project?.occupiedUnits || 0)} vacant</span>
-                </div>
-              </div>
+              )}
 
               {project?.budgetedRevenue && (
                 <div>
@@ -761,6 +800,11 @@ export default function RentRollProjectDetails() {
     enabled: !!projectId,
   });
 
+  const { data: leases } = useQuery<LeaseItem[]>({
+    queryKey: ['/api/rent-roll/leases', { projectId }],
+    enabled: !!projectId,
+  });
+
   const getProjectTypeLabel = (type: string) => {
     switch (type) {
       case 'OWNED': return 'Owned';
@@ -835,7 +879,7 @@ export default function RentRollProjectDetails() {
         </TabsList>
 
         <TabsContent value="overview" className="mt-6">
-          <OverviewTab project={project} loading={isLoading} />
+          <OverviewTab project={project} leases={leases} loading={isLoading} />
         </TabsContent>
 
         <TabsContent value="leases" className="mt-6">
