@@ -169,9 +169,15 @@ export function FileImportDrawer({
         const formData = new FormData();
         formData.append('file', file);
         
+        // Get CSRF token from cookie
+        const csrfMatch = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/);
+        const csrfToken = csrfMatch ? decodeURIComponent(csrfMatch[1]) : '';
+        
         const response = await fetch('/api/rent-roll/parse-pdf', {
           method: 'POST',
           body: formData,
+          credentials: 'include',
+          headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
         });
         
         if (!response.ok) {
@@ -250,7 +256,7 @@ export function FileImportDrawer({
       console.error('File parse error:', error);
       toast({
         title: "Failed to parse file",
-        description: "Please ensure the file is a valid CSV or Excel file.",
+        description: "Please ensure the file is a valid CSV, Excel, or PDF file.",
         variant: "destructive",
       });
     }
@@ -447,6 +453,10 @@ export function FileImportDrawer({
                 <Badge variant="outline">
                   <FileSpreadsheet className="h-3 w-3 mr-1" />
                   XLS
+                </Badge>
+                <Badge variant="outline">
+                  <FileText className="h-3 w-3 mr-1" />
+                  PDF
                 </Badge>
               </div>
             </div>
