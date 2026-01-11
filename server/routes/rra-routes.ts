@@ -5,6 +5,8 @@ import { z } from "zod";
 import multer from "multer";
 import * as pdfParseModule from "pdf-parse";
 const pdfParse = (pdfParseModule as any).default || pdfParseModule;
+import { db } from "../db";
+import { ilike, eq, and, or, desc } from "drizzle-orm";
 import {
   insertRraMarinaLocationSchema,
   insertRraStorageLocationSchema,
@@ -15,6 +17,8 @@ import {
   insertRraLeaseCashFlowSchema,
   insertRraSnapshotVersionSchema,
   insertRraModelingProjectLinkSchema,
+  crmDeals,
+  crmProperties,
 } from "@shared/schema";
 
 const router = Router();
@@ -876,6 +880,78 @@ router.post("/modeling-links/:linkId/sync", async (req: Request, res: Response, 
     const { linkId } = req.params;
     const result = await rraService.syncRraToModeling(orgId, linkId);
     res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// CRM Linking Search Endpoints
+router.get("/crm/deals/search", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const search = (req.query.search as string) || '';
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
+    
+    let query = db.select({
+      id: crmDeals.id,
+      title: crmDeals.title,
+      marinaName: crmDeals.marinaName,
+      city: crmDeals.city,
+      state: crmDeals.state,
+      status: crmDeals.status,
+      createdAt: crmDeals.createdAt,
+    }).from(crmDeals).where(eq(crmDeals.orgId, orgId));
+    
+    if (search) {
+      query = query.where(and(
+        eq(crmDeals.orgId, orgId),
+        or(
+          ilike(crmDeals.title, `%${search}%`),
+          ilike(crmDeals.marinaName, `%${search}%`),
+          ilike(crmDeals.city, `%${search}%`)
+        )
+      ));
+    }
+    
+    const deals = await query.orderBy(desc(crmDeals.createdAt)).limit(limit);
+    res.json(deals);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/crm/properties/search", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const search = (req.query.search as string) || '';
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
+    
+    let query = db.select({
+      id: crmProperties.id,
+      title: crmProperties.title,
+      city: crmProperties.city,
+      state: crmProperties.state,
+      address: crmProperties.address,
+      status: crmProperties.status,
+      wetSlips: crmProperties.wetSlips,
+      drySlips: crmProperties.drySlips,
+      totalCapacity: crmProperties.totalCapacity,
+      createdAt: crmProperties.createdAt,
+    }).from(crmProperties).where(eq(crmProperties.orgId, orgId));
+    
+    if (search) {
+      query = query.where(and(
+        eq(crmProperties.orgId, orgId),
+        or(
+          ilike(crmProperties.title, `%${search}%`),
+          ilike(crmProperties.city, `%${search}%`),
+          ilike(crmProperties.address, `%${search}%`)
+        )
+      ));
+    }
+    
+    const properties = await query.orderBy(desc(crmProperties.createdAt)).limit(limit);
+    res.json(properties);
   } catch (error) {
     next(error);
   }
