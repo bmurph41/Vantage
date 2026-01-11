@@ -54,7 +54,7 @@ const crmToolsNav = [
 const operationsModulesNav = [
   { name: "Portfolio", href: "/portfolio", icon: Building2 },
   { name: "Dockit", href: "/operations/dockit", icon: Anchor },
-  { name: "Rent Roll", href: "/operations/rent-roll", icon: Building2 },
+  { name: "Rent Roll", href: "/rent-roll/executive", icon: Building2 },
   { name: "Fuel Sales", href: "/operations/fuel", icon: Fuel },
   { name: "Ship Store", href: "/operations/ship-store", icon: ShoppingCart },
   { name: "Service Dept", href: "/operations/service", icon: Wrench },
@@ -190,7 +190,7 @@ export default function UnifiedSidebar() {
 
   // Filter operations nav to hide Rent Roll if user doesn't have access
   const filteredOperationsModulesNav = operationsModulesNav.filter(item => {
-    if (item.href === '/operations/rent-roll') {
+    if (item.href === '/rent-roll/executive') {
       return hasRentRollAccess();
     }
     return true;

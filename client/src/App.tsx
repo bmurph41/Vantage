@@ -618,12 +618,12 @@ function Router() {
           </UnifiedLayout>
         )}
       </Route>
+      {/* Redirect old rent-roll route to new V2 module */}
       <Route path="/operations/rent-roll">
-        {() => (
-          <UnifiedLayout>
-            <RentRollTabbed />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.replace('/rent-roll/executive');
+          return null;
+        }}
       </Route>
       <Route path="/operations/fuel">
         {() => (
@@ -684,10 +684,10 @@ function Router() {
         }}
       </Route>
       
-      {/* Legacy Operations Routes - Redirect to new tab-based URLs */}
+      {/* Legacy Operations Routes - Redirect to new V2 and tab-based URLs */}
       <Route path="/operations/customer-analytics">
         {() => {
-          window.location.replace('/operations/rent-roll?tab=customer-analytics');
+          window.location.replace('/rent-roll/cohorts');
           return null;
         }}
       </Route>
@@ -705,29 +705,27 @@ function Router() {
       </Route>
       <Route path="/operations/rent-roll/portfolio">
         {() => {
-          window.location.replace('/operations/rent-roll?tab=portfolio');
+          window.location.replace('/rent-roll/portfolio');
           return null;
         }}
       </Route>
       <Route path="/operations/rent-roll/projects">
         {() => {
-          window.location.replace('/operations/rent-roll?tab=projects');
+          window.location.replace('/rent-roll/projects');
           return null;
         }}
       </Route>
       <Route path="/operations/rent-roll/leases">
-        {() => (
-          <Suspense fallback={<PageLoader />}>
-            <RentRollLeases />
-          </Suspense>
-        )}
+        {() => {
+          window.location.replace('/rent-roll/dashboard');
+          return null;
+        }}
       </Route>
       <Route path="/operations/rent-roll/projects/:id">
-        {() => (
-          <Suspense fallback={<PageLoader />}>
-            <RentRollProjectDetails />
-          </Suspense>
-        )}
+        {() => {
+          window.location.replace('/rent-roll/projects');
+          return null;
+        }}
       </Route>
       <Route path="/operations/fuel/dashboard">
         {() => {
