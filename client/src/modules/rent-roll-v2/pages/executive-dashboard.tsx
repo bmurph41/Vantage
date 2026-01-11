@@ -48,13 +48,31 @@ import { createLocation } from "../lib/locationApi";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
+const STORAGE_TYPES = [
+  "Wet Slip",
+  "Lift Slip",
+  "Mooring",
+  "Jet Ski",
+  "Dry Rack - Indoor",
+  "Dry Rack - Outdoor",
+  "Houseboat",
+  "Land Storage",
+  "Boat on Trailer",
+  "Trailer Only",
+] as const;
+
+const storageTypeConfigSchema = z.object({
+  storageType: z.string(),
+  unitCount: z.number().min(0).nullable(),
+  targetOccupancy: z.string().optional(),
+});
+
 const addProjectSchema = z.object({
   name: z.string().min(1, "Project name is required"),
   projectType: z.enum(["OWNED", "DEAL"]),
   description: z.string().optional(),
-  capacity: z.number().nullable().optional(),
   status: z.string().optional(),
-  targetNOI: z.string().optional(),
+  storageTypeConfigs: z.array(storageTypeConfigSchema).default([]),
   includeInExecutive: z.boolean().default(true),
 });
 
@@ -280,9 +298,8 @@ export default function ExecutiveDashboard() {
       name: "",
       projectType: "OWNED",
       description: "",
-      capacity: null,
       status: "",
-      targetNOI: "",
+      storageTypeConfigs: [],
       includeInExecutive: true,
     },
   });
@@ -337,7 +354,6 @@ export default function ExecutiveDashboard() {
         ...data,
         description: data.description?.trim() || undefined,
         status: data.status?.trim() || undefined,
-        targetNOI: data.targetNOI?.trim() || undefined,
       };
       const result = await checkDuplicateName(data.name);
       if (result.isDuplicate && result.existingProject) {
@@ -1857,26 +1873,6 @@ export default function ExecutiveDashboard() {
 
                   <FormField
                     control={form.control}
-                    name="capacity"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Total Capacity (Slips)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            placeholder="e.g., 150"
-                            data-testid="input-project-capacity"
-                            value={field.value === null ? "" : field.value}
-                            onChange={(e) => field.onChange(e.target.value === "" ? null : parseInt(e.target.value))}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
                     name="status"
                     render={({ field }) => (
                       <FormItem>
@@ -1889,6 +1885,7 @@ export default function ExecutiveDashboard() {
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="Operating">Operating</SelectItem>
+                            <SelectItem value="Analyzing">Analyzing</SelectItem>
                             <SelectItem value="Under LOI">Under LOI</SelectItem>
                             <SelectItem value="Due Diligence">Due Diligence</SelectItem>
                             <SelectItem value="Closed">Closed</SelectItem>
@@ -1900,25 +1897,87 @@ export default function ExecutiveDashboard() {
                     )}
                   />
 
-                  {form.watch("projectType") === "DEAL" && (
-                    <FormField
-                      control={form.control}
-                      name="targetNOI"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Target NOI</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="e.g., 500000"
-                              data-testid="input-target-noi"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
+                  <div className="space-y-3">
+                    <FormLabel>Storage Types</FormLabel>
+                    <p className="text-xs text-muted-foreground">Select storage types and set unit count and target occupancy for each</p>
+                    <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
+                      {STORAGE_TYPES.map((storageType) => {
+                        const configs = form.watch("storageTypeConfigs") || [];
+                        const existingConfig = configs.find((c) => c.storageType === storageType);
+                        const isSelected = !!existingConfig;
+
+                        const toggleStorageType = () => {
+                          const currentConfigs = form.getValues("storageTypeConfigs") || [];
+                          if (isSelected) {
+                            form.setValue(
+                              "storageTypeConfigs",
+                              currentConfigs.filter((c) => c.storageType !== storageType)
+                            );
+                          } else {
+                            form.setValue("storageTypeConfigs", [
+                              ...currentConfigs,
+                              { storageType, unitCount: null, targetOccupancy: "" },
+                            ]);
+                          }
+                        };
+
+                        const updateConfig = (field: "unitCount" | "targetOccupancy", value: string) => {
+                          const currentConfigs = form.getValues("storageTypeConfigs") || [];
+                          const updatedConfigs = currentConfigs.map((c) => {
+                            if (c.storageType === storageType) {
+                              if (field === "unitCount") {
+                                return { ...c, unitCount: value === "" ? null : parseInt(value) };
+                              } else {
+                                const numericValue = value.replace(/[^0-9]/g, "");
+                                const formatted = numericValue ? `${numericValue}%` : "";
+                                return { ...c, targetOccupancy: formatted };
+                              }
+                            }
+                            return c;
+                          });
+                          form.setValue("storageTypeConfigs", updatedConfigs);
+                        };
+
+                        return (
+                          <div
+                            key={storageType}
+                            className={`rounded-lg border p-3 transition-colors ${
+                              isSelected ? "border-primary bg-primary/5" : "border-muted"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={toggleStorageType}
+                                data-testid={`checkbox-storage-${storageType.toLowerCase().replace(/\s+/g, "-")}`}
+                              />
+                              <span className="font-medium text-sm flex-1">{storageType}</span>
+                              {isSelected && (
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="number"
+                                    placeholder="Units"
+                                    className="w-20 h-8 text-sm"
+                                    value={existingConfig?.unitCount ?? ""}
+                                    onChange={(e) => updateConfig("unitCount", e.target.value)}
+                                    data-testid={`input-units-${storageType.toLowerCase().replace(/\s+/g, "-")}`}
+                                  />
+                                  <Input
+                                    type="text"
+                                    placeholder="e.g. 90%"
+                                    className="w-24 h-8 text-sm"
+                                    value={existingConfig?.targetOccupancy ?? ""}
+                                    onChange={(e) => updateConfig("targetOccupancy", e.target.value)}
+                                    data-testid={`input-occupancy-${storageType.toLowerCase().replace(/\s+/g, "-")}`}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
 
                   <FormField
                     control={form.control}
