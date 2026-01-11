@@ -926,15 +926,9 @@ export default function ProjectHub() {
                   </div>
 
                   <div className="space-y-3">
-                    <div className="flex items-baseline justify-between">
-                      <div>
-                        <FormLabel>Storage Types *</FormLabel>
-                        <p className="text-xs text-muted-foreground mt-1">Select storage types and set capacity details</p>
-                      </div>
-                      <div className="flex items-center gap-2" style={{ marginRight: '15px' }}>
-                        <span className="w-20 text-center text-xs font-medium text-muted-foreground">Capacity</span>
-                        <span className="w-24 text-center text-xs font-medium text-muted-foreground">Target Occ.</span>
-                      </div>
+                    <div>
+                      <FormLabel>Storage Types *</FormLabel>
+                      <p className="text-xs text-muted-foreground mt-1">Select storage types and set capacity details</p>
                     </div>
                     <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
                       {STORAGE_TYPES.map((storageType) => {
@@ -992,7 +986,7 @@ export default function ProjectHub() {
                                 <div className="flex items-center gap-2">
                                   <Input
                                     type="number"
-                                    placeholder="Units"
+                                    placeholder="Capacity"
                                     className="w-20 h-8 text-sm text-center"
                                     value={existingConfig?.unitCount ?? ""}
                                     onChange={(e) => updateConfig("unitCount", e.target.value)}
@@ -1000,7 +994,7 @@ export default function ProjectHub() {
                                   />
                                   <Input
                                     type="text"
-                                    placeholder="e.g. 90%"
+                                    placeholder="Target Occ. %"
                                     className="w-24 h-8 text-sm text-center"
                                     value={existingConfig?.targetOccupancy ?? ""}
                                     onChange={(e) => updateConfig("targetOccupancy", e.target.value)}
