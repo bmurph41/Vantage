@@ -922,9 +922,9 @@ export default function ProjectHub() {
                   </div>
 
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between pr-1">
                       <FormLabel>Storage Types *</FormLabel>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 mr-3">
                         <FormLabel className="w-20 text-center font-medium">Capacity</FormLabel>
                         <FormLabel className="w-24 text-center font-medium">Target Occ. %</FormLabel>
                       </div>
@@ -987,7 +987,7 @@ export default function ProjectHub() {
                                   <Input
                                     type="number"
                                     placeholder="Units"
-                                    className="w-20 h-8 text-sm"
+                                    className="w-20 h-8 text-sm text-center"
                                     value={existingConfig?.unitCount ?? ""}
                                     onChange={(e) => updateConfig("unitCount", e.target.value)}
                                     data-testid={`input-units-${storageType.toLowerCase().replace(/\s+/g, "-")}`}
@@ -995,7 +995,7 @@ export default function ProjectHub() {
                                   <Input
                                     type="text"
                                     placeholder="e.g. 90%"
-                                    className="w-24 h-8 text-sm"
+                                    className="w-24 h-8 text-sm text-center"
                                     value={existingConfig?.targetOccupancy ?? ""}
                                     onChange={(e) => updateConfig("targetOccupancy", e.target.value)}
                                     data-testid={`input-occupancy-${storageType.toLowerCase().replace(/\s+/g, "-")}`}
