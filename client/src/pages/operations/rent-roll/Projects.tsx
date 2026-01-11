@@ -419,6 +419,10 @@ function LocationFormDrawer({
         capacity: totalCap || null,
         storageMix: data.storageMix,
         budgetYear: data.budgetYear ? parseInt(data.budgetYear) : null,
+        targetNOI: data.targetNOI || null,
+        budgetedRevenue: data.budgetedRevenue || null,
+        budgetedExpenses: data.budgetedExpenses || null,
+        budgetedOccupancy: data.budgetedOccupancy || null,
         status: editProject?.status || 'active',
       };
       if (editProject) {
