@@ -362,6 +362,36 @@ function LocationFormDrawer({
   const summerEndDate = form.watch("seasonEndDate");
   const summerStartDate = form.watch("seasonStartDate");
 
+  // Reset form when editProject changes (switching between create/edit or different projects)
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        name: editProject?.name || "",
+        code: editProject?.code || "",
+        description: editProject?.description || "",
+        projectType: editProject?.projectType || "OWNED",
+        seasonType: editProject?.seasonType || "ANNUAL",
+        storageMix: editProject?.storageMix || [],
+        targetNOI: editProject?.targetNOI || "",
+        includeInExecutive: editProject?.includeInExecutive ?? true,
+        seasonStartDate: editProject?.seasonStartDate || "",
+        seasonEndDate: editProject?.seasonEndDate || "",
+        winterStartDate: editProject?.winterStartDate || "",
+        winterEndDate: editProject?.winterEndDate || "",
+        budgetedRevenue: editProject?.budgetedRevenue || "",
+        budgetedOccupancy: editProject?.budgetedOccupancy || "",
+        budgetedExpenses: editProject?.budgetedExpenses || "",
+        budgetYear: editProject?.budgetYear?.toString() || new Date().getFullYear().toString(),
+        baseRent1Label: editProject?.baseRent1Label || "Base Rent 1",
+        baseRent2Label: editProject?.baseRent2Label || "Base Rent 2",
+        baseRent3Label: editProject?.baseRent3Label || "Base Rent 3",
+        charge1Label: editProject?.charge1Label || "Charge 1",
+        charge2Label: editProject?.charge2Label || "Charge 2",
+        charge3Label: editProject?.charge3Label || "Charge 3",
+      });
+    }
+  }, [open, editProject, form]);
+
   useEffect(() => {
     if (!editProject && projectName && !form.getValues("code")) {
       const generatedCode = generateProjectCode(projectName, existingCodes);
