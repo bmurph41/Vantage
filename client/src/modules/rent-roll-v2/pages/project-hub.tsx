@@ -225,13 +225,7 @@ export default function ProjectHub() {
 
   const createProjectMutation = useMutation({
     mutationFn: async (data: z.infer<typeof addProjectSchema>) => {
-      const response = await fetch('/api/rent-roll/locations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error('Failed to create project');
+      const response = await apiRequest("POST", "/api/rent-roll/locations", data);
       return response.json();
     },
     onSuccess: () => {
@@ -278,13 +272,7 @@ export default function ProjectHub() {
   });
 
   const checkDuplicateName = async (name: string): Promise<DuplicateCheckResult> => {
-    const response = await fetch('/api/rent-roll/locations/check-duplicate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ name }),
-    });
-    if (!response.ok) throw new Error('Failed to check for duplicate');
+    const response = await apiRequest("POST", "/api/rent-roll/locations/check-duplicate", { name });
     return response.json();
   };
 
@@ -311,16 +299,7 @@ export default function ProjectHub() {
     
     setIsReplacing(true);
     try {
-      const response = await fetch('/api/rent-roll/locations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(pendingProjectData),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to create project');
-      }
+      await apiRequest("POST", "/api/rent-roll/locations", pendingProjectData);
       
       await deleteProjectMutation.mutateAsync(duplicateInfo.id);
       

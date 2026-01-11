@@ -1,4 +1,4 @@
-import { apiRequest } from "./queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import type { MarinaLocation, InsertMarinaLocation } from "@shared/schema";
 
 export async function getAllLocations(): Promise<MarinaLocation[]> {
