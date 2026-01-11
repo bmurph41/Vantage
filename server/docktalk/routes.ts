@@ -1786,6 +1786,33 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
+  // M&A Spotlight articles - articles tagged with M&A or Marina Sale categories
+  app.get("/api/docktalk/ma-spotlight-articles", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 200);
+      const offset = parseInt(req.query.offset as string, 10) || 0;
+      const region = req.query.region as string | undefined;
+      
+      // Fetch articles with M&A or Marina Sale categories
+      const articles = await dockTalkStorage.getArticles(null, {
+        categories: ['M&A', 'Marina Sale'],
+        region,
+        limit,
+        offset
+      });
+      
+      res.json({
+        articles,
+        total: articles.length,
+        limit,
+        offset
+      });
+    } catch (error) {
+      console.error("Error fetching M&A spotlight articles:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Deal endpoints
   app.get("/api/docktalk/deals/analytics", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {

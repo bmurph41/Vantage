@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, DollarSign, TrendingUp, Building2, Users, ExternalLink, Filter, X, BarChart3, Activity, Globe, Download, Share2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Calendar, DollarSign, TrendingUp, Building2, Users, ExternalLink, Filter, X, BarChart3, Activity, Globe, Download, Share2, FileText } from "lucide-react";
 import { format, parse } from "date-fns";
 import { Link } from "wouter";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
@@ -63,6 +64,23 @@ interface DealAnalytics {
   dealsByRegion: Array<{ region: string; count: number }>;
   monthlyDeals: Array<{ month: string; count: number }>;
   recentDealsCount: number;
+}
+
+interface MAArticle {
+  id: number;
+  title: string;
+  url: string;
+  source: string;
+  publishedAt: string | null;
+  categories: string[];
+  summary: string | null;
+  geography: string | null;
+  region: string | null;
+}
+
+interface MAArticlesResponse {
+  articles: MAArticle[];
+  total: number;
 }
 
 const TRANSACTION_TYPES = [
@@ -154,7 +172,19 @@ export default function DealsPage() {
     enabled: !!user,
   });
 
+  // Query for M&A/Marina Sale tagged articles
+  const maArticlesParams = new URLSearchParams();
+  if (regionFilter) maArticlesParams.append("region", regionFilter);
+  maArticlesParams.append("limit", "50");
+  const maArticlesUrl = `/api/docktalk/ma-spotlight-articles${maArticlesParams.toString() ? `?${maArticlesParams.toString()}` : ''}`;
+
+  const { data: maArticlesData, isLoading: maArticlesLoading } = useQuery<MAArticlesResponse>({
+    queryKey: [maArticlesUrl],
+    enabled: !!user,
+  });
+
   const deals = data?.deals || [];
+  const maArticles = maArticlesData?.articles || [];
 
   // Export deals to CSV
   const handleExportCSV = () => {
@@ -451,15 +481,29 @@ export default function DealsPage() {
             </CardContent>
           </Card>
 
-          {/* Results Summary */}
-          <div className="mb-4">
-            <p className="text-sm text-muted-foreground">
-              Showing {deals.length} {deals.length === 1 ? 'deal' : 'deals'}
-            </p>
-          </div>
+          {/* Tabbed Content: Deals and M&A Articles */}
+          <Tabs defaultValue="deals" className="mb-8">
+            <TabsList className="mb-4">
+              <TabsTrigger value="deals" className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Extracted Deals ({deals.length})
+              </TabsTrigger>
+              <TabsTrigger value="articles" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                M&A Articles ({maArticles.length})
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Deals List */}
-          {isLoading ? (
+            <TabsContent value="deals">
+              {/* Results Summary */}
+              <div className="mb-4">
+                <p className="text-sm text-muted-foreground">
+                  Showing {deals.length} {deals.length === 1 ? 'deal' : 'deals'} with extracted transaction details
+                </p>
+              </div>
+
+              {/* Deals List */}
+              {isLoading ? (
             <div className="grid grid-cols-1 gap-4">
               {[1, 2, 3].map(i => (
                 <Card key={i} className="animate-pulse">
@@ -652,6 +696,106 @@ export default function DealsPage() {
               ))}
             </div>
           )}
+            </TabsContent>
+
+            <TabsContent value="articles">
+              {/* Results Summary */}
+              <div className="mb-4">
+                <p className="text-sm text-muted-foreground">
+                  Showing {maArticles.length} {maArticles.length === 1 ? 'article' : 'articles'} tagged with M&A or Marina Sale
+                </p>
+              </div>
+
+              {/* M&A Articles List */}
+              {maArticlesLoading ? (
+                <div className="grid grid-cols-1 gap-4">
+                  {[1, 2, 3].map(i => (
+                    <Card key={i} className="animate-pulse">
+                      <CardHeader>
+                        <div className="h-6 bg-muted rounded w-3/4 mb-2"></div>
+                        <div className="h-4 bg-muted rounded w-1/2"></div>
+                      </CardHeader>
+                    </Card>
+                  ))}
+                </div>
+              ) : maArticles.length === 0 ? (
+                <Card>
+                  <CardContent className="py-12 text-center">
+                    <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-lg font-medium text-muted-foreground">No M&A articles found</p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Articles tagged with M&A or Marina Sale will appear here
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 gap-4">
+                  {maArticles.map((article) => (
+                    <Card key={article.id} className="hover:shadow-md transition-shadow" data-testid={`card-article-${article.id}`}>
+                      <CardHeader>
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
+                              {article.categories.map((category) => (
+                                <Badge 
+                                  key={category} 
+                                  variant={category === 'M&A' || category === 'Marina Sale' ? 'default' : 'outline'}
+                                >
+                                  {category}
+                                </Badge>
+                              ))}
+                              {article.region && (
+                                <Badge variant="secondary">{article.region}</Badge>
+                              )}
+                            </div>
+                            
+                            <CardTitle className="text-xl mb-2">
+                              {article.title}
+                            </CardTitle>
+                            
+                            {article.summary && (
+                              <CardDescription className="text-base mb-3 line-clamp-2">
+                                {article.summary}
+                              </CardDescription>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="mt-4 pt-4 border-t">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm">
+                                {article.source}
+                                {article.publishedAt && (
+                                  <span className="text-muted-foreground ml-2">
+                                    • {format(new Date(article.publishedAt), 'MMM d, yyyy')}
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              <Link href={`/docktalk?article=${article.id}`}>
+                                <Button variant="outline" size="sm">
+                                  <ExternalLink className="h-4 w-4 mr-1" />
+                                  View Details
+                                </Button>
+                              </Link>
+                              <a href={article.url} target="_blank" rel="noopener noreferrer">
+                                <Button variant="ghost" size="sm">
+                                  <Globe className="h-4 w-4 mr-1" />
+                                  Source
+                                </Button>
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      </CardHeader>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
     </div>
   );
