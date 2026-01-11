@@ -758,7 +758,7 @@ export default function ProjectHub() {
       </Dialog>
 
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent data-testid="dialog-add-rent-roll" className="sm:max-w-lg">
+        <DialogContent data-testid="dialog-add-rent-roll" className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle data-testid="text-dialog-title">
               {addDialogStep === 1 && "Add New Rent Roll"}
