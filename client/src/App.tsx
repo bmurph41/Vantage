@@ -546,20 +546,16 @@ function Router() {
       </Route>
       <Route path="/operations/rent-roll/leases">
         {() => (
-          <PrivateRoute>
-            <Suspense fallback={<LoadingSpinner />}>
-              <RentRollLeases />
-            </Suspense>
-          </PrivateRoute>
+          <Suspense fallback={<LoadingSpinner />}>
+            <RentRollLeases />
+          </Suspense>
         )}
       </Route>
       <Route path="/operations/rent-roll/projects/:id">
         {() => (
-          <PrivateRoute>
-            <Suspense fallback={<LoadingSpinner />}>
-              <RentRollProjectDetails />
-            </Suspense>
-          </PrivateRoute>
+          <Suspense fallback={<LoadingSpinner />}>
+            <RentRollProjectDetails />
+          </Suspense>
         )}
       </Route>
       <Route path="/operations/fuel/dashboard">
