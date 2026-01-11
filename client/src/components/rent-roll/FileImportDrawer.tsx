@@ -1,7 +1,8 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
+import * as XLSX from "xlsx";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -139,22 +140,53 @@ export function FileImportDrawer({
     multiple: false,
   });
 
+  const parsedDataRef = useRef<{ headers: string[]; allRows: string[][] }>({ headers: [], allRows: [] });
+
   const parseFile = async (file: File) => {
     try {
-      const text = await file.text();
-      const lines = text.split('\n').filter(line => line.trim());
+      const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
       
-      if (lines.length < 2) {
-        toast({
-          title: "Invalid file",
-          description: "File must have at least a header row and one data row.",
-          variant: "destructive",
-        });
-        return;
+      let headers: string[] = [];
+      let allRows: string[][] = [];
+
+      if (isExcel) {
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json<string[]>(firstSheet, { header: 1, defval: '' });
+        
+        if (jsonData.length < 2) {
+          toast({
+            title: "Invalid file",
+            description: "File must have at least a header row and one data row.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        headers = (jsonData[0] as string[]).map(h => String(h || '').trim());
+        allRows = jsonData.slice(1).map(row => 
+          (row as string[]).map(cell => String(cell || '').trim())
+        );
+      } else {
+        const text = await file.text();
+        const lines = text.split('\n').filter(line => line.trim());
+        
+        if (lines.length < 2) {
+          toast({
+            title: "Invalid file",
+            description: "File must have at least a header row and one data row.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        headers = parseCSVLine(lines[0]);
+        allRows = lines.slice(1).map(line => parseCSVLine(line));
       }
 
-      const headers = parseCSVLine(lines[0]);
-      const rows = lines.slice(1, 6).map(line => parseCSVLine(line));
+      parsedDataRef.current = { headers, allRows };
+      const previewRows = allRows.slice(0, 5);
       
       const initialMappings: Record<string, string> = {};
       headers.forEach(header => {
@@ -164,17 +196,18 @@ export function FileImportDrawer({
       setMappings(initialMappings);
       setPreview({
         headers,
-        rows,
-        totalRows: lines.length - 1,
+        rows: previewRows,
+        totalRows: allRows.length,
         mappings: headers.map(header => ({
           sourceColumn: header,
           targetField: initialMappings[header],
-          sampleValues: rows.map(row => row[headers.indexOf(header)] || ''),
+          sampleValues: previewRows.map(row => row[headers.indexOf(header)] || ''),
         })),
       });
       
       setStep('mapping');
     } catch (error) {
+      console.error('File parse error:', error);
       toast({
         title: "Failed to parse file",
         description: "Please ensure the file is a valid CSV or Excel file.",
@@ -214,10 +247,11 @@ export function FileImportDrawer({
     mutationFn: async () => {
       if (!file || !preview) throw new Error("No file to import");
       
-      const text = await file.text();
-      const lines = text.split('\n').filter(line => line.trim());
-      const headers = parseCSVLine(lines[0]);
-      const dataRows = lines.slice(1).map(line => parseCSVLine(line));
+      const { headers, allRows: dataRows } = parsedDataRef.current;
+      
+      if (!headers.length || !dataRows.length) {
+        throw new Error("No data to import");
+      }
       
       const results = { success: 0, errors: 0, errorDetails: [] as string[] };
       
