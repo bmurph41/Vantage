@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -37,7 +37,9 @@ import {
   Eye,
   Settings,
   Sun,
-  Snowflake
+  Snowflake,
+  Anchor,
+  X
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -55,6 +57,51 @@ import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
+
+const STORAGE_TYPES = [
+  "Wet Slip",
+  "Lift Slip",
+  "Mooring",
+  "Jet Ski",
+  "Dry Rack - Indoor",
+  "Dry Rack - Outdoor",
+  "Houseboat",
+  "Land Storage",
+  "Boat on Trailer",
+  "Trailer Only",
+  "Carport",
+  "RV Site",
+  "Other"
+] as const;
+
+type StorageMixItem = {
+  type: string;
+  capacity: number;
+};
+
+function generateProjectCode(name: string, existingCodes: string[]): string {
+  if (!name) return "";
+  const words = name.trim().split(/\s+/);
+  const initials = words
+    .map(word => word.charAt(0).toUpperCase())
+    .filter(char => /[A-Z]/.test(char))
+    .slice(0, 3)
+    .join("");
+  if (!initials) return "";
+  
+  const prefix = `${initials}-`;
+  const existingNumbers = existingCodes
+    .filter(code => code && code.startsWith(prefix))
+    .map(code => {
+      const numPart = code.slice(prefix.length);
+      return parseInt(numPart, 10);
+    })
+    .filter(n => !isNaN(n));
+  
+  const nextNum = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1;
+  return `${initials}-${String(nextNum).padStart(3, '0')}`;
+}
 
 type RRAProject = {
   id: string;
@@ -76,6 +123,7 @@ type RRAProject = {
   budgetedOccupancy?: string;
   budgetedExpenses?: string;
   budgetYear?: number;
+  storageMix?: StorageMixItem[];
   baseRent1Label?: string;
   baseRent2Label?: string;
   baseRent3Label?: string;
@@ -89,13 +137,18 @@ type RRAProject = {
   tenantCount: number;
 };
 
+const storageMixSchema = z.array(z.object({
+  type: z.string(),
+  capacity: z.number().min(0),
+}));
+
 const projectFormSchema = z.object({
   name: z.string().min(1, "Project name is required"),
   code: z.string().optional(),
   description: z.string().optional(),
   projectType: z.string().default("OWNED"),
   seasonType: z.string().default("ANNUAL"),
-  capacity: z.string().optional(),
+  storageMix: storageMixSchema.default([]),
   targetNOI: z.string().optional(),
   includeInExecutive: z.boolean().default(true),
   seasonStartDate: z.string().optional(),
@@ -133,9 +186,9 @@ function ProjectCard({ project, onDelete, onEdit }: { project: RRAProject; onDel
   const getProjectTypeLabel = (type: string) => {
     switch (type) {
       case 'OWNED': return 'Owned';
-      case 'ACQUISITION': return 'Acquisition';
-      case 'MANAGED': return 'Managed';
+      case 'UNDERWRITING': return 'Underwriting';
       case 'DEVELOPMENT': return 'Development';
+      case 'DEAL': return 'Deal';
       default: return type;
     }
   };
@@ -264,12 +317,14 @@ function LocationFormDrawer({
   open, 
   onOpenChange,
   editProject,
-  onSuccess 
+  onSuccess,
+  existingCodes
 }: { 
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editProject?: RRAProject | null;
   onSuccess: () => void;
+  existingCodes: string[];
 }) {
   const { toast } = useToast();
   
@@ -281,7 +336,7 @@ function LocationFormDrawer({
       description: editProject?.description || "",
       projectType: editProject?.projectType || "OWNED",
       seasonType: editProject?.seasonType || "ANNUAL",
-      capacity: editProject?.capacity?.toString() || "",
+      storageMix: editProject?.storageMix || [],
       targetNOI: editProject?.targetNOI || "",
       includeInExecutive: editProject?.includeInExecutive ?? true,
       seasonStartDate: editProject?.seasonStartDate || "",
@@ -302,12 +357,67 @@ function LocationFormDrawer({
   });
 
   const seasonType = form.watch("seasonType");
+  const storageMix = form.watch("storageMix");
+  const projectName = form.watch("name");
+  const summerEndDate = form.watch("seasonEndDate");
+  const summerStartDate = form.watch("seasonStartDate");
+
+  useEffect(() => {
+    if (!editProject && projectName && !form.getValues("code")) {
+      const generatedCode = generateProjectCode(projectName, existingCodes);
+      if (generatedCode) {
+        form.setValue("code", generatedCode);
+      }
+    }
+  }, [projectName, editProject, form, existingCodes]);
+
+  useEffect(() => {
+    if (summerEndDate && summerStartDate) {
+      const endDate = new Date(summerEndDate);
+      const startDate = new Date(summerStartDate);
+      
+      const winterStart = new Date(endDate);
+      winterStart.setDate(winterStart.getDate() + 1);
+      
+      const winterEnd = new Date(startDate);
+      winterEnd.setDate(winterEnd.getDate() - 1);
+      if (winterEnd <= winterStart) {
+        winterEnd.setFullYear(winterEnd.getFullYear() + 1);
+      }
+      
+      form.setValue("winterStartDate", winterStart.toISOString().split('T')[0]);
+      form.setValue("winterEndDate", winterEnd.toISOString().split('T')[0]);
+    }
+  }, [summerEndDate, summerStartDate, form]);
+
+  const totalCapacity = storageMix.reduce((sum, item) => sum + (item.capacity || 0), 0);
+
+  const addStorageType = (type: string) => {
+    const current = form.getValues("storageMix");
+    if (!current.find(item => item.type === type)) {
+      form.setValue("storageMix", [...current, { type, capacity: 0 }]);
+    }
+  };
+
+  const removeStorageType = (type: string) => {
+    const current = form.getValues("storageMix");
+    form.setValue("storageMix", current.filter(item => item.type !== type));
+  };
+
+  const updateStorageCapacity = (type: string, capacity: number) => {
+    const current = form.getValues("storageMix");
+    form.setValue("storageMix", current.map(item => 
+      item.type === type ? { ...item, capacity } : item
+    ));
+  };
 
   const saveMutation = useMutation({
     mutationFn: async (data: ProjectFormData) => {
+      const totalCap = data.storageMix.reduce((sum, item) => sum + (item.capacity || 0), 0);
       const payload = {
         ...data,
-        capacity: data.capacity ? parseInt(data.capacity) : null,
+        capacity: totalCap || null,
+        storageMix: data.storageMix,
         budgetYear: data.budgetYear ? parseInt(data.budgetYear) : null,
         status: editProject?.status || 'active',
       };
@@ -356,8 +466,8 @@ function LocationFormDrawer({
             <Tabs defaultValue="basic" className="w-full">
               <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="basic">Basic</TabsTrigger>
+                <TabsTrigger value="storage">Storage</TabsTrigger>
                 <TabsTrigger value="seasons">Seasons</TabsTrigger>
-                <TabsTrigger value="budget">Budget</TabsTrigger>
                 <TabsTrigger value="labels">Labels</TabsTrigger>
               </TabsList>
 
@@ -376,37 +486,20 @@ function LocationFormDrawer({
                   )}
                 />
 
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="code"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Project Code</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g., MB-001" {...field} data-testid="input-project-code" />
-                        </FormControl>
-                        <FormDescription>Short identifier for reports</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="capacity"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Total Capacity</FormLabel>
-                        <FormControl>
-                          <Input type="number" placeholder="e.g., 250" {...field} data-testid="input-capacity" />
-                        </FormControl>
-                        <FormDescription>Number of slips/units</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                <FormField
+                  control={form.control}
+                  name="code"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Project Code</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Auto-generated from name" {...field} data-testid="input-project-code" />
+                      </FormControl>
+                      <FormDescription>Auto-generated. Edit if needed.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <FormField
                   control={form.control}
@@ -441,8 +534,7 @@ function LocationFormDrawer({
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="OWNED">Owned</SelectItem>
-                            <SelectItem value="ACQUISITION">Acquisition</SelectItem>
-                            <SelectItem value="MANAGED">Managed</SelectItem>
+                            <SelectItem value="UNDERWRITING">Underwriting</SelectItem>
                             <SelectItem value="DEVELOPMENT">Development</SelectItem>
                           </SelectContent>
                         </Select>
@@ -541,6 +633,7 @@ function LocationFormDrawer({
                       <div className="flex items-center gap-2 mb-2">
                         <Snowflake className="h-5 w-5 text-slate-600" />
                         <h3 className="font-medium text-slate-900 dark:text-slate-100">Winter Season</h3>
+                        <span className="text-xs text-muted-foreground">(Auto-calculated from Summer)</span>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <FormField
@@ -550,7 +643,7 @@ function LocationFormDrawer({
                             <FormItem>
                               <FormLabel>Start Date</FormLabel>
                               <FormControl>
-                                <Input type="date" {...field} data-testid="input-winter-start" />
+                                <Input type="date" {...field} data-testid="input-winter-start" className="bg-muted/50" readOnly />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -563,7 +656,7 @@ function LocationFormDrawer({
                             <FormItem>
                               <FormLabel>End Date</FormLabel>
                               <FormControl>
-                                <Input type="date" {...field} data-testid="input-winter-end" />
+                                <Input type="date" {...field} data-testid="input-winter-end" className="bg-muted/50" readOnly />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -581,83 +674,69 @@ function LocationFormDrawer({
                 )}
               </TabsContent>
 
-              <TabsContent value="budget" className="space-y-4 mt-4">
-                <FormField
-                  control={form.control}
-                  name="budgetYear"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Budget Year</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder={new Date().getFullYear().toString()} {...field} data-testid="input-budget-year" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <Separator />
-
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="targetNOI"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Target NOI</FormLabel>
-                        <FormControl>
-                          <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-target-noi" />
-                        </FormControl>
-                        <FormDescription>Net Operating Income target</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="budgetedOccupancy"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Budgeted Occupancy (%)</FormLabel>
-                        <FormControl>
-                          <Input type="number" step="0.1" placeholder="95.0" {...field} data-testid="input-budget-occupancy" />
-                        </FormControl>
-                        <FormDescription>Target occupancy rate</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+              <TabsContent value="storage" className="space-y-4 mt-4">
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Anchor className="h-5 w-5 text-primary" />
+                    <h3 className="font-medium">Storage Types</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Select the storage types available at this marina and specify capacity for each.
+                  </p>
+                  
+                  <div className="space-y-3">
+                    {STORAGE_TYPES.map((type) => {
+                      const isSelected = storageMix.some(item => item.type === type);
+                      const currentCapacity = storageMix.find(item => item.type === type)?.capacity || 0;
+                      
+                      return (
+                        <div key={type} className="flex items-center gap-3">
+                          <Checkbox
+                            id={`storage-${type}`}
+                            checked={isSelected}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                addStorageType(type);
+                              } else {
+                                removeStorageType(type);
+                              }
+                            }}
+                          />
+                          <label 
+                            htmlFor={`storage-${type}`}
+                            className="flex-1 text-sm font-medium cursor-pointer"
+                          >
+                            {type}
+                          </label>
+                          {isSelected && (
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="number"
+                                min="0"
+                                value={currentCapacity}
+                                onChange={(e) => updateStorageCapacity(type, parseInt(e.target.value) || 0)}
+                                className="w-24 h-8"
+                                placeholder="Qty"
+                              />
+                              <span className="text-sm text-muted-foreground">units</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="budgetedRevenue"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Budgeted Revenue</FormLabel>
-                        <FormControl>
-                          <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-budget-revenue" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="budgetedExpenses"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Budgeted Expenses</FormLabel>
-                        <FormControl>
-                          <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-budget-expenses" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Total Capacity</p>
+                      <p className="text-sm text-muted-foreground">Sum of all storage types</p>
+                    </div>
+                    <div className="text-2xl font-bold text-primary">
+                      {totalCapacity.toLocaleString()}
+                    </div>
+                  </div>
                 </div>
               </TabsContent>
 
@@ -948,6 +1027,7 @@ export default function RentRollProjects() {
         onOpenChange={setFormDrawerOpen}
         editProject={editingProject}
         onSuccess={() => { setEditingProject(null); }}
+        existingCodes={(projects || []).map(p => p.code).filter((c): c is string => !!c)}
       />
     </div>
   );

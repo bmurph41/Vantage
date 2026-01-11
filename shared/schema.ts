@@ -2572,7 +2572,7 @@ export const rraStorageTypeEnum = pgEnum("rra_storage_type", [
   "Other"
 ]);
 
-export const rraProjectTypeEnum = pgEnum("rra_project_type", ["OWNED", "DEAL"]);
+export const rraProjectTypeEnum = pgEnum("rra_project_type", ["OWNED", "DEAL", "UNDERWRITING", "DEVELOPMENT"]);
 export const rraSeasonTypeEnum = pgEnum("rra_season_type", ["ANNUAL", "SEASONAL"]);
 export const rraDiscountTypeEnum = pgEnum("rra_discount_type", ["PERCENT_OFF", "FLAT_RATE", "AMOUNT_OFF"]);
 
@@ -2703,6 +2703,7 @@ export const rraMarinaLocations = pgTable("rra_marina_locations", {
   budgetedExpenses: numeric("budgeted_expenses", { precision: 14, scale: 2 }),
   budgetYear: integer("budget_year"),
   seasonalStorageTypes: text("seasonal_storage_types").array(),
+  storageMix: jsonb("storage_mix"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

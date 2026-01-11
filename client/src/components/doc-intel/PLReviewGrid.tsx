@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   flexRender,
@@ -917,9 +917,8 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
                     const isExpanded = expandedRows.has(rowKey);
                     
                     return (
-                      <>
+                      <Fragment key={rowKey}>
                         <TableRow
-                          key={rowKey}
                           className={
                             lineItem.status === "excluded"
                               ? "opacity-50 bg-muted/30"
@@ -1192,7 +1191,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
                             </TableCell>
                           </TableRow>
                         )}
-                      </>
+                      </Fragment>
                     );
                   })
                 )}
