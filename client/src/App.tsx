@@ -546,14 +546,14 @@ function Router() {
       </Route>
       <Route path="/operations/rent-roll/leases">
         {() => (
-          <Suspense fallback={<LoadingSpinner />}>
+          <Suspense fallback={<PageLoader />}>
             <RentRollLeases />
           </Suspense>
         )}
       </Route>
       <Route path="/operations/rent-roll/projects/:id">
         {() => (
-          <Suspense fallback={<LoadingSpinner />}>
+          <Suspense fallback={<PageLoader />}>
             <RentRollProjectDetails />
           </Suspense>
         )}
