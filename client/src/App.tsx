@@ -473,99 +473,117 @@ function Router() {
       <Route path="/rent-roll/projects/:id">
         {() => (
           <AuthGuard>
-            <Suspense fallback={<PageLoader />}>
-              <RentRollV2ProjectLayout>
-                <RentRollV2Dashboard />
-              </RentRollV2ProjectLayout>
-            </Suspense>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <RentRollV2ProjectLayout>
+                  <RentRollV2Dashboard />
+                </RentRollV2ProjectLayout>
+              </Suspense>
+            </UnifiedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/projects/:id/reports">
         {() => (
           <AuthGuard>
-            <Suspense fallback={<PageLoader />}>
-              <RentRollV2ProjectLayout>
-                <RentRollV2Reports />
-              </RentRollV2ProjectLayout>
-            </Suspense>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <RentRollV2ProjectLayout>
+                  <RentRollV2Reports />
+                </RentRollV2ProjectLayout>
+              </Suspense>
+            </UnifiedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/projects/:id/scenarios">
         {() => (
           <AuthGuard>
-            <Suspense fallback={<PageLoader />}>
-              <RentRollV2ProjectLayout>
-                <RentRollV2Scenarios />
-              </RentRollV2ProjectLayout>
-            </Suspense>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <RentRollV2ProjectLayout>
+                  <RentRollV2Scenarios />
+                </RentRollV2ProjectLayout>
+              </Suspense>
+            </UnifiedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/projects/:id/cohorts">
         {() => (
           <AuthGuard>
-            <Suspense fallback={<PageLoader />}>
-              <RentRollV2ProjectLayout>
-                <RentRollV2Cohorts />
-              </RentRollV2ProjectLayout>
-            </Suspense>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <RentRollV2ProjectLayout>
+                  <RentRollV2Cohorts />
+                </RentRollV2ProjectLayout>
+              </Suspense>
+            </UnifiedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/projects/:id/data-quality">
         {() => (
           <AuthGuard>
-            <Suspense fallback={<PageLoader />}>
-              <RentRollV2ProjectLayout>
-                <RentRollV2DataQuality />
-              </RentRollV2ProjectLayout>
-            </Suspense>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <RentRollV2ProjectLayout>
+                  <RentRollV2DataQuality />
+                </RentRollV2ProjectLayout>
+              </Suspense>
+            </UnifiedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/portfolio">
         {() => (
           <AuthGuard>
-            <Suspense fallback={<PageLoader />}>
-              <RentRollV2PortfolioLayout>
-                <RentRollV2Portfolio />
-              </RentRollV2PortfolioLayout>
-            </Suspense>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <RentRollV2PortfolioLayout>
+                  <RentRollV2Portfolio />
+                </RentRollV2PortfolioLayout>
+              </Suspense>
+            </UnifiedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/portfolio/reports">
         {() => (
           <AuthGuard>
-            <Suspense fallback={<PageLoader />}>
-              <RentRollV2PortfolioLayout>
-                <RentRollV2Reports />
-              </RentRollV2PortfolioLayout>
-            </Suspense>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <RentRollV2PortfolioLayout>
+                  <RentRollV2Reports />
+                </RentRollV2PortfolioLayout>
+              </Suspense>
+            </UnifiedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/portfolio/cohorts">
         {() => (
           <AuthGuard>
-            <Suspense fallback={<PageLoader />}>
-              <RentRollV2PortfolioLayout>
-                <RentRollV2Cohorts />
-              </RentRollV2PortfolioLayout>
-            </Suspense>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <RentRollV2PortfolioLayout>
+                  <RentRollV2Cohorts />
+                </RentRollV2PortfolioLayout>
+              </Suspense>
+            </UnifiedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/portfolio/data-quality">
         {() => (
           <AuthGuard>
-            <Suspense fallback={<PageLoader />}>
-              <RentRollV2PortfolioLayout>
-                <RentRollV2PortfolioDataQuality />
-              </RentRollV2PortfolioLayout>
-            </Suspense>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <RentRollV2PortfolioLayout>
+                  <RentRollV2PortfolioDataQuality />
+                </RentRollV2PortfolioLayout>
+              </Suspense>
+            </UnifiedLayout>
           </AuthGuard>
         )}
       </Route>
