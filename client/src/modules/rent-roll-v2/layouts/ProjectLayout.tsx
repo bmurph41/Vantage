@@ -36,11 +36,11 @@ export default function ProjectLayout({ children }: ProjectLayoutProps) {
   });
 
   const navItems = [
-    { path: `/projects/${projectId}`, label: "Rent Roll", icon: Table2, exact: true },
-    { path: `/projects/${projectId}/reports`, label: "Reports", icon: FileText },
-    { path: `/projects/${projectId}/scenarios`, label: "Scenarios", icon: Calculator },
-    { path: `/projects/${projectId}/cohorts`, label: "Cohorts", icon: Users },
-    { path: `/projects/${projectId}/data-quality`, label: "Data Quality", icon: AlertTriangle },
+    { path: `/rent-roll/projects/${projectId}`, label: "Rent Roll", icon: Table2, exact: true },
+    { path: `/rent-roll/projects/${projectId}/reports`, label: "Reports", icon: FileText },
+    { path: `/rent-roll/projects/${projectId}/scenarios`, label: "Scenarios", icon: Calculator },
+    { path: `/rent-roll/projects/${projectId}/cohorts`, label: "Cohorts", icon: Users },
+    { path: `/rent-roll/projects/${projectId}/data-quality`, label: "Data Quality", icon: AlertTriangle },
   ];
 
   const isActive = (path: string, exact?: boolean) => {
@@ -57,7 +57,7 @@ export default function ProjectLayout({ children }: ProjectLayoutProps) {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <Link href="/rent-roll">
+                <Link href="/rent-roll/projects">
                   <Button variant="ghost" size="sm" className="gap-2" data-testid="btn-back-to-projects">
                     <ChevronLeft className="h-4 w-4" />
                     Projects

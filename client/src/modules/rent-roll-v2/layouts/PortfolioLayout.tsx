@@ -20,10 +20,10 @@ export default function PortfolioLayout({ children }: PortfolioLayoutProps) {
   const [location] = useLocation();
 
   const navItems = [
-    { path: "/portfolio", label: "Overview", icon: Briefcase, exact: true },
-    { path: "/portfolio/reports", label: "Reports", icon: FileText },
-    { path: "/portfolio/cohorts", label: "Cohorts", icon: Users },
-    { path: "/portfolio/data-quality", label: "Data Quality", icon: AlertTriangle },
+    { path: "/rent-roll/portfolio", label: "Overview", icon: Briefcase, exact: true },
+    { path: "/rent-roll/portfolio/reports", label: "Reports", icon: FileText },
+    { path: "/rent-roll/portfolio/cohorts", label: "Cohorts", icon: Users },
+    { path: "/rent-roll/portfolio/data-quality", label: "Data Quality", icon: AlertTriangle },
   ];
 
   const isActive = (path: string, exact?: boolean) => {
@@ -40,7 +40,7 @@ export default function PortfolioLayout({ children }: PortfolioLayoutProps) {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <Link href="/">
+                <Link href="/rent-roll/executive">
                   <Button variant="ghost" size="sm" className="gap-2" data-testid="btn-back-to-dashboard">
                     <ChevronLeft className="h-4 w-4" />
                     Dashboard
