@@ -8,9 +8,9 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Loader2, Plus, Trash2, RefreshCw } from "lucide-react";
-import LocationsTable from "../components/locations/LocationsTable";
-import LocationFormDrawer from "../components/locations/LocationFormDrawer";
-import CustomTypesManagement from "../components/rent-roll/CustomTypesManagement";
+import LocationsTable from "../locations/LocationsTable";
+import LocationFormDrawer from "../locations/LocationFormDrawer";
+import CustomTypesManagement from "./CustomTypesManagement";
 import {
   AlertDialog,
   AlertDialogAction,
