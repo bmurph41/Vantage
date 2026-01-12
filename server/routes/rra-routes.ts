@@ -171,9 +171,11 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
     }
 
     // Use DocumentIntelligenceService for AI-powered extraction
-    try {
-      const extractionResult = await documentIntelligenceService.extractRentRollFromText(documentText);
-      
+    const extractionResult = await documentIntelligenceService.extractRentRollFromText(documentText);
+    
+    // Check if AI extraction returned meaningful data
+    // If not, fall through to basic text parsing for manual column mapping
+    if (extractionResult.units.length > 0) {
       // Transform RentRollExtractionResult into headers/rows format for FileImportDrawer
       const headers = [
         'Unit ID',
@@ -201,9 +203,7 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
 
       // Calculate confidence level
       let confidence: 'high' | 'medium' | 'low' = 'medium';
-      const avgConfidence = extractionResult.units.length > 0
-        ? extractionResult.units.reduce((sum, u) => sum + (u.confidence || 0), 0) / extractionResult.units.length
-        : 0;
+      const avgConfidence = extractionResult.units.reduce((sum, u) => sum + (u.confidence || 0), 0) / extractionResult.units.length;
       
       if (avgConfidence >= 0.8) confidence = 'high';
       else if (avgConfidence >= 0.5) confidence = 'medium';
@@ -211,9 +211,6 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
 
       // Build warnings
       const warnings: string[] = [];
-      if (extractionResult.units.length === 0) {
-        warnings.push('No lease/unit data could be extracted from this PDF.');
-      }
       if (avgConfidence < 0.5) {
         warnings.push('Low confidence extraction - please verify all data carefully.');
       }
@@ -224,8 +221,8 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
         warnings.push('Document was scanned using OCR - please verify extracted text.');
       }
 
-      res.json({
-        success: extractionResult.units.length > 0,
+      return res.json({
+        success: true,
         headers,
         rows,
         confidence,
@@ -238,9 +235,12 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
         extractionMethod,
         ocrConfidence
       });
-
-    } catch (aiError: any) {
-      console.error('AI extraction error, falling back to basic parsing:', aiError.message || aiError);
+    }
+    
+    // AI returned no units - fall through to basic text parsing
+    // This happens when AI is rate-limited or can't understand the document
+    {
+      console.log('[PDF Import] AI returned no units, falling back to basic parsing...');
       
       // Fallback: Enhanced text parsing when AI fails
       // Parse lines more flexibly to extract data for manual column mapping
