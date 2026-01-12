@@ -8,7 +8,14 @@ const require = createRequire(import.meta.url);
 
 async function parsePdf(buffer: Buffer): Promise<any> {
   const { PDFParse } = require('pdf-parse');
-  return PDFParse(buffer);
+  const parser = new PDFParse({ data: buffer });
+  const result = await parser.getText();
+  await parser.destroy();
+  return {
+    text: result.text || '',
+    numpages: result.total || result.numpages || 1,
+    info: result.info || {}
+  };
 }
 
 export interface ParsedPage {

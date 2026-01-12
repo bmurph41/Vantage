@@ -13,14 +13,17 @@ import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
 
-// Helper function to parse PDF buffer directly using pdf-parse with createRequire
+// Helper function to parse PDF buffer using pdf-parse v2 API
 async function parsePdfBuffer(buffer: Buffer): Promise<{ text: string; numpages: number }> {
   try {
     const { PDFParse } = require('pdf-parse');
-    const pdfData = await PDFParse(buffer);
+    const parser = new PDFParse({ data: buffer });
+    const result = await parser.getText();
+    const numpages = result.total || result.numpages || 1;
+    await parser.destroy();
     return { 
-      text: pdfData.text || '', 
-      numpages: pdfData.numpages || 1 
+      text: result.text || '', 
+      numpages 
     };
   } catch (error: any) {
     console.error('PDF parse error:', error);
