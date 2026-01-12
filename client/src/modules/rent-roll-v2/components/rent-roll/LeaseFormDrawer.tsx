@@ -38,8 +38,8 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { CommentsSection } from "../components/comments/CommentsSection";
-import LeaseEconomicsSection from "../components/rent-roll/LeaseEconomicsSection";
+import { CommentsSection } from "../comments/CommentsSection";
+import LeaseEconomicsSection from "./LeaseEconomicsSection";
 import type { LeaseLineItem } from "@shared/schema";
 
 interface LeaseFormDrawerProps {
