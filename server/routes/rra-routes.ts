@@ -16,8 +16,8 @@ const require = createRequire(import.meta.url);
 // Helper function to parse PDF buffer directly using pdf-parse with createRequire
 async function parsePdfBuffer(buffer: Buffer): Promise<{ text: string; numpages: number }> {
   try {
-    const pdfParse = require('pdf-parse');
-    const pdfData = await pdfParse(buffer);
+    const { PDFParse } = require('pdf-parse');
+    const pdfData = await PDFParse(buffer);
     return { 
       text: pdfData.text || '', 
       numpages: pdfData.numpages || 1 

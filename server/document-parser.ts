@@ -7,8 +7,8 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 
 async function parsePdf(buffer: Buffer): Promise<any> {
-  const pdfParse = require('pdf-parse');
-  return pdfParse(buffer);
+  const { PDFParse } = require('pdf-parse');
+  return PDFParse(buffer);
 }
 
 export interface ParsedPage {
