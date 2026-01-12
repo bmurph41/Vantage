@@ -3,8 +3,10 @@ import { rraService } from "../services/rra-service";
 import { requireRentRoll } from "../middleware/pack-guard";
 import { z } from "zod";
 import multer from "multer";
-import * as pdfParseModule from "pdf-parse";
-const pdfParse = (pdfParseModule as any).default || pdfParseModule;
+// pdf-parse is a CommonJS module, need createRequire for ESM
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const pdfParse = require("pdf-parse");
 import { db } from "../db";
 import { ilike, eq, and, or, desc } from "drizzle-orm";
 import {
