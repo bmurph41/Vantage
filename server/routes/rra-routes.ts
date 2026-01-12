@@ -98,6 +98,142 @@ router.post("/parse-pdf", upload.single('file'), async (req: Request, res: Respo
   }
 });
 
+// PDF import endpoint with AI extraction (base64 input)
+router.post("/leases/import/pdf", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { pdfBase64 } = req.body;
+    
+    if (!pdfBase64) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "No PDF data provided",
+        headers: [],
+        rows: [],
+        confidence: 'low',
+        warnings: ['No PDF data was received'],
+        pageCount: 0
+      });
+    }
+
+    // Convert base64 to buffer
+    const pdfBuffer = Buffer.from(pdfBase64, 'base64');
+    
+    // Parse PDF to extract text
+    let pdfData;
+    try {
+      pdfData = await pdfParse(pdfBuffer);
+    } catch (parseError: any) {
+      console.error('PDF parse error:', parseError);
+      return res.status(400).json({
+        success: false,
+        error: "Failed to parse PDF file",
+        headers: [],
+        rows: [],
+        confidence: 'low',
+        warnings: ['The PDF file could not be parsed. It may be corrupted or password-protected.'],
+        pageCount: 0
+      });
+    }
+
+    const text = pdfData.text;
+    const pageCount = pdfData.numpages || 1;
+    
+    if (!text || text.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "No text content found in PDF",
+        headers: [],
+        rows: [],
+        confidence: 'low',
+        warnings: ['The PDF appears to be empty or contains only images. Please use a text-based PDF or Excel/CSV format.'],
+        pageCount
+      });
+    }
+
+    // Split text into lines and parse table structure
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    
+    // Find lines that look like data rows (contain multiple values separated by spaces/tabs)
+    const dataLines = lines.filter(line => {
+      const parts = line.split(/\s{2,}|\t/).filter(p => p.trim());
+      return parts.length >= 2; // At least 2 columns of data
+    });
+    
+    if (dataLines.length < 2) {
+      return res.status(200).json({
+        success: false,
+        error: "Could not extract table data from PDF",
+        headers: [],
+        rows: [],
+        confidence: 'low',
+        warnings: ['No tabular data could be extracted from the PDF. Please use Excel or CSV format for better results.'],
+        pageCount
+      });
+    }
+    
+    // First qualifying line is likely headers
+    const headerLine = dataLines[0];
+    const headers = headerLine.split(/\s{2,}|\t/).map(h => h.trim()).filter(h => h);
+    
+    // Remaining lines are data rows - convert to objects
+    const rows = dataLines.slice(1).map(line => {
+      const cells = line.split(/\s{2,}|\t/).map(c => c.trim());
+      // Pad or trim to match header length
+      while (cells.length < headers.length) cells.push('');
+      const trimmedCells = cells.slice(0, headers.length);
+      
+      // Create object with header keys
+      const rowObj: Record<string, string> = {};
+      headers.forEach((header, i) => {
+        rowObj[header] = trimmedCells[i] || '';
+      });
+      return rowObj;
+    });
+    
+    // Filter out empty rows
+    const validRows = rows.filter(row => 
+      Object.values(row).some(v => v && v.trim().length > 0)
+    );
+
+    // Determine confidence based on data quality
+    let confidence: 'high' | 'medium' | 'low' = 'medium';
+    const warnings: string[] = [];
+    
+    if (validRows.length === 0) {
+      confidence = 'low';
+      warnings.push('No valid data rows could be extracted');
+    } else if (validRows.length < 3) {
+      confidence = 'low';
+      warnings.push('Only a few rows were extracted - please verify the data');
+    } else if (headers.length < 3) {
+      confidence = 'low';
+      warnings.push('Few columns detected - the PDF format may not be suitable for automatic extraction');
+    } else if (headers.length >= 5 && validRows.length >= 5) {
+      confidence = 'high';
+    }
+
+    res.json({
+      success: validRows.length > 0,
+      headers,
+      rows: validRows,
+      confidence,
+      warnings,
+      pageCount
+    });
+  } catch (error: any) {
+    console.error('PDF import error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to process PDF file",
+      headers: [],
+      rows: [],
+      confidence: 'low',
+      warnings: ['An unexpected error occurred while processing the PDF'],
+      pageCount: 0
+    });
+  }
+});
+
 router.get("/locations", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orgId = getOrgId(req);
