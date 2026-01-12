@@ -9,40 +9,22 @@ import * as XLSX from "xlsx";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
-import { documentParser } from "../document-parser";
+import { createRequire } from "module";
 
-// Helper function to parse PDF buffer by writing to temp file and using documentParser
+const require = createRequire(import.meta.url);
+
+// Helper function to parse PDF buffer directly using pdf-parse with createRequire
 async function parsePdfBuffer(buffer: Buffer): Promise<{ text: string; numpages: number }> {
-  const tempDir = os.tmpdir();
-  const tempFile = path.join(tempDir, `pdf-import-${Date.now()}.pdf`);
-  
   try {
-    await fs.writeFile(tempFile, buffer);
-    
-    // Create a mock document object for documentParser
-    const mockDocument = {
-      id: 'temp',
-      mimeType: 'application/pdf',
-      storagePath: tempFile,
-      filename: 'import.pdf',
-      size: buffer.length,
-      uploadedBy: 'system',
-      orgId: 'temp',
-      projectId: '',
-      createdAt: new Date()
+    const pdfParse = require('pdf-parse');
+    const pdfData = await pdfParse(buffer);
+    return { 
+      text: pdfData.text || '', 
+      numpages: pdfData.numpages || 1 
     };
-    
-    const pages = await documentParser.parseDocument(mockDocument as any);
-    const text = pages.map(p => p.content).join('\n\n');
-    const numpages = pages[0]?.metadata?.totalPages || pages.length;
-    
-    return { text, numpages };
-  } finally {
-    try {
-      await fs.unlink(tempFile);
-    } catch (e) {
-      // Ignore cleanup errors
-    }
+  } catch (error: any) {
+    console.error('PDF parse error:', error);
+    throw new Error(`Failed to parse PDF: ${error.message}`);
   }
 }
 import { ilike, eq, and, or, desc } from "drizzle-orm";
@@ -256,15 +238,51 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
       });
 
     } catch (aiError: any) {
-      console.error('AI extraction error:', aiError);
-      return res.status(500).json({
+      console.error('AI extraction error, falling back to basic parsing:', aiError);
+      
+      // Fallback: Basic text parsing when AI fails
+      // Split text into lines and find table-like structures
+      const lines = documentText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      
+      // Find lines with multiple values (potential data rows)
+      const dataLines = lines.filter(line => {
+        const parts = line.split(/\s{2,}|\t/).filter(p => p.trim());
+        return parts.length >= 3;
+      });
+      
+      if (dataLines.length >= 2) {
+        // First line is headers, rest are data
+        const headers = dataLines[0].split(/\s{2,}|\t/).map(h => h.trim()).filter(h => h);
+        const rows = dataLines.slice(1).map(line => {
+          const cells = line.split(/\s{2,}|\t/).map(c => c.trim());
+          const row: Record<string, string> = {};
+          headers.forEach((header, idx) => {
+            row[header] = cells[idx] || '';
+          });
+          return row;
+        });
+        
+        return res.json({
+          success: true,
+          headers,
+          rows,
+          confidence: 'low',
+          warnings: ['AI extraction unavailable. Basic text parsing was used - please verify all data carefully.'],
+          pageCount,
+          aiPowered: false
+        });
+      }
+      
+      // If no table structure found
+      return res.status(200).json({
         success: false,
-        error: "AI extraction failed",
+        error: "Could not extract table data",
         headers: [],
         rows: [],
         confidence: 'low',
-        warnings: [`AI extraction error: ${aiError.message}. Please try again or use Excel/CSV format.`],
+        warnings: ['No table structure found in PDF. Please use CSV or Excel format for best results.'],
         pageCount,
+        rawText: documentText.substring(0, 5000), // Provide raw text for debugging
         aiPowered: false
       });
     }

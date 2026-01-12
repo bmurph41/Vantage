@@ -2,9 +2,12 @@ import fs from 'fs/promises';
 import path from 'path';
 import * as XLSX from 'xlsx';
 import type { CddDocument, InsertDocPage } from '@shared/schema';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
 
 async function parsePdf(buffer: Buffer): Promise<any> {
-  const pdfParse = (await import('pdf-parse')).default;
+  const pdfParse = require('pdf-parse');
   return pdfParse(buffer);
 }
 
