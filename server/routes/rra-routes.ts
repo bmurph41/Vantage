@@ -4,14 +4,16 @@ import { requireRentRoll } from "../middleware/pack-guard";
 import { z } from "zod";
 import multer from "multer";
 import OpenAI from "openai";
-// pdf-parse is a CommonJS module, need createRequire for ESM
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse");
 import { db } from "../db";
 
 // OpenAI for AI-powered PDF extraction
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// Helper function for pdf-parse (CommonJS module in ESM context)
+async function parsePdfBuffer(buffer: Buffer): Promise<any> {
+  const pdfParse = (await import('pdf-parse')).default;
+  return pdfParse(buffer);
+}
 import { ilike, eq, and, or, desc } from "drizzle-orm";
 import {
   insertRraMarinaLocationSchema,
@@ -67,7 +69,7 @@ router.post("/parse-pdf", upload.single('file'), async (req: Request, res: Respo
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    const pdfData = await pdfParse(req.file.buffer);
+    const pdfData = await parsePdfBuffer(req.file.buffer);
     const text = pdfData.text;
     
     // Split text into lines and parse table structure
@@ -127,7 +129,7 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
     // Parse PDF to extract text
     let pdfData;
     try {
-      pdfData = await pdfParse(pdfBuffer);
+      pdfData = await parsePdfBuffer(pdfBuffer);
     } catch (parseError: any) {
       console.error('PDF parse error:', parseError);
       return res.status(400).json({
