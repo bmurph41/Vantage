@@ -729,6 +729,33 @@ function getBreadcrumbsForPath(path: string): BreadcrumbItem[] {
     return [DASHBOARD_ITEM, ...items];
   }
 
+  // Rent Roll project routes
+  const rentRollProjectMatch = path.match(/^\/rent-roll\/projects\/([a-f0-9-]+)(\/.*)?$/i);
+  if (rentRollProjectMatch) {
+    const projectId = rentRollProjectMatch[1];
+    const subPath = rentRollProjectMatch[2] || '';
+    
+    items = [
+      CATEGORIES.OPERATIONS,
+      { label: 'Rent Roll', href: '/rent-roll' },
+      { label: 'Projects', href: '/rent-roll/projects' },
+      { label: projectId, isDynamic: true, dynamicType: 'dd-project', dynamicId: projectId },
+    ];
+    
+    if (subPath) {
+      const subSegments = subPath.split('/').filter(Boolean);
+      subSegments.forEach(seg => {
+        const formattedLabel = seg
+          .split('-')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+        items.push({ label: formattedLabel });
+      });
+    }
+    
+    return [DASHBOARD_ITEM, ...items];
+  }
+
   // Legacy DD project route
   const legacyDdProjectMatch = path.match(/^\/projects\/([a-f0-9-]+)(\/.*)?$/i);
   if (legacyDdProjectMatch) {
