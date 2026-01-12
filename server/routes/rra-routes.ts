@@ -3,16 +3,21 @@ import { rraService } from "../services/rra-service";
 import { requireRentRoll } from "../middleware/pack-guard";
 import { z } from "zod";
 import multer from "multer";
-import OpenAI from "openai";
 import { db } from "../db";
-
-// OpenAI for AI-powered PDF extraction
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+import { documentIntelligenceService } from "../services/document-intelligence-service";
+import * as XLSX from "xlsx";
 
 // Helper function for pdf-parse (CommonJS module in ESM context)
-async function parsePdfBuffer(buffer: Buffer): Promise<any> {
-  const pdfParse = (await import('pdf-parse')).default;
-  return pdfParse(buffer);
+async function parsePdfBuffer(buffer: Buffer): Promise<{ text: string; numpages: number }> {
+  try {
+    const pdfParse = (await import('pdf-parse')).default;
+    const result = await pdfParse(buffer);
+    return { text: result.text || '', numpages: result.numpages || 1 };
+  } catch (error: any) {
+    console.error('pdf-parse error:', error);
+    // If pdf-parse fails, try alternative approach
+    throw new Error(`PDF parsing failed: ${error.message}`);
+  }
 }
 import { ilike, eq, and, or, desc } from "drizzle-orm";
 import {
@@ -107,6 +112,7 @@ router.post("/parse-pdf", upload.single('file'), async (req: Request, res: Respo
 });
 
 // PDF import endpoint with AI extraction (base64 input)
+// Uses DocumentIntelligenceService for reliable AI-powered extraction
 router.post("/leases/import/pdf", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { pdfBase64 } = req.body;
@@ -126,10 +132,14 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
     // Convert base64 to buffer
     const pdfBuffer = Buffer.from(pdfBase64, 'base64');
     
-    // Parse PDF to extract text
-    let pdfData;
+    // Parse PDF to extract text using the proven pattern
+    let documentText = '';
+    let pageCount = 1;
+    
     try {
-      pdfData = await parsePdfBuffer(pdfBuffer);
+      const pdfData = await parsePdfBuffer(pdfBuffer);
+      documentText = pdfData.text;
+      pageCount = pdfData.numpages;
     } catch (parseError: any) {
       console.error('PDF parse error:', parseError);
       return res.status(400).json({
@@ -142,11 +152,8 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
         pageCount: 0
       });
     }
-
-    const text = pdfData.text;
-    const pageCount = pdfData.numpages || 1;
     
-    if (!text || text.trim().length === 0) {
+    if (!documentText || documentText.trim().length === 0) {
       return res.status(400).json({
         success: false,
         error: "No text content found in PDF",
@@ -158,123 +165,79 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
       });
     }
 
-    // Use AI-powered extraction with OpenAI GPT-4o
-    const aiPrompt = `Analyze this rent roll or lease document from a marina/boat storage facility and extract it into a structured table format.
-
-Extract ALL lease/unit records into a consistent table with the following columns:
-- Unit/Slip ID or identifier
-- Tenant/Customer name
-- Unit type (wet slip, dry storage, RV, commercial, residential, etc.)
-- Size/Dimensions
-- Monthly rent amount
-- Annual rent amount (if available)
-- Lease start date
-- Lease end date
-- Status (occupied, vacant, reserved)
-- Any additional relevant fields you find
-
-Document text:
-${text.slice(0, 20000)}
-
-Respond with JSON only in this exact format:
-{
-  "headers": ["Column1", "Column2", "Column3", ...],
-  "rows": [
-    {"Column1": "value1", "Column2": "value2", "Column3": "value3", ...},
-    {"Column1": "value1", "Column2": "value2", "Column3": "value3", ...}
-  ],
-  "confidence": "high" | "medium" | "low",
-  "warnings": ["Any data quality issues or notes"],
-  "propertyName": "Detected property/marina name or null",
-  "asOfDate": "Detected as-of date or null"
-}
-
-Important:
-- Create appropriate column headers based on what's in the document
-- Each row should be an object with the header names as keys
-- Use consistent date formats (YYYY-MM-DD preferred)
-- Clean up monetary values (remove $ signs but keep numbers)
-- Set confidence based on how clear and complete the data extraction was`;
-
+    // Use DocumentIntelligenceService for AI-powered extraction
     try {
-      const aiResponse = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a marina operations analyst specializing in rent rolls and lease management. Extract lease and unit data accurately into structured table format. Always respond with valid JSON only.'
-          },
-          { role: 'user', content: aiPrompt }
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.1
-      });
+      const extractionResult = await documentIntelligenceService.extractRentRollFromText(documentText);
+      
+      // Transform RentRollExtractionResult into headers/rows format for FileImportDrawer
+      const headers = [
+        'Unit ID',
+        'Unit Type', 
+        'Size',
+        'Monthly Rent',
+        'Annual Rent',
+        'Tenant Name',
+        'Lease Start',
+        'Lease End',
+        'Status'
+      ];
+      
+      const rows = extractionResult.units.map(unit => ({
+        'Unit ID': unit.unitIdentifier || '',
+        'Unit Type': unit.unitType || '',
+        'Size': unit.size || '',
+        'Monthly Rent': unit.monthlyRent?.toString() || '',
+        'Annual Rent': unit.annualRent?.toString() || '',
+        'Tenant Name': unit.tenantName || '',
+        'Lease Start': unit.leaseStart || '',
+        'Lease End': unit.leaseEnd || '',
+        'Status': unit.status || ''
+      }));
 
-      const content = aiResponse.choices[0]?.message?.content;
-      if (!content) {
-        throw new Error('No response from AI');
+      // Calculate confidence level
+      let confidence: 'high' | 'medium' | 'low' = 'medium';
+      const avgConfidence = extractionResult.units.length > 0
+        ? extractionResult.units.reduce((sum, u) => sum + (u.confidence || 0), 0) / extractionResult.units.length
+        : 0;
+      
+      if (avgConfidence >= 0.8) confidence = 'high';
+      else if (avgConfidence >= 0.5) confidence = 'medium';
+      else confidence = 'low';
+
+      // Build warnings
+      const warnings: string[] = [];
+      if (extractionResult.units.length === 0) {
+        warnings.push('No lease/unit data could be extracted from this PDF.');
+      }
+      if (avgConfidence < 0.5) {
+        warnings.push('Low confidence extraction - please verify all data carefully.');
+      }
+      if (extractionResult.summary.vacantUnits > 0) {
+        warnings.push(`${extractionResult.summary.vacantUnits} vacant units detected.`);
       }
 
-      const aiResult = JSON.parse(content);
-      
       res.json({
-        success: (aiResult.rows?.length || 0) > 0,
-        headers: aiResult.headers || [],
-        rows: aiResult.rows || [],
-        confidence: aiResult.confidence || 'medium',
-        warnings: aiResult.warnings || [],
+        success: extractionResult.units.length > 0,
+        headers,
+        rows,
+        confidence,
+        warnings,
         pageCount,
-        propertyName: aiResult.propertyName,
-        asOfDate: aiResult.asOfDate,
+        propertyName: extractionResult.metadata.propertyName || null,
+        asOfDate: extractionResult.metadata.asOfDate || null,
+        summary: extractionResult.summary,
         aiPowered: true
       });
 
     } catch (aiError: any) {
-      console.error('AI extraction error, falling back to basic parsing:', aiError);
-      
-      // Fallback to basic text parsing if AI fails
-      const lines = text.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0);
-      const dataLines = lines.filter((line: string) => {
-        const parts = line.split(/\s{2,}|\t/).filter((p: string) => p.trim());
-        return parts.length >= 2;
-      });
-      
-      if (dataLines.length < 2) {
-        return res.json({
-          success: false,
-          error: "Could not extract table data from PDF",
-          headers: [],
-          rows: [],
-          confidence: 'low',
-          warnings: ['AI extraction failed and basic parsing found no tabular data. Please use Excel or CSV format.'],
-          pageCount,
-          aiPowered: false
-        });
-      }
-      
-      const headerLine = dataLines[0];
-      const headers = headerLine.split(/\s{2,}|\t/).map((h: string) => h.trim()).filter((h: string) => h);
-      
-      const rows = dataLines.slice(1).map((line: string) => {
-        const cells = line.split(/\s{2,}|\t/).map((c: string) => c.trim());
-        while (cells.length < headers.length) cells.push('');
-        const rowObj: Record<string, string> = {};
-        headers.forEach((header: string, i: number) => {
-          rowObj[header] = cells[i] || '';
-        });
-        return rowObj;
-      });
-      
-      const validRows = rows.filter((row: Record<string, string>) => 
-        Object.values(row).some(v => v && v.trim().length > 0)
-      );
-
-      res.json({
-        success: validRows.length > 0,
-        headers,
-        rows: validRows,
+      console.error('AI extraction error:', aiError);
+      return res.status(500).json({
+        success: false,
+        error: "AI extraction failed",
+        headers: [],
+        rows: [],
         confidence: 'low',
-        warnings: ['AI extraction unavailable - using basic text parsing. Results may be less accurate.'],
+        warnings: [`AI extraction error: ${aiError.message}. Please try again or use Excel/CSV format.`],
         pageCount,
         aiPowered: false
       });

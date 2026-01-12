@@ -717,6 +717,14 @@ Respond with JSON only in this exact format:
 
     return { imported, skipped };
   }
+
+  /**
+   * Public method for direct rent roll extraction from text
+   * Used by the Rent Roll V2 module for PDF/document imports
+   */
+  async extractRentRollFromText(documentText: string): Promise<RentRollExtractionResult> {
+    return this.extractRentRollData(documentText);
+  }
 }
 
 export const documentIntelligenceService = new DocumentIntelligenceService();
