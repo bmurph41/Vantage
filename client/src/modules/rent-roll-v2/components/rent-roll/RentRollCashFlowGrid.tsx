@@ -12,7 +12,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { getMonthlySummary, upsertPnlRackRevenue, regenerateCashFlows } from "../lib/rentRollApi";
+import { getMonthlySummary, upsertPnlRackRevenue, regenerateCashFlows } from "../../lib/rentRollApi";
 import { useToast } from "@/hooks/use-toast";
 import { format, subMonths, startOfYear, endOfYear } from "date-fns";
 import { RefreshCw } from "lucide-react";

@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { createLease, updateLease, getLease } from "../lib/rentRollApi";
+import { createLease, updateLease, getLease } from "../../lib/rentRollApi";
 import { useToast } from "@/hooks/use-toast";
 import { addYears, addMonths, subDays, format } from "date-fns";
 import {

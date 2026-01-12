@@ -22,7 +22,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { resetProject, type ResetProjectResult } from "../lib/rentRollApi";
+import { resetProject, type ResetProjectResult } from "../../lib/rentRollApi";
 
 interface ProjectDetailsTabProps {
   locationId: string;

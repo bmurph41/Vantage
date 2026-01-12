@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
-import { getRevenueByStorageType } from "../lib/rentRollApi";
+import { getRevenueByStorageType } from "../../lib/rentRollApi";
 import type { TimePeriodFilter } from "@shared/timePeriodUtils";
 import { calculateDateRange } from "@shared/timePeriodUtils";
 import TimePeriodSelector from "./TimePeriodSelector";
