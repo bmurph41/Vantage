@@ -237,51 +237,107 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
       });
     }
     
-    // AI returned no units - fall through to basic text parsing
+    // AI returned no units - fall through to smart text parsing
     // This happens when AI is rate-limited or can't understand the document
     {
-      console.log('[PDF Import] AI returned no units, falling back to basic parsing...');
+      console.log('[PDF Import] AI returned no units, falling back to smart parsing...');
       
-      // Fallback: Enhanced text parsing when AI fails
-      // Parse lines more flexibly to extract data for manual column mapping
       const lines = documentText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
       console.log(`[PDF Import Fallback] Found ${lines.length} non-empty lines to parse`);
       
-      // Try multiple parsing strategies
-      // Strategy 1: Find lines with multiple values (tabs or multiple spaces)
-      let dataLines = lines.filter(line => {
-        const parts = line.split(/\s{2,}|\t/).filter(p => p.trim());
-        return parts.length >= 2;
-      });
-      console.log(`[PDF Import Fallback] Strategy 1 (multi-column): ${dataLines.length} lines`);
+      // ============================================================
+      // STRATEGY 1: Numbered list format (e.g., "1. Name - Location, Type, $Amount")
+      // Common in rent roll reports with "Top Leases" sections
+      // ============================================================
+      const numberedListPattern = /^\d+\.\s+(.+?)\s*-\s*(.+?),\s*(.+?),\s*\$?([\d,]+(?:\.\d{2})?)/;
+      const numberedListLines = lines.filter(line => numberedListPattern.test(line));
       
-      // Strategy 2: If not enough tabular data, try comma-separated
-      if (dataLines.length < 2) {
-        dataLines = lines.filter(line => {
-          const parts = line.split(',').filter(p => p.trim());
-          return parts.length >= 2;
+      if (numberedListLines.length >= 3) {
+        console.log(`[PDF Import Fallback] Strategy 1: Found ${numberedListLines.length} numbered list entries`);
+        const headers = ['Tenant Name', 'Property', 'Storage Type', 'Amount'];
+        const rows = numberedListLines.map(line => {
+          const match = line.match(numberedListPattern);
+          if (match) {
+            return {
+              'Tenant Name': match[1].trim(),
+              'Property': match[2].trim(),
+              'Storage Type': match[3].trim(),
+              'Amount': match[4].replace(/,/g, '')
+            };
+          }
+          return { 'Tenant Name': line, 'Property': '', 'Storage Type': '', 'Amount': '' };
         });
-        console.log(`[PDF Import Fallback] Strategy 2 (comma-sep): ${dataLines.length} lines`);
+        
+        return res.json({
+          success: true,
+          headers,
+          rows,
+          confidence: 'medium',
+          warnings: ['Extracted from numbered list format. Please verify the data.'],
+          pageCount,
+          aiPowered: false,
+          extractionMethod,
+          ocrConfidence,
+          rawText: documentText.substring(0, 3000)
+        });
       }
       
-      // Strategy 3: Parse each line as a single record (for vertical-format PDFs)
-      if (dataLines.length < 2) {
-        const kvLines = lines.filter(line => line.includes(':'));
-        console.log(`[PDF Import Fallback] Strategy 3 (key-value): ${kvLines.length} lines with colons`);
-        if (kvLines.length >= 2) {
-          const headers = ['Field', 'Value'];
-          const rows = kvLines.map(line => {
-            const [key, ...vals] = line.split(':');
-            return { 'Field': key.trim(), 'Value': vals.join(':').trim() };
-          });
+      // ============================================================
+      // STRATEGY 2: QuickBooks/Transaction Report format
+      // Looks for header row with common accounting terms, then extracts rows
+      // ============================================================
+      const accountingHeaderPatterns = [
+        /\bType\b.*\bDate\b.*\bName\b/i,
+        /\bInvoice\b.*\bDate\b.*\bAmount\b/i,
+        /\bDescription\b.*\bDebit\b.*\bCredit\b/i,
+        /\bAccount\b.*\bBalance\b/i
+      ];
+      
+      let headerLineIndex = -1;
+      for (let i = 0; i < Math.min(lines.length, 20); i++) {
+        if (accountingHeaderPatterns.some(pattern => pattern.test(lines[i]))) {
+          headerLineIndex = i;
+          console.log(`[PDF Import Fallback] Strategy 2: Found accounting header at line ${i}: "${lines[i].substring(0, 60)}..."`);
+          break;
+        }
+      }
+      
+      if (headerLineIndex >= 0) {
+        const headerLine = lines[headerLineIndex];
+        const headerParts = headerLine.split(/\s{2,}|\t/).map(h => h.trim()).filter(h => h);
+        
+        // Find data lines that follow the header and have similar column structure
+        const dataRows: Record<string, string>[] = [];
+        for (let i = headerLineIndex + 1; i < lines.length; i++) {
+          const line = lines[i];
+          // Skip lines that look like totals, headers, or other non-data
+          if (/^Total|^TOTAL|^Page\s+\d|^\s*$/.test(line)) continue;
+          // Skip lines with too few characters
+          if (line.length < 10) continue;
           
-          console.log(`[PDF Import Fallback] Returning ${rows.length} key-value rows`);
+          // Parse the line using same delimiter
+          const parts = line.split(/\s{2,}|\t/).map(p => p.trim()).filter(p => p);
+          if (parts.length >= 2) {
+            const row: Record<string, string> = {};
+            headerParts.forEach((header, idx) => {
+              row[header] = parts[idx] || '';
+            });
+            // Add any extra columns
+            for (let j = headerParts.length; j < parts.length; j++) {
+              row[`Column ${j + 1}`] = parts[j];
+            }
+            dataRows.push(row);
+          }
+        }
+        
+        if (dataRows.length >= 1) {
+          console.log(`[PDF Import Fallback] Strategy 2: Extracted ${dataRows.length} transaction rows`);
           return res.json({
             success: true,
-            headers,
-            rows,
-            confidence: 'low',
-            warnings: ['AI unavailable. Extracted key-value pairs - map columns in the next step.'],
+            headers: headerParts,
+            rows: dataRows,
+            confidence: 'medium',
+            warnings: ['Extracted from transaction report format. Please verify column mappings.'],
             pageCount,
             aiPowered: false,
             extractionMethod,
@@ -291,7 +347,74 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
         }
       }
       
+      // ============================================================
+      // STRATEGY 3: Detect header row by common rent roll column names
+      // ============================================================
+      const rentRollHeaderPatterns = [
+        /\b(Tenant|Lessee|Name)\b/i,
+        /\b(Slip|Unit|Space|Dock)\b/i,
+        /\b(Rent|Rate|Amount|Fee)\b/i,
+        /\b(Start|Begin|From)\b.*\b(Date)?\b/i,
+        /\b(End|Expire|Through|To)\b.*\b(Date)?\b/i
+      ];
+      
+      let rentRollHeaderIndex = -1;
+      for (let i = 0; i < Math.min(lines.length, 15); i++) {
+        const line = lines[i];
+        const matchCount = rentRollHeaderPatterns.filter(p => p.test(line)).length;
+        if (matchCount >= 2) {
+          rentRollHeaderIndex = i;
+          console.log(`[PDF Import Fallback] Strategy 3: Found rent roll header at line ${i} (${matchCount} matches)`);
+          break;
+        }
+      }
+      
+      if (rentRollHeaderIndex >= 0) {
+        const headerLine = lines[rentRollHeaderIndex];
+        const headers = headerLine.split(/\s{2,}|\t/).map(h => h.trim()).filter(h => h);
+        
+        const dataRows: Record<string, string>[] = [];
+        for (let i = rentRollHeaderIndex + 1; i < lines.length; i++) {
+          const line = lines[i];
+          if (/^Total|^TOTAL|^\s*$/.test(line)) continue;
+          
+          const parts = line.split(/\s{2,}|\t/).map(p => p.trim()).filter(p => p);
+          if (parts.length >= 2) {
+            const row: Record<string, string> = {};
+            headers.forEach((header, idx) => {
+              row[header] = parts[idx] || '';
+            });
+            dataRows.push(row);
+          }
+        }
+        
+        if (dataRows.length >= 1) {
+          console.log(`[PDF Import Fallback] Strategy 3: Extracted ${dataRows.length} rent roll rows`);
+          return res.json({
+            success: true,
+            headers,
+            rows: dataRows,
+            confidence: 'medium',
+            warnings: ['Extracted rent roll data. Please verify column mappings.'],
+            pageCount,
+            aiPowered: false,
+            extractionMethod,
+            ocrConfidence,
+            rawText: documentText.substring(0, 3000)
+          });
+        }
+      }
+      
+      // ============================================================
+      // STRATEGY 4: Generic multi-column tabular data
+      // ============================================================
+      const dataLines = lines.filter(line => {
+        const parts = line.split(/\s{2,}|\t/).filter(p => p.trim());
+        return parts.length >= 2;
+      });
+      
       if (dataLines.length >= 2) {
+        console.log(`[PDF Import Fallback] Strategy 4: Found ${dataLines.length} multi-column lines`);
         const firstLine = dataLines[0];
         const isCommaSeparated = firstLine.split(',').length >= 2 && !firstLine.includes('\t');
         const delimiter = isCommaSeparated ? ',' : /\s{2,}|\t/;
@@ -308,13 +431,13 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
           return row;
         });
         
-        console.log(`[PDF Import Fallback] Returning ${rows.length} tabular rows with ${headers.length} columns`);
+        console.log(`[PDF Import Fallback] Strategy 4: Returning ${rows.length} tabular rows`);
         return res.json({
           success: true,
           headers,
           rows,
           confidence: 'low',
-          warnings: ['AI unavailable. Basic parsing was used - please map columns in the next step.'],
+          warnings: ['Basic tabular extraction. Please map columns carefully.'],
           pageCount,
           aiPowered: false,
           extractionMethod,
@@ -323,20 +446,46 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
         });
       }
       
-      // Strategy 4: Parse each line as raw text for user to interpret
-      // This ALWAYS succeeds if we have any text
-      if (lines.length >= 1) {
-        // Each line becomes a separate row with the full text
-        const headers = ['Raw Text'];
-        const rows = lines.slice(0, 100).map(line => ({ 'Raw Text': line }));
+      // ============================================================
+      // STRATEGY 5: Key-value pairs (lines with colons)
+      // ============================================================
+      const kvLines = lines.filter(line => line.includes(':'));
+      if (kvLines.length >= 2) {
+        console.log(`[PDF Import Fallback] Strategy 5: Found ${kvLines.length} key-value lines`);
+        const headers = ['Field', 'Value'];
+        const rows = kvLines.map(line => {
+          const [key, ...vals] = line.split(':');
+          return { 'Field': key.trim(), 'Value': vals.join(':').trim() };
+        });
         
-        console.log(`[PDF Import Fallback] Returning ${rows.length} raw text lines`);
         return res.json({
           success: true,
           headers,
           rows,
           confidence: 'low',
-          warnings: ['AI unavailable. Raw text extracted - each line is shown as a row. Map columns as needed.'],
+          warnings: ['Extracted key-value pairs. Map columns in the next step.'],
+          pageCount,
+          aiPowered: false,
+          extractionMethod,
+          ocrConfidence,
+          rawText: documentText.substring(0, 3000)
+        });
+      }
+      
+      // ============================================================
+      // STRATEGY 6: Raw text lines (always succeeds if we have text)
+      // ============================================================
+      if (lines.length >= 1) {
+        console.log(`[PDF Import Fallback] Strategy 6: Returning ${Math.min(lines.length, 100)} raw text lines`);
+        const headers = ['Raw Text'];
+        const rows = lines.slice(0, 100).map(line => ({ 'Raw Text': line }));
+        
+        return res.json({
+          success: true,
+          headers,
+          rows,
+          confidence: 'low',
+          warnings: ['Raw text extracted. Each line is shown as a row.'],
           pageCount,
           aiPowered: false,
           extractionMethod,
