@@ -69,7 +69,7 @@ import { format } from "date-fns";
 import BulkLeaseImportDialog from "./BulkLeaseImportDialog";
 import ColumnSettingsDialog from "./ColumnSettingsDialog";
 import CashFlowDrawer from "./CashFlowDrawer";
-import { useRentRollColumns } from "@/hooks/useRentRollColumns";
+import { useRentRollColumns } from "../../hooks/useRentRollColumns";
 import type { RentRollColumnConfig, LeaseWithTenant } from "@shared/schema";
 
 // Rolling/MTM contract term types that have no fixed expiration
