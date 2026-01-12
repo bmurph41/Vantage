@@ -342,6 +342,11 @@ export default function FileImportDrawer({ open, onClose, locationId }: FileImpo
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // Custom column creation state
+  const [customColumns, setCustomColumns] = useState<string[]>([]);
+  const [creatingCustomColumnFor, setCreatingCustomColumnFor] = useState<string | null>(null);
+  const [newCustomColumnName, setNewCustomColumnName] = useState("");
+  
   // Rate configuration state
   const [numberOfRates, setNumberOfRates] = useState<1 | 2 | 3>(1);
   const [rateConfigs, setRateConfigs] = useState<RateConfig[]>([
@@ -1874,6 +1879,10 @@ export default function FileImportDrawer({ open, onClose, locationId }: FileImpo
     setRateConfigs([{ seasonType: 'annual', columnKey: '', slipColumnKey: '', rateBasis: 'per_month' }]);
     // Reset drag state
     setIsDragging(false);
+    // Reset custom columns
+    setCustomColumns([]);
+    setCreatingCustomColumnFor(null);
+    setNewCustomColumnName("");
     // Reset step last, after all other state is cleared
     setStep("upload");
     onClose();
@@ -1906,6 +1915,10 @@ export default function FileImportDrawer({ open, onClose, locationId }: FileImpo
     setRateConfigs([{ seasonType: 'annual', columnKey: '', slipColumnKey: '', rateBasis: 'per_month' }]);
     // Reset drag state
     setIsDragging(false);
+    // Reset custom columns
+    setCustomColumns([]);
+    setCreatingCustomColumnFor(null);
+    setNewCustomColumnName("");
   };
 
   const validRows = parseResult?.parsedRows.filter(row => row.errors.length === 0) || [];
@@ -2364,11 +2377,73 @@ export default function FileImportDrawer({ open, onClose, locationId }: FileImpo
                             </div>
                             <div className="space-y-1.5">
                               <div className="relative">
+                                {creatingCustomColumnFor === field.value ? (
+                                  <div className="flex gap-2">
+                                    <Input
+                                      type="text"
+                                      placeholder="Enter column name..."
+                                      value={newCustomColumnName}
+                                      onChange={(e) => setNewCustomColumnName(e.target.value)}
+                                      className="h-8 text-sm flex-1"
+                                      autoFocus
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && newCustomColumnName.trim()) {
+                                          const trimmedName = newCustomColumnName.trim();
+                                          if (!fileHeaders.includes(trimmedName) && !customColumns.includes(trimmedName)) {
+                                            setCustomColumns(prev => [...prev, trimmedName]);
+                                            setFileHeaders(prev => [...prev, trimmedName]);
+                                          }
+                                          setColumnMapping(prev => ({ ...prev, [field.value]: trimmedName }));
+                                          setCreatingCustomColumnFor(null);
+                                          setNewCustomColumnName("");
+                                        } else if (e.key === 'Escape') {
+                                          setCreatingCustomColumnFor(null);
+                                          setNewCustomColumnName("");
+                                        }
+                                      }}
+                                    />
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-8 px-2"
+                                      onClick={() => {
+                                        if (newCustomColumnName.trim()) {
+                                          const trimmedName = newCustomColumnName.trim();
+                                          if (!fileHeaders.includes(trimmedName) && !customColumns.includes(trimmedName)) {
+                                            setCustomColumns(prev => [...prev, trimmedName]);
+                                            setFileHeaders(prev => [...prev, trimmedName]);
+                                          }
+                                          setColumnMapping(prev => ({ ...prev, [field.value]: trimmedName }));
+                                        }
+                                        setCreatingCustomColumnFor(null);
+                                        setNewCustomColumnName("");
+                                      }}
+                                    >
+                                      <Check className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-8 px-2"
+                                      onClick={() => {
+                                        setCreatingCustomColumnFor(null);
+                                        setNewCustomColumnName("");
+                                      }}
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                ) : (
                                 <Select
                                   value={currentMappedColumn || "__skip__"}
                                   onValueChange={(value) => {
-                                    const newValue = value === "__skip__" ? "" : value;
-                                    setColumnMapping(prev => ({ ...prev, [field.value]: newValue }));
+                                    if (value === "__create_custom__") {
+                                      setCreatingCustomColumnFor(field.value);
+                                      setNewCustomColumnName("");
+                                    } else {
+                                      const newValue = value === "__skip__" ? "" : value;
+                                      setColumnMapping(prev => ({ ...prev, [field.value]: newValue }));
+                                    }
                                   }}
                                 >
                                   <SelectTrigger id={`mapping-${field.value}`} data-testid={`select-mapping-${field.value}`} className="h-8 text-sm">
@@ -2376,14 +2451,25 @@ export default function FileImportDrawer({ open, onClose, locationId }: FileImpo
                                   </SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value="__skip__">Skip this field</SelectItem>
+                                    <SelectItem value="__create_custom__">
+                                      <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                                        <Pencil className="w-3 h-3" />
+                                        Create custom column...
+                                      </span>
+                                    </SelectItem>
                                     {fileHeaders.map(header => {
-                                      // Check if this header has an AI suggestion for this field
                                       const headerSuggestion = aiColumnSuggestions[header];
                                       const isAiSuggested = headerSuggestion?.field === field.value;
+                                      const isCustom = customColumns.includes(header);
                                       return (
                                         <SelectItem key={header} value={header}>
                                           <span className="flex items-center gap-1.5">
                                             {header}
+                                            {isCustom && (
+                                              <span className="text-[9px] px-1 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400">
+                                                Custom
+                                              </span>
+                                            )}
                                             {isAiSuggested && (
                                               <span className={`text-[9px] px-1 py-0.5 rounded ${
                                                 headerSuggestion.confidence === "high" 
@@ -2401,6 +2487,7 @@ export default function FileImportDrawer({ open, onClose, locationId }: FileImpo
                                     })}
                                   </SelectContent>
                                 </Select>
+                                )}
                                 {/* AI suggestion hint when not yet mapped */}
                                 {!isColumnMapped && suggestedColumn && suggestionConfidence !== "high" && (
                                   <button
