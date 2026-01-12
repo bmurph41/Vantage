@@ -240,18 +240,20 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
       });
 
     } catch (aiError: any) {
-      console.error('AI extraction error, falling back to basic parsing:', aiError);
+      console.error('AI extraction error, falling back to basic parsing:', aiError.message || aiError);
       
       // Fallback: Enhanced text parsing when AI fails
       // Parse lines more flexibly to extract data for manual column mapping
       const lines = documentText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      console.log(`[PDF Import Fallback] Found ${lines.length} non-empty lines to parse`);
       
       // Try multiple parsing strategies
       // Strategy 1: Find lines with multiple values (tabs or multiple spaces)
       let dataLines = lines.filter(line => {
         const parts = line.split(/\s{2,}|\t/).filter(p => p.trim());
-        return parts.length >= 2; // Reduced from 3 to 2 for more flexibility
+        return parts.length >= 2;
       });
+      console.log(`[PDF Import Fallback] Strategy 1 (multi-column): ${dataLines.length} lines`);
       
       // Strategy 2: If not enough tabular data, try comma-separated
       if (dataLines.length < 2) {
@@ -259,20 +261,21 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
           const parts = line.split(',').filter(p => p.trim());
           return parts.length >= 2;
         });
+        console.log(`[PDF Import Fallback] Strategy 2 (comma-sep): ${dataLines.length} lines`);
       }
       
       // Strategy 3: Parse each line as a single record (for vertical-format PDFs)
       if (dataLines.length < 2) {
-        // Try to find key-value patterns like "Slip: A-1" or "Tenant Name: John"
         const kvLines = lines.filter(line => line.includes(':'));
-        if (kvLines.length >= 3) {
-          // Group consecutive key-value lines into records
+        console.log(`[PDF Import Fallback] Strategy 3 (key-value): ${kvLines.length} lines with colons`);
+        if (kvLines.length >= 2) {
           const headers = ['Field', 'Value'];
           const rows = kvLines.map(line => {
             const [key, ...vals] = line.split(':');
             return { 'Field': key.trim(), 'Value': vals.join(':').trim() };
           });
           
+          console.log(`[PDF Import Fallback] Returning ${rows.length} key-value rows`);
           return res.json({
             success: true,
             headers,
@@ -289,12 +292,10 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
       }
       
       if (dataLines.length >= 2) {
-        // Determine delimiter
         const firstLine = dataLines[0];
         const isCommaSeparated = firstLine.split(',').length >= 2 && !firstLine.includes('\t');
         const delimiter = isCommaSeparated ? ',' : /\s{2,}|\t/;
         
-        // First line is headers, rest are data
         const headers = firstLine.split(delimiter).map((h: string) => h.trim()).filter((h: string) => h);
         const rows = dataLines.slice(1).map(line => {
           const cells = typeof delimiter === 'string' 
@@ -307,6 +308,7 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
           return row;
         });
         
+        console.log(`[PDF Import Fallback] Returning ${rows.length} tabular rows with ${headers.length} columns`);
         return res.json({
           success: true,
           headers,
@@ -321,27 +323,20 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
         });
       }
       
-      // Last resort: Parse all lines as raw data for manual mapping
-      // Create generic columns from the raw text lines
+      // Strategy 4: Parse each line as raw text for user to interpret
+      // This ALWAYS succeeds if we have any text
       if (lines.length >= 1) {
-        const headers = ['Line 1', 'Line 2', 'Line 3', 'Line 4', 'Line 5'];
-        const rows: Record<string, string>[] = [];
+        // Each line becomes a separate row with the full text
+        const headers = ['Raw Text'];
+        const rows = lines.slice(0, 100).map(line => ({ 'Raw Text': line }));
         
-        // Group every 5 lines as a potential row
-        for (let i = 0; i < lines.length; i += 5) {
-          const row: Record<string, string> = {};
-          for (let j = 0; j < 5; j++) {
-            row[`Line ${j + 1}`] = lines[i + j] || '';
-          }
-          rows.push(row);
-        }
-        
+        console.log(`[PDF Import Fallback] Returning ${rows.length} raw text lines`);
         return res.json({
           success: true,
           headers,
-          rows: rows.slice(0, 50), // Limit to 50 rows
+          rows,
           confidence: 'low',
-          warnings: ['No table structure detected. Raw text has been organized - please map columns carefully.'],
+          warnings: ['AI unavailable. Raw text extracted - each line is shown as a row. Map columns as needed.'],
           pageCount,
           aiPowered: false,
           extractionMethod,
@@ -350,7 +345,8 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
         });
       }
       
-      // If truly no data
+      // If truly no data (empty document)
+      console.log(`[PDF Import Fallback] No lines found, returning error`);
       return res.status(200).json({
         success: false,
         error: "Could not extract any data",
