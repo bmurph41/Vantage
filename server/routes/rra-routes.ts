@@ -6,17 +6,43 @@ import multer from "multer";
 import { db } from "../db";
 import { documentIntelligenceService } from "../services/document-intelligence-service";
 import * as XLSX from "xlsx";
+import fs from "fs/promises";
+import path from "path";
+import os from "os";
+import { documentParser } from "../document-parser";
 
-// Helper function for pdf-parse (CommonJS module in ESM context)
+// Helper function to parse PDF buffer by writing to temp file and using documentParser
 async function parsePdfBuffer(buffer: Buffer): Promise<{ text: string; numpages: number }> {
+  const tempDir = os.tmpdir();
+  const tempFile = path.join(tempDir, `pdf-import-${Date.now()}.pdf`);
+  
   try {
-    const pdfParse = (await import('pdf-parse')).default;
-    const result = await pdfParse(buffer);
-    return { text: result.text || '', numpages: result.numpages || 1 };
-  } catch (error: any) {
-    console.error('pdf-parse error:', error);
-    // If pdf-parse fails, try alternative approach
-    throw new Error(`PDF parsing failed: ${error.message}`);
+    await fs.writeFile(tempFile, buffer);
+    
+    // Create a mock document object for documentParser
+    const mockDocument = {
+      id: 'temp',
+      mimeType: 'application/pdf',
+      storagePath: tempFile,
+      filename: 'import.pdf',
+      size: buffer.length,
+      uploadedBy: 'system',
+      orgId: 'temp',
+      projectId: '',
+      createdAt: new Date()
+    };
+    
+    const pages = await documentParser.parseDocument(mockDocument as any);
+    const text = pages.map(p => p.content).join('\n\n');
+    const numpages = pages[0]?.metadata?.totalPages || pages.length;
+    
+    return { text, numpages };
+  } finally {
+    try {
+      await fs.unlink(tempFile);
+    } catch (e) {
+      // Ignore cleanup errors
+    }
   }
 }
 import { ilike, eq, and, or, desc } from "drizzle-orm";
