@@ -68,8 +68,8 @@ router.post("/parse-pdf", upload.single('file'), async (req: Request, res: Respo
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    const pdfData = await parsePdfBuffer(req.file.buffer);
-    const text = pdfData.text;
+    const pdfResult = await parseOcrPdf(req.file.buffer);
+    const text = pdfResult.text;
     
     // Split text into lines and parse table structure
     const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
@@ -98,7 +98,12 @@ router.post("/parse-pdf", upload.single('file'), async (req: Request, res: Respo
       return cells.slice(0, headers.length);
     });
     
-    res.json({ headers, rows });
+    res.json({ 
+      headers, 
+      rows,
+      extractionMethod: pdfResult.method,
+      ocrConfidence: pdfResult.confidence
+    });
   } catch (error) {
     console.error('PDF parse error:', error);
     res.status(500).json({ error: "Failed to parse PDF file" });
