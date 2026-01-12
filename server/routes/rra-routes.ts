@@ -5,6 +5,7 @@ import { z } from "zod";
 import multer from "multer";
 import { db } from "../db";
 import { documentIntelligenceService } from "../services/document-intelligence-service";
+import { parseOcrPdf } from "../services/ocr-pdf-parser";
 import * as XLSX from "xlsx";
 import fs from "fs/promises";
 import path from "path";
@@ -12,24 +13,6 @@ import os from "os";
 import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
-
-// Helper function to parse PDF buffer using pdf-parse v2 API
-async function parsePdfBuffer(buffer: Buffer): Promise<{ text: string; numpages: number }> {
-  try {
-    const { PDFParse } = require('pdf-parse');
-    const parser = new PDFParse({ data: buffer });
-    const result = await parser.getText();
-    const numpages = result.total || result.numpages || 1;
-    await parser.destroy();
-    return { 
-      text: result.text || '', 
-      numpages 
-    };
-  } catch (error: any) {
-    console.error('PDF parse error:', error);
-    throw new Error(`Failed to parse PDF: ${error.message}`);
-  }
-}
 import { ilike, eq, and, or, desc } from "drizzle-orm";
 import {
   insertRraMarinaLocationSchema,
@@ -123,7 +106,7 @@ router.post("/parse-pdf", upload.single('file'), async (req: Request, res: Respo
 });
 
 // PDF import endpoint with AI extraction (base64 input)
-// Uses DocumentIntelligenceService for reliable AI-powered extraction
+// Uses OCR-enhanced parsing + DocumentIntelligenceService for reliable extraction
 router.post("/leases/import/pdf", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { pdfBase64 } = req.body;
@@ -143,16 +126,22 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
     // Convert base64 to buffer
     const pdfBuffer = Buffer.from(pdfBase64, 'base64');
     
-    // Parse PDF to extract text using the proven pattern
+    // Parse PDF using OCR-enhanced extraction (handles scanned docs, photos, etc.)
     let documentText = '';
     let pageCount = 1;
+    let extractionMethod = 'direct';
+    let ocrConfidence = 95;
     
     try {
-      const pdfData = await parsePdfBuffer(pdfBuffer);
-      documentText = pdfData.text;
-      pageCount = pdfData.numpages;
+      console.log('[PDF Import] Starting OCR-enhanced PDF extraction...');
+      const ocrResult = await parseOcrPdf(pdfBuffer);
+      documentText = ocrResult.text;
+      pageCount = ocrResult.pageCount;
+      extractionMethod = ocrResult.method;
+      ocrConfidence = ocrResult.confidence;
+      console.log(`[PDF Import] Extraction complete. Method: ${extractionMethod}, Confidence: ${ocrConfidence}%, Text: ${documentText.length} chars`);
     } catch (parseError: any) {
-      console.error('PDF parse error:', parseError);
+      console.error('[PDF Import] OCR extraction failed:', parseError);
       return res.status(400).json({
         success: false,
         error: "Failed to parse PDF file",
@@ -171,7 +160,7 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
         headers: [],
         rows: [],
         confidence: 'low',
-        warnings: ['The PDF appears to be empty or contains only images. Please use a text-based PDF or Excel/CSV format.'],
+        warnings: ['The PDF appears to be empty or the OCR could not read any text. Try a higher quality scan.'],
         pageCount
       });
     }
@@ -226,6 +215,9 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
       if (extractionResult.summary.vacantUnits > 0) {
         warnings.push(`${extractionResult.summary.vacantUnits} vacant units detected.`);
       }
+      if (extractionMethod === 'ocr') {
+        warnings.push('Document was scanned using OCR - please verify extracted text.');
+      }
 
       res.json({
         success: extractionResult.units.length > 0,
@@ -237,7 +229,9 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
         propertyName: extractionResult.metadata.propertyName || null,
         asOfDate: extractionResult.metadata.asOfDate || null,
         summary: extractionResult.summary,
-        aiPowered: true
+        aiPowered: true,
+        extractionMethod,
+        ocrConfidence
       });
 
     } catch (aiError: any) {
@@ -272,7 +266,9 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
           confidence: 'low',
           warnings: ['AI extraction unavailable. Basic text parsing was used - please verify all data carefully.'],
           pageCount,
-          aiPowered: false
+          aiPowered: false,
+          extractionMethod,
+          ocrConfidence
         });
       }
       
@@ -285,8 +281,10 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
         confidence: 'low',
         warnings: ['No table structure found in PDF. Please use CSV or Excel format for best results.'],
         pageCount,
-        rawText: documentText.substring(0, 5000), // Provide raw text for debugging
-        aiPowered: false
+        rawText: documentText.substring(0, 5000),
+        aiPowered: false,
+        extractionMethod,
+        ocrConfidence
       });
     }
   } catch (error: any) {
