@@ -258,6 +258,13 @@ export class RRAService {
       .orderBy(asc(rraStorageLocations.name));
   }
 
+  async getStorageLocationById(id: string): Promise<RraStorageLocation | null> {
+    const [location] = await db.select()
+      .from(rraStorageLocations)
+      .where(eq(rraStorageLocations.id, id));
+    return location || null;
+  }
+
   async createStorageLocation(data: InsertRraStorageLocation): Promise<RraStorageLocation> {
     const [location] = await db.insert(rraStorageLocations)
       .values(data)

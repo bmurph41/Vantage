@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { createStorageLocation, updateStorageLocation, getStorageLocationById } from "../lib/storageLocationApi";
+import { createStorageLocation, updateStorageLocation, getStorageLocationById } from "../../lib/storageLocationApi";
 import { useToast } from "@/hooks/use-toast";
 import {
   Sheet,

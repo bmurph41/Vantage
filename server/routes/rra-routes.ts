@@ -201,6 +201,63 @@ router.delete("/storage/:id", async (req: Request, res: Response, next: NextFunc
   }
 });
 
+// Storage Locations API (alternative routes for frontend compatibility)
+router.get("/storage-locations", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const projectId = req.query.projectId as string;
+    if (!projectId) {
+      return res.status(400).json({ error: "projectId query parameter is required" });
+    }
+    const storageLocations = await rraService.getStorageLocations(projectId);
+    res.json(storageLocations);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/storage-locations/:id", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const location = await rraService.getStorageLocationById(req.params.id);
+    if (!location) {
+      return res.status(404).json({ error: "Storage location not found" });
+    }
+    res.json(location);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/storage-locations", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const validated = insertRraStorageLocationSchema.parse(req.body);
+    const location = await rraService.createStorageLocation(validated);
+    res.status(201).json(location);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put("/storage-locations/:id", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const location = await rraService.updateStorageLocation(req.params.id, req.body);
+    if (!location) {
+      return res.status(404).json({ error: "Storage location not found" });
+    }
+    res.json(location);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/storage-locations/:id", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await rraService.deleteStorageLocation(req.params.id);
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get("/tenants", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orgId = getOrgId(req);
