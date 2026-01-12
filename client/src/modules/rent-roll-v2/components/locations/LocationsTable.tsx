@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { getStorageLocationsByProject, deleteStorageLocation } from "../lib/storageLocationApi";
+import { getStorageLocationsByProject, deleteStorageLocation } from "../../lib/storageLocationApi";
 import { useToast } from "@/hooks/use-toast";
 import {
   Table,
