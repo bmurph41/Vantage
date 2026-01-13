@@ -5646,6 +5646,168 @@ export const insertCrmPhaseGateApprovalSchema = createInsertSchema(crmPhaseGateA
   updatedAt: true,
 });
 export type InsertCrmPhaseGateApproval = z.infer<typeof insertCrmPhaseGateApprovalSchema>;
+
+// ============================================================================
+// CRM ARCHIVE SYSTEM - Archived Contacts & Companies Post-Sale
+// ============================================================================
+
+// Archive reason enum
+export const archiveReasonEnum = pgEnum("archive_reason", [
+  "property_sold",
+  "out_of_industry", 
+  "duplicate",
+  "inactive",
+  "deceased",
+  "other"
+]);
+
+// Archived Contacts - Separate storage for contacts archived after property sale
+export const archivedContacts = pgTable("archived_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  originalContactId: varchar("original_contact_id").notNull(), // Original contact ID for reference
+  
+  // Copied contact data (snapshot at time of archive)
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  phones: jsonb("phones").default(sql`'[]'`),
+  position: text("position"),
+  address: text("address"),
+  unit: text("unit"),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
+  company: text("company"),
+  role: text("role"),
+  contactType: text("contact_type"),
+  contactTag: text("contact_tag"),
+  labels: text("labels").array().default(sql`ARRAY[]::text[]`),
+  linkedinUrl: text("linkedin_url"),
+  twitterHandle: text("twitter_handle"),
+  photoDataUrl: text("photo_data_url"),
+  
+  // Archive metadata
+  archiveReason: archiveReasonEnum("archive_reason").notNull().default("property_sold"),
+  archiveNotes: text("archive_notes"),
+  archivedBy: varchar("archived_by").notNull().references(() => users.id),
+  archivedAt: timestamp("archived_at").defaultNow().notNull(),
+  
+  // Associated sale information
+  salesCompId: varchar("sales_comp_id").references(() => salesComps.id, { onDelete: 'set null' }),
+  saleDate: timestamp("sale_date"),
+  
+  // Original record timestamps
+  originalCreatedAt: timestamp("original_created_at"),
+  originalUpdatedAt: timestamp("original_updated_at"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("archived_contacts_org_idx").on(table.orgId),
+  originalContactIdx: index("archived_contacts_original_idx").on(table.originalContactId),
+  salesCompIdx: index("archived_contacts_sales_comp_idx").on(table.salesCompId),
+  archivedAtIdx: index("archived_contacts_archived_at_idx").on(table.archivedAt),
+}));
+
+// Archived Companies - Separate storage for companies archived after property sale
+export const archivedCompanies = pgTable("archived_companies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  originalCompanyId: varchar("original_company_id").notNull(), // Original company ID for reference
+  
+  // Copied company data (snapshot at time of archive)
+  name: text("name").notNull(),
+  domain: text("domain"),
+  industry: text("industry"),
+  size: text("size"),
+  address: text("address"),
+  phone: text("phone"),
+  website: text("website"),
+  description: text("description"),
+  labels: text("labels").array().default(sql`ARRAY[]::text[]`),
+  annualRevenue: decimal("annual_revenue", { precision: 14, scale: 2 }),
+  annualMarinaSpend: decimal("annual_marina_spend", { precision: 14, scale: 2 }),
+  acquisitionInterest: text("acquisition_interest"),
+  portfolioCount: integer("portfolio_count"),
+  
+  // Archive metadata
+  archiveReason: archiveReasonEnum("archive_reason").notNull().default("property_sold"),
+  archiveNotes: text("archive_notes"),
+  archivedBy: varchar("archived_by").notNull().references(() => users.id),
+  archivedAt: timestamp("archived_at").defaultNow().notNull(),
+  
+  // Associated sale information
+  salesCompId: varchar("sales_comp_id").references(() => salesComps.id, { onDelete: 'set null' }),
+  saleDate: timestamp("sale_date"),
+  
+  // Original record timestamps
+  originalCreatedAt: timestamp("original_created_at"),
+  originalUpdatedAt: timestamp("original_updated_at"),
+  originalOwnerId: varchar("original_owner_id"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("archived_companies_org_idx").on(table.orgId),
+  originalCompanyIdx: index("archived_companies_original_idx").on(table.originalCompanyId),
+  salesCompIdx: index("archived_companies_sales_comp_idx").on(table.salesCompId),
+  archivedAtIdx: index("archived_companies_archived_at_idx").on(table.archivedAt),
+}));
+
+// Archive Property Associations - Track which properties were associated with archived entities
+export const archivePropertyAssociations = pgTable("archive_property_associations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  
+  // Link to archived entity (one of these will be set)
+  archivedContactId: varchar("archived_contact_id").references(() => archivedContacts.id, { onDelete: 'cascade' }),
+  archivedCompanyId: varchar("archived_company_id").references(() => archivedCompanies.id, { onDelete: 'cascade' }),
+  
+  // Property information (snapshot)
+  propertyId: varchar("property_id"), // Original property ID (may no longer exist)
+  propertyName: text("property_name").notNull(),
+  propertyAddress: text("property_address"),
+  propertyCity: text("property_city"),
+  propertyState: text("property_state"),
+  
+  // Sales comp reference
+  salesCompId: varchar("sales_comp_id").references(() => salesComps.id, { onDelete: 'set null' }),
+  
+  // Relationship details
+  relationship: text("relationship"), // "Owner", "Seller", "Manager", etc.
+  ownershipStartDate: timestamp("ownership_start_date"),
+  ownershipEndDate: timestamp("ownership_end_date"), // Sale date
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("archive_property_assoc_org_idx").on(table.orgId),
+  archivedContactIdx: index("archive_property_assoc_contact_idx").on(table.archivedContactId),
+  archivedCompanyIdx: index("archive_property_assoc_company_idx").on(table.archivedCompanyId),
+  salesCompIdx: index("archive_property_assoc_sales_comp_idx").on(table.salesCompId),
+}));
+
+// Archive Types & Schemas
+export type ArchivedContact = typeof archivedContacts.$inferSelect;
+export type ArchivedCompany = typeof archivedCompanies.$inferSelect;
+export type ArchivePropertyAssociation = typeof archivePropertyAssociations.$inferSelect;
+
+export const insertArchivedContactSchema = createInsertSchema(archivedContacts).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertArchivedContact = z.infer<typeof insertArchivedContactSchema>;
+
+export const insertArchivedCompanySchema = createInsertSchema(archivedCompanies).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertArchivedCompany = z.infer<typeof insertArchivedCompanySchema>;
+
+export const insertArchivePropertyAssociationSchema = createInsertSchema(archivePropertyAssociations).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertArchivePropertyAssociation = z.infer<typeof insertArchivePropertyAssociationSchema>;
 export type CrmPhaseGateApproval = typeof crmPhaseGateApprovals.$inferSelect;
 
 export const insertCrmRedFlagSchema = createInsertSchema(crmRedFlags).omit({
