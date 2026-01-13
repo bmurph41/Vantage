@@ -22321,7 +22321,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       }
       
       if (!layout) {
-        return res.status(404).json({ error: 'No dashboard layout found' });
+        return res.json({ layout: [], isDefault: true });
       }
       
       res.json(layout);
