@@ -1754,14 +1754,15 @@ router.post("/import/session/:sessionId/value-mappings", async (req: Request, re
   }
 });
 
-// Step 5: Preview import (with validation)
+// Step 5: Preview import (with validation and duplicate detection)
 router.get("/import/session/:sessionId/preview", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { sessionId } = req.params;
     const page = parseInt(req.query.page as string) || 1;
     const pageSize = Math.min(parseInt(req.query.pageSize as string) || 50, 100);
+    const targetLocationId = req.query.targetLocationId as string | undefined;
 
-    const preview = await importSessionService.previewImport(sessionId);
+    const preview = await importSessionService.previewImport(sessionId, targetLocationId);
 
     const startIndex = (page - 1) * pageSize;
     const paginatedRows = preview.rows.slice(startIndex, startIndex + pageSize);

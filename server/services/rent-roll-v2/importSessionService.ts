@@ -253,7 +253,7 @@ export class ImportSessionService {
     return session;
   }
 
-  async previewImport(sessionId: string): Promise<{
+  async previewImport(sessionId: string, targetLocationId?: string): Promise<{
     rows: Array<{
       rowIndex: number;
       data: Record<string, any>;
@@ -268,6 +268,30 @@ export class ImportSessionService {
   }> {
     const session = this.getSession(sessionId);
     if (!session) throw new Error("Session not found");
+
+    const existingTenants: Map<string, string> = new Map();
+    const existingLeases: Map<string, string> = new Map();
+
+    if (targetLocationId) {
+      const tenants = await db.select({ id: rraTenants.id, name: rraTenants.name, email: rraTenants.email })
+        .from(rraTenants)
+        .where(eq(rraTenants.marinaLocationId, targetLocationId));
+      
+      for (const t of tenants) {
+        if (t.name) existingTenants.set(t.name.toLowerCase().trim(), t.id);
+        if (t.email) existingTenants.set(t.email.toLowerCase().trim(), t.id);
+      }
+
+      const leases = await db.select({ id: rraLeases.id, unitLocation: rraLeases.unitLocation, tenantId: rraLeases.tenantId })
+        .from(rraLeases)
+        .where(eq(rraLeases.marinaLocationId, targetLocationId));
+      
+      for (const l of leases) {
+        if (l.unitLocation && l.tenantId) {
+          existingLeases.set(`${l.tenantId}:${l.unitLocation.toLowerCase().trim()}`, l.id);
+        }
+      }
+    }
 
     const results: Array<{
       rowIndex: number;
@@ -331,13 +355,33 @@ export class ImportSessionService {
         transformedData[mapping.targetField] = value;
       }
 
-      const isDuplicate = false;
+      let isDuplicate = false;
+      let duplicateReason: string | undefined;
+      let existingRecordId: string | undefined;
+
+      if (targetLocationId && transformedData.tenantName) {
+        const tenantKey = transformedData.tenantName.toLowerCase().trim();
+        const emailKey = transformedData.tenantEmail?.toLowerCase().trim();
+
+        if (existingTenants.has(tenantKey)) {
+          isDuplicate = true;
+          existingRecordId = existingTenants.get(tenantKey);
+          duplicateReason = `Tenant "${transformedData.tenantName}" already exists`;
+        } else if (emailKey && existingTenants.has(emailKey)) {
+          isDuplicate = true;
+          existingRecordId = existingTenants.get(emailKey);
+          duplicateReason = `Tenant with email "${transformedData.tenantEmail}" already exists`;
+        }
+      }
+
       const validation: ImportRowValidation = {
         rowIndex: i,
         isValid: errors.length === 0,
         errors,
         warnings,
         isDuplicate,
+        duplicateReason,
+        existingRecordId,
       };
 
       if (errors.length > 0) invalidCount++;
