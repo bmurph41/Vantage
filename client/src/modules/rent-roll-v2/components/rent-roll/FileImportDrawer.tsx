@@ -1058,10 +1058,18 @@ export default function FileImportDrawer({ open, onClose, locationId }: FileImpo
           if (!response.success || !response.rows || response.rows.length === 0) {
             const warningMsg = response.warnings?.join('. ') || 'No lease data could be extracted';
             toast({
-              title: "PDF extraction failed",
-              description: warningMsg,
-              variant: "destructive",
+              title: "AI extraction incomplete",
+              description: `${warningMsg}. You can still proceed to manually map columns.`,
+              variant: "default",
+              duration: 8000,
             });
+            
+            // Allow user to proceed with empty data structure for manual mapping
+            // Create placeholder headers that users can customize
+            const fallbackHeaders = ['Column 1', 'Column 2', 'Column 3', 'Column 4', 'Column 5'];
+            setFileHeaders(fallbackHeaders);
+            setFileRows([{ 'Column 1': '', 'Column 2': '', 'Column 3': '', 'Column 4': '', 'Column 5': '' }]);
+            setStep("mapping");
             resolve();
             return;
           }
@@ -1101,11 +1109,18 @@ export default function FileImportDrawer({ open, onClose, locationId }: FileImpo
         } catch (error: any) {
           console.error('[PDF Import] Error:', error);
           toast({
-            title: "PDF processing failed",
-            description: error.message || "Failed to process the PDF file",
-            variant: "destructive",
+            title: "AI extraction unavailable",
+            description: "AI extraction failed. You can still proceed to manually define and map columns.",
+            variant: "default",
+            duration: 8000,
           });
-          reject(error);
+          
+          // Allow user to proceed with empty data structure for manual mapping
+          const fallbackHeaders = ['Column 1', 'Column 2', 'Column 3', 'Column 4', 'Column 5'];
+          setFileHeaders(fallbackHeaders);
+          setFileRows([{ 'Column 1': '', 'Column 2': '', 'Column 3': '', 'Column 4': '', 'Column 5': '' }]);
+          setStep("mapping");
+          resolve();
         }
       });
     } else {
@@ -2316,6 +2331,24 @@ export default function FileImportDrawer({ open, onClose, locationId }: FileImpo
               {/* Scrollable mapping area - Grows to fill space */}
               <div className="flex-1 min-h-0 overflow-y-auto border rounded-lg bg-card">
                 <div className="p-3 space-y-4">
+                  
+                  {/* Manual Mode Notice - show when using fallback columns (AI extraction failed) */}
+                  {fileHeaders.length > 0 && fileHeaders.every(h => h.startsWith('Column ')) && (
+                    <Alert className="mb-3 border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/30" data-testid="alert-manual-mode">
+                      <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <AlertDescription className="text-blue-800 dark:text-blue-200">
+                        <span className="font-semibold">Manual Mode</span>
+                        <p className="text-sm mt-1">
+                          AI extraction was unavailable or returned no data. You can still import by:
+                        </p>
+                        <ul className="list-disc ml-4 mt-1 text-sm space-y-0.5">
+                          <li>Using <strong>"Create custom column..."</strong> option in each field dropdown to define your own column names</li>
+                          <li>Editing the placeholder column names above using the column editor</li>
+                          <li>Uploading a CSV or Excel file instead for more reliable parsing</li>
+                        </ul>
+                      </AlertDescription>
+                    </Alert>
+                  )}
                   
                   {/* Duplicate Column Warning */}
                   {duplicateMappings.length > 0 && (
