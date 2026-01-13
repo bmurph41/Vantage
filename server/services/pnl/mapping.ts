@@ -499,13 +499,19 @@ export async function mapParsedStatement(jobId: string): Promise<{ reviewCount: 
     
     const hasValidCanonical = res.canonicalLineItemId && canonicalById.has(res.canonicalLineItemId);
     
+    const wasResolvedByKeywordBank = res.mappingMethod === 'rule' && 
+      res.matchedKeywordRuleId && 
+      res.confidence >= 0.90;
+    
     const ambiguityCheck = checkAmbiguity(normalized);
-    if (ambiguityCheck.isAmbiguous) {
+    if (ambiguityCheck.isAmbiguous && !wasResolvedByKeywordBank) {
       res.isAmbiguous = true;
       res.ambiguityInfo = ambiguityCheck.ambiguityInfo;
     }
     
-    const needsReview = !hasValidCanonical || res.confidence < CONFIDENCE_THRESHOLD || res.isAmbiguous;
+    const needsReview = (!hasValidCanonical && !wasResolvedByKeywordBank) || 
+      (res.confidence < CONFIDENCE_THRESHOLD && !wasResolvedByKeywordBank) || 
+      res.isAmbiguous;
     
     if (needsReview && !approvedLabels.has(normalized)) {
       reviewInserts.push({
@@ -535,6 +541,9 @@ export async function mapParsedStatement(jobId: string): Promise<{ reviewCount: 
       mappingMethod: res.mappingMethod,
       mappingConfidence: res.confidence,
       normalizedLabel: normalized,
+      resolvedDepartment: res.department ?? null,
+      resolvedBucket: res.bucket ?? null,
+      resolvedByKeywordBank: wasResolvedByKeywordBank,
     };
   }
   
