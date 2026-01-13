@@ -254,6 +254,63 @@ export const pnlKeywordRulesRelations = relations(pnlKeywordRules, ({ one }) => 
   }),
 }));
 
+export const pnlDepartmentVerificationStatusEnum = ['pending', 'verified', 'skipped'] as const;
+export type PnlDepartmentVerificationStatus = typeof pnlDepartmentVerificationStatusEnum[number];
+
+export const pnlDepartmentVerifications = pgTable('pnl_department_verifications', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull(),
+  jobId: varchar('job_id').notNull().references(() => pnlJobs.id, { onDelete: 'cascade' }),
+  documentId: varchar('document_id').notNull().references(() => pnlDocuments.id, { onDelete: 'cascade' }),
+  extractedLabel: text('extracted_label').notNull(),
+  normalizedLabel: text('normalized_label').notNull(),
+  ambiguousKeyword: text('ambiguous_keyword').notNull(),
+  possibleDepartments: jsonb('possible_departments').notNull().$type<AmbiguousDepartmentOption[]>(),
+  ambiguityReason: text('ambiguity_reason').notNull(),
+  selectedDepartment: text('selected_department'),
+  selectedBucket: text('selected_bucket'),
+  status: text('status').notNull().default('pending'),
+  resolvedByUserId: varchar('resolved_by_user_id'),
+  saveToKeywordBank: boolean('save_to_keyword_bank').notNull().default(false),
+  keywordRuleId: varchar('keyword_rule_id').references(() => pnlKeywordRules.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+}, (table) => ({
+  jobIdx: index('pnl_dept_verifications_job_idx').on(table.jobId),
+  statusIdx: index('pnl_dept_verifications_status_idx').on(table.status),
+  orgIdx: index('pnl_dept_verifications_org_idx').on(table.orgId),
+  normalizedLabelIdx: index('pnl_dept_verifications_normalized_idx').on(table.normalizedLabel),
+}));
+
+export interface AmbiguousDepartmentOption {
+  department: string;
+  bucket: string;
+  description: string;
+}
+
+export const pnlDepartmentVerificationsRelations = relations(pnlDepartmentVerifications, ({ one }) => ({
+  job: one(pnlJobs, {
+    fields: [pnlDepartmentVerifications.jobId],
+    references: [pnlJobs.id],
+  }),
+  document: one(pnlDocuments, {
+    fields: [pnlDepartmentVerifications.documentId],
+    references: [pnlDocuments.id],
+  }),
+  keywordRule: one(pnlKeywordRules, {
+    fields: [pnlDepartmentVerifications.keywordRuleId],
+    references: [pnlKeywordRules.id],
+  }),
+}));
+
+export const insertPnlDepartmentVerificationSchema = createInsertSchema(pnlDepartmentVerifications).omit({
+  id: true,
+  createdAt: true,
+  resolvedAt: true,
+});
+export type PnlDepartmentVerification = typeof pnlDepartmentVerifications.$inferSelect;
+export type InsertPnlDepartmentVerification = z.infer<typeof insertPnlDepartmentVerificationSchema>;
+
 export const insertPnlDocumentSchema = createInsertSchema(pnlDocuments).omit({
   id: true,
   createdAt: true,

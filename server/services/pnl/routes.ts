@@ -22,6 +22,15 @@ import { runPnlPipeline } from './parseOrchestrator';
 import { mapParsedStatement, normalizeLabel, addToKeywordBank } from './mapping';
 import { storeMappedFacts } from './ingest';
 import { importKeywordBankFromExcel } from '../../scripts/importPnlKeywordBank';
+import {
+  getPendingVerifications,
+  resolveDepartmentVerification,
+  skipDepartmentVerification,
+  getKeywordBankRules,
+  deleteKeywordRule,
+  updateKeywordRule,
+} from './department-verification-service';
+import { pnlDepartmentVerifications } from '@shared/schema';
 
 const router = Router();
 
@@ -916,6 +925,164 @@ router.get('/statements/:statementId/lines', async (req: any, res) => {
     res.json({ grouped, periods });
   } catch (error: any) {
     console.error('Get statement lines error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/department-verifications', async (req: any, res) => {
+  try {
+    const { orgId } = getAuthContext(req);
+    const jobId = req.query.jobId ? String(req.query.jobId) : undefined;
+    
+    const verifications = await getPendingVerifications(orgId, jobId);
+    res.json({ verifications });
+  } catch (error: any) {
+    console.error('Get department verifications error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/department-verifications/:jobId', async (req: any, res) => {
+  try {
+    const { orgId } = getAuthContext(req);
+    const jobId = String(req.params.jobId);
+    
+    const verifications = await getPendingVerifications(orgId, jobId);
+    res.json({ verifications });
+  } catch (error: any) {
+    console.error('Get job department verifications error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/department-verifications/:id/resolve', async (req: any, res) => {
+  try {
+    const { orgId, userId } = getAuthContext(req);
+    const verificationId = String(req.params.id);
+    
+    const schema = z.object({
+      department: z.string().min(1),
+      bucket: z.enum(['Revenue', 'COGS', 'Expense']),
+      saveToKeywordBank: z.boolean().default(true),
+    });
+    
+    const parsedBody = schema.safeParse(req.body);
+    if (!parsedBody.success) {
+      return res.status(400).json({ error: parsedBody.error.flatten() });
+    }
+    
+    const result = await resolveDepartmentVerification(
+      verificationId,
+      orgId,
+      userId,
+      parsedBody.data
+    );
+    
+    res.json({
+      success: true,
+      verification: result.verification,
+      keywordRuleId: result.keywordRuleId,
+      savedToKeywordBank: parsedBody.data.saveToKeywordBank,
+    });
+  } catch (error: any) {
+    console.error('Resolve department verification error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/department-verifications/:id/skip', async (req: any, res) => {
+  try {
+    const { orgId, userId } = getAuthContext(req);
+    const verificationId = String(req.params.id);
+    
+    const verification = await skipDepartmentVerification(verificationId, orgId, userId);
+    
+    res.json({ success: true, verification });
+  } catch (error: any) {
+    console.error('Skip department verification error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/keyword-bank', async (req: any, res) => {
+  try {
+    const { orgId } = getAuthContext(req);
+    const source = req.query.source ? String(req.query.source) : undefined;
+    
+    const rules = await getKeywordBankRules(orgId, source);
+    res.json({ rules, total: rules.length });
+  } catch (error: any) {
+    console.error('Get keyword bank error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.patch('/keyword-bank/:id', async (req: any, res) => {
+  try {
+    const { orgId } = getAuthContext(req);
+    const ruleId = String(req.params.id);
+    
+    const schema = z.object({
+      department: z.string().optional(),
+      bucket: z.enum(['Revenue', 'COGS', 'Expense']).optional(),
+      priority: z.number().int().min(0).max(1000).optional(),
+      isActive: z.boolean().optional(),
+    });
+    
+    const parsedBody = schema.safeParse(req.body);
+    if (!parsedBody.success) {
+      return res.status(400).json({ error: parsedBody.error.flatten() });
+    }
+    
+    const updated = await updateKeywordRule(ruleId, orgId, parsedBody.data);
+    res.json({ success: true, rule: updated });
+  } catch (error: any) {
+    console.error('Update keyword rule error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.delete('/keyword-bank/:id', async (req: any, res) => {
+  try {
+    const { orgId } = getAuthContext(req);
+    const ruleId = String(req.params.id);
+    
+    await deleteKeywordRule(ruleId, orgId);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Delete keyword rule error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/keyword-bank/stats', async (req: any, res) => {
+  try {
+    const { orgId } = getAuthContext(req);
+    
+    const allRules = await getKeywordBankRules(orgId);
+    const userVerified = allRules.filter(r => r.source === 'user_verified');
+    const seeded = allRules.filter(r => r.source === 'seed');
+    const imported = allRules.filter(r => r.source === 'import');
+    
+    const totalMatches = allRules.reduce((sum, r) => sum + (r.timesMatched ?? 0), 0);
+    
+    res.json({
+      total: allRules.length,
+      bySource: {
+        user_verified: userVerified.length,
+        seed: seeded.length,
+        import: imported.length,
+      },
+      totalMatches,
+      topRules: allRules.slice(0, 10).map(r => ({
+        keyword: r.keyword,
+        department: r.department,
+        bucket: r.bucket,
+        timesMatched: r.timesMatched,
+      })),
+    });
+  } catch (error: any) {
+    console.error('Get keyword bank stats error:', error);
     res.status(500).json({ error: error.message });
   }
 });
