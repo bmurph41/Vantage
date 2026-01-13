@@ -139,7 +139,7 @@ type IncludedProjectsViewMode = "all" | "owned-only" | "pipeline-only";
 
 interface KpiFilterState {
   projectType: ProjectTypeFilter;
-  selectedProjectIds: string[];
+  selectedProjectIds: string[] | null;
 }
 
 type ContractTermOccupancyMode = "overall" | "annual" | "seasonal" | "winter" | "shortTerm";
@@ -212,7 +212,7 @@ export default function ExecutiveDashboard() {
   
   const [kpiFilter, setKpiFilter] = useState<KpiFilterState>({
     projectType: "ALL",
-    selectedProjectIds: [],
+    selectedProjectIds: null,
   });
   // Unified KPI filter state - shared across all KPI cards
   const [kpiSeasonMode, setKpiSeasonMode] = useState<ContractTermOccupancyMode>("overall");
@@ -232,7 +232,7 @@ export default function ExecutiveDashboard() {
     if (kpiFilter.projectType !== "ALL") {
       params.push(`projectType=${kpiFilter.projectType}`);
     }
-    if (kpiFilter.selectedProjectIds.length > 0) {
+    if (kpiFilter.selectedProjectIds !== null && kpiFilter.selectedProjectIds.length > 0) {
       params.push(`projectIds=${kpiFilter.selectedProjectIds.join(",")}`);
     }
     return params.length > 0 ? `&${params.join("&")}` : "";
@@ -780,7 +780,7 @@ export default function ExecutiveDashboard() {
                       variant={includedProjectsViewMode === "all" ? "default" : "ghost"}
                       size="sm"
                       onClick={() => {
-                        setKpiFilter({ projectType: "ALL", selectedProjectIds: [] });
+                        setKpiFilter({ projectType: "ALL", selectedProjectIds: null });
                       }}
                       className="h-7 px-3 text-xs"
                       data-testid="button-view-all"
@@ -791,7 +791,7 @@ export default function ExecutiveDashboard() {
                       variant={includedProjectsViewMode === "owned-only" ? "default" : "ghost"}
                       size="sm"
                       onClick={() => {
-                        setKpiFilter({ projectType: "OWNED", selectedProjectIds: [] });
+                        setKpiFilter({ projectType: "OWNED", selectedProjectIds: null });
                       }}
                       className="h-7 px-3 text-xs"
                       data-testid="button-view-owned"
@@ -802,7 +802,7 @@ export default function ExecutiveDashboard() {
                       variant={includedProjectsViewMode === "pipeline-only" ? "default" : "ghost"}
                       size="sm"
                       onClick={() => {
-                        setKpiFilter({ projectType: "DEAL", selectedProjectIds: [] });
+                        setKpiFilter({ projectType: "DEAL", selectedProjectIds: null });
                       }}
                       className="h-7 px-3 text-xs"
                       data-testid="button-view-pipeline"
@@ -824,86 +824,122 @@ export default function ExecutiveDashboard() {
             <CardContent className="space-y-6">
               {includedProjectsViewMode !== "pipeline-only" && includedProjects.filter(p => p.projectType === "OWNED").length > 0 && (
                 <div data-testid="section-owned-projects">
-                  {includedProjectsViewMode === "all" && (
-                    <div className="flex items-center gap-2 mb-3">
-                      <h3 className="text-sm font-semibold text-foreground">Owned</h3>
-                      <Badge variant="outline" className="text-xs">
-                        {includedProjects.filter(p => p.projectType === "OWNED").length}
-                      </Badge>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 mb-3">
+                    <h3 className="text-sm font-semibold text-foreground">Owned</h3>
+                    <Badge variant="outline" className="text-xs">
+                      {includedProjects.filter(p => p.projectType === "OWNED").length}
+                    </Badge>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {includedProjects
                       .filter(p => p.projectType === "OWNED")
-                      .map((project) => (
-                        <div
-                          key={project.locationId}
-                          className="relative group"
-                        >
-                          <Badge 
-                            variant="default"
-                            data-testid={`badge-project-${project.locationId}`}
-                            className="px-3 py-1.5 pr-3 text-sm cursor-pointer hover-elevate active-elevate-2"
-                            onClick={() => setLocation(`/projects/${project.locationId}`)}
+                      .map((project) => {
+                        const isSelected = kpiFilter.selectedProjectIds === null || 
+                          kpiFilter.selectedProjectIds.includes(project.locationId);
+                        return (
+                          <div
+                            key={project.locationId}
+                            className="flex items-center gap-1.5 group"
                           >
-                            {project.name}
-                          </Badge>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemoveProject(project.locationId);
-                            }}
-                            data-testid={`button-remove-${project.locationId}`}
-                            className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110"
-                            aria-label="Remove from executive summary"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ))}
+                            <Checkbox
+                              id={`check-${project.locationId}`}
+                              checked={isSelected}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  if (kpiFilter.selectedProjectIds === null) {
+                                    return;
+                                  }
+                                  const newSelected = [...kpiFilter.selectedProjectIds, project.locationId];
+                                  setKpiFilter(prev => ({
+                                    ...prev,
+                                    selectedProjectIds: newSelected.length === includedProjects.length ? null : newSelected
+                                  }));
+                                } else {
+                                  const currentSelected = kpiFilter.selectedProjectIds === null
+                                    ? includedProjects.map(p => p.locationId)
+                                    : kpiFilter.selectedProjectIds;
+                                  const newSelected = currentSelected.filter(id => id !== project.locationId);
+                                  setKpiFilter(prev => ({
+                                    ...prev,
+                                    selectedProjectIds: newSelected
+                                  }));
+                                }
+                              }}
+                              className="h-4 w-4"
+                              data-testid={`checkbox-project-${project.locationId}`}
+                            />
+                            <Badge 
+                              variant={isSelected ? "default" : "outline"}
+                              data-testid={`badge-project-${project.locationId}`}
+                              className={`px-3 py-1.5 text-sm cursor-pointer transition-all ${isSelected ? 'hover-elevate active-elevate-2' : 'opacity-60'}`}
+                              onClick={() => setLocation(`/projects/${project.locationId}`)}
+                            >
+                              {project.name}
+                            </Badge>
+                          </div>
+                        );
+                      })}
                   </div>
                 </div>
               )}
               
               {includedProjectsViewMode !== "owned-only" && includedProjects.filter(p => p.projectType === "DEAL").length > 0 && (
                 <div data-testid="section-pipeline-projects">
-                  {includedProjectsViewMode === "all" && (
-                    <div className="flex items-center gap-2 mb-3">
-                      <h3 className="text-sm font-semibold text-foreground">Pipeline</h3>
-                      <Badge variant="outline" className="text-xs">
-                        {includedProjects.filter(p => p.projectType === "DEAL").length}
-                      </Badge>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 mb-3">
+                    <h3 className="text-sm font-semibold text-foreground">Pipeline</h3>
+                    <Badge variant="outline" className="text-xs">
+                      {includedProjects.filter(p => p.projectType === "DEAL").length}
+                    </Badge>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {includedProjects
                       .filter(p => p.projectType === "DEAL")
-                      .map((project) => (
-                        <div
-                          key={project.locationId}
-                          className="relative group"
-                        >
-                          <Badge 
-                            variant="secondary"
-                            data-testid={`badge-project-${project.locationId}`}
-                            className="px-3 py-1.5 pr-3 text-sm cursor-pointer hover-elevate active-elevate-2"
-                            onClick={() => setLocation(`/projects/${project.locationId}`)}
+                      .map((project) => {
+                        const isSelected = kpiFilter.selectedProjectIds === null || 
+                          kpiFilter.selectedProjectIds.includes(project.locationId);
+                        return (
+                          <div
+                            key={project.locationId}
+                            className="flex items-center gap-1.5 group"
                           >
-                            {project.name}
-                          </Badge>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemoveProject(project.locationId);
-                            }}
-                            data-testid={`button-remove-${project.locationId}`}
-                            className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110"
-                            aria-label="Remove from executive summary"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ))}
+                            <Checkbox
+                              id={`check-${project.locationId}`}
+                              checked={isSelected}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  if (kpiFilter.selectedProjectIds === null) {
+                                    return;
+                                  }
+                                  const newSelected = [...kpiFilter.selectedProjectIds, project.locationId];
+                                  setKpiFilter(prev => ({
+                                    ...prev,
+                                    selectedProjectIds: newSelected.length === includedProjects.length ? null : newSelected
+                                  }));
+                                } else {
+                                  const currentSelected = kpiFilter.selectedProjectIds === null
+                                    ? includedProjects.map(p => p.locationId)
+                                    : kpiFilter.selectedProjectIds;
+                                  const newSelected = currentSelected.filter(id => id !== project.locationId);
+                                  setKpiFilter(prev => ({
+                                    ...prev,
+                                    selectedProjectIds: newSelected
+                                  }));
+                                }
+                              }}
+                              className="h-4 w-4"
+                              data-testid={`checkbox-project-${project.locationId}`}
+                            />
+                            <Badge 
+                              variant={isSelected ? "secondary" : "outline"}
+                              data-testid={`badge-project-${project.locationId}`}
+                              className={`px-3 py-1.5 text-sm cursor-pointer transition-all ${isSelected ? 'hover-elevate active-elevate-2' : 'opacity-60'}`}
+                              onClick={() => setLocation(`/projects/${project.locationId}`)}
+                            >
+                              {project.name}
+                            </Badge>
+                          </div>
+                        );
+                      })}
                   </div>
                 </div>
               )}
@@ -957,9 +993,9 @@ export default function ExecutiveDashboard() {
                       >
                         <Filter className="h-4 w-4" />
                         Filter
-                        {(kpiFilter.projectType !== "ALL" || kpiFilter.selectedProjectIds.length > 0) && (
+                        {(kpiFilter.projectType !== "ALL" || (kpiFilter.selectedProjectIds !== null && kpiFilter.selectedProjectIds.length > 0)) && (
                           <Badge variant="default" className="h-5 w-5 p-0 flex items-center justify-center text-xs">
-                            {(kpiFilter.projectType !== "ALL" ? 1 : 0) + (kpiFilter.selectedProjectIds.length > 0 ? 1 : 0)}
+                            {(kpiFilter.projectType !== "ALL" ? 1 : 0) + ((kpiFilter.selectedProjectIds !== null && kpiFilter.selectedProjectIds.length > 0) ? 1 : 0)}
                           </Badge>
                         )}
                       </Button>
@@ -972,7 +1008,7 @@ export default function ExecutiveDashboard() {
                             <Button
                               size="sm"
                               variant={kpiFilter.projectType === "ALL" ? "default" : "outline"}
-                              onClick={() => setKpiFilter({ projectType: "ALL", selectedProjectIds: [] })}
+                              onClick={() => setKpiFilter({ projectType: "ALL", selectedProjectIds: null })}
                               data-testid="filter-type-all"
                             >
                               All
@@ -980,7 +1016,7 @@ export default function ExecutiveDashboard() {
                             <Button
                               size="sm"
                               variant={kpiFilter.projectType === "OWNED" ? "default" : "outline"}
-                              onClick={() => setKpiFilter({ projectType: "OWNED", selectedProjectIds: [] })}
+                              onClick={() => setKpiFilter({ projectType: "OWNED", selectedProjectIds: null })}
                               data-testid="filter-type-owned"
                             >
                               Owned
@@ -988,7 +1024,7 @@ export default function ExecutiveDashboard() {
                             <Button
                               size="sm"
                               variant={kpiFilter.projectType === "DEAL" ? "default" : "outline"}
-                              onClick={() => setKpiFilter({ projectType: "DEAL", selectedProjectIds: [] })}
+                              onClick={() => setKpiFilter({ projectType: "DEAL", selectedProjectIds: null })}
                               data-testid="filter-type-pipeline"
                             >
                               Pipeline
@@ -999,12 +1035,12 @@ export default function ExecutiveDashboard() {
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <h4 className="font-medium text-sm">Select Projects</h4>
-                            {kpiFilter.selectedProjectIds.length > 0 && (
+                            {kpiFilter.selectedProjectIds !== null && kpiFilter.selectedProjectIds.length > 0 && (
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 className="h-6 text-xs"
-                                onClick={() => setKpiFilter(prev => ({ ...prev, selectedProjectIds: [] }))}
+                                onClick={() => setKpiFilter(prev => ({ ...prev, selectedProjectIds: null }))}
                                 data-testid="button-clear-selection"
                               >
                                 Clear
@@ -1014,45 +1050,69 @@ export default function ExecutiveDashboard() {
                           <div className="max-h-48 overflow-y-auto space-y-1">
                             {includedProjects?.filter(p => 
                               kpiFilter.projectType === "ALL" || p.projectType === kpiFilter.projectType
-                            ).map(project => (
-                              <div 
-                                key={project.locationId}
-                                className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 cursor-pointer"
-                                onClick={() => {
-                                  setKpiFilter(prev => {
-                                    const isSelected = prev.selectedProjectIds.includes(project.locationId);
-                                    return {
-                                      ...prev,
-                                      selectedProjectIds: isSelected
+                            ).map(project => {
+                              const isSelected = kpiFilter.selectedProjectIds === null || 
+                                kpiFilter.selectedProjectIds.includes(project.locationId);
+                              return (
+                                <div 
+                                  key={project.locationId}
+                                  className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 cursor-pointer"
+                                  onClick={() => {
+                                    setKpiFilter(prev => {
+                                      if (prev.selectedProjectIds === null) {
+                                        const allIds = includedProjects.map(p => p.locationId);
+                                        return {
+                                          ...prev,
+                                          selectedProjectIds: allIds.filter(id => id !== project.locationId)
+                                        };
+                                      }
+                                      const wasSelected = prev.selectedProjectIds.includes(project.locationId);
+                                      const newSelected = wasSelected
                                         ? prev.selectedProjectIds.filter(id => id !== project.locationId)
-                                        : [...prev.selectedProjectIds, project.locationId]
-                                    };
-                                  });
-                                }}
-                                data-testid={`filter-project-${project.locationId}`}
-                              >
-                                <Checkbox
-                                  checked={kpiFilter.selectedProjectIds.includes(project.locationId)}
-                                  onCheckedChange={(checked) => {
-                                    setKpiFilter(prev => ({
-                                      ...prev,
-                                      selectedProjectIds: checked
-                                        ? [...prev.selectedProjectIds, project.locationId]
-                                        : prev.selectedProjectIds.filter(id => id !== project.locationId)
-                                    }));
+                                        : [...prev.selectedProjectIds, project.locationId];
+                                      return {
+                                        ...prev,
+                                        selectedProjectIds: newSelected.length === includedProjects.length ? null : newSelected
+                                      };
+                                    });
                                   }}
-                                />
-                                <div className="flex-1">
-                                  <span className="text-sm">{project.name}</span>
-                                </div>
-                                <Badge 
-                                  variant={project.projectType === "OWNED" ? "default" : "secondary"} 
-                                  className="text-xs h-5"
+                                  data-testid={`filter-project-${project.locationId}`}
                                 >
-                                  {project.projectType === "OWNED" ? "Owned" : "Pipeline"}
-                                </Badge>
-                              </div>
-                            ))}
+                                  <Checkbox
+                                    checked={isSelected}
+                                    onCheckedChange={(checked) => {
+                                      setKpiFilter(prev => {
+                                        if (checked) {
+                                          if (prev.selectedProjectIds === null) return prev;
+                                          const newSelected = [...prev.selectedProjectIds, project.locationId];
+                                          return {
+                                            ...prev,
+                                            selectedProjectIds: newSelected.length === includedProjects.length ? null : newSelected
+                                          };
+                                        } else {
+                                          const currentSelected = prev.selectedProjectIds === null
+                                            ? includedProjects.map(p => p.locationId)
+                                            : prev.selectedProjectIds;
+                                          return {
+                                            ...prev,
+                                            selectedProjectIds: currentSelected.filter(id => id !== project.locationId)
+                                          };
+                                        }
+                                      });
+                                    }}
+                                  />
+                                  <div className="flex-1">
+                                    <span className="text-sm">{project.name}</span>
+                                  </div>
+                                  <Badge 
+                                    variant={project.projectType === "OWNED" ? "default" : "secondary"} 
+                                    className="text-xs h-5"
+                                  >
+                                    {project.projectType === "OWNED" ? "Owned" : "Pipeline"}
+                                  </Badge>
+                                </div>
+                              );
+                            })}
                             {includedProjects?.filter(p => 
                               kpiFilter.projectType === "ALL" || p.projectType === kpiFilter.projectType
                             ).length === 0 && (
