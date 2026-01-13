@@ -6,6 +6,7 @@ import multer from "multer";
 import { db } from "../db";
 import { documentIntelligenceService } from "../services/document-intelligence-service";
 import { parseOcrPdf } from "../services/ocr-pdf-parser";
+import { rentRollDocumentParser } from "../services/rent-roll-document-parser";
 import * as XLSX from "xlsx";
 import fs from "fs/promises";
 import path from "path";
@@ -110,8 +111,72 @@ router.post("/parse-pdf", upload.single('file'), async (req: Request, res: Respo
   }
 });
 
+// Unified document parsing endpoint - handles CSV, Excel, and PDF with consistent response format
+// This is the primary endpoint for the FileImportDrawer
+router.post("/leases/import/parse-document", upload.single('file'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { fileBase64, fileName, sheetName, useAI } = req.body;
+    
+    let buffer: Buffer;
+    let actualFileName: string;
+    
+    if (req.file) {
+      buffer = req.file.buffer;
+      actualFileName = req.file.originalname;
+    } else if (fileBase64 && fileName) {
+      buffer = Buffer.from(fileBase64, 'base64');
+      actualFileName = fileName;
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: "No file provided",
+        headers: [],
+        rows: [],
+        columns: [],
+        confidence: 'low',
+        warnings: ['Please upload a file to continue.'],
+        errors: ['No file was received'],
+        metadata: { totalRows: 0, aiPowered: false },
+      });
+    }
+    
+    console.log(`[Document Parser] Processing file: ${actualFileName} (${buffer.length} bytes)`);
+    
+    const result = await rentRollDocumentParser.parseDocument(buffer, actualFileName, {
+      sheetName,
+      useAI: useAI !== false,
+      skipAIOnError: true,
+    });
+    
+    if (result.headers.length > 0) {
+      const suggestions = rentRollDocumentParser.suggestColumnMappings(result.headers, result.rows);
+      (result as any).columnSuggestions = suggestions;
+    }
+    
+    console.log(`[Document Parser] Result: ${result.success ? 'success' : 'failed'}, ${result.rows.length} rows, ${result.headers.length} headers, confidence: ${result.confidence}`);
+    
+    return res.json(result);
+  } catch (error: any) {
+    console.error('[Document Parser] Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || "Failed to parse document",
+      headers: ['Tenant Name', 'Unit/Slip', 'Monthly Rent', 'Start Date', 'End Date', 'Notes'],
+      rows: [{ 'Tenant Name': '', 'Unit/Slip': '', 'Monthly Rent': '', 'Start Date': '', 'End Date': '', 'Notes': '' }],
+      columns: [],
+      confidence: 'low',
+      warnings: [
+        'Document parsing failed. You can still proceed by mapping columns manually.',
+        'Use "Create custom column" option to define your data structure.',
+      ],
+      errors: [error.message],
+      metadata: { totalRows: 0, aiPowered: false },
+    });
+  }
+});
+
 // PDF import endpoint with AI extraction (base64 input)
-// Uses OCR-enhanced parsing + DocumentIntelligenceService for reliable extraction
+// Uses new unified parser for reliable extraction with proper fallback handling
 router.post("/leases/import/pdf", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { pdfBase64 } = req.body;

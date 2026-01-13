@@ -1064,11 +1064,15 @@ export default function FileImportDrawer({ open, onClose, locationId }: FileImpo
               duration: 8000,
             });
             
-            // Allow user to proceed with empty data structure for manual mapping
-            // Create placeholder headers that users can customize
-            const fallbackHeaders = ['Column 1', 'Column 2', 'Column 3', 'Column 4', 'Column 5'];
+            // Use meaningful marina-specific fallback headers instead of generic placeholders
+            const fallbackHeaders = response.headers?.length > 0 
+              ? response.headers 
+              : ['Tenant Name', 'Unit/Slip', 'Monthly Rent', 'Start Date', 'End Date', 'Notes'];
+            const emptyRow: Record<string, string> = {};
+            fallbackHeaders.forEach(h => { emptyRow[h] = ''; });
+            
             setFileHeaders(fallbackHeaders);
-            setFileRows([{ 'Column 1': '', 'Column 2': '', 'Column 3': '', 'Column 4': '', 'Column 5': '' }]);
+            setFileRows([emptyRow]);
             setStep("mapping");
             resolve();
             return;
@@ -1115,10 +1119,13 @@ export default function FileImportDrawer({ open, onClose, locationId }: FileImpo
             duration: 8000,
           });
           
-          // Allow user to proceed with empty data structure for manual mapping
-          const fallbackHeaders = ['Column 1', 'Column 2', 'Column 3', 'Column 4', 'Column 5'];
+          // Use meaningful marina-specific fallback headers
+          const fallbackHeaders = ['Tenant Name', 'Unit/Slip', 'Monthly Rent', 'Start Date', 'End Date', 'Notes'];
+          const emptyRow: Record<string, string> = {};
+          fallbackHeaders.forEach(h => { emptyRow[h] = ''; });
+          
           setFileHeaders(fallbackHeaders);
-          setFileRows([{ 'Column 1': '', 'Column 2': '', 'Column 3': '', 'Column 4': '', 'Column 5': '' }]);
+          setFileRows([emptyRow]);
           setStep("mapping");
           resolve();
         }
@@ -2332,21 +2339,21 @@ export default function FileImportDrawer({ open, onClose, locationId }: FileImpo
               <div className="flex-1 min-h-0 overflow-y-auto border rounded-lg bg-card">
                 <div className="p-3 space-y-4">
                   
-                  {/* Manual Mode Notice - show when using fallback columns (AI extraction failed) */}
-                  {fileHeaders.length > 0 && fileHeaders.every(h => h.startsWith('Column ')) && (
+                  {/* Manual Mode Notice - show when using fallback/empty data (AI extraction failed or returned no data) */}
+                  {fileHeaders.length > 0 && fileRows.length <= 1 && fileRows.every(row => Object.values(row).every(v => !v || String(v).trim() === '')) && (
                     <Alert className="mb-3 border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/30" data-testid="alert-manual-mode">
                       <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      <AlertDescription className="text-blue-800 dark:text-blue-200">
-                        <span className="font-semibold">Manual Mode</span>
-                        <p className="text-sm mt-1">
-                          AI extraction was unavailable or returned no data. You can still import by:
-                        </p>
+                      <div className="text-blue-800 dark:text-blue-200">
+                        <span className="font-semibold">Manual Entry Mode</span>
+                        <div className="text-sm mt-1">
+                          AI extraction was unavailable or returned no data. You can still proceed by:
+                        </div>
                         <ul className="list-disc ml-4 mt-1 text-sm space-y-0.5">
-                          <li>Using <strong>"Create custom column..."</strong> option in each field dropdown to define your own column names</li>
-                          <li>Editing the placeholder column names above using the column editor</li>
-                          <li>Uploading a CSV or Excel file instead for more reliable parsing</li>
+                          <li>Using the <strong>"Create custom column..."</strong> option in each dropdown to define your data structure</li>
+                          <li>Editing column names above using the column editor</li>
+                          <li>For best results, upload a CSV or Excel file with clear column headers</li>
                         </ul>
-                      </AlertDescription>
+                      </div>
                     </Alert>
                   )}
                   
