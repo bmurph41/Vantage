@@ -362,15 +362,21 @@ export class ImportSessionService {
       if (targetLocationId && transformedData.tenantName) {
         const tenantKey = transformedData.tenantName.toLowerCase().trim();
         const emailKey = transformedData.tenantEmail?.toLowerCase().trim();
+        const unitKey = transformedData.unitLocation?.toLowerCase().trim();
 
-        if (existingTenants.has(tenantKey)) {
+        const existingTenantId = existingTenants.get(tenantKey) || (emailKey ? existingTenants.get(emailKey) : undefined);
+
+        if (existingTenantId && unitKey) {
+          const leaseKey = `${existingTenantId}:${unitKey}`;
+          if (existingLeases.has(leaseKey)) {
+            isDuplicate = true;
+            existingRecordId = existingLeases.get(leaseKey);
+            duplicateReason = `Lease for "${transformedData.tenantName}" at unit "${transformedData.unitLocation}" already exists`;
+          }
+        } else if (existingTenantId) {
           isDuplicate = true;
-          existingRecordId = existingTenants.get(tenantKey);
+          existingRecordId = existingTenantId;
           duplicateReason = `Tenant "${transformedData.tenantName}" already exists`;
-        } else if (emailKey && existingTenants.has(emailKey)) {
-          isDuplicate = true;
-          existingRecordId = existingTenants.get(emailKey);
-          duplicateReason = `Tenant with email "${transformedData.tenantEmail}" already exists`;
         }
       }
 
@@ -417,7 +423,7 @@ export class ImportSessionService {
     const session = this.getSession(sessionId);
     if (!session) throw new Error("Session not found");
 
-    const preview = await this.previewImport(sessionId);
+    const preview = await this.previewImport(sessionId, targetLocationId);
     const result: ImportResult = {
       success: true,
       imported: 0,
@@ -540,44 +546,104 @@ export class ImportSessionService {
         }
 
         if (row.data.unitLocation) {
-          const leaseId = uuidv4();
-          await db.insert(rraLeases).values({
-            id: leaseId,
-            orgId: session.orgId,
-            marinaLocationId: targetLocationId,
-            tenantId,
-            unitLocation: row.data.unitLocation,
-            storageType: row.data.storageType || "Wet Slip",
-            contractTermGroup: row.data.contractTerm || "Annual",
-            leaseCommencement: row.data.leaseCommencement,
-            leaseExpiration: row.data.leaseExpiration,
-            status: row.data.status || "Active",
-            boatLength: row.data.boatLength ? parseFloat(row.data.boatLength) : null,
-            boatWidth: row.data.boatWidth ? parseFloat(row.data.boatWidth) : null,
-            boatMake: row.data.boatMake,
-            boatModel: row.data.boatModel,
-            boatYear: row.data.boatYear ? parseInt(row.data.boatYear) : null,
-            electricIncluded: row.data.electricIncluded,
-            electricFee: row.data.electricFee ? parseFloat(row.data.electricFee) : null,
-            liveaboardAllowed: row.data.liveaboardAllowed,
-            liveaboardFee: row.data.liveaboardFee ? parseFloat(row.data.liveaboardFee) : null,
-            notes: row.data.notes,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          });
+          const [existingLease] = await db.select()
+            .from(rraLeases)
+            .where(and(
+              eq(rraLeases.marinaLocationId, targetLocationId),
+              eq(rraLeases.tenantId, tenantId),
+              ilike(rraLeases.unitLocation, row.data.unitLocation)
+            ))
+            .limit(1);
 
-          if (row.data.leaseAmount) {
-            await db.insert(rraLeaseLineItems).values({
-              id: uuidv4(),
+          let leaseId: string;
+
+          if (existingLease) {
+            if (options.importMode === "create") {
+              continue;
+            }
+
+            if (options.importMode === "replace") {
+              await db.update(rraLeases)
+                .set({
+                  storageType: row.data.storageType || existingLease.storageType,
+                  contractTermGroup: row.data.contractTerm || existingLease.contractTermGroup,
+                  leaseCommencement: row.data.leaseCommencement || existingLease.leaseCommencement,
+                  leaseExpiration: row.data.leaseExpiration || existingLease.leaseExpiration,
+                  status: row.data.status || existingLease.status,
+                  boatLength: row.data.boatLength ? parseFloat(row.data.boatLength) : existingLease.boatLength,
+                  boatWidth: row.data.boatWidth ? parseFloat(row.data.boatWidth) : existingLease.boatWidth,
+                  boatMake: row.data.boatMake || existingLease.boatMake,
+                  boatModel: row.data.boatModel || existingLease.boatModel,
+                  boatYear: row.data.boatYear ? parseInt(row.data.boatYear) : existingLease.boatYear,
+                  electricIncluded: row.data.electricIncluded ?? existingLease.electricIncluded,
+                  electricFee: row.data.electricFee ? parseFloat(row.data.electricFee) : existingLease.electricFee,
+                  liveaboardAllowed: row.data.liveaboardAllowed ?? existingLease.liveaboardAllowed,
+                  liveaboardFee: row.data.liveaboardFee ? parseFloat(row.data.liveaboardFee) : existingLease.liveaboardFee,
+                  notes: row.data.notes || existingLease.notes,
+                  updatedAt: new Date(),
+                })
+                .where(eq(rraLeases.id, existingLease.id));
+              leaseId = existingLease.id;
+            } else {
+              leaseId = existingLease.id;
+            }
+          } else {
+            leaseId = uuidv4();
+            await db.insert(rraLeases).values({
+              id: leaseId,
               orgId: session.orgId,
-              leaseId,
-              lineItemType: "Base Rent",
-              description: "Monthly Base Rent",
-              amount: parseFloat(row.data.leaseAmount),
-              frequency: "monthly",
+              marinaLocationId: targetLocationId,
+              tenantId,
+              unitLocation: row.data.unitLocation,
+              storageType: row.data.storageType || "Wet Slip",
+              contractTermGroup: row.data.contractTerm || "Annual",
+              leaseCommencement: row.data.leaseCommencement,
+              leaseExpiration: row.data.leaseExpiration,
+              status: row.data.status || "Active",
+              boatLength: row.data.boatLength ? parseFloat(row.data.boatLength) : null,
+              boatWidth: row.data.boatWidth ? parseFloat(row.data.boatWidth) : null,
+              boatMake: row.data.boatMake,
+              boatModel: row.data.boatModel,
+              boatYear: row.data.boatYear ? parseInt(row.data.boatYear) : null,
+              electricIncluded: row.data.electricIncluded,
+              electricFee: row.data.electricFee ? parseFloat(row.data.electricFee) : null,
+              liveaboardAllowed: row.data.liveaboardAllowed,
+              liveaboardFee: row.data.liveaboardFee ? parseFloat(row.data.liveaboardFee) : null,
+              notes: row.data.notes,
               createdAt: new Date(),
               updatedAt: new Date(),
             });
+          }
+
+          if (row.data.leaseAmount) {
+            const [existingLineItem] = await db.select()
+              .from(rraLeaseLineItems)
+              .where(and(
+                eq(rraLeaseLineItems.leaseId, leaseId),
+                eq(rraLeaseLineItems.lineItemType, "Base Rent")
+              ))
+              .limit(1);
+
+            if (existingLineItem && (options.importMode === "replace" || options.importMode === "append")) {
+              await db.update(rraLeaseLineItems)
+                .set({
+                  amount: parseFloat(row.data.leaseAmount),
+                  updatedAt: new Date(),
+                })
+                .where(eq(rraLeaseLineItems.id, existingLineItem.id));
+            } else if (!existingLineItem) {
+              await db.insert(rraLeaseLineItems).values({
+                id: uuidv4(),
+                orgId: session.orgId,
+                leaseId,
+                lineItemType: "Base Rent",
+                description: "Monthly Base Rent",
+                amount: parseFloat(row.data.leaseAmount),
+                frequency: "monthly",
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              });
+            }
           }
         }
       } catch (error: any) {
