@@ -17941,6 +17941,12 @@ export * from './pnl-pipeline-schema';
 export * from './financial-coa-schema';
 
 // ============================================================================
+// Capital Markets Schema
+// Forward-looking yield curves for SOFR, Treasury rates, and floating-rate debt modeling
+// ============================================================================
+export * from './capital-markets-schema';
+
+// ============================================================================
 // SLA-Driven Task Routing
 // Deadline tracking, auto-assignment, and escalation for tasks
 // ============================================================================
