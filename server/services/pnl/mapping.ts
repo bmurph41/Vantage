@@ -14,6 +14,128 @@ import {
 import { and, eq, or, isNull, sql, desc, asc } from 'drizzle-orm';
 import { getLlmClassifier, type ClassificationRequest } from '../../utils/llm';
 
+interface AmbiguousDepartmentOption {
+  department: string;
+  bucket: string;
+  description: string;
+}
+
+interface AmbiguousKeyword {
+  keywords: string[];
+  possibleDepartments: AmbiguousDepartmentOption[];
+  reason: string;
+}
+
+const AMBIGUOUS_LINE_ITEMS: AmbiguousKeyword[] = [
+  {
+    keywords: ['cleaning labor', 'cleaning wages', 'cleaning staff', 'janitorial labor', 'janitorial wages'],
+    possibleDepartments: [
+      { department: 'Payroll', bucket: 'Expense', description: 'In-house cleaning staff wages' },
+      { department: 'General', bucket: 'Expense', description: 'Contract cleaning service (third-party)' },
+    ],
+    reason: 'Cleaning labor could be in-house payroll or contracted services depending on your marina\'s arrangement.',
+  },
+  {
+    keywords: ['dock labor', 'dock hand', 'dockhand wages', 'dock attendant'],
+    possibleDepartments: [
+      { department: 'Payroll', bucket: 'Expense', description: 'Full-time dock employee wages' },
+      { department: 'Storage', bucket: 'Expense', description: 'Dock operations labor cost' },
+    ],
+    reason: 'Dock labor may be classified under payroll or as a direct storage operations cost.',
+  },
+  {
+    keywords: ['maintenance labor', 'repair labor', 'maintenance wages'],
+    possibleDepartments: [
+      { department: 'Payroll', bucket: 'Expense', description: 'In-house maintenance staff wages' },
+      { department: 'General', bucket: 'Expense', description: 'Contract maintenance services' },
+      { department: 'Service', bucket: 'Expense', description: 'Service department labor allocation' },
+    ],
+    reason: 'Maintenance labor could be payroll, contract services, or allocated to the service department.',
+  },
+  {
+    keywords: ['fuel labor', 'fuel attendant', 'fuel dock labor'],
+    possibleDepartments: [
+      { department: 'Payroll', bucket: 'Expense', description: 'Fuel dock staff wages' },
+      { department: 'Fuel', bucket: 'Expense', description: 'Fuel operations labor cost' },
+    ],
+    reason: 'Fuel labor may be allocated to payroll or directly to fuel operations.',
+  },
+  {
+    keywords: ['security labor', 'security wages', 'guard wages', 'night watch'],
+    possibleDepartments: [
+      { department: 'Payroll', bucket: 'Expense', description: 'In-house security staff wages' },
+      { department: 'General', bucket: 'Expense', description: 'Contract security service' },
+    ],
+    reason: 'Security costs may be in-house payroll or contracted third-party services.',
+  },
+  {
+    keywords: ['landscaping labor', 'grounds labor', 'groundskeeping'],
+    possibleDepartments: [
+      { department: 'Payroll', bucket: 'Expense', description: 'In-house grounds crew wages' },
+      { department: 'General', bucket: 'Expense', description: 'Contract landscaping service' },
+    ],
+    reason: 'Landscaping may be performed by employees (payroll) or contracted out.',
+  },
+  {
+    keywords: ['service labor', 'mechanic labor', 'technician labor', 'tech wages'],
+    possibleDepartments: [
+      { department: 'Payroll', bucket: 'Expense', description: 'Service department payroll' },
+      { department: 'Service', bucket: 'COGS', description: 'Direct labor cost of goods sold' },
+    ],
+    reason: 'Service technician labor could be classified as payroll expense or COGS depending on accounting method.',
+  },
+  {
+    keywords: ['ship store labor', 'retail labor', 'store wages', 'retail wages'],
+    possibleDepartments: [
+      { department: 'Payroll', bucket: 'Expense', description: 'Retail staff payroll' },
+      { department: "Ship's Store", bucket: 'Expense', description: 'Ship store operations labor' },
+    ],
+    reason: 'Retail staff wages may be under general payroll or allocated to ship store department.',
+  },
+  {
+    keywords: ['office labor', 'admin labor', 'administrative wages', 'office wages', 'clerical wages'],
+    possibleDepartments: [
+      { department: 'Payroll', bucket: 'Expense', description: 'Administrative payroll' },
+      { department: 'General', bucket: 'Expense', description: 'General & administrative expense' },
+    ],
+    reason: 'Office/admin wages may be classified under payroll or G&A expenses.',
+  },
+  {
+    keywords: ['management fee', 'manager fee', 'management expense'],
+    possibleDepartments: [
+      { department: 'Payroll', bucket: 'Expense', description: 'Manager salary/compensation' },
+      { department: 'General', bucket: 'Expense', description: 'Third-party management fee' },
+    ],
+    reason: 'Management fees could be internal payroll or external management company fees.',
+  },
+  {
+    keywords: ['contract labor', 'contracted labor', 'temp labor', 'temporary labor'],
+    possibleDepartments: [
+      { department: 'Payroll', bucket: 'Expense', description: 'Temporary/seasonal employee wages' },
+      { department: 'General', bucket: 'Expense', description: 'Third-party contract services' },
+      { department: 'Service', bucket: 'Expense', description: 'Contracted service technicians' },
+    ],
+    reason: 'Contract labor classification depends on whether workers are on payroll or independent contractors.',
+  },
+  {
+    keywords: ['trash removal', 'garbage service', 'waste disposal', 'dumpster service'],
+    possibleDepartments: [
+      { department: 'General', bucket: 'Expense', description: 'General facility expense' },
+      { department: 'Marina & Amenities', bucket: 'Expense', description: 'Marina amenities operating cost' },
+    ],
+    reason: 'Waste services may be classified as general overhead or marina amenities.',
+  },
+  {
+    keywords: ['credit card fees', 'merchant fees', 'processing fees', 'card fees'],
+    possibleDepartments: [
+      { department: 'General', bucket: 'Expense', description: 'General bank/CC fees' },
+      { department: 'Fuel', bucket: 'COGS', description: 'Fuel sales processing fees' },
+      { department: "Ship's Store", bucket: 'COGS', description: 'Retail processing fees' },
+    ],
+    reason: 'Credit card fees may be allocated to general expense or specific revenue departments.',
+  },
+];
+
 interface MapResult {
   canonicalLineItemId?: string;
   mappingMethod: PnlMappingMethod;
@@ -22,6 +144,12 @@ interface MapResult {
   matchedKeywordRuleId?: string;
   department?: string;
   bucket?: string;
+  isAmbiguous?: boolean;
+  ambiguityInfo?: {
+    reason: string;
+    possibleDepartments: AmbiguousDepartmentOption[];
+    matchedKeyword: string;
+  };
 }
 
 interface KeywordMatch {
@@ -31,6 +159,30 @@ interface KeywordMatch {
 }
 
 const CONFIDENCE_THRESHOLD = 0.75;
+
+function checkAmbiguity(normalized: string): { isAmbiguous: boolean; ambiguityInfo?: MapResult['ambiguityInfo'] } {
+  const normalizedLower = normalized.toLowerCase();
+  
+  for (const ambiguousItem of AMBIGUOUS_LINE_ITEMS) {
+    for (const keyword of ambiguousItem.keywords) {
+      const keywordLower = keyword.toLowerCase();
+      if (normalizedLower === keywordLower || 
+          normalizedLower.includes(keywordLower) || 
+          keywordLower.includes(normalizedLower)) {
+        return {
+          isAmbiguous: true,
+          ambiguityInfo: {
+            reason: ambiguousItem.reason,
+            possibleDepartments: ambiguousItem.possibleDepartments,
+            matchedKeyword: keyword,
+          },
+        };
+      }
+    }
+  }
+  
+  return { isAmbiguous: false };
+}
 
 export function normalizeLabel(s: string): string {
   return (s ?? '')
@@ -346,7 +498,14 @@ export async function mapParsedStatement(jobId: string): Promise<{ reviewCount: 
     }
     
     const hasValidCanonical = res.canonicalLineItemId && canonicalById.has(res.canonicalLineItemId);
-    const needsReview = !hasValidCanonical || res.confidence < CONFIDENCE_THRESHOLD;
+    
+    const ambiguityCheck = checkAmbiguity(normalized);
+    if (ambiguityCheck.isAmbiguous) {
+      res.isAmbiguous = true;
+      res.ambiguityInfo = ambiguityCheck.ambiguityInfo;
+    }
+    
+    const needsReview = !hasValidCanonical || res.confidence < CONFIDENCE_THRESHOLD || res.isAmbiguous;
     
     if (needsReview && !approvedLabels.has(normalized)) {
       reviewInserts.push({
@@ -361,9 +520,11 @@ export async function mapParsedStatement(jobId: string): Promise<{ reviewCount: 
           suggestion: res.suggestion ?? null,
           department: res.department ?? null,
           bucket: res.bucket ?? null,
+          isAmbiguous: res.isAmbiguous ?? false,
+          ambiguityInfo: res.ambiguityInfo ?? null,
         },
         confidence: String(res.confidence ?? 0),
-        status: 'needs_review',
+        status: res.isAmbiguous ? 'ambiguous' : 'needs_review',
       });
     } else if (!needsReview) {
       autoMappedCount++;
