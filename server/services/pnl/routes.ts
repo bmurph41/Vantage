@@ -126,10 +126,15 @@ router.get('/jobs/:jobId', async (req: any, res) => {
     }
 
     const reviewItems = await db.query.pnlReviewItems.findMany({
-      where: and(eq(pnlReviewItems.jobId, jobId), eq(pnlReviewItems.status, 'needs_review')),
+      where: and(
+        eq(pnlReviewItems.jobId, jobId), 
+        or(eq(pnlReviewItems.status, 'needs_review'), eq(pnlReviewItems.status, 'ambiguous'))
+      ),
     });
+    
+    const ambiguousCount = reviewItems.filter(r => r.status === 'ambiguous').length;
 
-    res.json({ job, reviewNeedsCount: reviewItems.length });
+    res.json({ job, reviewNeedsCount: reviewItems.length, ambiguousCount });
   } catch (error: any) {
     console.error('Get job error:', error);
     res.status(500).json({ error: error.message });
@@ -179,7 +184,7 @@ router.post('/jobs/:jobId/remap', async (req: any, res) => {
 
     const schema = z.object({
       extractedLabel: z.string().min(1),
-      canonicalLineItemId: z.string(),
+      canonicalLineItemId: z.string().optional().default(''),
       saveAsAlias: z.boolean().optional().default(true),
       addToKeywordBank: z.boolean().optional().default(false),
       department: z.string().optional(),
@@ -194,7 +199,7 @@ router.post('/jobs/:jobId/remap', async (req: any, res) => {
     const { extractedLabel, canonicalLineItemId, saveAsAlias, addToKeywordBank: shouldAddToKeywordBank, department, bucket } = parsedBody.data;
     const normalized = normalizeLabel(extractedLabel);
 
-    if (saveAsAlias) {
+    if (saveAsAlias && canonicalLineItemId) {
       await db.insert(pnlLineItemAliases).values({
         orgId,
         aliasText: normalized,
@@ -203,8 +208,9 @@ router.post('/jobs/:jobId/remap', async (req: any, res) => {
       }).onConflictDoNothing();
     }
 
-    if (shouldAddToKeywordBank && department && bucket) {
-      await addToKeywordBank(orgId, normalized, department, bucket, canonicalLineItemId);
+    if (department && bucket) {
+      await addToKeywordBank(orgId, normalized, department, bucket, canonicalLineItemId || undefined);
+      console.log(`[P&L Remap] Saved to keyword bank: "${normalized}" -> ${department}/${bucket}`);
     }
 
     await db
@@ -231,10 +237,12 @@ router.post('/jobs/:jobId/remap', async (req: any, res) => {
       for (const row of pj.rows ?? []) {
         if (row.normalizedLabel === normalized || normalizeLabel(row.label) === normalized) {
           row.mapping = {
-            canonicalLineItemId,
+            canonicalLineItemId: canonicalLineItemId || null,
             mappingMethod: 'manual',
             mappingConfidence: 1.0,
             normalizedLabel: normalized,
+            resolvedDepartment: department || null,
+            resolvedBucket: bucket || null,
           };
         }
       }
@@ -247,7 +255,10 @@ router.post('/jobs/:jobId/remap', async (req: any, res) => {
     await storeMappedFacts(jobId);
 
     const remainingReview = await db.query.pnlReviewItems.findMany({
-      where: and(eq(pnlReviewItems.jobId, jobId), eq(pnlReviewItems.status, 'needs_review')),
+      where: and(
+        eq(pnlReviewItems.jobId, jobId), 
+        or(eq(pnlReviewItems.status, 'needs_review'), eq(pnlReviewItems.status, 'ambiguous'))
+      ),
     });
 
     if (remainingReview.length === 0) {
@@ -750,7 +761,10 @@ router.get('/documents/:documentId', async (req: any, res) => {
       });
 
       const reviewItems = await db.query.pnlReviewItems.findMany({
-        where: and(eq(pnlReviewItems.jobId, latestJob.id), eq(pnlReviewItems.status, 'needs_review')),
+        where: and(
+          eq(pnlReviewItems.jobId, latestJob.id), 
+          or(eq(pnlReviewItems.status, 'needs_review'), eq(pnlReviewItems.status, 'ambiguous'))
+        ),
       });
       reviewItemsCount = reviewItems.length;
 
@@ -830,7 +844,10 @@ router.post('/statements/:statementId/approve', async (req: any, res) => {
       await db
         .update(pnlReviewItems)
         .set({ status: 'approved', resolvedBy: userId, updatedAt: new Date() })
-        .where(and(eq(pnlReviewItems.jobId, job.id), eq(pnlReviewItems.status, 'needs_review')));
+        .where(and(
+          eq(pnlReviewItems.jobId, job.id), 
+          or(eq(pnlReviewItems.status, 'needs_review'), eq(pnlReviewItems.status, 'ambiguous'))
+        ));
     }
 
     res.json({ ok: true, message: 'Statement approved for modeling' });

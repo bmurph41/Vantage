@@ -1,21 +1,49 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
-import { Check, X, ArrowLeft, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Check, X, ArrowLeft, Loader2, AlertCircle, CheckCircle2, AlertTriangle, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
+
+interface AmbiguousDepartmentOption {
+  department: string;
+  bucket: string;
+  description: string;
+}
+
+interface AmbiguityInfo {
+  reason: string;
+  possibleDepartments: AmbiguousDepartmentOption[];
+  matchedKeyword: string;
+}
 
 interface ReviewItem {
   id: string;
   extractedLabel: string;
   normalizedLabel: string;
   suggestedCanonicalLineItemId: string | null;
-  suggestionJson: any;
+  suggestionJson: {
+    mappingMethod?: string;
+    suggestion?: any;
+    department?: string | null;
+    bucket?: string | null;
+    isAmbiguous?: boolean;
+    ambiguityInfo?: AmbiguityInfo | null;
+  };
   confidence: string;
   status: string;
 }
@@ -44,7 +72,9 @@ export default function PnlReview() {
   const queryClient = useQueryClient();
 
   const [selectedMappings, setSelectedMappings] = useState<Record<string, string>>({});
+  const [selectedDepartments, setSelectedDepartments] = useState<Record<string, { department: string; bucket: string }>>({});
   const [saveAsAlias, setSaveAsAlias] = useState(true);
+  const [addToKeywordBank, setAddToKeywordBank] = useState(true);
 
   const reviewQuery = useQuery<ReviewResponse>({
     queryKey: ["/api/pnl/jobs", jobId, "review"],
@@ -56,12 +86,29 @@ export default function PnlReview() {
   });
 
   const remapMutation = useMutation({
-    mutationFn: async ({ extractedLabel, canonicalLineItemId }: { extractedLabel: string; canonicalLineItemId: string }) => {
+    mutationFn: async ({ 
+      extractedLabel, 
+      canonicalLineItemId,
+      department,
+      bucket,
+    }: { 
+      extractedLabel: string; 
+      canonicalLineItemId: string;
+      department?: string;
+      bucket?: string;
+    }) => {
       const res = await fetch(`/api/pnl/jobs/${jobId}/remap`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ extractedLabel, canonicalLineItemId, saveAsAlias }),
+        body: JSON.stringify({ 
+          extractedLabel, 
+          canonicalLineItemId, 
+          saveAsAlias,
+          addToKeywordBank: addToKeywordBank && !!department && !!bucket,
+          department,
+          bucket,
+        }),
       });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
@@ -83,7 +130,8 @@ export default function PnlReview() {
   });
 
   const items = reviewQuery.data?.items ?? [];
-  const needsReview = items.filter((i) => i.status === "needs_review");
+  const ambiguousItems = items.filter((i) => i.status === "ambiguous" || i.suggestionJson?.isAmbiguous);
+  const needsReview = items.filter((i) => i.status === "needs_review" && !i.suggestionJson?.isAmbiguous);
   const approved = items.filter((i) => i.status === "approved");
   const canonicalItems = canonicalQuery.data?.items ?? [];
 
@@ -94,7 +142,7 @@ export default function PnlReview() {
     return acc;
   }, {} as Record<string, CanonicalLineItem[]>);
 
-  const handleMapping = (itemId: string, extractedLabel: string) => {
+  const handleMapping = (itemId: string, extractedLabel: string, isAmbiguous: boolean = false) => {
     const canonicalId = selectedMappings[itemId];
     if (!canonicalId) {
       toast({
@@ -104,7 +152,46 @@ export default function PnlReview() {
       });
       return;
     }
-    remapMutation.mutate({ extractedLabel, canonicalLineItemId: canonicalId });
+    
+    const deptSelection = isAmbiguous ? selectedDepartments[itemId] : undefined;
+    if (isAmbiguous && !deptSelection) {
+      toast({
+        title: "Select a department",
+        description: "Please select which department this line item belongs to.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    remapMutation.mutate({ 
+      extractedLabel, 
+      canonicalLineItemId: canonicalId,
+      department: deptSelection?.department,
+      bucket: deptSelection?.bucket,
+    });
+  };
+
+  const handleAmbiguousMapping = (itemId: string, extractedLabel: string) => {
+    const deptSelection = selectedDepartments[itemId];
+    if (!deptSelection) {
+      toast({
+        title: "Select a department",
+        description: "Please select which department this line item belongs to.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const matchingCanonical = canonicalItems.find(
+      (c) => c.department === deptSelection.department
+    );
+    
+    remapMutation.mutate({ 
+      extractedLabel, 
+      canonicalLineItemId: matchingCanonical?.id || selectedMappings[itemId] || '',
+      department: deptSelection.department,
+      bucket: deptSelection.bucket,
+    });
   };
 
   if (!jobId) {
@@ -144,6 +231,12 @@ export default function PnlReview() {
           </p>
         </div>
         <div className="flex items-center gap-4">
+          {ambiguousItems.length > 0 && (
+            <Badge variant="outline" className="border-amber-500 text-amber-600">
+              <AlertTriangle className="mr-1 h-3 w-3" />
+              {ambiguousItems.length} need verification
+            </Badge>
+          )}
           <Badge variant="outline">
             {needsReview.length} needs review
           </Badge>
@@ -152,6 +245,135 @@ export default function PnlReview() {
           </Badge>
         </div>
       </div>
+
+      {ambiguousItems.length > 0 && (
+        <Card className="border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              <CardTitle className="text-amber-900 dark:text-amber-100">Ambiguous Line Items - Verification Required</CardTitle>
+            </div>
+            <CardDescription className="text-amber-800 dark:text-amber-200">
+              These line items could belong to different departments depending on how your marina operates.
+              Please select the correct department for each.
+            </CardDescription>
+            <div className="flex items-center gap-4 pt-2">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="addToKeywordBank"
+                  checked={addToKeywordBank}
+                  onCheckedChange={(checked) => setAddToKeywordBank(!!checked)}
+                />
+                <label htmlFor="addToKeywordBank" className="text-sm text-muted-foreground cursor-pointer">
+                  Remember my choices for future documents
+                </label>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {ambiguousItems.map((item) => {
+              const ambiguityInfo = item.suggestionJson?.ambiguityInfo;
+              const possibleDepts = ambiguityInfo?.possibleDepartments ?? [];
+              const selectedDept = selectedDepartments[item.id];
+              
+              return (
+                <div 
+                  key={item.id} 
+                  className="border rounded-lg p-4 bg-white dark:bg-gray-900 space-y-3"
+                  data-testid={`ambiguous-item-${item.id}`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-lg">{item.extractedLabel}</p>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-sm">
+                              <p className="text-sm">{ambiguityInfo?.reason || "This item needs department verification."}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{item.normalizedLabel}</p>
+                    </div>
+                    <Badge variant="outline" className="border-amber-500 text-amber-600">
+                      Needs Verification
+                    </Badge>
+                  </div>
+                  
+                  {ambiguityInfo?.reason && (
+                    <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
+                      <AlertTriangle className="h-4 w-4 text-amber-600" />
+                      <AlertDescription className="text-amber-800 dark:text-amber-200 text-sm">
+                        {ambiguityInfo.reason}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Select the correct department:</Label>
+                    <RadioGroup
+                      value={selectedDept ? `${selectedDept.department}|${selectedDept.bucket}` : ""}
+                      onValueChange={(val) => {
+                        const [department, bucket] = val.split("|");
+                        setSelectedDepartments((prev) => ({
+                          ...prev,
+                          [item.id]: { department, bucket },
+                        }));
+                      }}
+                      className="grid gap-2"
+                    >
+                      {possibleDepts.map((opt, idx) => (
+                        <div 
+                          key={idx} 
+                          className={`flex items-center space-x-3 p-3 rounded-lg border transition-colors cursor-pointer ${
+                            selectedDept?.department === opt.department && selectedDept?.bucket === opt.bucket
+                              ? "border-primary bg-primary/5"
+                              : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+                          }`}
+                        >
+                          <RadioGroupItem 
+                            value={`${opt.department}|${opt.bucket}`} 
+                            id={`${item.id}-${idx}`}
+                          />
+                          <Label 
+                            htmlFor={`${item.id}-${idx}`} 
+                            className="flex-1 cursor-pointer"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{opt.department}</span>
+                              <Badge variant="secondary" className="text-xs">{opt.bucket}</Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-0.5">{opt.description}</p>
+                          </Label>
+                        </div>
+                      ))}
+                    </RadioGroup>
+                  </div>
+                  
+                  <div className="flex justify-end pt-2">
+                    <Button
+                      onClick={() => handleAmbiguousMapping(item.id, item.extractedLabel)}
+                      disabled={!selectedDept || remapMutation.isPending}
+                      className="min-w-[120px]"
+                    >
+                      {remapMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <Check className="h-4 w-4 mr-2" />
+                      )}
+                      Confirm
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -177,10 +399,14 @@ export default function PnlReview() {
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : needsReview.length === 0 ? (
+          ) : needsReview.length === 0 && ambiguousItems.length === 0 ? (
             <div className="text-center py-8">
               <CheckCircle2 className="h-12 w-12 mx-auto text-green-500" />
               <p className="mt-4 text-muted-foreground">All line items have been mapped!</p>
+            </div>
+          ) : needsReview.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <p>No unmapped items. Please review the ambiguous items above.</p>
             </div>
           ) : (
             <Table>
