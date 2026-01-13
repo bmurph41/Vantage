@@ -309,14 +309,27 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
         // Find data lines that follow the header and have similar column structure
         const dataRows: Record<string, string>[] = [];
         for (let i = headerLineIndex + 1; i < lines.length; i++) {
-          const line = lines[i];
+          const line = lines[i].trim(); // Trim leading/trailing whitespace
           // Skip lines that look like totals, headers, or other non-data
           if (/^Total|^TOTAL|^Page\s+\d|^\s*$/.test(line)) continue;
           // Skip lines with too few characters
           if (line.length < 10) continue;
           
-          // Parse the line using same delimiter
-          const parts = line.split(/\s{2,}|\t/).map(p => p.trim()).filter(p => p);
+          // Parse the line - first try normal split, then try more aggressive splitting
+          let parts = line.split(/\s{2,}|\t/).map(p => p.trim()).filter(p => p);
+          
+          // If we got very few parts but line has content, try single space split for specific row types
+          // This handles QuickBooks transaction lines like "Invoice 11/01/2025 88801 NAME..."
+          if (parts.length < 3 && line.length > 20) {
+            // Check if this looks like a transaction row (starts with type like Invoice, Payment, etc.)
+            const transactionMatch = line.match(/^(Invoice|Payment|Credit|Debit|Journal|Deposit|Check|Bill|Expense)\s+(.+)/i);
+            if (transactionMatch) {
+              const restOfLine = transactionMatch[2];
+              const restParts = restOfLine.split(/\s{2,}|\s+(?=\d{1,2}\/\d{1,2}\/\d{2,4})|\s+(?=\d{4,})|\s{1,}/).map(p => p.trim()).filter(p => p);
+              parts = [transactionMatch[1], ...restParts];
+            }
+          }
+          
           if (parts.length >= 2) {
             const row: Record<string, string> = {};
             headerParts.forEach((header, idx) => {
@@ -330,14 +343,18 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
           }
         }
         
-        if (dataRows.length >= 1) {
-          console.log(`[PDF Import Fallback] Strategy 2: Extracted ${dataRows.length} transaction rows`);
+        // Even if we found 0 data rows, if we have headers, return them with empty rows
+        // This allows users to at least see the column structure
+        if (dataRows.length >= 1 || headerParts.length >= 3) {
+          console.log(`[PDF Import Fallback] Strategy 2: Extracted ${dataRows.length} transaction rows with ${headerParts.length} headers`);
           return res.json({
             success: true,
             headers: headerParts,
-            rows: dataRows,
-            confidence: 'medium',
-            warnings: ['Extracted from transaction report format. Please verify column mappings.'],
+            rows: dataRows.length > 0 ? dataRows : [Object.fromEntries(headerParts.map(h => [h, '']))],
+            confidence: dataRows.length > 0 ? 'medium' : 'low',
+            warnings: dataRows.length > 0 
+              ? ['Extracted from transaction report format. Please verify column mappings.']
+              : ['Found column headers but could not parse data rows. You may need to map manually.'],
             pageCount,
             aiPowered: false,
             extractionMethod,
