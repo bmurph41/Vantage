@@ -18,6 +18,7 @@ import { findMatchingCrmCompanies, searchCrmCompanies } from "./company-matcher"
 import { invalidateLearningCache } from "./services/ai-learning";
 import { invalidateCategorizerCache } from "./services/categorizer";
 import { sendNewSearchRecap } from "./services/alert-service";
+import { seedBizJournalsFeeds } from "./seeds/bizjournals-feeds";
 
 const VALID_CATEGORIES = [
   'Macro',
@@ -576,6 +577,22 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
+
+  // Seed BizJournals regional feeds for marina M&A coverage
+  app.post("/api/docktalk/rss-sources/seed-bizjournals", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      console.log("[DockTalk] Seeding BizJournals regional feeds...");
+      const results = await seedBizJournalsFeeds();
+      res.json({ 
+        success: true,
+        message: `Added ${results.added} BizJournals feeds, ${results.skipped} already existed`,
+        ...results
+      });
+    } catch (error) {
+      console.error("Error seeding BizJournals feeds:", error);
+      res.status(500).json({ error: "Failed to seed BizJournals feeds" });
+    }
+  });
   app.patch("/api/docktalk/rss-sources/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const RssSourceUpdateSchema = z.object({
