@@ -1,4 +1,4 @@
-import { db } from "@db";
+import { db } from "../../db";
 import { eq, and, desc, or, ilike } from "drizzle-orm";
 import { 
   archivedContacts, 

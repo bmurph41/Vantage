@@ -76,6 +76,7 @@ const Products = lazy(() => import("@/pages/products"));
 const Workflows = lazy(() => import("@/pages/workflows"));
 const Webhooks = lazy(() => import("@/pages/webhooks"));
 const Dedupe = lazy(() => import("@/pages/dedupe"));
+const ArchivePage = lazy(() => import("@/pages/crm/ArchivePage"));
 const Scoring = lazy(() => import("@/pages/scoring"));
 const ImportContacts = lazy(() => import("@/pages/import-contacts"));
 const ImportHistory = lazy(() => import("@/pages/import-history"));
@@ -1149,6 +1150,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <Webhooks />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/crm/archive">
+        {() => (
+          <UnifiedLayout>
+            <ArchivePage />
           </UnifiedLayout>
         )}
       </Route>
