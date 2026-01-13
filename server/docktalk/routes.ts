@@ -19,6 +19,7 @@ import { invalidateLearningCache } from "./services/ai-learning";
 import { invalidateCategorizerCache } from "./services/categorizer";
 import { sendNewSearchRecap } from "./services/alert-service";
 import { seedBizJournalsFeeds } from "./seeds/bizjournals-feeds";
+import { seedTradePublicationFeeds } from "./seeds/trade-publications-feeds";
 
 const VALID_CATEGORIES = [
   'Macro',
@@ -593,6 +594,22 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
       res.status(500).json({ error: "Failed to seed BizJournals feeds" });
     }
   });
+
+  app.post("/api/docktalk/rss-sources/seed-trade-publications", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      console.log("[DockTalk] Seeding trade publication feeds...");
+      const results = await seedTradePublicationFeeds();
+      res.json({ 
+        success: true,
+        message: `Added ${results.added} trade publication feeds, ${results.skipped} already existed`,
+        ...results
+      });
+    } catch (error) {
+      console.error("Error seeding trade publication feeds:", error);
+      res.status(500).json({ error: "Failed to seed trade publication feeds" });
+    }
+  });
+
   app.patch("/api/docktalk/rss-sources/:id", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const RssSourceUpdateSchema = z.object({
