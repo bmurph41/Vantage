@@ -1532,4 +1532,312 @@ router.get("/crm/properties/search", async (req: Request, res: Response, next: N
   }
 });
 
+// ============================================================
+// BULK IMPORT SESSION ENDPOINTS
+// Multi-step wizard: Upload → Sheet Select → Column Mapping → Value Mapping → Preview → Import
+// ============================================================
+
+import { importSessionService } from "../services/rent-roll-v2/importSessionService";
+import {
+  RENT_ROLL_TARGET_FIELDS,
+  columnMappingRequestSchema,
+  valueMappingRequestSchema,
+  importExecuteRequestSchema,
+} from "@shared/rent-roll-import-schema";
+
+// Step 1: Create import session (upload and parse file)
+router.post("/import/session", upload.single("file"), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const userId = getUserId(req);
+
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const { sheetName, importMode, skipDuplicates } = req.body;
+
+    const session = await importSessionService.createSession(
+      orgId,
+      userId,
+      req.file.buffer,
+      req.file.originalname,
+      {
+        sheetName,
+        importMode: importMode || "create",
+        skipDuplicates: skipDuplicates !== "false",
+      }
+    );
+
+    res.json({
+      success: true,
+      session: {
+        id: session.id,
+        status: session.status,
+        fileName: session.fileName,
+        fileType: session.fileType,
+        totalRows: session.totalRows,
+        headers: session.headers,
+        sheets: session.sheets,
+        selectedSheet: session.selectedSheet,
+        parseConfidence: session.parseConfidence,
+        extractionMethod: session.extractionMethod,
+        warnings: session.warnings,
+        errors: session.errors,
+      },
+    });
+  } catch (error: any) {
+    next(error);
+  }
+});
+
+// Get session details
+router.get("/import/session/:sessionId", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { sessionId } = req.params;
+    const session = importSessionService.getSession(sessionId);
+
+    if (!session) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    res.json({
+      id: session.id,
+      status: session.status,
+      fileName: session.fileName,
+      fileType: session.fileType,
+      totalRows: session.totalRows,
+      headers: session.headers,
+      sheets: session.sheets,
+      selectedSheet: session.selectedSheet,
+      columnMappings: session.columnMappings,
+      customFields: session.customFields,
+      valueMappings: session.valueMappings,
+      importMode: session.importMode,
+      skipDuplicates: session.skipDuplicates,
+      parseConfidence: session.parseConfidence,
+      warnings: session.warnings,
+      errors: session.errors,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Step 2: Select sheet (for Excel files with multiple sheets)
+router.post("/import/session/:sessionId/select-sheet", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { sessionId } = req.params;
+    const { sheetName } = req.body;
+
+    if (!sheetName) {
+      return res.status(400).json({ error: "Sheet name is required" });
+    }
+
+    const session = await importSessionService.selectSheet(sessionId, sheetName);
+
+    res.json({
+      success: true,
+      session: {
+        id: session.id,
+        status: session.status,
+        selectedSheet: session.selectedSheet,
+        headers: session.headers,
+        totalRows: session.totalRows,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Step 3a: Get AI-powered column mapping suggestions
+router.get("/import/session/:sessionId/column-suggestions", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { sessionId } = req.params;
+
+    const suggestions = await importSessionService.suggestColumnMappings(sessionId);
+
+    res.json({
+      success: true,
+      suggestions,
+      availableFields: RENT_ROLL_TARGET_FIELDS.map(f => ({
+        id: f.id,
+        label: f.label,
+        type: f.type,
+        required: f.required,
+        hasValidValues: !!(f.validValues && f.validValues.length > 0),
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Step 3b: Set column mappings (including custom fields)
+router.post("/import/session/:sessionId/column-mappings", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { sessionId } = req.params;
+    const parsed = columnMappingRequestSchema.safeParse({ sessionId, ...req.body });
+
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid request body", details: parsed.error.issues });
+    }
+
+    const session = await importSessionService.setColumnMappings(
+      sessionId,
+      parsed.data.mappings,
+      parsed.data.customFields
+    );
+
+    res.json({
+      success: true,
+      session: {
+        id: session.id,
+        status: session.status,
+        columnMappings: session.columnMappings,
+        customFields: session.customFields,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Step 4a: Get AI-powered value mapping suggestions
+router.get("/import/session/:sessionId/value-suggestions", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { sessionId } = req.params;
+
+    const suggestions = await importSessionService.suggestValueMappings(sessionId);
+
+    const fieldsWithValidValues = RENT_ROLL_TARGET_FIELDS
+      .filter(f => f.validValues && f.validValues.length > 0)
+      .map(f => ({
+        id: f.id,
+        label: f.label,
+        validValues: f.validValues,
+      }));
+
+    res.json({
+      success: true,
+      suggestions,
+      fieldsWithValidValues,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Step 4b: Set value mappings
+router.post("/import/session/:sessionId/value-mappings", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { sessionId } = req.params;
+    const parsed = valueMappingRequestSchema.safeParse({ sessionId, ...req.body });
+
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid request body", details: parsed.error.issues });
+    }
+
+    const session = await importSessionService.setValueMappings(sessionId, parsed.data.valueMappings);
+
+    res.json({
+      success: true,
+      session: {
+        id: session.id,
+        status: session.status,
+        valueMappings: session.valueMappings,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Step 5: Preview import (with validation)
+router.get("/import/session/:sessionId/preview", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { sessionId } = req.params;
+    const page = parseInt(req.query.page as string) || 1;
+    const pageSize = Math.min(parseInt(req.query.pageSize as string) || 50, 100);
+
+    const preview = await importSessionService.previewImport(sessionId);
+
+    const startIndex = (page - 1) * pageSize;
+    const paginatedRows = preview.rows.slice(startIndex, startIndex + pageSize);
+
+    res.json({
+      success: true,
+      rows: paginatedRows,
+      summary: preview.summary,
+      pagination: {
+        page,
+        pageSize,
+        totalPages: Math.ceil(preview.rows.length / pageSize),
+        totalRows: preview.rows.length,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Step 6: Execute import
+router.post("/import/session/:sessionId/execute", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { sessionId } = req.params;
+    const parsed = importExecuteRequestSchema.safeParse({ sessionId, ...req.body });
+
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid request body", details: parsed.error.issues });
+    }
+
+    const result = await importSessionService.executeImport(
+      sessionId,
+      parsed.data.targetLocationId,
+      {
+        importMode: parsed.data.importMode,
+        skipDuplicates: parsed.data.skipDuplicates,
+        skipInvalidRows: parsed.data.skipInvalidRows,
+      }
+    );
+
+    res.json({
+      success: result.success,
+      result,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Delete session
+router.delete("/import/session/:sessionId", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { sessionId } = req.params;
+    importSessionService.deleteSession(sessionId);
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get available target fields for column mapping UI
+router.get("/import/target-fields", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.json({
+      fields: RENT_ROLL_TARGET_FIELDS.map(f => ({
+        id: f.id,
+        label: f.label,
+        type: f.type,
+        required: f.required,
+        aliases: f.aliases,
+        validValues: f.validValues,
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
