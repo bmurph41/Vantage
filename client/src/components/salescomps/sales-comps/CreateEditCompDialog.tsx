@@ -26,6 +26,7 @@ import { PROFIT_CENTERS, WATER_TYPES, STORAGE_TYPES, US_REGIONS } from "@shared/
 import { AddressInput } from "@/components/address-input";
 import { useCustomStorageTypes, useCreateCustomStorageType } from "@/hooks/salescomps/useCustomStorageTypes";
 import PropertyAutocomplete from "@/components/property-autocomplete";
+import { ArchivePromptModal } from "@/components/crm/ArchivePromptModal";
 
 const compFormSchema = z.object({
   marina: z.string().min(1, "Marina name is required"),
@@ -140,6 +141,10 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
   
   // Property linking state
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>((comp as any)?.propertyId || null);
+  
+  // Archive prompt state - shows after creating a sales comp with seller info
+  const [showArchivePrompt, setShowArchivePrompt] = useState(false);
+  const [createdCompId, setCreatedCompId] = useState<string | null>(null);
 
   // Fetch existing portfolio comps
   const { data: portfoliosData } = useQuery({
@@ -387,12 +392,12 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
 
   const createMutation = useMutation({
     mutationFn: salesCompsApi.createComp,
-    onSuccess: () => {
+    onSuccess: (createdComp) => {
       toast({
         title: "Success",
         description: "Comp created successfully",
       });
-      onClose();
+      
       queryClient.invalidateQueries({ queryKey: queryKeys.comps.all });
       queryClient.invalidateQueries({ queryKey: ['/api/sales-comps'] });
       queryClient.invalidateQueries({ predicate: (query) => {
@@ -404,6 +409,14 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       // Invalidate project comps if editing in project context
       if (projectId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.projects.comps(projectId) });
+      }
+      
+      // Check if the created comp has seller info and prompt for archiving
+      if (createdComp && (createdComp.sellerContactId || createdComp.sellerCompanyId)) {
+        setCreatedCompId(createdComp.id);
+        setShowArchivePrompt(true);
+      } else {
+        onClose();
       }
     },
     onError: (error) => {
@@ -2004,6 +2017,26 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Archive Prompt Modal - shows after creating a sales comp with seller info */}
+      {createdCompId && (
+        <ArchivePromptModal
+          open={showArchivePrompt}
+          onOpenChange={(open) => {
+            setShowArchivePrompt(open);
+            if (!open) {
+              setCreatedCompId(null);
+              onClose();
+            }
+          }}
+          salesCompId={createdCompId}
+          onComplete={() => {
+            setShowArchivePrompt(false);
+            setCreatedCompId(null);
+            onClose();
+          }}
+        />
+      )}
     </div>
   );
 }

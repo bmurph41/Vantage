@@ -127,6 +127,10 @@ export function ArchivePromptModal({
   }
 
   if (!hasArchiveCandidates) {
+    if (open) {
+      onOpenChange(false);
+      onComplete?.();
+    }
     return null;
   }
 

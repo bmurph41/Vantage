@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { 
   BarChart3, Users, Building, Handshake, Calendar, 
   Bot, Bell, Mail, PieChart, TrendingUp, Settings,
-  LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight, ArrowLeft
+  LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight, ArrowLeft, Archive
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +32,7 @@ const automationNav = [
   { name: "Workflows", href: "/crm/workflows", icon: Bot },
   { name: "Webhooks", href: "/crm/webhooks", icon: Webhook },
   { name: "Dedupe & Merge", href: "/crm/dedupe", icon: GitMerge },
+  { name: "Archive", href: "/crm/archive", icon: Archive },
 ];
 
 const reportingNav = [
