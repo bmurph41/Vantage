@@ -369,29 +369,77 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
       
       if (headerLineIndex >= 0) {
         const headerLine = lines[headerLineIndex];
-        const headerParts = headerLine.split(/\s{2,}|\t/).map(h => h.trim()).filter(h => h);
+        let headerParts = headerLine.split(/\s{2,}|\t/).map(h => h.trim()).filter(h => h);
+        
+        // If split by 2+ spaces returns only 1 part, the PDF may have single-spaced headers
+        // Try to extract known QuickBooks column names directly
+        if (headerParts.length <= 2) {
+          const knownQBHeaders = ['Type', 'Date', 'Num', 'Name', 'Memo', 'Clr', 'Split', 'Debit', 'Credit', 'Balance', 
+                                   'Amount', 'Description', 'Account', 'Ref', 'Class', 'Item'];
+          const foundHeaders: string[] = [];
+          for (const knownHeader of knownQBHeaders) {
+            // Match whole words with word boundaries
+            const regex = new RegExp(`\\b${knownHeader}\\b`, 'i');
+            if (regex.test(headerLine)) {
+              foundHeaders.push(knownHeader);
+            }
+          }
+          if (foundHeaders.length >= 3) {
+            headerParts = foundHeaders;
+            console.log(`[PDF Import Fallback] Strategy 2: Extracted ${foundHeaders.length} QuickBooks headers from single-spaced line`);
+          }
+        }
         
         // Find data lines that follow the header and have similar column structure
         const dataRows: Record<string, string>[] = [];
+        
+        // Use a specialized parser for QuickBooks Transaction Detail format
+        // Pattern: Type Date Num Name [Memo] [Clr] Split Debit Credit Balance
+        const qbTransactionPattern = /^(Invoice|Payment|Credit|Debit|Journal|Deposit|Check|Bill|Expense)\s+(\d{1,2}\/\d{1,2}\/\d{2,4})\s+(\d+)\s+([A-Z][A-Z,\.\s'-]+?)(?:\s{2,}([^0-9\s][^0-9]*?))?\s+(\d+\s*·[^0-9]+|\d+\s*-[^0-9]+)?\s*([\d,]+\.?\d*)\s*([\d,]+\.?\d*)\s*([\d,]+\.?\d*)$/i;
+        
         for (let i = headerLineIndex + 1; i < lines.length; i++) {
-          const line = lines[i].trim(); // Trim leading/trailing whitespace
+          const line = lines[i].trim();
           // Skip lines that look like totals, headers, or other non-data
           if (/^Total|^TOTAL|^Page\s+\d|^\s*$/.test(line)) continue;
-          // Skip lines with too few characters
           if (line.length < 10) continue;
           
-          // Parse the line - first try normal split, then try more aggressive splitting
+          // Try specialized QuickBooks pattern first
+          const qbMatch = line.match(qbTransactionPattern);
+          if (qbMatch) {
+            const row: Record<string, string> = {
+              'Type': qbMatch[1] || '',
+              'Date': qbMatch[2] || '',
+              'Num': qbMatch[3] || '',
+              'Name': qbMatch[4]?.trim() || '',
+              'Memo': qbMatch[5]?.trim() || '',
+              'Clr': '',
+              'Split': qbMatch[6]?.trim() || '',
+              'Debit': qbMatch[7] || '',
+              'Credit': qbMatch[8] || '',
+              'Balance': qbMatch[9] || '',
+            };
+            dataRows.push(row);
+            continue;
+          }
+          
+          // Fallback: Try splitting by 2+ spaces
           let parts = line.split(/\s{2,}|\t/).map(p => p.trim()).filter(p => p);
           
           // If we got very few parts but line has content, try single space split for specific row types
-          // This handles QuickBooks transaction lines like "Invoice 11/01/2025 88801 NAME..."
           if (parts.length < 3 && line.length > 20) {
-            // Check if this looks like a transaction row (starts with type like Invoice, Payment, etc.)
             const transactionMatch = line.match(/^(Invoice|Payment|Credit|Debit|Journal|Deposit|Check|Bill|Expense)\s+(.+)/i);
             if (transactionMatch) {
-              const restOfLine = transactionMatch[2];
-              const restParts = restOfLine.split(/\s{2,}|\s+(?=\d{1,2}\/\d{1,2}\/\d{2,4})|\s+(?=\d{4,})|\s{1,}/).map(p => p.trim()).filter(p => p);
-              parts = [transactionMatch[1], ...restParts];
+              // Parse the rest of the line more intelligently
+              const rest = transactionMatch[2];
+              // Match: Date Num Name ...rest
+              const detailMatch = rest.match(/^(\d{1,2}\/\d{1,2}\/\d{2,4})\s+(\d+)\s+(.+)/);
+              if (detailMatch) {
+                const remainingParts = detailMatch[3].split(/\s{2,}/).map(p => p.trim()).filter(p => p);
+                parts = [transactionMatch[1], detailMatch[1], detailMatch[2], ...remainingParts];
+              } else {
+                const restParts = rest.split(/\s{2,}|\s+(?=\d{1,2}\/\d{1,2}\/\d{2,4})|\s+(?=\d{4,})/).map(p => p.trim()).filter(p => p);
+                parts = [transactionMatch[1], ...restParts];
+              }
             }
           }
           
