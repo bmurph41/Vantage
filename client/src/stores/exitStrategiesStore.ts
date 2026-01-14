@@ -1,5 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { 
+  sanitizePositiveNumber, 
+  sanitizePercentage, 
+  sanitizeHoldingPeriod,
+  validateExitStrategyCalculations,
+  type CalculationWarning 
+} from '@/lib/financial-validators';
 
 export interface MasterInputs {
   salePrice: number;
@@ -26,6 +33,7 @@ export interface ExitStrategiesMode {
 interface ExitStrategiesState {
   masterInputs: MasterInputs;
   mode: ExitStrategiesMode;
+  validationWarnings: CalculationWarning[];
   
   setMasterInput: <K extends keyof MasterInputs>(key: K, value: MasterInputs[K]) => void;
   bulkUpdateMaster: (updates: Partial<MasterInputs>) => void;
@@ -40,6 +48,7 @@ interface ExitStrategiesState {
     acquisitionDate?: string;
   }, projectId?: string) => void;
   reset: () => void;
+  getValidationWarnings: () => CalculationWarning[];
 }
 
 const defaultMasterInputs: MasterInputs = {
@@ -56,28 +65,71 @@ const defaultMasterInputs: MasterInputs = {
   brokerFeePercent: 5,
 };
 
+const sanitizeInputValue = <K extends keyof MasterInputs>(key: K, value: MasterInputs[K]): MasterInputs[K] => {
+  switch (key) {
+    case 'salePrice':
+    case 'costBasis':
+    case 'depreciationTaken':
+    case 'capitalImprovements':
+    case 'currentDebtBalance':
+    case 'closingCosts':
+      return sanitizePositiveNumber(value, defaultMasterInputs[key]) as MasterInputs[K];
+    case 'federalTaxRate':
+    case 'stateTaxRate':
+    case 'brokerFeePercent':
+      return sanitizePercentage(value, defaultMasterInputs[key] as number) as MasterInputs[K];
+    case 'holdingPeriod':
+      return sanitizeHoldingPeriod(value, defaultMasterInputs[key] as number) as MasterInputs[K];
+    case 'acquisitionDate':
+      return (typeof value === 'string' && value.length > 0 ? value : defaultMasterInputs[key]) as MasterInputs[K];
+    default:
+      return value;
+  }
+};
+
+const updateValidationWarnings = (inputs: MasterInputs): CalculationWarning[] => {
+  return validateExitStrategyCalculations(inputs);
+};
+
 export const useExitStrategiesStore = create<ExitStrategiesState>()(
   persist(
     (set, get) => ({
       masterInputs: { ...defaultMasterInputs },
       mode: { type: 'standalone' },
+      validationWarnings: [],
 
       setMasterInput: (key, value) => {
-        set((state) => ({
-          masterInputs: { ...state.masterInputs, [key]: value },
-          mode: state.mode.type === 'project-linked' 
-            ? { ...state.mode, isDirty: true }
-            : state.mode,
-        }));
+        const sanitizedValue = sanitizeInputValue(key, value);
+        set((state) => {
+          const newInputs = { ...state.masterInputs, [key]: sanitizedValue };
+          return {
+            masterInputs: newInputs,
+            validationWarnings: updateValidationWarnings(newInputs),
+            mode: state.mode.type === 'project-linked' 
+              ? { ...state.mode, isDirty: true }
+              : state.mode,
+          };
+        });
       },
 
       bulkUpdateMaster: (updates) => {
-        set((state) => ({
-          masterInputs: { ...state.masterInputs, ...updates },
-          mode: state.mode.type === 'project-linked'
-            ? { ...state.mode, isDirty: true }
-            : state.mode,
-        }));
+        const sanitizedUpdates: Partial<MasterInputs> = {};
+        for (const [key, value] of Object.entries(updates)) {
+          sanitizedUpdates[key as keyof MasterInputs] = sanitizeInputValue(
+            key as keyof MasterInputs, 
+            value
+          );
+        }
+        set((state) => {
+          const newInputs = { ...state.masterInputs, ...sanitizedUpdates };
+          return {
+            masterInputs: newInputs,
+            validationWarnings: updateValidationWarnings(newInputs),
+            mode: state.mode.type === 'project-linked'
+              ? { ...state.mode, isDirty: true }
+              : state.mode,
+          };
+        });
       },
 
       setMode: (mode) => {
@@ -98,61 +150,60 @@ export const useExitStrategiesStore = create<ExitStrategiesState>()(
         const updates: Partial<MasterInputs> = {};
         
         if (projectData.purchasePrice !== undefined) {
-          const purchasePrice = typeof projectData.purchasePrice === 'string' 
-            ? parseFloat(projectData.purchasePrice) 
-            : projectData.purchasePrice;
-          updates.salePrice = purchasePrice * 1.3;
+          const purchasePrice = sanitizePositiveNumber(projectData.purchasePrice, defaultMasterInputs.costBasis);
+          updates.salePrice = sanitizePositiveNumber(purchasePrice * 1.3, defaultMasterInputs.salePrice);
           updates.costBasis = purchasePrice;
         }
         
         if (projectData.basis !== undefined) {
-          updates.costBasis = typeof projectData.basis === 'string'
-            ? parseFloat(projectData.basis)
-            : projectData.basis;
+          updates.costBasis = sanitizePositiveNumber(projectData.basis, defaultMasterInputs.costBasis);
         }
         
         if (projectData.depreciation !== undefined) {
-          updates.depreciationTaken = typeof projectData.depreciation === 'string'
-            ? parseFloat(projectData.depreciation)
-            : projectData.depreciation;
+          updates.depreciationTaken = sanitizePositiveNumber(projectData.depreciation, 0);
         }
         
         if (projectData.capitalImprovements !== undefined) {
-          updates.capitalImprovements = typeof projectData.capitalImprovements === 'string'
-            ? parseFloat(projectData.capitalImprovements)
-            : projectData.capitalImprovements;
+          updates.capitalImprovements = sanitizePositiveNumber(projectData.capitalImprovements, 0);
         }
         
         if (projectData.holdingPeriod !== undefined) {
-          updates.holdingPeriod = projectData.holdingPeriod;
+          updates.holdingPeriod = sanitizeHoldingPeriod(projectData.holdingPeriod, defaultMasterInputs.holdingPeriod);
         }
         
         if (projectData.debtBalance !== undefined) {
-          updates.currentDebtBalance = typeof projectData.debtBalance === 'string'
-            ? parseFloat(projectData.debtBalance)
-            : projectData.debtBalance;
+          updates.currentDebtBalance = sanitizePositiveNumber(projectData.debtBalance, 0);
         }
         
         if (projectData.acquisitionDate) {
           updates.acquisitionDate = projectData.acquisitionDate;
         }
         
-        set((state) => ({
-          masterInputs: { ...state.masterInputs, ...updates },
-          mode: {
-            ...state.mode,
-            lastSyncedAt: new Date().toISOString(),
-            isDirty: false,
-            hydratedProjectId: projectId,
-          },
-        }));
+        set((state) => {
+          const newInputs = { ...state.masterInputs, ...updates };
+          return {
+            masterInputs: newInputs,
+            validationWarnings: updateValidationWarnings(newInputs),
+            mode: {
+              ...state.mode,
+              lastSyncedAt: new Date().toISOString(),
+              isDirty: false,
+              hydratedProjectId: projectId,
+            },
+          };
+        });
       },
 
       reset: () => {
         set({
           masterInputs: { ...defaultMasterInputs },
           mode: { type: 'standalone' },
+          validationWarnings: [],
         });
+      },
+
+      getValidationWarnings: () => {
+        return get().validationWarnings;
       },
     }),
     {

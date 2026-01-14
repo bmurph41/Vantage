@@ -7,6 +7,7 @@ import { db } from "../db";
 import { documentIntelligenceService } from "../services/document-intelligence-service";
 import { parseOcrPdf } from "../services/ocr-pdf-parser";
 import { rentRollDocumentParser } from "../services/rent-roll-document-parser";
+import { PlatformAuditService } from "../services/platform-audit-service";
 import * as XLSX from "xlsx";
 import fs from "fs/promises";
 import path from "path";
@@ -1442,9 +1443,15 @@ router.post("/leases/bulk-delete", async (req: Request, res: Response, next: Nex
     const deletedCount = await rraService.bulkDeleteLeases(orgId, ids);
     console.log(`[Rent Roll] Successfully deleted ${deletedCount} leases`);
     
+    await PlatformAuditService.logBulkOperation(req, 'delete', 'lease', deletedCount, {
+      requestedIds: ids,
+      deletedCount,
+    });
+    
     res.json({ deleted: deletedCount, message: `Successfully deleted ${deletedCount} leases` });
   } catch (error: any) {
     console.error("[Rent Roll] Bulk delete error:", error);
+    await PlatformAuditService.logError(req, 'bulk_delete', 'lease', error, { ids: req.body?.ids });
     next(error);
   }
 });
