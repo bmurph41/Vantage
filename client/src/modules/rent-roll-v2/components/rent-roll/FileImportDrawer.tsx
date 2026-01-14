@@ -3390,7 +3390,7 @@ export default function FileImportDrawer({ open, onClose, locationId }: FileImpo
                 </div>
               </div>
 
-              {importResult.details.failed.length > 0 && (
+              {importResult.details?.failed && importResult.details.failed.length > 0 && (
                 <div className="space-y-2">
                   <h4 className="text-sm font-medium text-red-600">Failed Imports:</h4>
                   <ScrollArea className="h-48 border rounded-lg p-4">
@@ -3406,7 +3406,7 @@ export default function FileImportDrawer({ open, onClose, locationId }: FileImpo
                 </div>
               )}
 
-              {importResult.details.duplicates.length > 0 && (
+              {importResult.details?.duplicates && importResult.details.duplicates.length > 0 && (
                 <div className="space-y-2">
                   <h4 className="text-sm font-medium text-yellow-600">Skipped Duplicates:</h4>
                   <ScrollArea className="h-32 border rounded-lg p-4">
@@ -3421,7 +3421,7 @@ export default function FileImportDrawer({ open, onClose, locationId }: FileImpo
                 </div>
               )}
 
-              {importResult.details.updated && importResult.details.updated.length > 0 && (
+              {importResult.details?.updated && importResult.details.updated.length > 0 && (
                 <div className="space-y-2">
                   <h4 className="text-sm font-medium text-blue-600">Updated Tenants:</h4>
                   <ScrollArea className="h-32 border rounded-lg p-4">
