@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ArrowLeft, HandCoins, ChevronRight, Download, DollarSign, Percent, Calculator, AlertTriangle, TrendingUp, Shield, FileText } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ModelingProject } from "@shared/schema";
+import { useExitStrategiesStore } from "@/stores/exitStrategiesStore";
 
 interface SellerFinancingProps {
   projectId: string;
@@ -34,16 +35,24 @@ interface AmortizationRow {
 
 export default function ExitSellerFinancing({ projectId }: SellerFinancingProps) {
   const [, setLocation] = useLocation();
+  const { masterInputs, setMode, hydrateFromProject } = useExitStrategiesStore();
   
   const { data: project } = useQuery<ModelingProject>({
     queryKey: ['/api/modeling/projects', projectId],
   });
 
+  useEffect(() => {
+    if (project) {
+      setMode({ type: 'project-linked', projectId });
+      hydrateFromProject({
+        purchasePrice: project.purchasePrice,
+      }, projectId);
+    }
+  }, [project, projectId, setMode, hydrateFromProject]);
+
   const basePath = `/modeling/projects/${projectId}/exit`;
 
-  const [inputs, setInputs] = useState({
-    salePrice: project?.purchasePrice ? Number(project.purchasePrice) * 1.3 : 10000000,
-    adjustedBasis: project?.purchasePrice ? Number(project.purchasePrice) * 0.75 : 6000000,
+  const [financingOnlyInputs, setFinancingOnlyInputs] = useState({
     downPayment: 20,
     interestRate: 6.5,
     termYears: 10,
@@ -52,12 +61,44 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
     useInstallmentMethod: true,
   });
 
-  const [taxRates, setTaxRates] = useState({
-    federalLongTermRate: 20,
+  const inputs = {
+    salePrice: masterInputs.salePrice || 10000000,
+    adjustedBasis: (masterInputs.costBasis - masterInputs.depreciationTaken) || 6000000,
+    ...financingOnlyInputs,
+  };
+
+  const setInputs = (updater: any) => {
+    if (typeof updater === 'function') {
+      const result = updater(inputs);
+      const { salePrice, adjustedBasis, ...rest } = result;
+      setFinancingOnlyInputs(rest);
+    } else {
+      const { salePrice, adjustedBasis, ...rest } = updater;
+      setFinancingOnlyInputs(rest);
+    }
+  };
+
+  const [taxRatesLocal, setTaxRatesLocal] = useState({
     niitRate: 3.8,
-    stateRate: 5,
     ordinaryIncomeRate: 37,
   });
+
+  const taxRates = {
+    federalLongTermRate: masterInputs.federalTaxRate || 20,
+    stateRate: masterInputs.stateTaxRate || 5,
+    ...taxRatesLocal,
+  };
+
+  const setTaxRates = (updater: any) => {
+    if (typeof updater === 'function') {
+      const result = updater(taxRates);
+      const { federalLongTermRate, stateRate, ...rest } = result;
+      setTaxRatesLocal(rest);
+    } else {
+      const { federalLongTermRate, stateRate, ...rest } = updater;
+      setTaxRatesLocal(rest);
+    }
+  };
 
   const [riskInputs, setRiskInputs] = useState({
     defaultProbability: 5,

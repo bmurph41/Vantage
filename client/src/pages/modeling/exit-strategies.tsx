@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   Calculator, 
   TrendingUp, 
@@ -17,9 +18,14 @@ import {
   HandCoins,
   Award,
   Target,
-  Info
+  Info,
+  Settings2,
+  ChevronDown,
+  ChevronUp,
+  RotateCcw
 } from "lucide-react";
 import { formatCurrency, formatPercent } from "@/lib/utils";
+import { useExitStrategiesStore, type MasterInputs } from "@/stores/exitStrategiesStore";
 
 const parseCurrency = (value: string): string => {
   const num = value.replace(/[^0-9.-]/g, '');
@@ -109,6 +115,137 @@ function PercentInput({ value, onChange, "data-testid": testId }: PercentInputPr
       step="0.01"
       data-testid={testId}
     />
+  );
+}
+
+function SharedInputsPanel() {
+  const [isOpen, setIsOpen] = useState(true);
+  const { masterInputs, setMasterInput, reset } = useExitStrategiesStore();
+
+  const handleInputChange = <K extends keyof MasterInputs>(key: K, value: string) => {
+    const numValue = parseFloat(value) || 0;
+    setMasterInput(key, numValue as MasterInputs[K]);
+  };
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <Card className="border-primary/20">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Settings2 className="h-5 w-5 text-primary" />
+              <CardTitle className="text-lg">Master Inputs</CardTitle>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => reset()}
+                className="h-8 text-xs"
+              >
+                <RotateCcw className="h-3 w-3 mr-1" />
+                Reset
+              </Button>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </CollapsibleTrigger>
+            </div>
+          </div>
+          <CardDescription className="text-xs">
+            These values are shared across all exit strategy calculators. Changes here update all tabs.
+          </CardDescription>
+        </CardHeader>
+        <CollapsibleContent>
+          <CardContent className="pt-0">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              <div>
+                <Label className="text-xs">Sale Price</Label>
+                <CurrencyInput
+                  value={masterInputs.salePrice.toString()}
+                  onChange={(v) => handleInputChange('salePrice', v)}
+                  data-testid="master-sale-price"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Cost Basis</Label>
+                <CurrencyInput
+                  value={masterInputs.costBasis.toString()}
+                  onChange={(v) => handleInputChange('costBasis', v)}
+                  data-testid="master-cost-basis"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Depreciation Taken</Label>
+                <CurrencyInput
+                  value={masterInputs.depreciationTaken.toString()}
+                  onChange={(v) => handleInputChange('depreciationTaken', v)}
+                  data-testid="master-depreciation"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Holding Period (Yrs)</Label>
+                <Input
+                  type="number"
+                  value={masterInputs.holdingPeriod}
+                  onChange={(e) => handleInputChange('holdingPeriod', e.target.value)}
+                  data-testid="master-holding-period"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Federal Tax Rate</Label>
+                <PercentInput
+                  value={masterInputs.federalTaxRate.toString()}
+                  onChange={(v) => handleInputChange('federalTaxRate', v)}
+                  data-testid="master-fed-rate"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">State Tax Rate</Label>
+                <PercentInput
+                  value={masterInputs.stateTaxRate.toString()}
+                  onChange={(v) => handleInputChange('stateTaxRate', v)}
+                  data-testid="master-state-rate"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Current Debt</Label>
+                <CurrencyInput
+                  value={masterInputs.currentDebtBalance.toString()}
+                  onChange={(v) => handleInputChange('currentDebtBalance', v)}
+                  data-testid="master-debt"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Closing Costs</Label>
+                <CurrencyInput
+                  value={masterInputs.closingCosts.toString()}
+                  onChange={(v) => handleInputChange('closingCosts', v)}
+                  data-testid="master-closing-costs"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Broker Fee %</Label>
+                <PercentInput
+                  value={masterInputs.brokerFeePercent.toString()}
+                  onChange={(v) => handleInputChange('brokerFeePercent', v)}
+                  data-testid="master-broker-fee"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Capital Improvements</Label>
+                <CurrencyInput
+                  value={masterInputs.capitalImprovements.toString()}
+                  onChange={(v) => handleInputChange('capitalImprovements', v)}
+                  data-testid="master-cap-improvements"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
   );
 }
 
@@ -238,13 +375,14 @@ export default function ExitStrategiesPage() {
               <div>
                 <p className="text-sm text-blue-800 font-medium">Standalone Mode</p>
                 <p className="text-sm text-blue-700">
-                  These tools use manual inputs for quick calculations. For integrated analysis with your project data, 
-                  open a modeling project and use the Exit Strategy tab.
+                  Master inputs below are shared across all tabs. Change a value once and it updates everywhere.
                 </p>
               </div>
             </div>
           </CardContent>
         </Card>
+
+        <SharedInputsPanel />
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="w-full flex flex-wrap h-auto gap-1 bg-muted/50 p-1">
@@ -307,19 +445,14 @@ export default function ExitStrategiesPage() {
 }
 
 function TaxCalculatorPanel() {
-  const [salePrice, setSalePrice] = useState<string>("5000000");
-  const [costBasis, setCostBasis] = useState<string>("3500000");
-  const [depreciationRecapture, setDepreciationRecapture] = useState<string>("500000");
-  const [holdingPeriod, setHoldingPeriod] = useState<string>("5");
-  const [taxRate, setTaxRate] = useState<string>("20");
-  const [stateRate, setStateRate] = useState<string>("5");
+  const { masterInputs } = useExitStrategiesStore();
 
   const calculateTax = () => {
-    const sale = parseFloat(salePrice) || 0;
-    const basis = parseFloat(costBasis) || 0;
-    const depreciation = parseFloat(depreciationRecapture) || 0;
-    const fedRate = parseFloat(taxRate) / 100 || 0.20;
-    const stRate = parseFloat(stateRate) / 100 || 0.05;
+    const sale = masterInputs.salePrice;
+    const basis = masterInputs.costBasis;
+    const depreciation = masterInputs.depreciationTaken;
+    const fedRate = masterInputs.federalTaxRate / 100;
+    const stRate = masterInputs.stateTaxRate / 100;
     
     const capitalGain = sale - basis;
     const federalTax = capitalGain * fedRate;
@@ -343,61 +476,35 @@ function TaxCalculatorPanel() {
             Tax Calculator
           </CardTitle>
           <CardDescription>
-            Calculate capital gains, depreciation recapture, and state taxes
+            Using master inputs: Sale Price, Cost Basis, Depreciation, and Tax Rates
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Sale Price</Label>
-              <CurrencyInput 
-                value={salePrice} 
-                onChange={setSalePrice}
-                data-testid="input-sale-price"
-              />
+          <div className="space-y-3 bg-muted/30 rounded-lg p-4">
+            <div className="flex justify-between py-1">
+              <span className="text-muted-foreground text-sm">Sale Price</span>
+              <span className="font-medium">{formatCurrency(masterInputs.salePrice)}</span>
             </div>
-            <div>
-              <Label>Cost Basis</Label>
-              <CurrencyInput 
-                value={costBasis} 
-                onChange={setCostBasis}
-                data-testid="input-cost-basis"
-              />
+            <div className="flex justify-between py-1">
+              <span className="text-muted-foreground text-sm">Cost Basis</span>
+              <span className="font-medium">{formatCurrency(masterInputs.costBasis)}</span>
             </div>
-            <div>
-              <Label>Depreciation Recapture</Label>
-              <CurrencyInput 
-                value={depreciationRecapture} 
-                onChange={setDepreciationRecapture}
-                data-testid="input-depreciation"
-              />
+            <div className="flex justify-between py-1">
+              <span className="text-muted-foreground text-sm">Depreciation Taken</span>
+              <span className="font-medium">{formatCurrency(masterInputs.depreciationTaken)}</span>
             </div>
-            <div>
-              <Label>Holding Period (Years)</Label>
-              <Input 
-                type="number" 
-                value={holdingPeriod} 
-                onChange={(e) => setHoldingPeriod(e.target.value)}
-                data-testid="input-holding-period"
-              />
+            <div className="flex justify-between py-1">
+              <span className="text-muted-foreground text-sm">Holding Period</span>
+              <span className="font-medium">{masterInputs.holdingPeriod} years</span>
             </div>
-            <div>
-              <Label>Federal Cap Gains Rate</Label>
-              <PercentInput 
-                value={taxRate} 
-                onChange={setTaxRate}
-                data-testid="input-fed-rate"
-              />
-            </div>
-            <div>
-              <Label>State Tax Rate</Label>
-              <PercentInput 
-                value={stateRate} 
-                onChange={setStateRate}
-                data-testid="input-state-rate"
-              />
+            <div className="flex justify-between py-1">
+              <span className="text-muted-foreground text-sm">Federal Rate / State Rate</span>
+              <span className="font-medium">{masterInputs.federalTaxRate}% / {masterInputs.stateTaxRate}%</span>
             </div>
           </div>
+          <p className="text-xs text-muted-foreground text-center">
+            Edit these values in the Master Inputs panel above
+          </p>
         </CardContent>
       </Card>
 
@@ -443,17 +550,14 @@ function TaxCalculatorPanel() {
 }
 
 function NetProceedsPanel() {
-  const [salePrice, setSalePrice] = useState<string>("5000000");
-  const [loanBalance, setLoanBalance] = useState<string>("2500000");
-  const [closingCosts, setClosingCosts] = useState<string>("150000");
-  const [brokerFee, setBrokerFee] = useState<string>("5");
+  const { masterInputs } = useExitStrategiesStore();
   const [taxes, setTaxes] = useState<string>("300000");
 
   const calculate = () => {
-    const sale = parseFloat(salePrice) || 0;
-    const loan = parseFloat(loanBalance) || 0;
-    const closing = parseFloat(closingCosts) || 0;
-    const brokerPct = parseFloat(brokerFee) / 100 || 0;
+    const sale = masterInputs.salePrice;
+    const loan = masterInputs.currentDebtBalance;
+    const closing = masterInputs.closingCosts;
+    const brokerPct = masterInputs.brokerFeePercent / 100;
     const tax = parseFloat(taxes) || 0;
     
     const brokerCost = sale * brokerPct;
@@ -474,31 +578,31 @@ function NetProceedsPanel() {
             Net Proceeds Calculator
           </CardTitle>
           <CardDescription>
-            Calculate cash proceeds after all deductions
+            Using master inputs plus estimated taxes
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Sale Price</Label>
-              <CurrencyInput value={salePrice} onChange={setSalePrice} />
+          <div className="space-y-3 bg-muted/30 rounded-lg p-4">
+            <div className="flex justify-between py-1">
+              <span className="text-muted-foreground text-sm">Sale Price</span>
+              <span className="font-medium">{formatCurrency(masterInputs.salePrice)}</span>
             </div>
-            <div>
-              <Label>Loan Balance</Label>
-              <CurrencyInput value={loanBalance} onChange={setLoanBalance} />
+            <div className="flex justify-between py-1">
+              <span className="text-muted-foreground text-sm">Loan Balance</span>
+              <span className="font-medium">{formatCurrency(masterInputs.currentDebtBalance)}</span>
             </div>
-            <div>
-              <Label>Closing Costs</Label>
-              <CurrencyInput value={closingCosts} onChange={setClosingCosts} />
+            <div className="flex justify-between py-1">
+              <span className="text-muted-foreground text-sm">Closing Costs</span>
+              <span className="font-medium">{formatCurrency(masterInputs.closingCosts)}</span>
             </div>
-            <div>
-              <Label>Broker Fee</Label>
-              <PercentInput value={brokerFee} onChange={setBrokerFee} />
+            <div className="flex justify-between py-1">
+              <span className="text-muted-foreground text-sm">Broker Fee</span>
+              <span className="font-medium">{masterInputs.brokerFeePercent}%</span>
             </div>
-            <div className="col-span-2">
-              <Label>Estimated Taxes</Label>
-              <CurrencyInput value={taxes} onChange={setTaxes} />
-            </div>
+          </div>
+          <div>
+            <Label>Estimated Taxes (this tab only)</Label>
+            <CurrencyInput value={taxes} onChange={setTaxes} />
           </div>
         </CardContent>
       </Card>
@@ -511,11 +615,11 @@ function NetProceedsPanel() {
           <div className="space-y-3">
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Gross Sale Price</span>
-              <span className="font-semibold">{formatCurrency(salePrice)}</span>
+              <span className="font-semibold">{formatCurrency(masterInputs.salePrice)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Loan Payoff</span>
-              <span className="text-red-600">-{formatCurrency(loanBalance)}</span>
+              <span className="text-red-600">-{formatCurrency(masterInputs.currentDebtBalance)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Broker Commission</span>
@@ -523,7 +627,7 @@ function NetProceedsPanel() {
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Closing Costs</span>
-              <span className="text-red-600">-{formatCurrency(closingCosts)}</span>
+              <span className="text-red-600">-{formatCurrency(masterInputs.closingCosts)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Taxes</span>
@@ -541,14 +645,18 @@ function NetProceedsPanel() {
 }
 
 function Exchange1031Panel() {
-  const [relinquishedValue, setRelinquishedValue] = useState<string>("5000000");
+  const { masterInputs } = useExitStrategiesStore();
   const [replacementValue, setReplacementValue] = useState<string>("6000000");
   const [bootReceived, setBootReceived] = useState<string>("0");
-  const [identificationDays, setIdentificationDays] = useState<string>("45");
-  const [closingDays, setClosingDays] = useState<string>("180");
+  const [identificationDays] = useState<string>("45");
+  const [closingDays] = useState<string>("180");
 
-  const deferredGain = Math.min(parseFloat(relinquishedValue) || 0, parseFloat(replacementValue) || 0);
+  const relinquishedValue = masterInputs.salePrice;
+  const adjustedBasis = masterInputs.costBasis + masterInputs.capitalImprovements - masterInputs.depreciationTaken;
+  const gain = relinquishedValue - adjustedBasis;
+  const deferredGain = Math.min(gain, parseFloat(replacementValue) || 0);
   const taxableGain = parseFloat(bootReceived) || 0;
+  const taxSaved = deferredGain * ((masterInputs.federalTaxRate + masterInputs.stateTaxRate) / 100);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -559,15 +667,25 @@ function Exchange1031Panel() {
             1031 Exchange Planner
           </CardTitle>
           <CardDescription>
-            Plan your like-kind exchange and track deadlines
+            Relinquished value from master Sale Price
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Relinquished Property Value</Label>
-              <CurrencyInput value={relinquishedValue} onChange={setRelinquishedValue} />
+          <div className="space-y-3 bg-muted/30 rounded-lg p-4">
+            <div className="flex justify-between py-1">
+              <span className="text-muted-foreground text-sm">Relinquished Value (Sale Price)</span>
+              <span className="font-medium">{formatCurrency(relinquishedValue)}</span>
             </div>
+            <div className="flex justify-between py-1">
+              <span className="text-muted-foreground text-sm">Adjusted Basis</span>
+              <span className="font-medium">{formatCurrency(adjustedBasis)}</span>
+            </div>
+            <div className="flex justify-between py-1">
+              <span className="text-muted-foreground text-sm">Realized Gain</span>
+              <span className="font-medium">{formatCurrency(gain)}</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Replacement Property Value</Label>
               <CurrencyInput value={replacementValue} onChange={setReplacementValue} />
@@ -575,10 +693,6 @@ function Exchange1031Panel() {
             <div>
               <Label>Boot Received</Label>
               <CurrencyInput value={bootReceived} onChange={setBootReceived} />
-            </div>
-            <div>
-              <Label>Identification Period (Days)</Label>
-              <Input type="number" value={identificationDays} onChange={(e) => setIdentificationDays(e.target.value)} />
             </div>
           </div>
         </CardContent>
@@ -599,6 +713,10 @@ function Exchange1031Panel() {
               <span className="text-red-600">{formatCurrency(taxableGain)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Tax Savings</span>
+              <span className="font-semibold text-green-600">{formatCurrency(taxSaved)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">ID Deadline</span>
               <span>{identificationDays} days</span>
             </div>
@@ -614,12 +732,14 @@ function Exchange1031Panel() {
 }
 
 function DSTAnalysisPanel() {
-  const [investmentAmount, setInvestmentAmount] = useState<string>("1000000");
+  const { masterInputs } = useExitStrategiesStore();
   const [distributionRate, setDistributionRate] = useState<string>("5.5");
-  const [holdPeriod, setHoldPeriod] = useState<string>("7");
 
-  const annualDistribution = (parseFloat(investmentAmount) || 0) * (parseFloat(distributionRate) / 100 || 0);
-  const totalDistributions = annualDistribution * (parseFloat(holdPeriod) || 0);
+  const investmentAmount = masterInputs.salePrice - masterInputs.currentDebtBalance - masterInputs.closingCosts;
+  const annualDistribution = investmentAmount * (parseFloat(distributionRate) / 100 || 0);
+  const totalDistributions = annualDistribution * masterInputs.holdingPeriod;
+  const gain = masterInputs.salePrice - masterInputs.costBasis;
+  const deferredTax = gain * ((masterInputs.federalTaxRate + masterInputs.stateTaxRate) / 100);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -630,23 +750,23 @@ function DSTAnalysisPanel() {
             DST Analysis
           </CardTitle>
           <CardDescription>
-            Delaware Statutory Trust investment modeling
+            Investment amount from net equity (Sale - Debt - Costs)
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Investment Amount</Label>
-              <CurrencyInput value={investmentAmount} onChange={setInvestmentAmount} />
+          <div className="space-y-3 bg-muted/30 rounded-lg p-4">
+            <div className="flex justify-between py-1">
+              <span className="text-muted-foreground text-sm">Net Equity Available</span>
+              <span className="font-medium">{formatCurrency(investmentAmount)}</span>
             </div>
-            <div>
-              <Label>Distribution Rate</Label>
-              <PercentInput value={distributionRate} onChange={setDistributionRate} />
+            <div className="flex justify-between py-1">
+              <span className="text-muted-foreground text-sm">Hold Period</span>
+              <span className="font-medium">{masterInputs.holdingPeriod} years</span>
             </div>
-            <div>
-              <Label>Hold Period (Years)</Label>
-              <Input type="number" value={holdPeriod} onChange={(e) => setHoldPeriod(e.target.value)} />
-            </div>
+          </div>
+          <div>
+            <Label>Distribution Rate</Label>
+            <PercentInput value={distributionRate} onChange={setDistributionRate} />
           </div>
         </CardContent>
       </Card>
@@ -658,12 +778,20 @@ function DSTAnalysisPanel() {
         <CardContent className="space-y-4">
           <div className="space-y-3">
             <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Investment Amount</span>
+              <span className="font-semibold">{formatCurrency(investmentAmount)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Annual Distribution</span>
               <span className="font-semibold text-green-600">{formatCurrency(annualDistribution)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Total Distributions</span>
+              <span className="text-muted-foreground">Total Distributions ({masterInputs.holdingPeriod} yrs)</span>
               <span className="font-semibold">{formatCurrency(totalDistributions)}</span>
+            </div>
+            <div className="flex justify-between py-3 bg-green-50 rounded-lg px-3">
+              <span className="font-semibold">Tax Deferred via 1031</span>
+              <span className="font-bold text-green-600">{formatCurrency(deferredTax)}</span>
             </div>
           </div>
         </CardContent>
@@ -673,16 +801,24 @@ function DSTAnalysisPanel() {
 }
 
 function SellerFinancingPanel() {
-  const [salePrice, setSalePrice] = useState<string>("5000000");
-  const [downPayment, setDownPayment] = useState<string>("1000000");
+  const { masterInputs } = useExitStrategiesStore();
+  const [downPaymentPercent, setDownPaymentPercent] = useState<string>("20");
   const [interestRate, setInterestRate] = useState<string>("6");
   const [term, setTerm] = useState<string>("10");
 
-  const loanAmount = (parseFloat(salePrice) || 0) - (parseFloat(downPayment) || 0);
+  const salePrice = masterInputs.salePrice;
+  const downPayment = salePrice * (parseFloat(downPaymentPercent) / 100 || 0);
+  const loanAmount = salePrice - downPayment;
   const monthlyRate = (parseFloat(interestRate) / 100 || 0) / 12;
   const months = (parseFloat(term) || 0) * 12;
-  const monthlyPayment = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1) || 0;
+  const monthlyPayment = monthlyRate > 0 ? loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1) : 0;
   const totalInterest = (monthlyPayment * months) - loanAmount;
+  
+  const gain = salePrice - masterInputs.costBasis;
+  const grossProfitRatio = salePrice > 0 ? gain / salePrice : 0;
+  const taxableDownPayment = downPayment * grossProfitRatio;
+  const annualPrincipal = loanAmount / (parseFloat(term) || 1);
+  const annualTaxableGain = annualPrincipal * grossProfitRatio;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -693,18 +829,28 @@ function SellerFinancingPanel() {
             Seller Financing
           </CardTitle>
           <CardDescription>
-            Installment sale with amortization
+            Sale price from master inputs with installment sale treatment
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="space-y-3 bg-muted/30 rounded-lg p-4">
+            <div className="flex justify-between py-1">
+              <span className="text-muted-foreground text-sm">Sale Price</span>
+              <span className="font-medium">{formatCurrency(salePrice)}</span>
+            </div>
+            <div className="flex justify-between py-1">
+              <span className="text-muted-foreground text-sm">Cost Basis</span>
+              <span className="font-medium">{formatCurrency(masterInputs.costBasis)}</span>
+            </div>
+            <div className="flex justify-between py-1">
+              <span className="text-muted-foreground text-sm">Gain</span>
+              <span className="font-medium">{formatCurrency(gain)}</span>
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Sale Price</Label>
-              <CurrencyInput value={salePrice} onChange={setSalePrice} />
-            </div>
-            <div>
-              <Label>Down Payment</Label>
-              <CurrencyInput value={downPayment} onChange={setDownPayment} />
+              <Label>Down Payment %</Label>
+              <PercentInput value={downPaymentPercent} onChange={setDownPaymentPercent} />
             </div>
             <div>
               <Label>Interest Rate</Label>
@@ -725,7 +871,11 @@ function SellerFinancingPanel() {
         <CardContent className="space-y-4">
           <div className="space-y-3">
             <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Loan Amount</span>
+              <span className="text-muted-foreground">Down Payment</span>
+              <span className="font-semibold">{formatCurrency(downPayment)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Note Amount</span>
               <span className="font-semibold">{formatCurrency(loanAmount)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
@@ -733,8 +883,16 @@ function SellerFinancingPanel() {
               <span className="font-semibold text-green-600">{formatCurrency(monthlyPayment)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Total Interest</span>
+              <span className="text-muted-foreground">Total Interest Income</span>
               <span>{formatCurrency(totalInterest)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Gross Profit Ratio</span>
+              <span>{(grossProfitRatio * 100).toFixed(1)}%</span>
+            </div>
+            <div className="flex justify-between py-3 bg-amber-50 rounded-lg px-3">
+              <span className="font-semibold">Year 1 Taxable Gain</span>
+              <span className="font-bold text-amber-600">{formatCurrency(taxableDownPayment + annualTaxableGain)}</span>
             </div>
           </div>
         </CardContent>

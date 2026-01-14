@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,7 @@ import { Slider } from "@/components/ui/slider";
 import { ArrowLeft, Landmark, ChevronRight, Download, Plus, Trash2, Building, DollarSign, AlertTriangle, TrendingUp, PieChart, Percent, Calculator, Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ModelingProject } from "@shared/schema";
+import { useExitStrategiesStore } from "@/stores/exitStrategiesStore";
 
 interface DSTAnalysisProps {
   projectId: string;
@@ -51,17 +52,27 @@ interface FractionalInterest {
 
 export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
   const [, setLocation] = useLocation();
+  const { masterInputs, setMode, hydrateFromProject } = useExitStrategiesStore();
   
   const { data: project } = useQuery<ModelingProject>({
     queryKey: ['/api/modeling/projects', projectId],
   });
 
+  useEffect(() => {
+    if (project) {
+      setMode({ type: 'project-linked', projectId });
+      hydrateFromProject({
+        purchasePrice: project.purchasePrice,
+      }, projectId);
+    }
+  }, [project, projectId, setMode, hydrateFromProject]);
+
   const basePath = `/modeling/projects/${projectId}/exit`;
 
-  const [investmentAmount, setInvestmentAmount] = useState(2500000);
-  const [exchangeGain, setExchangeGain] = useState(1500000);
-  const [federalTaxRate, setFederalTaxRate] = useState(23.8);
-  const [stateTaxRate, setStateTaxRate] = useState(5);
+  const investmentAmount = masterInputs.salePrice - masterInputs.currentDebtBalance || 2500000;
+  const exchangeGain = masterInputs.salePrice - masterInputs.costBasis || 1500000;
+  const federalTaxRate = masterInputs.federalTaxRate + 3.8 || 23.8;
+  const stateTaxRate = masterInputs.stateTaxRate || 5;
   const [include1031, setInclude1031] = useState(true);
   const [usePortfolioDiversification, setUsePortfolioDiversification] = useState(true);
 

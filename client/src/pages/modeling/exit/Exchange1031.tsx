@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, RefreshCcw, ChevronRight, Download, Calendar, AlertCircle, CheckCircle, Plus, Trash2, Building, DollarSign, FileText, Clock } from "lucide-react";
 import type { ModelingProject } from "@shared/schema";
+import { useExitStrategiesStore } from "@/stores/exitStrategiesStore";
 
 interface Exchange1031Props {
   projectId: string;
@@ -39,21 +40,26 @@ interface ExchangeMilestone {
 
 export default function Exit1031Exchange({ projectId }: Exchange1031Props) {
   const [, setLocation] = useLocation();
+  const { masterInputs, setMode, hydrateFromProject } = useExitStrategiesStore();
   
   const { data: project } = useQuery<ModelingProject>({
     queryKey: ['/api/modeling/projects', projectId],
   });
 
+  useEffect(() => {
+    if (project) {
+      setMode({ type: 'project-linked', projectId });
+      hydrateFromProject({
+        purchasePrice: project.purchasePrice,
+      }, projectId);
+    }
+  }, [project, projectId, setMode, hydrateFromProject]);
+
   const basePath = `/modeling/projects/${projectId}/exit`;
 
-  const [inputs, setInputs] = useState({
-    relinquishedValue: project?.purchasePrice ? Number(project.purchasePrice) * 1.3 : 10000000,
-    relinquishedBasis: project?.purchasePrice ? Number(project.purchasePrice) : 8000000,
-    accumulatedDepreciation: 500000,
-    existingDebt: 5000000,
+  const [exchangeOnlyInputs, setExchangeOnlyInputs] = useState({
     replacementValue: 12000000,
     replacementDebt: 7000000,
-    closingCosts: 300000,
     daysIdentified: 35,
     daysClosed: 120,
     qiFees: 2500,
@@ -61,6 +67,26 @@ export default function Exit1031Exchange({ projectId }: Exchange1031Props) {
     titleAndEscrow: 12000,
     inspectionFees: 5000,
   });
+
+  const inputs = {
+    relinquishedValue: masterInputs.salePrice,
+    relinquishedBasis: masterInputs.costBasis,
+    accumulatedDepreciation: masterInputs.depreciationTaken,
+    existingDebt: masterInputs.currentDebtBalance,
+    closingCosts: masterInputs.closingCosts,
+    ...exchangeOnlyInputs,
+  };
+
+  const setInputs = (updater: any) => {
+    if (typeof updater === 'function') {
+      const result = updater(inputs);
+      const { relinquishedValue, relinquishedBasis, accumulatedDepreciation, existingDebt, closingCosts, ...rest } = result;
+      setExchangeOnlyInputs(rest);
+    } else {
+      const { relinquishedValue, relinquishedBasis, accumulatedDepreciation, existingDebt, closingCosts, ...rest } = updater;
+      setExchangeOnlyInputs(rest);
+    }
+  };
 
   const [replacementProperties, setReplacementProperties] = useState<ReplacementProperty[]>([
     { id: '1', name: 'Marina Bay Harbor', address: '123 Harbor Way, FL', value: 6000000, newDebt: 3500000, propertyType: 'marina', status: 'identified' },
