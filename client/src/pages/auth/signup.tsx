@@ -51,7 +51,7 @@ const signupSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   confirmPassword: z.string(),
-  orgName: z.string().min(2, "Organization name must be at least 2 characters"),
+  orgName: z.string().min(2, "Company name must be at least 2 characters"),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",
   path: ["confirmPassword"],
@@ -395,11 +395,11 @@ export default function SignupPage() {
                 name="orgName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Organization Name</FormLabel>
+                    <FormLabel>Company</FormLabel>
                     <FormControl>
                       <Input
                         {...field}
-                        placeholder="Acme Marina Group"
+                        placeholder="Company Name"
                         autoComplete="organization"
                         data-testid="input-org-name"
                       />
