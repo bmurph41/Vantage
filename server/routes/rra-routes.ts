@@ -8,6 +8,7 @@ import { documentIntelligenceService } from "../services/document-intelligence-s
 import { parseOcrPdf } from "../services/ocr-pdf-parser";
 import { rentRollDocumentParser } from "../services/rent-roll-document-parser";
 import { PlatformAuditService } from "../services/platform-audit-service";
+import { getValidatedOrgId, getValidatedUserId, AuthenticatedRequest } from "../middleware/auth-resolver";
 import * as XLSX from "xlsx";
 import fs from "fs/promises";
 import path from "path";
@@ -36,11 +37,19 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 router.use(requireRentRoll());
 
 function getOrgId(req: Request): string {
-  return (req as any).user?.orgId || (req as any).session?.user?.orgId || (req as any).session?.orgId || 'default-org';
+  const authReq = req as AuthenticatedRequest;
+  if (authReq.validatedOrgId) {
+    return authReq.validatedOrgId;
+  }
+  return (req as any).tenantId || (req as any).user?.orgId || (req as any).session?.orgId || 'org-1';
 }
 
 function getUserId(req: Request): string {
-  return (req as any).session?.userId || (req as any).user?.id || 'system';
+  const authReq = req as AuthenticatedRequest;
+  if (authReq.validatedUserId) {
+    return authReq.validatedUserId;
+  }
+  return (req as any).session?.userId || (req as any).user?.id || 'user-1';
 }
 
 router.get("/dashboard", async (req: Request, res: Response, next: NextFunction) => {

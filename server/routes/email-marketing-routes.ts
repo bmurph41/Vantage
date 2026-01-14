@@ -7,6 +7,7 @@ import {
 import { eq, and, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import crypto from 'crypto';
+import { getValidatedOrgId, getValidatedUserId, AuthenticatedRequest } from '../middleware/auth-resolver';
 
 const router = Router();
 
@@ -88,15 +89,11 @@ function validateAndConsumeState(nonce: string): { userId: string; orgId: string
   return { userId: stateData.userId, orgId: stateData.orgId };
 }
 
-interface AuthenticatedRequest extends Request {
-  user?: { id: string };
-  tenantId?: string;
-}
-
-router.get('/status', async (req: AuthenticatedRequest, res: Response) => {
+router.get('/status', async (req: Request, res: Response) => {
   try {
-    const orgId = req.tenantId || 'org-1';
-    const userId = req.user?.id || 'user-1';
+    const authReq = req as AuthenticatedRequest;
+    const orgId = authReq.validatedOrgId || (authReq as any).tenantId || 'org-1';
+    const userId = authReq.validatedUserId || (authReq as any).user?.id || 'user-1';
 
     const connections = await db.select()
       .from(emailMarketingConnections)

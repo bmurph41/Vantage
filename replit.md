@@ -86,6 +86,17 @@ The platform uses React 18 with TypeScript and Wouter for routing. The UI is bui
 
 ## Security Requirements
 
+### Authentication & Authorization
+- **Auth Resolver Middleware** (`server/middleware/auth-resolver.ts`): Global middleware chain for validating tenant/user identity
+- **Strict Org Guards**: Production mode enforces authenticated org/user; development allows mock auth via `DEV_ALLOW_ANON_ORG` flag
+- **Multi-tenancy Isolation**: All data queries scoped by orgId to prevent cross-tenant access
+- **Platform Audit Service** (`server/services/platform-audit-service.ts`): Comprehensive audit logging for rent roll, modeling, CRM, DD operations, security events, and bulk operations
+
+### Input Validation
+- **Financial Validators** (`client/src/lib/financial-validators.ts`): Sanitization for numbers, percentages, holding periods with NaN/negative prevention
+- **Import Validators** (`server/lib/import-validators.ts`): Zod schemas for rent roll and sales comp bulk imports with row-level error reporting
+- **Exit Strategies Store**: Automatic input sanitization and real-time validation warnings tracking
+
 ### Email Marketing Module
 - **Token Encryption**: OAuth tokens stored using AES-256-GCM encryption
 - **Required Secrets**: `EMAIL_MARKETING_ENCRYPTION_KEY` or `JWT_SECRET` must be set (min 16 chars) - no fallback allowed
