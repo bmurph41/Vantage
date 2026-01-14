@@ -1,5 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
+import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 import { storage } from "./storage";
 import { db } from "./db";
 import { eq, and, or, desc, asc, gte, lte, sql, gt, inArray, notInArray } from "drizzle-orm";
@@ -238,6 +239,9 @@ const syncToCalendarSchema = z.object({
 
 export async function registerRoutes(app: Express): Promise<Server> {
 
+  // Setup Replit Auth (social login with Google, GitHub, X, Apple)
+  await setupAuth(app);
+  registerAuthRoutes(app);
   // Health check endpoints (no authentication required)
   app.get("/health", async (_req, res) => {
     try {
