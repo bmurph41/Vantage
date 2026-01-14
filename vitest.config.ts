@@ -8,6 +8,9 @@ export default defineConfig({
     setupFiles: ['./vitest.setup.ts'],
     include: ['**/*.{test,spec}.{js,ts,jsx,tsx}'],
     exclude: ['node_modules', 'dist', 'ship-store'],
+    environmentMatchGlobs: [
+      ['server/**', 'node'],
+    ],
   },
   resolve: {
     alias: {
