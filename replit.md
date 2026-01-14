@@ -47,6 +47,14 @@ The platform uses React 18 with TypeScript and Wouter for routing. The UI is bui
 - **File Uploads**: Multer-based, 10MB limit, local storage.
 - **Webhook Idempotency**: In-memory storage.
 
+### Schema Column Naming Conventions
+Different tables use different column names for organization filtering:
+- **CRM tables** (`crm_contacts`, `crm_companies`, `crm_properties`): Use `orgId` column
+- **CRM Deals** (`crm_deals`): Uses `ownerId` for filtering (no direct org column)
+- **DD Projects** (`projects`): Uses `orgId` column
+- **Modeling Projects** (`modeling_projects`): Uses `orgId` column
+- **Articles** (`articles`): Uses `organizationId` column (table may not exist in all environments)
+
 ## External Dependencies
 
 ### Core Runtime
