@@ -175,6 +175,103 @@ router.post("/leases/import/parse-document", upload.single('file'), async (req: 
   }
 });
 
+// Validate and parse mapped data from the column mapping step
+// This endpoint receives already-mapped data and validates it for preview
+router.post("/leases/import/parse", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { rows, columnMapping } = req.body;
+    
+    if (!rows || !Array.isArray(rows)) {
+      return res.status(400).json({
+        error: "No rows provided",
+        parsedRows: [],
+        columnMapping: {},
+      });
+    }
+    
+    // Validate and transform each row
+    const parsedRows = rows.map((row: Record<string, any>, index: number) => {
+      const errors: string[] = [];
+      const warnings: string[] = [];
+      
+      // Basic validation - check for tenant name
+      const tenantName = row.name || row.tenantName || '';
+      if (!tenantName || tenantName.trim() === '') {
+        warnings.push('Tenant name is missing');
+      }
+      
+      // Validate date fields
+      const dateFields = ['leaseCommencement', 'leaseExpiration', 'coiExpiration'];
+      for (const field of dateFields) {
+        const value = row[field];
+        if (value && typeof value === 'string') {
+          const date = new Date(value);
+          if (isNaN(date.getTime())) {
+            warnings.push(`Invalid date format for ${field}: ${value}`);
+          }
+        }
+      }
+      
+      // Validate numeric/currency fields
+      const currencyFields = ['leaseAmount', 'winterAmount', 'summerAmount', 'seasonalAmount', 'liveaboardAmount', 'electricAmount'];
+      for (const field of currencyFields) {
+        const value = row[field];
+        if (value !== undefined && value !== null && value !== '') {
+          const cleanValue = String(value).replace(/[$,]/g, '');
+          const numValue = parseFloat(cleanValue);
+          if (isNaN(numValue)) {
+            warnings.push(`Invalid number format for ${field}: ${value}`);
+          }
+        }
+      }
+      
+      return {
+        rowIndex: index,
+        tenantData: {
+          name: tenantName,
+          boatMake: row.boatMake || null,
+          boatYear: row.boatYear || null,
+          boatLength: row.boatLength || null,
+          boatWidth: row.boatWidth || null,
+          address1: row.address1 || null,
+          address2: row.address2 || null,
+          city: row.city || null,
+          state: row.state || null,
+          zip: row.zip || null,
+        },
+        leaseData: {
+          commencement: row.leaseCommencement || null,
+          expiration: row.leaseExpiration || null,
+          monthlyRent: row.leaseAmount || null,
+          storageType: row.storageType || null,
+          unitLocation: row.unitLocation || null,
+          contractTerm: row.contractTerm || null,
+          winterAmount: row.winterAmount || null,
+          summerAmount: row.summerAmount || null,
+          seasonalAmount: row.seasonalAmount || null,
+          liveaboardAmount: row.liveaboardAmount || null,
+          electricAmount: row.electricAmount || null,
+        },
+        errors,
+        warnings,
+        isDuplicate: false,
+      };
+    });
+    
+    return res.json({
+      parsedRows,
+      columnMapping: columnMapping || {},
+    });
+  } catch (error: any) {
+    console.error('[Lease Import Parse] Error:', error);
+    return res.status(500).json({
+      error: error.message || "Failed to parse data",
+      parsedRows: [],
+      columnMapping: {},
+    });
+  }
+});
+
 // PDF import endpoint with AI extraction (base64 input)
 // Uses new unified parser for reliable extraction with proper fallback handling
 router.post("/leases/import/pdf", async (req: Request, res: Response, next: NextFunction) => {
