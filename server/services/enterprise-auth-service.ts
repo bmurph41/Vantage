@@ -9,6 +9,7 @@ import bcrypt from 'bcrypt';
 import speakeasy from 'speakeasy';
 import QRCode from 'qrcode';
 import { logger } from '../lib/logger';
+import { sendPasswordResetEmail } from './email-service';
 
 const SALT_ROUNDS = 12;
 const SESSION_DURATION_MS = 8 * 60 * 60 * 1000; // 8 hours default
@@ -625,12 +626,22 @@ export class EnterpriseAuthService {
         expiresAt,
       });
 
-      const resetUrl = `${process.env.APP_URL || 'http://localhost:5000'}/reset-password?token=${token}`;
+      const baseUrl = process.env.REPLIT_DOMAINS 
+        ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+        : process.env.APP_URL || 'http://localhost:5000';
+      const resetUrl = `${baseUrl}/reset-password?token=${token}`;
       
-      logger.info({ email, resetUrl }, 'Password reset token created');
+      const emailSent = await sendPasswordResetEmail(email, resetUrl, user.name || undefined);
+      
+      if (emailSent) {
+        logger.info({ email }, 'Password reset email sent successfully');
+      } else {
+        logger.warn({ email, resetUrl }, 'Failed to send password reset email - token created but email not delivered');
+      }
       
       await this.logSecurityEvent(user.id, user.orgId, 'password_reset_requested', {
-        email
+        email,
+        emailSent
       }, {}, true);
 
     } catch (error) {
