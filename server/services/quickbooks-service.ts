@@ -52,10 +52,21 @@ export interface ProfitAndLossReport {
   netIncome: number;
 }
 
+export interface QuickBooksError {
+  code: 'NOT_CONNECTED' | 'TOKEN_EXPIRED' | 'REFRESH_FAILED' | 'API_ERROR' | 'CONFIG_ERROR';
+  message: string;
+  retryable: boolean;
+  originalError?: any;
+}
+
+const MAX_RETRY_ATTEMPTS = 3;
+const INITIAL_RETRY_DELAY_MS = 1000;
+
 export class QuickBooksService {
   private config: QuickBooksConfig;
   private encryptionKey: string;
   private isConfigured: boolean = false;
+  private tokenPersistenceEnabled: boolean = false;
 
   constructor() {
     this.config = {
@@ -65,18 +76,66 @@ export class QuickBooksService {
       useSandbox: process.env.NODE_ENV !== 'production'
     };
     
-    const envKey = process.env.QB_ENCRYPTION_KEY;
+    const envKey = process.env.QB_ENCRYPTION_KEY || process.env.JWT_SECRET;
     if (envKey && envKey.length >= 32) {
-      this.encryptionKey = envKey;
+      this.encryptionKey = envKey.slice(0, 32);
       this.isConfigured = true;
+      this.tokenPersistenceEnabled = true;
     } else {
       this.encryptionKey = crypto.randomBytes(32).toString('hex');
-      console.warn('QB_ENCRYPTION_KEY not set or too short. QuickBooks integration will not persist tokens across restarts.');
+      this.tokenPersistenceEnabled = false;
+      console.warn('[QuickBooks] QB_ENCRYPTION_KEY or JWT_SECRET (32+ chars) not set. Token persistence disabled - tokens will not survive server restarts.');
     }
   }
 
   isQuickBooksConfigured(): boolean {
     return this.isConfigured && !!this.config.clientId && !!this.config.clientSecret;
+  }
+
+  isTokenPersistenceEnabled(): boolean {
+    return this.tokenPersistenceEnabled;
+  }
+
+  private async sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  private async retryWithBackoff<T>(
+    operation: () => Promise<T>,
+    operationName: string,
+    maxAttempts: number = MAX_RETRY_ATTEMPTS
+  ): Promise<T> {
+    let lastError: any;
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await operation();
+      } catch (error: any) {
+        lastError = error;
+        const isRetryable = this.isRetryableError(error);
+        
+        if (!isRetryable || attempt === maxAttempts) {
+          console.error(`[QuickBooks] ${operationName} failed after ${attempt} attempt(s):`, error.response?.data || error.message);
+          throw error;
+        }
+        
+        const delayMs = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+        console.warn(`[QuickBooks] ${operationName} attempt ${attempt} failed, retrying in ${delayMs}ms...`);
+        await this.sleep(delayMs);
+      }
+    }
+    
+    throw lastError;
+  }
+
+  private isRetryableError(error: any): boolean {
+    if (!error.response) return true;
+    const status = error.response.status;
+    return status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+  }
+
+  createError(code: QuickBooksError['code'], message: string, retryable: boolean = false, originalError?: any): QuickBooksError {
+    return { code, message, retryable, originalError };
   }
 
   private encrypt(text: string): string {
@@ -185,26 +244,35 @@ export class QuickBooksService {
       .limit(1);
 
     if (!integration || !integration.refreshToken) {
+      console.warn('[QuickBooks] No integration or refresh token found for org:', orgId);
       return null;
     }
 
     const authHeader = Buffer.from(`${this.config.clientId}:${this.config.clientSecret}`).toString('base64');
     const decryptedRefreshToken = this.decrypt(integration.refreshToken);
 
+    if (!decryptedRefreshToken || decryptedRefreshToken === integration.refreshToken) {
+      console.warn('[QuickBooks] Token decryption may have failed - possible encryption key mismatch');
+    }
+
     try {
-      const response = await axios.post(
-        QB_TOKEN_URL,
-        new URLSearchParams({
-          grant_type: 'refresh_token',
-          refresh_token: decryptedRefreshToken
-        }),
-        {
-          headers: {
-            'Authorization': `Basic ${authHeader}`,
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Accept': 'application/json'
+      const response = await this.retryWithBackoff(
+        async () => axios.post(
+          QB_TOKEN_URL,
+          new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: decryptedRefreshToken
+          }),
+          {
+            headers: {
+              'Authorization': `Basic ${authHeader}`,
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'Accept': 'application/json'
+            },
+            timeout: 10000
           }
-        }
+        ),
+        'Token refresh'
       );
 
       const { access_token, refresh_token, expires_in } = response.data;
@@ -215,9 +283,12 @@ export class QuickBooksService {
           accessToken: this.encrypt(access_token),
           refreshToken: this.encrypt(refresh_token),
           tokenExpiresAt: expiresAt,
+          isConnected: true,
           updatedAt: new Date()
         })
         .where(eq(quickbooksIntegrations.orgId, orgId));
+
+      console.log('[QuickBooks] Token refresh successful for org:', orgId);
 
       return {
         accessToken: access_token,
@@ -226,7 +297,16 @@ export class QuickBooksService {
         expiresAt
       };
     } catch (error: any) {
-      console.error('Failed to refresh QuickBooks tokens:', error.response?.data || error.message);
+      const errorCode = error.response?.data?.error;
+      const errorDescription = error.response?.data?.error_description;
+      
+      console.error('[QuickBooks] Token refresh failed for org:', orgId, {
+        error: errorCode,
+        description: errorDescription,
+        status: error.response?.status
+      });
+      
+      const isTokenRevoked = errorCode === 'invalid_grant' || error.response?.status === 401;
       
       await db.update(quickbooksIntegrations)
         .set({
@@ -234,6 +314,10 @@ export class QuickBooksService {
           updatedAt: new Date()
         })
         .where(eq(quickbooksIntegrations.orgId, orgId));
+
+      if (isTokenRevoked) {
+        console.warn('[QuickBooks] Token revoked or expired - user needs to reconnect');
+      }
 
       return null;
     }
@@ -280,20 +364,45 @@ export class QuickBooksService {
     lastSyncAt: Date | null;
     companyName?: string;
     realmId?: string;
+    tokenPersistenceEnabled: boolean;
+    warnings: string[];
   }> {
+    const warnings: string[] = [];
+    
+    if (!this.tokenPersistenceEnabled) {
+      warnings.push('Token persistence is disabled. Connection will not survive server restarts. Set QB_ENCRYPTION_KEY or JWT_SECRET (32+ chars) to enable.');
+    }
+
     const [integration] = await db.select()
       .from(quickbooksIntegrations)
       .where(eq(quickbooksIntegrations.orgId, orgId))
       .limit(1);
 
     if (!integration) {
-      return { isConnected: false, lastSyncAt: null };
+      return { 
+        isConnected: false, 
+        lastSyncAt: null, 
+        tokenPersistenceEnabled: this.tokenPersistenceEnabled,
+        warnings 
+      };
+    }
+
+    if (integration.isConnected && integration.tokenExpiresAt) {
+      const expiresAt = new Date(integration.tokenExpiresAt);
+      const now = new Date();
+      const hoursUntilExpiry = (expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60);
+      
+      if (hoursUntilExpiry < 24 && hoursUntilExpiry > 0) {
+        warnings.push('Access token expires soon. Consider refreshing the connection.');
+      }
     }
 
     return {
       isConnected: integration.isConnected,
       lastSyncAt: integration.lastSyncAt,
-      realmId: integration.realmId || undefined
+      realmId: integration.realmId || undefined,
+      tokenPersistenceEnabled: this.tokenPersistenceEnabled,
+      warnings
     };
   }
 
