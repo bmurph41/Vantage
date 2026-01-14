@@ -872,7 +872,7 @@ export default function ExecutiveDashboard() {
                               variant={isSelected ? "default" : "outline"}
                               data-testid={`badge-project-${project.locationId}`}
                               className={`px-3 py-1.5 text-sm cursor-pointer transition-all ${isSelected ? 'hover-elevate active-elevate-2' : 'opacity-60'}`}
-                              onClick={() => setLocation(`/projects/${project.locationId}`)}
+                              onClick={() => setLocation(`/rent-roll/projects/${project.locationId}`)}
                             >
                               {project.name}
                             </Badge>
@@ -933,7 +933,7 @@ export default function ExecutiveDashboard() {
                               variant={isSelected ? "secondary" : "outline"}
                               data-testid={`badge-project-${project.locationId}`}
                               className={`px-3 py-1.5 text-sm cursor-pointer transition-all ${isSelected ? 'hover-elevate active-elevate-2' : 'opacity-60'}`}
-                              onClick={() => setLocation(`/projects/${project.locationId}`)}
+                              onClick={() => setLocation(`/rent-roll/projects/${project.locationId}`)}
                             >
                               {project.name}
                             </Badge>

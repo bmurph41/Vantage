@@ -8,7 +8,7 @@ interface BreadcrumbItem {
   href?: string;
   icon?: React.ComponentType<{ className?: string }>;
   isDynamic?: boolean;
-  dynamicType?: 'modeling-project' | 'fund' | 'sales-comp' | 'rate-comp' | 'dd-project' | 'contact' | 'company' | 'property' | 'deal' | 'workspace';
+  dynamicType?: 'modeling-project' | 'fund' | 'sales-comp' | 'rate-comp' | 'dd-project' | 'rra-project' | 'contact' | 'company' | 'property' | 'deal' | 'workspace';
   dynamicId?: string;
 }
 
@@ -739,7 +739,7 @@ function getBreadcrumbsForPath(path: string): BreadcrumbItem[] {
       CATEGORIES.OPERATIONS,
       { label: 'Rent Roll', href: '/rent-roll' },
       { label: 'Projects', href: '/rent-roll/projects' },
-      { label: projectId, isDynamic: true, dynamicType: 'dd-project', dynamicId: projectId },
+      { label: projectId, isDynamic: true, dynamicType: 'rra-project', dynamicId: projectId },
     ];
     
     if (subPath) {
@@ -929,6 +929,11 @@ function DynamicBreadcrumbItem({ item, isLast }: { item: BreadcrumbItem; isLast:
     enabled: item.dynamicType === 'dd-project' && !!item.dynamicId,
   });
 
+  const { data: rraProject } = useQuery<{ name: string }>({
+    queryKey: ['/api/rent-roll/locations', item.dynamicId],
+    enabled: item.dynamicType === 'rra-project' && !!item.dynamicId,
+  });
+
   const { data: contact } = useQuery<{ firstName: string; lastName: string }>({
     queryKey: ['/api/contacts', item.dynamicId],
     enabled: item.dynamicType === 'contact' && !!item.dynamicId,
@@ -965,6 +970,8 @@ function DynamicBreadcrumbItem({ item, isLast }: { item: BreadcrumbItem; isLast:
     displayLabel = rateComp?.marina || item.label;
   } else if (item.dynamicType === 'dd-project') {
     displayLabel = ddProject?.name || item.label;
+  } else if (item.dynamicType === 'rra-project') {
+    displayLabel = rraProject?.name || item.label;
   } else if (item.dynamicType === 'contact') {
     displayLabel = contact ? `${contact.firstName} ${contact.lastName}`.trim() : item.label;
   } else if (item.dynamicType === 'company') {
