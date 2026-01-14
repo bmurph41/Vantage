@@ -96,13 +96,17 @@ export default function LocationsTable({ projectId, onEditLocation }: LocationsT
     );
   }
 
-  // Format posted rate for display
+  // Format posted rate for display as $00,000 format
   const formatPostedRate = (rate: string | null, rateType: string | null) => {
     if (!rate) return "-";
-    const formattedRate = parseFloat(rate).toLocaleString('en-US', { 
+    const numRate = parseFloat(rate);
+    // Use whole number format unless there are actual cents
+    const hasDecimals = numRate % 1 !== 0;
+    const formattedRate = numRate.toLocaleString('en-US', { 
       style: 'currency', 
       currency: 'USD',
-      minimumFractionDigits: 2 
+      minimumFractionDigits: hasDecimals ? 2 : 0,
+      maximumFractionDigits: hasDecimals ? 2 : 0,
     });
     return rateType ? `${formattedRate} ${rateType}` : formattedRate;
   };

@@ -167,6 +167,13 @@ export function ProjectDetailsTab({ locationId }: ProjectDetailsTabProps) {
     isActive: boolean 
   }>>({
     queryKey: ['/api/rent-roll/storage-locations', { projectId: locationId }],
+    queryFn: async () => {
+      const res = await fetch(`/api/rent-roll/storage-locations?projectId=${locationId}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch storage locations");
+      return res.json();
+    },
     enabled: !!locationId,
   });
 
@@ -343,10 +350,7 @@ export function ProjectDetailsTab({ locationId }: ProjectDetailsTabProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/rent-roll/locations/${locationId}/details-config`] });
-      toast({
-        title: "Configuration updated",
-        description: "Project details configuration has been saved.",
-      });
+      // Silent save - no toast to avoid disrupting user workflow
     },
     onError: (error: Error) => {
       toast({

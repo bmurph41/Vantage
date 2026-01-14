@@ -1018,7 +1018,15 @@ export default function ProjectOverview({ locationId, periodFilter }: ProjectOve
                           <TableCell className="text-right">
                             {loc.postedRate ? (
                               <span>
-                                ${loc.postedRate.toFixed(2)}
+                                {(() => {
+                                  const hasDecimals = loc.postedRate % 1 !== 0;
+                                  return loc.postedRate.toLocaleString('en-US', { 
+                                    style: 'currency', 
+                                    currency: 'USD', 
+                                    minimumFractionDigits: hasDecimals ? 2 : 0, 
+                                    maximumFractionDigits: hasDecimals ? 2 : 0 
+                                  });
+                                })()}
                                 <span className="text-xs text-muted-foreground ml-1">
                                   {loc.postedRateType === "Per Foot/Month" && "/ft/mo"}
                                   {loc.postedRateType === "Per Month" && "/mo"}
