@@ -1,21 +1,21 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Plus, Search, Edit, Trash2, MapPin, Anchor, Building, DollarSign, Home, TrendingUp, AlertCircle, X, FolderPlus } from "lucide-react";
+import { Upload, Plus, Search, Edit, Trash2, MapPin, Anchor, Building, DollarSign, Home, TrendingUp, FolderPlus } from "lucide-react";
 import { FileUpload } from "@/components/file-upload";
-import PropertyDetailModal from "@/components/modals/property-detail-modal";
 import PropertyFormModal from "@/components/modals/property-form-modal";
-import ContactDetailModal from "@/components/modals/contact-detail-modal";
-import CompanyDetailModal from "@/components/modals/company-detail-modal";
 import PortfolioWizard from "@/components/salescomps/sales-comps/PortfolioWizard";
+import { CrmPageShell } from "@/components/crm/CrmPageShell";
+import { CrmTopBar } from "@/components/crm/CrmTopBar";
+import { CrmSplitView } from "@/components/crm/CrmSplitView";
+import { CrmDataTable, type CrmColumn } from "@/components/crm/CrmDataTable";
+import { CrmDetailsPanel, CrmDetailSection, CrmDetailField } from "@/components/crm/CrmDetailsPanel";
 import { apiRequest } from "@/lib/queryClient";
-import type { Contact, Company, Deal } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type Property = {
   id: string;
@@ -44,26 +44,18 @@ type Property = {
   updatedAt: string;
 };
 
-const propertyTypeColors = {
+const propertyTypeColors: Record<string, string> = {
   marina: 'bg-blue-100 text-blue-800',
   boat: 'bg-green-100 text-green-800',
   slip: 'bg-purple-100 text-purple-800',
   dry_storage: 'bg-orange-100 text-orange-800'
 };
 
-const statusColors = {
+const statusColors: Record<string, string> = {
   available: 'bg-green-100 text-green-800',
   under_contract: 'bg-yellow-100 text-yellow-800',
   sold: 'bg-gray-100 text-gray-800',
   off_market: 'bg-red-100 text-red-800'
-};
-
-type PendingPropertyProfile = {
-  id: string;
-  compId: string;
-  orgId: string;
-  status: string;
-  createdAt: string;
 };
 
 export default function Properties() {
@@ -73,15 +65,8 @@ export default function Properties() {
   const [isPropertyFormOpen, setIsPropertyFormOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [showFileUpload, setShowFileUpload] = useState(false);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [showPortfolioWizard, setShowPortfolioWizard] = useState(false);
-  
-  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
-  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
-  const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
-  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
-  
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -90,12 +75,11 @@ export default function Properties() {
   });
 
   const deletePropertyMutation = useMutation({
-    mutationFn: async (id: string) => {
-      return await apiRequest('DELETE', `/api/properties/${id}`);
-    },
+    mutationFn: async (id: string) => apiRequest('DELETE', `/api/properties/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
       toast({ title: "Property deleted successfully" });
+      setSelectedProperty(null);
     },
     onError: () => {
       toast({ title: "Failed to delete property", variant: "destructive" });
@@ -104,17 +88,18 @@ export default function Properties() {
 
   const handleRowClick = (property: Property) => {
     setSelectedProperty(property);
-    setIsDetailModalOpen(true);
   };
 
-  const handleEdit = (property: Property, e?: React.MouseEvent) => {
-    e?.stopPropagation();
+  const handleCloseDetail = () => {
+    setSelectedProperty(null);
+  };
+
+  const handleEdit = (property: Property) => {
     setEditingProperty(property);
     setIsPropertyFormOpen(true);
   };
 
-  const handleDelete = (id: string, e?: React.MouseEvent) => {
-    e?.stopPropagation();
+  const handleDelete = (id: string) => {
     if (confirm('Are you sure you want to delete this property?')) {
       deletePropertyMutation.mutate(id);
     }
@@ -127,49 +112,25 @@ export default function Properties() {
 
   const handleFileUpload = async (files: File[]) => {
     const formData = new FormData();
-    files.forEach(file => {
-      formData.append('files', file);
-    });
+    files.forEach(file => formData.append('files', file));
 
     try {
-      const response = await fetch('/api/upload/properties', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
-
+      const response = await fetch('/api/upload/properties', { method: 'POST', body: formData });
+      if (!response.ok) throw new Error('Upload failed');
       const result = await response.json();
-      
       queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
-      
       const totalCreated = result.results.reduce((sum: number, r: any) => sum + (r.created || 0), 0);
-      toast({
-        title: "Files processed successfully",
-        description: `Parsed ${totalCreated} properties from ${files.length} file(s)`,
-      });
-      
+      toast({ title: "Files processed successfully", description: `Parsed ${totalCreated} properties from ${files.length} file(s)` });
       setShowFileUpload(false);
     } catch (error) {
-      toast({
-        title: "Upload failed",
-        description: error instanceof Error ? error.message : "Failed to process files",
-        variant: "destructive",
-      });
+      toast({ title: "Upload failed", description: error instanceof Error ? error.message : "Failed to process files", variant: "destructive" });
     }
   };
 
   const formatPrice = (price?: string) => {
-    if (!price) return '-';
+    if (!price) return '—';
     const num = parseFloat(price);
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(num);
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(num);
   };
 
   const getPropertyIcon = (type: string) => {
@@ -184,61 +145,260 @@ export default function Properties() {
 
   const getSpecificationSummary = (property: Property) => {
     const specs = property.specifications || {};
-    if (property.type === 'marina') {
-      return specs.slipCount ? `${specs.slipCount} slips` : 'Marina';
-    }
-    if (property.type === 'boat') {
-      return specs.length ? `${specs.length}ft ${specs.make || 'Boat'}` : 'Boat';
-    }
-    if (property.type === 'slip') {
-      return specs.maxBoatLength ? `Max ${specs.maxBoatLength}ft` : 'Slip';
-    }
+    if (property.type === 'marina') return specs.slipCount ? `${specs.slipCount} slips` : 'Marina';
+    if (property.type === 'boat') return specs.length ? `${specs.length}ft ${specs.make || 'Boat'}` : 'Boat';
+    if (property.type === 'slip') return specs.maxBoatLength ? `Max ${specs.maxBoatLength}ft` : 'Slip';
     return property.type.replace('_', ' ');
   };
 
-  // Filter properties based on search and filters
-  const filteredProperties = properties.filter(property => {
-    const matchesSearch = !searchTerm || 
-      property.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      property.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      property.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesType = typeFilter === 'all' || property.type === typeFilter;
-    const matchesStatus = statusFilter === 'all' || property.status === statusFilter;
-    
-    return matchesSearch && matchesType && matchesStatus;
-  });
+  const filteredProperties = useMemo(() => {
+    return properties.filter(property => {
+      const matchesSearch = !searchTerm || 
+        property.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        property.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        property.description?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesType = typeFilter === 'all' || property.type === typeFilter;
+      const matchesStatus = statusFilter === 'all' || property.status === statusFilter;
+      return matchesSearch && matchesType && matchesStatus;
+    });
+  }, [properties, searchTerm, typeFilter, statusFilter]);
 
-  return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
-      {/* Clean Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <h1 className="text-lg font-semibold text-gray-900" data-testid="properties-title">Properties</h1>
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-500">{properties.length} properties</span>
+  const totalProperties = properties.length;
+  const marinas = properties.filter(p => p.type === 'marina').length;
+  const available = properties.filter(p => p.status === 'available').length;
+  const underContract = properties.filter(p => p.status === 'under_contract').length;
+
+  const columns: CrmColumn<Property>[] = [
+    {
+      key: 'property',
+      header: 'Property',
+      render: (property) => (
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center text-white flex-shrink-0">
+            {getPropertyIcon(property.type)}
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-gray-900 truncate">{property.title}</div>
+            <div className="text-xs text-gray-500 truncate">{getSpecificationSummary(property)}</div>
+          </div>
+        </div>
+      )
+    },
+    {
+      key: 'type',
+      header: 'Type',
+      render: (property) => (
+        <Badge className={propertyTypeColors[property.type] || 'bg-gray-100 text-gray-800'}>
+          {property.type.replace('_', ' ')}
+        </Badge>
+      )
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (property) => (
+        <Badge className={statusColors[property.status] || 'bg-gray-100 text-gray-800'}>
+          {property.status.replace('_', ' ')}
+        </Badge>
+      )
+    },
+    {
+      key: 'price',
+      header: 'Price',
+      render: (property) => (
+        <div className="flex items-center gap-1.5 text-sm font-medium text-gray-900">
+          <DollarSign className="w-3.5 h-3.5 text-gray-400" />
+          <span>{formatPrice(property.listingPrice)}</span>
+        </div>
+      )
+    },
+    {
+      key: 'location',
+      header: 'Location',
+      render: (property) => property.address ? (
+        <div className="flex items-center gap-1.5 text-sm text-gray-600">
+          <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+          <span className="truncate">{property.address}</span>
+        </div>
+      ) : <span className="text-gray-400">—</span>
+    },
+    {
+      key: 'actions',
+      header: '',
+      width: 'w-20',
+      render: (property) => (
+        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+          <Button variant="ghost" size="sm" onClick={() => handleEdit(property)} className="h-7 w-7 p-0">
+            <Edit className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => handleDelete(property.id)} className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50">
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      )
+    }
+  ];
+
+  const listContent = (
+    <div className="flex flex-col h-full">
+      {showFileUpload && (
+        <div className="bg-white border-b border-gray-200 p-4">
+          <FileUpload onUpload={handleFileUpload} title="Import Properties" description="Upload CSV, TXT, or PDF files with property information" acceptedFileTypes={['.txt', '.csv', '.pdf', '.docx']} maxFiles={5} />
+        </div>
+      )}
+
+      <div className="grid grid-cols-4 gap-4 p-4 bg-white border-b border-gray-200">
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Total Properties</p>
+              <p className="text-2xl font-bold text-gray-900">{totalProperties}</p>
+            </div>
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+              <Home className="w-5 h-5 text-blue-600" />
             </div>
           </div>
-          
-          <div className="flex items-center space-x-3">
-            {/* Search Bar */}
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Marinas</p>
+              <p className="text-2xl font-bold text-gray-900">{marinas}</p>
+            </div>
+            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+              <Anchor className="w-5 h-5 text-purple-600" />
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Available</p>
+              <p className="text-2xl font-bold text-gray-900">{available}</p>
+            </div>
+            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+              <TrendingUp className="w-5 h-5 text-green-600" />
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Under Contract</p>
+              <p className="text-2xl font-bold text-gray-900">{underContract}</p>
+            </div>
+            <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+              <DollarSign className="w-5 h-5 text-yellow-600" />
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      <div className="flex-1 overflow-auto">
+        <CrmDataTable
+          data={filteredProperties}
+          columns={columns}
+          isLoading={isLoading}
+          selectedId={selectedProperty?.id}
+          onRowClick={handleRowClick}
+          getRowId={(p) => p.id}
+          emptyState={{
+            title: searchTerm || typeFilter !== 'all' || statusFilter !== 'all' ? 'No properties found' : 'No properties yet',
+            description: searchTerm || typeFilter !== 'all' || statusFilter !== 'all'
+              ? 'Try adjusting your search or filter criteria.'
+              : 'Start by adding your first property listing.',
+            action: !searchTerm && typeFilter === 'all' && statusFilter === 'all' ? { label: 'Add Property', onClick: handleAdd } : undefined
+          }}
+        />
+      </div>
+    </div>
+  );
+
+  const detailsContent = selectedProperty ? (
+    <CrmDetailsPanel
+      title={selectedProperty.title}
+      subtitle={getSpecificationSummary(selectedProperty)}
+      onEdit={() => handleEdit(selectedProperty)}
+      onDelete={() => handleDelete(selectedProperty.id)}
+    >
+      <CrmDetailSection title="Property Information">
+        <CrmDetailField label="Type" value={
+          <Badge className={propertyTypeColors[selectedProperty.type] || 'bg-gray-100 text-gray-800'}>
+            {selectedProperty.type.replace('_', ' ')}
+          </Badge>
+        } />
+        <CrmDetailField label="Status" value={
+          <Badge className={statusColors[selectedProperty.status] || 'bg-gray-100 text-gray-800'}>
+            {selectedProperty.status.replace('_', ' ')}
+          </Badge>
+        } />
+        <CrmDetailField label="Price" value={formatPrice(selectedProperty.listingPrice)} />
+        <CrmDetailField label="Address" value={selectedProperty.address} />
+      </CrmDetailSection>
+
+      {selectedProperty.specifications && (
+        <CrmDetailSection title="Specifications">
+          {selectedProperty.type === 'marina' && (
+            <>
+              <CrmDetailField label="Slip Count" value={selectedProperty.specifications.slipCount} />
+              <CrmDetailField label="Max Boat Length" value={selectedProperty.specifications.maxBoatLength ? `${selectedProperty.specifications.maxBoatLength}ft` : null} />
+              <CrmDetailField label="Dock Type" value={selectedProperty.specifications.dockType} />
+            </>
+          )}
+          {selectedProperty.type === 'boat' && (
+            <>
+              <CrmDetailField label="Make" value={selectedProperty.specifications.make} />
+              <CrmDetailField label="Model" value={selectedProperty.specifications.model} />
+              <CrmDetailField label="Year" value={selectedProperty.specifications.year} />
+              <CrmDetailField label="Length" value={selectedProperty.specifications.length ? `${selectedProperty.specifications.length}ft` : null} />
+            </>
+          )}
+          {selectedProperty.specifications.amenities && selectedProperty.specifications.amenities.length > 0 && (
+            <CrmDetailField label="Amenities" value={
+              <div className="flex flex-wrap gap-1">
+                {selectedProperty.specifications.amenities.map((amenity, i) => (
+                  <Badge key={i} variant="outline" className="text-xs">{amenity}</Badge>
+                ))}
+              </div>
+            } />
+          )}
+        </CrmDetailSection>
+      )}
+
+      {selectedProperty.description && (
+        <CrmDetailSection title="Description">
+          <p className="text-sm text-gray-700">{selectedProperty.description}</p>
+        </CrmDetailSection>
+      )}
+    </CrmDetailsPanel>
+  ) : null;
+
+  return (
+    <CrmPageShell>
+      <CrmTopBar
+        title="Properties"
+        subtitle={`${totalProperties} properties`}
+        actions={
+          <>
+            <Button variant="outline" size="sm" onClick={() => setShowFileUpload(!showFileUpload)}>
+              <Upload className="h-4 w-4 mr-2" />Import
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setShowPortfolioWizard(true)}>
+              <FolderPlus className="h-4 w-4 mr-2" />Portfolio
+            </Button>
+            <Button className="bg-blue-600 hover:bg-blue-700" size="sm" onClick={handleAdd}>
+              <Plus className="h-4 w-4 mr-2" />Add Property
+            </Button>
+          </>
+        }
+        filters={
+          <>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input 
-                placeholder="Search properties" 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-64 h-9 text-sm border-gray-300 focus:border-gray-400"
-                data-testid="search-properties"
-              />
+              <Input placeholder="Search properties..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 w-60 h-9" />
             </div>
-            
-            {/* Type Filter */}
             <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-32 h-9 text-sm" data-testid="filter-type">
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
+              <SelectTrigger className="w-32 h-9"><SelectValue placeholder="All Types" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="marina">Marina</SelectItem>
@@ -247,12 +407,8 @@ export default function Properties() {
                 <SelectItem value="dry_storage">Dry Storage</SelectItem>
               </SelectContent>
             </Select>
-            
-            {/* Status Filter */}
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-32 h-9 text-sm" data-testid="filter-status">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
+              <SelectTrigger className="w-36 h-9"><SelectValue placeholder="All Status" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="available">Available</SelectItem>
@@ -261,326 +417,14 @@ export default function Properties() {
                 <SelectItem value="off_market">Off Market</SelectItem>
               </SelectContent>
             </Select>
-            
-            {/* Import Button */}
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setShowFileUpload(!showFileUpload)}
-              className="h-9 text-sm"
-              data-testid="import-properties-button"
-            >
-              <Upload className="h-4 w-4 mr-1" />
-              Import
-            </Button>
-            
-            {/* Create Portfolio Button */}
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setShowPortfolioWizard(true)}
-              className="h-9 text-sm"
-              data-testid="create-portfolio-button"
-            >
-              <FolderPlus className="h-4 w-4 mr-1" />
-              Portfolio
-            </Button>
-            
-            {/* Add Property Button */}
-            <Button 
-              className="bg-blue-600 hover:bg-blue-700 h-9 text-sm" 
-              size="sm" 
-              onClick={handleAdd}
-              data-testid="add-property-button"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Property
-            </Button>
-          </div>
-        </div>
-      </div>
-        
-      <main className="flex-1 overflow-y-auto p-6" data-testid="properties-main">
+          </>
+        }
+      />
 
-        {/* File Upload Section */}
-        {showFileUpload && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-            <FileUpload
-              onUpload={handleFileUpload}
-              title="Import Properties"
-              description="Upload CSV, TXT, or PDF files with property information"
-              acceptedFileTypes={['.txt', '.csv', '.pdf', '.docx']}
-              maxFiles={5}
-            />
-          </div>
-        )}
+      <CrmSplitView list={listContent} details={detailsContent} isDetailOpen={!!selectedProperty} onCloseDetail={handleCloseDetail} />
 
-        {/* Metrics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card className="p-4 bg-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Properties</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{properties.length || 0}</p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                <Home className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-          </Card>
-          
-          <Card className="p-4 bg-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Marinas</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
-                  {properties.filter(p => p.type === 'marina').length || 0}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                <Anchor className="w-6 h-6 text-purple-600" />
-              </div>
-            </div>
-          </Card>
-          
-          <Card className="p-4 bg-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Available</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
-                  {properties.filter(p => p.status === 'available').length || 0}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
-          </Card>
-          
-          <Card className="p-4 bg-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Under Contract</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
-                  {properties.filter(p => p.status === 'under_contract').length || 0}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-yellow-600" />
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {isLoading ? (
-          <div className="bg-white rounded-lg border border-gray-200">
-            <div className="p-6">
-              <div className="animate-pulse space-y-4">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="flex items-center space-x-4 py-3">
-                    <div className="w-8 h-8 bg-gray-200 rounded-full"></div>
-                    <div className="flex-1 space-y-2">
-                      <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                      <div className="h-3 bg-gray-200 rounded w-1/6"></div>
-                    </div>
-                    <div className="h-6 bg-gray-200 rounded w-20"></div>
-                    <div className="h-6 bg-gray-200 rounded w-16"></div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : filteredProperties.length === 0 ? (
-          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-            <div className="w-16 h-16 mx-auto mb-4 bg-blue-50 rounded-full flex items-center justify-center">
-              <Anchor className="w-8 h-8 text-blue-500" />
-            </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {searchTerm || typeFilter !== 'all' || statusFilter !== 'all' ? 'No properties found' : 'No properties yet'}
-            </h3>
-            <p className="text-gray-500 mb-6">
-              {searchTerm || typeFilter !== 'all' || statusFilter !== 'all'
-                ? 'Try adjusting your search or filter criteria.'
-                : 'Start by adding your first property listing.'}
-            </p>
-            {!searchTerm && typeFilter === 'all' && statusFilter === 'all' && (
-              <Button onClick={handleAdd} className="bg-blue-600 hover:bg-blue-700">
-                <Plus className="w-4 h-4 mr-2" />
-                Add First Property
-              </Button>
-            )}
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Property</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Type</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Price</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Location</th>
-                  <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredProperties.map((property) => (
-                  <tr 
-                    key={property.id} 
-                    onClick={() => handleRowClick(property)}
-                    className="hover:bg-gray-50 cursor-pointer transition-colors" 
-                    data-testid={`row-property-${property.id}`}
-                  >
-                    {/* Property */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center text-white flex-shrink-0">
-                          {getPropertyIcon(property.type)}
-                        </div>
-                        <div>
-                          <div className="text-sm font-semibold text-gray-900" data-testid={`text-property-title-${property.id}`}>
-                            {property.title}
-                          </div>
-                          <div className="text-sm text-gray-500" data-testid={`text-property-specs-${property.id}`}>
-                            {getSpecificationSummary(property)}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    
-                    {/* Type */}
-                    <td className="px-6 py-4">
-                      <Badge className={propertyTypeColors[property.type] || 'bg-gray-100 text-gray-800'} data-testid={`badge-property-type-${property.id}`}>
-                        {property.type.replace('_', ' ')}
-                      </Badge>
-                    </td>
-                    
-                    {/* Status */}
-                    <td className="px-6 py-4">
-                      <Badge className={statusColors[property.status] || 'bg-gray-100 text-gray-800'} data-testid={`badge-property-status-${property.id}`}>
-                        {property.status.replace('_', ' ')}
-                      </Badge>
-                    </td>
-                    
-                    {/* Price */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm font-medium text-gray-900" data-testid={`text-property-price-${property.id}`}>
-                          {formatPrice(property.listingPrice)}
-                        </span>
-                      </div>
-                    </td>
-                    
-                    {/* Location */}
-                    <td className="px-6 py-4">
-                      {property.address ? (
-                        <div className="flex items-center gap-2">
-                          <MapPin className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-900" data-testid={`text-property-location-${property.id}`}>
-                            {property.address}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-gray-400">-</span>
-                      )}
-                    </td>
-                    
-                    {/* Actions */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => handleEdit(property, e)}
-                          className="h-8 w-8 p-0 hover:bg-gray-200"
-                          data-testid={`button-edit-property-${property.id}`}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => handleDelete(property.id, e)}
-                          className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                          data-testid={`button-delete-property-${property.id}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        
-        <PropertyFormModal
-          isOpen={isPropertyFormOpen}
-          onClose={() => {
-            setIsPropertyFormOpen(false);
-            setEditingProperty(null);
-          }}
-          property={editingProperty}
-        />
-
-        <PropertyDetailModal
-          isOpen={isDetailModalOpen}
-          onClose={() => {
-            setIsDetailModalOpen(false);
-            setSelectedProperty(null);
-          }}
-          property={selectedProperty}
-          onContactClick={(contact) => {
-            setSelectedContact(contact);
-            setIsContactModalOpen(true);
-          }}
-          onCompanyClick={(company) => {
-            setSelectedCompany(company);
-            setIsCompanyModalOpen(true);
-          }}
-        />
-
-        <ContactDetailModal
-          isOpen={isContactModalOpen}
-          onClose={() => {
-            setIsContactModalOpen(false);
-            setSelectedContact(null);
-          }}
-          contact={selectedContact}
-          onCompanyClick={(company) => {
-            setSelectedCompany(company);
-            setIsCompanyModalOpen(true);
-          }}
-          onPropertyClick={(property) => {
-            setSelectedProperty(property as any);
-            setIsDetailModalOpen(true);
-          }}
-        />
-
-        <CompanyDetailModal
-          isOpen={isCompanyModalOpen}
-          onClose={() => {
-            setIsCompanyModalOpen(false);
-            setSelectedCompany(null);
-          }}
-          company={selectedCompany}
-          onContactClick={(contact) => {
-            setSelectedContact(contact);
-            setIsContactModalOpen(true);
-          }}
-          onPropertyClick={(property) => {
-            setSelectedProperty(property as any);
-            setIsDetailModalOpen(true);
-          }}
-        />
-
-        <PortfolioWizard
-          open={showPortfolioWizard}
-          onClose={() => setShowPortfolioWizard(false)}
-        />
-      </main>
-    </div>
+      <PropertyFormModal isOpen={isPropertyFormOpen} onClose={() => { setIsPropertyFormOpen(false); setEditingProperty(null); }} property={editingProperty} />
+      <PortfolioWizard open={showPortfolioWizard} onClose={() => setShowPortfolioWizard(false)} />
+    </CrmPageShell>
   );
 }

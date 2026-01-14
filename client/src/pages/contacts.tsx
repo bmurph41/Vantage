@@ -1,43 +1,27 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Edit, Trash2, Mail, Phone, Building, Upload, Users, User, Star, Download, Tag, UserPlus, Thermometer } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Mail, Phone, Building, Upload, Users, User, Star, Download, Thermometer, Filter } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import ContactFormModal from "@/components/modals/contact-form-modal";
-import ContactDetailModal from "@/components/modals/contact-detail-modal";
-import CompanyDetailModal from "@/components/modals/company-detail-modal";
-import PropertyDetailModal from "@/components/modals/property-detail-modal";
-import { DetailDrawer } from "@/components/crm/detail-drawer";
 import { FileUpload } from "@/components/file-upload";
 import { ImportResultsModal, type ImportResult } from "@/components/import-results-modal";
-import type { Contact, Company, Deal, Property } from "@shared/schema";
+import { CrmPageShell } from "@/components/crm/CrmPageShell";
+import { CrmTopBar } from "@/components/crm/CrmTopBar";
+import { CrmSplitView } from "@/components/crm/CrmSplitView";
+import { CrmDataTable, type CrmColumn } from "@/components/crm/CrmDataTable";
+import { CrmDetailsPanel, CrmDetailSection, CrmDetailField } from "@/components/crm/CrmDetailsPanel";
+import type { Contact, Company, Deal } from "@shared/schema";
 
 type ContactWithCompany = Contact & { 
   company?: Company | null;
   deal?: Deal | null;
-};
-
-const statusColors = {
-  active: 'bg-green-100 text-green-800',
-  inactive: 'bg-gray-100 text-gray-800',
-  prospect: 'bg-blue-100 text-blue-800',
-  customer: 'bg-purple-100 text-purple-800',
-  lead: 'bg-yellow-100 text-yellow-800'
-};
-
-const contactTypeColors = {
-  prospect: 'bg-blue-100 text-blue-800',
-  vendor: 'bg-orange-100 text-orange-800',
-  buyer: 'bg-green-100 text-green-800',
-  seller: 'bg-purple-100 text-purple-800',
-  partner: 'bg-indigo-100 text-indigo-800',
-  client: 'bg-emerald-100 text-emerald-800'
 };
 
 const contactTagColors = {
@@ -62,20 +46,14 @@ const leadStatusColors = {
 };
 
 export default function Contacts() {
+  const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [contactTagFilter, setContactTagFilter] = useState('all');
   const [isContactFormOpen, setIsContactFormOpen] = useState(false);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
-  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [selectedContact, setSelectedContact] = useState<ContactWithCompany | null>(null);
   const [showFileUpload, setShowFileUpload] = useState(false);
-  
-  const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
-  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
-  const [isPropertyModalOpen, setIsPropertyModalOpen] = useState(false);
-  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
-  const [isContactDetailModalOpen, setIsContactDetailModalOpen] = useState(false);
   const [importResults, setImportResults] = useState<ImportResult[]>([]);
   const [showImportResults, setShowImportResults] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -86,10 +64,6 @@ export default function Contacts() {
     queryKey: ['/api/contacts'],
   });
 
-  const { data: deals = [] } = useQuery<Deal[]>({
-    queryKey: ['/api/deals'],
-  });
-
   const deleteContactMutation = useMutation({
     mutationFn: async (id: string) => {
       return await apiRequest('DELETE', `/api/contacts/${id}`);
@@ -97,6 +71,7 @@ export default function Contacts() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
       toast({ title: "Contact deleted successfully" });
+      setSelectedContact(null);
     },
     onError: () => {
       toast({ title: "Failed to delete contact", variant: "destructive" });
@@ -117,14 +92,12 @@ export default function Contacts() {
     },
   });
 
-  const handleEdit = (contact: Contact, e?: React.MouseEvent) => {
-    e?.stopPropagation(); // Prevent row click when clicking edit
+  const handleEdit = (contact: Contact) => {
     setEditingContact(contact);
     setIsContactFormOpen(true);
   };
 
-  const handleDelete = (id: string, e?: React.MouseEvent) => {
-    e?.stopPropagation(); // Prevent row click when clicking delete
+  const handleDelete = (id: string) => {
     if (confirm('Are you sure you want to delete this contact?')) {
       deleteContactMutation.mutate(id);
     }
@@ -135,9 +108,12 @@ export default function Contacts() {
     setIsContactFormOpen(true);
   };
 
-  const handleRowClick = (contact: Contact) => {
+  const handleRowClick = (contact: ContactWithCompany) => {
     setSelectedContact(contact);
-    setIsDetailModalOpen(true);
+  };
+
+  const handleCloseDetail = () => {
+    setSelectedContact(null);
   };
 
   const handleFileUpload = async (files: File[]) => {
@@ -158,7 +134,6 @@ export default function Contacts() {
 
       const result = await response.json();
       
-      // Transform results to match ImportResult interface
       const transformedResults: ImportResult[] = result.results.map((r: any) => ({
         filename: r.filename,
         processed: r.processed || 0,
@@ -173,12 +148,10 @@ export default function Contacts() {
       const totalCreated = transformedResults.reduce((sum: number, r) => sum + r.created, 0);
       const totalErrors = transformedResults.reduce((sum: number, r) => sum + (r.rowErrors?.length || 0), 0);
       
-      // Show results modal
       setImportResults(transformedResults);
       setShowImportResults(true);
       setShowFileUpload(false);
       
-      // Show quick toast summary
       if (totalErrors > 0) {
         toast({
           title: "Import completed with errors",
@@ -201,31 +174,12 @@ export default function Contacts() {
   };
 
   const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName[0]}${lastName[0]}`.toUpperCase();
+    return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
   };
 
   const getContactStatus = (contact: ContactWithCompany): string => {
-    // Simple logic to determine contact status
     if (contact.company) return 'customer';
     return 'prospect';
-  };
-
-  const toggleSelection = (id: string) => {
-    const newSelected = new Set(selectedIds);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
-    } else {
-      newSelected.add(id);
-    }
-    setSelectedIds(newSelected);
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedIds.size === filteredContacts.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(filteredContacts.map(c => c.id)));
-    }
   };
 
   const handleBulkDelete = () => {
@@ -265,67 +219,334 @@ export default function Contacts() {
     toast({ title: `Exported ${selectedIds.size} contact(s)` });
   };
 
-  // Filter contacts based on search, status, and contact tag
-  const filteredContacts = contacts.filter(contact => {
-    const matchesSearch = !searchTerm || 
-      `${contact.firstName} ${contact.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contact.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contact.company?.name?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const contactStatus = getContactStatus(contact);
-    const matchesStatus = statusFilter === 'all' || contactStatus === statusFilter;
-    
-    const matchesContactTag = contactTagFilter === 'all' || contact.contactTag === contactTagFilter;
-    
-    return matchesSearch && matchesStatus && matchesContactTag;
-  });
+  const filteredContacts = useMemo(() => {
+    return contacts.filter(contact => {
+      const matchesSearch = !searchTerm || 
+        `${contact.firstName} ${contact.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        contact.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        contact.company?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const contactStatus = getContactStatus(contact);
+      const matchesStatus = statusFilter === 'all' || contactStatus === statusFilter;
+      
+      const matchesContactTag = contactTagFilter === 'all' || contact.contactTag === contactTagFilter;
+      
+      return matchesSearch && matchesStatus && matchesContactTag;
+    });
+  }, [contacts, searchTerm, statusFilter, contactTagFilter]);
 
-  // Calculate metrics
   const totalContacts = contacts.length;
   const prospects = contacts.filter(c => c.contactTag === 'lead').length;
   const clients = contacts.filter(c => c.dealAssignment).length;
   const hotLeads = contacts.filter(c => c.contactTag === 'lead' && c.leadScore === 'hot').length;
 
-  return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
-      {/* Clean Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900" data-testid="contacts-title">Contacts</h1>
-            <p className="text-sm text-gray-500 mt-1">{totalContacts} total contacts</p>
+  const columns: CrmColumn<ContactWithCompany>[] = [
+    {
+      key: 'contact',
+      header: 'Contact',
+      render: (contact) => (
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
+            {getInitials(contact.firstName, contact.lastName)}
           </div>
-          
-          <div className="flex items-center gap-3">
-            {/* Search Bar */}
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-gray-900 truncate">
+              {contact.firstName} {contact.lastName}
+            </div>
+            <div className="text-xs text-gray-500 truncate">
+              {contact.position || contact.role || '—'}
+            </div>
+          </div>
+        </div>
+      )
+    },
+    {
+      key: 'email',
+      header: 'Email',
+      render: (contact) => (
+        <div className="flex items-center gap-1.5 text-sm text-gray-600">
+          <Mail className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+          <span className="truncate">{contact.email || '—'}</span>
+        </div>
+      )
+    },
+    {
+      key: 'phone',
+      header: 'Phone',
+      render: (contact) => (
+        contact.phone ? (
+          <div className="flex items-center gap-1.5 text-sm text-gray-600">
+            <Phone className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+            <span>{contact.phone}</span>
+          </div>
+        ) : <span className="text-gray-400">—</span>
+      )
+    },
+    {
+      key: 'company',
+      header: 'Company',
+      render: (contact) => (
+        contact.company ? (
+          <div className="flex items-center gap-1.5 text-sm text-gray-600">
+            <Building className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+            <span className="truncate">{contact.company.name}</span>
+          </div>
+        ) : <span className="text-gray-400">—</span>
+      )
+    },
+    {
+      key: 'type',
+      header: 'Type',
+      render: (contact) => (
+        <div className="flex flex-wrap gap-1">
+          {contact.contactTag && (
+            <Badge className={`text-xs ${contactTagColors[contact.contactTag as keyof typeof contactTagColors] || 'bg-gray-500 text-white'}`}>
+              {contact.contactTag.charAt(0).toUpperCase() + contact.contactTag.slice(1)}
+            </Badge>
+          )}
+          {contact.contactTag === 'lead' && contact.leadStatus && (
+            <Badge className={`text-xs flex items-center gap-0.5 ${leadStatusColors[contact.leadStatus as keyof typeof leadStatusColors] || 'bg-gray-100 text-gray-800'}`}>
+              <Thermometer className="h-3 w-3" />
+              {contact.leadStatus.charAt(0).toUpperCase() + contact.leadStatus.slice(1)}
+            </Badge>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'actions',
+      header: '',
+      width: 'w-20',
+      render: (contact) => (
+        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleEdit(contact)}
+            className="h-7 w-7 p-0"
+          >
+            <Edit className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleDelete(contact.id)}
+            className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      )
+    }
+  ];
+
+  const listContent = (
+    <div className="flex flex-col h-full">
+      {showFileUpload && (
+        <div className="bg-white border-b border-gray-200 p-4">
+          <FileUpload
+            onUpload={handleFileUpload}
+            title="Import Contacts"
+            description="Upload CSV, TXT, PDF, DOCX, or XLSX files with contact information"
+            acceptedFileTypes={['.txt', '.csv', '.pdf', '.docx', '.xlsx']}
+            maxFiles={5}
+          />
+        </div>
+      )}
+
+      <div className="grid grid-cols-4 gap-4 p-4 bg-white border-b border-gray-200">
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Total Contacts</p>
+              <p className="text-2xl font-bold text-gray-900">{totalContacts}</p>
+            </div>
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+              <Users className="w-5 h-5 text-blue-600" />
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Prospects</p>
+              <p className="text-2xl font-bold text-gray-900">{prospects}</p>
+            </div>
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+              <User className="w-5 h-5 text-blue-600" />
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Clients</p>
+              <p className="text-2xl font-bold text-gray-900">{clients}</p>
+            </div>
+            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+              <Building className="w-5 h-5 text-green-600" />
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Hot Leads</p>
+              <p className="text-2xl font-bold text-gray-900">{hotLeads}</p>
+            </div>
+            <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+              <Star className="w-5 h-5 text-red-600" />
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {selectedIds.size > 0 && (
+        <div className="bg-blue-50 border-b border-blue-200 px-4 py-3 flex items-center justify-between">
+          <span className="text-sm font-medium text-blue-900">
+            {selectedIds.size} contact(s) selected
+          </span>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleBulkExport}>
+              <Download className="w-3.5 h-3.5 mr-1.5" />
+              Export
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleBulkDelete} disabled={bulkDeleteMutation.isPending}>
+              <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+              Delete
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
+              Clear
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <div className="flex-1 overflow-auto">
+        <CrmDataTable
+          data={filteredContacts}
+          columns={columns}
+          isLoading={isLoading}
+          selectedId={selectedContact?.id}
+          onRowClick={handleRowClick}
+          getRowId={(c) => c.id}
+          selectedIds={selectedIds}
+          onSelectionChange={setSelectedIds}
+          emptyState={{
+            title: searchTerm || statusFilter !== 'all' ? 'No contacts found' : 'No contacts yet',
+            description: searchTerm || statusFilter !== 'all' 
+              ? 'Try adjusting your search or filter criteria.'
+              : 'Start by adding your first contact to build your network.',
+            action: !searchTerm && statusFilter === 'all' ? {
+              label: 'Add Contact',
+              onClick: handleAdd
+            } : undefined
+          }}
+        />
+      </div>
+    </div>
+  );
+
+  const detailsContent = selectedContact ? (
+    <CrmDetailsPanel
+      title={`${selectedContact.firstName} ${selectedContact.lastName}`}
+      subtitle={selectedContact.position || selectedContact.role || undefined}
+      onEdit={() => handleEdit(selectedContact)}
+      onDelete={() => handleDelete(selectedContact.id)}
+    >
+      <CrmDetailSection title="Contact Information">
+        <CrmDetailField label="Email" value={selectedContact.email} />
+        <CrmDetailField label="Phone" value={selectedContact.phone} />
+        <CrmDetailField label="Position" value={selectedContact.position || selectedContact.role} />
+        <CrmDetailField label="Type" value={
+          selectedContact.contactTag && (
+            <Badge className={`text-xs ${contactTagColors[selectedContact.contactTag as keyof typeof contactTagColors] || 'bg-gray-500 text-white'}`}>
+              {selectedContact.contactTag.charAt(0).toUpperCase() + selectedContact.contactTag.slice(1)}
+            </Badge>
+          )
+        } />
+        {selectedContact.contactTag === 'lead' && selectedContact.leadStatus && (
+          <CrmDetailField label="Lead Status" value={
+            <Badge className={`text-xs ${leadStatusColors[selectedContact.leadStatus as keyof typeof leadStatusColors] || 'bg-gray-100 text-gray-800'}`}>
+              {selectedContact.leadStatus.charAt(0).toUpperCase() + selectedContact.leadStatus.slice(1)}
+            </Badge>
+          } />
+        )}
+      </CrmDetailSection>
+
+      {selectedContact.company && (
+        <CrmDetailSection title="Company">
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+              <Building className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <div className="text-sm font-medium text-gray-900">{selectedContact.company.name}</div>
+              {selectedContact.company.industry && (
+                <div className="text-xs text-gray-500">{selectedContact.company.industry}</div>
+              )}
+            </div>
+          </div>
+        </CrmDetailSection>
+      )}
+
+      <CrmDetailSection title="Additional Details">
+        <CrmDetailField label="Source" value={selectedContact.source} />
+        <CrmDetailField label="Notes" value={selectedContact.notes} />
+      </CrmDetailSection>
+    </CrmDetailsPanel>
+  ) : null;
+
+  return (
+    <CrmPageShell>
+      <CrmTopBar
+        title="Contacts"
+        subtitle={`${totalContacts} total contacts`}
+        actions={
+          <>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setShowFileUpload(!showFileUpload)}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Import
+            </Button>
+            <Button 
+              className="bg-blue-600 hover:bg-blue-700" 
+              size="sm" 
+              onClick={handleAdd}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Contact
+            </Button>
+          </>
+        }
+        filters={
+          <>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input 
                 placeholder="Search contacts..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-64 h-10"
-                data-testid="search-contacts"
+                className="pl-9 w-60 h-9"
               />
             </div>
             
-            {/* Status Filter */}
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-36 h-10" data-testid="filter-status">
+              <SelectTrigger className="w-32 h-9">
                 <SelectValue placeholder="All Status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="prospect">Prospect</SelectItem>
                 <SelectItem value="customer">Customer</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
               </SelectContent>
             </Select>
             
-            {/* Contact Tag Filter */}
             <Select value={contactTagFilter} onValueChange={setContactTagFilter}>
-              <SelectTrigger className="w-36 h-10" data-testid="filter-contact-tag">
+              <SelectTrigger className="w-32 h-9">
                 <SelectValue placeholder="All Tags" />
               </SelectTrigger>
               <SelectContent>
@@ -341,406 +562,32 @@ export default function Contacts() {
                 <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
-            
-            {/* Import Button */}
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setShowFileUpload(!showFileUpload)}
-              className="h-10"
-              data-testid="import-contacts-button"
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Import
-            </Button>
-            
-            {/* Add Contact Button */}
-            <Button 
-              className="bg-blue-600 hover:bg-blue-700 h-10" 
-              size="sm" 
-              onClick={handleAdd}
-              data-testid="add-contact-button"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Contact
-            </Button>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
+
+      <CrmSplitView
+        list={listContent}
+        details={detailsContent}
+        isDetailOpen={!!selectedContact}
+        onCloseDetail={handleCloseDetail}
+      />
         
-      <main className="flex-1 overflow-y-auto p-6" data-testid="contacts-main">
-        {/* File Upload Section */}
-        {showFileUpload && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-            <FileUpload
-              onUpload={handleFileUpload}
-              title="Import Contacts"
-              description="Upload CSV, TXT, PDF, DOCX, or XLSX files with contact information"
-              acceptedFileTypes={['.txt', '.csv', '.pdf', '.docx', '.xlsx']}
-              maxFiles={5}
-            />
-          </div>
-        )}
+      <ContactFormModal
+        isOpen={isContactFormOpen}
+        onClose={() => {
+          setIsContactFormOpen(false);
+          setEditingContact(null);
+        }}
+        contact={editingContact}
+      />
 
-        {/* Metrics Cards */}
-        <div className="grid grid-cols-4 gap-6 mb-6">
-          <Card className="p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Total Contacts</p>
-                <p className="text-3xl font-bold text-gray-900">{totalContacts}</p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Prospects</p>
-                <p className="text-3xl font-bold text-gray-900">{prospects}</p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <User className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Clients</p>
-                <p className="text-3xl font-bold text-gray-900">{clients}</p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <Building className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-center">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Hot Leads</p>
-                <p className="text-3xl font-bold text-gray-900">{hotLeads}</p>
-              </div>
-              <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                <Star className="w-6 h-6 text-red-600" />
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Bulk Actions Toolbar */}
-        {selectedIds.size > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Checkbox
-                checked={selectedIds.size === filteredContacts.length}
-                onCheckedChange={toggleSelectAll}
-                data-testid="checkbox-select-all-toolbar"
-              />
-              <span className="text-sm font-medium text-blue-900">
-                {selectedIds.size} contact(s) selected
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleBulkExport}
-                data-testid="button-bulk-export"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Export
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleBulkDelete}
-                data-testid="button-bulk-delete"
-                disabled={bulkDeleteMutation.isPending}
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedIds(new Set())}
-                data-testid="button-clear-selection"
-              >
-                Clear
-              </Button>
-            </div>
-          </div>
-        )}
-        
-        {isLoading ? (
-          <div className="bg-white rounded-lg border border-gray-200">
-            <div className="p-6">
-              <div className="animate-pulse space-y-4">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="flex items-center space-x-4 py-3">
-                    <div className="w-8 h-8 bg-gray-200 rounded-full"></div>
-                    <div className="flex-1 space-y-2">
-                      <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                      <div className="h-3 bg-gray-200 rounded w-1/6"></div>
-                    </div>
-                    <div className="h-6 bg-gray-200 rounded w-20"></div>
-                    <div className="h-6 bg-gray-200 rounded w-16"></div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : filteredContacts.length === 0 ? (
-          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-            <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {searchTerm || statusFilter !== 'all' ? 'No contacts found' : 'No contacts yet'}
-            </h3>
-            <p className="text-gray-500 mb-6">
-              {searchTerm || statusFilter !== 'all' 
-                ? 'Try adjusting your search or filter criteria.'
-                : 'Start by adding your first contact to build your network.'}
-            </p>
-            {!searchTerm && statusFilter === 'all' && (
-              <Button onClick={handleAdd} className="bg-blue-600 hover:bg-blue-700">
-                <Plus className="w-4 h-4 mr-2" />
-                Add First Contact
-              </Button>
-            )}
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-4 py-4 w-12">
-                    <Checkbox
-                      checked={selectedIds.size > 0 && selectedIds.size === filteredContacts.length}
-                      onCheckedChange={toggleSelectAll}
-                      data-testid="checkbox-select-all"
-                    />
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Contact</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Email</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Phone</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Company</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Type</th>
-                  <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredContacts.map((contact) => (
-                  <tr 
-                    key={contact.id} 
-                    className="hover:bg-gray-50 transition-colors" 
-                    data-testid={`row-contact-${contact.id}`}
-                  >
-                    {/* Checkbox */}
-                    <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        checked={selectedIds.has(contact.id)}
-                        onCheckedChange={() => toggleSelection(contact.id)}
-                        data-testid={`checkbox-contact-${contact.id}`}
-                      />
-                    </td>
-                    
-                    {/* Contact */}
-                    <td className="px-6 py-4 cursor-pointer" onClick={() => handleRowClick(contact)}>
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-sm flex-shrink-0">
-                          {getInitials(contact.firstName, contact.lastName)}
-                        </div>
-                        <div>
-                          <div className="text-sm font-semibold text-gray-900" data-testid={`text-contact-name-${contact.id}`}>
-                            {contact.firstName} {contact.lastName}
-                          </div>
-                          <div className="text-sm text-gray-500" data-testid={`text-contact-title-${contact.id}`}>
-                            {contact.position || contact.role || 'No title'}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    
-                    {/* Email */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <Mail className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm text-gray-900" data-testid={`text-contact-email-${contact.id}`}>
-                          {contact.email}
-                        </span>
-                      </div>
-                    </td>
-                    
-                    {/* Phone */}
-                    <td className="px-6 py-4">
-                      {contact.phone ? (
-                        <div className="flex items-center gap-2">
-                          <Phone className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-900" data-testid={`text-contact-phone-${contact.id}`}>
-                            {contact.phone}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-gray-400">-</span>
-                      )}
-                    </td>
-                    
-                    {/* Company */}
-                    <td className="px-6 py-4">
-                      {contact.company ? (
-                        <div className="flex items-center gap-2">
-                          <Building className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-900" data-testid={`text-contact-company-${contact.id}`}>
-                            {contact.company.name}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-gray-400">-</span>
-                      )}
-                    </td>
-                    
-                    {/* Type */}
-                    <td className="px-6 py-4">
-                      <div className="flex flex-wrap gap-1">
-                        {/* Contact Tag Badge (Primary) */}
-                        {contact.contactTag && (
-                          <Badge 
-                            className={contactTagColors[contact.contactTag as keyof typeof contactTagColors] || 'bg-gray-500 text-white'} 
-                            data-testid={`badge-contact-tag-${contact.id}`}
-                          >
-                            {contact.contactTag.charAt(0).toUpperCase() + contact.contactTag.slice(1)}
-                          </Badge>
-                        )}
-                        
-                        {/* Lead Status Badge (Conditional - only when contactTag = 'lead') */}
-                        {contact.contactTag === 'lead' && contact.leadStatus && (
-                          <Badge 
-                            className={`flex items-center gap-0.5 text-xs ${leadStatusColors[contact.leadStatus as keyof typeof leadStatusColors] || 'bg-gray-100 text-gray-800'}`}
-                            data-testid={`badge-lead-status-${contact.id}`}
-                          >
-                            <Thermometer className="h-3 w-3" />
-                            {contact.leadStatus.charAt(0).toUpperCase() + contact.leadStatus.slice(1)}
-                          </Badge>
-                        )}
-                      </div>
-                    </td>
-                    
-                    {/* Actions */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => handleEdit(contact, e)}
-                          className="h-8 w-8 p-0 hover:bg-gray-200"
-                          data-testid={`button-edit-contact-${contact.id}`}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => handleDelete(contact.id, e)}
-                          className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                          data-testid={`button-delete-contact-${contact.id}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        
-        <ContactFormModal
-          isOpen={isContactFormOpen}
-          onClose={() => {
-            setIsContactFormOpen(false);
-            setEditingContact(null);
-          }}
-          contact={editingContact}
-        />
-
-        <DetailDrawer
-          open={isDetailModalOpen}
-          onOpenChange={(open) => {
-            setIsDetailModalOpen(open);
-            if (!open) setSelectedContact(null);
-          }}
-          entityType="contact"
-          entityId={selectedContact?.id || null}
-          onDelete={() => {
-            queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
-          }}
-        />
-
-        <ContactDetailModal
-          isOpen={isContactDetailModalOpen}
-          onClose={() => {
-            setIsContactDetailModalOpen(false);
-            setSelectedContact(null);
-          }}
-          contact={selectedContact}
-          onCompanyClick={(company) => {
-            setSelectedCompany(company);
-            setIsCompanyModalOpen(true);
-          }}
-          onPropertyClick={(property) => {
-            setSelectedProperty(property);
-            setIsPropertyModalOpen(true);
-          }}
-        />
-
-        <CompanyDetailModal
-          isOpen={isCompanyModalOpen}
-          onClose={() => {
-            setIsCompanyModalOpen(false);
-            setSelectedCompany(null);
-          }}
-          company={selectedCompany}
-          onContactClick={(contact) => {
-            setSelectedContact(contact);
-            setIsContactDetailModalOpen(true);
-          }}
-          onPropertyClick={(property) => {
-            setSelectedProperty(property);
-            setIsPropertyModalOpen(true);
-          }}
-        />
-
-        <PropertyDetailModal
-          isOpen={isPropertyModalOpen}
-          onClose={() => {
-            setIsPropertyModalOpen(false);
-            setSelectedProperty(null);
-          }}
-          property={selectedProperty}
-          onContactClick={(contact) => {
-            setSelectedContact(contact);
-            setIsContactDetailModalOpen(true);
-          }}
-          onCompanyClick={(company) => {
-            setSelectedCompany(company);
-            setIsCompanyModalOpen(true);
-          }}
-        />
-        
-        <ImportResultsModal 
-          isOpen={showImportResults}
-          onClose={() => setShowImportResults(false)}
-          results={importResults}
-          entityType="contacts"
-        />
-      </main>
-    </div>
+      <ImportResultsModal 
+        isOpen={showImportResults}
+        onClose={() => setShowImportResults(false)}
+        results={importResults}
+        entityType="contacts"
+      />
+    </CrmPageShell>
   );
 }
