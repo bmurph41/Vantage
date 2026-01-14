@@ -3518,7 +3518,8 @@ export class DatabaseStorage implements IStorage {
       createdCompany = await this.updateCrmCompany(duplicateId, updateData);
     } else {
       const companyData: InsertCrmCompany = {
-        ownerId: pending.orgId,
+        orgId: pending.orgId,
+        ownerId: userId,
         name: pending.name,
         website: pending.website || undefined,
         phone: pending.phone || undefined,
