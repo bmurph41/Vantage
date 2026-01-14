@@ -294,20 +294,21 @@ function Router() {
           </Suspense>
         )}
       </Route>
-      {/* Design preview - no auth required */}
-      <Route path="/design-preview">
+      {/* Public landing page - no auth required */}
+      <Route path="/">
         {() => (
           <Suspense fallback={<PageLoader />}>
             <DesignPreview />
           </Suspense>
         )}
       </Route>
-      {/* Root path redirects to Dashboard */}
-      <Route path="/">
-        {() => {
-          setLocation('/dashboard');
-          return null;
-        }}
+      {/* Keep design-preview as alias */}
+      <Route path="/design-preview">
+        {() => (
+          <Suspense fallback={<PageLoader />}>
+            <DesignPreview />
+          </Suspense>
+        )}
       </Route>
       {/* Protected routes - authentication handled by UnifiedLayout */}
       <Route path="/projects">

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -157,11 +158,14 @@ export default function DesignPreview() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-slate-400 text-sm hidden md:block">Home</span>
-            <span className="text-slate-400 text-sm hidden md:block">Our Team</span>
-            <Button className="bg-cyan-500 hover:bg-cyan-600 text-white">
-              Request Demo
-            </Button>
+            <Link href="/login">
+              <span className="text-slate-300 hover:text-white text-sm cursor-pointer">Sign In</span>
+            </Link>
+            <Link href="/signup">
+              <Button className="bg-cyan-500 hover:bg-cyan-600 text-white">
+                Get Started
+              </Button>
+            </Link>
           </div>
         </div>
       </nav>
@@ -194,12 +198,16 @@ export default function DesignPreview() {
           
           {/* CTA Buttons */}
           <div className="flex items-center justify-center gap-4">
-            <Button size="lg" className="bg-cyan-500 hover:bg-cyan-600 text-white px-8">
-              Get Started
-            </Button>
-            <Button size="lg" variant="outline" className="border-cyan-400 text-cyan-300 hover:bg-cyan-950 px-8">
-              Watch Demo
-            </Button>
+            <Link href="/signup">
+              <Button size="lg" className="bg-cyan-500 hover:bg-cyan-600 text-white px-8">
+                Get Started Free
+              </Button>
+            </Link>
+            <Link href="/login">
+              <Button size="lg" variant="outline" className="border-cyan-400 text-cyan-300 hover:bg-cyan-950 px-8">
+                Sign In
+              </Button>
+            </Link>
           </div>
         </div>
 
@@ -389,12 +397,16 @@ export default function DesignPreview() {
             Join the leading marina investment firms using MarinaMatch to source, analyze, and close deals faster.
           </p>
           <div className="flex items-center justify-center gap-4">
-            <Button size="lg" className="bg-cyan-500 hover:bg-cyan-600 text-white px-8">
-              Start Free Trial
-            </Button>
-            <Button size="lg" variant="outline" className="border-cyan-400 text-cyan-300 hover:bg-cyan-950 px-8">
-              Schedule Demo
-            </Button>
+            <Link href="/signup">
+              <Button size="lg" className="bg-cyan-500 hover:bg-cyan-600 text-white px-8">
+                Start Free Trial
+              </Button>
+            </Link>
+            <Link href="/login">
+              <Button size="lg" variant="outline" className="border-cyan-400 text-cyan-300 hover:bg-cyan-950 px-8">
+                Sign In
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
