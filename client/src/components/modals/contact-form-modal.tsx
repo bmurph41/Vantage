@@ -148,7 +148,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
     setState(contact?.state ?? "");
     setZipCode(contact?.zipCode ?? "");
     setCompany(contact?.company ?? "");
-    setSelectedCompanyId(null);
+    setSelectedCompanyId(contact?.companyId ?? null);
     setCompanySearchQuery("");
     setCompanyPopoverOpen(false);
     setRole(contact?.role ?? contact?.position ?? "");

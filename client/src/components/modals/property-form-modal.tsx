@@ -245,7 +245,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
       setLinearFeet("");
       setYearBuilt("");
     }
-  }, [property, form]);
+  }, [property, form, isOpen]);
 
   const createPropertyMutation = useMutation({
     mutationFn: async (data: any) => {
