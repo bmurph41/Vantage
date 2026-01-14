@@ -113,6 +113,23 @@ export class RRAService {
     return location || null;
   }
 
+  async getIncludedProjects(orgId: string): Promise<{ locationId: string; name: string; projectType: string; includeInExecutive: boolean }[]> {
+    const locations = await db.select({
+      locationId: rraMarinaLocations.id,
+      name: rraMarinaLocations.name,
+      projectType: rraMarinaLocations.projectType,
+      includeInExecutive: rraMarinaLocations.includeInExecutive
+    })
+      .from(rraMarinaLocations)
+      .where(and(
+        eq(rraMarinaLocations.orgId, orgId),
+        eq(rraMarinaLocations.includeInExecutive, true)
+      ))
+      .orderBy(asc(rraMarinaLocations.name));
+    
+    return locations;
+  }
+
   async createLocation(data: InsertRraMarinaLocation): Promise<RraMarinaLocation> {
     const [location] = await db.insert(rraMarinaLocations)
       .values(data)

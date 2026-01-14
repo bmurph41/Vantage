@@ -654,6 +654,17 @@ router.post("/leases/import/pdf", async (req: Request, res: Response, next: Next
   }
 });
 
+// Get projects included in Executive Summary
+router.get("/included-projects", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const includedProjects = await rraService.getIncludedProjects(orgId);
+    res.json(includedProjects);
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get("/locations", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orgId = getOrgId(req);
