@@ -18697,5 +18697,224 @@ export interface ParsedImportRow {
 }
 
 
+// ================================================================================
+// MARINALYTICS - Portfolio Company & Operating Metrics Analytics
+// ================================================================================
+
+// Metric category enum for organizing metrics
+export const marinalyticsMetricCategoryEnum = pgEnum("marinalytics_metric_category", [
+  "revenue", "occupancy", "fuel", "ancillary", "labor", "operating_expense", 
+  "margin", "customer", "maintenance", "capital"
+]);
+
+// Metric unit enum
+export const marinalyticsMetricUnitEnum = pgEnum("marinalytics_metric_unit", [
+  "percentage", "currency", "days", "count", "ratio", "currency_per_foot", 
+  "currency_per_slip", "currency_per_sqft"
+]);
+
+// Benchmark cohort type
+export const marinalyticsCohortTypeEnum = pgEnum("marinalytics_cohort_type", [
+  "all", "region", "size", "property_type", "capital_partner"
+]);
+
+// Metric definitions - standard metrics that can be tracked
+export const marinalyticsMetricDefinitions = pgTable("marinalytics_metric_definitions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  metricKey: varchar("metric_key", { length: 100 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  category: marinalyticsMetricCategoryEnum("category").notNull(),
+  unit: marinalyticsMetricUnitEnum("unit").notNull(),
+  calculationFormula: text("calculation_formula"),
+  isSystem: boolean("is_system").default(true),
+  displayOrder: integer("display_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Operator profiles - extended profile for portfolio companies
+export const marinalyticsOperatorProfiles = pgTable("marinalytics_operator_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  companyId: varchar("company_id").notNull().references(() => crmCompanies.id, { onDelete: 'cascade' }),
+  capitalPartner: varchar("capital_partner", { length: 255 }),
+  focusSegments: text("focus_segments").array(), // wet slips, dry storage, yacht clubs, etc.
+  primaryRegions: text("primary_regions").array(), // geographic focus areas
+  totalMarinaCount: integer("total_marina_count").default(0),
+  totalSlipCount: integer("total_slip_count").default(0),
+  totalLinearFeet: integer("total_linear_feet").default(0),
+  acquisitionStartYear: integer("acquisition_start_year"),
+  preferredBenchmarkCohorts: jsonb("preferred_benchmark_cohorts"), // cohort IDs for comparison
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Metric snapshots - actual metric values for operators/properties
+export const marinalyticsMetricSnapshots = pgTable("marinalytics_metric_snapshots", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  operatorProfileId: varchar("operator_profile_id").references(() => marinalyticsOperatorProfiles.id, { onDelete: 'cascade' }),
+  propertyId: varchar("property_id").references(() => crmProperties.id, { onDelete: 'cascade' }),
+  metricKey: varchar("metric_key", { length: 100 }).notNull(),
+  periodStart: date("period_start").notNull(),
+  periodEnd: date("period_end").notNull(),
+  value: decimal("value", { precision: 15, scale: 4 }).notNull(),
+  sourceType: varchar("source_type", { length: 50 }), // manual, pnl_import, calculated
+  confidence: varchar("confidence", { length: 20 }).default("high"), // low, medium, high
+  sourceDocumentId: varchar("source_document_id"),
+  notes: text("notes"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+  createdBy: varchar("created_by").references(() => users.id),
+});
+
+// Benchmark sets - industry benchmarks for comparison
+export const marinalyticsBenchmarkSets = pgTable("marinalytics_benchmark_sets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").references(() => organizations.id), // null for system-wide benchmarks
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  cohortType: marinalyticsCohortTypeEnum("cohort_type").notNull(),
+  cohortValue: varchar("cohort_value", { length: 255 }), // e.g., "Southeast", "Large (>200 slips)"
+  metricKey: varchar("metric_key", { length: 100 }).notNull(),
+  p10: decimal("p10", { precision: 15, scale: 4 }), // 10th percentile
+  p25: decimal("p25", { precision: 15, scale: 4 }), // 25th percentile
+  p50: decimal("p50", { precision: 15, scale: 4 }), // median
+  p75: decimal("p75", { precision: 15, scale: 4 }), // 75th percentile
+  p90: decimal("p90", { precision: 15, scale: 4 }), // 90th percentile
+  mean: decimal("mean", { precision: 15, scale: 4 }),
+  sampleSize: integer("sample_size").default(0),
+  periodYear: integer("period_year"),
+  isSystem: boolean("is_system").default(false),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Capital partners table - track institutional investors
+export const marinalyticsCapitalPartners = pgTable("marinalytics_capital_partners", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: varchar("name", { length: 255 }).notNull(),
+  type: varchar("type", { length: 100 }), // PE, Family Office, REIT, Private, Strategic
+  aum: decimal("aum", { precision: 15, scale: 2 }), // Assets under management
+  marinaFocusPercentage: decimal("marina_focus_percentage", { precision: 5, scale: 2 }),
+  headquarters: varchar("headquarters", { length: 255 }),
+  website: varchar("website", { length: 500 }),
+  foundedYear: integer("founded_year"),
+  notes: text("notes"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Relations
+export const marinalyticsOperatorProfilesRelations = relations(marinalyticsOperatorProfiles, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [marinalyticsOperatorProfiles.orgId],
+    references: [organizations.id],
+  }),
+  company: one(crmCompanies, {
+    fields: [marinalyticsOperatorProfiles.companyId],
+    references: [crmCompanies.id],
+  }),
+  metricSnapshots: many(marinalyticsMetricSnapshots),
+}));
+
+export const marinalyticsMetricSnapshotsRelations = relations(marinalyticsMetricSnapshots, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [marinalyticsMetricSnapshots.orgId],
+    references: [organizations.id],
+  }),
+  operatorProfile: one(marinalyticsOperatorProfiles, {
+    fields: [marinalyticsMetricSnapshots.operatorProfileId],
+    references: [marinalyticsOperatorProfiles.id],
+  }),
+  property: one(crmProperties, {
+    fields: [marinalyticsMetricSnapshots.propertyId],
+    references: [crmProperties.id],
+  }),
+  creator: one(users, {
+    fields: [marinalyticsMetricSnapshots.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const marinalyticsBenchmarkSetsRelations = relations(marinalyticsBenchmarkSets, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [marinalyticsBenchmarkSets.orgId],
+    references: [organizations.id],
+  }),
+}));
+
+export const marinalyticsCapitalPartnersRelations = relations(marinalyticsCapitalPartners, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [marinalyticsCapitalPartners.orgId],
+    references: [organizations.id],
+  }),
+}));
+
+// Insert/Select schemas
+export const insertMarinalyticsMetricDefinitionSchema = createInsertSchema(marinalyticsMetricDefinitions).omit({
+  id: true,
+  createdAt: true,
+});
+export type MarinalyticsMetricDefinition = typeof marinalyticsMetricDefinitions.$inferSelect;
+export type InsertMarinalyticsMetricDefinition = z.infer<typeof insertMarinalyticsMetricDefinitionSchema>;
+
+export const insertMarinalyticsOperatorProfileSchema = createInsertSchema(marinalyticsOperatorProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type MarinalyticsOperatorProfile = typeof marinalyticsOperatorProfiles.$inferSelect;
+export type InsertMarinalyticsOperatorProfile = z.infer<typeof insertMarinalyticsOperatorProfileSchema>;
+
+export const insertMarinalyticsMetricSnapshotSchema = createInsertSchema(marinalyticsMetricSnapshots).omit({
+  id: true,
+  createdAt: true,
+});
+export type MarinalyticsMetricSnapshot = typeof marinalyticsMetricSnapshots.$inferSelect;
+export type InsertMarinalyticsMetricSnapshot = z.infer<typeof insertMarinalyticsMetricSnapshotSchema>;
+
+export const insertMarinalyticsBenchmarkSetSchema = createInsertSchema(marinalyticsBenchmarkSets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type MarinalyticsBenchmarkSet = typeof marinalyticsBenchmarkSets.$inferSelect;
+export type InsertMarinalyticsBenchmarkSet = z.infer<typeof insertMarinalyticsBenchmarkSetSchema>;
+
+export const insertMarinalyticsCapitalPartnerSchema = createInsertSchema(marinalyticsCapitalPartners).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type MarinalyticsCapitalPartner = typeof marinalyticsCapitalPartners.$inferSelect;
+export type InsertMarinalyticsCapitalPartner = z.infer<typeof insertMarinalyticsCapitalPartnerSchema>;
+
+// Standard marina operating metrics seed data
+export const MARINALYTICS_STANDARD_METRICS = [
+  { metricKey: 'slip_revenue_per_foot', name: 'Slip Revenue per Linear Foot', category: 'revenue', unit: 'currency_per_foot' },
+  { metricKey: 'occupancy_rate', name: 'Occupancy Rate', category: 'occupancy', unit: 'percentage' },
+  { metricKey: 'transient_mix', name: 'Transient vs Annual Mix', category: 'occupancy', unit: 'percentage' },
+  { metricKey: 'fuel_gross_margin', name: 'Fuel Gross Margin', category: 'fuel', unit: 'percentage' },
+  { metricKey: 'fuel_gallons_per_slip', name: 'Fuel Gallons per Slip', category: 'fuel', unit: 'count' },
+  { metricKey: 'ancillary_revenue_share', name: 'Ancillary Revenue Share', category: 'ancillary', unit: 'percentage' },
+  { metricKey: 'ship_store_revenue_per_slip', name: 'Ship Store Revenue per Slip', category: 'ancillary', unit: 'currency_per_slip' },
+  { metricKey: 'labor_to_revenue', name: 'Labor to Revenue Ratio', category: 'labor', unit: 'percentage' },
+  { metricKey: 'opex_per_slip', name: 'Operating Expense per Slip', category: 'operating_expense', unit: 'currency_per_slip' },
+  { metricKey: 'utilities_per_slip', name: 'Utilities per Slip', category: 'operating_expense', unit: 'currency_per_slip' },
+  { metricKey: 'maintenance_per_slip', name: 'Maintenance per Slip', category: 'maintenance', unit: 'currency_per_slip' },
+  { metricKey: 'ebitda_margin', name: 'EBITDA Margin', category: 'margin', unit: 'percentage' },
+  { metricKey: 'noi_margin', name: 'NOI Margin', category: 'margin', unit: 'percentage' },
+  { metricKey: 'gross_margin', name: 'Gross Margin', category: 'margin', unit: 'percentage' },
+  { metricKey: 'customer_retention', name: 'Customer Retention Rate', category: 'customer', unit: 'percentage' },
+  { metricKey: 'ar_aging_days', name: 'AR Aging Days', category: 'customer', unit: 'days' },
+  { metricKey: 'capex_per_foot', name: 'CapEx per Linear Foot', category: 'capital', unit: 'currency_per_foot' },
+  { metricKey: 'service_dept_margin', name: 'Service Department Gross Margin', category: 'margin', unit: 'percentage' },
+] as const;
+
 // Replit Auth models
 export * from "./models/auth";

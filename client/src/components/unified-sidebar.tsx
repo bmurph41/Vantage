@@ -105,6 +105,7 @@ const marinalyticsNav = [
   { name: "Rate Comps", href: "/analysis/rate-comps", icon: TrendingUp },
   { name: "Demographics", href: "/analysis/demographics", icon: Users },
   { name: "Capital Markets", href: "/analysis/benchmarks", icon: Target },
+  { name: "Portfolio Analytics", href: "/analysis/marinalytics", icon: BarChart3 },
 ];
 
 type PendingItem = {

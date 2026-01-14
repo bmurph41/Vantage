@@ -560,6 +560,40 @@ export default function CompanyDetailModal({
           <ScrollArea className="flex-1 px-6 py-4">
             {/* Overview Tab */}
             <TabsContent value="overview" className="mt-0 space-y-6">
+              {/* Portfolio Company Badge */}
+              {company?.isPortfolioCompany && (
+                <Card className="bg-gradient-to-r from-cyan-50 to-blue-50 dark:from-cyan-950 dark:to-blue-950 border-cyan-200 dark:border-cyan-800">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-cyan-500/20 rounded-lg">
+                          <Anchor className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <Badge className="bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200">
+                              Portfolio Company
+                            </Badge>
+                            {company.capitalPartner && (
+                              <Badge variant="outline" className="text-xs">
+                                {company.capitalPartner}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Tracked in Marinalytics for operating metrics and benchmarking
+                          </p>
+                        </div>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => window.location.href = '/analysis/marinalytics'}>
+                        <TrendingUp className="w-4 h-4 mr-2" />
+                        View Analytics
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Stats Cards */}
               <div className="grid grid-cols-4 gap-4">
                 <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200 dark:border-green-800">

@@ -45,6 +45,7 @@ import { enterpriseAuthService } from "./services/enterprise-auth-service";
 import { registerCommentRoutes } from "./routes/comment-routes";
 import emailMarketingRoutes from "./routes/email-marketing-routes";
 import archiveRoutes from "./routes/archive-routes";
+import marinalyticsRoutes from "./routes/marinalytics-routes";
 import { userSessions, insertProspectingEntrySchema, users } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { rentRollService } from "./services/rent-roll-service";
@@ -360,6 +361,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerCommentRoutes(app);
   app.use("/api/email-marketing", authenticateUser, emailMarketingRoutes);
   app.use("/api/archive", authenticateUser, archiveRoutes);
+  app.use("/api/marinalytics", authenticateUser, marinalyticsRoutes);
   // Apply authentication to CRM route aliases
   app.use("/api/leads", authenticateUser, enforceTenant);
   app.use("/api/deals", authenticateUser, enforceTenant);
