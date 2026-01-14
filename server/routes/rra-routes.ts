@@ -1,7 +1,6 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { rraService } from "../services/rra-service";
 import { requireRentRoll } from "../middleware/pack-guard";
-import { bulkDeleteLeases, bulkUpdateLeases } from "../services/rent-roll-v2/rentRollService";
 import { z } from "zod";
 import multer from "multer";
 import { db } from "../db";
@@ -1440,7 +1439,7 @@ router.post("/leases/bulk-delete", async (req: Request, res: Response, next: Nex
     }
     
     console.log(`[Rent Roll] Bulk deleting ${ids.length} leases for org ${orgId}`);
-    const deletedCount = await bulkDeleteLeases(ids, orgId);
+    const deletedCount = await rraService.bulkDeleteLeases(orgId, ids);
     console.log(`[Rent Roll] Successfully deleted ${deletedCount} leases`);
     
     res.json({ deleted: deletedCount, message: `Successfully deleted ${deletedCount} leases` });

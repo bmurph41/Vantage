@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { eq, and, desc, asc, sql, ilike, or, between, isNull } from "drizzle-orm";
+import { eq, and, desc, asc, sql, ilike, or, between, isNull, inArray } from "drizzle-orm";
 import {
   rraMarinaLocations,
   rraStorageLocations,
@@ -502,6 +502,111 @@ export class RRAService {
         eq(rraLeases.orgId, orgId)
       ));
     return true;
+  }
+
+  /**
+   * Bulk delete multiple leases and all their associated data
+   * Cascade deletes: line items, contract charges, terms, rent steps, 
+   * escalations, concessions, cash flows, move events, document bindings
+   * Also deletes orphaned tenants (tenants with no remaining leases)
+   */
+  async bulkDeleteLeases(orgId: string, leaseIds: string[]): Promise<number> {
+    if (!leaseIds || leaseIds.length === 0) {
+      return 0;
+    }
+
+    // Verify all leases belong to this organization
+    const existingLeases = await db.select({ 
+      id: rraLeases.id, 
+      tenantId: rraLeases.tenantId 
+    })
+      .from(rraLeases)
+      .where(and(
+        inArray(rraLeases.id, leaseIds),
+        eq(rraLeases.orgId, orgId)
+      ));
+
+    if (existingLeases.length === 0) {
+      throw new Error("No leases found matching the provided IDs");
+    }
+
+    // Only proceed with leases that belong to this org
+    const validLeaseIds = existingLeases.map(l => l.id);
+    const tenantIds = [...new Set(existingLeases.map(l => l.tenantId))];
+
+    console.log(`[RRA] Bulk deleting ${validLeaseIds.length} leases with cascade...`);
+
+    // Delete all related data in correct order (respecting foreign key constraints)
+    // The schema has onDelete: 'cascade' for most of these, but we'll be explicit
+    
+    // Delete cash flow budget mappings first (references cash flows)
+    await db.delete(rraBudgetCashFlowMap)
+      .where(sql`${rraBudgetCashFlowMap.cashFlowId} IN (
+        SELECT id FROM rra_lease_cash_flows WHERE lease_id = ANY(${validLeaseIds})
+      )`);
+
+    // Delete cash flows
+    await db.delete(rraLeaseCashFlows)
+      .where(inArray(rraLeaseCashFlows.leaseId, validLeaseIds));
+
+    // Delete move events
+    await db.delete(rraMoveEvents)
+      .where(inArray(rraMoveEvents.leaseId, validLeaseIds));
+
+    // Delete document bindings
+    await db.delete(rraLeaseDocumentBindings)
+      .where(inArray(rraLeaseDocumentBindings.leaseId, validLeaseIds));
+
+    // Delete lease snapshots
+    await db.delete(rraLeaseSnapshots)
+      .where(inArray(rraLeaseSnapshots.leaseId, validLeaseIds));
+
+    // Delete concessions
+    await db.delete(rraLeaseConcessions)
+      .where(inArray(rraLeaseConcessions.leaseId, validLeaseIds));
+
+    // Delete escalations
+    await db.delete(rraLeaseEscalations)
+      .where(inArray(rraLeaseEscalations.leaseId, validLeaseIds));
+
+    // Delete rent steps
+    await db.delete(rraLeaseRentSteps)
+      .where(inArray(rraLeaseRentSteps.leaseId, validLeaseIds));
+
+    // Delete terms
+    await db.delete(rraLeaseTerms)
+      .where(inArray(rraLeaseTerms.leaseId, validLeaseIds));
+
+    // Delete contract charges
+    await db.delete(rraContractCharges)
+      .where(inArray(rraContractCharges.leaseId, validLeaseIds));
+
+    // Delete line items
+    await db.delete(rraLeaseLineItems)
+      .where(inArray(rraLeaseLineItems.leaseId, validLeaseIds));
+
+    // Delete the leases themselves
+    await db.delete(rraLeases)
+      .where(inArray(rraLeases.id, validLeaseIds));
+
+    // Delete orphaned tenants (tenants that no longer have any leases)
+    if (tenantIds.length > 0) {
+      const tenantsWithOtherLeases = await db.select({ tenantId: rraLeases.tenantId })
+        .from(rraLeases)
+        .where(inArray(rraLeases.tenantId, tenantIds));
+      
+      const tenantsStillInUse = new Set(tenantsWithOtherLeases.map(t => t.tenantId));
+      const orphanedTenantIds = tenantIds.filter(id => !tenantsStillInUse.has(id));
+      
+      if (orphanedTenantIds.length > 0) {
+        console.log(`[RRA] Deleting ${orphanedTenantIds.length} orphaned tenants...`);
+        await db.delete(rraTenants)
+          .where(inArray(rraTenants.id, orphanedTenantIds));
+      }
+    }
+
+    console.log(`[RRA] Successfully deleted ${validLeaseIds.length} leases`);
+    return validLeaseIds.length;
   }
 
   async createLeaseLineItem(data: InsertRraLeaseLineItem): Promise<RraLeaseLineItem> {
