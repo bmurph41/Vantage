@@ -49,6 +49,29 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Landing page or dashboard redirect based on auth status
+function LandingOrDashboard() {
+  const { isAuthenticated, isLoading } = useAuth();
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+  
+  if (isAuthenticated) {
+    return <Redirect to="/dashboard" />;
+  }
+  
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <DesignPreview />
+    </Suspense>
+  );
+}
+
 // Code-split less frequently used pages
 const ProjectPage = lazy(() => import("@/pages/project"));
 const NotificationSettingsPage = lazy(() => import("@/pages/notification-settings"));
@@ -310,13 +333,9 @@ function Router() {
           </Suspense>
         )}
       </Route>
-      {/* Public landing page - no auth required */}
+      {/* Public landing page - redirects to dashboard if logged in */}
       <Route path="/">
-        {() => (
-          <Suspense fallback={<PageLoader />}>
-            <DesignPreview />
-          </Suspense>
-        )}
+        {() => <LandingOrDashboard />}
       </Route>
       {/* Keep design-preview as alias */}
       <Route path="/design-preview">
