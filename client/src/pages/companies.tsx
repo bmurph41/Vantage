@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -88,6 +89,8 @@ const colorMap: Record<string, { bg: string; text: string }> = {
 };
 
 export default function Companies() {
+  const [, setLocation] = useLocation();
+  const searchString = useSearch();
   const [searchTerm, setSearchTerm] = useState('');
   const [industryFilter, setIndustryFilter] = useState('all');
   const [sizeFilter, setSizeFilter] = useState('all');
@@ -103,6 +106,20 @@ export default function Companies() {
   const { data: companies, isLoading } = useQuery<Company[]>({
     queryKey: ['/api/companies'],
   });
+  
+  useEffect(() => {
+    if (companies && searchString) {
+      const params = new URLSearchParams(searchString);
+      const selectedId = params.get('selected');
+      if (selectedId) {
+        const company = companies.find(c => c.id === selectedId);
+        if (company) {
+          setSelectedCompany(company);
+          setLocation('/crm/companies', { replace: true });
+        }
+      }
+    }
+  }, [companies, searchString, setLocation]);
 
   const { data: kpiPreferences } = useQuery<{ kpiConfig: KpiConfigItem[] }>({
     queryKey: ['/api/user-preferences/kpis', PAGE_KEY],

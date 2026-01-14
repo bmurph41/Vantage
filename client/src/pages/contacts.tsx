@@ -476,12 +476,15 @@ export default function Contacts() {
 
       {selectedContact.company && (
         <CrmDetailSection title="Company">
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+          <div 
+            className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+            onClick={() => setLocation(`/crm/companies?selected=${selectedContact.company?.id}`)}
+          >
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
               <Building className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <div className="text-sm font-medium text-gray-900">{selectedContact.company.name}</div>
+              <div className="text-sm font-medium text-blue-600 hover:text-blue-700">{selectedContact.company.name}</div>
               {selectedContact.company.industry && (
                 <div className="text-xs text-gray-500">{selectedContact.company.industry}</div>
               )}
