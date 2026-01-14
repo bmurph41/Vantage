@@ -1,4 +1,4 @@
-import { db } from "./db";
+import { db } from "../../db";
 import { 
   tenants, 
   leases, 
@@ -853,18 +853,37 @@ export async function bulkDeleteLeases(leaseIds: string[], organizationId: strin
   // Get tenant IDs to delete
   const tenantIds = existingLeases.map(l => l.tenantId);
   
-  // Delete cash flows first (foreign key constraint)
+  // Delete related data first (order matters due to foreign key constraints)
+  // Delete lease line items
+  await db.delete(leaseLineItems)
+    .where(inArray(leaseLineItems.leaseId, leaseIds));
+  
+  // Delete cash flows
   await db.delete(leaseCashFlows)
     .where(inArray(leaseCashFlows.leaseId, leaseIds));
+  
+  // Delete move events if they exist
+  await db.delete(moveEvents)
+    .where(inArray(moveEvents.leaseId, leaseIds));
   
   // Delete the leases
   await db.delete(leases)
     .where(inArray(leases.id, leaseIds));
   
-  // Delete the tenants
+  // Delete orphaned tenants (tenants that only belonged to these leases)
+  // We filter to only delete tenants that don't have other leases
   if (tenantIds.length > 0) {
-    await db.delete(tenants)
-      .where(inArray(tenants.id, tenantIds));
+    const tenantsWithOtherLeases = await db.select({ tenantId: leases.tenantId })
+      .from(leases)
+      .where(inArray(leases.tenantId, tenantIds));
+    
+    const tenantsStillInUse = new Set(tenantsWithOtherLeases.map(t => t.tenantId));
+    const orphanedTenantIds = tenantIds.filter(id => !tenantsStillInUse.has(id));
+    
+    if (orphanedTenantIds.length > 0) {
+      await db.delete(tenants)
+        .where(inArray(tenants.id, orphanedTenantIds));
+    }
   }
   
   return leaseIds.length;

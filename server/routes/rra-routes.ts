@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { rraService } from "../services/rra-service";
 import { requireRentRoll } from "../middleware/pack-guard";
+import { bulkDeleteLeases, bulkUpdateLeases } from "../services/rent-roll-v2/rentRollService";
 import { z } from "zod";
 import multer from "multer";
 import { db } from "../db";
@@ -1425,6 +1426,26 @@ router.delete("/leases/:id", async (req: Request, res: Response, next: NextFunct
     await rraService.deleteLease(orgId, req.params.id);
     res.status(204).send();
   } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/leases/bulk-delete", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { ids } = req.body;
+    
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: "Invalid or empty IDs array" });
+    }
+    
+    console.log(`[Rent Roll] Bulk deleting ${ids.length} leases for org ${orgId}`);
+    const deletedCount = await bulkDeleteLeases(ids, orgId);
+    console.log(`[Rent Roll] Successfully deleted ${deletedCount} leases`);
+    
+    res.json({ deleted: deletedCount, message: `Successfully deleted ${deletedCount} leases` });
+  } catch (error: any) {
+    console.error("[Rent Roll] Bulk delete error:", error);
     next(error);
   }
 });
