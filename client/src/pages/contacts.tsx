@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +47,7 @@ const leadStatusColors = {
 
 export default function Contacts() {
   const [, setLocation] = useLocation();
+  const searchString = typeof window !== 'undefined' ? window.location.search : '';
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [contactTagFilter, setContactTagFilter] = useState('all');
@@ -63,6 +64,20 @@ export default function Contacts() {
   const { data: contacts = [], isLoading } = useQuery<ContactWithCompany[]>({
     queryKey: ['/api/contacts'],
   });
+  
+  useEffect(() => {
+    if (contacts.length > 0 && searchString) {
+      const params = new URLSearchParams(searchString);
+      const selectedId = params.get('selected');
+      if (selectedId) {
+        const contact = contacts.find(c => c.id === selectedId);
+        if (contact) {
+          setSelectedContact(contact);
+          setLocation('/crm/contacts', { replace: true });
+        }
+      }
+    }
+  }, [contacts, searchString, setLocation]);
 
   const deleteContactMutation = useMutation({
     mutationFn: async (id: string) => {

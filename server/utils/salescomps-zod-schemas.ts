@@ -167,6 +167,8 @@ export const compFiltersSchema = z.object({
   ),
   includePortfolios: z.coerce.boolean().optional(),
   excludePortfolios: z.coerce.boolean().optional(),
+  buyerCompanyId: z.string().uuid().optional(),
+  sellerCompanyId: z.string().uuid().optional(),
   sortBy: z.string().default('createdAt'),
   sortDir: z.enum(['asc', 'desc']).default('desc'),
   page: z.coerce.number().int().min(1).default(1),

@@ -4153,6 +4153,12 @@ export class DatabaseStorage implements IStorage {
     if (filters.portfoliosOnly) {
       conditions.push(eq(salesComps.isPortfolio, true));
     }
+    if (filters.buyerCompanyId) {
+      conditions.push(eq(salesComps.buyerCompanyId, filters.buyerCompanyId));
+    }
+    if (filters.sellerCompanyId) {
+      conditions.push(eq(salesComps.sellerCompanyId, filters.sellerCompanyId));
+    }
 
     const [{ total }] = await db.select({ total: count() })
       .from(salesComps)

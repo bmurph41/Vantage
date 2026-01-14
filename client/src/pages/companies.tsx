@@ -6,7 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building, Plus, Edit, Trash2, Upload, Search, Globe, Users, MapPin, TrendingUp, Download, Phone, Settings, Calendar, Briefcase, Home, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Building, Plus, Edit, Trash2, Upload, Search, Globe, Users, MapPin, TrendingUp, Download, Phone, Settings, Calendar, Briefcase, Home, Loader2, User, ChevronRight, Anchor, DollarSign } from "lucide-react";
 import CompanyFormModal from "@/components/modals/company-form-modal";
 import { FileUpload } from "@/components/file-upload";
 import KpiSettingsModal from "@/components/modals/kpi-settings-modal";
@@ -18,7 +20,7 @@ import { CrmDetailsPanel, CrmDetailSection, CrmDetailField } from "@/components/
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { formatNumber } from "@/lib/utils";
-import type { Company, KpiConfigItem } from "@shared/schema";
+import type { Company, KpiConfigItem, Contact, Property } from "@shared/schema";
 
 const industryColors: Record<string, string> = {
   technology: 'bg-blue-100 text-blue-800',
@@ -100,12 +102,61 @@ export default function Companies() {
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isKpiSettingsOpen, setIsKpiSettingsOpen] = useState(false);
+  const [showPropertiesModal, setShowPropertiesModal] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: companies, isLoading } = useQuery<Company[]>({
     queryKey: ['/api/companies'],
   });
+  
+  const { data: companyContacts = [] } = useQuery<Contact[]>({
+    queryKey: ['/api/companies', selectedCompany?.id, 'contacts'],
+    queryFn: async () => {
+      if (!selectedCompany?.id) return [];
+      const response = await fetch(`/api/companies/${selectedCompany.id}/contacts`);
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: !!selectedCompany?.id,
+  });
+  
+  const { data: companyProperties = [] } = useQuery<Property[]>({
+    queryKey: ['/api/companies', selectedCompany?.id, 'properties'],
+    queryFn: async () => {
+      if (!selectedCompany?.id) return [];
+      const response = await fetch(`/api/companies/${selectedCompany.id}/properties`);
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: !!selectedCompany?.id,
+  });
+  
+  const { data: companySalesComps = [] } = useQuery<any[]>({
+    queryKey: ['/api/companies', selectedCompany?.id, 'acquisitions'],
+    queryFn: async () => {
+      if (!selectedCompany?.id) return [];
+      const response = await fetch(`/api/sales-comps?buyerCompanyId=${selectedCompany.id}`);
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data : data.comps || [];
+    },
+    enabled: !!selectedCompany?.id,
+  });
+  
+  const lastAcquisition = useMemo(() => {
+    if (!companySalesComps?.length) return null;
+    const sorted = [...companySalesComps].sort((a, b) => {
+      const dateA = new Date(a.saleDate || a.closingDate || 0);
+      const dateB = new Date(b.saleDate || b.closingDate || 0);
+      return dateB.getTime() - dateA.getTime();
+    });
+    return sorted[0];
+  }, [companySalesComps]);
+  
+  const topContacts = useMemo(() => {
+    return companyContacts.slice(0, 3);
+  }, [companyContacts]);
   
   useEffect(() => {
     if (companies && searchString) {
@@ -449,18 +500,77 @@ export default function Companies() {
         <CrmDetailField label="Industry" value={selectedCompany.industry ? (
           <Badge className={industryColors[selectedCompany.industry] || 'bg-gray-100 text-gray-800'}>{formatRole(selectedCompany.industry)}</Badge>
         ) : null} />
-        <CrmDetailField label="Size" value={selectedCompany.size ? (
-          <Badge className={sizeColors[getSizeCategory(selectedCompany.size)] || 'bg-gray-100 text-gray-800'}>{selectedCompany.size}</Badge>
-        ) : null} />
+        <CrmDetailField label="Size" value={
+          companyProperties.length > 0 ? (
+            <button 
+              onClick={() => setShowPropertiesModal(true)}
+              className="flex items-center gap-1 text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+            >
+              <span>{companyProperties.length} {companyProperties.length === 1 ? 'Property' : 'Properties'}</span>
+              <ChevronRight className="w-3 h-3" />
+            </button>
+          ) : (
+            selectedCompany.size ? (
+              <Badge className={sizeColors[getSizeCategory(selectedCompany.size)] || 'bg-gray-100 text-gray-800'}>{selectedCompany.size}</Badge>
+            ) : null
+          )
+        } />
       </CrmDetailSection>
 
       <CrmDetailSection title="Portfolio">
-        <CrmDetailField label="# of Marinas" value={selectedCompany.portfolioCount || 0} />
+        <CrmDetailField label="# of Marinas" value={selectedCompany.portfolioCount || companyProperties.length || 0} />
         <CrmDetailField label="Portfolio Company" value={selectedCompany.isPortfolioCompany ? 'Yes' : 'No'} />
         {selectedCompany.isPortfolioCompany && selectedCompany.capitalPartner && (
           <CrmDetailField label="Capital Partner" value={selectedCompany.capitalPartner} />
         )}
+        {lastAcquisition && (
+          <CrmDetailField label="Last Acquisition" value={
+            <div className="flex items-center gap-2">
+              <DollarSign className="w-3.5 h-3.5 text-green-600" />
+              <span className="text-sm">
+                {lastAcquisition.propertyName || lastAcquisition.name || 'Marina'} 
+                {' - '}
+                {new Date(lastAcquisition.saleDate || lastAcquisition.closingDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+              </span>
+            </div>
+          } />
+        )}
       </CrmDetailSection>
+
+      {topContacts.length > 0 && (
+        <CrmDetailSection title="Key Contacts">
+          <div className="space-y-2">
+            {topContacts.map((contact: Contact) => (
+              <div 
+                key={contact.id}
+                onClick={() => setLocation(`/crm/contacts?selected=${contact.id}`)}
+                className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+              >
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <User className="w-4 h-4 text-blue-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium text-gray-900 truncate">
+                    {contact.firstName} {contact.lastName}
+                  </div>
+                  {contact.position && (
+                    <div className="text-xs text-gray-500 truncate">{contact.position}</div>
+                  )}
+                </div>
+                <ChevronRight className="w-4 h-4 text-gray-400" />
+              </div>
+            ))}
+            {companyContacts.length > 3 && (
+              <button 
+                onClick={() => setLocation(`/crm/contacts?company=${selectedCompany.id}`)}
+                className="text-xs text-blue-600 hover:underline pl-2"
+              >
+                View all {companyContacts.length} contacts
+              </button>
+            )}
+          </div>
+        </CrmDetailSection>
+      )}
 
       {selectedCompany.description && (
         <CrmDetailSection title="Description">
@@ -523,6 +633,57 @@ export default function Companies() {
 
       <CompanyFormModal isOpen={isFormOpen} onClose={() => { setIsFormOpen(false); setEditingCompany(null); }} company={editingCompany} />
       <KpiSettingsModal isOpen={isKpiSettingsOpen} onClose={() => setIsKpiSettingsOpen(false)} pageKey={PAGE_KEY} currentConfig={kpiConfig} availableMetrics={AVAILABLE_METRICS} />
+      
+      <Dialog open={showPropertiesModal} onOpenChange={setShowPropertiesModal}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building className="w-5 h-5 text-blue-600" />
+              Properties Owned by {selectedCompany?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            {companyProperties.length > 0 ? (
+              <div className="space-y-3 p-1">
+                {companyProperties.map((property: any) => (
+                  <div 
+                    key={property.id}
+                    onClick={() => {
+                      setShowPropertiesModal(false);
+                      setLocation(`/crm/properties?selected=${property.id}`);
+                    }}
+                    className="flex items-center gap-4 p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                  >
+                    <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Anchor className="w-6 h-6 text-teal-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-gray-900">{property.name || property.propertyName}</div>
+                      {property.address && (
+                        <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                          <MapPin className="w-3 h-3" />
+                          {property.address}
+                        </div>
+                      )}
+                      {(property.city || property.state) && (
+                        <div className="text-xs text-gray-400 mt-0.5">
+                          {[property.city, property.state].filter(Boolean).join(', ')}
+                        </div>
+                      )}
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-gray-400" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <Building className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+                <p>No properties linked to this company</p>
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </CrmPageShell>
   );
 }

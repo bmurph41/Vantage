@@ -18,6 +18,8 @@ export interface FilterParams {
   disclosedOnly?: boolean;
   disclosedCapRateOnly?: boolean;
   portfoliosOnly?: boolean;
+  buyerCompanyId?: string;
+  sellerCompanyId?: string;
   sortBy?: string;
   sortDir?: 'asc' | 'desc';
   page?: number;
@@ -99,6 +101,14 @@ export class FilterBuilder {
     }
     if (params.portfoliosOnly) {
       filters.portfoliosOnly = params.portfoliosOnly;
+    }
+    
+    // Company filters
+    if (params.buyerCompanyId) {
+      filters.buyerCompanyId = params.buyerCompanyId;
+    }
+    if (params.sellerCompanyId) {
+      filters.sellerCompanyId = params.sellerCompanyId;
     }
 
     return filters;

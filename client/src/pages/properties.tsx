@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -59,6 +60,8 @@ const statusColors: Record<string, string> = {
 };
 
 export default function Properties() {
+  const [, setLocation] = useLocation();
+  const searchString = typeof window !== 'undefined' ? window.location.search : '';
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -73,6 +76,20 @@ export default function Properties() {
   const { data: properties = [], isLoading } = useQuery<Property[]>({
     queryKey: ['/api/properties'],
   });
+  
+  useEffect(() => {
+    if (properties.length > 0 && searchString) {
+      const params = new URLSearchParams(searchString);
+      const selectedId = params.get('selected');
+      if (selectedId) {
+        const property = properties.find(p => p.id === selectedId);
+        if (property) {
+          setSelectedProperty(property);
+          setLocation('/crm/properties', { replace: true });
+        }
+      }
+    }
+  }, [properties, searchString, setLocation]);
 
   const deletePropertyMutation = useMutation({
     mutationFn: async (id: string) => apiRequest('DELETE', `/api/properties/${id}`),
