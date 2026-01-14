@@ -1877,13 +1877,19 @@ export default function FileImportDrawer({ open, onClose, locationId }: FileImpo
       queryClient.invalidateQueries({ queryKey: ["/api/rent-roll/included-projects"] });
       
       // Invalidate project-specific queries if locationId provided
+      // Use array format with partial matching to hit queries with any date params
       if (locationId) {
-        queryClient.invalidateQueries({ queryKey: [`/api/rent-roll/${locationId}/overview/metrics`] });
-        queryClient.invalidateQueries({ queryKey: [`/api/rent-roll/${locationId}/overview/revenue-trend`] });
-        queryClient.invalidateQueries({ queryKey: [`/api/rent-roll/${locationId}/overview/revenue-by-storage-type`] });
-        queryClient.invalidateQueries({ queryKey: [`/api/rent-roll/${locationId}/overview/move-events`] });
-        queryClient.invalidateQueries({ queryKey: [`/api/rent-roll/${locationId}/overview/economic-vacancy`] });
-        queryClient.invalidateQueries({ queryKey: [`/api/rent-roll/locations/${locationId}`] });
+        queryClient.invalidateQueries({ queryKey: ["/api/rent-roll", locationId, "overview/metrics"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/rent-roll", locationId, "overview/revenue-trend"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/rent-roll", locationId, "overview/revenue-by-storage"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/rent-roll", locationId, "overview/move-events"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/rent-roll", locationId, "overview/economic-vacancy"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/rent-roll", locationId, "overview/seasonal-occupancy"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/rent-roll", locationId, "overview/contract-term-occupancy"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/rent-roll", locationId, "overview/seasonal-move-events"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/rent-roll", locationId, "overview/available-storage-types"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/rent-roll", locationId, "overview/leases-by-storage-location"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/rent-roll/locations", locationId] });
       }
       
       toast({
