@@ -13,6 +13,46 @@ export type ImportMode = "create" | "append" | "replace";
 
 export type ConfidenceLevel = "high" | "medium" | "low";
 
+export type RateSeasonType = "annual" | "summer" | "winter";
+
+export type RateBasisType = 
+  | "per_month" 
+  | "per_season" 
+  | "per_year" 
+  | "per_contract" 
+  | "per_ft_month" 
+  | "per_ft_season" 
+  | "per_ft_year";
+
+export interface RateConfig {
+  seasonType: RateSeasonType;
+  columnKey: string;
+  slipColumnKey?: string;
+  rateBasis: RateBasisType;
+}
+
+export const RATE_BASIS_OPTIONS: { value: RateBasisType; label: string }[] = [
+  { value: "per_month", label: "$/Month (flat monthly rate)" },
+  { value: "per_season", label: "$/Season (flat seasonal rate)" },
+  { value: "per_year", label: "$/Year (flat annual rate)" },
+  { value: "per_contract", label: "Total Contract Value (full term amount)" },
+  { value: "per_ft_month", label: "$/Ft/Month (per foot per month)" },
+  { value: "per_ft_season", label: "$/Ft/Season (per foot for season)" },
+  { value: "per_ft_year", label: "$/Ft/Year (per foot per year)" },
+];
+
+export interface ImportOptions {
+  defaultStorageType?: string;
+  autoApplyContractTermDates?: boolean;
+  projectSeasonDates?: {
+    seasonStart: string | null;
+    seasonEnd: string | null;
+    winterStart: string | null;
+    winterEnd: string | null;
+  };
+  rateConfiguration?: RateConfig[];
+}
+
 export interface ParsedColumn {
   name: string;
   index: number;
@@ -86,14 +126,19 @@ export interface ImportSession {
   selectedSheet?: string;
   sheets?: SheetInfo[];
   headers: string[];
+  rawRows: Record<string, any>[];
   totalRows: number;
   columnMappings: ColumnMappingSuggestion[];
   customFields: CustomFieldDefinition[];
   valueMappings: ValueMappingItem[];
+  rateConfiguration?: RateConfig[];
+  defaultStorageType?: string;
+  autoApplyContractTermDates?: boolean;
   importMode: ImportMode;
   skipDuplicates: boolean;
   parseConfidence: ConfidenceLevel;
   extractionMethod: "direct" | "ocr" | "ai" | "heuristic";
+  parsedRows?: ParsedImportRow[];
   warnings: string[];
   errors: string[];
   createdAt: Date;
@@ -109,32 +154,65 @@ export interface CustomFieldDefinition {
   createdByUser: boolean;
 }
 
-export const RENT_ROLL_TARGET_FIELDS: ImportFieldDefinition[] = [
-  { id: "tenantName", label: "Tenant Name", type: "text", required: true, aliases: ["tenant", "lessee", "name", "customer", "owner", "renter", "client"] },
-  { id: "unitLocation", label: "Unit/Slip Location", type: "text", required: true, aliases: ["slip", "unit", "space", "dock", "location", "berth", "spot", "stall"] },
-  { id: "storageType", label: "Storage Type", type: "text", required: false, aliases: ["type", "storage", "category", "class"], validValues: ["Wet Slip", "Lift Slip", "Mooring", "Jet Ski", "Dry Rack - Indoor", "Dry Rack - Outdoor", "Houseboat", "Land Storage", "Boat on Trailer", "Trailer Only"] },
-  { id: "leaseAmount", label: "Lease Amount", type: "currency", required: false, aliases: ["rent", "rate", "amount", "fee", "charge", "monthly", "price", "cost"] },
-  { id: "leaseCommencement", label: "Lease Start Date", type: "date", required: false, aliases: ["start", "begin", "commence", "from", "effective", "start_date"] },
-  { id: "leaseExpiration", label: "Lease End Date", type: "date", required: false, aliases: ["end", "expire", "expiration", "through", "to_date", "term_end", "end_date"] },
-  { id: "boatLength", label: "Boat Length (ft)", type: "number", required: false, aliases: ["length", "loa", "boat_size", "size"] },
-  { id: "boatWidth", label: "Boat Beam/Width (ft)", type: "number", required: false, aliases: ["width", "beam"] },
-  { id: "boatMake", label: "Boat Make", type: "text", required: false, aliases: ["make", "manufacturer", "brand"] },
-  { id: "boatModel", label: "Boat Model", type: "text", required: false, aliases: ["model"] },
-  { id: "boatYear", label: "Boat Year", type: "number", required: false, aliases: ["year", "model_year"] },
-  { id: "contractTerm", label: "Contract Term", type: "text", required: false, aliases: ["term", "contract", "period", "season"], validValues: ["Annual", "Seasonal", "Winter", "Monthly", "Short-Term", "Transient"] },
-  { id: "status", label: "Lease Status", type: "text", required: false, aliases: ["status", "occupancy"], validValues: ["Active", "Expired", "Pending", "Cancelled", "Hold"] },
-  { id: "tenantEmail", label: "Tenant Email", type: "text", required: false, aliases: ["email", "email_address", "e-mail"] },
-  { id: "tenantPhone", label: "Tenant Phone", type: "text", required: false, aliases: ["phone", "phone_number", "telephone", "mobile", "cell"] },
-  { id: "fullAddress", label: "Full Address (AI will split)", type: "text", required: false, aliases: ["address", "full_address", "complete_address", "mailing_address"] },
-  { id: "address1", label: "Street Address", type: "text", required: false, aliases: ["address1", "street", "street_address"] },
+export const TENANT_FIELDS: ImportFieldDefinition[] = [
+  { id: "tenantName", label: "Tenant Name", type: "text", required: false, recommended: true, aliases: ["tenant", "lessee", "name", "customer", "owner", "renter", "client", "boat owner", "vessel owner"] },
+  { id: "boatMake", label: "Boat Make", type: "text", required: false, aliases: ["make", "manufacturer", "brand", "boat_make", "vessel make"] },
+  { id: "boatModel", label: "Boat Model", type: "text", required: false, aliases: ["model", "boat_model", "vessel model"] },
+  { id: "boatYear", label: "Boat Year", type: "number", required: false, aliases: ["year", "model_year", "boat_year", "vessel year"] },
+  { id: "boatLength", label: "Boat Length (ft)", type: "number", required: false, aliases: ["length", "loa", "boat_size", "size", "overall length", "vessel length", "loa (ft)"] },
+  { id: "boatWidth", label: "Boat Width/Beam (ft)", type: "number", required: false, aliases: ["width", "beam", "boat_width", "vessel beam"] },
+  { id: "tenantEmail", label: "Tenant Email", type: "text", required: false, aliases: ["email", "email_address", "e-mail", "contact email"] },
+  { id: "tenantPhone", label: "Tenant Phone", type: "text", required: false, aliases: ["phone", "phone_number", "telephone", "mobile", "cell", "contact phone"] },
+  { id: "address1", label: "Address Line 1", type: "text", required: false, aliases: ["address1", "street", "street_address", "address line 1"] },
+  { id: "address2", label: "Address Line 2", type: "text", required: false, aliases: ["address2", "apt", "suite", "unit", "address line 2"] },
   { id: "city", label: "City", type: "text", required: false, aliases: ["city", "town"] },
   { id: "state", label: "State", type: "text", required: false, aliases: ["state", "province", "region"] },
-  { id: "zip", label: "ZIP/Postal Code", type: "text", required: false, aliases: ["zip", "zipcode", "postal", "postal_code"] },
-  { id: "electricIncluded", label: "Electric Included", type: "boolean", required: false, aliases: ["electric", "electric_included", "power"] },
-  { id: "electricFee", label: "Electric Fee", type: "currency", required: false, aliases: ["electric_fee", "electric_charge", "power_fee"] },
-  { id: "liveaboardAllowed", label: "Liveaboard Allowed", type: "boolean", required: false, aliases: ["liveaboard", "live_aboard", "live_on"] },
-  { id: "liveaboardFee", label: "Liveaboard Fee", type: "currency", required: false, aliases: ["liveaboard_fee", "liveaboard_charge"] },
-  { id: "notes", label: "Notes/Comments", type: "text", required: false, aliases: ["notes", "comments", "memo", "remarks"] },
+  { id: "zip", label: "ZIP Code", type: "text", required: false, aliases: ["zip", "zipcode", "postal", "postal_code"] },
+  { id: "fullAddress", label: "Full Address (AI will split)", type: "text", required: false, aliases: ["address", "full_address", "complete_address", "mailing_address", "customer address"] },
+];
+
+export const LEASE_FIELDS: ImportFieldDefinition[] = [
+  { id: "unitLocation", label: "Unit/Slip Location", type: "text", required: false, aliases: ["slip", "unit", "space", "dock", "location", "berth", "spot", "stall", "slip #", "slip number", "slip no"] },
+  { id: "storageType", label: "Storage Type", type: "text", required: false, recommended: true, aliases: ["type", "storage", "category", "class", "storage type", "slip type"], validValues: ["Wet Slip", "Lift Slip", "Mooring", "Jet Ski", "Dry Rack - Indoor", "Dry Rack - Outdoor", "Houseboat", "Land Storage", "Boat on Trailer", "Trailer Only"] },
+  { id: "leaseAmount", label: "Monthly Rent (Base Rent)", type: "currency", required: false, recommended: true, aliases: ["rent", "rate", "amount", "fee", "charge", "monthly", "price", "cost", "base rent", "monthly rent", "slip fee"] },
+  { id: "baseRent2", label: "Base Rent 2", type: "currency", required: false, aliases: ["rent 2", "rate 2", "second rate", "alternate rent"] },
+  { id: "baseRent3", label: "Base Rent 3", type: "currency", required: false, aliases: ["rent 3", "rate 3", "third rate"] },
+  { id: "leaseCommencement", label: "Lease Start Date", type: "date", required: false, recommended: true, aliases: ["start", "begin", "commence", "from", "effective", "start_date", "lease start", "commencement", "start date"] },
+  { id: "leaseExpiration", label: "Lease End Date", type: "date", required: false, aliases: ["end", "expire", "expiration", "through", "to_date", "term_end", "end_date", "lease end", "expiration date"] },
+  { id: "contractTerm", label: "Contract Term", type: "text", required: false, aliases: ["term", "contract", "period", "season", "contract type", "lease type", "term type"], validValues: ["Annual", "Seasonal", "Summer", "Winter", "Monthly", "Short-Term", "Transient"] },
+  { id: "slipStatus", label: "Slip Status", type: "text", required: false, aliases: ["status", "occupancy", "slip status"], validValues: ["Occupied", "Vacant", "Reserved", "Maintenance", "Sold"] },
+  { id: "slipLength", label: "Slip Length (ft)", type: "number", required: false, aliases: ["slip length", "dock length", "slip size"] },
+  { id: "slipWidth", label: "Slip Width (ft)", type: "number", required: false, aliases: ["slip width", "dock width"] },
+  { id: "leaseOnFile", label: "Lease on File", type: "boolean", required: false, aliases: ["lease on file", "has lease", "lease document"] },
+  { id: "coiOnFile", label: "COI on File", type: "boolean", required: false, aliases: ["coi on file", "has coi", "insurance on file"] },
+  { id: "coiExpiration", label: "COI Expiration", type: "date", required: false, aliases: ["coi expiration", "insurance expiration", "coi exp"] },
+  { id: "hasDiscount", label: "Has Discount", type: "boolean", required: false, aliases: ["discount", "has discount", "discounted"] },
+  { id: "discountType", label: "Discount Type", type: "text", required: false, aliases: ["discount type", "discount reason"] },
+  { id: "discountValue", label: "Discount Value", type: "currency", required: false, aliases: ["discount value", "discount amount"] },
+  { id: "notes", label: "Notes/Comments", type: "text", required: false, aliases: ["notes", "comments", "memo", "remarks", "special instructions"] },
+];
+
+export const SEASONAL_RATE_FIELDS: ImportFieldDefinition[] = [
+  { id: "winterAmount", label: "Winter Slip Amount", type: "currency", required: false, aliases: ["winter amount", "winter rate", "winter fee", "winter slip", "winter rent"] },
+  { id: "summerAmount", label: "Summer Slip Amount", type: "currency", required: false, aliases: ["summer amount", "summer rate", "summer fee", "summer slip", "summer rent", "seasonal amount"] },
+  { id: "seasonalAmount", label: "Seasonal Slip Amount", type: "currency", required: false, aliases: ["seasonal amount", "season rate", "seasonal fee"] },
+  { id: "winterSlip", label: "Winter Slip Assignment", type: "text", required: false, aliases: ["winter slip", "winter location", "winter berth"] },
+  { id: "summerSlip", label: "Summer Slip Assignment", type: "text", required: false, aliases: ["summer slip", "summer location", "summer berth"] },
+];
+
+export const ADDITIONAL_FEE_FIELDS: ImportFieldDefinition[] = [
+  { id: "liveaboardAmount", label: "Liveaboard Fee", type: "currency", required: false, aliases: ["liveaboard", "liveaboard_fee", "liveaboard_charge", "live aboard fee"] },
+  { id: "electricAmount", label: "Electric Fee", type: "currency", required: false, aliases: ["electric", "electric_fee", "electric_charge", "power_fee", "electricity"] },
+  { id: "additionalCharge1", label: "Additional Charge 1", type: "currency", required: false, aliases: ["additional 1", "charge 1", "extra 1", "misc 1"] },
+  { id: "additionalCharge2", label: "Additional Charge 2", type: "currency", required: false, aliases: ["additional 2", "charge 2", "extra 2", "misc 2"] },
+  { id: "additionalCharge3", label: "Additional Charge 3", type: "currency", required: false, aliases: ["additional 3", "charge 3", "extra 3", "misc 3"] },
+];
+
+export const RENT_ROLL_TARGET_FIELDS: ImportFieldDefinition[] = [
+  ...TENANT_FIELDS,
+  ...LEASE_FIELDS,
+  ...SEASONAL_RATE_FIELDS,
+  ...ADDITIONAL_FEE_FIELDS,
 ];
 
 export interface ImportFieldDefinition {
@@ -142,11 +220,48 @@ export interface ImportFieldDefinition {
   label: string;
   type: "text" | "number" | "date" | "currency" | "boolean";
   required: boolean;
+  recommended?: boolean;
   aliases: string[];
   validValues?: string[];
   validator?: (value: any) => { valid: boolean; error?: string };
   transformer?: (value: any) => any;
 }
+
+export interface ParsedImportRow {
+  rowIndex: number;
+  tenantData: Record<string, any>;
+  leaseData: Record<string, any>;
+  lineItemData?: Record<string, any>;
+  errors: string[];
+  warnings: string[];
+  isDuplicate?: boolean;
+  duplicateMatchReason?: string;
+  existingLeaseId?: string;
+  existingTenantId?: string;
+}
+
+export interface ParseResponse {
+  parsedRows: ParsedImportRow[];
+  columnMapping: Record<string, string>;
+  rateStructureHint?: "annual" | "seasonal" | "mixed" | null;
+  contractTermHints?: { column: string; detectedTerms: string[] }[];
+}
+
+export interface DuplicateMatch {
+  tenantId: string;
+  tenantName: string;
+  leaseId?: string;
+  matchType: "name_exact" | "name_fuzzy" | "slip_conflict" | "date_overlap";
+  matchDetails: string;
+  confidence: number;
+}
+
+export const rateConfigSchema = z.object({
+  seasonType: z.enum(["annual", "summer", "winter"]),
+  columnKey: z.string(),
+  slipColumnKey: z.string().optional(),
+  rateBasis: z.enum(["per_month", "per_season", "per_year", "per_contract", "per_ft_month", "per_ft_season", "per_ft_year"]),
+});
 
 export const importSessionSchema = z.object({
   fileName: z.string().min(1),
@@ -185,6 +300,9 @@ export const importExecuteRequestSchema = z.object({
   importMode: z.enum(["create", "append", "replace"]),
   skipDuplicates: z.boolean().default(true),
   skipInvalidRows: z.boolean().default(false),
+  rateConfiguration: z.array(rateConfigSchema).optional(),
+  defaultStorageType: z.string().optional(),
+  autoApplyContractTermDates: z.boolean().optional(),
 });
 
 export interface ImportResult {

@@ -13,6 +13,10 @@ import {
   RENT_ROLL_TARGET_FIELDS,
   CustomFieldDefinition,
   UnrecognizedValues,
+  RateConfig,
+  RateBasisType,
+  ImportOptions,
+  ParsedImportRow,
   transformDate,
   transformCurrency,
   transformBoolean,
@@ -30,6 +34,64 @@ import {
 } from "@shared/schema";
 
 const importSessions = new Map<string, ImportSession & { rawData: Record<string, any>[] }>();
+
+function isSummaryRow(row: Record<string, any>): boolean {
+  const summaryPattern = /^(total|totals|grand\s*total|subtotal|sub\s*total|sum|sums|sum\s+of|count|avg|average|=sum|=total)s?:?\s*$/i;
+  for (const value of Object.values(row)) {
+    const strValue = String(value || '').trim().toLowerCase();
+    if (strValue.length > 0 && strValue.length < 30 && summaryPattern.test(strValue)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function convertToMonthly(rawAmount: number, rateBasis: RateBasisType, periodMonths: number, boatLength?: number): number {
+  switch (rateBasis) {
+    case 'per_month':
+      return rawAmount;
+    case 'per_season':
+    case 'per_contract':
+      return periodMonths > 0 ? rawAmount / periodMonths : rawAmount;
+    case 'per_year':
+      return rawAmount / 12;
+    case 'per_ft_month':
+      return boatLength && boatLength > 0 ? rawAmount * boatLength : rawAmount;
+    case 'per_ft_season':
+      return boatLength && boatLength > 0 
+        ? (rawAmount * boatLength) / periodMonths 
+        : rawAmount / periodMonths;
+    case 'per_ft_year':
+      return boatLength && boatLength > 0 
+        ? (rawAmount * boatLength) / 12 
+        : rawAmount / 12;
+    default:
+      return rawAmount;
+  }
+}
+
+function getSeasonMonths(seasonType: string, projectDates?: ImportOptions['projectSeasonDates']): number {
+  const currentYear = new Date().getFullYear();
+  if (seasonType === 'summer') {
+    if (projectDates?.seasonStart && projectDates?.seasonEnd) {
+      const [startMonth] = projectDates.seasonStart.split('/').map(Number);
+      const [endMonth] = projectDates.seasonEnd.split('/').map(Number);
+      return Math.max(1, endMonth - startMonth + 1);
+    }
+    return 6;
+  } else if (seasonType === 'winter') {
+    if (projectDates?.winterStart && projectDates?.winterEnd) {
+      const [startMonth] = projectDates.winterStart.split('/').map(Number);
+      const [endMonth] = projectDates.winterEnd.split('/').map(Number);
+      if (endMonth < startMonth) {
+        return Math.max(1, (12 - startMonth + 1) + endMonth);
+      }
+      return Math.max(1, endMonth - startMonth + 1);
+    }
+    return 6;
+  }
+  return 12;
+}
 
 export class ImportSessionService {
   async createSession(
@@ -53,6 +115,8 @@ export class ImportSessionService {
     });
 
     const sessionId = uuidv4();
+    const filteredRows = parseResult.rows.filter(row => !isSummaryRow(row));
+    
     const session: ImportSession & { rawData: Record<string, any>[] } = {
       id: sessionId,
       orgId,
@@ -70,19 +134,24 @@ export class ImportSessionService {
         previewData: [],
       })),
       headers: parseResult.headers,
-      totalRows: parseResult.rows.length,
+      rawRows: filteredRows,
+      totalRows: filteredRows.length,
       columnMappings: [],
       customFields: [],
       valueMappings: [],
+      rateConfiguration: [{ seasonType: 'annual', columnKey: '', rateBasis: 'per_month' }],
+      defaultStorageType: undefined,
+      autoApplyContractTermDates: true,
       importMode: options.importMode || "create",
       skipDuplicates: options.skipDuplicates ?? true,
       parseConfidence: parseResult.confidence,
       extractionMethod: parseResult.extractionMethod,
+      parsedRows: undefined,
       warnings: parseResult.warnings,
       errors: parseResult.errors,
       createdAt: new Date(),
       updatedAt: new Date(),
-      rawData: parseResult.rows,
+      rawData: filteredRows,
     };
 
     importSessions.set(sessionId, session);
@@ -150,6 +219,96 @@ export class ImportSessionService {
     session.updatedAt = new Date();
 
     return session;
+  }
+
+  async setRateConfiguration(
+    sessionId: string,
+    rateConfig: RateConfig[],
+    options?: {
+      defaultStorageType?: string;
+      autoApplyContractTermDates?: boolean;
+    }
+  ): Promise<ImportSession> {
+    const session = this.getSession(sessionId);
+    if (!session) throw new Error("Session not found");
+
+    session.rateConfiguration = rateConfig;
+    if (options?.defaultStorageType !== undefined) {
+      session.defaultStorageType = options.defaultStorageType;
+    }
+    if (options?.autoApplyContractTermDates !== undefined) {
+      session.autoApplyContractTermDates = options.autoApplyContractTermDates;
+    }
+    session.updatedAt = new Date();
+
+    return session;
+  }
+
+  async detectRateStructure(sessionId: string): Promise<{
+    suggestedStructure: "annual" | "seasonal" | "mixed" | null;
+    detectedRateColumns: string[];
+    contractTermHints: { column: string; detectedTerms: string[] }[];
+  }> {
+    const session = this.getSession(sessionId);
+    if (!session) throw new Error("Session not found");
+
+    const rateColumns: string[] = [];
+    const contractTermHints: { column: string; detectedTerms: string[] }[] = [];
+    let hasSeasonalTerms = false;
+    let hasAnnualTerms = false;
+
+    const winterPattern = /winter|cold|off-?season/i;
+    const summerPattern = /summer|season|warm/i;
+    const annualPattern = /annual|yearly|year|12\s*month/i;
+
+    for (const header of session.headers) {
+      const normalized = header.toLowerCase();
+      if (winterPattern.test(normalized) || summerPattern.test(normalized)) {
+        rateColumns.push(header);
+        hasSeasonalTerms = true;
+      }
+      if (/rate|rent|amount|fee|charge|price/i.test(normalized)) {
+        if (!rateColumns.includes(header)) rateColumns.push(header);
+      }
+    }
+
+    const contractTermMapping = session.columnMappings.find(m => m.targetField === 'contractTerm');
+    if (contractTermMapping) {
+      const detectedTerms = new Set<string>();
+      for (const row of session.rawData.slice(0, 50)) {
+        const value = row[contractTermMapping.sourceColumn]?.toString().toLowerCase().trim();
+        if (value) {
+          detectedTerms.add(value);
+          if (winterPattern.test(value) || summerPattern.test(value)) {
+            hasSeasonalTerms = true;
+          }
+          if (annualPattern.test(value)) {
+            hasAnnualTerms = true;
+          }
+        }
+      }
+      if (detectedTerms.size > 0) {
+        contractTermHints.push({
+          column: contractTermMapping.sourceColumn,
+          detectedTerms: Array.from(detectedTerms),
+        });
+      }
+    }
+
+    let suggestedStructure: "annual" | "seasonal" | "mixed" | null = null;
+    if (hasSeasonalTerms && hasAnnualTerms) {
+      suggestedStructure = "mixed";
+    } else if (hasSeasonalTerms) {
+      suggestedStructure = "seasonal";
+    } else if (hasAnnualTerms || rateColumns.length === 1) {
+      suggestedStructure = "annual";
+    }
+
+    return {
+      suggestedStructure,
+      detectedRateColumns: rateColumns,
+      contractTermHints,
+    };
   }
 
   async detectUnrecognizedValues(sessionId: string): Promise<UnrecognizedValues> {
