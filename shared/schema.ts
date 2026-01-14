@@ -12702,7 +12702,675 @@ export const exitActivities = pgTable('exit_activities', {
 }));
 
 // ============================================================================
-// EXIT STRATEGY - Insert Schemas and Types
+// EXIT STRATEGY SUITE V2 - CCIM-Aligned Dynamic Scenario System
+// Template-driven architecture supporting dozens of exit strategy variations
+// with professional-grade CCIM calculation worksheets (ACSW, CFAW)
+// ============================================================================
+
+// Enums for Exit Strategy V2
+export const exitScenarioCategoryEnum = pgEnum("exit_scenario_category", [
+  "direct_sale",
+  "tax_deferred",
+  "installment",
+  "structured",
+  "portfolio"
+]);
+
+export const exitLoanTypeEnum = pgEnum("exit_loan_type", [
+  "permanent",
+  "bridge",
+  "construction",
+  "mezzanine",
+  "sba",
+  "seller_note",
+  "assumption"
+]);
+
+export const exitCashflowCategoryEnum = pgEnum("exit_cashflow_category", [
+  "operating_income",
+  "operating_expense",
+  "capital_expense",
+  "debt_service",
+  "reserve_funding",
+  "leasing_cost",
+  "management_fee",
+  "disposition"
+]);
+
+// Exit Scenario Templates - Defines input schemas and calculation rules for each scenario type
+export const exitScenarioTemplates = pgTable('exit_scenario_templates', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Template identification
+  code: varchar('code', { length: 50 }).notNull().unique(), // e.g., 'cash_sale_standard', '1031_full', 'dst_fractional'
+  name: text('name').notNull(),
+  description: text('description'),
+  category: exitScenarioCategoryEnum('category').notNull(),
+  
+  // Template configuration (JSON schemas)
+  inputSchema: jsonb('input_schema').notNull(), // Zod-compatible schema for required inputs
+  outputSchema: jsonb('output_schema'), // Expected output structure
+  uiConfig: jsonb('ui_config'), // Form layout, field groups, validation hints
+  
+  // Calculation engine references
+  calculatorId: varchar('calculator_id', { length: 100 }), // Which engine to use
+  ccimWorksheetType: varchar('ccim_worksheet_type', { length: 20 }), // 'ACSW', 'CFAW', 'both', null
+  
+  // Template metadata
+  version: integer('version').default(1),
+  isSystemTemplate: boolean('is_system_template').default(true),
+  isActive: boolean('is_active').default(true),
+  
+  // Feature flags for template capabilities
+  supportsMultiYear: boolean('supports_multi_year').default(true),
+  supportsMortgageTracking: boolean('supports_mortgage_tracking').default(true),
+  supportsBasisLedger: boolean('supports_basis_ledger').default(true),
+  supportsTaxDeferral: boolean('supports_tax_deferral').default(false),
+  supportsWaterfall: boolean('supports_waterfall').default(false),
+  
+  sortOrder: integer('sort_order').default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  codeIdx: index('exit_templates_code_idx').on(table.code),
+  categoryIdx: index('exit_templates_category_idx').on(table.category),
+}));
+
+// Exit Scenario Loans - Multi-loan tracking with CCIM-style amortization schedules
+export const exitScenarioLoans = pgTable('exit_scenario_loans', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  exitScenarioId: varchar('exit_scenario_id').notNull().references(() => exitScenarios.id, { onDelete: 'cascade' }),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  // Loan identification
+  name: text('name').notNull(),
+  loanType: exitLoanTypeEnum('loan_type').notNull().default('permanent'),
+  lenderName: text('lender_name'),
+  
+  // Original loan terms (CCIM CFAW fields)
+  originalAmount: decimal('original_amount', { precision: 18, scale: 2 }).notNull(),
+  interestRate: decimal('interest_rate', { precision: 8, scale: 6 }).notNull(), // e.g., 0.0525 = 5.25%
+  amortizationPeriodMonths: integer('amortization_period_months'), // null for IO
+  loanTermMonths: integer('loan_term_months').notNull(),
+  originationDate: timestamp('origination_date'),
+  maturityDate: timestamp('maturity_date'),
+  
+  // Payment structure
+  isInterestOnly: boolean('is_interest_only').default(false),
+  interestOnlyMonths: integer('interest_only_months').default(0),
+  monthlyPayment: decimal('monthly_payment', { precision: 18, scale: 2 }),
+  annualDebtService: decimal('annual_debt_service', { precision: 18, scale: 2 }),
+  
+  // Fees and costs (CCIM fields)
+  loanFees: decimal('loan_fees', { precision: 18, scale: 2 }).default('0'), // Points, origination
+  loanCosts: decimal('loan_costs', { precision: 18, scale: 2 }).default('0'), // Legal, appraisal
+  prepaymentPenaltyType: varchar('prepayment_penalty_type', { length: 30 }), // 'defeasance', 'yield_maintenance', 'step_down', 'none'
+  prepaymentPenaltySchedule: jsonb('prepayment_penalty_schedule'), // Year-by-year penalties
+  
+  // Balloon/refi assumptions
+  hasBalloon: boolean('has_balloon').default(false),
+  balloonAmount: decimal('balloon_amount', { precision: 18, scale: 2 }),
+  balloonYear: integer('balloon_year'),
+  assumedRefiRate: decimal('assumed_refi_rate', { precision: 8, scale: 6 }),
+  
+  // Multi-year principal balance tracking (CCIM CFAW)
+  principalBalancesByYear: jsonb('principal_balances_by_year'), // {1: 4850000, 2: 4695000, ...}
+  interestPaidByYear: jsonb('interest_paid_by_year'),
+  principalPaidByYear: jsonb('principal_paid_by_year'),
+  
+  // Full amortization schedule
+  amortizationSchedule: jsonb('amortization_schedule'), // Monthly breakdown
+  
+  priority: integer('priority').default(1), // 1 = senior
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  exitScenarioIdx: index('exit_loans_scenario_idx').on(table.exitScenarioId),
+  orgIdx: index('exit_loans_org_idx').on(table.orgId),
+}));
+
+// Exit Scenario Basis Ledger - CCIM-style basis tracking with capital additions and recapture
+export const exitScenarioBasisLedger = pgTable('exit_scenario_basis_ledger', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  exitScenarioId: varchar('exit_scenario_id').notNull().references(() => exitScenarios.id, { onDelete: 'cascade' }),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  // Original acquisition (CCIM ACSW Line 1-3)
+  originalPurchasePrice: decimal('original_purchase_price', { precision: 18, scale: 2 }).notNull(),
+  acquisitionCosts: decimal('acquisition_costs', { precision: 18, scale: 2 }).default('0'), // Closing, legal, etc.
+  initialBasis: decimal('initial_basis', { precision: 18, scale: 2 }).notNull(),
+  
+  // Land vs improvements allocation
+  landValueAtAcquisition: decimal('land_value_at_acquisition', { precision: 18, scale: 2 }),
+  improvementValueAtAcquisition: decimal('improvement_value_at_acquisition', { precision: 18, scale: 2 }),
+  personalPropertyValue: decimal('personal_property_value', { precision: 18, scale: 2 }).default('0'),
+  
+  // Capital additions over hold period (CCIM ACSW Line 4)
+  capitalAdditions: decimal('capital_additions', { precision: 18, scale: 2 }).default('0'),
+  capitalAdditionsByYear: jsonb('capital_additions_by_year'), // {1: 50000, 2: 75000, ...}
+  capitalAdditionsDetail: jsonb('capital_additions_detail'), // [{year: 1, description: "Dock replacement", amount: 50000}]
+  
+  // Depreciation tracking (CCIM ACSW Line 5-6)
+  depreciationScheduleYears: integer('depreciation_schedule_years').default(39), // 39 commercial, 27.5 residential
+  costRecoveryTaken: decimal('cost_recovery_taken', { precision: 18, scale: 2 }).default('0'),
+  costRecoveryByYear: jsonb('cost_recovery_by_year'),
+  straightLineRecapture: decimal('straight_line_recapture', { precision: 18, scale: 2 }).default('0'),
+  
+  // Cost segregation study
+  hasCostSegregation: boolean('has_cost_segregation').default(false),
+  costSegregationBonus: decimal('cost_segregation_bonus', { precision: 18, scale: 2 }).default('0'),
+  costSegregationYear: integer('cost_segregation_year'),
+  acceleratedDepreciation: decimal('accelerated_depreciation', { precision: 18, scale: 2 }).default('0'),
+  
+  // Partial sales adjustments (CCIM ACSW Line 7)
+  partialSalesProceeds: decimal('partial_sales_proceeds', { precision: 18, scale: 2 }).default('0'),
+  partialSalesDetail: jsonb('partial_sales_detail'),
+  
+  // Adjusted basis calculation
+  adjustedBasis: decimal('adjusted_basis', { precision: 18, scale: 2 }).notNull(),
+  
+  // Prior 1031 exchange deferred gain (if applicable)
+  prior1031DeferredGain: decimal('prior_1031_deferred_gain', { precision: 18, scale: 2 }).default('0'),
+  prior1031CarryoverBasis: decimal('prior_1031_carryover_basis', { precision: 18, scale: 2 }),
+  
+  // Suspended passive losses (CCIM ACSW)
+  suspendedPassiveLosses: decimal('suspended_passive_losses', { precision: 18, scale: 2 }).default('0'),
+  suspendedLossesByYear: jsonb('suspended_losses_by_year'),
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  exitScenarioIdx: index('exit_basis_ledger_scenario_idx').on(table.exitScenarioId),
+  orgIdx: index('exit_basis_ledger_org_idx').on(table.orgId),
+}));
+
+// Exit Scenario Multi-Year Cashflows - CCIM CFAW style operating projections
+export const exitScenarioMultiYearCashflows = pgTable('exit_scenario_multi_year_cashflows', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  exitScenarioId: varchar('exit_scenario_id').notNull().references(() => exitScenarios.id, { onDelete: 'cascade' }),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  // Period identification
+  year: integer('year').notNull(), // 1, 2, 3, 4, 5...
+  periodStart: timestamp('period_start'),
+  periodEnd: timestamp('period_end'),
+  
+  // Revenue (CCIM CFAW Operating Statement)
+  potentialRentalIncome: decimal('potential_rental_income', { precision: 18, scale: 2 }),
+  vacancyLoss: decimal('vacancy_loss', { precision: 18, scale: 2 }),
+  vacancyRate: decimal('vacancy_rate', { precision: 8, scale: 6 }),
+  effectiveGrossIncome: decimal('effective_gross_income', { precision: 18, scale: 2 }),
+  otherIncome: decimal('other_income', { precision: 18, scale: 2 }).default('0'),
+  totalGrossIncome: decimal('total_gross_income', { precision: 18, scale: 2 }),
+  
+  // Operating expenses (CCIM CFAW)
+  operatingExpenses: decimal('operating_expenses', { precision: 18, scale: 2 }),
+  operatingExpenseRatio: decimal('operating_expense_ratio', { precision: 8, scale: 6 }),
+  propertyTaxes: decimal('property_taxes', { precision: 18, scale: 2 }),
+  insurance: decimal('insurance', { precision: 18, scale: 2 }),
+  utilities: decimal('utilities', { precision: 18, scale: 2 }),
+  repairs: decimal('repairs', { precision: 18, scale: 2 }),
+  managementFee: decimal('management_fee', { precision: 18, scale: 2 }),
+  managementFeeRate: decimal('management_fee_rate', { precision: 8, scale: 6 }),
+  
+  // Net Operating Income
+  noi: decimal('noi', { precision: 18, scale: 2 }).notNull(),
+  noiGrowthRate: decimal('noi_growth_rate', { precision: 8, scale: 6 }),
+  
+  // Debt Service (CCIM CFAW)
+  annualDebtService: decimal('annual_debt_service', { precision: 18, scale: 2 }),
+  debtServiceByLoan: jsonb('debt_service_by_loan'), // {loanId: amount, ...}
+  
+  // Below-the-line items (CCIM CFAW)
+  leasingCommissions: decimal('leasing_commissions', { precision: 18, scale: 2 }).default('0'),
+  tenantImprovements: decimal('tenant_improvements', { precision: 18, scale: 2 }).default('0'),
+  capitalExpenditures: decimal('capital_expenditures', { precision: 18, scale: 2 }).default('0'),
+  fundedReserves: decimal('funded_reserves', { precision: 18, scale: 2 }).default('0'),
+  
+  // Cash flow calculations
+  cashFlowBeforeDebt: decimal('cash_flow_before_debt', { precision: 18, scale: 2 }),
+  cashFlowAfterDebt: decimal('cash_flow_after_debt', { precision: 18, scale: 2 }),
+  cashFlowAfterCapex: decimal('cash_flow_after_capex', { precision: 18, scale: 2 }),
+  
+  // Key ratios (CCIM)
+  dscr: decimal('dscr', { precision: 8, scale: 4 }),
+  capRate: decimal('cap_rate', { precision: 8, scale: 6 }),
+  cashOnCashReturn: decimal('cash_on_cash_return', { precision: 8, scale: 6 }),
+  
+  // Cumulative tracking
+  cumulativeNoi: decimal('cumulative_noi', { precision: 18, scale: 2 }),
+  cumulativeCashFlow: decimal('cumulative_cash_flow', { precision: 18, scale: 2 }),
+  
+  // Sync source tracking
+  syncedFromRentRoll: boolean('synced_from_rent_roll').default(false),
+  syncedFromModeling: boolean('synced_from_modeling').default(false),
+  lastSyncAt: timestamp('last_sync_at'),
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  exitScenarioIdx: index('exit_multi_year_cf_scenario_idx').on(table.exitScenarioId),
+  orgIdx: index('exit_multi_year_cf_org_idx').on(table.orgId),
+  yearIdx: index('exit_multi_year_cf_year_idx').on(table.year),
+}));
+
+// Exit Scenario Tax Profiles - Enhanced tax calculations with CCIM ACSW fields
+export const exitScenarioTaxProfiles = pgTable('exit_scenario_tax_profiles', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  exitScenarioId: varchar('exit_scenario_id').notNull().references(() => exitScenarios.id, { onDelete: 'cascade' }),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  // Filer profile
+  filingStatus: filingStatusEnum('filing_status').notNull().default('single'),
+  adjustedGrossIncome: decimal('adjusted_gross_income', { precision: 18, scale: 2 }),
+  stateOfResidence: varchar('state_of_residence', { length: 2 }).default('CA'),
+  isQualifiedOpportunityZone: boolean('is_qualified_opportunity_zone').default(false),
+  isRealEstateProfessional: boolean('is_real_estate_professional').default(false),
+  
+  // Sale proceeds (CCIM ACSW Line 8-11)
+  grossSalePrice: decimal('gross_sale_price', { precision: 18, scale: 2 }).notNull(),
+  costsOfSale: decimal('costs_of_sale', { precision: 18, scale: 2 }).default('0'),
+  brokerCommission: decimal('broker_commission', { precision: 18, scale: 2 }),
+  legalAndClosing: decimal('legal_and_closing', { precision: 18, scale: 2 }),
+  transferTaxes: decimal('transfer_taxes', { precision: 18, scale: 2 }),
+  netSalePrice: decimal('net_sale_price', { precision: 18, scale: 2 }),
+  
+  // Participation payments / earnouts (CCIM ACSW Line 12)
+  participationPayments: decimal('participation_payments', { precision: 18, scale: 2 }).default('0'),
+  earnoutPayments: decimal('earnout_payments', { precision: 18, scale: 2 }).default('0'),
+  
+  // Gain calculation (CCIM ACSW)
+  totalGain: decimal('total_gain', { precision: 18, scale: 2 }),
+  
+  // Suspended losses utilized (CCIM ACSW Line 14)
+  suspendedLossesUtilized: decimal('suspended_losses_utilized', { precision: 18, scale: 2 }).default('0'),
+  netGainAfterSuspendedLosses: decimal('net_gain_after_suspended_losses', { precision: 18, scale: 2 }),
+  
+  // Capital gain breakdown (CCIM ACSW)
+  longTermCapitalGain: decimal('long_term_capital_gain', { precision: 18, scale: 2 }),
+  shortTermCapitalGain: decimal('short_term_capital_gain', { precision: 18, scale: 2 }).default('0'),
+  unrecapturedSection1250: decimal('unrecaptured_section_1250', { precision: 18, scale: 2 }), // 25% bucket
+  section1245Recapture: decimal('section_1245_recapture', { precision: 18, scale: 2 }).default('0'), // Ordinary income
+  
+  // Tax rates applied
+  federalLongTermRate: decimal('federal_long_term_rate', { precision: 8, scale: 6 }).default('0.20'),
+  federalShortTermRate: decimal('federal_short_term_rate', { precision: 8, scale: 6 }).default('0.37'),
+  section1250Rate: decimal('section_1250_rate', { precision: 8, scale: 6 }).default('0.25'),
+  niitRate: decimal('niit_rate', { precision: 8, scale: 6 }).default('0.038'),
+  stateTaxRate: decimal('state_tax_rate', { precision: 8, scale: 6 }),
+  
+  // Tax liability breakdown
+  federalLongTermTax: decimal('federal_long_term_tax', { precision: 18, scale: 2 }),
+  federalShortTermTax: decimal('federal_short_term_tax', { precision: 18, scale: 2 }),
+  section1250Tax: decimal('section_1250_tax', { precision: 18, scale: 2 }),
+  section1245Tax: decimal('section_1245_tax', { precision: 18, scale: 2 }),
+  niitTax: decimal('niit_tax', { precision: 18, scale: 2 }),
+  stateTax: decimal('state_tax', { precision: 18, scale: 2 }),
+  totalTaxLiability: decimal('total_tax_liability', { precision: 18, scale: 2 }),
+  effectiveTaxRate: decimal('effective_tax_rate', { precision: 8, scale: 6 }),
+  
+  // After-tax results
+  afterTaxProceeds: decimal('after_tax_proceeds', { precision: 18, scale: 2 }),
+  
+  // Installment sale deferral (if applicable)
+  isInstallmentSale: boolean('is_installment_sale').default(false),
+  grossProfitRatio: decimal('gross_profit_ratio', { precision: 8, scale: 6 }),
+  yearlyTaxableGain: jsonb('yearly_taxable_gain'),
+  yearlyTaxLiability: jsonb('yearly_tax_liability'),
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  exitScenarioIdx: index('exit_tax_profiles_scenario_idx').on(table.exitScenarioId),
+  orgIdx: index('exit_tax_profiles_org_idx').on(table.orgId),
+}));
+
+// Exit 1031 Replacement Properties - Track identified replacement properties
+export const exit1031ReplacementProperties = pgTable('exit_1031_replacement_properties', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  exchange1031Id: varchar('exchange_1031_id').notNull().references(() => exit1031Exchanges.id, { onDelete: 'cascade' }),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  // Property identification
+  propertyName: text('property_name').notNull(),
+  propertyAddress: text('property_address'),
+  propertyType: text('property_type'),
+  
+  // Values
+  estimatedValue: decimal('estimated_value', { precision: 18, scale: 2 }),
+  estimatedMortgage: decimal('estimated_mortgage', { precision: 18, scale: 2 }),
+  estimatedEquity: decimal('estimated_equity', { precision: 18, scale: 2 }),
+  
+  // Property metrics
+  noi: decimal('noi', { precision: 18, scale: 2 }),
+  capRate: decimal('cap_rate', { precision: 8, scale: 6 }),
+  
+  // Status
+  identificationDate: timestamp('identification_date'),
+  isSelected: boolean('is_selected').default(false),
+  closingDate: timestamp('closing_date'),
+  status: varchar('status', { length: 30 }).default('identified'), // 'identified', 'under_contract', 'closed', 'rejected'
+  
+  // Link to sales comp if available
+  salesCompId: varchar('sales_comp_id'),
+  
+  notes: text('notes'),
+  sortOrder: integer('sort_order').default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  exchangeIdx: index('exit_1031_replacements_exchange_idx').on(table.exchange1031Id),
+  orgIdx: index('exit_1031_replacements_org_idx').on(table.orgId),
+}));
+
+// Exit DST Interests - Multiple DST investments for comparison
+export const exitDstInterests = pgTable('exit_dst_interests', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  exitScenarioId: varchar('exit_scenario_id').notNull().references(() => exitScenarios.id, { onDelete: 'cascade' }),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  // DST identification
+  dstName: text('dst_name').notNull(),
+  sponsorName: text('sponsor_name'),
+  
+  // Investment structure
+  fractionalInterest: decimal('fractional_interest', { precision: 10, scale: 8 }), // e.g., 0.0125 = 1.25%
+  investmentAmount: decimal('investment_amount', { precision: 18, scale: 2 }).notNull(),
+  minimumInvestment: decimal('minimum_investment', { precision: 18, scale: 2 }),
+  
+  // Underlying property
+  propertyType: text('property_type'),
+  propertyLocation: text('property_location'),
+  propertyValue: decimal('property_value', { precision: 18, scale: 2 }),
+  leverageRatio: decimal('leverage_ratio', { precision: 8, scale: 6 }),
+  
+  // Projected returns
+  projectedDistributionRate: decimal('projected_distribution_rate', { precision: 8, scale: 6 }),
+  projectedAnnualDistribution: decimal('projected_annual_distribution', { precision: 18, scale: 2 }),
+  projectedHoldYears: integer('projected_hold_years'),
+  projectedIrr: decimal('projected_irr', { precision: 8, scale: 6 }),
+  projectedEquityMultiple: decimal('projected_equity_multiple', { precision: 8, scale: 4 }),
+  
+  // Fee structure
+  sponsorAcquisitionFee: decimal('sponsor_acquisition_fee', { precision: 8, scale: 6 }),
+  sponsorAssetManagementFee: decimal('sponsor_asset_management_fee', { precision: 8, scale: 6 }),
+  sponsorDispositionFee: decimal('sponsor_disposition_fee', { precision: 8, scale: 6 }),
+  sellingCommission: decimal('selling_commission', { precision: 8, scale: 6 }),
+  totalLoadedFees: decimal('total_loaded_fees', { precision: 18, scale: 2 }),
+  
+  // Depreciation passthrough
+  depreciationPassthrough: decimal('depreciation_passthrough', { precision: 18, scale: 2 }),
+  annualK1Depreciation: decimal('annual_k1_depreciation', { precision: 18, scale: 2 }),
+  
+  // Risk assessment
+  riskScore: integer('risk_score'), // 1-10
+  tenantCreditRating: varchar('tenant_credit_rating', { length: 10 }),
+  leaseTermRemaining: decimal('lease_term_remaining', { precision: 8, scale: 2 }),
+  
+  isSelected: boolean('is_selected').default(false),
+  notes: text('notes'),
+  sortOrder: integer('sort_order').default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  exitScenarioIdx: index('exit_dst_interests_scenario_idx').on(table.exitScenarioId),
+  orgIdx: index('exit_dst_interests_org_idx').on(table.orgId),
+}));
+
+// Exit Waterfall Tiers - Enhanced tier structure with capital account tracking
+export const exitWaterfallTiers = pgTable('exit_waterfall_tiers', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  waterfallStructureId: varchar('waterfall_structure_id').notNull().references(() => exitWaterfallStructures.id, { onDelete: 'cascade' }),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  // Tier identification
+  name: text('name').notNull(),
+  tierNumber: integer('tier_number').notNull(),
+  
+  // Hurdle definition
+  hurdleType: varchar('hurdle_type', { length: 20 }).notNull().default('irr'), // 'irr', 'moic', 'pref_return'
+  hurdleRate: decimal('hurdle_rate', { precision: 8, scale: 6 }).notNull(),
+  
+  // Split structure
+  lpSplit: decimal('lp_split', { precision: 8, scale: 6 }).notNull(),
+  gpSplit: decimal('gp_split', { precision: 8, scale: 6 }).notNull(),
+  
+  // Catch-up provision (if applicable)
+  hasCatchUp: boolean('has_catch_up').default(false),
+  catchUpPercentage: decimal('catch_up_percentage', { precision: 8, scale: 6 }),
+  catchUpTarget: decimal('catch_up_target', { precision: 8, scale: 6 }),
+  
+  // Calculated distributions
+  tierAmount: decimal('tier_amount', { precision: 18, scale: 2 }),
+  lpDistribution: decimal('lp_distribution', { precision: 18, scale: 2 }),
+  gpDistribution: decimal('gp_distribution', { precision: 18, scale: 2 }),
+  
+  sortOrder: integer('sort_order').default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  waterfallIdx: index('exit_waterfall_tiers_waterfall_idx').on(table.waterfallStructureId),
+  orgIdx: index('exit_waterfall_tiers_org_idx').on(table.orgId),
+}));
+
+// Exit Capital Calls - Track capital call schedule for fund/syndication waterfalls
+export const exitCapitalCalls = pgTable('exit_capital_calls', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  waterfallStructureId: varchar('waterfall_structure_id').notNull().references(() => exitWaterfallStructures.id, { onDelete: 'cascade' }),
+  fundId: varchar('fund_id').references(() => exitFunds.id),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  // Call details
+  callNumber: integer('call_number').notNull(),
+  callDate: timestamp('call_date'),
+  dueDate: timestamp('due_date'),
+  
+  // Amounts
+  callAmount: decimal('call_amount', { precision: 18, scale: 2 }).notNull(),
+  callPercentage: decimal('call_percentage', { precision: 8, scale: 6 }), // % of commitment
+  
+  // Purpose
+  purpose: text('purpose'), // 'acquisition', 'capex', 'working_capital', 'fees'
+  
+  // Tracking
+  amountReceived: decimal('amount_received', { precision: 18, scale: 2 }).default('0'),
+  status: varchar('status', { length: 20 }).default('scheduled'), // 'scheduled', 'called', 'funded', 'defaulted'
+  
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  waterfallIdx: index('exit_capital_calls_waterfall_idx').on(table.waterfallStructureId),
+  fundIdx: index('exit_capital_calls_fund_idx').on(table.fundId),
+  orgIdx: index('exit_capital_calls_org_idx').on(table.orgId),
+}));
+
+// Exit Scenario Comparisons - Side-by-side scenario analysis
+export const exitScenarioComparisons = pgTable('exit_scenario_comparisons', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  name: text('name').notNull(),
+  description: text('description'),
+  
+  // Scenarios included in comparison
+  scenarioIds: jsonb('scenario_ids').notNull(), // Array of exit scenario IDs
+  
+  // Comparison configuration
+  metricsToCompare: jsonb('metrics_to_compare'), // ['irr', 'moic', 'netProceeds', 'taxLiability']
+  
+  // Cached comparison results
+  comparisonResults: jsonb('comparison_results'),
+  
+  // Recommendation
+  recommendedScenarioId: varchar('recommended_scenario_id'),
+  recommendationReason: text('recommendation_reason'),
+  
+  createdBy: varchar('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  projectIdx: index('exit_comparisons_project_idx').on(table.modelingProjectId),
+  orgIdx: index('exit_comparisons_org_idx').on(table.orgId),
+}));
+
+// ============================================================================
+// EXIT STRATEGY V2 - Insert Schemas and Types
+// ============================================================================
+
+export const insertExitScenarioTemplateSchema = createInsertSchema(exitScenarioTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateExitScenarioTemplateSchema = insertExitScenarioTemplateSchema.partial();
+
+export const insertExitScenarioLoanSchema = createInsertSchema(exitScenarioLoans).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  originalAmount: z.string().or(z.number()),
+  interestRate: z.string().or(z.number()),
+});
+
+export const updateExitScenarioLoanSchema = insertExitScenarioLoanSchema.partial();
+
+export const insertExitScenarioBasisLedgerSchema = createInsertSchema(exitScenarioBasisLedger).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  originalPurchasePrice: z.string().or(z.number()),
+  initialBasis: z.string().or(z.number()),
+  adjustedBasis: z.string().or(z.number()),
+});
+
+export const updateExitScenarioBasisLedgerSchema = insertExitScenarioBasisLedgerSchema.partial();
+
+export const insertExitScenarioMultiYearCashflowSchema = createInsertSchema(exitScenarioMultiYearCashflows).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  noi: z.string().or(z.number()),
+});
+
+export const updateExitScenarioMultiYearCashflowSchema = insertExitScenarioMultiYearCashflowSchema.partial();
+
+export const insertExitScenarioTaxProfileSchema = createInsertSchema(exitScenarioTaxProfiles).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  grossSalePrice: z.string().or(z.number()),
+});
+
+export const updateExitScenarioTaxProfileSchema = insertExitScenarioTaxProfileSchema.partial();
+
+export const insertExit1031ReplacementPropertySchema = createInsertSchema(exit1031ReplacementProperties).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateExit1031ReplacementPropertySchema = insertExit1031ReplacementPropertySchema.partial();
+
+export const insertExitDstInterestSchema = createInsertSchema(exitDstInterests).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  investmentAmount: z.string().or(z.number()),
+});
+
+export const updateExitDstInterestSchema = insertExitDstInterestSchema.partial();
+
+export const insertExitWaterfallTierSchema = createInsertSchema(exitWaterfallTiers).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  hurdleRate: z.string().or(z.number()),
+  lpSplit: z.string().or(z.number()),
+  gpSplit: z.string().or(z.number()),
+});
+
+export const updateExitWaterfallTierSchema = insertExitWaterfallTierSchema.partial();
+
+export const insertExitCapitalCallSchema = createInsertSchema(exitCapitalCalls).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  callAmount: z.string().or(z.number()),
+});
+
+export const updateExitCapitalCallSchema = insertExitCapitalCallSchema.partial();
+
+export const insertExitScenarioComparisonSchema = createInsertSchema(exitScenarioComparisons).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateExitScenarioComparisonSchema = insertExitScenarioComparisonSchema.partial();
+
+// Type exports for Exit Strategy V2
+export type ExitScenarioTemplate = typeof exitScenarioTemplates.$inferSelect;
+export type InsertExitScenarioTemplate = z.infer<typeof insertExitScenarioTemplateSchema>;
+export type UpdateExitScenarioTemplate = z.infer<typeof updateExitScenarioTemplateSchema>;
+
+export type ExitScenarioLoan = typeof exitScenarioLoans.$inferSelect;
+export type InsertExitScenarioLoan = z.infer<typeof insertExitScenarioLoanSchema>;
+export type UpdateExitScenarioLoan = z.infer<typeof updateExitScenarioLoanSchema>;
+
+export type ExitScenarioBasisLedger = typeof exitScenarioBasisLedger.$inferSelect;
+export type InsertExitScenarioBasisLedger = z.infer<typeof insertExitScenarioBasisLedgerSchema>;
+export type UpdateExitScenarioBasisLedger = z.infer<typeof updateExitScenarioBasisLedgerSchema>;
+
+export type ExitScenarioMultiYearCashflow = typeof exitScenarioMultiYearCashflows.$inferSelect;
+export type InsertExitScenarioMultiYearCashflow = z.infer<typeof insertExitScenarioMultiYearCashflowSchema>;
+export type UpdateExitScenarioMultiYearCashflow = z.infer<typeof updateExitScenarioMultiYearCashflowSchema>;
+
+export type ExitScenarioTaxProfile = typeof exitScenarioTaxProfiles.$inferSelect;
+export type InsertExitScenarioTaxProfile = z.infer<typeof insertExitScenarioTaxProfileSchema>;
+export type UpdateExitScenarioTaxProfile = z.infer<typeof updateExitScenarioTaxProfileSchema>;
+
+export type Exit1031ReplacementProperty = typeof exit1031ReplacementProperties.$inferSelect;
+export type InsertExit1031ReplacementProperty = z.infer<typeof insertExit1031ReplacementPropertySchema>;
+export type UpdateExit1031ReplacementProperty = z.infer<typeof updateExit1031ReplacementPropertySchema>;
+
+export type ExitDstInterest = typeof exitDstInterests.$inferSelect;
+export type InsertExitDstInterest = z.infer<typeof insertExitDstInterestSchema>;
+export type UpdateExitDstInterest = z.infer<typeof updateExitDstInterestSchema>;
+
+export type ExitWaterfallTier = typeof exitWaterfallTiers.$inferSelect;
+export type InsertExitWaterfallTier = z.infer<typeof insertExitWaterfallTierSchema>;
+export type UpdateExitWaterfallTier = z.infer<typeof updateExitWaterfallTierSchema>;
+
+export type ExitCapitalCall = typeof exitCapitalCalls.$inferSelect;
+export type InsertExitCapitalCall = z.infer<typeof insertExitCapitalCallSchema>;
+export type UpdateExitCapitalCall = z.infer<typeof updateExitCapitalCallSchema>;
+
+export type ExitScenarioComparison = typeof exitScenarioComparisons.$inferSelect;
+export type InsertExitScenarioComparison = z.infer<typeof insertExitScenarioComparisonSchema>;
+export type UpdateExitScenarioComparison = z.infer<typeof updateExitScenarioComparisonSchema>;
+
+// ============================================================================
+// EXIT STRATEGY - Insert Schemas and Types (Original)
 // ============================================================================
 
 export const insertExitScenarioSchema = createInsertSchema(exitScenarios).omit({
