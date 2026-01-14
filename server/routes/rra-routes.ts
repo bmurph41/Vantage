@@ -272,6 +272,176 @@ router.post("/leases/import/parse", async (req: Request, res: Response, next: Ne
   }
 });
 
+// Detect unrecognized values in enum fields during import
+// This helps identify values that need mapping to standard types
+router.post("/leases/import/detect-values", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { rows, columnMapping } = req.body;
+    
+    if (!rows || !Array.isArray(rows)) {
+      return res.status(400).json({
+        hasUnrecognizedValues: false,
+        unrecognizedValues: {},
+      });
+    }
+    
+    // Define standard values for enum-like fields
+    const standardValues: Record<string, string[]> = {
+      storageType: ['wet_slip', 'dry_storage', 'mooring', 'rack', 'trailer', 'covered', 'uncovered', 'indoor', 'outdoor'],
+      contractTerm: ['annual', 'seasonal', 'winter', 'summer', 'monthly', 'transient', 'short_term'],
+      status: ['active', 'expired', 'pending', 'cancelled', 'terminated'],
+    };
+    
+    const unrecognizedValues: Record<string, { label: string; values: string[] }> = {};
+    
+    // Check each enum field for unrecognized values
+    for (const [fieldId, validValues] of Object.entries(standardValues)) {
+      const sourceColumn = columnMapping[fieldId];
+      if (!sourceColumn) continue;
+      
+      const uniqueValues = new Set<string>();
+      for (const row of rows) {
+        const value = row[sourceColumn];
+        if (value && typeof value === 'string') {
+          const normalized = value.trim().toLowerCase().replace(/[\s_-]+/g, '_');
+          if (!validValues.includes(normalized) && normalized !== '') {
+            uniqueValues.add(value.trim());
+          }
+        }
+      }
+      
+      if (uniqueValues.size > 0) {
+        unrecognizedValues[fieldId] = {
+          label: fieldId === 'storageType' ? 'Storage Type' : 
+                 fieldId === 'contractTerm' ? 'Contract Term' : 
+                 fieldId === 'status' ? 'Status' : fieldId,
+          values: Array.from(uniqueValues),
+        };
+      }
+    }
+    
+    return res.json({
+      hasUnrecognizedValues: Object.keys(unrecognizedValues).length > 0,
+      unrecognizedValues,
+    });
+  } catch (error: any) {
+    console.error('[Lease Import Detect Values] Error:', error);
+    return res.status(500).json({
+      hasUnrecognizedValues: false,
+      unrecognizedValues: {},
+      error: error.message,
+    });
+  }
+});
+
+// AI-powered suggestions for mapping unrecognized values to standard types
+router.post("/leases/import/suggest-mappings", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { unrecognizedValues } = req.body;
+    
+    if (!unrecognizedValues || typeof unrecognizedValues !== 'object') {
+      return res.json({ suggestions: [] });
+    }
+    
+    // Simple heuristic-based suggestions (can be enhanced with AI later)
+    const standardMappings: Record<string, Record<string, string>> = {
+      storageType: {
+        'slip': 'wet_slip',
+        'wet': 'wet_slip',
+        'dock': 'wet_slip',
+        'dry': 'dry_storage',
+        'rack storage': 'rack',
+        'covered storage': 'covered',
+        'outside': 'outdoor',
+        'inside': 'indoor',
+        'boat trailer': 'trailer',
+      },
+      contractTerm: {
+        'year': 'annual',
+        'yearly': 'annual',
+        '12 month': 'annual',
+        '12 months': 'annual',
+        'season': 'seasonal',
+        'month': 'monthly',
+        'month to month': 'monthly',
+        'transient': 'transient',
+        'daily': 'transient',
+        'weekly': 'transient',
+        'guest': 'transient',
+      },
+      status: {
+        'current': 'active',
+        'valid': 'active',
+        'in force': 'active',
+        'ended': 'expired',
+        'lapsed': 'expired',
+        'canceled': 'cancelled',
+        'void': 'cancelled',
+      },
+    };
+    
+    const suggestions: Array<{
+      fieldId: string;
+      fieldLabel: string;
+      suggestions: Array<{
+        originalValue: string;
+        suggestedValue: string | null;
+        confidence: "high" | "medium" | "low";
+      }>;
+    }> = [];
+    
+    for (const [fieldId, fieldData] of Object.entries(unrecognizedValues as Record<string, { label: string; values: string[] }>)) {
+      const fieldMappings = standardMappings[fieldId] || {};
+      const fieldSuggestions: Array<{
+        originalValue: string;
+        suggestedValue: string | null;
+        confidence: "high" | "medium" | "low";
+      }> = [];
+      
+      for (const value of fieldData.values) {
+        const normalizedValue = value.toLowerCase().trim();
+        let suggestedValue: string | null = null;
+        let confidence: "high" | "medium" | "low" = "low";
+        
+        // Check direct matches
+        if (fieldMappings[normalizedValue]) {
+          suggestedValue = fieldMappings[normalizedValue];
+          confidence = "high";
+        } else {
+          // Check partial matches
+          for (const [pattern, mapping] of Object.entries(fieldMappings)) {
+            if (normalizedValue.includes(pattern) || pattern.includes(normalizedValue)) {
+              suggestedValue = mapping;
+              confidence = "medium";
+              break;
+            }
+          }
+        }
+        
+        fieldSuggestions.push({
+          originalValue: value,
+          suggestedValue,
+          confidence,
+        });
+      }
+      
+      suggestions.push({
+        fieldId,
+        fieldLabel: fieldData.label,
+        suggestions: fieldSuggestions,
+      });
+    }
+    
+    return res.json({ suggestions });
+  } catch (error: any) {
+    console.error('[Lease Import Suggest Mappings] Error:', error);
+    return res.status(500).json({
+      suggestions: [],
+      error: error.message,
+    });
+  }
+});
+
 // PDF import endpoint with AI extraction (base64 input)
 // Uses new unified parser for reliable extraction with proper fallback handling
 router.post("/leases/import/pdf", async (req: Request, res: Response, next: NextFunction) => {
