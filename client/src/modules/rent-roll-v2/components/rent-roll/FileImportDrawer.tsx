@@ -1077,6 +1077,31 @@ export default function FileImportDrawer({ open, onClose, locationId }: FileImpo
             resolve();
             return;
           }
+          
+          // Check if we got only a single "Raw Text" column - this means extraction failed
+          // Provide comprehensive fallback headers for manual mapping
+          if (response.headers.length === 1 && response.headers[0] === 'Raw Text') {
+            toast({
+              title: "PDF requires manual mapping",
+              description: "The PDF structure couldn't be auto-detected. Please use the column dropdowns to map your data fields.",
+              variant: "default",
+              duration: 8000,
+            });
+            
+            // Provide comprehensive marina-specific headers for manual mapping
+            const comprehensiveHeaders = [
+              'Tenant Name', 'Unit/Slip', 'Storage Type', 'Boat Length', 'Boat Width',
+              'Monthly Rent', 'Annual Rent', 'Start Date', 'End Date', 'Status', 'Notes'
+            ];
+            const emptyRow: Record<string, string> = {};
+            comprehensiveHeaders.forEach(h => { emptyRow[h] = ''; });
+            
+            setFileHeaders(comprehensiveHeaders);
+            setFileRows([emptyRow]);
+            setStep("mapping");
+            resolve();
+            return;
+          }
 
           // Show confidence-based toast
           if (response.confidence === 'low') {
