@@ -30,6 +30,14 @@ const parser = new Parser({
   }
 });
 
+function matchesCustomKeywords(title: string, content: string, keywords: string[] | null): boolean {
+  if (!keywords || keywords.length === 0) {
+    return true;
+  }
+  const text = `${title} ${content}`.toLowerCase();
+  return keywords.some(keyword => text.includes(keyword.toLowerCase()));
+}
+
 interface FeedItem {
   title?: string;
   link?: string;
@@ -70,7 +78,7 @@ export async function fetchRssFeeds(): Promise<number> {
           const feed = await parser.parseURL(source.url);
           
           for (const item of feed.items || []) {
-            const newArticles = await processRssItem(item, source.name);
+            const newArticles = await processRssItem(item, source.name, source.customKeywords);
             totalNewArticles += newArticles;
           }
           
@@ -301,7 +309,7 @@ async function processScrapedArticle(article: ScrapedArticle, sourceName: string
   }
 }
 
-async function processRssItem(item: FeedItem, sourceName: string): Promise<number> {
+async function processRssItem(item: FeedItem, sourceName: string, customKeywords?: string[] | null): Promise<number> {
   try {
     const url = item.link || item.guid;
     if (!url || !item.title) {
@@ -316,6 +324,11 @@ async function processRssItem(item: FeedItem, sourceName: string): Promise<numbe
 
     const content = item.content || item.contentSnippet || item.summary || "";
     const title = item.title;
+    
+    // Check custom keyword filter (for sources like Yahoo Finance that need marina-specific filtering)
+    if (!matchesCustomKeywords(title, content, customKeywords || null)) {
+      return 0;
+    }
     
     // Score article for relevance
     const relevanceScore = scoreArticle(title, content, sourceName);
