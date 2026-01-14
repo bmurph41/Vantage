@@ -180,6 +180,15 @@ export default function CompanyDetailModal({
     enabled: isOpen && !!company?.id,
   });
 
+  // Fetch company acquisitions from Sales Comps (where this company is the buyer)
+  const { data: acquisitions = [] } = useQuery<any[]>({
+    queryKey: ['/api/companies', company?.id, 'acquisitions'],
+    enabled: isOpen && !!company?.id,
+  });
+
+  // Get the most recent acquisition for display
+  const lastAcquisition = acquisitions.length > 0 ? acquisitions[0] : null;
+
   // Fetch tasks for this company
   const { data: tasks = [] } = useQuery<CrmTask[]>({
     queryKey: ['/api/crm/tasks', { companyId: company?.id }],
@@ -714,6 +723,15 @@ export default function CompanyDetailModal({
                                 <FormControl>
                                   {isEditing ? (
                                     <Input {...field} className="h-9" placeholder="e.g., 11-50 employees" />
+                                  ) : (linkedProperties.length > 0 || ownedProperties.length > 0) ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => setActiveTab('properties')}
+                                      className="font-medium text-primary hover:underline cursor-pointer flex items-center gap-1 text-left"
+                                    >
+                                      {field.value || '-'}
+                                      <Anchor className="w-3 h-3" />
+                                    </button>
                                   ) : (
                                     <p className="font-medium">{field.value || '-'}</p>
                                   )}
@@ -953,6 +971,41 @@ export default function CompanyDetailModal({
                       )}
                     </CardContent>
                   </Card>
+
+                  {/* Last Acquisition */}
+                  {lastAcquisition && (
+                    <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950 dark:to-teal-900 border-emerald-200 dark:border-emerald-800">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <TrendingUp className="w-4 h-4 text-emerald-600" />
+                            Last Acquisition
+                          </CardTitle>
+                          <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
+                            {acquisitions.length} Total
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          <p className="font-semibold text-emerald-700 dark:text-emerald-300">{lastAcquisition.marina}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {lastAcquisition.saleMonth && lastAcquisition.saleYear 
+                              ? `${new Date(lastAcquisition.saleYear, lastAcquisition.saleMonth - 1).toLocaleString('default', { month: 'long' })} ${lastAcquisition.saleYear}`
+                              : lastAcquisition.saleYear 
+                              ? `${lastAcquisition.saleYear}`
+                              : 'Date unknown'}
+                          </p>
+                          {lastAcquisition.city && lastAcquisition.state && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />
+                              {lastAcquisition.city}, {lastAcquisition.state}
+                            </p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
 
                   {/* Open Tasks */}
                   <Card>

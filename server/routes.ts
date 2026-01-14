@@ -9809,6 +9809,21 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Company Acquisitions - Sales Comps where this company is the buyer
+  app.get("/api/companies/:id/acquisitions", async (req: any, res) => {
+    try {
+      const { orgId } = req.user || {};
+      if (!orgId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const acquisitions = await storage.getSalesCompsByBuyerCompany(orgId, req.params.id);
+      res.json(acquisitions);
+    } catch (error: any) {
+      console.error("Failed to get company acquisitions:", error);
+      res.status(500).json({ error: "Failed to retrieve company acquisitions" });
+    }
+  });
+
   // Company-Property Links
   app.get("/api/companies/:id/properties", async (req: any, res) => {
     try {

@@ -409,6 +409,7 @@ export interface IStorage {
   getCompanyContacts(companyId: string): Promise<Array<{ id: string; contactId: string; companyId: string; role?: string | null; isPrimary: boolean; contact?: any }>>;
   getCompanyProperties(companyId: string): Promise<Array<{ id: string; companyId: string; propertyId: string; relationship?: string | null; property?: any }>>;
   unlinkCompanyFromProperty(linkId: string): Promise<void>;
+  getSalesCompsByBuyerCompany(orgId: string, companyId: string): Promise<any[]>;
 
   // CRM - Pending Contacts
   getPendingContact(id: string): Promise<PendingContact | undefined>;
@@ -3369,6 +3370,19 @@ export class DatabaseStorage implements IStorage {
 
   async unlinkCompanyFromProperty(linkId: string): Promise<void> {
     await db.delete(crmCompanyProperties).where(eq(crmCompanyProperties.id, linkId));
+  }
+
+  async getSalesCompsByBuyerCompany(orgId: string, companyId: string): Promise<any[]> {
+    const results = await db.select()
+      .from(salesComps)
+      .where(
+        and(
+          eq(salesComps.orgId, orgId),
+          eq(salesComps.buyerCompanyId, companyId)
+        )
+      )
+      .orderBy(desc(salesComps.saleYear), desc(salesComps.saleMonth));
+    return results;
   }
 
   // CRM - Pending Contacts
