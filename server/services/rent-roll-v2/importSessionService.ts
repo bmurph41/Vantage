@@ -70,23 +70,49 @@ function convertToMonthly(rawAmount: number, rateBasis: RateBasisType, periodMon
   }
 }
 
+function parseMonthFromDateString(dateStr: string): number | null {
+  if (!dateStr) return null;
+  
+  // Try MM/DD format first
+  if (dateStr.includes('/')) {
+    const parts = dateStr.split('/');
+    if (parts.length >= 2) {
+      const month = parseInt(parts[0], 10);
+      if (!isNaN(month) && month >= 1 && month <= 12) {
+        return month;
+      }
+    }
+  }
+  
+  // Try ISO date format (YYYY-MM-DD or Date object string)
+  const parsed = new Date(dateStr);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.getMonth() + 1; // getMonth is 0-indexed
+  }
+  
+  return null;
+}
+
 function getSeasonMonths(seasonType: string, projectDates?: ImportOptions['projectSeasonDates']): number {
-  const currentYear = new Date().getFullYear();
   if (seasonType === 'summer') {
     if (projectDates?.seasonStart && projectDates?.seasonEnd) {
-      const [startMonth] = projectDates.seasonStart.split('/').map(Number);
-      const [endMonth] = projectDates.seasonEnd.split('/').map(Number);
-      return Math.max(1, endMonth - startMonth + 1);
+      const startMonth = parseMonthFromDateString(projectDates.seasonStart);
+      const endMonth = parseMonthFromDateString(projectDates.seasonEnd);
+      if (startMonth && endMonth) {
+        return Math.max(1, endMonth - startMonth + 1);
+      }
     }
     return 6;
   } else if (seasonType === 'winter') {
     if (projectDates?.winterStart && projectDates?.winterEnd) {
-      const [startMonth] = projectDates.winterStart.split('/').map(Number);
-      const [endMonth] = projectDates.winterEnd.split('/').map(Number);
-      if (endMonth < startMonth) {
-        return Math.max(1, (12 - startMonth + 1) + endMonth);
+      const startMonth = parseMonthFromDateString(projectDates.winterStart);
+      const endMonth = parseMonthFromDateString(projectDates.winterEnd);
+      if (startMonth && endMonth) {
+        if (endMonth < startMonth) {
+          return Math.max(1, (12 - startMonth + 1) + endMonth);
+        }
+        return Math.max(1, endMonth - startMonth + 1);
       }
-      return Math.max(1, endMonth - startMonth + 1);
     }
     return 6;
   }
