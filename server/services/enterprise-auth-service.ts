@@ -1,9 +1,9 @@
 import { db } from '../db';
 import { 
-  users, organizations, ssoConfigurations, userSessions, securityAuditLog,
+  users, organizations, ssoConfigurations, userSessions, securityAuditLog, passwordResetTokens,
   type User, type Organization, type SsoConfiguration, type UserSession
 } from '@shared/schema';
-import { eq, and, gt, lt } from 'drizzle-orm';
+import { eq, and, gt, lt, isNull } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcrypt';
 import speakeasy from 'speakeasy';
@@ -15,6 +15,7 @@ const SESSION_DURATION_MS = 8 * 60 * 60 * 1000; // 8 hours default
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes idle timeout
+const PASSWORD_RESET_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
 
 export interface AuthResult {
   success: boolean;
@@ -601,6 +602,86 @@ export class EnterpriseAuthService {
       orderBy: (log, { desc }) => [desc(log.createdAt)],
       limit: filters?.limit || 100
     });
+  }
+
+  async requestPasswordReset(email: string): Promise<void> {
+    try {
+      const user = await this.getUserByEmail(email);
+      
+      if (!user) {
+        logger.info({ email }, 'Password reset requested for non-existent email');
+        return;
+      }
+
+      await db.delete(passwordResetTokens)
+        .where(eq(passwordResetTokens.userId, user.id));
+
+      const token = uuidv4();
+      const expiresAt = new Date(Date.now() + PASSWORD_RESET_EXPIRY_MS);
+
+      await db.insert(passwordResetTokens).values({
+        userId: user.id,
+        token,
+        expiresAt,
+      });
+
+      const resetUrl = `${process.env.APP_URL || 'http://localhost:5000'}/reset-password?token=${token}`;
+      
+      logger.info({ email, resetUrl }, 'Password reset token created');
+      
+      await this.logSecurityEvent(user.id, user.orgId, 'password_reset_requested', {
+        email
+      }, {}, true);
+
+    } catch (error) {
+      logger.error({ error, email }, 'Error requesting password reset');
+      throw error;
+    }
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const resetToken = await db.query.passwordResetTokens.findFirst({
+        where: and(
+          eq(passwordResetTokens.token, token),
+          isNull(passwordResetTokens.usedAt),
+          gt(passwordResetTokens.expiresAt, new Date())
+        )
+      });
+
+      if (!resetToken) {
+        logger.warn({ token: token.substring(0, 8) }, 'Invalid or expired password reset token');
+        return { success: false, error: 'Invalid or expired reset link' };
+      }
+
+      const passwordHash = await this.hashPassword(newPassword);
+
+      await db.update(users)
+        .set({ passwordHash })
+        .where(eq(users.id, resetToken.userId));
+
+      await db.update(passwordResetTokens)
+        .set({ usedAt: new Date() })
+        .where(eq(passwordResetTokens.id, resetToken.id));
+
+      await db.delete(userSessions)
+        .where(eq(userSessions.userId, resetToken.userId));
+
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, resetToken.userId)
+      });
+
+      if (user) {
+        await this.logSecurityEvent(user.id, user.orgId, 'password_reset_completed', {}, {}, true);
+      }
+
+      logger.info({ userId: resetToken.userId }, 'Password reset completed successfully');
+      return { success: true };
+
+    } catch (error) {
+      logger.error({ error }, 'Error resetting password');
+      return { success: false, error: 'Password reset failed' };
+    }
   }
 }
 

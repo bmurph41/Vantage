@@ -234,6 +234,61 @@ router.post('/mfa/disable', requireSession, async (req: Request, res: Response) 
   }
 });
 
+const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  password: z.string().min(8),
+});
+
+router.post('/forgot-password', async (req: Request, res: Response) => {
+  try {
+    const parsed = forgotPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Invalid email address' });
+    }
+
+    const { email } = parsed.data;
+    
+    await enterpriseAuthService.requestPasswordReset(email.toLowerCase());
+    
+    res.json({ 
+      success: true, 
+      message: 'If an account exists with this email, password reset instructions have been sent.' 
+    });
+  } catch (error) {
+    logger.error({ error }, 'Forgot password error');
+    res.json({ 
+      success: true, 
+      message: 'If an account exists with this email, password reset instructions have been sent.' 
+    });
+  }
+});
+
+router.post('/reset-password', async (req: Request, res: Response) => {
+  try {
+    const parsed = resetPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Invalid request' });
+    }
+
+    const { token, password } = parsed.data;
+    
+    const result = await enterpriseAuthService.resetPassword(token, password);
+    
+    if (!result.success) {
+      return res.status(400).json({ error: result.error || 'Password reset failed' });
+    }
+    
+    res.json({ success: true, message: 'Password has been reset successfully' });
+  } catch (error) {
+    logger.error({ error }, 'Reset password error');
+    res.status(500).json({ error: 'Password reset failed' });
+  }
+});
+
 router.post('/register', async (req: Request, res: Response) => {
   try {
     const parsed = registerSchema.safeParse(req.body);

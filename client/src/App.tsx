@@ -85,6 +85,8 @@ const MilestoneDemo = lazy(() => import("@/pages/milestone-demo"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 const LoginPage = lazy(() => import("@/pages/auth/login"));
 const SignupPage = lazy(() => import("@/pages/auth/signup"));
+const ForgotPasswordPage = lazy(() => import("@/pages/auth/forgot-password"));
+const ResetPasswordPage = lazy(() => import("@/pages/auth/reset-password"));
 const DesignPreview = lazy(() => import("@/pages/design-preview"));
 const PacksSettings = lazy(() => import("@/pages/packs-settings"));
 const AccountMappingPage = lazy(() => import("@/pages/admin/AccountMappingPage"));
@@ -291,6 +293,20 @@ function Router() {
         {() => (
           <Suspense fallback={<PageLoader />}>
             <SignupPage />
+          </Suspense>
+        )}
+      </Route>
+      <Route path="/forgot-password">
+        {() => (
+          <Suspense fallback={<PageLoader />}>
+            <ForgotPasswordPage />
+          </Suspense>
+        )}
+      </Route>
+      <Route path="/reset-password">
+        {() => (
+          <Suspense fallback={<PageLoader />}>
+            <ResetPasswordPage />
           </Suspense>
         )}
       </Route>

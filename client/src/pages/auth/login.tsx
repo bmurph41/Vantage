@@ -266,6 +266,9 @@ export default function LoginPage() {
                 {loginMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Sign In
               </Button>
+              <Link href="/forgot-password" className="text-sm text-primary hover:underline" data-testid="link-forgot-password">
+                Forgot your password?
+              </Link>
               <div className="text-center text-sm text-muted-foreground">
                 Don't have an account?{" "}
                 <Link href="/signup" className="text-primary hover:underline" data-testid="link-signup">

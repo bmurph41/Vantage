@@ -305,6 +305,18 @@ export const userSessions = pgTable("user_sessions", {
   sessionTokenIdx: index("user_sessions_token_idx").on(table.sessionToken),
 }));
 
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  tokenIdx: index("password_reset_token_idx").on(table.token),
+  userIdIdx: index("password_reset_user_id_idx").on(table.userId),
+}));
+
 // Security Audit Log - Track auth events
 export const securityAuditLog = pgTable("security_audit_log", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
