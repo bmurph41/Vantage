@@ -1216,23 +1216,70 @@ router.post("/leases/import", async (req: Request, res: Response, next: NextFunc
         const normalizedStorageType = normalizeStorageType(storageType);
         const normalizedStatus = normalizeLeaseStatus(status);
         
-        await rraService.createLease({
+        // Calculate the effective monthly amount
+        const effectiveMonthlyAmount = monthlyRate > 0 ? monthlyRate : (annualRent > 0 ? annualRent / 12 : 0);
+        
+        const lease = await rraService.createLease({
           orgId,
           tenantId: tenant.id,
           locationId: locationId || null,
           leaseKey,
-          unitIdentifier: unitId,
+          unitNumber: unitId,
           storageType: normalizedStorageType,
-          monthlyBaseRate: monthlyRate > 0 ? monthlyRate.toString() : null,
-          annualBaseRate: annualRent > 0 ? annualRent.toString() : (monthlyRate > 0 ? (monthlyRate * 12).toString() : null),
-          startDate: leaseStart ? new Date(leaseStart) : null,
-          endDate: leaseEnd ? new Date(leaseEnd) : null,
-          status: normalizedStatus,
-          boatLength: size ? parseFloat(size) || null : null,
-          boatBeam: beam ? parseFloat(beam) || null : null,
-          notes: notes || null,
+          leaseAmount: effectiveMonthlyAmount > 0 ? effectiveMonthlyAmount.toString() : null,
+          totalContractValue: annualRent > 0 ? annualRent.toString() : (monthlyRate > 0 ? (monthlyRate * 12).toString() : null),
+          leaseCommencement: leaseStart ? leaseStart : null,
+          leaseExpiration: leaseEnd ? leaseEnd : null,
+          slipStatus: normalizedStatus === 'active' ? 'Occupied' : normalizedStatus === 'vacant' ? 'Vacant' : 'Occupied',
+          slipLength: size ? parseFloat(size) || null : null,
+          slipWidth: beam ? parseFloat(beam) || null : null,
           isActive: normalizedStatus === 'active' || normalizedStatus === 'occupied',
         });
+        
+        // Generate monthly cash flows based on lease dates
+        if (effectiveMonthlyAmount > 0 && leaseStart) {
+          const startDate = new Date(leaseStart);
+          const endDate = leaseEnd ? new Date(leaseEnd) : new Date(startDate.getFullYear(), 11, 31); // Default to year-end if no end date
+          
+          // Don't generate cash flows for invalid dates
+          if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime()) && startDate <= endDate) {
+            // Get existing cash flows for this lease to avoid duplicates
+            const existingCashFlows = await rraService.getCashFlows(orgId, { leaseId: lease.id });
+            const existingPeriods = new Set(existingCashFlows.map(cf => `${cf.year}-${cf.month}`));
+            
+            // Generate cash flows for each month within the lease period
+            let currentDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+            const finalMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+            
+            while (currentDate <= finalMonth) {
+              const year = currentDate.getFullYear();
+              const month = currentDate.getMonth() + 1;
+              const periodKey = `${year}-${month}`;
+              
+              // Skip if cash flow already exists for this period
+              if (!existingPeriods.has(periodKey)) {
+                const periodStart = new Date(year, month - 1, 1);
+                const periodEnd = new Date(year, month, 0); // Last day of month
+                
+                await rraService.createCashFlow({
+                  orgId,
+                  leaseId: lease.id,
+                  locationId: locationId || null,
+                  cashflowType: 'rent',
+                  periodStart: periodStart.toISOString().split('T')[0],
+                  periodEnd: periodEnd.toISOString().split('T')[0],
+                  amount: effectiveMonthlyAmount.toFixed(2),
+                  year: year,
+                  month: month,
+                  isProjected: false,
+                });
+              }
+              
+              // Move to next month
+              currentDate.setMonth(currentDate.getMonth() + 1);
+            }
+          }
+        }
         
         imported++;
       } catch (rowError: any) {
@@ -1324,7 +1371,7 @@ router.get("/leases", async (req: Request, res: Response, next: NextFunction) =>
       storageType: req.query.storageType as string | undefined,
     };
     const leases = await rraService.getLeases(orgId, filters);
-    res.json(leases);
+    res.json({ leases, total: leases.length });
   } catch (error) {
     next(error);
   }
