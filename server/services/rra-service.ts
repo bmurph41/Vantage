@@ -360,6 +360,26 @@ export class RRAService {
     return true;
   }
 
+  async findTenantByName(orgId: string, name: string): Promise<RraTenant | null> {
+    const [tenant] = await db.select()
+      .from(rraTenants)
+      .where(and(
+        eq(rraTenants.orgId, orgId),
+        ilike(rraTenants.name, name)
+      ));
+    return tenant || null;
+  }
+
+  async findLeaseByKey(orgId: string, leaseKey: string): Promise<RraLease | null> {
+    const [lease] = await db.select()
+      .from(rraLeases)
+      .where(and(
+        eq(rraLeases.orgId, orgId),
+        eq(rraLeases.leaseKey, leaseKey)
+      ));
+    return lease || null;
+  }
+
   async getLeases(orgId: string, filters?: {
     locationId?: string;
     tenantId?: string;

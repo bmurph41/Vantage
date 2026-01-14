@@ -1153,6 +1153,147 @@ router.delete("/tenants/:id", async (req: Request, res: Response, next: NextFunc
   }
 });
 
+router.post("/leases/import", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const userId = getUserId(req);
+    const { 
+      rows, 
+      skipDuplicates = false, 
+      locationId, 
+      fileMetadata,
+      importMode = 'append',
+      rateConfiguration,
+      defaultStorageType,
+      autoApplyContractTermDates,
+      projectSeasonDates
+    } = req.body;
+    
+    if (!rows || !Array.isArray(rows)) {
+      return res.status(400).json({ error: "No rows provided for import" });
+    }
+    
+    let imported = 0;
+    let skipped = 0;
+    let errors = 0;
+    const errorMessages: string[] = [];
+    
+    for (const row of rows) {
+      try {
+        const tenantName = row.tenantName || row.tenant_name || row['Tenant Name'] || row.name || 'Unknown Tenant';
+        const unitId = row.unitId || row.unit_id || row['Unit ID'] || row.unit || row.slip || row.slipNumber || '';
+        const storageType = row.storageType || row.storage_type || row['Storage Type'] || defaultStorageType || 'wet_slip';
+        const monthlyRate = parseFloat(row.monthlyRent || row.monthly_rent || row['Monthly Rent'] || row.monthlyRate || row.rate || 0);
+        const annualRent = parseFloat(row.annualRent || row.annual_rent || row['Annual Rent'] || 0);
+        const leaseStart = row.leaseStart || row.lease_start || row['Lease Start'] || row.startDate || row.start_date || null;
+        const leaseEnd = row.leaseEnd || row.lease_end || row['Lease End'] || row.endDate || row.end_date || null;
+        const status = row.status || row['Status'] || 'active';
+        const size = row.size || row['Size'] || row.length || row.loa || '';
+        const beam = row.beam || row['Beam'] || '';
+        const notes = row.notes || row['Notes'] || '';
+        
+        let tenant = await rraService.findTenantByName(orgId, tenantName);
+        if (!tenant) {
+          tenant = await rraService.createTenant({
+            orgId,
+            name: tenantName,
+            email: row.email || null,
+            phone: row.phone || null,
+            isActive: true,
+          });
+        }
+        
+        const leaseKey = `${tenant.id}|${locationId || 'none'}|${unitId || Date.now()}`;
+        
+        if (skipDuplicates) {
+          const existingLease = await rraService.findLeaseByKey(orgId, leaseKey);
+          if (existingLease) {
+            skipped++;
+            continue;
+          }
+        }
+        
+        const normalizedStorageType = normalizeStorageType(storageType);
+        const normalizedStatus = normalizeLeaseStatus(status);
+        
+        await rraService.createLease({
+          orgId,
+          tenantId: tenant.id,
+          locationId: locationId || null,
+          leaseKey,
+          unitIdentifier: unitId,
+          storageType: normalizedStorageType,
+          monthlyBaseRate: monthlyRate > 0 ? monthlyRate.toString() : null,
+          annualBaseRate: annualRent > 0 ? annualRent.toString() : (monthlyRate > 0 ? (monthlyRate * 12).toString() : null),
+          startDate: leaseStart ? new Date(leaseStart) : null,
+          endDate: leaseEnd ? new Date(leaseEnd) : null,
+          status: normalizedStatus,
+          boatLength: size ? parseFloat(size) || null : null,
+          boatBeam: beam ? parseFloat(beam) || null : null,
+          notes: notes || null,
+          isActive: normalizedStatus === 'active' || normalizedStatus === 'occupied',
+        });
+        
+        imported++;
+      } catch (rowError: any) {
+        errors++;
+        errorMessages.push(`Row error: ${rowError.message}`);
+        console.error('[Lease Import] Row error:', rowError);
+      }
+    }
+    
+    res.json({
+      success: true,
+      imported,
+      skipped,
+      errors,
+      total: rows.length,
+      errorMessages: errorMessages.slice(0, 10),
+    });
+  } catch (error: any) {
+    console.error('[Lease Import] Error:', error);
+    res.status(500).json({ error: error.message || 'Import failed' });
+  }
+});
+
+function normalizeStorageType(type: string): string {
+  const normalized = type?.toLowerCase().replace(/[^a-z0-9]/g, '_') || 'wet_slip';
+  const mappings: Record<string, string> = {
+    'wet': 'wet_slip',
+    'wet_slip': 'wet_slip',
+    'wetslip': 'wet_slip',
+    'slip': 'wet_slip',
+    'dry': 'dry_rack',
+    'dry_rack': 'dry_rack',
+    'dryrack': 'dry_rack',
+    'rack': 'dry_rack',
+    'dry_storage': 'dry_storage',
+    'drystorage': 'dry_storage',
+    'mooring': 'mooring',
+    'anchor': 'mooring',
+    'yard': 'yard_storage',
+    'yard_storage': 'yard_storage',
+    'trailer': 'trailer_storage',
+    'trailer_storage': 'trailer_storage',
+  };
+  return mappings[normalized] || 'wet_slip';
+}
+
+function normalizeLeaseStatus(status: string): string {
+  const normalized = status?.toLowerCase().replace(/[^a-z0-9]/g, '_') || 'active';
+  const mappings: Record<string, string> = {
+    'active': 'active',
+    'occupied': 'occupied',
+    'vacant': 'vacant',
+    'available': 'vacant',
+    'expired': 'expired',
+    'terminated': 'terminated',
+    'pending': 'pending',
+    'reserved': 'reserved',
+  };
+  return mappings[normalized] || 'active';
+}
+
 router.get("/leases", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orgId = getOrgId(req);
