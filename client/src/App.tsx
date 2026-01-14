@@ -85,6 +85,7 @@ const MilestoneDemo = lazy(() => import("@/pages/milestone-demo"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 const LoginPage = lazy(() => import("@/pages/auth/login"));
 const SignupPage = lazy(() => import("@/pages/auth/signup"));
+const DesignPreview = lazy(() => import("@/pages/design-preview"));
 const PacksSettings = lazy(() => import("@/pages/packs-settings"));
 const AccountMappingPage = lazy(() => import("@/pages/admin/AccountMappingPage"));
 const FeatureGate = lazy(() => import("@/components/FeatureGate").then(m => ({ default: m.FeatureGate })));
@@ -290,6 +291,14 @@ function Router() {
         {() => (
           <Suspense fallback={<PageLoader />}>
             <SignupPage />
+          </Suspense>
+        )}
+      </Route>
+      {/* Design preview - no auth required */}
+      <Route path="/design-preview">
+        {() => (
+          <Suspense fallback={<PageLoader />}>
+            <DesignPreview />
           </Suspense>
         )}
       </Route>
