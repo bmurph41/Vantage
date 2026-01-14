@@ -1,7 +1,7 @@
+import { describe, it, expect } from 'vitest';
 import { calculateCriticalPath } from './critical-path';
 import type { Task, Project, ProjectSettings } from '../../../shared/schema';
 
-// Test utility to create a mock task
 function createMockTask(
   id: string, 
   title: string, 
@@ -49,12 +49,10 @@ function createMockTask(
     taskOwner: null,
     createdAt: new Date(),
     updatedAt: new Date(),
-    // Assuming durationDays is a calculated property from the template
     durationDays
   } as Task & { durationDays: number };
 }
 
-// Test project
 const mockProject: Project = {
   id: 'test-project',
   orgId: 'test-org',
@@ -74,7 +72,6 @@ const mockProject: Project = {
   createdAt: new Date('2024-01-01')
 };
 
-// Test settings
 const mockSettings: ProjectSettings = {
   projectId: 'test-project',
   useBusinessDays: false,
@@ -83,76 +80,104 @@ const mockSettings: ProjectSettings = {
   ndaRequired: false
 };
 
-// Test function
-export function testCriticalPath() {
+describe('calculateCriticalPath', () => {
+  describe('linear dependency chain', () => {
+    const linearTasks = [
+      createMockTask('A', 'Task A', [], 3),
+      createMockTask('B', 'Task B', ['A'], 2),
+      createMockTask('C', 'Task C', ['B'], 4)
+    ];
 
-  // Test Case 1: Simple linear dependency chain
-  const linearTasks = [
-    createMockTask('A', 'Task A', [], 3),      // 3 days, no deps
-    createMockTask('B', 'Task B', ['A'], 2),   // 2 days, depends on A  
-    createMockTask('C', 'Task C', ['B'], 4)    // 4 days, depends on B
-  ];
-
-  try {
-    const result1 = calculateCriticalPath(linearTasks, mockProject, mockSettings);
-    
-    // All tasks should be critical in a linear chain
-    linearTasks.forEach(task => {
-      const node = result1.nodes.get(task.id);
-      if (node) {
-      }
+    it('calculates critical path for linear dependencies', () => {
+      const result = calculateCriticalPath(linearTasks, mockProject, mockSettings);
+      expect(result).toBeDefined();
+      expect(result.nodes).toBeDefined();
     });
-  } catch (error) {
-    console.error('❌ Linear test failed:', error);
-  }
 
-  // Test Case 2: Parallel tasks with different durations
-  const parallelTasks = [
-    createMockTask('A', 'Task A', [], 2),      // 2 days, no deps
-    createMockTask('B', 'Task B', ['A'], 3),   // 3 days, depends on A
-    createMockTask('C', 'Task C', ['A'], 4),   // 4 days, depends on A  
-    createMockTask('D', 'Task D', ['C'], 2)    // 2 days, depends on C
-  ];
-
-  try {
-    const result2 = calculateCriticalPath(parallelTasks, mockProject, mockSettings);
-    
-    parallelTasks.forEach(task => {
-      const node = result2.nodes.get(task.id);
-      if (node) {
-      }
+    it('marks all tasks as critical in linear chain', () => {
+      const result = calculateCriticalPath(linearTasks, mockProject, mockSettings);
+      linearTasks.forEach(task => {
+        const node = result.nodes.get(task.id);
+        expect(node).toBeDefined();
+        if (node) {
+          expect(node.isCritical).toBe(true);
+        }
+      });
     });
-  } catch (error) {
-    console.error('❌ Parallel test failed:', error);
-  }
+  });
 
-  // Test Case 3: Complex dependency network
-  const complexTasks = [
-    createMockTask('Start', 'Project Start', [], 1),
-    createMockTask('Design', 'Design Phase', ['Start'], 5),
-    createMockTask('Dev1', 'Development 1', ['Design'], 3),
-    createMockTask('Dev2', 'Development 2', ['Design'], 4),
-    createMockTask('Test1', 'Testing 1', ['Dev1'], 2),
-    createMockTask('Test2', 'Testing 2', ['Dev2'], 3),
-    createMockTask('Integration', 'Integration', ['Test1', 'Test2'], 2),
-    createMockTask('Deploy', 'Deployment', ['Integration'], 1)
-  ];
+  describe('parallel tasks with different durations', () => {
+    const parallelTasks = [
+      createMockTask('A', 'Task A', [], 2),
+      createMockTask('B', 'Task B', ['A'], 3),
+      createMockTask('C', 'Task C', ['A'], 4),
+      createMockTask('D', 'Task D', ['C'], 2)
+    ];
 
-  try {
-    const result3 = calculateCriticalPath(complexTasks, mockProject, mockSettings);
-    
-    complexTasks.forEach(task => {
-      const node = result3.nodes.get(task.id);
-      if (node) {
-      }
+    it('handles parallel task branches', () => {
+      const result = calculateCriticalPath(parallelTasks, mockProject, mockSettings);
+      expect(result).toBeDefined();
+      expect(result.nodes.size).toBe(4);
     });
-  } catch (error) {
-    console.error('❌ Complex test failed:', error);
-  }
 
-}
+    it('identifies critical path through longest branch', () => {
+      const result = calculateCriticalPath(parallelTasks, mockProject, mockSettings);
+      const nodeC = result.nodes.get('C');
+      const nodeD = result.nodes.get('D');
+      expect(nodeC?.isCritical).toBe(true);
+      expect(nodeD?.isCritical).toBe(true);
+    });
+  });
 
-// Export for use in browser console
-if (typeof window !== 'undefined') {
-  (window as any).testCriticalPath = testCriticalPath;
-}
+  describe('complex dependency network', () => {
+    const complexTasks = [
+      createMockTask('Start', 'Project Start', [], 1),
+      createMockTask('Design', 'Design Phase', ['Start'], 5),
+      createMockTask('Dev1', 'Development 1', ['Design'], 3),
+      createMockTask('Dev2', 'Development 2', ['Design'], 4),
+      createMockTask('Test1', 'Testing 1', ['Dev1'], 2),
+      createMockTask('Test2', 'Testing 2', ['Dev2'], 3),
+      createMockTask('Integration', 'Integration', ['Test1', 'Test2'], 2),
+      createMockTask('Deploy', 'Deployment', ['Integration'], 1)
+    ];
+
+    it('calculates critical path for complex network', () => {
+      const result = calculateCriticalPath(complexTasks, mockProject, mockSettings);
+      expect(result).toBeDefined();
+      expect(result.nodes.size).toBe(8);
+    });
+
+    it('identifies start as critical', () => {
+      const result = calculateCriticalPath(complexTasks, mockProject, mockSettings);
+      const startNode = result.nodes.get('Start');
+      expect(startNode?.isCritical).toBe(true);
+    });
+
+    it('identifies design as critical', () => {
+      const result = calculateCriticalPath(complexTasks, mockProject, mockSettings);
+      const designNode = result.nodes.get('Design');
+      expect(designNode?.isCritical).toBe(true);
+    });
+
+    it('identifies deploy as critical', () => {
+      const result = calculateCriticalPath(complexTasks, mockProject, mockSettings);
+      const deployNode = result.nodes.get('Deploy');
+      expect(deployNode?.isCritical).toBe(true);
+    });
+  });
+
+  describe('edge cases', () => {
+    it('handles empty task list', () => {
+      const result = calculateCriticalPath([], mockProject, mockSettings);
+      expect(result.nodes.size).toBe(0);
+    });
+
+    it('handles single task', () => {
+      const singleTask = [createMockTask('Only', 'Only Task', [], 5)];
+      const result = calculateCriticalPath(singleTask, mockProject, mockSettings);
+      expect(result.nodes.size).toBe(1);
+      const node = result.nodes.get('Only');
+      expect(node?.isCritical).toBe(true);
+    });
+  });
+});
