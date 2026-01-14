@@ -13,6 +13,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, X, User, Building, Star, MapPin } from "lucide-react";
 import { AddressInput, type AddressComponents } from "@/components/address-input";
 import { StateSelect } from "@/components/ui/state-select";
@@ -82,6 +83,10 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
   const [state, setState] = useState("");
   const [zipCode, setZipCode] = useState("");
   
+  // Portfolio company fields
+  const [isPortfolioCompany, setIsPortfolioCompany] = useState(false);
+  const [capitalPartner, setCapitalPartner] = useState("");
+  
   // Pending relationships for new companies
   const [pendingContacts, setPendingContacts] = useState<Array<{contact: Contact, role?: string}>>([]);
   const [pendingContactsToCreate, setPendingContactsToCreate] = useState<Array<{data: any, role?: string}>>([]);
@@ -123,6 +128,15 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
       city: true,
       state: true,
       zipCode: true,
+      country: true,
+      linkedInUrl: true,
+      twitterHandle: true,
+      employeeCount: true,
+      tags: true,
+      metadata: true,
+      createdBy: true,
+      isPortfolioCompany: true,
+      capitalPartner: true,
     }).extend({
       name: z.string().min(1, "Company name is required"),
       industry: z.string().optional(),
@@ -174,6 +188,9 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
       setCity(company.city || "");
       setState(company.state || "");
       setZipCode(company.zipCode || "");
+      // Reset portfolio company fields
+      setIsPortfolioCompany(company.isPortfolioCompany || false);
+      setCapitalPartner(company.capitalPartner || "");
     } else {
       form.reset({
         name: "",
@@ -190,6 +207,9 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
       setCity("");
       setState("");
       setZipCode("");
+      // Reset portfolio company fields
+      setIsPortfolioCompany(false);
+      setCapitalPartner("");
       // Reset pending relationships when creating a new company
       setPendingContacts([]);
       setPendingContactsToCreate([]);
@@ -207,6 +227,8 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
         city: city.trim() || undefined,
         state: state.trim() || undefined,
         zipCode: zipCode.trim() || undefined,
+        isPortfolioCompany,
+        capitalPartner: isPortfolioCompany ? capitalPartner.trim() || undefined : undefined,
       };
       Object.keys(cleanData).forEach(key => {
         if (cleanData[key] === "" || cleanData[key] === undefined) delete cleanData[key];
@@ -283,6 +305,8 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
         city: city.trim() || null,
         state: state.trim() || null,
         zipCode: zipCode.trim() || null,
+        isPortfolioCompany,
+        capitalPartner: isPortfolioCompany ? capitalPartner.trim() || null : null,
       };
       Object.keys(cleanData).forEach(key => {
         if (cleanData[key] === "") cleanData[key] = null;
@@ -824,6 +848,47 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                     </FormItem>
                   )}
                 />
+
+                {/* Portfolio Company Section */}
+                <Card className="border-cyan-200 dark:border-cyan-800 bg-cyan-50/50 dark:bg-cyan-950/20">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-cyan-800 dark:text-cyan-200">Portfolio Company</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="isPortfolioCompany"
+                        checked={isPortfolioCompany}
+                        onCheckedChange={(checked) => {
+                          setIsPortfolioCompany(checked === true);
+                          if (!checked) {
+                            setCapitalPartner("");
+                          }
+                        }}
+                        data-testid="checkbox-portfolio-company"
+                      />
+                      <Label 
+                        htmlFor="isPortfolioCompany" 
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                      >
+                        This is a portfolio company
+                      </Label>
+                    </div>
+                    
+                    {isPortfolioCompany && (
+                      <div className="space-y-2 pl-6">
+                        <Label htmlFor="capitalPartner" className="text-sm">Capital Partner</Label>
+                        <Input
+                          id="capitalPartner"
+                          value={capitalPartner}
+                          onChange={(e) => setCapitalPartner(e.target.value)}
+                          placeholder="Enter capital partner name..."
+                          data-testid="input-capital-partner"
+                        />
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
 
                 <div className="flex justify-end space-x-3 pt-4">
                   <Button 

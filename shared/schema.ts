@@ -2120,6 +2120,30 @@ export const crmCompanies = pgTable("crm_companies", {
   acquisitionInterest: text("acquisition_interest"), // hot, warm, cold, none, unknown
   portfolioCount: integer("portfolio_count").default(0), // Number of marinas/properties owned
   
+  // Portfolio Company Fields
+  isPortfolioCompany: boolean("is_portfolio_company").default(false),
+  capitalPartner: text("capital_partner"), // Name of capital partner (only relevant if isPortfolioCompany is true)
+  
+  // Extended Address Fields
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
+  country: text("country"),
+  
+  // Social Profiles
+  linkedInUrl: text("linkedin_url"),
+  twitterHandle: text("twitter_handle"),
+  
+  // Employee Info
+  employeeCount: integer("employee_count"),
+  
+  // Tags and Metadata
+  tags: text("tags").array().default(sql`ARRAY[]::text[]`),
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+  
+  // Created By
+  createdBy: varchar("created_by").references(() => users.id),
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
