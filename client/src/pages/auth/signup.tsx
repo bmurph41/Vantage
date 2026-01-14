@@ -161,7 +161,7 @@ export default function SignupPage() {
               </div>
             </div>
             <h1 className="text-3xl font-bold mb-2" data-testid="text-packs-title">
-              Choose Your Packs
+              Choose Your Tools
             </h1>
             <p className="text-muted-foreground" data-testid="text-packs-description">
               Select the packs you need to build your marina management platform
