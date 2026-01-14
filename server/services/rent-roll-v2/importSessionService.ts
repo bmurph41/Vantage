@@ -37,12 +37,28 @@ const importSessions = new Map<string, ImportSession & { rawData: Record<string,
 
 function isSummaryRow(row: Record<string, any>): boolean {
   const summaryPattern = /^(total|totals|grand\s*total|subtotal|sub\s*total|sum|sums|sum\s+of|count|avg|average|=sum|=total)s?:?\s*$/i;
-  for (const value of Object.values(row)) {
-    const strValue = String(value || '').trim().toLowerCase();
+  const lineStartSummaryPattern = /^(total|totals|grand\s*total|subtotal)/i;
+  
+  const values = Object.values(row);
+  if (values.length === 0) return false;
+  
+  const firstValue = String(values[0] || '').trim();
+  if (lineStartSummaryPattern.test(firstValue)) {
+    return true;
+  }
+  
+  const nonEmptyValues = values.filter(v => {
+    const s = String(v || '').trim();
+    return s.length > 0 && !/^[\d,.$%-]+$/.test(s);
+  });
+  
+  if (nonEmptyValues.length === 1) {
+    const strValue = String(nonEmptyValues[0] || '').trim().toLowerCase();
     if (strValue.length > 0 && strValue.length < 30 && summaryPattern.test(strValue)) {
       return true;
     }
   }
+  
   return false;
 }
 
@@ -140,8 +156,17 @@ export class ImportSessionService {
       skipAIOnError: true,
     });
 
+    console.log(`[ImportSession] Parse result: ${parseResult.rows.length} rows, method: ${parseResult.extractionMethod}, confidence: ${parseResult.confidence}`);
+    if (parseResult.rows.length > 0 && parseResult.rows.length <= 5) {
+      console.log('[ImportSession] Parsed rows:', JSON.stringify(parseResult.rows, null, 2));
+    } else if (parseResult.rows.length > 5) {
+      console.log('[ImportSession] First row:', JSON.stringify(parseResult.rows[0], null, 2));
+    }
+
     const sessionId = uuidv4();
     const filteredRows = parseResult.rows.filter(row => !isSummaryRow(row));
+    
+    console.log(`[ImportSession] After filtering summary rows: ${filteredRows.length} rows (filtered ${parseResult.rows.length - filteredRows.length})`);
     
     const session: ImportSession & { rawData: Record<string, any>[] } = {
       id: sessionId,
