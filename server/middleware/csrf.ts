@@ -15,6 +15,7 @@ const EXEMPT_PATHS = [
   '/api/stripe/webhook',
   '/api/webhooks',
   '/api/modeling/projects/',
+  '/api/ai-assistant/',
 ];
 
 function generateCsrfToken(): string {

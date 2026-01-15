@@ -137,6 +137,176 @@ Key expense categories as % of revenue:
 - **Peak Season**: May - September (Northeast), Year-round (Florida)
 - **Off-Season Discounts**: 20-40% winter rate reductions common
 - **Storage Revenue**: Critical for northern marinas, dry stack = 12-18 turns/year
+
+## Capital Markets & Debt Metrics (2024-2025)
+
+### Current Lending Environment
+- **Bank Debt**: SOFR + 225-350bps, 55-65% LTV, 1.25-1.40x DSCR required
+- **CMBS/Conduit**: SOFR + 200-300bps, 60-70% LTV, 1.30x+ DSCR, 10-year term
+- **Credit Union/Regional**: SOFR + 275-375bps, 55-60% LTV, relationship-based
+- **Bridge/Mezz**: SOFR + 400-600bps, 70-80% LTC, 2-3 year term, interest-only
+- **SBA 504**: Prime + 0-100bps, 75-85% LTV, 25-year amort, <$5M projects
+- **Life Companies**: 4.50-5.50% fixed, 50-55% LTV, prefer stabilized assets
+
+### Forward-Looking Rate Expectations (2025-2026)
+- **Fed Funds**: Expected 25-50bps cuts if inflation moderates
+- **SOFR Trend**: Currently elevated, gradual decline expected
+- **Spread Compression**: Likely 25-50bps as competition returns
+- **Refinance Risk**: Assets purchased at 4.5% cap now face 7%+ debt costs
+
+### Key Debt Metrics & Thresholds
+- **DSCR** (Debt Service Coverage Ratio):
+  - Minimum acceptable: 1.20x (distressed/bridge)
+  - Comfortable: 1.30-1.40x
+  - Conservative: 1.50x+
+  - Breakeven warning: <1.10x requires cash infusion
+- **LTV** (Loan-to-Value):
+  - Conservative: 50-55%
+  - Typical: 60-65%
+  - Aggressive: 70-75%
+  - High-risk: >75%
+- **Debt Yield** (NOI/Loan Amount):
+  - Minimum acceptable: 8%
+  - Healthy: 9-11%
+  - Conservative: 12%+
+- **Interest Coverage**: NOI/Interest expense, prefer 2.0x+
+
+### Loan Sizing Methodology
+Lenders use the most restrictive of:
+1. LTV constraint (e.g., 65% of appraised value)
+2. DSCR constraint (e.g., NOI / 1.25 = max debt service)
+3. Debt yield constraint (e.g., NOI / 9% = max loan)
+
+### Refinance Risk Assessment
+- **Red Flag**: Debt matures when rates >acquisition cap rate
+- **Concern**: <18 months to maturity with no extension
+- **Stress Test**: Always model +200bps rate shock
+
+## Sales Comps Analysis Framework
+
+### Comp Selection Criteria (In Order of Importance)
+1. **Location proximity**: Same MSA preferred, regional acceptable
+2. **Asset type match**: Wet slip vs dry storage, marina type
+3. **Size similarity**: Within 50% of subject slip count
+4. **Transaction recency**: <3 years preferred, <5 years acceptable
+5. **Arm's-length transaction**: Exclude related-party deals
+
+### Comp Adjustment Factors
+- **Size premium/discount**: Larger assets trade tighter (3-5% per size tier)
+- **Location adjustment**: Premium markets +10-30%, tertiary -10-20%
+- **Condition adjustment**: Deferred maintenance -5-15%
+- **Lease-up adjustment**: Unstabilized assets -10-20%
+- **Age of sale**: +50bps cap rate per year if rates rising
+
+### When Comps May Be Weak
+- Limited transaction volume (<3 comps in 3 years)
+- Significant size/quality mismatch
+- Changing market conditions since comp date
+- Mixed-use vs pure-play marina comparisons
+
+### Better Comp Identification Triggers
+- Subject cap rate >150bps from comp average → investigate
+- Price/slip deviates >25% from comps → verify adjustments
+- No comps in same state → consider regional benchmarks
+
+## Rate Comps & Rental Benchmarking
+
+### Rate Analysis Framework
+- **Per Linear Foot Analysis**: Most common for wet slips
+- **Per Square Foot**: Used for dry storage
+- **Per Slip (blended)**: Useful for quick comparisons
+
+### Market Rate Indicators
+- **Aggressive** (above market): >10% above comp average
+- **Market**: Within +/-10% of comp average  
+- **Conservative** (below market): >10% below comp average
+
+### Rate Growth Assumptions
+- **Conservative**: 2-3% annually (inflation-linked)
+- **Moderate**: 3-5% annually (typical markets)
+- **Aggressive**: 5-8% annually (high-demand markets only)
+- **Red Flag**: >8% year-over-year without justification
+
+### Rate Comparison Sources
+- Nearby marina rate cards (public/mystery shop)
+- Industry surveys (Marina Industries Association)
+- Historical trend analysis (3-5 year CAGR)
+
+## Demographics & Location Analysis
+
+### Positive Location Indicators
+- **Household income**: >$100K median in 10-mile radius
+- **Boat registrations**: High per-capita boat ownership
+- **Population growth**: >1.5% annual growth
+- **Tourism traffic**: Seasonal population surge
+- **Water access**: Limited competitive waterfront
+- **Barrier to entry**: Permitting restrictions, protected waterways
+
+### Location Risk Factors
+- **Environmental exposure**: Hurricane zone, flood plain, erosion
+- **Regulatory burden**: Restrictive zoning, environmental oversight
+- **Access challenges**: Bridge height limits, channel depth issues
+- **Industrial proximity**: Port traffic, commercial shipping
+- **Competition**: New marina development, public ramps
+- **Demographic decline**: Population loss, aging demographics
+
+### Market Positioning Analysis
+- **Primary draw radius**: 30-60 minute drive time
+- **Secondary draw**: Regional destination (2-4 hour drive)
+- **Competitive set**: All marinas within 30-mile radius
+- **Market share estimate**: Subject slips / total market slips
+
+## Lease-Up & Stabilization Assessment
+
+### Lease-Up Speed Categories
+- **Aggressive**: 15-20+ slips/month absorption
+  - Requires: Strong market, competitive rates, marketing budget
+  - Risk: High if market softens
+- **Moderate**: 8-15 slips/month absorption
+  - Typical for secondary markets
+  - Reasonable for most projections
+- **Conservative**: 3-8 slips/month absorption
+  - Appropriate for tertiary markets or repositioning
+  - Safer for underwriting
+
+### Stabilization Timeline Benchmarks
+- **Strong market**: 12-18 months to 90%+ occupancy
+- **Average market**: 18-30 months to 90%+ occupancy
+- **Weak/repositioning**: 24-36+ months to stabilization
+
+### Lease-Up Risk Factors
+- Starting occupancy <60% = extended timeline
+- Competitive new supply = slower absorption
+- Seasonal market = limited lease-up windows
+- Major renovation = temporary occupancy disruption
+
+## Pro Forma Validation
+
+### Revenue Growth Red Flags
+- Rate growth >5% without market support
+- Occupancy assumptions >95% (unrealistic)
+- New revenue streams without operational plan
+- Fuel margin assumptions >$0.50/gallon
+
+### Expense Red Flags  
+- Expense ratio <45% (likely understated)
+- No capex reserve (<2% of revenue)
+- Insurance estimate too low (verify quotes)
+- Property tax not reflecting purchase price
+
+### Model Sensitivity Requirements
+- Always stress test: -10% revenue, +10% expenses
+- Interest rate sensitivity: +100bps and +200bps
+- Exit cap rate expansion: +50bps from entry
+
+### Conservative vs Aggressive Indicators
+| Metric | Conservative | Aggressive |
+|--------|--------------|------------|
+| Rate growth | 2-3% | 5-8% |
+| Expense inflation | 3-4% | 2% |
+| Exit cap | Entry +50bps | Entry flat |
+| Lease-up | 3-8 slips/mo | 15-20+ slips/mo |
+| Hold period | 7-10 years | 3-5 years |
 `;
 
 const ADVISORY_SYSTEM_PROMPTS: Record<AdvisoryMode, string> = {
