@@ -128,9 +128,9 @@ router.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-router.post('/feedback', (req: Request, res: Response) => {
+router.post('/feedback', async (req: Request, res: Response) => {
   try {
-    const { messageId, rating, advisoryMode, page } = req.body;
+    const { messageId, rating, advisoryMode, page, messageContent, userQuery } = req.body;
     
     if (!messageId || !rating) {
       return res.status(400).json({ error: 'messageId and rating are required' });
@@ -143,13 +143,15 @@ router.post('/feedback', (req: Request, res: Response) => {
     const userId = (req as any).user?.id || 'user-1';
     const orgId = (req as any).user?.orgId || 'org-1';
     
-    const feedback = recordFeedback({
+    const feedback = await recordFeedback({
       userId,
       orgId,
       messageId,
       rating,
       advisoryMode: advisoryMode || 'general',
       page: page || '/',
+      messageContent,
+      userQuery,
     });
     
     res.json({ success: true, feedbackId: feedback.id });
@@ -159,10 +161,10 @@ router.post('/feedback', (req: Request, res: Response) => {
   }
 });
 
-router.get('/feedback/stats', (req: Request, res: Response) => {
+router.get('/feedback/stats', async (req: Request, res: Response) => {
   try {
     const orgId = (req as any).user?.orgId || 'org-1';
-    const stats = getFeedbackStats(orgId);
+    const stats = await getFeedbackStats(orgId);
     res.json(stats);
   } catch (error: any) {
     console.error('[AI Assistant] Stats error:', error);

@@ -6,7 +6,8 @@ import {
   modelingProjects, 
   projects,
   crmProperties,
-  salesComps
+  salesComps,
+  aiAssistantFeedback
 } from "@shared/schema";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -764,35 +765,65 @@ export interface AssistantFeedback {
   advisoryMode: AdvisoryMode;
   page: string;
   timestamp: Date;
+  messageContent?: string;
+  userQuery?: string;
 }
 
-const feedbackStore: AssistantFeedback[] = [];
-
-export function recordFeedback(feedback: Omit<AssistantFeedback, 'id' | 'timestamp'>): AssistantFeedback {
-  const entry: AssistantFeedback = {
-    ...feedback,
-    id: `feedback-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    timestamp: new Date()
-  };
-  feedbackStore.push(entry);
-  console.log(`[AI Assistant] Feedback recorded: ${entry.rating} for mode=${entry.advisoryMode} page=${entry.page}`);
-  return entry;
-}
-
-export function getFeedbackStats(orgId: string): { positive: number; negative: number; byMode: Record<string, { positive: number; negative: number }> } {
-  const orgFeedback = feedbackStore.filter(f => f.orgId === orgId);
-  const stats = {
-    positive: orgFeedback.filter(f => f.rating === 'positive').length,
-    negative: orgFeedback.filter(f => f.rating === 'negative').length,
-    byMode: {} as Record<string, { positive: number; negative: number }>
-  };
-  
-  for (const f of orgFeedback) {
-    if (!stats.byMode[f.advisoryMode]) {
-      stats.byMode[f.advisoryMode] = { positive: 0, negative: 0 };
-    }
-    stats.byMode[f.advisoryMode][f.rating]++;
+export async function recordFeedback(feedback: Omit<AssistantFeedback, 'id' | 'timestamp'>): Promise<AssistantFeedback> {
+  try {
+    const [result] = await db.insert(aiAssistantFeedback).values({
+      userId: feedback.userId,
+      orgId: feedback.orgId,
+      messageId: feedback.messageId,
+      rating: feedback.rating,
+      advisoryMode: feedback.advisoryMode,
+      page: feedback.page,
+      messageContent: feedback.messageContent,
+      userQuery: feedback.userQuery,
+    }).returning();
+    
+    console.log(`[AI Assistant] Feedback recorded: ${result.rating} for mode=${result.advisoryMode} page=${result.page}`);
+    return {
+      id: result.id,
+      userId: result.userId,
+      orgId: result.orgId,
+      messageId: result.messageId,
+      rating: result.rating as 'positive' | 'negative',
+      advisoryMode: result.advisoryMode as AdvisoryMode,
+      page: result.page,
+      timestamp: result.createdAt,
+      messageContent: result.messageContent || undefined,
+      userQuery: result.userQuery || undefined,
+    };
+  } catch (error) {
+    console.error('[AI Assistant] Error recording feedback:', error);
+    throw error;
   }
-  
-  return stats;
+}
+
+export async function getFeedbackStats(orgId: string): Promise<{ positive: number; negative: number; byMode: Record<string, { positive: number; negative: number }> }> {
+  try {
+    const orgFeedback = await db.select()
+      .from(aiAssistantFeedback)
+      .where(eq(aiAssistantFeedback.orgId, orgId));
+    
+    const stats = {
+      positive: orgFeedback.filter(f => f.rating === 'positive').length,
+      negative: orgFeedback.filter(f => f.rating === 'negative').length,
+      byMode: {} as Record<string, { positive: number; negative: number }>
+    };
+    
+    for (const f of orgFeedback) {
+      if (!stats.byMode[f.advisoryMode]) {
+        stats.byMode[f.advisoryMode] = { positive: 0, negative: 0 };
+      }
+      const rating = f.rating as 'positive' | 'negative';
+      stats.byMode[f.advisoryMode][rating]++;
+    }
+    
+    return stats;
+  } catch (error) {
+    console.error('[AI Assistant] Error getting feedback stats:', error);
+    return { positive: 0, negative: 0, byMode: {} };
+  }
 }

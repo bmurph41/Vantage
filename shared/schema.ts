@@ -5158,6 +5158,30 @@ export const crmAiMessages = pgTable("crm_ai_messages", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// AI Assistant Feedback table - stores user feedback on AI responses for quality tracking
+
+export const aiAssistantFeedback = pgTable("ai_assistant_feedback", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").notNull(),
+  
+  // Feedback details
+  messageId: varchar("message_id").notNull(), // Client-side message ID
+  rating: text("rating").notNull(), // 'positive' or 'negative'
+  advisoryMode: text("advisory_mode").notNull(), // The mode used for this response
+  page: text("page").notNull(), // The page context where feedback was given
+  
+  // Optional additional context
+  messageContent: text("message_content"), // The AI response content (for analysis)
+  userQuery: text("user_query"), // What the user asked
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("ai_assistant_feedback_org_idx").on(table.orgId),
+  userIdx: index("ai_assistant_feedback_user_idx").on(table.userId),
+  ratingIdx: index("ai_assistant_feedback_rating_idx").on(table.rating),
+}));
+
 // Dedupe Rules table - stores rules for detecting duplicate records
 
 export const crmDedupeRules = pgTable("crm_dedupe_rules", {
