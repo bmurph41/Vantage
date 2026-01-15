@@ -247,7 +247,7 @@ export default function RateTiersDataTable({
             : `${rows.length} rate${rows.length !== 1 ? 's' : ''} configured`
           }
         </p>
-        <Button onClick={handleAddRow} size="sm" data-testid="button-add-tier">
+        <Button type="button" onClick={handleAddRow} size="sm" data-testid="button-add-tier">
           <Plus className="h-4 w-4 mr-1" />
           Add Rate
         </Button>
@@ -386,6 +386,7 @@ export default function RateTiersDataTable({
 
               <div className="flex justify-end gap-2 pt-2 border-t">
                 <Button
+                  type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => handleCancelEdit(index)}
@@ -394,6 +395,7 @@ export default function RateTiersDataTable({
                   Cancel
                 </Button>
                 <Button
+                  type="button"
                   size="sm"
                   onClick={() => handleSaveRow(index)}
                   disabled={isPending}
@@ -440,6 +442,7 @@ export default function RateTiersDataTable({
                   </div>
                   <div className="flex items-center gap-1">
                     <Button
+                      type="button"
                       variant="ghost"
                       size="sm"
                       onClick={() => handleEditRow(index)}
@@ -450,7 +453,7 @@ export default function RateTiersDataTable({
                     </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="sm" disabled={isPending} data-testid={`button-delete-tier-${index}`}>
+                        <Button type="button" variant="ghost" size="sm" disabled={isPending} data-testid={`button-delete-tier-${index}`}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </AlertDialogTrigger>
@@ -507,6 +510,7 @@ export default function RateTiersDataTable({
                   </div>
                   <div className="flex items-center gap-1">
                     <Button
+                      type="button"
                       variant="ghost"
                       size="sm"
                       onClick={() => handleEditRow(index)}
@@ -517,7 +521,7 @@ export default function RateTiersDataTable({
                     </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="sm" disabled={isPending} data-testid={`button-delete-tier-${index}`}>
+                        <Button type="button" variant="ghost" size="sm" disabled={isPending} data-testid={`button-delete-tier-${index}`}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </AlertDialogTrigger>
