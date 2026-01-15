@@ -38,6 +38,7 @@ The platform uses React 18 with TypeScript and Wouter for routing. The UI is bui
 - **DockTalk 2.0**: Industry intelligence, AI-powered RSS aggregation, M&A tracking, and sentiment analysis.
 - **Listing Ingestion V2**: Institutional-grade listing aggregation pipeline with identity resolution, verified asset binding, validation, and SSRF protection.
 - **Analytics**: Marina KPI Calculator, ancillary revenue tracking, benchmarking, and Unified Cross-Module Analytics Dashboard (`/api/analytics/unified`) aggregating CRM, DD, Modeling, and DockTalk metrics with trend visualization.
+- **AI Assistant**: Context-aware chatbot (`/api/ai-assistant`) powered by GPT-5 with streaming responses, page-specific suggested questions, and platform knowledge base covering all modules. Appears as floating chat bubble in authenticated pages.
 - **Add-on Packs**: Fund Management, LP Portal, Prospecting, and MarinaMatch Intel.
 
 ### System Design Choices

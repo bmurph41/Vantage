@@ -46,6 +46,7 @@ import { registerCommentRoutes } from "./routes/comment-routes";
 import emailMarketingRoutes from "./routes/email-marketing-routes";
 import archiveRoutes from "./routes/archive-routes";
 import marinalyticsRoutes from "./routes/marinalytics-routes";
+import aiAssistantRoutes from "./routes/ai-assistant-routes";
 import { userSessions, insertProspectingEntrySchema, users } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { rentRollService } from "./services/rent-roll-service";
@@ -409,6 +410,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerEntityLinkingRoutes(app);
   registerEventMonitoringRoutes(app);
   app.use("/api/analytics", authenticateUser, analyticsRoutes);
+  app.use("/api/ai-assistant", authenticateUser, aiAssistantRoutes);
 
   // Dockit Marina Operations Module - mounted at /dockit/api
   try {

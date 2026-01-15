@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react";
 import { CommandPalette } from "@/components/CommandPalette";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { AIAssistant } from "@/components/ai-assistant";
 
 // Eagerly load critical pages for instant navigation (no white screen)
 import Dashboard from "@/pages/dashboard";
@@ -291,6 +292,7 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
         </main>
       </div>
       <CommandPalette />
+      <AIAssistant />
     </div>
   );
 }
