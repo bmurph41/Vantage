@@ -96,7 +96,7 @@ export function InlineBanner({
         <button
           onClick={onDismiss}
           className={cn(
-            "flex-shrink-0 p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors",
+            "flex-shrink-0 p-2 rounded-lg hover:bg-black/10 dark:hover:bg-white/15 transition-all",
             "focus:outline-none focus:ring-2 focus:ring-offset-2",
             variant === "info" && "focus:ring-blue-500",
             variant === "success" && "focus:ring-green-500",
@@ -104,7 +104,7 @@ export function InlineBanner({
             variant === "error" && "focus:ring-red-500"
           )}
         >
-          <X className="h-4 w-4" />
+          <X className="h-5 w-5" />
           <span className="sr-only">Dismiss</span>
         </button>
       )}
