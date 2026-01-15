@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { SkeletonTableRows } from "@/components/ui/skeleton-variants";
+import { EmptyState } from "@/components/ui/empty-state";
 import { 
   ChevronUp, 
   ChevronDown, 
@@ -12,7 +14,8 @@ import {
   Eye, 
   Edit, 
   Trash2, 
-  MoreHorizontal
+  MoreHorizontal,
+  Ship
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { formatCurrency } from '@/lib/ratecomps/format';
@@ -420,8 +423,8 @@ export default function CompsDataGrid({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="p-6">
+        <SkeletonTableRows rows={8} columns={4} />
       </div>
     );
   }
@@ -478,11 +481,13 @@ export default function CompsDataGrid({
             <TableBody>
               {data.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={defaultColumns.length + 1} className="text-center py-8">
-                    <div className="text-muted-foreground">
-                      <p className="text-lg mb-2">No rate comps found</p>
-                      <p className="text-sm">Try adjusting your filters or add some rate data to get started</p>
-                    </div>
+                  <TableCell colSpan={defaultColumns.length + 1} className="h-64">
+                    <EmptyState
+                      icon={Ship}
+                      title="No rate comps found"
+                      description="Try adjusting your filters or add some rate data to get started"
+                      size="sm"
+                    />
                   </TableCell>
                 </TableRow>
               ) : (

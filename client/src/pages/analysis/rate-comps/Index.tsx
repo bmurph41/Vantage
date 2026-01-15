@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation, useQueryClient, useQueries, keepPreviousData } from "@tanstack/react-query";
 import { BarChart3, FolderPlus, Trash2, ChevronLeft, ChevronRight, Filter, ChevronUp } from "lucide-react";
+import { SkeletonTableRows } from "@/components/ui/skeleton-variants";
 import { Link } from "wouter";
 import debounce from "lodash.debounce";
 import { rateCompsApi } from "@/lib/ratecomps/api";
@@ -157,11 +158,12 @@ export default function RateCompsIndex() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
+      <div className="min-h-screen p-6 space-y-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="h-8 w-48 bg-muted animate-pulse rounded" />
+          <div className="h-10 w-32 bg-muted animate-pulse rounded" />
         </div>
+        <SkeletonTableRows rows={10} columns={5} />
       </div>
     );
   }
