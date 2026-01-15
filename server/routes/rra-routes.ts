@@ -326,13 +326,13 @@ router.post("/leases/import/detect-values", async (req: Request, res: Response, 
     const unrecognizedValues: Record<string, { label: string; values: string[]; validOptions: string[]; occurrences: Record<string, number> }> = {};
     
     // Check each enum field for unrecognized values
-    // Normalize both input and valid values for case-insensitive comparison
+    // Use EXACT match (case-insensitive only) to catch variants like "wet_slip" that need mapping
     for (const [fieldId, validValues] of Object.entries(standardValues)) {
       const sourceColumn = columnMapping[fieldId];
       if (!sourceColumn) continue;
       
-      // Normalize valid values for comparison (lowercase, no special chars)
-      const normalizedValidValues = validValues.map(v => v.toLowerCase().replace(/[\s_-]+/g, ''));
+      // Create a set of lowercase valid values for exact case-insensitive comparison
+      const validValuesLower = new Set(validValues.map(v => v.toLowerCase()));
       
       const uniqueValues = new Set<string>();
       const occurrences: Record<string, number> = {};
@@ -341,10 +341,10 @@ router.post("/leases/import/detect-values", async (req: Request, res: Response, 
         const value = row[sourceColumn];
         if (value && typeof value === 'string') {
           const trimmedValue = value.trim();
-          const normalized = trimmedValue.toLowerCase().replace(/[\s_-]+/g, '');
-          // Check if the normalized value matches any valid option
-          const isRecognized = normalizedValidValues.some(v => v === normalized);
-          if (!isRecognized && normalized !== '') {
+          // Only do case-insensitive matching - don't normalize underscores/special chars
+          // This ensures "wet_slip" triggers value-mapping while "Wet Slip" is accepted
+          const isRecognized = validValuesLower.has(trimmedValue.toLowerCase());
+          if (!isRecognized && trimmedValue !== '') {
             uniqueValues.add(trimmedValue);
             occurrences[trimmedValue] = (occurrences[trimmedValue] || 0) + 1;
           }
