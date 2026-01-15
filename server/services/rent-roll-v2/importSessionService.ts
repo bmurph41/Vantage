@@ -773,6 +773,19 @@ export class ImportSessionService {
             }
 
             if (options.importMode === "replace") {
+              // Parse lease amounts for update - support both field naming conventions
+              const leaseAmountStr = row.data.leaseAmount;
+              const baseRent2Str = row.data.baseRent2 || row.data.winterAmount;
+              const baseRent3Str = row.data.baseRent3 || row.data.summerAmount;
+              
+              const hasLeaseAmount = leaseAmountStr !== undefined && leaseAmountStr !== null && leaseAmountStr !== '';
+              const hasBaseRent2 = baseRent2Str !== undefined && baseRent2Str !== null && baseRent2Str !== '';
+              const hasBaseRent3 = baseRent3Str !== undefined && baseRent3Str !== null && baseRent3Str !== '';
+              
+              const parsedLeaseAmount = hasLeaseAmount ? parseFloat(leaseAmountStr) : null;
+              const parsedBaseRent2 = hasBaseRent2 ? parseFloat(baseRent2Str) : null;
+              const parsedBaseRent3 = hasBaseRent3 ? parseFloat(baseRent3Str) : null;
+              
               await db.update(rraLeases)
                 .set({
                   storageType: row.data.storageType || existingLease.storageType,
@@ -780,6 +793,9 @@ export class ImportSessionService {
                   leaseCommencement: row.data.leaseCommencement || existingLease.leaseCommencement,
                   leaseExpiration: row.data.leaseExpiration || existingLease.leaseExpiration,
                   status: row.data.status || existingLease.status,
+                  leaseAmount: parsedLeaseAmount !== null && !isNaN(parsedLeaseAmount) ? parsedLeaseAmount.toString() : existingLease.leaseAmount,
+                  baseRent2: parsedBaseRent2 !== null && !isNaN(parsedBaseRent2) ? parsedBaseRent2.toString() : existingLease.baseRent2,
+                  baseRent3: parsedBaseRent3 !== null && !isNaN(parsedBaseRent3) ? parsedBaseRent3.toString() : existingLease.baseRent3,
                   boatLength: row.data.boatLength ? parseFloat(row.data.boatLength) : existingLease.boatLength,
                   boatWidth: row.data.boatWidth ? parseFloat(row.data.boatWidth) : existingLease.boatWidth,
                   boatMake: row.data.boatMake || existingLease.boatMake,
@@ -799,6 +815,20 @@ export class ImportSessionService {
             }
           } else {
             leaseId = uuidv4();
+            
+            // Parse lease amounts - support both field naming conventions
+            const leaseAmountStr = row.data.leaseAmount;
+            const baseRent2Str = row.data.baseRent2 || row.data.winterAmount;
+            const baseRent3Str = row.data.baseRent3 || row.data.summerAmount;
+            
+            const hasLeaseAmount = leaseAmountStr !== undefined && leaseAmountStr !== null && leaseAmountStr !== '';
+            const hasBaseRent2 = baseRent2Str !== undefined && baseRent2Str !== null && baseRent2Str !== '';
+            const hasBaseRent3 = baseRent3Str !== undefined && baseRent3Str !== null && baseRent3Str !== '';
+            
+            const parsedLeaseAmount = hasLeaseAmount ? parseFloat(leaseAmountStr) : null;
+            const parsedBaseRent2 = hasBaseRent2 ? parseFloat(baseRent2Str) : null;
+            const parsedBaseRent3 = hasBaseRent3 ? parseFloat(baseRent3Str) : null;
+            
             await db.insert(rraLeases).values({
               id: leaseId,
               orgId: session.orgId,
@@ -810,6 +840,9 @@ export class ImportSessionService {
               leaseCommencement: row.data.leaseCommencement,
               leaseExpiration: row.data.leaseExpiration,
               status: row.data.status || "Active",
+              leaseAmount: parsedLeaseAmount !== null && !isNaN(parsedLeaseAmount) ? parsedLeaseAmount.toString() : null,
+              baseRent2: parsedBaseRent2 !== null && !isNaN(parsedBaseRent2) ? parsedBaseRent2.toString() : null,
+              baseRent3: parsedBaseRent3 !== null && !isNaN(parsedBaseRent3) ? parsedBaseRent3.toString() : null,
               boatLength: row.data.boatLength ? parseFloat(row.data.boatLength) : null,
               boatWidth: row.data.boatWidth ? parseFloat(row.data.boatWidth) : null,
               boatMake: row.data.boatMake,
