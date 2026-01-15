@@ -11,11 +11,16 @@ import {
   insertOmThemeSchema,
   insertOmPageLayoutSchema,
   crmDeals,
-  modelingProjects
+  modelingProjects,
+  valuationSnapshots,
+  salesComps,
+  rateComps,
+  dealSalesComps,
+  dealRateComps,
 } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { generateOmContent, improveContent, suggestLayout, type GenerateRequest } from "./ai-service";
@@ -1573,9 +1578,14 @@ router.post("/oms/:id/export-pdf", async (req, res) => {
 // Data Binding Resolver Route
 // ============================================================================
 
-router.post("/resolve-bindings", async (req, res) => {
+router.post("/resolve-bindings", async (req: any, res) => {
   try {
     const { bindings, projectId, modelingProjectId, dealId } = req.body;
+    
+    if (!req.user?.orgId) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    const userOrgId = req.user.orgId;
 
     if (!bindings || !Array.isArray(bindings)) {
       return res.status(400).json({ error: "bindings array is required" });
@@ -1588,13 +1598,24 @@ router.post("/resolve-bindings", async (req, res) => {
       
       switch (source) {
         case 'underwriting':
-          resolved[key] = getUnderwritingStub(field);
+        case 'modeling':
+          resolved[key] = await resolveLiveModelingData(modelingProjectId || projectId, field, userOrgId);
+          break;
+        case 'deal':
+          resolved[key] = await resolveLiveDealData(dealId, field, userOrgId);
+          break;
+        case 'valuation':
+          resolved[key] = await resolveLiveValuationData(modelingProjectId || projectId, field, userOrgId);
           break;
         case 'salesComps':
-          resolved[key] = getSalesCompsStub(field);
+          resolved[key] = await resolveLiveSalesCompsData(dealId, userOrgId, field);
           break;
+        case 'rateComps':
         case 'rentComps':
-          resolved[key] = getRentCompsStub(field);
+          resolved[key] = await resolveLiveRateCompsData(dealId, userOrgId, field);
+          break;
+        case 'rentRoll':
+          resolved[key] = await resolveLiveRentRollData(projectId, userOrgId, field);
           break;
         case 'demographics':
           resolved[key] = getDemographicsStub(field);
@@ -1658,6 +1679,279 @@ function getDemographicsStub(field: string): any {
     'waterAccessHouseholds': 125000,
   };
   return stubs[field] ?? `[Demographics: ${field}]`;
+}
+
+async function resolveLiveModelingData(projectId: string | undefined, field: string, orgId?: string): Promise<any> {
+  if (!projectId) return getUnderwritingStub(field);
+  
+  try {
+    const conditions = [eq(modelingProjects.id, projectId)];
+    if (orgId) conditions.push(eq(modelingProjects.orgId, orgId));
+    
+    const [project] = await db.select().from(modelingProjects).where(and(...conditions));
+    if (!project) return getUnderwritingStub(field);
+    
+    const assumptions = (project.assumptions as any) || {};
+    const fieldMap: Record<string, any> = {
+      'purchasePrice': assumptions.purchasePrice || project.askingPrice,
+      'noi': assumptions.noi || project.projectedNoi,
+      'capRate': assumptions.capRate || project.year1CapRate,
+      'totalSlips': assumptions.slipCount || project.slipCount,
+      'occupancy': assumptions.occupancyRate,
+      'grossRevenue': assumptions.grossRevenue || assumptions.goi,
+      'operatingExpenses': assumptions.operatingExpenses,
+      'debtService': assumptions.debtService,
+      'cashOnCash': assumptions.cashOnCash,
+      'irr': assumptions.targetIrr,
+      'projectedExitValue': assumptions.exitValue,
+      'propertyName': project.name,
+      'propertyLocation': `${project.city || ''}, ${project.state || ''}`.trim(),
+      'description': project.description,
+      'holdPeriod': assumptions.holdPeriod || 5,
+      'ltvRatio': assumptions.ltvRatio || 0.65,
+      'interestRate': assumptions.interestRate,
+      'revenueBreakdown': assumptions.revenueBreakdown,
+    };
+    
+    return fieldMap[field] ?? `[Modeling: ${field}]`;
+  } catch (error) {
+    console.error('Error resolving modeling data:', error);
+    return getUnderwritingStub(field);
+  }
+}
+
+async function resolveLiveDealData(dealId: string | undefined, field: string, orgId?: string): Promise<any> {
+  if (!dealId) return `[Deal: ${field}]`;
+  
+  try {
+    const { users } = await import("@shared/schema");
+    
+    const results = await db.select({
+      deal: crmDeals,
+      ownerOrgId: users.orgId,
+    })
+      .from(crmDeals)
+      .leftJoin(users, eq(crmDeals.ownerId, users.id))
+      .where(eq(crmDeals.id, dealId));
+    
+    if (results.length === 0) return `[Deal: ${field}]`;
+    
+    const { deal, ownerOrgId } = results[0];
+    if (!deal) return `[Deal: ${field}]`;
+    
+    if (orgId && ownerOrgId !== orgId) {
+      return `[Deal: Access denied]`;
+    }
+    
+    const propertyDetails = (deal.propertyDetails as any) || {};
+    const fieldMap: Record<string, any> = {
+      'dealName': deal.title,
+      'dealValue': deal.value,
+      'stage': deal.stage,
+      'priority': deal.priority,
+      'description': deal.description,
+      'marinaName': deal.marinaName || propertyDetails.marinaName,
+      'location': `${deal.city || ''}, ${deal.state || ''}`.trim(),
+      'slipsTotal': propertyDetails.slipsTotal,
+      'linearFeet': propertyDetails.linearFeet,
+      'grossRevenue': propertyDetails.grossRevenue,
+      'noi': propertyDetails.noi,
+      'occupancyRate': propertyDetails.occupancyRate,
+      'acreage': propertyDetails.acreage,
+      'ownershipType': propertyDetails.ownershipType,
+      'servicesOffered': propertyDetails.servicesOffered,
+      'closingDate': deal.closingDate,
+      'expectedCloseDate': deal.expectedCloseDate,
+    };
+    
+    return fieldMap[field] ?? `[Deal: ${field}]`;
+  } catch (error) {
+    console.error('Error resolving deal data:', error);
+    return `[Deal: ${field}]`;
+  }
+}
+
+async function resolveLiveValuationData(projectId: string | undefined, field: string, orgId?: string): Promise<any> {
+  if (!projectId) return `[Valuation: ${field}]`;
+  
+  try {
+    const conditions = [eq(valuationSnapshots.modelingProjectId, projectId)];
+    if (orgId) conditions.push(eq(valuationSnapshots.orgId, orgId));
+    
+    const [latestValuation] = await db.select()
+      .from(valuationSnapshots)
+      .where(and(...conditions))
+      .orderBy(desc(valuationSnapshots.snapshotDate))
+      .limit(1);
+    
+    if (!latestValuation) return `[Valuation: ${field}]`;
+    
+    const fieldMap: Record<string, any> = {
+      'totalValue': latestValuation.totalValue,
+      'indicatedValue': latestValuation.indicatedValue,
+      'capRate': latestValuation.capRate,
+      'noi': latestValuation.noi,
+      'grossRevenue': latestValuation.grossRevenue,
+      'operatingExpenses': latestValuation.operatingExpenses,
+      'snapshotDate': latestValuation.snapshotDate,
+      'pricePerSlip': latestValuation.pricePerSlip,
+      'pricePerLinearFoot': latestValuation.pricePerLinearFoot,
+    };
+    
+    return fieldMap[field] ?? `[Valuation: ${field}]`;
+  } catch (error) {
+    console.error('Error resolving valuation data:', error);
+    return `[Valuation: ${field}]`;
+  }
+}
+
+async function resolveLiveSalesCompsData(dealId: string | undefined, orgId: string | undefined, field: string): Promise<any> {
+  if (!dealId || !orgId) return getSalesCompsStub(field);
+  
+  try {
+    const linkedComps = await db.select({
+      comp: salesComps,
+      link: dealSalesComps,
+    })
+    .from(dealSalesComps)
+    .innerJoin(salesComps, eq(dealSalesComps.salesCompId, salesComps.id))
+    .where(and(
+      eq(dealSalesComps.dealId, dealId),
+      eq(dealSalesComps.orgId, orgId)
+    ));
+    
+    if (linkedComps.length === 0) return getSalesCompsStub(field);
+    
+    const comps = linkedComps.map(lc => lc.comp);
+    
+    switch (field) {
+      case 'compsTable':
+        return comps.map(c => ({
+          marinaName: c.marinaName,
+          location: `${c.city}, ${c.state}`,
+          salePrice: c.salePrice,
+          saleDate: c.saleDate,
+          slipCount: c.slipCount,
+          pricePerSlip: c.pricePerSlip,
+          capRate: c.capRate,
+        }));
+      case 'averagePricePerSlip':
+        const prices = comps.filter(c => c.pricePerSlip).map(c => Number(c.pricePerSlip));
+        return prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : null;
+      case 'medianCapRate':
+        const caps = comps.filter(c => c.capRate).map(c => Number(c.capRate)).sort((a, b) => a - b);
+        return caps.length > 0 ? caps[Math.floor(caps.length / 2)] : null;
+      case 'recentSalesCount':
+        return comps.length;
+      case 'priceRange':
+        const salePrices = comps.filter(c => c.salePrice).map(c => Number(c.salePrice));
+        return salePrices.length > 0 ? { min: Math.min(...salePrices), max: Math.max(...salePrices) } : null;
+      default:
+        return `[Sales Comps: ${field}]`;
+    }
+  } catch (error) {
+    console.error('Error resolving sales comps data:', error);
+    return getSalesCompsStub(field);
+  }
+}
+
+async function resolveLiveRateCompsData(dealId: string | undefined, orgId: string | undefined, field: string): Promise<any> {
+  if (!dealId || !orgId) return getRentCompsStub(field);
+  
+  try {
+    const linkedComps = await db.select({
+      comp: rateComps,
+      link: dealRateComps,
+    })
+    .from(dealRateComps)
+    .innerJoin(rateComps, eq(dealRateComps.rateCompId, rateComps.id))
+    .where(and(
+      eq(dealRateComps.dealId, dealId),
+      eq(dealRateComps.orgId, orgId)
+    ));
+    
+    if (linkedComps.length === 0) return getRentCompsStub(field);
+    
+    const comps = linkedComps.map(lc => lc.comp);
+    
+    switch (field) {
+      case 'compsTable':
+        return comps.map(c => ({
+          marinaName: c.marinaName,
+          location: `${c.city}, ${c.state}`,
+          averageRate: c.averageRate,
+          slipCount: c.slipCount,
+          occupancyRate: c.occupancyRate,
+        }));
+      case 'averageRentPerFoot':
+        const rates = comps.filter(c => c.averageRate).map(c => Number(c.averageRate));
+        return rates.length > 0 ? rates.reduce((a, b) => a + b, 0) / rates.length : null;
+      case 'occupancyRate':
+        const occupancies = comps.filter(c => c.occupancyRate).map(c => Number(c.occupancyRate));
+        return occupancies.length > 0 ? occupancies.reduce((a, b) => a + b, 0) / occupancies.length : null;
+      case 'marketGrowthRate':
+        return 0.035;
+      default:
+        return `[Rate Comps: ${field}]`;
+    }
+  } catch (error) {
+    console.error('Error resolving rate comps data:', error);
+    return getRentCompsStub(field);
+  }
+}
+
+async function resolveLiveRentRollData(projectId: string | undefined, orgId: string | undefined, field: string): Promise<any> {
+  if (!projectId || !orgId) return `[Rent Roll: ${field}]`;
+  
+  try {
+    const { marinaLeases } = await import("@shared/schema");
+    const leases = await db.select()
+      .from(marinaLeases)
+      .where(and(
+        eq(marinaLeases.marinaProjectId, projectId),
+        eq(marinaLeases.orgId, orgId)
+      ))
+      .limit(100);
+    
+    if (leases.length === 0) return `[Rent Roll: ${field}]`;
+    
+    switch (field) {
+      case 'leasesTable':
+        return leases.map(l => ({
+          tenantId: l.tenantId,
+          leaseNumber: l.leaseNumber,
+          startDate: l.startDate,
+          endDate: l.endDate,
+          monthlyRent: l.monthlyRent,
+          annualRent: l.annualRent,
+          status: l.status,
+          contractTerm: l.contractTermGroup,
+        }));
+      case 'totalMonthlyRent':
+        return leases.reduce((sum, l) => sum + (Number(l.monthlyRent) || 0), 0);
+      case 'totalAnnualRent':
+        return leases.reduce((sum, l) => sum + (Number(l.annualRent) || Number(l.monthlyRent) * 12 || 0), 0);
+      case 'activeLeases':
+        return leases.filter(l => l.status === 'active').length;
+      case 'totalLeases':
+        return leases.length;
+      case 'averageMonthlyRent':
+        const rents = leases.filter(l => l.monthlyRent).map(l => Number(l.monthlyRent));
+        return rents.length > 0 ? rents.reduce((a, b) => a + b, 0) / rents.length : 0;
+      case 'occupancyRate':
+        const active = leases.filter(l => l.status === 'active').length;
+        return leases.length > 0 ? active / leases.length : 0;
+      case 'annualLeases':
+        return leases.filter(l => l.contractTermGroup === 'annual').length;
+      case 'seasonalLeases':
+        return leases.filter(l => l.contractTermGroup === 'seasonal').length;
+      default:
+        return `[Rent Roll: ${field}]`;
+    }
+  } catch (error) {
+    console.error('Error resolving rent roll data:', error);
+    return `[Rent Roll: ${field}]`;
+  }
 }
 
 // ============================================================================

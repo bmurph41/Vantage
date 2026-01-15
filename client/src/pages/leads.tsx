@@ -14,7 +14,7 @@ import LeadFormModal from "@/components/modals/lead-form-modal";
 import CompanyFormModal from "@/components/modals/company-form-modal";
 import ContactFormModal from "@/components/modals/contact-form-modal";
 import LeadDetailModal from "@/components/modals/lead-detail-modal";
-import { LeadConversionModal } from "@/components/lead-conversion-modal";
+import { LeadConversionWizard } from "@/components/lead-conversion-wizard";
 import type { Lead, Company, Contact } from "@shared/schema";
 
 const statusColors = {
@@ -515,7 +515,7 @@ export default function LeadsPage() {
           onEdit={openEditFromDetail}
         />
 
-        <LeadConversionModal
+        <LeadConversionWizard
           lead={convertingLead}
           isOpen={isConversionModalOpen}
           onClose={() => {

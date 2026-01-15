@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { apiRequest } from "@/lib/queryClient";
 import LeadFormModal from "@/components/modals/lead-form-modal";
 import LeadDetailModal from "@/components/modals/lead-detail-modal";
-import { LeadConversionModal } from "@/components/lead-conversion-modal";
+import { LeadConversionWizard } from "@/components/lead-conversion-wizard";
 import type { Lead, Company, Contact } from "@shared/schema";
 
 interface LeadsViewProps {
@@ -331,10 +331,17 @@ export default function LeadsView({ searchQuery }: LeadsViewProps) {
       )}
 
       {convertingLead && (
-        <LeadConversionModal
-          open={isConversionModalOpen}
-          onOpenChange={setIsConversionModalOpen}
+        <LeadConversionWizard
           lead={convertingLead}
+          isOpen={isConversionModalOpen}
+          onClose={() => {
+            setIsConversionModalOpen(false);
+            setConvertingLead(null);
+          }}
+          onSuccess={() => {
+            setIsConversionModalOpen(false);
+            setConvertingLead(null);
+          }}
         />
       )}
     </div>

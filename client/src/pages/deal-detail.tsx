@@ -4,6 +4,8 @@ import { useParams, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
 import { 
   ArrowLeft, 
   DollarSign, 
@@ -18,14 +20,62 @@ import {
   MapPin,
   FileText,
   FolderOpen,
-  FileSpreadsheet
+  FileSpreadsheet,
+  CheckCircle,
+  ListChecks,
+  TrendingUp,
+  Files,
+  Activity,
+  ExternalLink,
+  Calculator
 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
 import type { Deal, Contact, Company } from "@shared/schema";
 import ConvertToProjectModal from "@/components/modals/convert-to-project-modal";
+import CompSetSelector from "@/components/comp-set-selector";
 import { formatCurrency } from "@/lib/utils";
+
+interface WorkspaceData {
+  deal: Deal;
+  ddProject: {
+    id: string;
+    name: string;
+    status: string;
+    createdAt: string;
+  } | null;
+  ddTaskSummary: {
+    total: number;
+    completed: number;
+    inProgress: number;
+    pending: number;
+    percentComplete: number;
+  } | null;
+  modelingProject: {
+    id: string;
+    name: string;
+    askingPrice?: string;
+    currentValuation?: string;
+  } | null;
+  latestValuation: {
+    id: string;
+    snapshotDate: string;
+    totalValue?: string;
+    capRate?: string;
+    noiEstimate?: string;
+  } | null;
+  vdrFolder: {
+    id: string;
+    name: string;
+  } | null;
+  recentActivities: Array<{
+    id: string;
+    type: string;
+    subject?: string;
+    createdAt: string;
+  }>;
+}
 
 // Deal with relations type
 type DealWithRelations = Deal & { 
@@ -64,10 +114,16 @@ export default function DealDetail() {
   const [, setLocation] = useLocation();
   const dealId = params.dealId;
   const [isConvertModalOpen, setIsConvertModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
   const queryClient = useQueryClient();
 
   const { data: deal, isLoading, error } = useQuery<DealWithRelations>({
     queryKey: ['/api/deals', dealId],
+    enabled: !!dealId,
+  });
+
+  const { data: workspaceData } = useQuery<WorkspaceData>({
+    queryKey: ['/api/deals', dealId, 'workspace'],
     enabled: !!dealId,
   });
 
@@ -200,6 +256,115 @@ export default function DealDetail() {
         deal={deal}
       />
 
+      {(workspaceData?.ddProject || workspaceData?.modelingProject) && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {workspaceData?.ddProject && (
+            <Card className="border-l-4 border-l-blue-500">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <ListChecks className="w-5 h-5 text-blue-500" />
+                    <span className="font-semibold">Due Diligence</span>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setLocation(`/dd/projects/${workspaceData.ddProject?.id}`)}
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </Button>
+                </div>
+                <p className="text-sm text-gray-600 mb-2">{workspaceData.ddProject.name}</p>
+                {workspaceData?.ddTaskSummary && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Task Progress</span>
+                      <span className="font-medium">{workspaceData.ddTaskSummary.completed}/{workspaceData.ddTaskSummary.total}</span>
+                    </div>
+                    <Progress value={workspaceData.ddTaskSummary.percentComplete} className="h-2" />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {workspaceData?.modelingProject && (
+            <Card className="border-l-4 border-l-green-500">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Calculator className="w-5 h-5 text-green-500" />
+                    <span className="font-semibold">Modeling</span>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setLocation(`/modeling/${workspaceData.modelingProject?.id}`)}
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </Button>
+                </div>
+                <p className="text-sm text-gray-600 mb-2">{workspaceData.modelingProject.name}</p>
+                {workspaceData?.latestValuation && (
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Latest Valuation</span>
+                      <span className="font-medium text-green-600">
+                        {workspaceData.latestValuation.totalValue 
+                          ? formatCurrency(Number(workspaceData.latestValuation.totalValue))
+                          : 'N/A'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400">
+                      {new Date(workspaceData.latestValuation.snapshotDate).toLocaleDateString()}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {workspaceData?.vdrFolder && (
+            <Card className="border-l-4 border-l-purple-500">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Files className="w-5 h-5 text-purple-500" />
+                    <span className="font-semibold">Data Room</span>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setLocation(`/vdr/folders/${workspaceData.vdrFolder?.id}`)}
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </Button>
+                </div>
+                <p className="text-sm text-gray-600">{workspaceData.vdrFolder.name}</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {workspaceData?.recentActivities && workspaceData.recentActivities.length > 0 && (
+            <Card className="border-l-4 border-l-orange-500 md:col-span-3">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Activity className="w-5 h-5 text-orange-500" />
+                  <span className="font-semibold">Recent Activity</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {workspaceData.recentActivities.slice(0, 5).map((activity) => (
+                    <Badge key={activity.id} variant="secondary" className="text-xs">
+                      {activity.type}: {activity.subject || 'Activity'} - {new Date(activity.createdAt).toLocaleDateString()}
+                    </Badge>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Deal Information */}
         <div className="lg:col-span-2 space-y-6">
@@ -284,6 +449,9 @@ export default function DealDetail() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Comp Set Selector */}
+          <CompSetSelector dealId={dealId!} />
 
           {/* Property Details - Show if any property details exist */}
           {deal.propertyDetails && Object.keys(deal.propertyDetails as any).length > 0 && (

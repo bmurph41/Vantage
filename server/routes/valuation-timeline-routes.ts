@@ -163,4 +163,86 @@ router.post('/sync', async (req, res) => {
   }
 });
 
+const pushToModelingSchema = z.object({
+  metrics: z.object({
+    noi: z.number().optional(),
+    grossRevenue: z.number().optional(),
+    operatingExpenses: z.number().optional(),
+    capRate: z.number().optional(),
+    indicatedValue: z.number().optional(),
+  }).optional(),
+  note: z.string().optional(),
+});
+
+router.post('/projects/:projectId/push-to-modeling', async (req, res) => {
+  try {
+    const orgId = req.headers['x-org-id'] as string || (req as any).orgId;
+    const userId = req.headers['x-user-id'] as string || (req as any).userId;
+    
+    if (!orgId) {
+      return res.status(401).json({ error: 'Organization ID required' });
+    }
+    
+    const { projectId } = req.params;
+    const body = pushToModelingSchema.parse(req.body);
+    
+    const currentValuation = await valuationTimelineService.getValuationAsOf({
+      modelingProjectId: projectId,
+      orgId,
+      asOfDate: new Date(),
+      userId
+    });
+    
+    if (!currentValuation) {
+      return res.status(404).json({ error: 'No valuation data available' });
+    }
+    
+    const { modelingProjects } = await import('@shared/schema');
+    const { db } = await import('../db');
+    const { eq } = await import('drizzle-orm');
+    
+    const metricsToUpdate = body.metrics || {
+      noi: currentValuation.noi,
+      grossRevenue: currentValuation.grossRevenue,
+      operatingExpenses: currentValuation.operatingExpenses,
+      capRate: currentValuation.capRate,
+      indicatedValue: currentValuation.indicatedValue,
+    };
+    
+    const updateData: Record<string, any> = {};
+    if (metricsToUpdate.indicatedValue !== undefined) {
+      updateData.currentValuation = String(metricsToUpdate.indicatedValue);
+    }
+    if (metricsToUpdate.capRate !== undefined) {
+      updateData.year1CapRate = String(metricsToUpdate.capRate);
+    }
+    if (metricsToUpdate.noi !== undefined) {
+      updateData.projectedNoi = String(metricsToUpdate.noi);
+    }
+    updateData.updatedAt = new Date();
+    
+    const [updated] = await db.update(modelingProjects)
+      .set(updateData)
+      .where(eq(modelingProjects.id, projectId))
+      .returning();
+    
+    if (!updated) {
+      return res.status(404).json({ error: 'Modeling project not found' });
+    }
+    
+    res.json({ 
+      success: true,
+      message: 'Valuation metrics pushed to modeling project',
+      project: updated,
+      metricsPushed: metricsToUpdate
+    });
+  } catch (error) {
+    console.error('Error pushing to modeling:', error);
+    res.status(500).json({ 
+      error: 'Failed to push metrics to modeling',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 export default router;

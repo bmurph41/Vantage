@@ -21,6 +21,7 @@ import {
   crmContacts,
   crmCompanies,
   crmProperties,
+  vdrFolders,
   CrmDeal,
   CrmContact,
   CrmCompany,
@@ -459,7 +460,57 @@ export class DealOrchestratorService {
       })
       .where(eq(crmDeals.id, dealId));
 
+    // Auto-setup VDR folder structure for the DD project
+    try {
+      const orgId = deal.ownerId; // Use deal owner's org context
+      await this.setupVdrFolderStructure(project.id, orgId, projectName || deal.title);
+      console.log(`VDR folder structure created for project ${project.id}`);
+    } catch (vdrError) {
+      console.error(`Failed to create VDR folders for project ${project.id}:`, vdrError);
+      // Don't fail the DD project creation if VDR setup fails
+    }
+
     return { dealId, projectId: project.id };
+  }
+
+  /**
+   * Create standard VDR folder structure for a DD project
+   */
+  async setupVdrFolderStructure(projectId: string, orgId: string, projectName: string): Promise<void> {
+    const standardFolders = [
+      { name: 'Financial Documents', path: '/financial-documents', displayOrder: 1, icon: 'dollar-sign' },
+      { name: 'Legal Documents', path: '/legal-documents', displayOrder: 2, icon: 'file-text' },
+      { name: 'Environmental', path: '/environmental', displayOrder: 3, icon: 'leaf' },
+      { name: 'Property & Survey', path: '/property-survey', displayOrder: 4, icon: 'map' },
+      { name: 'Permits & Licenses', path: '/permits-licenses', displayOrder: 5, icon: 'award' },
+      { name: 'Operations', path: '/operations', displayOrder: 6, icon: 'settings' },
+      { name: 'Insurance', path: '/insurance', displayOrder: 7, icon: 'shield' },
+      { name: 'Contracts', path: '/contracts', displayOrder: 8, icon: 'file-signature' },
+      { name: 'Marketing Materials', path: '/marketing', displayOrder: 9, icon: 'image' },
+      { name: 'Closing Documents', path: '/closing', displayOrder: 10, icon: 'check-circle' },
+    ];
+
+    // Create root folder for the project
+    const [rootFolder] = await db.insert(vdrFolders).values({
+      name: projectName,
+      path: '/',
+      projectId,
+      orgId,
+      displayOrder: 0,
+      parentId: null,
+    }).returning();
+
+    // Create standard subfolders
+    for (const folder of standardFolders) {
+      await db.insert(vdrFolders).values({
+        name: folder.name,
+        path: folder.path,
+        projectId,
+        orgId,
+        displayOrder: folder.displayOrder,
+        parentId: rootFolder.id,
+      });
+    }
   }
 
   /**

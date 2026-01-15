@@ -8997,6 +8997,88 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: "Failed to retrieve deal" });
     }
   });
+
+  app.get("/api/deals/:id/workspace", async (req: any, res) => {
+    try {
+      const dealId = req.params.id;
+      const orgId = req.user?.orgId;
+      
+      const deal = await storage.getCrmDeal(dealId);
+      if (!deal) {
+        return res.status(404).json({ error: "Deal not found" });
+      }
+
+      const { tasks, valuationSnapshots, vdrFolders } = await import('@shared/schema');
+
+      let ddProject = null;
+      let ddTaskSummary = null;
+      if (deal.ddProjectId) {
+        ddProject = await db.select().from(projects).where(eq(projects.id, deal.ddProjectId)).then(r => r[0]);
+        
+        if (ddProject) {
+          const taskStats = await db.select({
+            total: sql<number>`count(*)`,
+            completed: sql<number>`sum(case when ${tasks.status} = 'complete' then 1 else 0 end)`,
+            inProgress: sql<number>`sum(case when ${tasks.status} = 'in_progress' then 1 else 0 end)`,
+            pending: sql<number>`sum(case when ${tasks.status} = 'pending' then 1 else 0 end)`
+          }).from(tasks).where(eq(tasks.projectId, ddProject.id)).then(r => r[0]);
+          
+          ddTaskSummary = {
+            total: Number(taskStats?.total) || 0,
+            completed: Number(taskStats?.completed) || 0,
+            inProgress: Number(taskStats?.inProgress) || 0,
+            pending: Number(taskStats?.pending) || 0,
+            percentComplete: taskStats?.total ? Math.round((Number(taskStats?.completed) / Number(taskStats?.total)) * 100) : 0
+          };
+        }
+      }
+
+      let modelingProject = null;
+      let latestValuation = null;
+      if (deal.modelingProjectId) {
+        modelingProject = await db.select().from(modelingProjects).where(eq(modelingProjects.id, deal.modelingProjectId)).then(r => r[0]);
+      }
+      
+      if (ddProject?.id && !modelingProject) {
+        const mp = await db.select().from(modelingProjects).where(eq(modelingProjects.ddProjectId, ddProject.id)).then(r => r[0]);
+        if (mp) modelingProject = mp;
+      }
+      
+      if (modelingProject) {
+        latestValuation = await db.select().from(valuationSnapshots)
+          .where(and(
+            eq(valuationSnapshots.modelingProjectId, modelingProject.id),
+            orgId ? eq(valuationSnapshots.orgId, orgId) : sql`true`
+          ))
+          .orderBy(desc(valuationSnapshots.snapshotDate))
+          .limit(1)
+          .then(r => r[0]);
+      }
+
+      let vdrFolder = null;
+      if (ddProject?.vdrFolderId) {
+        vdrFolder = await db.select().from(vdrFolders).where(eq(vdrFolders.id, ddProject.vdrFolderId)).then(r => r[0]);
+      }
+
+      const recentActivities = await db.select().from(crmActivities)
+        .where(eq(crmActivities.dealId, dealId))
+        .orderBy(desc(crmActivities.createdAt))
+        .limit(10);
+
+      res.json({
+        deal,
+        ddProject,
+        ddTaskSummary,
+        modelingProject,
+        latestValuation,
+        vdrFolder,
+        recentActivities
+      });
+    } catch (error: any) {
+      console.error("Failed to get deal workspace:", error);
+      res.status(500).json({ error: "Failed to retrieve deal workspace" });
+    }
+  });
   app.put("/api/deals/:id", async (req: any, res) => {
     try {
       let updateData = { ...req.body };

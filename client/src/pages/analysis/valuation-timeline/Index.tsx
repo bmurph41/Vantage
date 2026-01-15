@@ -20,7 +20,8 @@ import {
   Store,
   Clock,
   ChevronRight,
-  RefreshCw
+  RefreshCw,
+  ArrowRightCircle
 } from "lucide-react";
 import {
   LineChart,
@@ -161,6 +162,30 @@ export default function ValuationTimelinePage() {
     },
   });
 
+  const pushToModelingMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/valuations/projects/${selectedProjectId}/push-to-modeling`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          note: "Pushed from Valuation Timeline"
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to push metrics to modeling");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ 
+        title: "Metrics Pushed", 
+        description: "Valuation metrics have been synced to the modeling project" 
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/modeling-projects"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const quickDates = [
     { label: "Today", date: new Date() },
     { label: "1 Week Ago", date: subWeeks(new Date(), 1) },
@@ -188,13 +213,24 @@ export default function ValuationTimelinePage() {
           </p>
         </div>
         {selectedProjectId && (
-          <Button 
-            onClick={() => createSnapshotMutation.mutate()}
-            disabled={createSnapshotMutation.isPending}
-          >
-            <Camera className="h-4 w-4 mr-2" />
-            {createSnapshotMutation.isPending ? "Saving..." : "Take Snapshot"}
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={() => createSnapshotMutation.mutate()}
+              disabled={createSnapshotMutation.isPending}
+            >
+              <Camera className="h-4 w-4 mr-2" />
+              {createSnapshotMutation.isPending ? "Saving..." : "Take Snapshot"}
+            </Button>
+            <Button 
+              variant="outline"
+              onClick={() => pushToModelingMutation.mutate()}
+              disabled={pushToModelingMutation.isPending || !currentValuation}
+              title="Sync current valuation metrics to the modeling project"
+            >
+              <ArrowRightCircle className="h-4 w-4 mr-2" />
+              {pushToModelingMutation.isPending ? "Pushing..." : "Push to Modeling"}
+            </Button>
+          </div>
         )}
       </div>
 
