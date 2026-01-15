@@ -295,27 +295,37 @@ router.post("/leases/import/detect-values", async (req: Request, res: Response, 
       });
     }
     
-    // Define standard values for enum-like fields
+    // Define standard values for enum-like fields (Title Case to match database schema)
     const standardValues: Record<string, string[]> = {
-      storageType: ['wet_slip', 'dry_storage', 'mooring', 'rack', 'trailer', 'covered', 'uncovered', 'indoor', 'outdoor'],
-      contractTerm: ['annual', 'seasonal', 'winter', 'summer', 'monthly', 'transient', 'short_term'],
-      status: ['active', 'expired', 'pending', 'cancelled', 'terminated'],
+      storageType: ['Wet Slip', 'Lift Slip', 'Mooring', 'Jet Ski', 'Dry Rack - Indoor', 'Dry Rack - Outdoor', 'Houseboat', 'Land Storage', 'Boat on Trailer', 'Trailer Only'],
+      contractTerm: ['Annual', 'Seasonal', 'Summer', 'Winter', 'Monthly', 'Short-Term', 'Transient'],
+      status: ['Active', 'Expired', 'Pending', 'Cancelled', 'Terminated'],
     };
     
-    const unrecognizedValues: Record<string, { label: string; values: string[] }> = {};
+    const unrecognizedValues: Record<string, { label: string; values: string[]; validOptions: string[]; occurrences: Record<string, number> }> = {};
     
     // Check each enum field for unrecognized values
+    // Normalize both input and valid values for case-insensitive comparison
     for (const [fieldId, validValues] of Object.entries(standardValues)) {
       const sourceColumn = columnMapping[fieldId];
       if (!sourceColumn) continue;
       
+      // Normalize valid values for comparison (lowercase, no special chars)
+      const normalizedValidValues = validValues.map(v => v.toLowerCase().replace(/[\s_-]+/g, ''));
+      
       const uniqueValues = new Set<string>();
+      const occurrences: Record<string, number> = {};
+      
       for (const row of rows) {
         const value = row[sourceColumn];
         if (value && typeof value === 'string') {
-          const normalized = value.trim().toLowerCase().replace(/[\s_-]+/g, '_');
-          if (!validValues.includes(normalized) && normalized !== '') {
-            uniqueValues.add(value.trim());
+          const trimmedValue = value.trim();
+          const normalized = trimmedValue.toLowerCase().replace(/[\s_-]+/g, '');
+          // Check if the normalized value matches any valid option
+          const isRecognized = normalizedValidValues.some(v => v === normalized);
+          if (!isRecognized && normalized !== '') {
+            uniqueValues.add(trimmedValue);
+            occurrences[trimmedValue] = (occurrences[trimmedValue] || 0) + 1;
           }
         }
       }
@@ -326,6 +336,8 @@ router.post("/leases/import/detect-values", async (req: Request, res: Response, 
                  fieldId === 'contractTerm' ? 'Contract Term' : 
                  fieldId === 'status' ? 'Status' : fieldId,
           values: Array.from(uniqueValues),
+          validOptions: validValues,
+          occurrences,
         };
       }
     }
@@ -353,40 +365,73 @@ router.post("/leases/import/suggest-mappings", async (req: Request, res: Respons
       return res.json({ suggestions: [] });
     }
     
-    // Simple heuristic-based suggestions (can be enhanced with AI later)
+    // Simple heuristic-based suggestions - map to Title Case values matching database schema
     const standardMappings: Record<string, Record<string, string>> = {
       storageType: {
-        'slip': 'wet_slip',
-        'wet': 'wet_slip',
-        'dock': 'wet_slip',
-        'dry': 'dry_storage',
-        'rack storage': 'rack',
-        'covered storage': 'covered',
-        'outside': 'outdoor',
-        'inside': 'indoor',
-        'boat trailer': 'trailer',
+        'slip': 'Wet Slip',
+        'wet': 'Wet Slip',
+        'wet slip': 'Wet Slip',
+        'wet_slip': 'Wet Slip',
+        'dock': 'Wet Slip',
+        'lift': 'Lift Slip',
+        'lift slip': 'Lift Slip',
+        'lift_slip': 'Lift Slip',
+        'dry': 'Dry Rack - Indoor',
+        'dry rack': 'Dry Rack - Indoor',
+        'dry_rack': 'Dry Rack - Indoor',
+        'dry storage': 'Dry Rack - Indoor',
+        'dry_storage': 'Dry Rack - Indoor',
+        'rack storage': 'Dry Rack - Indoor',
+        'indoor': 'Dry Rack - Indoor',
+        'outdoor': 'Dry Rack - Outdoor',
+        'outside': 'Dry Rack - Outdoor',
+        'inside': 'Dry Rack - Indoor',
+        'mooring': 'Mooring',
+        'jetski': 'Jet Ski',
+        'jet ski': 'Jet Ski',
+        'jet_ski': 'Jet Ski',
+        'pwc': 'Jet Ski',
+        'houseboat': 'Houseboat',
+        'land': 'Land Storage',
+        'land storage': 'Land Storage',
+        'yard': 'Land Storage',
+        'boat trailer': 'Boat on Trailer',
+        'trailer': 'Boat on Trailer',
+        'trailer only': 'Trailer Only',
       },
       contractTerm: {
-        'year': 'annual',
-        'yearly': 'annual',
-        '12 month': 'annual',
-        '12 months': 'annual',
-        'season': 'seasonal',
-        'month': 'monthly',
-        'month to month': 'monthly',
-        'transient': 'transient',
-        'daily': 'transient',
-        'weekly': 'transient',
-        'guest': 'transient',
+        'year': 'Annual',
+        'yearly': 'Annual',
+        'annual': 'Annual',
+        '12 month': 'Annual',
+        '12 months': 'Annual',
+        'season': 'Seasonal',
+        'seasonal': 'Seasonal',
+        'summer': 'Summer',
+        'winter': 'Winter',
+        'month': 'Monthly',
+        'monthly': 'Monthly',
+        'month to month': 'Monthly',
+        'short term': 'Short-Term',
+        'short-term': 'Short-Term',
+        'transient': 'Transient',
+        'daily': 'Transient',
+        'weekly': 'Transient',
+        'guest': 'Transient',
       },
       status: {
-        'current': 'active',
-        'valid': 'active',
-        'in force': 'active',
-        'ended': 'expired',
-        'lapsed': 'expired',
-        'canceled': 'cancelled',
-        'void': 'cancelled',
+        'current': 'Active',
+        'valid': 'Active',
+        'active': 'Active',
+        'in force': 'Active',
+        'ended': 'Expired',
+        'expired': 'Expired',
+        'lapsed': 'Expired',
+        'pending': 'Pending',
+        'canceled': 'Cancelled',
+        'cancelled': 'Cancelled',
+        'void': 'Cancelled',
+        'terminated': 'Terminated',
       },
     };
     
@@ -1192,7 +1237,7 @@ router.post("/leases/import", async (req: Request, res: Response, next: NextFunc
       try {
         const tenantName = row.tenantName || row.tenant_name || row['Tenant Name'] || row.name || 'Unknown Tenant';
         const unitId = row.unitId || row.unit_id || row['Unit ID'] || row.unit || row.slip || row.slipNumber || '';
-        const storageType = row.storageType || row.storage_type || row['Storage Type'] || defaultStorageType || 'wet_slip';
+        const storageType = row.storageType || row.storage_type || row['Storage Type'] || defaultStorageType || 'Wet Slip';
         const monthlyRate = parseFloat(row.monthlyRent || row.monthly_rent || row['Monthly Rent'] || row.monthlyRate || row.rate || 0);
         const annualRent = parseFloat(row.annualRent || row.annual_rent || row['Annual Rent'] || 0);
         const leaseStart = row.leaseStart || row.lease_start || row['Lease Start'] || row.startDate || row.start_date || null;
