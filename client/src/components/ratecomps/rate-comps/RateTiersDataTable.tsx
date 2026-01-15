@@ -63,6 +63,7 @@ interface RateTiersDataTableProps {
   onTiersUpdated?: () => void;
   localTiers?: TierRowData[];
   onLocalTiersChange?: (tiers: TierRowData[]) => void;
+  hideAddButton?: boolean;
 }
 
 function tierToRowData(tier: RateTier): TierRowData {
@@ -87,7 +88,8 @@ export default function RateTiersDataTable({
   marinaName, 
   onTiersUpdated,
   localTiers,
-  onLocalTiersChange 
+  onLocalTiersChange,
+  hideAddButton = false
 }: RateTiersDataTableProps) {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -247,10 +249,12 @@ export default function RateTiersDataTable({
             : `${rows.length} rate${rows.length !== 1 ? 's' : ''} configured`
           }
         </p>
-        <Button type="button" onClick={handleAddRow} size="sm" data-testid="button-add-tier">
-          <Plus className="h-4 w-4 mr-1" />
-          Add Rate
-        </Button>
+        {!hideAddButton && (
+          <Button type="button" onClick={handleAddRow} size="sm" data-testid="button-add-tier">
+            <Plus className="h-4 w-4 mr-1" />
+            Add Rate
+          </Button>
+        )}
       </div>
 
       {/* Editing Form - Card Based */}

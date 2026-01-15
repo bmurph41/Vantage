@@ -59,6 +59,10 @@ const compFormSchema = z.object({
   isPortfolio: z.boolean().default(false),
   parentPortfolioId: z.string().optional(),
   // Rate-focused fields
+  rateType: z.string().optional(),
+  seasonality: z.string().optional(),
+  boatLengthMin: z.union([z.string(), z.number()]).optional(),
+  boatLengthMax: z.union([z.string(), z.number()]).optional(),
   rateCollectionDate: z.string().optional(),
   rateSource: z.string().optional(),
   rateTrend: z.string().optional(),
@@ -197,6 +201,10 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       isPortfolio: comp?.isPortfolio ?? isPortfolioMode,
       parentPortfolioId: comp?.parentPortfolioId || "",
       // Rate-focused fields
+      rateType: (comp as any)?.rateType || "",
+      seasonality: (comp as any)?.seasonality || "",
+      boatLengthMin: (comp as any)?.boatLengthMin || "",
+      boatLengthMax: (comp as any)?.boatLengthMax || "",
       rateCollectionDate: (comp as any)?.rateCollectionDate || "",
       rateSource: (comp as any)?.rateSource || "",
       rateTrend: (comp as any)?.rateTrend || "",
@@ -564,6 +572,10 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       // CRM Property link
       propertyId: data.propertyId || undefined,
       // Rate-focused fields
+      rateType: data.rateType === "" || data.rateType === "none-selected" ? undefined : data.rateType,
+      seasonality: data.seasonality === "" || data.seasonality === "none-selected" ? undefined : data.seasonality,
+      boatLengthMin: data.boatLengthMin === "" ? undefined : Number(data.boatLengthMin),
+      boatLengthMax: data.boatLengthMax === "" ? undefined : Number(data.boatLengthMax),
       rateCollectionDate: data.rateCollectionDate || undefined,
       rateSource: data.rateSource === "" || data.rateSource === "none-selected" ? undefined : data.rateSource,
       rateTrend: data.rateTrend === "" || data.rateTrend === "none-selected" ? undefined : data.rateTrend,
@@ -772,13 +784,369 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
             /* Regular Comp Creation/Edit Mode */
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                {/* Edit Mode: Clean header with marina name and address */}
+                {/* Edit Mode: Editable sections for comp details */}
                 {isEdit && comp && (
-                  <div className="pb-2 border-b">
-                    <h2 className="text-xl font-semibold">{comp.marina}</h2>
-                    <p className="text-sm text-muted-foreground">
-                      {[comp.address, comp.city, comp.state, comp.zip].filter(Boolean).join(', ')}
-                    </p>
+                  <div className="space-y-6">
+                    {/* Identity & Location Section */}
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base">Property Details</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="marina"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Marina Name *</FormLabel>
+                              <FormControl>
+                                <Input {...field} placeholder="Marina name" data-testid="edit-marina-name" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="address"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Address</FormLabel>
+                                <FormControl>
+                                  <Input {...field} placeholder="Street address" data-testid="edit-address" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="city"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>City</FormLabel>
+                                <FormControl>
+                                  <Input {...field} placeholder="City" data-testid="edit-city" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="state"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>State</FormLabel>
+                                <FormControl>
+                                  <Input {...field} placeholder="State" maxLength={50} data-testid="edit-state" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="zip"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Zip</FormLabel>
+                                <FormControl>
+                                  <Input {...field} placeholder="Zip code" data-testid="edit-zip" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="region"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Region</FormLabel>
+                                <Select value={field.value || ""} onValueChange={field.onChange}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="edit-region">
+                                      <SelectValue placeholder="Select region" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="none-selected">No region</SelectItem>
+                                    {US_REGIONS.map((r) => (
+                                      <SelectItem key={r} value={r}>{r}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Rate Classification Section */}
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base">Rate Classification</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="rateType"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Rate Type</FormLabel>
+                                <Select value={field.value || ""} onValueChange={field.onChange}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="edit-rate-type">
+                                      <SelectValue placeholder="Select rate type" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="none-selected">Not specified</SelectItem>
+                                    <SelectItem value="Monthly">Monthly</SelectItem>
+                                    <SelectItem value="Annual">Annual</SelectItem>
+                                    <SelectItem value="Daily">Daily</SelectItem>
+                                    <SelectItem value="Weekly">Weekly</SelectItem>
+                                    <SelectItem value="Seasonal">Seasonal</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="seasonality"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Seasonality</FormLabel>
+                                <Select value={field.value || ""} onValueChange={field.onChange}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="edit-seasonality">
+                                      <SelectValue placeholder="Select seasonality" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="none-selected">Not specified</SelectItem>
+                                    <SelectItem value="Year-Round">Year-Round</SelectItem>
+                                    <SelectItem value="Seasonal">Seasonal</SelectItem>
+                                    <SelectItem value="Summer Only">Summer Only</SelectItem>
+                                    <SelectItem value="Winter Only">Winter Only</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="boatLengthMin"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Min Boat Length (ft)</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    {...field} 
+                                    value={field.value ?? ""} 
+                                    placeholder="e.g., 20" 
+                                    data-testid="edit-boat-length-min" 
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="boatLengthMax"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Max Boat Length (ft)</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    {...field} 
+                                    value={field.value ?? ""} 
+                                    placeholder="e.g., 60" 
+                                    data-testid="edit-boat-length-max" 
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <FormField
+                          control={form.control}
+                          name="storageTypes"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Storage Types</FormLabel>
+                              <div className="flex flex-wrap gap-2">
+                                {allStorageTypes.map((type) => (
+                                  <label
+                                    key={type}
+                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border cursor-pointer transition-colors text-sm ${
+                                      field.value?.includes(type)
+                                        ? 'bg-primary text-primary-foreground border-primary'
+                                        : 'bg-background hover:bg-muted border-input'
+                                    }`}
+                                  >
+                                    <Checkbox
+                                      checked={field.value?.includes(type)}
+                                      onCheckedChange={(checked) => {
+                                        const current = field.value || [];
+                                        if (checked) {
+                                          field.onChange([...current, type]);
+                                        } else {
+                                          field.onChange(current.filter((t: string) => t !== type));
+                                        }
+                                      }}
+                                      className="sr-only"
+                                    />
+                                    {type}
+                                  </label>
+                                ))}
+                              </div>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </CardContent>
+                    </Card>
+
+                    {/* Facility Details Section */}
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base">Facility Details</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid grid-cols-3 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="wetSlips"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Wet Slips</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    {...field} 
+                                    value={field.value ?? ""} 
+                                    placeholder="Count" 
+                                    data-testid="edit-wet-slips" 
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="dryRacks"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Dry Racks</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    {...field} 
+                                    value={field.value ?? ""} 
+                                    placeholder="Count" 
+                                    data-testid="edit-dry-racks" 
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="waterType"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Water Type</FormLabel>
+                                <Select value={field.value || ""} onValueChange={field.onChange}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="edit-water-type">
+                                      <SelectValue placeholder="Select type" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="none-selected">Not specified</SelectItem>
+                                    {WATER_TYPES.map((wt) => (
+                                      <SelectItem key={wt} value={wt}>{wt}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="bodyOfWater"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Body of Water</FormLabel>
+                                <FormControl>
+                                  <Input {...field} placeholder="e.g., Gulf, Bay, Lake" data-testid="edit-body-of-water" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="waterBodyName"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Water Body Name</FormLabel>
+                                <FormControl>
+                                  <Input {...field} placeholder="e.g., Lake Superior" data-testid="edit-water-body-name" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <FormField
+                          control={form.control}
+                          name="notes"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Notes</FormLabel>
+                              <FormControl>
+                                <Textarea 
+                                  {...field} 
+                                  placeholder="Additional notes about this rate comp..." 
+                                  className="min-h-[80px]"
+                                  data-testid="edit-notes" 
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </CardContent>
+                    </Card>
                   </div>
                 )}
 
@@ -1144,6 +1512,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                     marinaName={form.watch("marina") || comp?.marina || ""}
                     localTiers={!comp ? pendingRateTiers : undefined}
                     onLocalTiersChange={!comp ? setPendingRateTiers : undefined}
+                    hideAddButton={isEdit}
                   />
                 </CardContent>
               </Card>
