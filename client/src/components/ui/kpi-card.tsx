@@ -162,16 +162,24 @@ export function KPICard({
     )
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (onClick && (e.key === "Enter" || e.key === " ")) {
+      e.preventDefault()
+      onClick()
+    }
+  }
+
   return (
     <div
       className={cn(
         "rounded-xl border bg-card transition-all duration-200",
         "hover:shadow-md hover:border-border/80",
-        onClick && "cursor-pointer hover:bg-accent/50",
+        onClick && "cursor-pointer hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
         sizes.container,
         className
       )}
       onClick={onClick}
+      onKeyDown={onClick ? handleKeyDown : undefined}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
     >

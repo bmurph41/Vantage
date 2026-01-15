@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, Fragment } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -101,15 +101,18 @@ export default function CompsDataGrid({
   }, []);
 
   const defaultColumns = [
-    { key: 'marina', label: 'Marina', width: 280, sortable: true },
-    { key: 'location', label: 'Location', width: 180, sortable: true },
-    { key: 'rateSummary', label: 'Rates', width: 400, sortable: false },
-    { key: 'actions', label: '', width: 80, sortable: false },
+    { key: 'marina', label: 'Marina', width: 260, sortable: true },
+    { key: 'location', label: 'Location', width: 160, sortable: true },
+    { key: 'storageTypes', label: 'Storage Types', width: 120, sortable: false },
+    { key: 'rateRange', label: 'Rate Range', width: 160, sortable: false },
+    { key: 'lastUpdated', label: 'Last Updated', width: 110, sortable: false },
+    { key: 'expand', label: '', width: 50, sortable: false },
+    { key: 'actions', label: '', width: 60, sortable: false },
   ];
 
   const getRowHeight = useCallback((index: number) => {
     const comp = data[index];
-    if (!comp) return 52;
+    if (!comp) return 48;
     if (expandedRows.has(comp.id)) {
       const tiers = (comp as any).tiers || [];
       const tiersByStorage: Record<string, any[]> = {};
@@ -119,9 +122,13 @@ export default function CompsDataGrid({
         tiersByStorage[storageType].push(tier);
       });
       const storageTypeCount = Object.keys(tiersByStorage).length || 1;
-      return 52 + (storageTypeCount * 24) + 16;
+      const yearGroupsCount = Object.values(tiersByStorage).reduce((sum, group) => {
+        const years = new Set(group.map((t: any) => t.effectiveDate ? new Date(t.effectiveDate).getFullYear() : 'undated'));
+        return sum + years.size;
+      }, 0);
+      return 48 + 40 + (storageTypeCount * 32) + (yearGroupsCount * 28);
     }
-    return 52;
+    return 48;
   }, [data, expandedRows]);
 
   const rowVirtualizer = useVirtualizer({
@@ -292,9 +299,96 @@ export default function CompsDataGrid({
     };
   };
 
+  const buildGroupedRates = (comp: RateComp & { tiers?: any[] }) => {
+    const tiers = (comp as any).tiers || [];
+    
+    // Group by storage type, then by year
+    const storageGroups: Record<string, {
+      label: string;
+      yearGroups: Record<number | 'undated', {
+        year: number | 'undated';
+        rates: Array<{
+          amount: number;
+          unit: string;
+          period: string;
+          electricIncluded?: boolean;
+          seasonality?: string;
+        }>;
+      }>;
+    }> = {};
+
+    tiers.forEach((tier: any) => {
+      const storageType = tier.storageType || 'unknown';
+      const storageLabel = STORAGE_TYPE_LABELS[storageType as keyof typeof STORAGE_TYPE_LABELS] || storageType;
+      
+      if (!storageGroups[storageType]) {
+        storageGroups[storageType] = {
+          label: storageLabel,
+          yearGroups: {},
+        };
+      }
+
+      let year: number | 'undated' = 'undated';
+      if (tier.effectiveDate) {
+        const parsedYear = new Date(tier.effectiveDate).getFullYear();
+        if (!isNaN(parsedYear)) year = parsedYear;
+      }
+
+      if (!storageGroups[storageType].yearGroups[year]) {
+        storageGroups[storageType].yearGroups[year] = {
+          year,
+          rates: [],
+        };
+      }
+
+      if (tier.amountCents) {
+        storageGroups[storageType].yearGroups[year].rates.push({
+          amount: tier.amountCents / 100,
+          unit: tier.rateUnit || 'flat',
+          period: tier.ratePeriod || 'monthly',
+          electricIncluded: tier.electricIncluded,
+          seasonality: tier.seasonality,
+        });
+      }
+    });
+
+    // Convert to sorted arrays
+    return Object.entries(storageGroups).map(([storageType, group]) => ({
+      storageType,
+      label: group.label,
+      yearGroups: Object.values(group.yearGroups)
+        .sort((a, b) => {
+          if (a.year === 'undated') return 1;
+          if (b.year === 'undated') return -1;
+          return (b.year as number) - (a.year as number);
+        }),
+    }));
+  };
+
+  const formatLastUpdated = (comp: RateComp & { tiers?: any[] }) => {
+    const tiers = (comp as any).tiers || [];
+    let latestDate: Date | null = null;
+    
+    tiers.forEach((tier: any) => {
+      if (tier.effectiveDate) {
+        const date = new Date(tier.effectiveDate);
+        if (!latestDate || date > latestDate) {
+          latestDate = date;
+        }
+      }
+    });
+    
+    if (latestDate) {
+      return latestDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    }
+    return null;
+  };
+
   const formatCellValue = (comp: RateComp & { tiers?: any[]; tierCount?: number }, column: string) => {
     const tiers = (comp as any).tiers || [];
     const tierCount = (comp as any).tierCount || 0;
+    const summary = buildRateSummary(comp);
+    const isExpanded = expandedRows.has(comp.id);
 
     switch (column) {
       case 'marina':
@@ -308,8 +402,8 @@ export default function CompsDataGrid({
               {comp.marina || '—'}
             </span>
             {tierCount > 0 && (
-              <Badge variant="secondary" className="text-xs shrink-0">
-                {tierCount} {tierCount === 1 ? 'rate' : 'rates'}
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 shrink-0">
+                {tierCount}
               </Badge>
             )}
           </div>
@@ -319,77 +413,59 @@ export default function CompsDataGrid({
         const city = comp.city || '';
         const state = comp.state || '';
         const location = [city, state].filter(Boolean).join(', ');
-        return <span className="truncate text-muted-foreground">{location || '—'}</span>;
+        return <span className="truncate text-muted-foreground text-sm">{location || '—'}</span>;
 
-      case 'rateSummary':
-        const summary = buildRateSummary(comp);
-        const isExpanded = expandedRows.has(comp.id);
-        
-        if (!summary.hasRates) {
-          return <span className="text-muted-foreground text-sm">No rates</span>;
+      case 'storageTypes':
+        if (!summary.hasRates || summary.totalStorageTypes === 0) {
+          return <span className="text-muted-foreground text-sm">—</span>;
         }
-
-        const canExpand = summary.totalRates > 0;
-
+        const typeLabels = summary.storageGroups.slice(0, 2).map(g => g.label);
+        const moreCount = summary.totalStorageTypes - 2;
         return (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              {canExpand && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleRowExpanded(comp.id);
-                  }}
-                  className="flex items-center justify-center w-5 h-5 rounded hover:bg-muted transition-colors"
-                  data-testid={`expand-rates-${comp.id}`}
-                >
-                  <ChevronRight className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                </button>
-              )}
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-muted-foreground">
-                  {summary.totalStorageTypes} type{summary.totalStorageTypes !== 1 ? 's' : ''}
-                </span>
-                {summary.rangeText && (
-                  <>
-                    <span className="text-border">•</span>
-                    <span className="font-medium">{summary.rangeText}</span>
-                  </>
-                )}
-                {summary.years.length > 0 && (
-                  <>
-                    <span className="text-border">•</span>
-                    <span className="text-muted-foreground text-xs">
-                      {summary.years.length === 1 ? summary.years[0] : `${summary.years[summary.years.length - 1]}-${summary.years[0]}`}
-                    </span>
-                  </>
-                )}
-              </div>
-            </div>
-            
-            {isExpanded && (
-              <div className="pl-7 space-y-1 pb-1">
-                {summary.storageGroups.map((group) => (
-                  <div 
-                    key={group.storageType}
-                    className="flex items-center gap-2 text-xs text-muted-foreground"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary/50" />
-                    <span className="font-medium text-foreground">{group.label}</span>
-                    {group.tierCount > 1 && (
-                      <span>({group.tierCount})</span>
-                    )}
-                    {group.rateText && (
-                      <>
-                        <span>•</span>
-                        <span>{group.rateText}</span>
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
+          <div className="flex flex-wrap gap-1">
+            {typeLabels.map((label, i) => (
+              <Badge key={i} variant="outline" className="text-[10px] px-1.5 py-0 font-normal">
+                {label}
+              </Badge>
+            ))}
+            {moreCount > 0 && (
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                +{moreCount}
+              </Badge>
             )}
           </div>
+        );
+
+      case 'rateRange':
+        if (!summary.rangeText) {
+          return <span className="text-muted-foreground text-sm">—</span>;
+        }
+        return (
+          <span className="font-medium text-sm">{summary.rangeText}</span>
+        );
+
+      case 'lastUpdated':
+        const lastUpdated = formatLastUpdated(comp);
+        if (!lastUpdated) {
+          return <span className="text-muted-foreground text-sm">—</span>;
+        }
+        return <span className="text-muted-foreground text-sm">{lastUpdated}</span>;
+
+      case 'expand':
+        const canExpand = summary.hasRates && summary.totalRates > 0;
+        if (!canExpand) return null;
+        return (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleRowExpanded(comp.id);
+            }}
+            className="flex items-center justify-center w-6 h-6 rounded hover:bg-muted transition-colors"
+            data-testid={`expand-rates-${comp.id}`}
+            aria-expanded={isExpanded}
+          >
+            <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+          </button>
         );
       
       default:
@@ -424,7 +500,7 @@ export default function CompsDataGrid({
   if (loading) {
     return (
       <div className="p-6">
-        <SkeletonTableRows rows={8} columns={4} />
+        <SkeletonTableRows rows={8} columns={6} />
       </div>
     );
   }
@@ -498,71 +574,120 @@ export default function CompsDataGrid({
                   
                   {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                     const comp = data[virtualRow.index];
+                    const isExpanded = expandedRows.has(comp.id);
+                    const groupedRates = isExpanded ? buildGroupedRates(comp) : [];
                     
                     return (
-                      <TableRow 
-                        key={comp.id}
-                        className={`border-b border-border/50 hover:bg-muted/50 ${
-                          selectedIds.includes(comp.id) ? 'bg-primary/10' : ''
-                        }`}
-                        data-testid={`row-comp-${comp.id}`}
-                      >
-                        <TableCell className="w-[50px]">
-                          <Checkbox
-                            checked={selectedIds.includes(comp.id)}
-                            onCheckedChange={(checked) => handleSelectRow(comp.id, checked as boolean)}
-                            data-testid={`checkbox-row-${comp.id}`}
-                          />
-                        </TableCell>
-                        
-                        {defaultColumns.map((column) => (
-                          <TableCell 
-                            key={column.key}
-                            className={`${column.key === 'rateSummary' ? 'whitespace-normal py-2' : 'whitespace-nowrap'} ${
-                              column.key === 'electricIncluded' ? 'text-center' : 'text-left'
-                            }`}
-                            style={{ 
-                              width: `${column.width}px`,
-                              minWidth: `${column.width}px`,
-                            }}
-                            data-testid={`cell-${column.key}-${comp.id}`}
-                          >
-                            {column.key === 'actions' ? (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => onCompClick?.(comp)}>
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    View
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => {
-                                    setEditingComp(comp);
-                                    setShowEditDialog(true);
-                                  }}>
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Edit
-                                  </DropdownMenuItem>
-                                  {canDelete && (
-                                    <DropdownMenuItem 
-                                      onClick={() => handleDelete(comp)}
-                                      className="text-destructive"
-                                    >
-                                      <Trash2 className="h-4 w-4 mr-2" />
-                                      Delete
-                                    </DropdownMenuItem>
-                                  )}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            ) : (
-                              formatCellValue(comp, column.key)
-                            )}
+                      <Fragment key={comp.id}>
+                        <TableRow
+                          className={`border-b border-border/50 hover:bg-muted/50 ${
+                            selectedIds.includes(comp.id) ? 'bg-primary/10' : ''
+                          } ${isExpanded ? 'border-b-0' : ''}`}
+                          data-testid={`row-comp-${comp.id}`}
+                        >
+                          <TableCell className="w-[50px]">
+                            <Checkbox
+                              checked={selectedIds.includes(comp.id)}
+                              onCheckedChange={(checked) => handleSelectRow(comp.id, checked as boolean)}
+                              data-testid={`checkbox-row-${comp.id}`}
+                            />
                           </TableCell>
-                        ))}
-                      </TableRow>
+                          
+                          {defaultColumns.map((column) => (
+                            <TableCell 
+                              key={column.key}
+                              className={`whitespace-nowrap ${
+                                column.key === 'expand' ? 'text-center px-2' : 'text-left'
+                              }`}
+                              style={{ 
+                                width: `${column.width}px`,
+                                minWidth: `${column.width}px`,
+                              }}
+                              data-testid={`cell-${column.key}-${comp.id}`}
+                            >
+                              {column.key === 'actions' ? (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => onCompClick?.(comp)}>
+                                      <Eye className="h-4 w-4 mr-2" />
+                                      View
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => {
+                                      setEditingComp(comp);
+                                      setShowEditDialog(true);
+                                    }}>
+                                      <Edit className="h-4 w-4 mr-2" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                    {canDelete && (
+                                      <DropdownMenuItem 
+                                        onClick={() => handleDelete(comp)}
+                                        className="text-destructive"
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Delete
+                                      </DropdownMenuItem>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              ) : (
+                                formatCellValue(comp, column.key)
+                              )}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+
+                        {isExpanded && groupedRates.length > 0 && (
+                          <tr key={`${comp.id}-expanded`}>
+                            <td colSpan={defaultColumns.length + 1} className="bg-muted/30 border-b border-border/50 p-0">
+                              <div className="py-3 px-4 pl-14">
+                                <div className="space-y-3">
+                                  {groupedRates.map((storageGroup) => (
+                                    <div key={storageGroup.storageType} className="space-y-1.5">
+                                      <div className="flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-primary" />
+                                        <span className="text-sm font-medium">{storageGroup.label}</span>
+                                      </div>
+                                      <div className="pl-4 space-y-1">
+                                        {storageGroup.yearGroups.map((yearGroup) => (
+                                          <div 
+                                            key={yearGroup.year}
+                                            className="flex items-start gap-3 text-sm"
+                                          >
+                                            <span className="text-muted-foreground min-w-[60px]">
+                                              {yearGroup.year === 'undated' ? '—' : yearGroup.year}
+                                            </span>
+                                            <div className="flex flex-wrap gap-2">
+                                              {yearGroup.rates.map((rate, idx) => (
+                                                <span 
+                                                  key={idx}
+                                                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-background rounded border text-xs"
+                                                >
+                                                  <span className="font-medium">
+                                                    ${formatRateValue(rate.amount)}{getUnitSuffix(rate.unit)}{getPeriodSuffix(rate.period)}
+                                                  </span>
+                                                  {rate.electricIncluded && (
+                                                    <span className="text-muted-foreground text-[10px]">+elec</span>
+                                                  )}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     );
                   })}
                   
