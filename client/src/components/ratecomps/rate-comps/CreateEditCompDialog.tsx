@@ -60,6 +60,7 @@ const compFormSchema = z.object({
   parentPortfolioId: z.string().optional(),
   // Rate-focused fields
   rateType: z.string().optional(),
+  rateAmount: z.union([z.string(), z.number()]).optional(),
   seasonality: z.string().optional(),
   boatLengthMin: z.union([z.string(), z.number()]).optional(),
   boatLengthMax: z.union([z.string(), z.number()]).optional(),
@@ -202,6 +203,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       parentPortfolioId: comp?.parentPortfolioId || "",
       // Rate-focused fields
       rateType: (comp as any)?.rateType || "",
+      rateAmount: (comp as any)?.rateAmount || "",
       seasonality: (comp as any)?.seasonality || "",
       boatLengthMin: (comp as any)?.boatLengthMin || "",
       boatLengthMax: (comp as any)?.boatLengthMax || "",
@@ -573,6 +575,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       propertyId: data.propertyId || undefined,
       // Rate-focused fields
       rateType: data.rateType === "" || data.rateType === "none-selected" ? undefined : data.rateType,
+      rateAmount: data.rateAmount === "" ? undefined : Number(data.rateAmount),
       seasonality: data.seasonality === "" || data.seasonality === "none-selected" ? undefined : data.seasonality,
       boatLengthMin: data.boatLengthMin === "" ? undefined : Number(data.boatLengthMin),
       boatLengthMax: data.boatLengthMax === "" ? undefined : Number(data.boatLengthMax),
@@ -886,42 +889,61 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                           />
                         </div>
 
-                        <FormField
-                          control={form.control}
-                          name="storageTypes"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Storage Types</FormLabel>
-                              <div className="flex flex-wrap gap-2">
-                                {allStorageTypes.map((type) => (
-                                  <label
-                                    key={type}
-                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border cursor-pointer transition-colors text-sm ${
-                                      field.value?.includes(type)
-                                        ? 'bg-primary text-primary-foreground border-primary'
-                                        : 'bg-background hover:bg-muted border-input'
-                                    }`}
-                                  >
-                                    <Checkbox
-                                      checked={field.value?.includes(type)}
-                                      onCheckedChange={(checked) => {
-                                        const current = field.value || [];
-                                        if (checked) {
-                                          field.onChange([...current, type]);
-                                        } else {
-                                          field.onChange(current.filter((t: string) => t !== type));
-                                        }
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="storageTypes"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Storage Type</FormLabel>
+                                <Select 
+                                  value={field.value?.[0] || ""} 
+                                  onValueChange={(value) => field.onChange(value ? [value] : [])}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger data-testid="edit-storage-type">
+                                      <SelectValue placeholder="Select storage type" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {allStorageTypes.map((type) => (
+                                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="rateAmount"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Rate Amount</FormLabel>
+                                <FormControl>
+                                  <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                                    <Input 
+                                      type="text"
+                                      inputMode="numeric"
+                                      {...field}
+                                      value={field.value ? Number(field.value).toLocaleString('en-US') : ""}
+                                      onChange={(e) => {
+                                        const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                                        field.onChange(rawValue ? parseInt(rawValue, 10) : "");
                                       }}
-                                      className="sr-only"
+                                      placeholder="0"
+                                      className="pl-7"
+                                      data-testid="edit-rate-amount"
                                     />
-                                    {type}
-                                  </label>
-                                ))}
-                              </div>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
                       </CardContent>
                     </Card>
                   </div>

@@ -7791,6 +7791,7 @@ export const rateComps = pgTable('rate_comps', {
   ioBoth: text('inside_outside_both'), // Legacy field - deprecated
   storageTypes: text('storage_types').array().default(sql`'{}'`), // Multi-select storage types
   rateType: text('rate_type'), // 'Monthly', 'Annual', 'Daily', 'Weekly', etc.
+  rateAmount: integer('rate_amount'), // Rate in whole dollars (e.g., 1500 = $1,500)
   seasonality: text('seasonality'), // 'Year-Round', 'Seasonal', 'Summer Only', 'Winter Only', etc.
   boatLengthMin: integer('boat_length_min'), // Minimum boat length in feet
   boatLengthMax: integer('boat_length_max'), // Maximum boat length in feet
