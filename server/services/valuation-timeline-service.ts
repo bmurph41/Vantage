@@ -392,15 +392,18 @@ export class ValuationTimelineService {
       lte(fuelSales.transactionDate, asOfDate)
     ));
     
-    // NOTE: ship_store_transactions table lacks orgId column - multi-tenant isolation not possible
-    // Ship store data is excluded from valuation calculations until schema migration adds orgId
-    // This prevents cross-tenant data leakage in multi-tenant environments
-    const shipStoreData = [{
-      totalRevenue: '0',
-      totalCost: '0',
-      transactionCount: '0',
-      latestDate: null as string | null
-    }];
+    // Ship store transactions with orgId filtering for multi-tenant isolation
+    const shipStoreData = await db.select({
+      totalRevenue: sql<string>`COALESCE(SUM(${shipStoreTransactions.total}::numeric), 0)`,
+      totalCost: sql<string>`COALESCE(SUM(${shipStoreTransactions.subtotal}::numeric * 0.6), 0)`,
+      transactionCount: sql<string>`COUNT(*)`,
+      latestDate: sql<string>`MAX(${shipStoreTransactions.createdAt})`
+    })
+    .from(shipStoreTransactions)
+    .where(and(
+      eq(shipStoreTransactions.orgId, orgId),
+      lte(shipStoreTransactions.createdAt, asOfDate)
+    ));
     
     const rentRoll = rentRollData[0];
     const fuel = fuelData[0];

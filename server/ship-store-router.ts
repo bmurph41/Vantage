@@ -261,8 +261,11 @@ router.get('/transactions', async (req: Request, res: Response) => {
   try {
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = parseInt(req.query.offset as string) || 0;
+    const user = (req as any).user;
+    const orgId = user?.organizationId || user?.orgId;
     
     const result = await db.select().from(shipStoreTransactions)
+      .where(orgId ? eq(shipStoreTransactions.orgId, orgId) : undefined)
       .orderBy(desc(shipStoreTransactions.createdAt))
       .limit(limit)
       .offset(offset);
@@ -274,7 +277,12 @@ router.get('/transactions', async (req: Request, res: Response) => {
 
 router.get('/transactions/count', async (req: Request, res: Response) => {
   try {
-    const [result] = await db.select({ count: sql<number>`count(*)` }).from(shipStoreTransactions);
+    const user = (req as any).user;
+    const orgId = user?.organizationId || user?.orgId;
+    
+    const [result] = await db.select({ count: sql<number>`count(*)` })
+      .from(shipStoreTransactions)
+      .where(orgId ? eq(shipStoreTransactions.orgId, orgId) : undefined);
     res.json({ count: result?.count || 0 });
   } catch (error) {
     res.status(500).json({ message: 'Error counting transactions' });
@@ -284,7 +292,11 @@ router.get('/transactions/count', async (req: Request, res: Response) => {
 router.get('/transactions/recent', async (req: Request, res: Response) => {
   try {
     const limit = parseInt(req.query.limit as string) || 10;
+    const user = (req as any).user;
+    const orgId = user?.organizationId || user?.orgId;
+    
     const result = await db.select().from(shipStoreTransactions)
+      .where(orgId ? eq(shipStoreTransactions.orgId, orgId) : undefined)
       .orderBy(desc(shipStoreTransactions.createdAt))
       .limit(limit);
     res.json(result);
@@ -296,6 +308,8 @@ router.get('/transactions/recent', async (req: Request, res: Response) => {
 router.post('/transactions', async (req: Request, res: Response) => {
   try {
     const data = insertTransactionSchema.parse(req.body);
+    const user = (req as any).user;
+    const orgId = user?.organizationId || user?.orgId;
     
     // Validate stock availability before creating transaction
     if (data.items && Array.isArray(data.items)) {
@@ -321,8 +335,11 @@ router.post('/transactions', async (req: Request, res: Response) => {
       }
     }
     
-    // Create transaction
-    const [transaction] = await db.insert(shipStoreTransactions).values(data).returning();
+    // Create transaction with orgId for multi-tenant isolation
+    const [transaction] = await db.insert(shipStoreTransactions).values({
+      ...data,
+      orgId: orgId || null
+    }).returning();
     
     // Update product stock
     if (data.items && Array.isArray(data.items)) {

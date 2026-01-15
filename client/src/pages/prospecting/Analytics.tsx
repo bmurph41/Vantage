@@ -6,7 +6,8 @@ import {
   TrendingUp, TrendingDown, Minus, Phone, Mail, Calendar, 
   Target, Handshake, Users, DollarSign, Download, RefreshCcw
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { formatNumber } from "@/lib/utils";
 
 type MetricCardProps = {
@@ -59,29 +60,112 @@ function MetricCard({ title, value, change, changeLabel, icon: Icon, color }: Me
 type FunnelStage = {
   name: string;
   value: number;
+  goal: number;
   percentage: number;
   color: string;
 };
 
-const funnelData: FunnelStage[] = [
-  { name: 'Total Touches', value: 1250, percentage: 100, color: 'bg-blue-500' },
-  { name: 'Conversations', value: 312, percentage: 25, color: 'bg-green-500' },
-  { name: 'Qualified Leads', value: 156, percentage: 12.5, color: 'bg-yellow-500' },
-  { name: 'Deals Created', value: 42, percentage: 3.4, color: 'bg-purple-500' },
-  { name: 'Deals Closed', value: 8, percentage: 0.6, color: 'bg-orange-500' },
-];
-
-const sourceData = [
-  { source: 'Cold Call', leads: 85, deals: 12, conversion: '14.1%' },
-  { source: 'Email Campaign', leads: 120, deals: 8, conversion: '6.7%' },
-  { source: 'LoopNet', leads: 45, deals: 6, conversion: '13.3%' },
-  { source: 'Crexi', leads: 38, deals: 5, conversion: '13.2%' },
-  { source: 'Broker Referral', leads: 28, deals: 8, conversion: '28.6%' },
-  { source: 'Direct Owner', leads: 22, deals: 3, conversion: '13.6%' },
-];
-
 export default function DealSourcingAnalytics() {
   const [timeRange, setTimeRange] = useState('month');
+
+  const { data: stats, isLoading: isLoadingStats, refetch: refetchStats } = useQuery<{
+    callsMade: number;
+    emailsSent: number;
+    leadsGenerated: number;
+    meetingsBooked: number;
+    callsChange: number;
+    emailsChange: number;
+    leadsChange: number;
+    meetingsChange: number;
+  }>({
+    queryKey: ['/api/prospecting/dashboard-stats'],
+  });
+
+  const { data: settings } = useQuery<{
+    weeklyCallsGoal?: number;
+    weeklyEmailsGoal?: number;
+    weeklyLeadsGoal?: number;
+    weeklyDealsGoal?: number;
+    weeklyConversationsGoal?: number;
+    weeklyQualifiedGoal?: number;
+    weeklyDealsClosedGoal?: number;
+  }>({
+    queryKey: ['/api/prospecting/settings'],
+  });
+
+  const { data: leads } = useQuery<any[]>({
+    queryKey: ['/api/leads'],
+  });
+
+  const { data: deals } = useQuery<any[]>({
+    queryKey: ['/api/deals'],
+  });
+
+  const leadsArray = leads || [];
+  const dealsArray = deals || [];
+
+  const currentCalls = stats?.callsMade || 0;
+  const currentEmails = stats?.emailsSent || 0;
+  const totalTouches = currentCalls + currentEmails;
+
+  const conversations = leadsArray.filter((l: any) => 
+    l.status === 'contacted' || l.status === 'qualified' || l.status === 'converted'
+  ).length;
+  const qualified = leadsArray.filter((l: any) => 
+    l.status === 'qualified' || l.status === 'converted'
+  ).length;
+  const dealsCreated = dealsArray.length;
+  const dealsClosed = dealsArray.filter((d: any) => d.stage === 'closed_won').length;
+
+  const touchesGoal = (settings?.weeklyCallsGoal || 50) + (settings?.weeklyEmailsGoal || 100);
+  const conversationsGoal = settings?.weeklyConversationsGoal || 25;
+  const qualifiedGoal = settings?.weeklyQualifiedGoal || 10;
+  const dealsGoal = settings?.weeklyDealsGoal || 5;
+  const dealsClosedGoal = settings?.weeklyDealsClosedGoal || 2;
+
+  const funnelData: FunnelStage[] = useMemo(() => [
+    { name: 'Total Touches', value: totalTouches, goal: touchesGoal, percentage: Math.min(Math.round((totalTouches / touchesGoal) * 100), 100), color: 'bg-blue-500' },
+    { name: 'Conversations', value: conversations, goal: conversationsGoal, percentage: Math.min(Math.round((conversations / conversationsGoal) * 100), 100), color: 'bg-green-500' },
+    { name: 'Qualified Leads', value: qualified, goal: qualifiedGoal, percentage: Math.min(Math.round((qualified / qualifiedGoal) * 100), 100), color: 'bg-yellow-500' },
+    { name: 'Deals Created', value: dealsCreated, goal: dealsGoal, percentage: Math.min(Math.round((dealsCreated / dealsGoal) * 100), 100), color: 'bg-purple-500' },
+    { name: 'Deals Closed', value: dealsClosed, goal: dealsClosedGoal, percentage: Math.min(Math.round((dealsClosed / dealsClosedGoal) * 100), 100), color: 'bg-orange-500' },
+  ], [totalTouches, touchesGoal, conversations, conversationsGoal, qualified, qualifiedGoal, dealsCreated, dealsGoal, dealsClosed, dealsClosedGoal]);
+
+  const sourceData = useMemo(() => {
+    const sourceStats: Record<string, { leads: number; deals: number }> = {};
+    
+    leadsArray.forEach((lead: any) => {
+      const source = lead.source || 'Unknown';
+      if (!sourceStats[source]) {
+        sourceStats[source] = { leads: 0, deals: 0 };
+      }
+      sourceStats[source].leads += 1;
+    });
+    
+    dealsArray.forEach((deal: any) => {
+      const source = deal.source || deal.leadSource || 'Unknown';
+      if (!sourceStats[source]) {
+        sourceStats[source] = { leads: 0, deals: 0 };
+      }
+      sourceStats[source].deals += 1;
+    });
+    
+    return Object.entries(sourceStats)
+      .map(([source, stats]) => ({
+        source,
+        leads: stats.leads,
+        deals: stats.deals,
+        conversion: stats.leads > 0 ? `${((stats.deals / stats.leads) * 100).toFixed(1)}%` : '0%'
+      }))
+      .sort((a, b) => b.leads - a.leads);
+  }, [leadsArray, dealsArray]);
+
+  const pipelineValue = dealsArray.reduce((sum: number, deal: any) => sum + (deal.amount || 0), 0);
+  const avgDealSize = dealsArray.length > 0 ? pipelineValue / dealsArray.length : 0;
+
+  const handleRefresh = () => {
+    refetchStats();
+  };
 
   return (
     <div className="flex-1 overflow-auto p-6 bg-gray-50">
@@ -103,7 +187,7 @@ export default function DealSourcingAnalytics() {
                 <SelectItem value="year">This Year</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" size="sm" data-testid="button-refresh">
+            <Button variant="outline" size="sm" data-testid="button-refresh" onClick={handleRefresh}>
               <RefreshCcw className="w-4 h-4 mr-2" />
               Refresh
             </Button>
@@ -117,29 +201,27 @@ export default function DealSourcingAnalytics() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <MetricCard
             title="Total Touches"
-            value="1,250"
-            change={15}
+            value={formatNumber(totalTouches)}
+            change={stats?.callsChange}
             icon={Phone}
             color="bg-blue-500"
           />
           <MetricCard
             title="Conversations"
-            value="312"
-            change={8}
+            value={formatNumber(conversations)}
+            change={stats?.leadsChange}
             icon={Users}
             color="bg-green-500"
           />
           <MetricCard
             title="Deals Created"
-            value="42"
-            change={-5}
+            value={formatNumber(dealsCreated)}
             icon={Target}
             color="bg-purple-500"
           />
           <MetricCard
             title="Pipeline Value"
-            value="$18.5M"
-            change={22}
+            value={`$${formatNumber(pipelineValue)}`}
             icon={DollarSign}
             color="bg-orange-500"
           />
@@ -158,17 +240,17 @@ export default function DealSourcingAnalytics() {
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm text-gray-600">{stage.name}</span>
                       <div className="flex items-center space-x-2">
-                        <span className="text-sm font-medium">{formatNumber(stage.value)}</span>
+                        <span className="text-sm font-medium">{formatNumber(stage.value)} / {formatNumber(stage.goal)}</span>
                         <Badge variant="secondary" className="text-xs">{stage.percentage}%</Badge>
                       </div>
                     </div>
                     <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
                       <div 
                         className={`h-full ${stage.color} rounded-full transition-all duration-500`}
-                        style={{ width: `${stage.percentage}%` }}
+                        style={{ width: `${Math.max(stage.percentage, 2)}%` }}
                       />
                     </div>
-                    {index < funnelData.length - 1 && (
+                    {index < funnelData.length - 1 && stage.value > 0 && (
                       <div className="flex justify-center my-1">
                         <div className="text-xs text-gray-400">
                           {Math.round((funnelData[index + 1].value / stage.value) * 100)}% conversion
@@ -193,28 +275,28 @@ export default function DealSourcingAnalytics() {
                     <Phone className="w-5 h-5 text-blue-600 mr-3" />
                     <span className="font-medium">Calls Made</span>
                   </div>
-                  <span className="text-xl font-bold text-blue-600">428</span>
+                  <span className="text-xl font-bold text-blue-600">{currentCalls}</span>
                 </div>
                 <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
                   <div className="flex items-center">
                     <Mail className="w-5 h-5 text-green-600 mr-3" />
                     <span className="font-medium">Emails Sent</span>
                   </div>
-                  <span className="text-xl font-bold text-green-600">822</span>
+                  <span className="text-xl font-bold text-green-600">{currentEmails}</span>
                 </div>
                 <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
                   <div className="flex items-center">
                     <Calendar className="w-5 h-5 text-purple-600 mr-3" />
                     <span className="font-medium">Meetings Held</span>
                   </div>
-                  <span className="text-xl font-bold text-purple-600">67</span>
+                  <span className="text-xl font-bold text-purple-600">{stats?.meetingsBooked || 0}</span>
                 </div>
                 <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
                   <div className="flex items-center">
                     <Handshake className="w-5 h-5 text-orange-600 mr-3" />
-                    <span className="font-medium">LOIs Submitted</span>
+                    <span className="font-medium">Deals Closed</span>
                   </div>
-                  <span className="text-xl font-bold text-orange-600">12</span>
+                  <span className="text-xl font-bold text-orange-600">{dealsClosed}</span>
                 </div>
               </div>
             </CardContent>
@@ -239,32 +321,40 @@ export default function DealSourcingAnalytics() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sourceData.map((row, index) => (
-                    <tr key={row.source} className="border-b last:border-b-0">
-                      <td className="py-3 px-4">
-                        <span className="font-medium text-gray-900">{row.source}</span>
-                      </td>
-                      <td className="py-3 px-4 text-right text-gray-600">{row.leads}</td>
-                      <td className="py-3 px-4 text-right text-gray-600">{row.deals}</td>
-                      <td className="py-3 px-4 text-right">
-                        <Badge variant={parseFloat(row.conversion) > 15 ? "default" : "secondary"}>
-                          {row.conversion}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full rounded-full ${
-                              parseFloat(row.conversion) > 20 ? 'bg-green-500' :
-                              parseFloat(row.conversion) > 10 ? 'bg-blue-500' :
-                              'bg-yellow-500'
-                            }`}
-                            style={{ width: `${Math.min(parseFloat(row.conversion) * 3, 100)}%` }}
-                          />
-                        </div>
+                  {sourceData.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-gray-500">
+                        No lead source data available yet. Start adding leads to see performance metrics.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    sourceData.map((row) => (
+                      <tr key={row.source} className="border-b last:border-b-0">
+                        <td className="py-3 px-4">
+                          <span className="font-medium text-gray-900">{row.source}</span>
+                        </td>
+                        <td className="py-3 px-4 text-right text-gray-600">{row.leads}</td>
+                        <td className="py-3 px-4 text-right text-gray-600">{row.deals}</td>
+                        <td className="py-3 px-4 text-right">
+                          <Badge variant={parseFloat(row.conversion) > 15 ? "default" : "secondary"}>
+                            {row.conversion}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full rounded-full ${
+                                parseFloat(row.conversion) > 20 ? 'bg-green-500' :
+                                parseFloat(row.conversion) > 10 ? 'bg-blue-500' :
+                                'bg-yellow-500'
+                              }`}
+                              style={{ width: `${Math.min(parseFloat(row.conversion) * 3, 100)}%` }}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
