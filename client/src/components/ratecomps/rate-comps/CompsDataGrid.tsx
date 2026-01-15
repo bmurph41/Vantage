@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, Fragment } from "react";
+import { useState, useRef, useCallback, useEffect, Fragment, useMemo } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -67,6 +67,17 @@ interface CompsDataGridProps {
 }
 
 
+interface MarinaGroup {
+  id: string;
+  marina: string;
+  city: string;
+  state: string;
+  rates: RateComp[];
+  primaryStorageType: string;
+  primaryRate: string | null;
+  primaryYear: number | null;
+}
+
 export default function CompsDataGrid({
   data,
   loading,
@@ -87,6 +98,48 @@ export default function CompsDataGrid({
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  const groupedData = useMemo((): MarinaGroup[] => {
+    const groups: Record<string, MarinaGroup> = {};
+    
+    data.forEach(comp => {
+      const key = comp.marina?.toLowerCase().trim() || comp.id;
+      
+      if (!groups[key]) {
+        const storageType = comp.storageType || 'unknown';
+        const storageLabel = STORAGE_TYPE_LABELS[storageType as keyof typeof STORAGE_TYPE_LABELS] || storageType;
+        
+        let rateText: string | null = null;
+        if (comp.rateAmount) {
+          const amount = Number(comp.rateAmount) / 100;
+          const unit = comp.rateUnit || 'flat';
+          const period = comp.ratePeriod || 'monthly';
+          rateText = `$${amount.toLocaleString('en-US', { maximumFractionDigits: 0 })}${getUnitSuffix(unit)}${getPeriodSuffix(period)}`;
+        }
+        
+        let year: number | null = null;
+        if (comp.effectiveDate) {
+          const parsed = new Date(comp.effectiveDate).getFullYear();
+          if (!isNaN(parsed)) year = parsed;
+        }
+        
+        groups[key] = {
+          id: key,
+          marina: comp.marina || '',
+          city: comp.city || '',
+          state: comp.state || '',
+          rates: [],
+          primaryStorageType: storageLabel,
+          primaryRate: rateText,
+          primaryYear: year,
+        };
+      }
+      
+      groups[key].rates.push(comp);
+    });
+    
+    return Object.values(groups);
+  }, [data]);
 
   const toggleRowExpanded = useCallback((compId: string) => {
     setExpandedRows(prev => {
@@ -111,28 +164,17 @@ export default function CompsDataGrid({
   ];
 
   const getRowHeight = useCallback((index: number) => {
-    const comp = data[index];
-    if (!comp) return 48;
-    if (expandedRows.has(comp.id)) {
-      const tiers = (comp as any).tiers || [];
-      const tiersByStorage: Record<string, any[]> = {};
-      tiers.forEach((tier: any) => {
-        const storageType = tier.storageType || 'unknown';
-        if (!tiersByStorage[storageType]) tiersByStorage[storageType] = [];
-        tiersByStorage[storageType].push(tier);
-      });
-      const storageTypeCount = Object.keys(tiersByStorage).length || 1;
-      const yearGroupsCount = Object.values(tiersByStorage).reduce((sum, group) => {
-        const years = new Set(group.map((t: any) => t.effectiveDate ? new Date(t.effectiveDate).getFullYear() : 'undated'));
-        return sum + years.size;
-      }, 0);
-      return 48 + 40 + (storageTypeCount * 32) + (yearGroupsCount * 28);
+    const group = groupedData[index];
+    if (!group) return 48;
+    if (expandedRows.has(group.id)) {
+      const rateCount = group.rates.length;
+      return 48 + 32 + (rateCount * 36);
     }
     return 48;
-  }, [data, expandedRows]);
+  }, [groupedData, expandedRows]);
 
   const rowVirtualizer = useVirtualizer({
-    count: data.length,
+    count: groupedData.length,
     getScrollElement: () => tableContainerRef.current,
     estimateSize: getRowHeight,
     overscan: 5,
@@ -541,7 +583,7 @@ export default function CompsDataGrid({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.length === 0 ? (
+              {groupedData.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={defaultColumns.length + 1} className="h-64">
                     <EmptyState
@@ -559,115 +601,157 @@ export default function CompsDataGrid({
                   )}
                   
                   {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                    const comp = data[virtualRow.index];
-                    const isExpanded = expandedRows.has(comp.id);
-                    const groupedRates = isExpanded ? buildGroupedRates(comp) : [];
+                    const group = groupedData[virtualRow.index];
+                    const isExpanded = expandedRows.has(group.id);
+                    const hasMultipleRates = group.rates.length > 1;
+                    const allRateIds = group.rates.map(r => r.id);
+                    const isGroupSelected = allRateIds.every(id => selectedIds.includes(id));
                     
                     return (
-                      <Fragment key={comp.id}>
+                      <Fragment key={group.id}>
                         <TableRow
                           className={`border-b border-border/50 hover:bg-muted/50 ${
-                            selectedIds.includes(comp.id) ? 'bg-primary/10' : ''
+                            isGroupSelected ? 'bg-primary/10' : ''
                           } ${isExpanded ? 'border-b-0' : ''}`}
-                          data-testid={`row-comp-${comp.id}`}
+                          data-testid={`row-marina-${group.id}`}
                         >
                           <TableCell className="w-[50px]">
                             <Checkbox
-                              checked={selectedIds.includes(comp.id)}
-                              onCheckedChange={(checked) => handleSelectRow(comp.id, checked as boolean)}
-                              data-testid={`checkbox-row-${comp.id}`}
+                              checked={isGroupSelected}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  onSelectionChange([...new Set([...selectedIds, ...allRateIds])]);
+                                } else {
+                                  onSelectionChange(selectedIds.filter(id => !allRateIds.includes(id)));
+                                }
+                              }}
+                              data-testid={`checkbox-row-${group.id}`}
                             />
                           </TableCell>
                           
-                          {defaultColumns.map((column) => (
-                            <TableCell 
-                              key={column.key}
-                              className={`whitespace-nowrap ${
-                                column.key === 'expand' ? 'text-center px-2' : 'text-left'
-                              }`}
-                              style={{ 
-                                width: `${column.width}px`,
-                                minWidth: `${column.width}px`,
-                              }}
-                              data-testid={`cell-${column.key}-${comp.id}`}
-                            >
-                              {column.key === 'actions' ? (
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                                      <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => onCompClick?.(comp)}>
-                                      <Eye className="h-4 w-4 mr-2" />
-                                      View
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => {
-                                      setEditingComp(comp);
-                                      setShowEditDialog(true);
-                                    }}>
-                                      <Edit className="h-4 w-4 mr-2" />
-                                      Edit
-                                    </DropdownMenuItem>
-                                    {canDelete && (
-                                      <DropdownMenuItem 
-                                        onClick={() => handleDelete(comp)}
-                                        className="text-destructive"
-                                      >
-                                        <Trash2 className="h-4 w-4 mr-2" />
-                                        Delete
-                                      </DropdownMenuItem>
-                                    )}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              ) : (
-                                formatCellValue(comp, column.key)
+                          <TableCell style={{ width: '260px', minWidth: '260px' }}>
+                            <div className="flex items-center gap-2">
+                              <span 
+                                className="truncate font-medium text-primary cursor-pointer hover:underline"
+                                onClick={() => onCompClick?.(group.rates[0])}
+                              >
+                                {group.marina || '—'}
+                              </span>
+                              {hasMultipleRates && (
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 shrink-0">
+                                  {group.rates.length}
+                                </Badge>
                               )}
-                            </TableCell>
-                          ))}
+                            </div>
+                          </TableCell>
+                          
+                          <TableCell style={{ width: '160px', minWidth: '160px' }}>
+                            <span className="truncate text-muted-foreground text-sm">
+                              {[group.city, group.state].filter(Boolean).join(', ') || '—'}
+                            </span>
+                          </TableCell>
+                          
+                          <TableCell style={{ width: '120px', minWidth: '120px' }}>
+                            <span className="text-sm">{group.primaryStorageType || '—'}</span>
+                          </TableCell>
+                          
+                          <TableCell style={{ width: '140px', minWidth: '140px' }}>
+                            <span className="font-medium text-sm">{group.primaryRate || '—'}</span>
+                          </TableCell>
+                          
+                          <TableCell style={{ width: '70px', minWidth: '70px' }}>
+                            <span className="text-sm">{group.primaryYear || '—'}</span>
+                          </TableCell>
+                          
+                          <TableCell style={{ width: '50px', minWidth: '50px' }} className="text-center px-2">
+                            {hasMultipleRates && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleRowExpanded(group.id);
+                                }}
+                                className="flex items-center justify-center w-6 h-6 rounded hover:bg-muted transition-colors"
+                                aria-expanded={isExpanded}
+                              >
+                                <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+                              </button>
+                            )}
+                          </TableCell>
+                          
+                          <TableCell style={{ width: '60px', minWidth: '60px' }}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => onCompClick?.(group.rates[0])}>
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => {
+                                  setEditingComp(group.rates[0]);
+                                  setShowEditDialog(true);
+                                }}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                {canDelete && (
+                                  <DropdownMenuItem 
+                                    onClick={() => handleDelete(group.rates[0])}
+                                    className="text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
                         </TableRow>
 
-                        {isExpanded && groupedRates.length > 0 && (
-                          <tr key={`${comp.id}-expanded`}>
+                        {isExpanded && hasMultipleRates && (
+                          <tr key={`${group.id}-expanded`}>
                             <td colSpan={defaultColumns.length + 1} className="bg-muted/30 border-b border-border/50 p-0">
-                              <div className="py-3 px-4 pl-14">
-                                <div className="space-y-3">
-                                  {groupedRates.map((storageGroup) => (
-                                    <div key={storageGroup.storageType} className="space-y-1.5">
-                                      <div className="flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-primary" />
-                                        <span className="text-sm font-medium">{storageGroup.label}</span>
+                              <div className="py-2 px-4 pl-14">
+                                <div className="space-y-1">
+                                  {group.rates.map((rate) => {
+                                    const storageType = rate.storageType || 'unknown';
+                                    const storageLabel = STORAGE_TYPE_LABELS[storageType as keyof typeof STORAGE_TYPE_LABELS] || storageType;
+                                    let rateText = '—';
+                                    if (rate.rateAmount) {
+                                      const amount = Number(rate.rateAmount) / 100;
+                                      const unit = rate.rateUnit || 'flat';
+                                      const period = rate.ratePeriod || 'monthly';
+                                      rateText = `$${amount.toLocaleString('en-US', { maximumFractionDigits: 0 })}${getUnitSuffix(unit)}${getPeriodSuffix(period)}`;
+                                    }
+                                    let year: number | string = '—';
+                                    if (rate.effectiveDate) {
+                                      const parsed = new Date(rate.effectiveDate).getFullYear();
+                                      if (!isNaN(parsed)) year = parsed;
+                                    }
+                                    
+                                    return (
+                                      <div 
+                                        key={rate.id}
+                                        className="flex items-center gap-4 py-1.5 px-2 rounded hover:bg-muted/50 text-sm"
+                                      >
+                                        <span className="w-24 text-muted-foreground">{storageLabel}</span>
+                                        <span className="w-28 font-medium">{rateText}</span>
+                                        <span className="w-16 text-muted-foreground">{year}</span>
+                                        <button
+                                          onClick={() => {
+                                            setEditingComp(rate);
+                                            setShowEditDialog(true);
+                                          }}
+                                          className="ml-auto text-xs text-primary hover:underline"
+                                        >
+                                          Edit
+                                        </button>
                                       </div>
-                                      <div className="pl-4 space-y-1">
-                                        {storageGroup.yearGroups.map((yearGroup) => (
-                                          <div 
-                                            key={yearGroup.year}
-                                            className="flex items-start gap-3 text-sm"
-                                          >
-                                            <span className="text-muted-foreground min-w-[60px]">
-                                              {yearGroup.year === 'undated' ? '—' : yearGroup.year}
-                                            </span>
-                                            <div className="flex flex-wrap gap-2">
-                                              {yearGroup.rates.map((rate, idx) => (
-                                                <span 
-                                                  key={idx}
-                                                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-background rounded border text-xs"
-                                                >
-                                                  <span className="font-medium">
-                                                    ${formatRateValue(rate.amount)}{getUnitSuffix(rate.unit)}{getPeriodSuffix(rate.period)}
-                                                  </span>
-                                                  {rate.electricIncluded && (
-                                                    <span className="text-muted-foreground text-[10px]">+elec</span>
-                                                  )}
-                                                </span>
-                                              ))}
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               </div>
                             </td>
