@@ -1,6 +1,14 @@
 import OpenAI from "openai";
+import { db } from "../db";
+import { eq, and, desc, sql } from "drizzle-orm";
+import { 
+  crmDeals, 
+  modelingProjects, 
+  projects,
+  crmProperties,
+  salesComps
+} from "@shared/schema";
 
-// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export interface AssistantContext {
@@ -10,6 +18,8 @@ export interface AssistantContext {
   entityName?: string;
   userId?: string;
   orgId?: string;
+  advisoryMode?: AdvisoryMode;
+  entityData?: Record<string, any>;
 }
 
 export interface ConversationMessage {
@@ -18,103 +28,411 @@ export interface ConversationMessage {
   timestamp: Date;
 }
 
+export type AdvisoryMode = 
+  | 'general'
+  | 'critique'
+  | 'risk_analysis'
+  | 'benchmark_comparison'
+  | 'options_analysis'
+  | 'decision_memo'
+  | 'stress_test'
+  | 'next_actions';
+
+const MARINA_INDUSTRY_KNOWLEDGE = `
+## Marina Industry Benchmarks & Market Intelligence
+
+### Cap Rate Benchmarks (2024-2025)
+- **Premium Coastal Marinas** (FL, CA, Northeast): 5.5% - 7.0%
+- **Secondary Markets**: 7.0% - 8.5%
+- **Tertiary/Inland Markets**: 8.5% - 10.0%
+- **Distressed Assets**: 10.0%+ (higher risk premium)
+- **Trophy/Irreplaceable Assets**: 4.5% - 5.5% (institutional demand)
+
+Cap rate factors:
+- Barrier-to-entry markets command 50-150bps compression
+- Fuel operations add 25-50bps to cap rates (operational risk)
+- Dry storage-heavy marinas trade 50-100bps wider than wet slip marinas
+- Long-term ground leases add 100-200bps vs fee simple
+
+### NOI Multiples
+- **Typical Range**: 10x - 18x trailing NOI
+- **Premium Assets**: 14x - 20x NOI
+- **Value-Add Opportunities**: 8x - 12x NOI (with upside)
+
+### Occupancy Benchmarks
+- **Strong Performance**: 90%+ annual occupancy
+- **Healthy Range**: 80-90% occupancy
+- **Concerning**: Below 75% occupancy (investigate causes)
+- **Seasonal Adjustment**: Winter occupancy typically 60-70% of peak
+
+### Revenue Per Slip Benchmarks
+- **Premium Markets** (Miami, San Diego, NYC): $15,000 - $35,000+ per slip/year
+- **Strong Secondary Markets**: $8,000 - $15,000 per slip/year
+- **Average Markets**: $4,000 - $8,000 per slip/year
+- **Tertiary/Rural**: $2,000 - $4,000 per slip/year
+
+### Revenue Mix Best Practices
+- **Slip Rentals**: 50-70% of revenue (stable, recurring)
+- **Fuel Sales**: 15-25% of revenue (volume-sensitive, ~5-8% margin)
+- **Service/Repair**: 10-20% of revenue (higher margin, 30-50%)
+- **Ship Store/Retail**: 5-10% of revenue (25-35% margin)
+- **Boat Sales (if applicable)**: Variable (2-5% margin)
+
+### Operating Expense Ratios
+- **Well-Run Marina**: 45-55% expense ratio
+- **Average Marina**: 55-65% expense ratio
+- **Inefficient/Distressed**: 65%+ expense ratio
+
+Key expense categories as % of revenue:
+- Payroll: 20-30%
+- Insurance: 5-10%
+- Utilities: 5-8%
+- Repairs/Maintenance: 5-10%
+- Property Taxes: 3-8%
+- Management Fee: 3-5%
+
+### Slip Rate Benchmarks (Monthly)
+- **Per Linear Foot Pricing**:
+  - Premium Coastal: $30 - $75/LF/month
+  - Secondary Markets: $15 - $30/LF/month
+  - Tertiary Markets: $8 - $15/LF/month
+- **Annual Rate Increases**: 3-5% typical, 5-8% in high-demand markets
+
+### Due Diligence Red Flags
+1. **Environmental**: Underground fuel tanks, historical spills, superfund proximity
+2. **Structural**: Seawall age (30+ years needs inspection), dock condition, dredging needs
+3. **Regulatory**: Submerged land lease terms, DEP permits, zoning restrictions
+4. **Operational**: High tenant turnover (>25%), fuel compliance issues, deferred maintenance
+5. **Financial**: Declining revenue trends, below-market rents (artificial occupancy), owner adjustments >15% of NOI
+6. **Legal**: Pending litigation, title issues, easement encumbrances
+7. **Market**: New competition, changing demographics, access challenges
+
+### Value-Add Opportunities
+1. **Rate Optimization**: Mark-to-market slip rates (typical 10-20% upside)
+2. **Occupancy Improvement**: Marketing, waitlist management, seasonal programs
+3. **Service Expansion**: Add repair services, retail, boat club programs
+4. **Fuel Margin Enhancement**: Volume discounts, pricing optimization
+5. **Operational Efficiency**: Reduce expense ratio by 5-10 points
+6. **Capital Improvements**: Dock upgrades, amenity additions, dry storage
+7. **Ancillary Revenue**: Parking, events, storage lockers, ice/bait sales
+
+### Exit Strategy Considerations
+- **Hold Period Benchmarks**: 5-7 years typical for value-add, 7-10 years for stabilized
+- **Target IRR Ranges**:
+  - Core/Stabilized: 8-12% levered IRR
+  - Value-Add: 15-20% levered IRR
+  - Opportunistic: 20%+ levered IRR
+- **Equity Multiple Targets**:
+  - Core: 1.5x - 1.8x
+  - Value-Add: 1.8x - 2.5x
+  - Opportunistic: 2.5x+
+
+### Financing Benchmarks
+- **LTV Ranges**: 50-65% for stabilized, 60-70% for value-add with recourse
+- **Interest Rates** (2024-2025): SOFR + 250-400bps for stabilized
+- **Debt Service Coverage**: Minimum 1.25x, prefer 1.40x+
+- **Amortization**: 25-30 years typical
+
+### Seasonal Considerations
+- **Peak Season**: May - September (Northeast), Year-round (Florida)
+- **Off-Season Discounts**: 20-40% winter rate reductions common
+- **Storage Revenue**: Critical for northern marinas, dry stack = 12-18 turns/year
+`;
+
+const ADVISORY_SYSTEM_PROMPTS: Record<AdvisoryMode, string> = {
+  general: `
+You are MarinaMatch AI Advisor, an expert marina acquisition consultant. Beyond platform guidance, you serve as a strategic sounding board for investment decisions.
+
+Your advisory capabilities:
+- Analyze deals and identify potential issues
+- Compare opportunities against market benchmarks
+- Suggest risk mitigation strategies
+- Help structure thinking on complex decisions
+- Provide institutional-quality investment perspectives
+
+When advising:
+- Ask clarifying questions to understand the full picture
+- Surface both opportunities and risks
+- Reference industry benchmarks and best practices
+- Be direct about concerns while remaining constructive
+- Think like a seasoned marina investor
+`,
+
+  critique: `
+You are in CRITIQUE MODE. Your job is to stress-test the user's assumptions and identify potential weaknesses.
+
+Structure your critique as:
+1. **What Could Go Wrong**: Identify 3-5 specific risks or weaknesses
+2. **Hidden Assumptions**: Point out assumptions that may not hold
+3. **Market Concerns**: Compare against industry norms and flag deviations
+4. **Operational Risks**: Identify execution challenges
+5. **Recommendations**: Suggest specific actions to address each concern
+
+Be direct but constructive. The goal is to help them avoid costly mistakes, not discourage them.
+`,
+
+  risk_analysis: `
+You are in RISK ANALYSIS MODE. Provide a comprehensive risk assessment.
+
+Structure your analysis as:
+1. **Risk Register**: List all identified risks with severity (High/Medium/Low)
+2. **Probability Assessment**: Likelihood of each risk materializing
+3. **Impact Analysis**: Financial and operational impact if risk occurs
+4. **Mitigation Strategies**: Specific actions to reduce each risk
+5. **Residual Risk**: What remains after mitigation
+
+Categories to consider:
+- Market/Economic risks
+- Operational/Execution risks
+- Environmental/Regulatory risks
+- Financial/Capital structure risks
+- Legal/Title risks
+- Competition risks
+`,
+
+  benchmark_comparison: `
+You are in BENCHMARK COMPARISON MODE. Compare the deal/asset against industry standards.
+
+Structure your comparison as:
+1. **Valuation Metrics**: Cap rate, price per slip, NOI multiple vs market
+2. **Operating Performance**: Occupancy, expense ratio, revenue per slip vs peers
+3. **Revenue Mix**: Compare to optimal marina revenue distribution
+4. **Rate Analysis**: Slip rates vs market, room for increases
+5. **Competitive Position**: How does this asset rank in its market?
+
+Flag significant deviations (>10-15% from benchmarks) and explain implications.
+`,
+
+  options_analysis: `
+You are in OPTIONS ANALYSIS MODE. Help the user think through alternatives.
+
+Structure your analysis as:
+1. **Options Identified**: List distinct strategic options (proceed, pass, renegotiate, etc.)
+2. **Pros & Cons**: For each option, list key advantages and disadvantages
+3. **Financial Impact**: Estimated impact on returns for each option
+4. **Risk Comparison**: How risk profile changes with each option
+5. **Recommendation**: Your suggested path with reasoning
+
+Be comprehensive but decisive. Provide a clear recommendation.
+`,
+
+  decision_memo: `
+You are in DECISION MEMO MODE. Generate a structured investment memo.
+
+Structure the memo as:
+1. **Executive Summary**: 2-3 sentence investment thesis
+2. **Deal Overview**: Key terms and structure
+3. **Investment Highlights**: Top 3-5 reasons to proceed
+4. **Key Risks & Mitigants**: Major concerns and how they're addressed
+5. **Financial Summary**: Key metrics, returns, sensitivity ranges
+6. **Recommendation**: Clear GO/NO-GO with confidence level
+7. **Next Steps**: Required actions if proceeding
+
+Write in a professional, institutional tone suitable for an investment committee.
+`,
+
+  stress_test: `
+You are in STRESS TEST MODE. Analyze how the investment performs under adverse scenarios.
+
+Test the following scenarios:
+1. **Recession Scenario**: 20% revenue decline, 30% occupancy drop
+2. **Rising Rates**: +200bps on debt, refinance risk
+3. **Competition**: New marina opens nearby, 15% rate pressure
+4. **Environmental**: Major repair need ($500K+), hurricane impact
+5. **Operational**: Key staff departure, fuel compliance issue
+
+For each scenario:
+- Estimate impact on NOI and cash flow
+- Assess whether investment still works
+- Identify breaking points
+- Suggest protective measures
+`,
+
+  next_actions: `
+You are in NEXT ACTIONS MODE. Provide clear, prioritized action items.
+
+Structure your recommendations as:
+1. **Immediate Actions** (This Week): Urgent items that can't wait
+2. **Short-Term Actions** (This Month): Important next steps
+3. **Due Diligence Items**: Specific questions to answer, documents to request
+4. **Stakeholder Actions**: Who to talk to, approvals needed
+5. **Decision Points**: Key go/no-go moments and their criteria
+
+Be specific and actionable. Include who should do what and by when.
+`
+};
+
 const PLATFORM_KNOWLEDGE = `
-You are MarinaMatch AI Assistant, a helpful guide for users navigating the MarinaMatch platform - an institutional-grade marina acquisition and management system.
+## MarinaMatch Platform Overview
 
-## Platform Overview
-MarinaMatch helps institutional investors and marina operators manage the entire lifecycle of marina acquisitions:
-- **CRM Module**: Track deals, leads, contacts, companies, and properties
-- **Due Diligence (DD)**: Manage DD projects with tasks, timelines, and document tracking
-- **Modeling Projects**: Financial modeling for marina valuations with exit strategies, cap rates, and scenario analysis
-- **Rent Roll**: Track marina tenants, leases, slip assignments, and occupancy
-- **Sales Comps**: Compare marina sales data for valuation analysis
-- **DockTalk**: Industry intelligence and news aggregation
-- **Virtual Data Room (VDR)**: Secure document storage with granular permissions
+MarinaMatch is an institutional-grade marina acquisition and management platform covering the full investment lifecycle:
 
-## Key Features by Module
+### Modules
+- **CRM**: Deals, leads, contacts, companies, properties - pipeline management
+- **Due Diligence**: DD projects with tasks, timelines, document tracking
+- **Modeling**: Financial modeling with exit strategies, scenarios, capital stack
+- **Rent Roll**: Tenant management, lease tracking, occupancy analytics
+- **Sales Comps**: Transaction comparables for valuation analysis
+- **DockTalk**: Industry news and intelligence aggregation
+- **VDR**: Secure document management with permissions
 
-### CRM
-- Deals progress through pipeline stages (Lead → Qualified → Proposal → Negotiation → Closed)
-- Track activities, meetings, and communications
-- Link contacts to companies and properties
-- Property status tracking and ownership history
-
-### Due Diligence
-- Create DD projects from deals
-- Track tasks with deadlines and assignees
-- Monitor DD period expiration
-- Manage document requests and deliverables
-
-### Modeling Projects
-- Multi-case scenario modeling (Base, Upside, Downside)
-- Exit strategy calculations with IRR and equity multiples
-- Addbacks system for EBITDA normalization
-- Capital stack builder for financing structures
-- Pro forma projections
-
-### Rent Roll
-- Tenant management with lease tracking
-- Slip assignments and storage locations
-- Occupancy analytics by contract type
-- Move-in/move-out event tracking
-
-### Analytics Dashboard
-- Unified cross-module analytics
-- Pipeline value tracking
-- DD completion rates
-- Trend visualization
-
-## Your Role
-- Help users understand features and navigate the platform
-- Explain financial concepts relevant to marina acquisitions
-- Guide users through workflows step-by-step
-- Answer questions about data they're viewing
-- Provide best practices for marina due diligence
-
-## Response Style
-- Be concise but thorough
-- Use bullet points for multi-step instructions
-- Explain marina-specific terminology when needed
-- If asked about specific data, explain where to find it
-- If you don't know something specific to their data, acknowledge it and explain what you can help with
+### Key Workflows
+1. **Deal Sourcing** (CRM): Track leads → qualify → create deal → move through pipeline
+2. **Due Diligence**: Create DD project from deal → assign tasks → track completion
+3. **Valuation** (Modeling): Build model → run scenarios → calculate exit strategies
+4. **Operations Analysis** (Rent Roll): Analyze tenant mix → occupancy → cash flows
+5. **Market Analysis** (Sales Comps): Compare to recent transactions → benchmark pricing
 `;
 
 const PAGE_CONTEXT_PROMPTS: Record<string, string> = {
   '/': 'User is on the Dashboard viewing key metrics and quick access items.',
-  '/crm': 'User is in the CRM module. They can manage deals, contacts, companies, and properties here.',
-  '/crm/deals': 'User is viewing the Deals list. Deals represent potential or active marina acquisitions.',
-  '/crm/contacts': 'User is viewing Contacts. These are people associated with deals, properties, or companies.',
-  '/crm/companies': 'User is viewing Companies. These are organizations involved in marina transactions.',
-  '/crm/properties': 'User is viewing Properties. These represent marina properties being tracked.',
-  '/crm/pipeline': 'User is viewing the Pipeline board. This shows deals organized by stage.',
-  '/dd': 'User is in the Due Diligence module for managing DD projects.',
+  '/crm': 'User is in the CRM module managing deals, contacts, companies, and properties.',
+  '/crm/deals': 'User is viewing Deals - potential or active marina acquisitions.',
+  '/crm/contacts': 'User is viewing Contacts associated with deals and properties.',
+  '/crm/companies': 'User is viewing Companies involved in transactions.',
+  '/crm/properties': 'User is viewing Properties representing marina assets.',
+  '/crm/pipeline': 'User is viewing the Pipeline board with deals by stage.',
+  '/dd': 'User is in Due Diligence managing DD projects.',
   '/dd/projects': 'User is viewing Due Diligence projects list.',
-  '/modeling': 'User is in the Modeling module for financial analysis and valuation.',
-  '/rent-roll': 'User is in the Rent Roll module for managing marina tenants and leases.',
-  '/sales-comps': 'User is in Sales Comps for marina transaction comparables analysis.',
+  '/modeling': 'User is in Modeling for financial analysis and valuation.',
+  '/rent-roll': 'User is in Rent Roll managing tenants and leases.',
+  '/sales-comps': 'User is in Sales Comps for transaction comparables.',
   '/docktalk': 'User is in DockTalk for industry news and intelligence.',
-  '/vdr': 'User is in the Virtual Data Room for secure document management.',
-  '/analytics': 'User is viewing Analytics for cross-module insights and trends.',
+  '/vdr': 'User is in the Virtual Data Room for document management.',
+  '/analytics': 'User is viewing Analytics for cross-module insights.',
 };
 
-function getContextPrompt(context: AssistantContext): string {
-  let prompt = '';
+async function getTenantContext(orgId: string, context: AssistantContext): Promise<string> {
+  if (!orgId) return '';
+  
+  try {
+    let tenantData = '';
+    
+    const [deals, models, ddProjects, properties, comps] = await Promise.all([
+      db.select({
+        id: crmDeals.id,
+        name: crmDeals.name,
+        stage: crmDeals.stage,
+        value: crmDeals.value,
+        status: crmDeals.status
+      })
+      .from(crmDeals)
+      .where(eq(crmDeals.ownerId, orgId))
+      .orderBy(desc(crmDeals.updatedAt))
+      .limit(10),
+      
+      db.select({
+        id: modelingProjects.id,
+        name: modelingProjects.name,
+        status: modelingProjects.status,
+        acquisitionPrice: modelingProjects.acquisitionPrice,
+        capRate: modelingProjects.capRate
+      })
+      .from(modelingProjects)
+      .where(eq(modelingProjects.orgId, orgId))
+      .orderBy(desc(modelingProjects.updatedAt))
+      .limit(10),
+      
+      db.select({
+        id: projects.id,
+        name: projects.name,
+        status: projects.status,
+        completedTasks: projects.completedTasks,
+        totalTasks: projects.totalTasks
+      })
+      .from(projects)
+      .where(eq(projects.orgId, orgId))
+      .orderBy(desc(projects.updatedAt))
+      .limit(10),
+      
+      db.select({
+        id: crmProperties.id,
+        name: crmProperties.name,
+        city: crmProperties.city,
+        state: crmProperties.state,
+        status: crmProperties.status
+      })
+      .from(crmProperties)
+      .where(eq(crmProperties.orgId, orgId))
+      .orderBy(desc(crmProperties.updatedAt))
+      .limit(10),
+      
+      db.select({
+        id: salesComps.id,
+        marinaName: salesComps.marinaName,
+        salePrice: salesComps.salePrice,
+        capRate: salesComps.capRate,
+        totalSlips: salesComps.totalSlips
+      })
+      .from(salesComps)
+      .where(eq(salesComps.orgId, orgId))
+      .orderBy(desc(salesComps.updatedAt))
+      .limit(10)
+    ]);
+
+    if (deals.length > 0) {
+      const activeDeals = deals.filter(d => d.status === 'active');
+      const totalValue = deals.reduce((sum, d) => sum + (Number(d.value) || 0), 0);
+      tenantData += `\n\n**Your Active Deals**: ${activeDeals.length} deals, $${(totalValue / 1000000).toFixed(1)}M total pipeline value`;
+      tenantData += `\nRecent deals: ${deals.slice(0, 3).map(d => `${d.name} (${d.stage})`).join(', ')}`;
+    }
+
+    if (models.length > 0) {
+      tenantData += `\n\n**Your Modeling Projects**: ${models.length} models`;
+      tenantData += `\nRecent models: ${models.slice(0, 3).map(m => `${m.name} ($${((Number(m.acquisitionPrice) || 0) / 1000000).toFixed(1)}M, ${m.capRate || 'N/A'}% cap)`).join(', ')}`;
+    }
+
+    if (ddProjects.length > 0) {
+      const inProgress = ddProjects.filter(p => p.status === 'in-progress');
+      tenantData += `\n\n**Your DD Projects**: ${ddProjects.length} total, ${inProgress.length} in progress`;
+    }
+
+    if (properties.length > 0) {
+      tenantData += `\n\n**Your Properties**: ${properties.length} properties tracked`;
+      tenantData += `\nLocations: ${[...new Set(properties.map(p => p.state).filter(Boolean))].join(', ')}`;
+    }
+
+    if (comps.length > 0) {
+      const avgCap = comps.filter(c => c.capRate).reduce((sum, c, _, arr) => sum + (Number(c.capRate) || 0) / arr.length, 0);
+      tenantData += `\n\n**Your Sales Comps**: ${comps.length} comparables, avg ${avgCap.toFixed(1)}% cap rate`;
+    }
+
+    return tenantData ? `\n\n## Your Organization's Data Context${tenantData}` : '';
+  } catch (error) {
+    console.error('[AI Assistant] Error fetching tenant context:', error);
+    return '';
+  }
+}
+
+function buildSystemPrompt(context: AssistantContext, tenantContext: string): string {
+  const mode = context.advisoryMode || 'general';
+  const advisoryPrompt = ADVISORY_SYSTEM_PROMPTS[mode];
+  
+  let systemPrompt = advisoryPrompt + '\n\n' + PLATFORM_KNOWLEDGE + '\n\n' + MARINA_INDUSTRY_KNOWLEDGE;
   
   const pageContext = Object.entries(PAGE_CONTEXT_PROMPTS).find(([path]) => 
     context.currentPage.startsWith(path) && path !== '/'
   );
   
   if (pageContext) {
-    prompt += `\n\nCurrent Context: ${pageContext[1]}`;
+    systemPrompt += `\n\n**Current Context**: ${pageContext[1]}`;
   } else if (context.currentPage === '/') {
-    prompt += `\n\nCurrent Context: ${PAGE_CONTEXT_PROMPTS['/']}`;
+    systemPrompt += `\n\n**Current Context**: ${PAGE_CONTEXT_PROMPTS['/']}`;
   }
   
   if (context.entityType && context.entityName) {
-    prompt += `\nViewing: ${context.entityType} - "${context.entityName}"`;
+    systemPrompt += `\n**Viewing**: ${context.entityType} - "${context.entityName}"`;
   }
   
-  return prompt;
+  if (context.entityData) {
+    systemPrompt += `\n\n**Entity Details**:\n${JSON.stringify(context.entityData, null, 2)}`;
+  }
+  
+  if (tenantContext) {
+    systemPrompt += tenantContext;
+  }
+  
+  return systemPrompt;
 }
 
 export async function chat(
@@ -122,7 +440,8 @@ export async function chat(
   context: AssistantContext,
   conversationHistory: ConversationMessage[] = []
 ): Promise<string> {
-  const systemPrompt = PLATFORM_KNOWLEDGE + getContextPrompt(context);
+  const tenantContext = await getTenantContext(context.orgId || '', context);
+  const systemPrompt = buildSystemPrompt(context, tenantContext);
   
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: 'system', content: systemPrompt },
@@ -137,7 +456,7 @@ export async function chat(
     const response = await openai.chat.completions.create({
       model: 'gpt-5',
       messages,
-      max_completion_tokens: 1024,
+      max_completion_tokens: 2048,
     });
     
     return response.choices[0].message.content || "I'm sorry, I couldn't generate a response. Please try again.";
@@ -152,7 +471,8 @@ export async function* chatStream(
   context: AssistantContext,
   conversationHistory: ConversationMessage[] = []
 ): AsyncGenerator<string> {
-  const systemPrompt = PLATFORM_KNOWLEDGE + getContextPrompt(context);
+  const tenantContext = await getTenantContext(context.orgId || '', context);
+  const systemPrompt = buildSystemPrompt(context, tenantContext);
   
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: 'system', content: systemPrompt },
@@ -167,7 +487,7 @@ export async function* chatStream(
     const stream = await openai.chat.completions.create({
       model: 'gpt-5',
       messages,
-      max_completion_tokens: 1024,
+      max_completion_tokens: 2048,
       stream: true,
     });
     
@@ -183,48 +503,61 @@ export async function* chatStream(
   }
 }
 
-export function getSuggestedQuestions(currentPage: string): string[] {
-  const baseQuestions = [
-    "What can I do in this section?",
-    "How do I get started?",
+export function getSuggestedQuestions(currentPage: string, advisoryMode?: AdvisoryMode): string[] {
+  const advisoryQuestions = [
+    "What are the biggest risks with this deal?",
+    "How does this compare to market benchmarks?",
+    "What should I be asking that I'm not?",
   ];
-  
+
   const pageQuestions: Record<string, string[]> = {
     '/': [
-      "What metrics should I focus on?",
-      "How do I create a new deal?",
-      "Explain the pipeline stages",
+      "Review my pipeline - any concerns?",
+      "Which deals should I prioritize?",
+      "What metrics indicate a good marina investment?",
+      "How is my portfolio performing vs benchmarks?",
     ],
     '/crm': [
-      "How do I add a new contact?",
-      "What's the difference between deals and leads?",
-      "How do I link a contact to a property?",
+      "What makes a marina deal worth pursuing?",
+      "Help me qualify this lead",
+      "What should I look for in initial screening?",
     ],
     '/crm/deals': [
-      "How do I move a deal to the next stage?",
-      "What fields are required for a deal?",
-      "How do I convert a deal to a DD project?",
+      "Critique this deal for me",
+      "What are typical deal breakers?",
+      "Is this pricing in line with the market?",
+      "What questions should I ask the seller?",
+    ],
+    '/crm/pipeline': [
+      "Which deals have the highest risk?",
+      "Are any deals stalled that need attention?",
+      "Help me prioritize my pipeline",
     ],
     '/modeling': [
-      "How do I create a valuation model?",
-      "What are exit strategies?",
-      "Explain cap rate calculation",
-      "What are addbacks in EBITDA?",
+      "Are my assumptions reasonable?",
+      "Stress test this model for me",
+      "What cap rate should I use?",
+      "Is my exit strategy realistic?",
+      "What's driving the returns?",
+      "Compare my model to market benchmarks",
     ],
     '/dd': [
-      "How do I track DD tasks?",
-      "What's a typical DD timeline?",
-      "How do I manage document requests?",
+      "What should my DD checklist include?",
+      "What are common DD red flags?",
+      "Am I missing any critical DD items?",
+      "What's a reasonable DD timeline?",
     ],
     '/rent-roll': [
-      "How do I add a new tenant?",
-      "What's the difference between annual and seasonal leases?",
-      "How do I track occupancy?",
+      "Is this occupancy healthy?",
+      "Are the rates at market?",
+      "What's the tenant concentration risk?",
+      "How does seasonality affect this asset?",
     ],
     '/sales-comps': [
-      "How do I import sales comparables?",
-      "What metrics matter for marina valuations?",
-      "How do I filter comps by region?",
+      "How does this compare to recent transactions?",
+      "What's the market cap rate trend?",
+      "Is the seller's pricing justified?",
+      "What adjustments should I make to comps?",
     ],
   };
   
@@ -233,8 +566,63 @@ export function getSuggestedQuestions(currentPage: string): string[] {
   ) || (currentPage === '/' ? '/' : null);
   
   if (matchedPath && pageQuestions[matchedPath]) {
-    return [...pageQuestions[matchedPath], ...baseQuestions].slice(0, 5);
+    return [...pageQuestions[matchedPath], ...advisoryQuestions].slice(0, 6);
   }
   
-  return baseQuestions;
+  return advisoryQuestions;
+}
+
+export function getAdvisoryModes(): { id: AdvisoryMode; name: string; description: string; icon: string }[] {
+  return [
+    { id: 'general', name: 'General', description: 'General questions and guidance', icon: 'MessageCircle' },
+    { id: 'critique', name: 'Critique', description: 'Challenge my assumptions', icon: 'AlertTriangle' },
+    { id: 'risk_analysis', name: 'Risk Analysis', description: 'Comprehensive risk assessment', icon: 'Shield' },
+    { id: 'benchmark_comparison', name: 'Benchmark', description: 'Compare to market standards', icon: 'BarChart' },
+    { id: 'options_analysis', name: 'Options', description: 'Analyze alternatives', icon: 'GitBranch' },
+    { id: 'decision_memo', name: 'Decision Memo', description: 'Generate investment memo', icon: 'FileText' },
+    { id: 'stress_test', name: 'Stress Test', description: 'Test adverse scenarios', icon: 'TrendingDown' },
+    { id: 'next_actions', name: 'Next Actions', description: 'Prioritized action items', icon: 'CheckSquare' },
+  ];
+}
+
+export interface AssistantFeedback {
+  id: string;
+  userId: string;
+  orgId: string;
+  messageId: string;
+  rating: 'positive' | 'negative';
+  advisoryMode: AdvisoryMode;
+  page: string;
+  timestamp: Date;
+}
+
+const feedbackStore: AssistantFeedback[] = [];
+
+export function recordFeedback(feedback: Omit<AssistantFeedback, 'id' | 'timestamp'>): AssistantFeedback {
+  const entry: AssistantFeedback = {
+    ...feedback,
+    id: `feedback-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    timestamp: new Date()
+  };
+  feedbackStore.push(entry);
+  console.log(`[AI Assistant] Feedback recorded: ${entry.rating} for mode=${entry.advisoryMode} page=${entry.page}`);
+  return entry;
+}
+
+export function getFeedbackStats(orgId: string): { positive: number; negative: number; byMode: Record<string, { positive: number; negative: number }> } {
+  const orgFeedback = feedbackStore.filter(f => f.orgId === orgId);
+  const stats = {
+    positive: orgFeedback.filter(f => f.rating === 'positive').length,
+    negative: orgFeedback.filter(f => f.rating === 'negative').length,
+    byMode: {} as Record<string, { positive: number; negative: number }>
+  };
+  
+  for (const f of orgFeedback) {
+    if (!stats.byMode[f.advisoryMode]) {
+      stats.byMode[f.advisoryMode] = { positive: 0, negative: 0 };
+    }
+    stats.byMode[f.advisoryMode][f.rating]++;
+  }
+  
+  return stats;
 }

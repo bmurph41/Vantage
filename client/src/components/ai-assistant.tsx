@@ -1,15 +1,43 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useLocation } from 'wouter';
-import { MessageCircle, X, Send, Loader2, Sparkles } from 'lucide-react';
+import { 
+  MessageCircle, 
+  X, 
+  Send, 
+  Loader2, 
+  Sparkles,
+  AlertTriangle,
+  Shield,
+  BarChart3,
+  GitBranch,
+  FileText,
+  TrendingDown,
+  CheckSquare,
+  ChevronDown,
+  RotateCcw,
+  ThumbsUp,
+  ThumbsDown
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from '@/components/ui/badge';
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  advisoryMode?: AdvisoryMode;
+  feedback?: 'helpful' | 'not_helpful';
 }
 
 interface AssistantContext {
@@ -17,7 +45,50 @@ interface AssistantContext {
   entityType?: string;
   entityId?: string;
   entityName?: string;
+  advisoryMode?: AdvisoryMode;
 }
+
+type AdvisoryMode = 
+  | 'general'
+  | 'critique'
+  | 'risk_analysis'
+  | 'benchmark_comparison'
+  | 'options_analysis'
+  | 'decision_memo'
+  | 'stress_test'
+  | 'next_actions';
+
+interface AdvisoryModeInfo {
+  id: AdvisoryMode;
+  name: string;
+  description: string;
+  icon: string;
+}
+
+const ADVISORY_MODES: AdvisoryModeInfo[] = [
+  { id: 'general', name: 'General', description: 'General questions and guidance', icon: 'MessageCircle' },
+  { id: 'critique', name: 'Critique', description: 'Challenge my assumptions', icon: 'AlertTriangle' },
+  { id: 'risk_analysis', name: 'Risk Analysis', description: 'Comprehensive risk assessment', icon: 'Shield' },
+  { id: 'benchmark_comparison', name: 'Benchmark', description: 'Compare to market standards', icon: 'BarChart' },
+  { id: 'options_analysis', name: 'Options', description: 'Analyze alternatives', icon: 'GitBranch' },
+  { id: 'decision_memo', name: 'Decision Memo', description: 'Generate investment memo', icon: 'FileText' },
+  { id: 'stress_test', name: 'Stress Test', description: 'Test adverse scenarios', icon: 'TrendingDown' },
+  { id: 'next_actions', name: 'Next Actions', description: 'Prioritized action items', icon: 'CheckSquare' },
+];
+
+const getModeIcon = (iconName: string) => {
+  const icons: Record<string, any> = {
+    MessageCircle,
+    AlertTriangle,
+    Shield,
+    BarChart: BarChart3,
+    GitBranch,
+    FileText,
+    TrendingDown,
+    CheckSquare,
+  };
+  return icons[iconName] || MessageCircle;
+};
 
 export function AIAssistant() {
   const [location] = useLocation();
@@ -27,6 +98,7 @@ export function AIAssistant() {
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [streamingContent, setStreamingContent] = useState('');
+  const [advisoryMode, setAdvisoryMode] = useState<AdvisoryMode>('general');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesRef = useRef<Message[]>([]);
@@ -36,14 +108,15 @@ export function AIAssistant() {
   const getContext = useCallback((): AssistantContext => {
     return {
       currentPage: location,
+      advisoryMode,
     };
-  }, [location]);
+  }, [location, advisoryMode]);
 
   useEffect(() => {
     if (isOpen) {
       fetchSuggestions();
     }
-  }, [location, isOpen]);
+  }, [location, isOpen, advisoryMode]);
 
   useEffect(() => {
     if (scrollContainerRef.current) {
@@ -59,7 +132,7 @@ export function AIAssistant() {
 
   const fetchSuggestions = async () => {
     try {
-      const response = await fetch(`/api/ai-assistant/suggestions?page=${encodeURIComponent(location)}`);
+      const response = await fetch(`/api/ai-assistant/suggestions?page=${encodeURIComponent(location)}&mode=${advisoryMode}`);
       if (response.ok) {
         const data = await response.json();
         setSuggestions(data.suggestions || []);
@@ -77,6 +150,7 @@ export function AIAssistant() {
       role: 'user',
       content: content.trim(),
       timestamp: new Date(),
+      advisoryMode,
     };
 
     const currentMessages = [...messagesRef.current, userMessage];
@@ -97,6 +171,7 @@ export function AIAssistant() {
             content: m.content,
             timestamp: m.timestamp,
           })),
+          advisoryMode,
         }),
       });
 
@@ -138,6 +213,7 @@ export function AIAssistant() {
                     role: 'assistant',
                     content: accumulatedContent,
                     timestamp: new Date(),
+                    advisoryMode,
                   };
                   setMessages(prev => [...prev, assistantMessage]);
                   setStreamingContent('');
@@ -171,6 +247,7 @@ export function AIAssistant() {
           role: 'assistant',
           content: accumulatedContent,
           timestamp: new Date(),
+          advisoryMode,
         };
         setMessages(prev => {
           const lastMsg = prev[prev.length - 1];
@@ -209,6 +286,30 @@ export function AIAssistant() {
     setStreamingContent('');
   };
 
+  const handleFeedback = async (messageId: string, feedback: 'helpful' | 'not_helpful') => {
+    setMessages(prev => prev.map(m => 
+      m.id === messageId ? { ...m, feedback } : m
+    ));
+    
+    try {
+      await fetch('/api/ai-assistant/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messageId,
+          rating: feedback === 'helpful' ? 'positive' : 'negative',
+          advisoryMode,
+          page: currentPage,
+        }),
+      });
+    } catch (error) {
+      console.error('[AI Assistant] Failed to record feedback:', error);
+    }
+  };
+
+  const currentMode = ADVISORY_MODES.find(m => m.id === advisoryMode) || ADVISORY_MODES[0];
+  const ModeIcon = getModeIcon(currentMode.icon);
+
   return (
     <>
       <Button
@@ -220,79 +321,160 @@ export function AIAssistant() {
           isOpen && "hidden"
         )}
       >
-        <MessageCircle className="h-6 w-6 text-white" />
+        <Sparkles className="h-6 w-6 text-white" />
       </Button>
 
       {isOpen && (
-        <div className="fixed bottom-6 right-6 w-96 h-[600px] max-h-[80vh] bg-background border rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4 flex items-center justify-between">
+        <div className="fixed bottom-6 right-6 w-[420px] h-[650px] max-h-[85vh] bg-background border rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-white" />
-              <h3 className="font-semibold text-white">MarinaMatch AI</h3>
+              <h3 className="font-semibold text-white">MarinaMatch Advisor</h3>
             </div>
             <div className="flex items-center gap-1">
               {messages.length > 0 && (
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   onClick={clearConversation}
-                  className="text-white/80 hover:text-white hover:bg-white/10 text-xs"
+                  className="text-white/80 hover:text-white hover:bg-white/10 h-8 w-8"
+                  title="Clear conversation"
                 >
-                  Clear
+                  <RotateCcw className="h-4 w-4" />
                 </Button>
               )}
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsOpen(false)}
-                className="text-white hover:bg-white/10"
+                className="text-white hover:bg-white/10 h-8 w-8"
               >
                 <X className="h-5 w-5" />
               </Button>
             </div>
           </div>
 
+          <div className="px-3 py-2 border-b bg-muted/30">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="w-full justify-between h-9">
+                  <div className="flex items-center gap-2">
+                    <ModeIcon className="h-4 w-4" />
+                    <span className="font-medium">{currentMode.name}</span>
+                    <span className="text-xs text-muted-foreground hidden sm:inline">- {currentMode.description}</span>
+                  </div>
+                  <ChevronDown className="h-4 w-4 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-80">
+                <DropdownMenuLabel>Advisory Mode</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {ADVISORY_MODES.map((mode) => {
+                  const Icon = getModeIcon(mode.icon);
+                  return (
+                    <DropdownMenuItem
+                      key={mode.id}
+                      onClick={() => setAdvisoryMode(mode.id)}
+                      className={cn(
+                        "flex items-center gap-3 py-2",
+                        advisoryMode === mode.id && "bg-accent"
+                      )}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      <div className="flex flex-col">
+                        <span className="font-medium">{mode.name}</span>
+                        <span className="text-xs text-muted-foreground">{mode.description}</span>
+                      </div>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
           <div 
             ref={scrollContainerRef}
-            className="flex-1 overflow-y-auto p-4"
+            className="flex-1 overflow-y-auto p-3"
           >
             {messages.length === 0 && !streamingContent && (
               <div className="space-y-4">
-                <div className="text-center text-muted-foreground py-4">
+                <div className="text-center text-muted-foreground py-3">
                   <Sparkles className="h-8 w-8 mx-auto mb-2 text-blue-500" />
-                  <p className="text-sm">Hi! I'm your MarinaMatch assistant.</p>
-                  <p className="text-xs mt-1">Ask me anything about the platform.</p>
+                  <p className="text-sm font-medium">Your Marina Investment Advisor</p>
+                  <p className="text-xs mt-1">I can analyze deals, compare benchmarks, identify risks, and help you make better investment decisions.</p>
                 </div>
                 
                 {suggestions.length > 0 && (
                   <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground font-medium">Suggested questions:</p>
+                    <p className="text-xs text-muted-foreground font-medium">Try asking:</p>
                     {suggestions.map((suggestion, idx) => (
                       <button
                         key={idx}
                         onClick={() => handleSuggestionClick(suggestion)}
-                        className="w-full text-left text-sm p-2 rounded-lg bg-muted hover:bg-muted/80 transition-colors"
+                        className="w-full text-left text-sm p-2.5 rounded-lg bg-muted hover:bg-muted/80 transition-colors border border-transparent hover:border-border"
                       >
                         {suggestion}
                       </button>
                     ))}
                   </div>
                 )}
+
+                <div className="pt-2 border-t">
+                  <p className="text-xs text-muted-foreground mb-2">Quick Actions:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { mode: 'critique' as AdvisoryMode, label: 'Critique Deal' },
+                      { mode: 'risk_analysis' as AdvisoryMode, label: 'Risk Analysis' },
+                      { mode: 'benchmark_comparison' as AdvisoryMode, label: 'Compare Benchmarks' },
+                      { mode: 'stress_test' as AdvisoryMode, label: 'Stress Test' },
+                    ].map(({ mode, label }) => (
+                      <Badge
+                        key={mode}
+                        variant="secondary"
+                        className="cursor-pointer hover:bg-secondary/80 text-xs"
+                        onClick={() => {
+                          setAdvisoryMode(mode);
+                          setInputValue(`Help me with a ${label.toLowerCase()}`);
+                          inputRef.current?.focus();
+                        }}
+                      >
+                        {label}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               {messages.map((message) => (
                 <div
                   key={message.id}
                   className={cn(
-                    "flex",
-                    message.role === 'user' ? "justify-end" : "justify-start"
+                    "flex flex-col",
+                    message.role === 'user' ? "items-end" : "items-start"
                   )}
                 >
+                  {message.role === 'assistant' && message.advisoryMode && message.advisoryMode !== 'general' && (
+                    <div className="flex items-center gap-1 mb-1">
+                      {(() => {
+                        const mode = ADVISORY_MODES.find(m => m.id === message.advisoryMode);
+                        if (mode) {
+                          const Icon = getModeIcon(mode.icon);
+                          return (
+                            <Badge variant="outline" className="text-xs py-0 h-5">
+                              <Icon className="h-3 w-3 mr-1" />
+                              {mode.name}
+                            </Badge>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
+                  )}
                   <div
                     className={cn(
-                      "max-w-[85%] rounded-lg px-3 py-2 text-sm",
+                      "max-w-[90%] rounded-lg px-3 py-2 text-sm",
                       message.role === 'user'
                         ? "bg-blue-600 text-white"
                         : "bg-muted"
@@ -300,12 +482,43 @@ export function AIAssistant() {
                   >
                     <div className="whitespace-pre-wrap">{message.content}</div>
                   </div>
+                  {message.role === 'assistant' && !message.feedback && (
+                    <div className="flex items-center gap-1 mt-1">
+                      <button
+                        onClick={() => handleFeedback(message.id, 'helpful')}
+                        className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                        title="Helpful"
+                      >
+                        <ThumbsUp className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={() => handleFeedback(message.id, 'not_helpful')}
+                        className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                        title="Not helpful"
+                      >
+                        <ThumbsDown className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
+                  {message.feedback && (
+                    <span className="text-xs text-muted-foreground mt-1">
+                      {message.feedback === 'helpful' ? 'Thanks for the feedback!' : 'We\'ll improve this.'}
+                    </span>
+                  )}
                 </div>
               ))}
 
               {streamingContent && (
-                <div className="flex justify-start">
-                  <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm bg-muted">
+                <div className="flex flex-col items-start">
+                  {advisoryMode !== 'general' && (
+                    <div className="flex items-center gap-1 mb-1">
+                      <Badge variant="outline" className="text-xs py-0 h-5">
+                        <ModeIcon className="h-3 w-3 mr-1" />
+                        {currentMode.name}
+                      </Badge>
+                    </div>
+                  )}
+                  <div className="max-w-[90%] rounded-lg px-3 py-2 text-sm bg-muted">
                     <div className="whitespace-pre-wrap">{streamingContent}</div>
                   </div>
                 </div>
@@ -321,13 +534,13 @@ export function AIAssistant() {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-4 border-t bg-background">
+          <form onSubmit={handleSubmit} className="p-3 border-t bg-background">
             <div className="flex gap-2">
               <Input
                 ref={inputRef}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Ask me anything..."
+                placeholder={advisoryMode === 'general' ? "Ask me anything..." : `Ask for ${currentMode.name.toLowerCase()}...`}
                 disabled={isLoading}
                 className="flex-1"
               />
@@ -341,7 +554,7 @@ export function AIAssistant() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground text-center mt-2">
-              Powered by AI to help you navigate MarinaMatch
+              Your AI advisor for marina investments
             </p>
           </form>
         </div>

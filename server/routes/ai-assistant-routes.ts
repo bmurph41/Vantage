@@ -1,5 +1,15 @@
 import { Router, Request, Response } from 'express';
-import { chat, chatStream, getSuggestedQuestions, ConversationMessage, AssistantContext } from '../services/ai-assistant-service';
+import { 
+  chat, 
+  chatStream, 
+  getSuggestedQuestions, 
+  getAdvisoryModes,
+  recordFeedback,
+  getFeedbackStats,
+  ConversationMessage, 
+  AssistantContext,
+  AdvisoryMode 
+} from '../services/ai-assistant-service';
 
 const router = Router();
 
@@ -7,11 +17,12 @@ interface ChatRequest {
   message: string;
   context: AssistantContext;
   conversationHistory?: ConversationMessage[];
+  advisoryMode?: AdvisoryMode;
 }
 
 router.post('/chat', async (req: Request, res: Response) => {
   try {
-    const { message, context, conversationHistory = [] } = req.body as ChatRequest;
+    const { message, context, conversationHistory = [], advisoryMode } = req.body as ChatRequest;
     
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ error: 'Message is required' });
@@ -21,19 +32,21 @@ router.post('/chat', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Context with currentPage is required' });
     }
     
-    const userId = (req as any).userId || 'user-1';
-    const orgId = (req as any).tenantId || 'org-1';
+    const userId = (req as any).user?.id || 'user-1';
+    const orgId = (req as any).user?.orgId || 'org-1';
     
     const enrichedContext: AssistantContext = {
       ...context,
       userId,
       orgId,
+      advisoryMode: advisoryMode || context.advisoryMode || 'general',
     };
     
     const response = await chat(message, enrichedContext, conversationHistory);
     
     res.json({
       response,
+      advisoryMode: enrichedContext.advisoryMode,
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
@@ -47,7 +60,7 @@ router.post('/chat', async (req: Request, res: Response) => {
 
 router.post('/chat/stream', async (req: Request, res: Response) => {
   try {
-    const { message, context, conversationHistory = [] } = req.body as ChatRequest;
+    const { message, context, conversationHistory = [], advisoryMode } = req.body as ChatRequest;
     
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ error: 'Message is required' });
@@ -57,13 +70,14 @@ router.post('/chat/stream', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Context with currentPage is required' });
     }
     
-    const userId = (req as any).userId || 'user-1';
-    const orgId = (req as any).tenantId || 'org-1';
+    const userId = (req as any).user?.id || 'user-1';
+    const orgId = (req as any).user?.orgId || 'org-1';
     
     const enrichedContext: AssistantContext = {
       ...context,
       userId,
       orgId,
+      advisoryMode: advisoryMode || context.advisoryMode || 'general',
     };
     
     res.setHeader('Content-Type', 'text/event-stream');
@@ -92,9 +106,15 @@ router.post('/chat/stream', async (req: Request, res: Response) => {
 
 router.get('/suggestions', (req: Request, res: Response) => {
   const currentPage = (req.query.page as string) || '/';
-  const suggestions = getSuggestedQuestions(currentPage);
+  const advisoryMode = (req.query.mode as AdvisoryMode) || undefined;
+  const suggestions = getSuggestedQuestions(currentPage, advisoryMode);
   
   res.json({ suggestions });
+});
+
+router.get('/modes', (_req: Request, res: Response) => {
+  const modes = getAdvisoryModes();
+  res.json({ modes });
 });
 
 router.get('/health', (_req: Request, res: Response) => {
@@ -106,6 +126,48 @@ router.get('/health', (_req: Request, res: Response) => {
       ? 'AI Assistant is ready' 
       : 'OpenAI API key not configured',
   });
+});
+
+router.post('/feedback', (req: Request, res: Response) => {
+  try {
+    const { messageId, rating, advisoryMode, page } = req.body;
+    
+    if (!messageId || !rating) {
+      return res.status(400).json({ error: 'messageId and rating are required' });
+    }
+    
+    if (!['positive', 'negative'].includes(rating)) {
+      return res.status(400).json({ error: 'rating must be positive or negative' });
+    }
+    
+    const userId = (req as any).user?.id || 'user-1';
+    const orgId = (req as any).user?.orgId || 'org-1';
+    
+    const feedback = recordFeedback({
+      userId,
+      orgId,
+      messageId,
+      rating,
+      advisoryMode: advisoryMode || 'general',
+      page: page || '/',
+    });
+    
+    res.json({ success: true, feedbackId: feedback.id });
+  } catch (error: any) {
+    console.error('[AI Assistant] Feedback error:', error);
+    res.status(500).json({ error: 'Failed to record feedback' });
+  }
+});
+
+router.get('/feedback/stats', (req: Request, res: Response) => {
+  try {
+    const orgId = (req as any).user?.orgId || 'org-1';
+    const stats = getFeedbackStats(orgId);
+    res.json(stats);
+  } catch (error: any) {
+    console.error('[AI Assistant] Stats error:', error);
+    res.status(500).json({ error: 'Failed to get feedback stats' });
+  }
 });
 
 export default router;
