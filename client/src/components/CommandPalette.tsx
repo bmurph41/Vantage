@@ -149,10 +149,21 @@ export function CommandPalette() {
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInputField = target.tagName === 'INPUT' || 
+                          target.tagName === 'TEXTAREA' || 
+                          target.isContentEditable;
+      
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setOpen((open) => !open);
       }
+      
+      if (e.key === "/" && !isInputField) {
+        e.preventDefault();
+        setOpen(true);
+      }
+      
       if (e.key === "Escape") {
         setOpen(false);
       }
