@@ -49,6 +49,7 @@ import marinalyticsRoutes from "./routes/marinalytics-routes";
 import aiAssistantRoutes from "./routes/ai-assistant-routes";
 import executiveDashboardRoutes from "./routes/executive-dashboard-routes";
 import marinaCompRoutes from "./routes/marina-comp-routes";
+import valuationTimelineRoutes from "./routes/valuation-timeline-routes";
 import { userSessions, insertProspectingEntrySchema, users } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { rentRollService } from "./services/rent-roll-service";
@@ -415,6 +416,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/analytics", authenticateUser, analyticsRoutes);
   app.use("/api/ai-assistant", authenticateUser, aiAssistantRoutes);
   app.use("/api/marina-comps", authenticateUser, enforceTenant, marinaCompRoutes);
+  app.use("/api/valuations", authenticateUser, enforceTenant, valuationTimelineRoutes);
 
   // Dockit Marina Operations Module - mounted at /dockit/api
   try {

@@ -10087,6 +10087,98 @@ export const modelingProjects = pgTable('modeling_projects', {
   orgOutcomeIdx: index('modeling_projects_org_outcome_idx').on(table.orgId, table.dealOutcome),
 }));
 
+// Valuation Snapshots - Point-in-time valuation captures for historical tracking
+export const valuationSnapshotTriggerEnum = pgEnum("valuation_snapshot_trigger", [
+  "manual",           // User manually triggered
+  "scheduled",        // Auto-generated on schedule (daily/weekly)
+  "data_change",      // Triggered by operations data change
+  "comp_update",      // Triggered by comp set update
+  "model_save"        // Triggered when model is saved
+]);
+
+export const valuationSnapshots = pgTable('valuation_snapshots', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  
+  // Snapshot timing
+  snapshotDate: timestamp('snapshot_date').notNull(), // Point-in-time this valuation represents
+  dataAsOfDate: date('data_as_of_date').notNull(), // Latest operations data included
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  createdBy: varchar('created_by').references(() => users.id),
+  
+  // Trigger info
+  trigger: valuationSnapshotTriggerEnum('trigger').notNull().default('manual'),
+  triggerNote: text('trigger_note'), // Optional description of why snapshot was taken
+  
+  // Core valuation metrics
+  purchasePrice: decimal('purchase_price', { precision: 18, scale: 2 }),
+  indicatedValue: decimal('indicated_value', { precision: 18, scale: 2 }),
+  capRate: decimal('cap_rate', { precision: 6, scale: 4 }), // e.g., 0.0725 = 7.25%
+  
+  // Income metrics
+  grossRevenue: decimal('gross_revenue', { precision: 18, scale: 2 }),
+  effectiveGrossIncome: decimal('effective_gross_income', { precision: 18, scale: 2 }),
+  operatingExpenses: decimal('operating_expenses', { precision: 18, scale: 2 }),
+  noi: decimal('noi', { precision: 18, scale: 2 }),
+  ebitda: decimal('ebitda', { precision: 18, scale: 2 }),
+  
+  // Revenue breakdown
+  rentRollRevenue: decimal('rent_roll_revenue', { precision: 18, scale: 2 }),
+  fuelRevenue: decimal('fuel_revenue', { precision: 18, scale: 2 }),
+  fuelCogs: decimal('fuel_cogs', { precision: 18, scale: 2 }),
+  fuelMargin: decimal('fuel_margin', { precision: 18, scale: 2 }),
+  shipStoreRevenue: decimal('ship_store_revenue', { precision: 18, scale: 2 }),
+  shipStoreCogs: decimal('ship_store_cogs', { precision: 18, scale: 2 }),
+  shipStoreMargin: decimal('ship_store_margin', { precision: 18, scale: 2 }),
+  otherRevenue: decimal('other_revenue', { precision: 18, scale: 2 }),
+  
+  // Investment returns
+  irr: decimal('irr', { precision: 8, scale: 4 }), // e.g., 0.1525 = 15.25%
+  equityMultiple: decimal('equity_multiple', { precision: 6, scale: 3 }), // e.g., 2.450
+  cashOnCash: decimal('cash_on_cash', { precision: 8, scale: 4 }),
+  
+  // Comp references (what comps were used for this valuation)
+  rateCompSetId: varchar('rate_comp_set_id').references(() => compSets.id, { onDelete: 'set null' }),
+  salesCompSetId: varchar('sales_comp_set_id').references(() => compSets.id, { onDelete: 'set null' }),
+  rateIndication: decimal('rate_indication', { precision: 18, scale: 2 }), // Indicated rate from comp set
+  salesIndication: decimal('sales_indication', { precision: 18, scale: 2 }), // Indicated value from comp set
+  
+  // Full data snapshot (for reconstruction)
+  inputData: jsonb('input_data').default(sql`'{}'`), // Complete input parameters
+  computedData: jsonb('computed_data').default(sql`'{}'`), // Full computed results
+  
+  // Version tracking
+  modelVersion: text('model_version'), // Version of the model/engine used
+  
+}, (table) => ({
+  orgIdx: index('valuation_snapshots_org_idx').on(table.orgId),
+  projectIdx: index('valuation_snapshots_project_idx').on(table.modelingProjectId),
+  dateIdx: index('valuation_snapshots_date_idx').on(table.snapshotDate),
+  projectDateIdx: index('valuation_snapshots_project_date_idx').on(table.modelingProjectId, table.snapshotDate),
+  triggerIdx: index('valuation_snapshots_trigger_idx').on(table.trigger),
+}));
+
+// Valuation Snapshot Data Sources - Track which data sources contributed to each snapshot
+export const valuationSnapshotSources = pgTable('valuation_snapshot_sources', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  snapshotId: varchar('snapshot_id').notNull().references(() => valuationSnapshots.id, { onDelete: 'cascade' }),
+  
+  sourceType: text('source_type').notNull(), // 'rent_roll' | 'fuel_sales' | 'ship_store' | 'rate_comp' | 'sales_comp'
+  sourceId: varchar('source_id').notNull(), // ID of the source record/snapshot
+  sourceVersion: text('source_version'), // Version/snapshot ID if applicable
+  dataAsOf: date('data_as_of'), // Date of the source data
+  
+  // Contribution to valuation
+  revenueContribution: decimal('revenue_contribution', { precision: 18, scale: 2 }),
+  expenseContribution: decimal('expense_contribution', { precision: 18, scale: 2 }),
+  
+  metadata: jsonb('metadata').default(sql`'{}'`),
+}, (table) => ({
+  snapshotIdx: index('valuation_snapshot_sources_snapshot_idx').on(table.snapshotId),
+  sourceTypeIdx: index('valuation_snapshot_sources_type_idx').on(table.sourceType),
+}));
+
 // Transaction & Closing Costs - Transaction Closing Summary - Aggregated metrics and computations (1:1 with modeling_projects)
 export const transactionClosingSummary = pgTable('transaction_closing_summary', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
@@ -11722,6 +11814,27 @@ export const updateModelingProjectSchema = insertModelingProjectSchema.partial()
 export type ModelingProject = typeof modelingProjects.$inferSelect;
 export type InsertModelingProject = z.infer<typeof insertModelingProjectSchema>;
 export type UpdateModelingProject = z.infer<typeof updateModelingProjectSchema>;
+
+// Valuation Snapshot schemas
+export const insertValuationSnapshotSchema = createInsertSchema(valuationSnapshots).omit({
+  id: true,
+  orgId: true,
+  createdAt: true,
+});
+
+export const updateValuationSnapshotSchema = insertValuationSnapshotSchema.partial();
+
+export type ValuationSnapshot = typeof valuationSnapshots.$inferSelect;
+export type InsertValuationSnapshot = z.infer<typeof insertValuationSnapshotSchema>;
+export type UpdateValuationSnapshot = z.infer<typeof updateValuationSnapshotSchema>;
+
+// Valuation Snapshot Source schemas
+export const insertValuationSnapshotSourceSchema = createInsertSchema(valuationSnapshotSources).omit({
+  id: true,
+});
+
+export type ValuationSnapshotSource = typeof valuationSnapshotSources.$inferSelect;
+export type InsertValuationSnapshotSource = z.infer<typeof insertValuationSnapshotSourceSchema>;
 
 // Modeling Project Config table - holds project-level configuration settings
 export const modelingProjectConfig = pgTable('modeling_project_config', {
