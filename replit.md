@@ -17,6 +17,18 @@ Preferred communication style: Simple, everyday language.
 ### UI/UX Decisions
 The platform uses React 18 with TypeScript and Wouter for routing. The UI is built with shadcn/ui (on Radix UI), styled using Tailwind CSS with CSS variables, and uses Lucide-React for icons, ensuring mobile optimization. Navigation is structured with a "Pack System" for modular premium features and a consolidated "Deal Workspace" for project-specific tabs, alongside "Market Intelligence" and "Analysis" sections.
 
+**Reusable UI Components (client/src/components/ui/):**
+- `skeleton-variants.tsx`: SkeletonTableRows, SkeletonCard, SkeletonKPICard, SkeletonKPIGrid, SkeletonTextBlock, SkeletonList, SkeletonChart, SkeletonForm
+- `empty-state.tsx`: EmptyState component with icon, title, description, and CTA props
+- `inline-banner.tsx`: InlineBanner with info/success/warning/error variants for contextual messaging
+- `bulk-action-bar.tsx`: BulkActionBar floating component for table row selections
+
+**Keyboard Shortcuts:**
+- Cmd/Ctrl+K: Opens command palette
+- "/": Opens command palette (when not in input fields)
+- ESC: Closes modals/dialogs
+- Reusable hook: `use-keyboard-shortcut.ts` for custom shortcuts
+
 ### Technical Implementations
 - **Frontend**: React 18, TypeScript, Wouter, TanStack Query, React Hook Form with Zod.
 - **Backend**: Express.js with TypeScript, RESTful API, Drizzle ORM.
