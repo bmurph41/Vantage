@@ -784,113 +784,10 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
             /* Regular Comp Creation/Edit Mode */
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                {/* Edit Mode: Editable sections for comp details */}
+                {/* Edit Mode: Rate details only - property info shown in parent context */}
                 {isEdit && comp && (
                   <div className="space-y-6">
-                    {/* Identity & Location Section */}
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base">Property Details</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <FormField
-                          control={form.control}
-                          name="marina"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Marina Name *</FormLabel>
-                              <FormControl>
-                                <Input {...field} placeholder="Marina name" data-testid="edit-marina-name" />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <div className="grid grid-cols-2 gap-4">
-                          <FormField
-                            control={form.control}
-                            name="address"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Address</FormLabel>
-                                <FormControl>
-                                  <Input {...field} placeholder="Street address" data-testid="edit-address" />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="city"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>City</FormLabel>
-                                <FormControl>
-                                  <Input {...field} placeholder="City" data-testid="edit-city" />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        
-                        <div className="grid grid-cols-3 gap-4">
-                          <FormField
-                            control={form.control}
-                            name="state"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>State</FormLabel>
-                                <FormControl>
-                                  <Input {...field} placeholder="State" maxLength={50} data-testid="edit-state" />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="zip"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Zip</FormLabel>
-                                <FormControl>
-                                  <Input {...field} placeholder="Zip code" data-testid="edit-zip" />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="region"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Region</FormLabel>
-                                <Select value={field.value || ""} onValueChange={field.onChange}>
-                                  <FormControl>
-                                    <SelectTrigger data-testid="edit-region">
-                                      <SelectValue placeholder="Select region" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="none-selected">No region</SelectItem>
-                                    {US_REGIONS.map((r) => (
-                                      <SelectItem key={r} value={r}>{r}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    {/* Rate Classification Section */}
+                    {/* Rate Details Section */}
                     <Card>
                       <CardHeader className="pb-3">
                         <CardTitle className="text-base">Rate Classification</CardTitle>
@@ -1021,126 +918,6 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                                   </label>
                                 ))}
                               </div>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </CardContent>
-                    </Card>
-
-                    {/* Facility Details Section */}
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base">Facility Details</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="grid grid-cols-3 gap-4">
-                          <FormField
-                            control={form.control}
-                            name="wetSlips"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Wet Slips</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    type="number" 
-                                    {...field} 
-                                    value={field.value ?? ""} 
-                                    placeholder="Count" 
-                                    data-testid="edit-wet-slips" 
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="dryRacks"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Dry Racks</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    type="number" 
-                                    {...field} 
-                                    value={field.value ?? ""} 
-                                    placeholder="Count" 
-                                    data-testid="edit-dry-racks" 
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="waterType"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Water Type</FormLabel>
-                                <Select value={field.value || ""} onValueChange={field.onChange}>
-                                  <FormControl>
-                                    <SelectTrigger data-testid="edit-water-type">
-                                      <SelectValue placeholder="Select type" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="none-selected">Not specified</SelectItem>
-                                    {WATER_TYPES.map((wt) => (
-                                      <SelectItem key={wt} value={wt}>{wt}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <FormField
-                            control={form.control}
-                            name="bodyOfWater"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Body of Water</FormLabel>
-                                <FormControl>
-                                  <Input {...field} placeholder="e.g., Gulf, Bay, Lake" data-testid="edit-body-of-water" />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="waterBodyName"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Water Body Name</FormLabel>
-                                <FormControl>
-                                  <Input {...field} placeholder="e.g., Lake Superior" data-testid="edit-water-body-name" />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-
-                        <FormField
-                          control={form.control}
-                          name="notes"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Notes</FormLabel>
-                              <FormControl>
-                                <Textarea 
-                                  {...field} 
-                                  placeholder="Additional notes about this rate comp..." 
-                                  className="min-h-[80px]"
-                                  data-testid="edit-notes" 
-                                />
-                              </FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -1521,7 +1298,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
           )}
         </div>
 
-        <DialogFooter className="flex gap-2 sticky bottom-0 bg-background pt-4 border-t mt-4">
+        <DialogFooter className="flex gap-3 sticky bottom-0 bg-background pt-5 pb-2 px-6 border-t mt-4">
         <Button
           type="button"
           variant="outline"

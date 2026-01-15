@@ -127,7 +127,7 @@ const ModalFooter = ({
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      "px-6 py-4 border-t bg-muted/20",
+      "px-6 py-5 border-t bg-muted/20",
       "flex items-center justify-end gap-3",
       className
     )}
