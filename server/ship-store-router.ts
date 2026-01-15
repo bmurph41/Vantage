@@ -373,14 +373,19 @@ router.post('/transactions', async (req: Request, res: Response) => {
 
 router.get('/dashboard/metrics', async (req: Request, res: Response) => {
   try {
-    // Calculate basic metrics
+    const user = (req as any).user;
+    const orgId = user?.organizationId || user?.orgId;
+    
+    // Calculate basic metrics with orgId filtering for multi-tenant security
     const [totalRevenueResult] = await db.select({
       totalRevenue: sql<number>`COALESCE(SUM(${shipStoreTransactions.total}), 0)`
-    }).from(shipStoreTransactions);
+    }).from(shipStoreTransactions)
+      .where(orgId ? eq(shipStoreTransactions.orgId, orgId) : undefined);
     
     const [transactionCountResult] = await db.select({
       count: sql<number>`count(*)`
-    }).from(shipStoreTransactions);
+    }).from(shipStoreTransactions)
+      .where(orgId ? eq(shipStoreTransactions.orgId, orgId) : undefined);
     
     const [activeProductsResult] = await db.select({
       count: sql<number>`count(*)`
@@ -441,12 +446,15 @@ router.put('/settings', requireManager, async (req: Request, res: Response) => {
 
 router.get('/analytics/sales-trends', async (req: Request, res: Response) => {
   try {
+    const user = (req as any).user;
+    const orgId = user?.organizationId || user?.orgId;
     const days = parseInt(req.query.days as string) || 30;
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
     const endDate = new Date();
 
     // Use date series to ensure all days are included, even with zero transactions
+    // Filter by orgId for multi-tenant security
     const transactions = await db.execute(sql`
       SELECT 
         d::date as date,
@@ -458,6 +466,7 @@ router.get('/analytics/sales-trends', async (req: Request, res: Response) => {
         '1 day'::interval
       ) d
       LEFT JOIN ship_store_transactions t ON DATE(t.created_at) = d::date
+        AND (${orgId}::text IS NULL OR t.org_id = ${orgId})
       GROUP BY d
       ORDER BY d
     `);
@@ -470,11 +479,14 @@ router.get('/analytics/sales-trends', async (req: Request, res: Response) => {
 
 router.get('/analytics/top-products', async (req: Request, res: Response) => {
   try {
+    const user = (req as any).user;
+    const orgId = user?.organizationId || user?.orgId;
     const days = parseInt(req.query.days as string) || 30;
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
     // Use PostgreSQL JSONB functions to extract and aggregate items
+    // Filter by orgId for multi-tenant security
     const topProducts = await db.execute(sql`
       SELECT 
         item->>'productId' as "productId",
@@ -484,6 +496,7 @@ router.get('/analytics/top-products', async (req: Request, res: Response) => {
       FROM ship_store_transactions t,
       jsonb_array_elements(t.items) as item
       WHERE t.created_at >= ${startDate.toISOString()}
+        AND (${orgId}::text IS NULL OR t.org_id = ${orgId})
       GROUP BY item->>'productId', item->>'name'
       ORDER BY revenue DESC
       LIMIT 10
@@ -497,11 +510,14 @@ router.get('/analytics/top-products', async (req: Request, res: Response) => {
 
 router.get('/analytics/category-revenue', async (req: Request, res: Response) => {
   try {
+    const user = (req as any).user;
+    const orgId = user?.organizationId || user?.orgId;
     const days = parseInt(req.query.days as string) || 30;
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
     // Use PostgreSQL JSONB functions with lateral join to get category revenue
+    // Filter by orgId for multi-tenant security
     const categoryRevenue = await db.execute(sql`
       SELECT 
         c.name,
@@ -512,6 +528,7 @@ router.get('/analytics/category-revenue', async (req: Request, res: Response) =>
       LEFT JOIN ship_store_categories c ON c.id = p.category_id
       WHERE t.created_at >= ${startDate.toISOString()}
         AND c.name IS NOT NULL
+        AND (${orgId}::text IS NULL OR t.org_id = ${orgId})
       GROUP BY c.name
       ORDER BY value DESC
     `);
@@ -524,7 +541,11 @@ router.get('/analytics/category-revenue', async (req: Request, res: Response) =>
 
 router.get('/analytics/product-performance', async (req: Request, res: Response) => {
   try {
+    const user = (req as any).user;
+    const orgId = user?.organizationId || user?.orgId;
+    
     // Use PostgreSQL JSONB functions to aggregate product performance
+    // Filter transactions by orgId for multi-tenant security
     const productStats = await db.execute(sql`
       SELECT 
         p.id,
@@ -537,7 +558,7 @@ router.get('/analytics/product-performance', async (req: Request, res: Response)
         COALESCE(AVG((item->>'price')::numeric), 0) as "avgPrice"
       FROM ship_store_products p
       LEFT JOIN ship_store_categories c ON c.id = p.category_id
-      LEFT JOIN ship_store_transactions t ON true
+      LEFT JOIN ship_store_transactions t ON (${orgId}::text IS NULL OR t.org_id = ${orgId})
       LEFT JOIN LATERAL jsonb_array_elements(t.items) as item ON (item->>'productId') = p.id
       WHERE p.is_active = true
       GROUP BY p.id, p.name, p.sku, p.stock, c.name
