@@ -120,11 +120,30 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
   const [linkToPortfolio, setLinkToPortfolio] = useState(!!(comp?.parentPortfolioId));
   const [showRateTiersDialog, setShowRateTiersDialog] = useState(false);
   
+  // Combined marina search result type (from Marina DB or CRM Properties)
+  type CombinedMarinaResult = {
+    id: string;
+    marinaName: string;
+    city?: string;
+    state?: string;
+    address?: string;
+    zip?: string;
+    waterType?: string;
+    wetSlips?: number | null;
+    dryRacks?: number | null;
+    bodyOfWater?: string;
+    waterBodyName?: string;
+    region?: string;
+    rateSource?: string;
+    source: 'marina_db' | 'crm_property';
+    propertyId?: string; // Only for CRM properties
+  };
+
   // Marina lookup state
   const [marinaSearchOpen, setMarinaSearchOpen] = useState(false);
   const [marinaSearchQuery, setMarinaSearchQuery] = useState("");
-  const [marinaSearchResults, setMarinaSearchResults] = useState<MarinaRateDatabase[]>([]);
-  const [selectedMarina, setSelectedMarina] = useState<MarinaRateDatabase | null>(null);
+  const [marinaSearchResults, setMarinaSearchResults] = useState<CombinedMarinaResult[]>([]);
+  const [selectedMarina, setSelectedMarina] = useState<CombinedMarinaResult | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   
   // CRM Property linking state
@@ -254,7 +273,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
     }
   }, [open, comp]);
 
-  // Marina search function with debouncing
+  // Marina search function with debouncing - searches both Marina DB and CRM Properties
   const searchMarinas = async (query: string) => {
     if (query.length < 2) {
       setMarinaSearchResults([]);
@@ -263,10 +282,51 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
     
     setIsSearching(true);
     try {
-      const results = await apiRequest<MarinaRateDatabase[]>(
-        `/api/marina-database/search?q=${encodeURIComponent(query)}&limit=15`
-      );
-      setMarinaSearchResults(results || []);
+      // Search both Marina Database and CRM Properties in parallel
+      const [marinaDbResults, crmResults] = await Promise.all([
+        apiRequest<MarinaRateDatabase[]>(
+          `/api/marina-database/search?q=${encodeURIComponent(query)}&limit=10`
+        ).catch(() => [] as MarinaRateDatabase[]),
+        apiRequest<Array<{id: string; title: string; city?: string; state?: string; address?: string; zip?: string; wetSlips?: number; drySlips?: number; occupancy?: number}>>(
+          `/api/properties/search?q=${encodeURIComponent(query)}&limit=10&type=marina`
+        ).catch(() => [])
+      ]);
+      
+      // Convert Marina DB results to combined format
+      const marinaDbFormatted: CombinedMarinaResult[] = (marinaDbResults || []).map(m => ({
+        id: m.id,
+        marinaName: m.marinaName,
+        city: m.city || undefined,
+        state: m.state || undefined,
+        address: m.address || undefined,
+        zip: m.zip || undefined,
+        waterType: m.waterType || undefined,
+        wetSlips: m.wetSlips,
+        dryRacks: m.dryRacks,
+        bodyOfWater: m.bodyOfWater || undefined,
+        waterBodyName: m.waterBodyName || undefined,
+        region: m.region || undefined,
+        rateSource: m.rateSource || undefined,
+        source: 'marina_db' as const,
+      }));
+      
+      // Convert CRM Property results to combined format
+      const crmFormatted: CombinedMarinaResult[] = (crmResults || []).map(p => ({
+        id: `crm-${p.id}`,
+        marinaName: p.title,
+        city: p.city || undefined,
+        state: p.state || undefined,
+        address: p.address || undefined,
+        zip: p.zip || undefined,
+        wetSlips: p.wetSlips ?? null,
+        dryRacks: p.drySlips ?? null,
+        source: 'crm_property' as const,
+        propertyId: p.id,
+      }));
+      
+      // Combine and deduplicate by name (prefer CRM if exists)
+      const combined = [...crmFormatted, ...marinaDbFormatted];
+      setMarinaSearchResults(combined);
     } catch (error) {
       console.error("Error searching marinas:", error);
       setMarinaSearchResults([]);
@@ -284,31 +344,66 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
     debouncedSearch(value);
   };
 
-  // Handle marina selection - auto-populate form fields
-  const handleMarinaSelect = (marina: MarinaRateDatabase) => {
+  // Handle marina selection - auto-populate form fields (works for both Marina DB and CRM Properties)
+  const handleMarinaSelect = async (marina: CombinedMarinaResult) => {
     setSelectedMarina(marina);
     setMarinaSearchOpen(false);
     setMarinaSearchQuery("");
     
     // Populate form fields from selected marina
     form.setValue("marina", marina.marinaName);
-    form.setValue("marinaId", marina.id);
-    if (marina.city) form.setValue("city", marina.city);
-    if (marina.state) form.setValue("state", marina.state);
-    if (marina.address) form.setValue("address", marina.address);
-    if (marina.zip) form.setValue("zip", marina.zip);
-    if (marina.waterType) form.setValue("waterType", marina.waterType);
-    if (marina.wetSlips) form.setValue("wetSlips", marina.wetSlips);
-    if (marina.dryRacks) form.setValue("dryRacks", marina.dryRacks);
-    if (marina.bodyOfWater) form.setValue("bodyOfWater", marina.bodyOfWater);
-    if (marina.waterBodyName) form.setValue("waterBodyName", marina.waterBodyName);
-    if (marina.region) form.setValue("region", marina.region);
-    if (marina.rateSource) form.setValue("rateSource", marina.rateSource);
     
-    toast({
-      title: "Marina Linked",
-      description: `Linked to "${marina.marinaName}" from Marina Database. Fields have been auto-populated.`,
-    });
+    // If from CRM Property, link to property and fetch full data
+    if (marina.source === 'crm_property' && marina.propertyId) {
+      form.setValue("propertyId", marina.propertyId);
+      setSelectedPropertyId(marina.propertyId);
+      
+      // Fetch full property data for comprehensive auto-population
+      try {
+        const response = await fetch(`/api/properties/${marina.propertyId}/for-rate-comp`, {
+          credentials: 'include'
+        });
+        if (response.ok) {
+          const fullData = await response.json();
+          if (fullData.city) form.setValue('city', fullData.city);
+          if (fullData.state) form.setValue('state', fullData.state);
+          if (fullData.address) form.setValue('address', fullData.address);
+          if (fullData.zip) form.setValue('zip', fullData.zip);
+          if (fullData.wetSlips) form.setValue('wetSlips', fullData.wetSlips);
+          if (fullData.dryRacks) form.setValue('dryRacks', fullData.dryRacks);
+          if (fullData.waterType) form.setValue('waterType', fullData.waterType);
+          if (fullData.bodyOfWater) form.setValue('bodyOfWater', fullData.bodyOfWater);
+          if (fullData.waterBodyName) form.setValue('waterBodyName', fullData.waterBodyName);
+          if (fullData.region) form.setValue('region', fullData.region);
+        }
+      } catch (error) {
+        console.error("Error fetching full property data:", error);
+      }
+      
+      toast({
+        title: "Property Linked",
+        description: `Linked to "${marina.marinaName}" from CRM. Fields have been auto-populated.`,
+      });
+    } else {
+      // From Marina DB - use the ID directly
+      form.setValue("marinaId", marina.id);
+      if (marina.city) form.setValue("city", marina.city);
+      if (marina.state) form.setValue("state", marina.state);
+      if (marina.address) form.setValue("address", marina.address);
+      if (marina.zip) form.setValue("zip", marina.zip);
+      if (marina.waterType) form.setValue("waterType", marina.waterType);
+      if (marina.wetSlips) form.setValue("wetSlips", marina.wetSlips);
+      if (marina.dryRacks) form.setValue("dryRacks", marina.dryRacks);
+      if (marina.bodyOfWater) form.setValue("bodyOfWater", marina.bodyOfWater);
+      if (marina.waterBodyName) form.setValue("waterBodyName", marina.waterBodyName);
+      if (marina.region) form.setValue("region", marina.region);
+      if (marina.rateSource) form.setValue("rateSource", marina.rateSource);
+      
+      toast({
+        title: "Marina Linked",
+        description: `Linked to "${marina.marinaName}" from Marina Database. Fields have been auto-populated.`,
+      });
+    }
   };
 
   // Handle unlinking from marina database
@@ -1104,8 +1199,13 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                                                   className="cursor-pointer"
                                                   data-testid={`marina-result-${marina.id}`}
                                                 >
-                                                  <div className="flex flex-col">
-                                                    <span className="font-medium">{marina.marinaName}</span>
+                                                  <div className="flex flex-col w-full">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                      <span className="font-medium">{marina.marinaName}</span>
+                                                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${marina.source === 'crm_property' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}`}>
+                                                        {marina.source === 'crm_property' ? 'CRM' : 'Marina DB'}
+                                                      </span>
+                                                    </div>
                                                     <span className="text-xs text-muted-foreground">
                                                       {marina.city}, {marina.state}
                                                       {marina.wetSlips ? ` • ${marina.wetSlips} slips` : ''}
