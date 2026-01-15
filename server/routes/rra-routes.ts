@@ -296,8 +296,29 @@ router.post("/leases/import/detect-values", async (req: Request, res: Response, 
     }
     
     // Define standard values for enum-like fields (Title Case to match database schema)
+    // Storage types match the comprehensive list from salescomps-constants.ts (with singular variants)
     const standardValues: Record<string, string[]> = {
-      storageType: ['Wet Slip', 'Lift Slip', 'Mooring', 'Jet Ski', 'Dry Rack - Indoor', 'Dry Rack - Outdoor', 'Houseboat', 'Land Storage', 'Boat on Trailer', 'Trailer Only'],
+      storageType: [
+        'Wet Slip', 'Wet Slips',
+        'Lift Slip', 'Lift Slips', 
+        'Mooring', 'Moorings',
+        'Jet Ski', 'Jet Skis',
+        'Dry Rack - Indoor', 'Dry Racks - Indoor',
+        'Dry Rack - Outdoor', 'Dry Racks - Outdoor',
+        'Houseboat', 'Houseboats',
+        'Land Storage',
+        'Boat on Trailer', 'Trailered Boats',
+        'Trailer Only', 'Trailers',
+        'Dinghies/Small Boats',
+        'Carports',
+        'RV Sites',
+        'Cabins',
+        'Sales',
+        'Service',
+        'Commercial',
+        'Rental Boats', 'Boat Club',
+        'Mixed'
+      ],
       contractTerm: ['Annual', 'Seasonal', 'Summer', 'Winter', 'Monthly', 'Short-Term', 'Transient'],
       status: ['Active', 'Expired', 'Pending', 'Cancelled', 'Terminated'],
     };

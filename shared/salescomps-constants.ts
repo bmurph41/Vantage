@@ -46,7 +46,8 @@ export const STORAGE_TYPES = [
   'Service',
   'Commercial',
   'Rental Boats',
-  'Boat Club'
+  'Boat Club',
+  'Mixed'
 ] as const;
 export type StorageType = typeof STORAGE_TYPES[number];
 
