@@ -103,9 +103,9 @@ export default function CompsDataGrid({
   const defaultColumns = [
     { key: 'marina', label: 'Marina', width: 260, sortable: true },
     { key: 'location', label: 'Location', width: 160, sortable: true },
-    { key: 'storageTypes', label: 'Storage Types', width: 120, sortable: false },
-    { key: 'rateRange', label: 'Rate Range', width: 160, sortable: false },
-    { key: 'lastUpdated', label: 'Last Updated', width: 110, sortable: false },
+    { key: 'storageType', label: 'Storage Type', width: 120, sortable: false },
+    { key: 'rate', label: 'Rate', width: 140, sortable: false },
+    { key: 'year', label: 'Year', width: 70, sortable: false },
     { key: 'expand', label: '', width: 50, sortable: false },
     { key: 'actions', label: '', width: 60, sortable: false },
   ];
@@ -415,28 +415,14 @@ export default function CompsDataGrid({
         const location = [city, state].filter(Boolean).join(', ');
         return <span className="truncate text-muted-foreground text-sm">{location || '—'}</span>;
 
-      case 'storageTypes':
+      case 'storageType':
         if (!summary.hasRates || summary.totalStorageTypes === 0) {
           return <span className="text-muted-foreground text-sm">—</span>;
         }
-        const typeLabels = summary.storageGroups.slice(0, 2).map(g => g.label);
-        const moreCount = summary.totalStorageTypes - 2;
-        return (
-          <div className="flex flex-wrap gap-1">
-            {typeLabels.map((label, i) => (
-              <Badge key={i} variant="outline" className="text-[10px] px-1.5 py-0 font-normal">
-                {label}
-              </Badge>
-            ))}
-            {moreCount > 0 && (
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                +{moreCount}
-              </Badge>
-            )}
-          </div>
-        );
+        const primaryType = summary.storageGroups[0]?.label || '—';
+        return <span className="text-sm">{primaryType}</span>;
 
-      case 'rateRange':
+      case 'rate':
         if (!summary.rangeText) {
           return <span className="text-muted-foreground text-sm">—</span>;
         }
@@ -444,12 +430,12 @@ export default function CompsDataGrid({
           <span className="font-medium text-sm">{summary.rangeText}</span>
         );
 
-      case 'lastUpdated':
-        const lastUpdated = formatLastUpdated(comp);
-        if (!lastUpdated) {
+      case 'year':
+        const rateYear = summary.years?.[0];
+        if (!rateYear) {
           return <span className="text-muted-foreground text-sm">—</span>;
         }
-        return <span className="text-muted-foreground text-sm">{lastUpdated}</span>;
+        return <span className="text-sm">{rateYear}</span>;
 
       case 'expand':
         const canExpand = summary.hasRates && summary.totalRates > 0;
