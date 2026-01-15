@@ -12548,6 +12548,7 @@ export type InsertProduct = z.infer<typeof insertProductSchema>;
 
 export const shipStoreTransactions = pgTable("ship_store_transactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").references(() => organizations.id),
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
   tax: decimal("tax", { precision: 10, scale: 2 }).notNull(),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
@@ -12568,6 +12569,8 @@ export const shipStoreTransactions = pgTable("ship_store_transactions", {
 }, (table) => ({
   // Performance index for dashboard revenue queries
   createdAtIdx: index('ship_store_transactions_created_at_idx').on(table.createdAt),
+  // Index for multi-tenant queries
+  orgIdIdx: index('ship_store_transactions_org_id_idx').on(table.orgId),
 }));
 
 export const insertTransactionSchema = createInsertSchema(shipStoreTransactions).omit({
