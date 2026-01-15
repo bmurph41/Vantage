@@ -68,6 +68,7 @@ function KpiCard({ title, value, change, changeLabel, icon: Icon, color, isLoadi
 type FunnelStage = {
   name: string;
   value: number;
+  goal: number;
   percentage: number;
   color: string;
 };
@@ -88,6 +89,18 @@ export default function ProspectingOverview() {
     meetingsChange: number;
   }>({
     queryKey: ['/api/prospecting/dashboard-stats'],
+  });
+
+  const { data: settings } = useQuery<{
+    weeklyCallsGoal?: number;
+    weeklyEmailsGoal?: number;
+    weeklyLeadsGoal?: number;
+    weeklyDealsGoal?: number;
+    weeklyConversationsGoal?: number;
+    weeklyQualifiedGoal?: number;
+    weeklyDealsClosedGoal?: number;
+  }>({
+    queryKey: ['/api/prospecting/settings'],
   });
 
   const { data: leads } = useQuery<any[]>({
@@ -131,6 +144,12 @@ export default function ProspectingOverview() {
 
   const pipelineValue = dealsArray.reduce((sum: number, deal: any) => sum + (deal.amount || 0), 0);
 
+  const touchesGoal = (settings?.weeklyCallsGoal || 50) + (settings?.weeklyEmailsGoal || 100);
+  const conversationsGoal = settings?.weeklyConversationsGoal || 25;
+  const qualifiedGoal = settings?.weeklyQualifiedGoal || 10;
+  const dealsGoal = settings?.weeklyDealsGoal || 5;
+  const dealsClosedGoal = settings?.weeklyDealsClosedGoal || 2;
+
   // Calculate lead source performance from real data
   const sourceData = (() => {
     const sourceStats: Record<string, { leads: number; deals: number }> = {};
@@ -165,11 +184,11 @@ export default function ProspectingOverview() {
   })();
 
   const funnelData: FunnelStage[] = [
-    { name: 'Total Touches', value: totalTouches, percentage: 100, color: 'bg-blue-500' },
-    { name: 'Conversations', value: conversations, percentage: totalTouches > 0 ? Math.round((conversations / totalTouches) * 100) : 0, color: 'bg-green-500' },
-    { name: 'Qualified Leads', value: qualified, percentage: totalTouches > 0 ? Math.round((qualified / totalTouches) * 100) : 0, color: 'bg-yellow-500' },
-    { name: 'Deals Created', value: dealsCreated, percentage: totalTouches > 0 ? Math.round((dealsCreated / totalTouches) * 100) : 0, color: 'bg-purple-500' },
-    { name: 'Deals Closed', value: dealsClosed, percentage: totalTouches > 0 ? Math.round((dealsClosed / totalTouches) * 100) : 0, color: 'bg-orange-500' },
+    { name: 'Total Touches', value: totalTouches, goal: touchesGoal, percentage: Math.min(Math.round((totalTouches / touchesGoal) * 100), 100), color: 'bg-blue-500' },
+    { name: 'Conversations', value: conversations, goal: conversationsGoal, percentage: Math.min(Math.round((conversations / conversationsGoal) * 100), 100), color: 'bg-green-500' },
+    { name: 'Qualified Leads', value: qualified, goal: qualifiedGoal, percentage: Math.min(Math.round((qualified / qualifiedGoal) * 100), 100), color: 'bg-yellow-500' },
+    { name: 'Deals Created', value: dealsCreated, goal: dealsGoal, percentage: Math.min(Math.round((dealsCreated / dealsGoal) * 100), 100), color: 'bg-purple-500' },
+    { name: 'Deals Closed', value: dealsClosed, goal: dealsClosedGoal, percentage: Math.min(Math.round((dealsClosed / dealsClosedGoal) * 100), 100), color: 'bg-orange-500' },
   ];
 
   return (
@@ -256,7 +275,7 @@ export default function ProspectingOverview() {
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm text-gray-600">{stage.name}</span>
                       <div className="flex items-center space-x-2">
-                        <span className="text-sm font-medium">{formatNumber(stage.value)}</span>
+                        <span className="text-sm font-medium">{formatNumber(stage.value)} / {formatNumber(stage.goal)}</span>
                         <Badge variant="secondary" className="text-xs">{stage.percentage}%</Badge>
                       </div>
                     </div>
