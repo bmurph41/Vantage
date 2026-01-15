@@ -2067,7 +2067,12 @@ export async function getExecutiveDashboardMetrics(
   endDate: string,
   filterOptions?: KpiFilterOptions
 ): Promise<ExecutiveDashboardMetrics> {
-  const filterCondition = buildProjectFilterConditions(marinaLocations, filterOptions);
+  // Build filter with orgId for tenant isolation
+  const baseFilterCondition = buildProjectFilterConditions(marinaLocations, filterOptions);
+  const filterCondition = and(
+    eq(marinaLocations.orgId, orgId),
+    baseFilterCondition || sql`1=1`
+  );
   const contractTermCondition = buildContractTermCondition(leases, filterOptions?.seasonMode);
   const storageTypeCondition = buildStorageTypeCondition(storageLocations, filterOptions?.storageType);
   
@@ -2376,7 +2381,12 @@ export async function getExecutiveRevenueTrend(
   endDate: string,
   filterOptions?: KpiFilterOptions
 ): Promise<RevenueTrendDataPoint[]> {
-  const filterCondition = buildProjectFilterConditions(marinaLocations, filterOptions);
+  // Build filter with orgId for tenant isolation
+  const baseFilterCondition = buildProjectFilterConditions(marinaLocations, filterOptions);
+  const filterCondition = and(
+    eq(marinaLocations.orgId, orgId),
+    baseFilterCondition || sql`1=1`
+  );
   
   const startDateObj = new Date(startDate);
   const endDateObj = new Date(endDate);
@@ -2464,15 +2474,20 @@ export async function getExecutiveAvailableStorageTypes(
   orgId: string,
   projectIds?: string[]
 ): Promise<string[]> {
+  // Build conditions with orgId for tenant isolation
+  const conditions = [eq(marinaLocations.orgId, orgId)];
+  
+  if (projectIds?.length) {
+    conditions.push(inArray(marinaLocations.id, projectIds));
+  } else {
+    conditions.push(eq(marinaLocations.includeInExecutive, true));
+  }
+  
   const result = await db
     .selectDistinct({ storageType: storageLocations.storageType })
     .from(storageLocations)
     .innerJoin(marinaLocations, eq(storageLocations.projectId, marinaLocations.id))
-    .where(
-      projectIds?.length
-        ? inArray(marinaLocations.id, projectIds)
-        : eq(marinaLocations.includeInExecutive, true)
-    );
+    .where(and(...conditions));
   
   return result.map(r => r.storageType).filter(Boolean) as string[];
 }
@@ -5921,6 +5936,7 @@ export interface ExecutiveSeasonalMoveEvents {
 /**
  * Get aggregated seasonal move events across all included projects for executive dashboard
  * Uses default season dates (May 1 - Oct 31 summer, Nov 1 - Apr 30 winter) for consistency
+ * Filters events within the specified date range
  */
 export async function getExecutiveSeasonalMoveEvents(
   orgId: string,
@@ -5928,14 +5944,19 @@ export async function getExecutiveSeasonalMoveEvents(
   endDate: string,
   filterOptions?: KpiFilterOptions
 ): Promise<ExecutiveSeasonalMoveEvents> {
-  // Extract year from start date for calendar building
-  const year = new Date(startDate).getFullYear();
+  // Parse date range for filtering
+  const startDateObj = new Date(startDate);
+  const endDateObj = new Date(endDate);
+  const year = startDateObj.getFullYear();
   
   // Build default season calendar for executive view (use standard dates)
   const calendar = buildSeasonCalendar(null, null, null, null, year);
   
-  // Build project filter conditions
-  const filterCondition = buildProjectFilterConditions(marinaLocations, filterOptions);
+  // Build project filter conditions with orgId for tenant isolation
+  const filterCondition = and(
+    eq(marinaLocations.orgId, orgId),
+    buildProjectFilterConditions(marinaLocations, filterOptions) || sql`1=1`
+  );
   
   // Get all included projects
   const projects = await db.query.rraMarinaLocations.findMany({
@@ -5964,12 +5985,12 @@ export async function getExecutiveSeasonalMoveEvents(
   let annualMoveIns = 0, annualMoveOuts = 0;
   
   for (const lease of allLeases) {
-    // Check move-in (lease commencement)
+    // Check move-in (lease commencement) within the date range
     if (lease.leaseCommencement) {
       const commenceDate = new Date(lease.leaseCommencement);
-      const commenceYear = commenceDate.getFullYear();
       
-      if (commenceYear === year) {
+      // Only count if within the requested date range
+      if (commenceDate >= startDateObj && commenceDate <= endDateObj) {
         if (commenceDate >= calendar.summer.start && commenceDate <= calendar.summer.end) {
           summerMoveIns++;
         } else if (commenceDate >= calendar.winter.start && commenceDate <= calendar.winter.end) {
@@ -5980,12 +6001,12 @@ export async function getExecutiveSeasonalMoveEvents(
       }
     }
     
-    // Check move-out (lease expiration)
+    // Check move-out (lease expiration) within the date range
     if (lease.leaseExpiration) {
       const expireDate = new Date(lease.leaseExpiration);
-      const expireYear = expireDate.getFullYear();
       
-      if (expireYear === year) {
+      // Only count if within the requested date range
+      if (expireDate >= startDateObj && expireDate <= endDateObj) {
         if (expireDate >= calendar.summer.start && expireDate <= calendar.summer.end) {
           summerMoveOuts++;
         } else if (expireDate >= calendar.winter.start && expireDate <= calendar.winter.end) {
@@ -6150,7 +6171,11 @@ export async function getExecutiveContractTermOccupancy(
   const { projectType, projectIds, storageType } = filterOptions || {};
   
   // Get projects included in executive summary with their season types
-  const conditions = [eq(marinaLocations.includeInExecutive, true)];
+  // IMPORTANT: Always filter by orgId for tenant isolation
+  const conditions = [
+    eq(marinaLocations.orgId, orgId),
+    eq(marinaLocations.includeInExecutive, true)
+  ];
   
   if (projectType) {
     conditions.push(eq(marinaLocations.projectType, projectType as any));
@@ -6637,10 +6662,14 @@ export async function getExecutiveAvgBoatSize(
   orgId: string,
   filterOptions?: { projectType?: string; projectIds?: string[]; storageType?: string }
 ): Promise<AvgBoatSizeMetrics> {
-  const { projectType, projectIds } = filterOptions || {};
+  const { projectType, projectIds, storageType } = filterOptions || {};
   
   // Get projects included in executive summary
-  const conditions = [eq(marinaLocations.includeInExecutive, true)];
+  // IMPORTANT: Always filter by orgId for tenant isolation
+  const conditions = [
+    eq(marinaLocations.orgId, orgId),
+    eq(marinaLocations.includeInExecutive, true)
+  ];
   
   if (projectType) {
     conditions.push(eq(marinaLocations.projectType, projectType as any));
