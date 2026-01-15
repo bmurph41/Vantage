@@ -1836,8 +1836,73 @@ export default function FileImportDrawer({ open, onClose, locationId }: FileImpo
       // Filter rate configs that have columns mapped
       const configuredRates = rateConfigs.filter(r => r.columnKey && r.columnKey !== "");
       
+      // Flatten parsedRows to the format expected by backend /leases/import
+      // Backend expects flat rows with: tenantName, monthlyRent, storageType, unitId, etc.
+      const flattenedRows = parseResult.parsedRows.map((parsedRow) => {
+        const { tenantData, leaseData, lineItemData } = parsedRow;
+        
+        // Map tenantData fields to expected names
+        const tenantName = tenantData?.name || tenantData?.tenantName || 'Unknown Tenant';
+        const email = tenantData?.email || tenantData?.tenantEmail || null;
+        const phone = tenantData?.phone || tenantData?.tenantPhone || null;
+        const address1 = tenantData?.address1 || tenantData?.address || null;
+        const city = tenantData?.city || null;
+        const state = tenantData?.state || null;
+        const zip = tenantData?.zip || tenantData?.zipCode || null;
+        
+        // Map leaseData fields to expected names
+        const unitId = leaseData?.unitLocation || leaseData?.unit || leaseData?.slip || leaseData?.slipNumber || '';
+        const storageType = leaseData?.storageType || defaultStorageType || 'Wet Slip';
+        const monthlyRent = leaseData?.leaseAmount || leaseData?.monthlyRent || leaseData?.baseRent || 0;
+        const annualRent = leaseData?.annualRent || leaseData?.totalContractValue || 0;
+        const leaseStart = leaseData?.leaseCommencement || leaseData?.startDate || null;
+        const leaseEnd = leaseData?.leaseExpiration || leaseData?.endDate || null;
+        const status = leaseData?.status || leaseData?.slipStatus || 'Active';
+        const contractTerm = leaseData?.contractTerm || 'Annual';
+        
+        // Boat and additional details
+        const boatLength = leaseData?.boatLength || leaseData?.loa || leaseData?.size || null;
+        const boatWidth = leaseData?.boatWidth || leaseData?.beam || null;
+        const boatMake = leaseData?.boatMake || null;
+        const boatModel = leaseData?.boatModel || null;
+        const boatYear = leaseData?.boatYear || null;
+        const notes = leaseData?.notes || null;
+        
+        // Additional rent fields
+        const baseRent2 = leaseData?.baseRent2 || leaseData?.winterAmount || null;
+        const baseRent3 = leaseData?.baseRent3 || leaseData?.summerAmount || null;
+        
+        return {
+          tenantName,
+          email,
+          phone,
+          address1,
+          city,
+          state,
+          zip,
+          unitId,
+          storageType,
+          monthlyRent,
+          annualRent,
+          leaseStart,
+          leaseEnd,
+          status,
+          contractTerm,
+          boatLength,
+          boatWidth,
+          boatMake,
+          boatModel,
+          boatYear,
+          notes,
+          baseRent2,
+          baseRent3,
+          // Include original row data for any custom fields
+          ...lineItemData,
+        };
+      });
+      
       const response = await apiRequest('POST', '/api/rent-roll/leases/import', {
-        rows: parseResult.parsedRows,
+        rows: flattenedRows,
         skipDuplicates,
         locationId: locationId || undefined,
         fileMetadata,
