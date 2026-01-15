@@ -118,7 +118,7 @@ const TRADE_PUBLICATION_FEEDS = [
   },
   {
     name: "Soundings Trade Only",
-    url: "https://www.soundingsonline.com/feed",
+    url: "http://soundingsonline.com/feed",
     category: "Trade Publication",
     description: "Recreational boating trade news",
   },
@@ -151,13 +151,24 @@ const PRESS_RELEASE_FEEDS = [
   },
 ];
 
-const ASSOCIATION_FEEDS = [
+const WEB_SCRAPE_SOURCES = [
+  {
+    name: "Marina World",
+    url: "https://www.marinaworld.com/news",
+    category: "Trade Publication",
+    description: "Global marina industry magazine covering marinas, pontoons, and harbor developments worldwide",
+    sourceType: "web_scrape",
+  },
   {
     name: "NMMA - National Marine Manufacturers Association",
-    url: "https://www.nmma.org/press/rss",
+    url: "https://www.nmma.org/press/latest-news",
     category: "Association",
     description: "Recreational boating industry association news and statistics",
+    sourceType: "web_scrape",
   },
+];
+
+const ASSOCIATION_FEEDS = [
   {
     name: "AMI - Association of Marina Industries",
     url: "https://marinaassociation.org/feed/",
@@ -176,6 +187,7 @@ const ALL_FEEDS = [
   ...TRADE_PUBLICATION_FEEDS,
   ...PRESS_RELEASE_FEEDS,
   ...ASSOCIATION_FEEDS,
+  ...WEB_SCRAPE_SOURCES,
 ];
 
 export async function seedTradePublicationFeeds(): Promise<{
@@ -196,17 +208,19 @@ export async function seedTradePublicationFeeds(): Promise<{
         continue;
       }
 
+      const sourceType = (feed as any).sourceType || "rss";
+      
       await db.insert(rssSources).values({
         name: feed.name,
         url: feed.url,
-        sourceType: "rss",
+        sourceType: sourceType,
         isActive: true,
         minRelevanceScore: feed.category === "Press Release" ? 50 : 35,
         customKeywords: MARINA_KEYWORDS,
       });
 
       results.added++;
-      console.log(`[Trade Pub Seed] Added: ${feed.name}`);
+      console.log(`[Trade Pub Seed] Added: ${feed.name} (${sourceType})`);
     } catch (error: any) {
       results.errors.push(`${feed.name}: ${error.message}`);
       console.error(`[Trade Pub Seed] Failed to add ${feed.name}:`, error.message);
@@ -217,4 +231,4 @@ export async function seedTradePublicationFeeds(): Promise<{
   return results;
 }
 
-export { TRADE_PUBLICATION_FEEDS, PRESS_RELEASE_FEEDS, ASSOCIATION_FEEDS, ALL_FEEDS, MARINA_KEYWORDS };
+export { TRADE_PUBLICATION_FEEDS, PRESS_RELEASE_FEEDS, ASSOCIATION_FEEDS, WEB_SCRAPE_SOURCES, ALL_FEEDS, MARINA_KEYWORDS };
