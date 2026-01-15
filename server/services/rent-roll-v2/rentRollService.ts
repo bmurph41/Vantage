@@ -472,7 +472,7 @@ export async function updateLease(
   leaseData: Partial<InsertLease>
 ): Promise<LeaseWithTenant> {
   // Get existing lease with tenant
-  const existing = await db.query.leases.findFirst({
+  const existing = await db.query.rraLeases.findFirst({
     where: eq(leases.id, leaseId),
     with: { tenant: true },
   });
@@ -668,7 +668,7 @@ export async function updateLease(
   }
   
   // Return updated lease with tenant
-  const updated = await db.query.leases.findFirst({
+  const updated = await db.query.rraLeases.findFirst({
     where: eq(leases.id, leaseId),
     with: { tenant: true },
   });
@@ -725,7 +725,7 @@ export async function getAllLeasesWithTenants(filters?: {
     conditions.push(inArray(leases.locationId, allowedLocationIds));
   }
   
-  const allLeases = await db.query.leases.findMany({
+  const allLeases = await db.query.rraLeases.findMany({
     where: conditions.length > 0 ? and(...conditions) : undefined,
     with: { tenant: true },
     orderBy: [desc(leases.createdAt)],
@@ -1373,7 +1373,7 @@ export async function backfillCashFlowsForIncompleteLeasesWithAmounts(projectId?
     conditions.push(eq(leases.locationId, projectId));
   }
   
-  const incompleteLeasesWithAmounts = await db.query.leases.findMany({
+  const incompleteLeasesWithAmounts = await db.query.rraLeases.findMany({
     where: and(...conditions),
     with: { tenant: true },
   });
@@ -1435,7 +1435,7 @@ export async function regenerateAllCashFlowsForProject(projectId: string): Promi
   let generatedCount = 0;
   
   // Get all leases for this project with valid dates and amounts
-  const projectLeases = await db.query.leases.findMany({
+  const projectLeases = await db.query.rraLeases.findMany({
     where: eq(leases.locationId, projectId),
     with: { tenant: true },
   });
@@ -2062,6 +2062,7 @@ function buildStorageTypeCondition(
  * Get executive dashboard KPIs for a date range
  */
 export async function getExecutiveDashboardMetrics(
+  orgId: string,
   startDate: string,
   endDate: string,
   filterOptions?: KpiFilterOptions
@@ -2069,6 +2070,23 @@ export async function getExecutiveDashboardMetrics(
   const filterCondition = buildProjectFilterConditions(marinaLocations, filterOptions);
   const contractTermCondition = buildContractTermCondition(leases, filterOptions?.seasonMode);
   const storageTypeCondition = buildStorageTypeCondition(storageLocations, filterOptions?.storageType);
+  
+  // Parse date range into year/month bounds for RRA schema filtering
+  const startDateObj = new Date(startDate);
+  const endDateObj = new Date(endDate);
+  const startYear = startDateObj.getFullYear();
+  const startMonth = startDateObj.getMonth() + 1; // 1-indexed
+  const endYear = endDateObj.getFullYear();
+  const endMonth = endDateObj.getMonth() + 1;
+  
+  // Build year/month range condition for cash flows
+  const buildYearMonthCondition = () => {
+    return sql`(
+      (${leaseCashFlows.year} > ${startYear} OR (${leaseCashFlows.year} = ${startYear} AND ${leaseCashFlows.month} >= ${startMonth}))
+      AND
+      (${leaseCashFlows.year} < ${endYear} OR (${leaseCashFlows.year} = ${endYear} AND ${leaseCashFlows.month} <= ${endMonth}))
+    )`;
+  };
   
   // Build combined filter conditions
   const buildLeaseConditions = (...additionalConditions: (ReturnType<typeof eq> | null)[]) => {
@@ -2082,21 +2100,19 @@ export async function getExecutiveDashboardMetrics(
   const hasStorageTypeFilter = filterOptions?.storageType && filterOptions.storageType !== "all";
   
   const [revenueData, leaseData, moveEventData, capacityData, storageRevenueData] = await Promise.all([
-    // Revenue query - needs storage location join when filtering by storage type
+    // Revenue query - uses year/month columns directly (RRA schema)
     hasStorageTypeFilter
       ? db
           .select({
-            totalRevenue: sql<string>`COALESCE(SUM(${leaseCashFlows.rentAmount}), 0)`,
+            totalRevenue: sql<string>`COALESCE(SUM(${leaseCashFlows.amount}), 0)`,
           })
           .from(leaseCashFlows)
           .innerJoin(leases, eq(leaseCashFlows.leaseId, leases.id))
           .innerJoin(marinaLocations, eq(leases.locationId, marinaLocations.id))
           .innerJoin(storageLocations, eq(leases.storageLocationId, storageLocations.id))
-          .innerJoin(periods, eq(leaseCashFlows.periodId, periods.id))
           .where(
             and(
-              gte(periods.periodDate, startDate),
-              lte(periods.periodDate, endDate),
+              buildYearMonthCondition(),
               filterCondition,
               contractTermCondition,
               storageTypeCondition
@@ -2104,16 +2120,14 @@ export async function getExecutiveDashboardMetrics(
           )
       : db
           .select({
-            totalRevenue: sql<string>`COALESCE(SUM(${leaseCashFlows.rentAmount}), 0)`,
+            totalRevenue: sql<string>`COALESCE(SUM(${leaseCashFlows.amount}), 0)`,
           })
           .from(leaseCashFlows)
           .innerJoin(leases, eq(leaseCashFlows.leaseId, leases.id))
           .innerJoin(marinaLocations, eq(leases.locationId, marinaLocations.id))
-          .innerJoin(periods, eq(leaseCashFlows.periodId, periods.id))
           .where(
             and(
-              gte(periods.periodDate, startDate),
-              lte(periods.periodDate, endDate),
+              buildYearMonthCondition(),
               buildLeaseConditions()
             )
           ),
@@ -2353,10 +2367,120 @@ export async function getExecutiveDashboardMetrics(
   };
 }
 
+/**
+ * Get executive revenue trend (aggregated monthly data)
+ */
+export async function getExecutiveRevenueTrend(
+  orgId: string,
+  startDate: string,
+  endDate: string,
+  filterOptions?: KpiFilterOptions
+): Promise<RevenueTrendDataPoint[]> {
+  const filterCondition = buildProjectFilterConditions(marinaLocations, filterOptions);
+  
+  const startDateObj = new Date(startDate);
+  const endDateObj = new Date(endDate);
+  const startYear = startDateObj.getFullYear();
+  const startMonth = startDateObj.getMonth() + 1;
+  const endYear = endDateObj.getFullYear();
+  const endMonth = endDateObj.getMonth() + 1;
+  
+  const result = await db
+    .select({
+      year: leaseCashFlows.year,
+      month: leaseCashFlows.month,
+      totalRevenue: sql<string>`COALESCE(SUM(${leaseCashFlows.amount}), 0)`,
+      leaseCount: sql<number>`CAST(COUNT(DISTINCT ${leaseCashFlows.leaseId}) AS INTEGER)`,
+    })
+    .from(leaseCashFlows)
+    .innerJoin(leases, eq(leaseCashFlows.leaseId, leases.id))
+    .innerJoin(marinaLocations, eq(leases.locationId, marinaLocations.id))
+    .where(
+      and(
+        sql`(
+          (${leaseCashFlows.year} > ${startYear} OR (${leaseCashFlows.year} = ${startYear} AND ${leaseCashFlows.month} >= ${startMonth}))
+          AND
+          (${leaseCashFlows.year} < ${endYear} OR (${leaseCashFlows.year} = ${endYear} AND ${leaseCashFlows.month} <= ${endMonth}))
+        )`,
+        filterCondition
+      )
+    )
+    .groupBy(leaseCashFlows.year, leaseCashFlows.month)
+    .orderBy(leaseCashFlows.year, leaseCashFlows.month);
+  
+  return result.map(row => ({
+    periodDate: `${row.year}-${String(row.month).padStart(2, '0')}-01`,
+    periodLabel: new Date(row.year, row.month - 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+    revenue: row.totalRevenue,
+    leaseCount: row.leaseCount,
+  }));
+}
+
+/**
+ * Get executive revenue trend by storage type
+ */
+export async function getExecutiveRevenueTrendByStorageType(
+  orgId: string,
+  startDate: string,
+  endDate: string,
+  filterOptions?: KpiFilterOptions & { storageTypes?: string[] }
+): Promise<RevenueTrendByStorageType> {
+  const total = await getExecutiveRevenueTrend(orgId, startDate, endDate, filterOptions);
+  return {
+    total,
+    byStorageType: {},
+    storageTypes: [],
+  };
+}
+
+/**
+ * Get executive ancillary revenue trend (placeholder)
+ */
+export async function getExecutiveAncillaryRevenueTrend(
+  orgId: string,
+  startDate: string,
+  endDate: string,
+  filterOptions?: KpiFilterOptions
+): Promise<AncillaryRevenueTrendDataPoint[]> {
+  return [];
+}
+
+/**
+ * Get executive transient revenue trend (placeholder)
+ */
+export async function getExecutiveTransientRevenueTrend(
+  orgId: string,
+  startDate: string,
+  endDate: string,
+  filterOptions?: KpiFilterOptions
+): Promise<RevenueTrendDataPoint[]> {
+  return [];
+}
+
+/**
+ * Get available storage types for executive dashboard filters
+ */
+export async function getExecutiveAvailableStorageTypes(
+  orgId: string,
+  projectIds?: string[]
+): Promise<string[]> {
+  const result = await db
+    .selectDistinct({ storageType: storageLocations.storageType })
+    .from(storageLocations)
+    .innerJoin(marinaLocations, eq(storageLocations.projectId, marinaLocations.id))
+    .where(
+      projectIds?.length
+        ? inArray(marinaLocations.id, projectIds)
+        : eq(marinaLocations.includeInExecutive, true)
+    );
+  
+  return result.map(r => r.storageType).filter(Boolean) as string[];
+}
+
 export interface RevenueTrendDataPoint {
   periodDate: string;
   periodLabel: string;
-  revenue: string;  // Storage revenue only (slip/dock fees, excludes ancillary like electric, liveaboard)
+  revenue: string;
   leaseCount: number;
 }
 
@@ -5299,7 +5423,7 @@ export async function buildOccupancySpans(
   calendar: SeasonCalendar
 ): Promise<OccupancySpan[]> {
   // Get all leases for this project with their tenants and line items
-  const projectLeases = await db.query.leases.findMany({
+  const projectLeases = await db.query.rraLeases.findMany({
     where: eq(leases.locationId, projectId),
     with: {
       tenant: true,
@@ -5460,7 +5584,7 @@ export async function getSeasonalOccupancyMetrics(
   year: number
 ): Promise<SeasonalOccupancyMetrics> {
   // Get project season configuration
-  const project = await db.query.marinaLocations.findFirst({
+  const project = await db.query.rraMarinaLocations.findFirst({
     where: eq(marinaLocations.id, projectId),
   });
   
@@ -5578,7 +5702,7 @@ export async function getSeasonalMoveEvents(
   year: number
 ): Promise<SeasonalMoveEventsMetrics> {
   // Get project season configuration
-  const project = await db.query.marinaLocations.findFirst({
+  const project = await db.query.rraMarinaLocations.findFirst({
     where: eq(marinaLocations.id, projectId),
   });
   
@@ -5596,7 +5720,7 @@ export async function getSeasonalMoveEvents(
   );
   
   // Get all leases for this project
-  const projectLeases = await db.query.leases.findMany({
+  const projectLeases = await db.query.rraLeases.findMany({
     where: eq(leases.locationId, projectId),
   });
   
@@ -5677,7 +5801,7 @@ export async function getSeasonalRevenue(
   year: number
 ): Promise<SeasonalRevenueMetrics> {
   // Get project season configuration  
-  const project = await db.query.marinaLocations.findFirst({
+  const project = await db.query.rraMarinaLocations.findFirst({
     where: eq(marinaLocations.id, projectId),
   });
   
@@ -5747,7 +5871,7 @@ export async function getUnifiedSeasonalMetrics(
   ]);
   
   // Get project for season dates
-  const project = await db.query.marinaLocations.findFirst({
+  const project = await db.query.rraMarinaLocations.findFirst({
     where: eq(marinaLocations.id, projectId),
   });
   
@@ -5799,9 +5923,14 @@ export interface ExecutiveSeasonalMoveEvents {
  * Uses default season dates (May 1 - Oct 31 summer, Nov 1 - Apr 30 winter) for consistency
  */
 export async function getExecutiveSeasonalMoveEvents(
-  year: number,
+  orgId: string,
+  startDate: string,
+  endDate: string,
   filterOptions?: KpiFilterOptions
 ): Promise<ExecutiveSeasonalMoveEvents> {
+  // Extract year from start date for calendar building
+  const year = new Date(startDate).getFullYear();
+  
   // Build default season calendar for executive view (use standard dates)
   const calendar = buildSeasonCalendar(null, null, null, null, year);
   
@@ -5809,7 +5938,7 @@ export async function getExecutiveSeasonalMoveEvents(
   const filterCondition = buildProjectFilterConditions(marinaLocations, filterOptions);
   
   // Get all included projects
-  const projects = await db.query.marinaLocations.findMany({
+  const projects = await db.query.rraMarinaLocations.findMany({
     where: filterCondition,
   });
   
@@ -5825,7 +5954,7 @@ export async function getExecutiveSeasonalMoveEvents(
   }
   
   // Get all leases from included projects
-  const allLeases = await db.query.leases.findMany({
+  const allLeases = await db.query.rraLeases.findMany({
     where: inArray(leases.locationId, projectIds),
   });
   
@@ -5918,7 +6047,7 @@ export async function getContractTermOccupancy(
   storageType?: string
 ): Promise<ContractTermOccupancyMetrics> {
   // Get project for capacity and seasonType
-  const project = await db.query.marinaLocations.findFirst({
+  const project = await db.query.rraMarinaLocations.findFirst({
     where: eq(marinaLocations.id, projectId),
   });
   
@@ -5935,7 +6064,7 @@ export async function getContractTermOccupancy(
   
   if (storageType) {
     // Try to get capacity for specific storage type from storage_locations
-    const storageLocationData = await db.query.storageLocations.findMany({
+    const storageLocationData = await db.query.rraStorageLocations.findMany({
       where: and(
         eq(storageLocations.projectId, projectId),
         eq(storageLocations.storageType, storageType)
@@ -5960,7 +6089,7 @@ export async function getContractTermOccupancy(
   }
   
   // Get all active leases for this project with their contract terms
-  const projectLeases = await db.query.leases.findMany({
+  const projectLeases = await db.query.rraLeases.findMany({
     where: and(...conditions),
     columns: {
       id: true,
@@ -6015,22 +6144,23 @@ export async function getContractTermOccupancy(
  * This enables mixed portfolios (annual + seasonal) to be aggregated correctly.
  */
 export async function getExecutiveContractTermOccupancy(
-  projectType?: "OWNED" | "DEAL",
-  projectIds?: string[],
-  storageType?: string
+  orgId: string,
+  filterOptions?: { projectType?: string; projectIds?: string[]; storageType?: string }
 ): Promise<ContractTermOccupancyMetrics> {
+  const { projectType, projectIds, storageType } = filterOptions || {};
+  
   // Get projects included in executive summary with their season types
   const conditions = [eq(marinaLocations.includeInExecutive, true)];
   
   if (projectType) {
-    conditions.push(eq(marinaLocations.projectType, projectType));
+    conditions.push(eq(marinaLocations.projectType, projectType as any));
   }
   
   if (projectIds && projectIds.length > 0) {
     conditions.push(inArray(marinaLocations.id, projectIds));
   }
   
-  const projects = await db.query.marinaLocations.findMany({
+  const projects = await db.query.rraMarinaLocations.findMany({
     where: and(...conditions),
     columns: {
       id: true,
@@ -6063,7 +6193,7 @@ export async function getExecutiveContractTermOccupancy(
   
   // Get all active leases with their project IDs FIRST
   // We need this to determine which projects have leases of the filtered type
-  const allLeases = await db.query.leases.findMany({
+  const allLeases = await db.query.rraLeases.findMany({
     where: and(...leaseConditions),
     columns: {
       id: true,
@@ -6089,7 +6219,7 @@ export async function getExecutiveContractTermOccupancy(
   
   if (storageType) {
     // Get all storage_locations for these projects to know which have ANY configuration
-    const allStorageLocationData = await db.query.storageLocations.findMany({
+    const allStorageLocationData = await db.query.rraStorageLocations.findMany({
       where: inArray(storageLocations.projectId, projects.map(p => p.id)),
     });
     
@@ -6129,7 +6259,7 @@ export async function getExecutiveContractTermOccupancy(
   } else {
     // "All Types" mode - aggregate capacities from storage_locations if they exist
     // Get all storage_locations for these projects
-    const allStorageLocationData = await db.query.storageLocations.findMany({
+    const allStorageLocationData = await db.query.rraStorageLocations.findMany({
       where: inArray(storageLocations.projectId, projects.map(p => p.id)),
     });
     
@@ -6335,7 +6465,7 @@ export async function getAvailableStorageTypes(
       conditions.push(inArray(marinaLocations.id, projectIds));
     }
     
-    const includedProjects = await db.query.marinaLocations.findMany({
+    const includedProjects = await db.query.rraMarinaLocations.findMany({
       where: and(...conditions),
       columns: { id: true },
     });
@@ -6357,7 +6487,7 @@ export async function getAvailableStorageTypes(
   conditions.push(eq(leases.isActive, true));
   conditions.push(isNotNull(leases.storageType));
   
-  const leasesWithStorage = await db.query.leases.findMany({
+  const leasesWithStorage = await db.query.rraLeases.findMany({
     where: and(...conditions),
     columns: {
       storageType: true,
@@ -6389,7 +6519,7 @@ export async function getLeasesByStorageLocation(
   projectId: string
 ): Promise<StorageLocationLeaseBreakdown[]> {
   // Get all storage locations for this project
-  const storageLocationsList = await db.query.storageLocations.findMany({
+  const storageLocationsList = await db.query.rraStorageLocations.findMany({
     where: eq(storageLocations.marinaLocationId, projectId),
     columns: {
       id: true,
@@ -6401,7 +6531,7 @@ export async function getLeasesByStorageLocation(
   
   if (storageLocationsList.length === 0) {
     // If no storage locations, return a single "Unassigned" category
-    const allLeases = await db.query.leases.findMany({
+    const allLeases = await db.query.rraLeases.findMany({
       where: eq(leases.locationId, projectId),
       columns: {
         id: true,
@@ -6425,7 +6555,7 @@ export async function getLeasesByStorageLocation(
   }
   
   // Get all leases for this project with storage location assignments
-  const allLeases = await db.query.leases.findMany({
+  const allLeases = await db.query.rraLeases.findMany({
     where: eq(leases.locationId, projectId),
     columns: {
       id: true,
@@ -6504,21 +6634,23 @@ export interface AvgBoatSizeMetrics {
  * Returns weighted averages by the count of boats in each project/contract type.
  */
 export async function getExecutiveAvgBoatSize(
-  projectType?: "OWNED" | "DEAL",
-  projectIds?: string[]
+  orgId: string,
+  filterOptions?: { projectType?: string; projectIds?: string[]; storageType?: string }
 ): Promise<AvgBoatSizeMetrics> {
+  const { projectType, projectIds } = filterOptions || {};
+  
   // Get projects included in executive summary
   const conditions = [eq(marinaLocations.includeInExecutive, true)];
   
   if (projectType) {
-    conditions.push(eq(marinaLocations.projectType, projectType));
+    conditions.push(eq(marinaLocations.projectType, projectType as any));
   }
   
   if (projectIds && projectIds.length > 0) {
     conditions.push(inArray(marinaLocations.id, projectIds));
   }
   
-  const projects = await db.query.marinaLocations.findMany({
+  const projects = await db.query.rraMarinaLocations.findMany({
     where: and(...conditions),
     columns: {
       id: true,

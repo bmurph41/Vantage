@@ -47,6 +47,7 @@ import emailMarketingRoutes from "./routes/email-marketing-routes";
 import archiveRoutes from "./routes/archive-routes";
 import marinalyticsRoutes from "./routes/marinalytics-routes";
 import aiAssistantRoutes from "./routes/ai-assistant-routes";
+import executiveDashboardRoutes from "./routes/executive-dashboard-routes";
 import { userSessions, insertProspectingEntrySchema, users } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { rentRollService } from "./services/rent-roll-service";
@@ -393,6 +394,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/docktalk/v2", authenticateUser, enforceTenant, scraperV2Routes);
   app.use("/api/pnl", authenticateUser, enforceTenant, pnlRouter);
   app.use("/api/rent-roll", authenticateUser, enforceTenant, requireRentRoll(), rraRoutes);
+  app.use("/api/executive-dashboard", authenticateUser, enforceTenant, requireRentRoll(), executiveDashboardRoutes);
   app.use("/api/capital-markets", authenticateUser, enforceTenant, capitalMarketsRouter);
   app.use("/api/listings/v2", authenticateUser, enforceTenant, liv2Routes);
   app.use("/api/funds", authenticateUser, requireFundManagement());

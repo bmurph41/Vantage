@@ -2659,4 +2659,192 @@ router.get("/import/target-fields", async (req: Request, res: Response, next: Ne
   }
 });
 
+// ============================================================================
+// EXECUTIVE DASHBOARD ROUTES - Aggregate metrics across included projects
+// ============================================================================
+
+// Executive Dashboard KPIs (aggregated across all included projects)
+router.get("/executive-dashboard/metrics", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { startDate, endDate, projectType, projectIds, seasonMode, storageType } = req.query;
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "startDate and endDate are required" });
+    }
+    
+    const metrics = await rentRollService.getExecutiveDashboardMetrics(
+      orgId,
+      startDate as string,
+      endDate as string,
+      {
+        projectType: projectType as string | undefined,
+        projectIds: projectIds ? (projectIds as string).split(',') : undefined,
+        seasonMode: seasonMode as string | undefined,
+        storageType: storageType as string | undefined,
+      }
+    );
+    res.json(metrics);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Executive Dashboard Revenue Trend
+router.get("/executive-dashboard/revenue-trend", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { startDate, endDate, projectType, projectIds } = req.query;
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "startDate and endDate are required" });
+    }
+    
+    const trend = await rentRollService.getExecutiveRevenueTrend(
+      orgId,
+      startDate as string,
+      endDate as string,
+      {
+        projectType: projectType as string | undefined,
+        projectIds: projectIds ? (projectIds as string).split(',') : undefined,
+      }
+    );
+    res.json(trend);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Executive Dashboard Revenue Trend by Storage Type
+router.get("/executive-dashboard/revenue-trend-by-storage-type", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { startDate, endDate, projectType, projectIds, storageTypes } = req.query;
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "startDate and endDate are required" });
+    }
+    
+    const trend = await rentRollService.getExecutiveRevenueTrendByStorageType(
+      orgId,
+      startDate as string,
+      endDate as string,
+      {
+        projectType: projectType as string | undefined,
+        projectIds: projectIds ? (projectIds as string).split(',') : undefined,
+        storageTypes: storageTypes ? (storageTypes as string).split(',') : undefined,
+      }
+    );
+    res.json(trend);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Executive Dashboard Ancillary Revenue Trend
+router.get("/executive-dashboard/ancillary-revenue-trend", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { startDate, endDate, projectType, projectIds } = req.query;
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "startDate and endDate are required" });
+    }
+    
+    const trend = await rentRollService.getExecutiveAncillaryRevenueTrend(
+      orgId,
+      startDate as string,
+      endDate as string,
+      {
+        projectType: projectType as string | undefined,
+        projectIds: projectIds ? (projectIds as string).split(',') : undefined,
+      }
+    );
+    res.json(trend);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Executive Dashboard Transient Revenue Trend
+router.get("/executive-dashboard/transient-revenue-trend", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { startDate, endDate, projectType, projectIds } = req.query;
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "startDate and endDate are required" });
+    }
+    
+    const trend = await rentRollService.getExecutiveTransientRevenueTrend(
+      orgId,
+      startDate as string,
+      endDate as string,
+      {
+        projectType: projectType as string | undefined,
+        projectIds: projectIds ? (projectIds as string).split(',') : undefined,
+      }
+    );
+    res.json(trend);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Executive Dashboard Contract Term Occupancy
+router.get("/executive-dashboard/contract-term-occupancy", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectType, projectIds, storageType } = req.query;
+    
+    const metrics = await rentRollService.getExecutiveContractTermOccupancy(
+      orgId,
+      {
+        projectType: projectType as string | undefined,
+        projectIds: projectIds ? (projectIds as string).split(',') : undefined,
+        storageType: storageType as string | undefined,
+      }
+    );
+    res.json(metrics);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Executive Dashboard Available Storage Types
+router.get("/executive-dashboard/available-storage-types", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectIds } = req.query;
+    
+    const types = await rentRollService.getExecutiveAvailableStorageTypes(
+      orgId,
+      projectIds ? (projectIds as string).split(',') : undefined
+    );
+    res.json(types);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Executive Dashboard Avg Boat Size
+router.get("/executive-dashboard/avg-boat-size", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectType, projectIds, storageType } = req.query;
+    
+    const metrics = await rentRollService.getExecutiveAvgBoatSize(
+      orgId,
+      {
+        projectType: projectType as string | undefined,
+        projectIds: projectIds ? (projectIds as string).split(',') : undefined,
+        storageType: storageType as string | undefined,
+      }
+    );
+    res.json(metrics);
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
