@@ -73,7 +73,7 @@ interface MarinaGroup {
   city: string;
   state: string;
   rates: RateComp[];
-  primaryStorageType: string;
+  stackedStorageTypes: string[];
   primaryRate: string | null;
   primaryYear: number | null;
 }
@@ -106,9 +106,6 @@ export default function CompsDataGrid({
       const key = comp.marina?.toLowerCase().trim() || comp.id;
       
       if (!groups[key]) {
-        const storageType = comp.storageType || 'unknown';
-        const storageLabel = STORAGE_TYPE_LABELS[storageType as keyof typeof STORAGE_TYPE_LABELS] || storageType;
-        
         let rateText: string | null = null;
         if (comp.rateAmount) {
           const amount = Number(comp.rateAmount) / 100;
@@ -129,13 +126,25 @@ export default function CompsDataGrid({
           city: comp.city || '',
           state: comp.state || '',
           rates: [],
-          primaryStorageType: storageLabel,
+          stackedStorageTypes: [],
           primaryRate: rateText,
           primaryYear: year,
         };
       }
       
       groups[key].rates.push(comp);
+    });
+    
+    Object.values(groups).forEach(group => {
+      const uniqueTypes = new Set<string>();
+      group.rates.forEach(rate => {
+        const storageType = rate.storageType || '';
+        if (storageType) {
+          const label = STORAGE_TYPE_LABELS[storageType as keyof typeof STORAGE_TYPE_LABELS] || storageType;
+          uniqueTypes.add(label);
+        }
+      });
+      group.stackedStorageTypes = Array.from(uniqueTypes);
     });
     
     return Object.values(groups);
@@ -154,12 +163,12 @@ export default function CompsDataGrid({
   }, []);
 
   const defaultColumns = [
-    { key: 'marina', label: 'Marina', width: 260, sortable: true },
+    { key: 'expand', label: '', width: 40, sortable: false },
+    { key: 'marina', label: 'Marina', width: 240, sortable: true },
     { key: 'location', label: 'Location', width: 160, sortable: true },
-    { key: 'storageType', label: 'Storage Type', width: 120, sortable: false },
+    { key: 'storageType', label: 'Storage Type', width: 160, sortable: false },
     { key: 'rate', label: 'Rate', width: 140, sortable: false },
     { key: 'year', label: 'Year', width: 70, sortable: false },
-    { key: 'expand', label: '', width: 50, sortable: false },
     { key: 'actions', label: '', width: 60, sortable: false },
   ];
 
@@ -629,7 +638,22 @@ export default function CompsDataGrid({
                             />
                           </TableCell>
                           
-                          <TableCell style={{ width: '260px', minWidth: '260px' }}>
+                          <TableCell style={{ width: '40px', minWidth: '40px' }} className="px-1">
+                            {hasMultipleRates && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleRowExpanded(group.id);
+                                }}
+                                className="flex items-center justify-center w-6 h-6 rounded hover:bg-muted transition-colors"
+                                aria-expanded={isExpanded}
+                              >
+                                <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+                              </button>
+                            )}
+                          </TableCell>
+                          
+                          <TableCell style={{ width: '240px', minWidth: '240px' }}>
                             <div className="flex items-center gap-2">
                               <span 
                                 className="truncate font-medium text-primary cursor-pointer hover:underline"
@@ -651,8 +675,16 @@ export default function CompsDataGrid({
                             </span>
                           </TableCell>
                           
-                          <TableCell style={{ width: '120px', minWidth: '120px' }}>
-                            <span className="text-sm">{group.primaryStorageType || '—'}</span>
+                          <TableCell style={{ width: '160px', minWidth: '160px' }}>
+                            {group.stackedStorageTypes.length > 0 ? (
+                              <div className="flex flex-col gap-0.5">
+                                {group.stackedStorageTypes.map((type, idx) => (
+                                  <span key={idx} className="text-sm leading-tight">{type}</span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                           
                           <TableCell style={{ width: '140px', minWidth: '140px' }}>
@@ -661,21 +693,6 @@ export default function CompsDataGrid({
                           
                           <TableCell style={{ width: '70px', minWidth: '70px' }}>
                             <span className="text-sm">{group.primaryYear || '—'}</span>
-                          </TableCell>
-                          
-                          <TableCell style={{ width: '50px', minWidth: '50px' }} className="text-center px-2">
-                            {hasMultipleRates && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleRowExpanded(group.id);
-                                }}
-                                className="flex items-center justify-center w-6 h-6 rounded hover:bg-muted transition-colors"
-                                aria-expanded={isExpanded}
-                              >
-                                <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
-                              </button>
-                            )}
                           </TableCell>
                           
                           <TableCell style={{ width: '60px', minWidth: '60px' }}>
@@ -714,11 +731,12 @@ export default function CompsDataGrid({
                         {isExpanded && hasMultipleRates && (
                           <tr key={`${group.id}-expanded`}>
                             <td colSpan={defaultColumns.length + 1} className="bg-muted/30 border-b border-border/50 p-0">
-                              <div className="py-2 px-4 pl-14">
+                              <div className="py-2 px-4 pl-16">
                                 <div className="space-y-1">
                                   {group.rates.map((rate) => {
-                                    const storageType = rate.storageType || 'unknown';
-                                    const storageLabel = STORAGE_TYPE_LABELS[storageType as keyof typeof STORAGE_TYPE_LABELS] || storageType;
+                                    const storageType = rate.storageType || '';
+                                    const storageLabel = storageType ? (STORAGE_TYPE_LABELS[storageType as keyof typeof STORAGE_TYPE_LABELS] || storageType) : '—';
+                                    const rateName = rate.rateName || rate.name || '—';
                                     let rateText = '—';
                                     if (rate.rateAmount) {
                                       const amount = Number(rate.rateAmount) / 100;
@@ -737,8 +755,9 @@ export default function CompsDataGrid({
                                         key={rate.id}
                                         className="flex items-center gap-4 py-1.5 px-2 rounded hover:bg-muted/50 text-sm"
                                       >
-                                        <span className="w-24 text-muted-foreground">{storageLabel}</span>
-                                        <span className="w-28 font-medium">{rateText}</span>
+                                        <span className="w-32 font-medium">{rateName}</span>
+                                        <span className="w-28 text-muted-foreground">{storageLabel}</span>
+                                        <span className="w-28">{rateText}</span>
                                         <span className="w-16 text-muted-foreground">{year}</span>
                                         <button
                                           onClick={() => {
