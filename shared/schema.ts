@@ -2997,7 +2997,54 @@ export const rraMoveEvents = pgTable("rra_move_events", {
   dateIdx: index("rra_move_events_date_idx").on(table.eventDate),
 }));
 
-// 13. RRA Snapshot Versions
+// 13. RRA Periods - Monthly periods for revenue tracking
+export const rraPeriods = pgTable("rra_periods", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id"),
+  locationId: varchar("location_id"),
+  periodDate: date("period_date").notNull(),
+  label: text("label"),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  locationIdx: index("rra_periods_location_idx").on(table.locationId),
+  dateIdx: index("rra_periods_date_idx").on(table.periodDate),
+  yearMonthIdx: index("rra_periods_year_month_idx").on(table.year, table.month),
+}));
+
+// 14. RRA Project Details Config
+export const rraProjectDetailsConfig = pgTable("rra_project_details_config", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id"),
+  projectId: varchar("project_id").notNull(),
+  seasonStartDate: date("season_start_date"),
+  seasonEndDate: date("season_end_date"),
+  winterStartDate: date("winter_start_date"),
+  winterEndDate: date("winter_end_date"),
+  defaultContractTerm: text("default_contract_term"),
+  config: jsonb("config"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  projectIdx: unique("rra_project_details_config_project_idx").on(table.projectId),
+}));
+
+// 15. RRA P&L Rack Revenue - Track actual rack revenue vs contracted
+export const rraPnlRackRevenue = pgTable("rra_pnl_rack_revenue", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id"),
+  locationId: varchar("location_id").notNull(),
+  periodId: varchar("period_id").notNull(),
+  amount: numeric("amount", { precision: 14, scale: 2 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  locationIdx: index("rra_pnl_rack_revenue_location_idx").on(table.locationId),
+  periodIdx: index("rra_pnl_rack_revenue_period_idx").on(table.periodId),
+  uniqueLocationPeriod: unique("rra_pnl_rack_revenue_unique").on(table.locationId, table.periodId),
+}));
+
+// 16. RRA Snapshot Versions
 export const rraSnapshotVersions = pgTable("rra_snapshot_versions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
@@ -19607,6 +19654,33 @@ export const MARINALYTICS_STANDARD_METRICS = [
   { metricKey: 'capex_per_foot', name: 'CapEx per Linear Foot', category: 'capital', unit: 'currency_per_foot' },
   { metricKey: 'service_dept_margin', name: 'Service Department Gross Margin', category: 'margin', unit: 'percentage' },
 ] as const;
+
+// ============================================================================
+// RRA NEW TABLE TYPES - Types for rraPeriods, rraProjectDetailsConfig, rraPnlRackRevenue
+// ============================================================================
+
+export type RraPeriod = typeof rraPeriods.$inferSelect;
+export type InsertRraPeriod = typeof rraPeriods.$inferInsert;
+export type RraProjectDetailsConfig = typeof rraProjectDetailsConfig.$inferSelect;
+export type InsertRraProjectDetailsConfig = typeof rraProjectDetailsConfig.$inferInsert;
+export type RraPnlRackRevenue = typeof rraPnlRackRevenue.$inferSelect;
+export type InsertRraPnlRackRevenue = typeof rraPnlRackRevenue.$inferInsert;
+
+// ============================================================================
+// RENT ROLL V2 SERVICE ALIASES - Compatibility layer for rentRollService.ts
+// These map expected imports to existing RRA tables (only non-conflicting exports)
+// ============================================================================
+
+// Table aliases - map short names to RRA-prefixed tables
+export const tenants = rraTenants;
+export const periods = rraPeriods;
+export const projectDetailsConfig = rraProjectDetailsConfig;
+export const pnlRackRevenue = rraPnlRackRevenue;
+
+// Type aliases - map short type names to RRA types
+export type Tenant = RraTenant;
+export type Period = RraPeriod;
+export type InsertTenant = InsertRraTenant;
 
 // Replit Auth models
 export * from "./models/auth";

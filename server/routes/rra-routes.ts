@@ -14,6 +14,7 @@ import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import { createRequire } from "module";
+import * as rentRollService from "../services/rent-roll-v2/rentRollService";
 
 const require = createRequire(import.meta.url);
 import { ilike, eq, and, or, desc } from "drizzle-orm";
@@ -1063,6 +1064,187 @@ router.delete("/locations/:id", async (req: Request, res: Response, next: NextFu
     const orgId = getOrgId(req);
     await rraService.deleteLocation(orgId, req.params.id);
     res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============================================================================
+// PROJECT OVERVIEW ROUTES - Drive all project tabs/KPIs from lease data
+// ============================================================================
+
+// Project KPIs (Total Storage Revenue, Active Leases, Occupancy, Avg Lease Value)
+router.get("/:locationId/overview/metrics", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.params;
+    const { startDate, endDate } = req.query;
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "startDate and endDate are required" });
+    }
+    
+    const metrics = await rentRollService.getProjectKPIs(
+      locationId, 
+      startDate as string, 
+      endDate as string
+    );
+    res.json(metrics);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Move events (move-ins, move-outs, net change, avg vessel size)
+router.get("/:locationId/overview/move-events", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.params;
+    const { startDate, endDate } = req.query;
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "startDate and endDate are required" });
+    }
+    
+    const moveEvents = await rentRollService.getProjectMoveEvents(
+      locationId,
+      startDate as string,
+      endDate as string
+    );
+    res.json(moveEvents);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Revenue trend (monthly breakdown for charts)
+router.get("/:locationId/overview/revenue-trend", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.params;
+    const { startDate, endDate } = req.query;
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "startDate and endDate are required" });
+    }
+    
+    const trend = await rentRollService.getProjectRevenueTrend(
+      locationId,
+      startDate as string,
+      endDate as string
+    );
+    res.json(trend);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Revenue by storage type (pie chart data)
+router.get("/:locationId/overview/revenue-by-storage", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.params;
+    const { startDate, endDate } = req.query;
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "startDate and endDate are required" });
+    }
+    
+    const revenueByStorage = await rentRollService.getProjectRevenueByStorage(
+      locationId,
+      startDate as string,
+      endDate as string
+    );
+    res.json(revenueByStorage);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Economic vacancy metrics
+router.get("/:locationId/overview/economic-vacancy", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.params;
+    
+    const vacancyMetrics = await rentRollService.getEconomicVacancyMetrics(locationId);
+    res.json(vacancyMetrics);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Seasonal occupancy metrics
+router.get("/:locationId/overview/seasonal-occupancy", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.params;
+    const { year } = req.query;
+    
+    const yearNum = parseInt(year as string) || new Date().getFullYear();
+    const seasonalOccupancy = await rentRollService.getSeasonalOccupancyMetrics(locationId, yearNum);
+    res.json(seasonalOccupancy);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Contract term-based occupancy metrics
+router.get("/:locationId/overview/contract-term-occupancy", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.params;
+    const { storageType } = req.query;
+    
+    const occupancy = await rentRollService.getContractTermOccupancy(
+      locationId,
+      storageType as string | undefined
+    );
+    res.json(occupancy);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Available storage types for filter dropdowns
+router.get("/:locationId/overview/available-storage-types", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.params;
+    const storageTypes = await rentRollService.getAvailableStorageTypes(locationId);
+    res.json(storageTypes);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Seasonal move events metrics
+router.get("/:locationId/overview/seasonal-move-events", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.params;
+    const { year } = req.query;
+    
+    const yearNum = parseInt(year as string) || new Date().getFullYear();
+    const seasonalMoveEvents = await rentRollService.getSeasonalMoveEvents(locationId, yearNum);
+    res.json(seasonalMoveEvents);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Move event lease details for drill-down modal
+router.get("/:locationId/overview/move-event-leases", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.params;
+    const { startDate, endDate, eventType } = req.query;
+    
+    if (!startDate || !endDate || !eventType) {
+      return res.status(400).json({ error: "startDate, endDate, and eventType are required" });
+    }
+    
+    if (eventType !== "move-in" && eventType !== "move-out") {
+      return res.status(400).json({ error: "eventType must be 'move-in' or 'move-out'" });
+    }
+    
+    const leases = await rentRollService.getProjectMoveEventLeases(
+      locationId,
+      startDate as string,
+      endDate as string,
+      eventType as "move-in" | "move-out"
+    );
+    res.json(leases);
   } catch (error) {
     next(error);
   }
