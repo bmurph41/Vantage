@@ -6368,6 +6368,59 @@ export const salesComps = pgTable('sales_comps', {
   noiPerSlip: integer('noi_per_slip'), // Computed: noi / (wetSlips + dryRacks)
   totalUnits: integer('total_units'), // Computed: wetSlips + dryRacks
 
+  // === MARINA COMPS ENGINE FIELDS ===
+  
+  // Land storage capacity
+  landStorageSqft: integer('land_storage_sqft'),
+  
+  // Capacity Index for similarity scoring (slips + racks * 0.75)
+  capacityIndex: decimal('capacity_index', { precision: 10, scale: 2 }),
+  pricePerCapacityIndex: decimal('price_per_capacity_index', { precision: 12, scale: 2 }),
+  pricePerRack: integer('price_per_rack'), // Computed: salePrice / dryRacks
+  
+  // Deal Flags for transaction classification
+  dealFlags: jsonb('deal_flags').$type<{
+    portfolio?: boolean;
+    distressed?: boolean;
+    relatedParty?: boolean;
+    saleLeaseback?: boolean;
+    bankruptcySale?: boolean;
+    foreclosure?: boolean;
+    offMarket?: boolean;
+    auction?: boolean;
+  }>().default({}),
+  
+  // Slip Mix (length bucket distributions for similarity scoring)
+  slipMix: jsonb('slip_mix').$type<{
+    slips_under_30ft?: number;
+    slips_30_40ft?: number;
+    slips_40_50ft?: number;
+    slips_50_60ft?: number;
+    slips_over_60ft?: number;
+    power_30a?: number;
+    power_50a?: number;
+    power_100a?: number;
+  }>().default({}),
+  
+  // Operational capabilities/profile (for similarity scoring)
+  operationalProfile: jsonb('operational_profile').$type<{
+    travelLiftTons?: number;
+    forkliftCapacity?: number;
+    maxLoaService?: number;
+    fuelDock?: boolean;
+    serviceYard?: boolean;
+    shipStore?: boolean;
+    brokerage?: boolean;
+    rentals?: boolean;
+    boatClub?: boolean;
+    waterfrontAccessNotes?: string;
+    bridgeClearance?: number;
+    channelDepth?: number;
+  }>().default({}),
+  
+  // Quality tier for condition scoring
+  qualityTier: text('quality_tier'), // 'A' | 'B' | 'C' | 'D'
+
   // Expandable data
   custom: jsonb('custom').$type<Record<string, unknown>>().default({}),
 }, (table) => ({
@@ -7864,6 +7917,59 @@ export const rateComps = pgTable('rate_comps', {
   sellerContactId: varchar('seller_contact_id').references(() => crmContacts.id, { onDelete: 'set null' }),
   buyerCompanyId: varchar('buyer_company_id').references(() => crmCompanies.id, { onDelete: 'set null' }),
   buyerContactId: varchar('buyer_contact_id').references(() => crmContacts.id, { onDelete: 'set null' }),
+
+  // === MARINA COMPS ENGINE FIELDS ===
+  
+  // Rate structure fields (for Rate Comp Engine)
+  wetRateUnit: text('wet_rate_unit'), // 'PER_FT_PER_MONTH' | 'PER_SLIP_PER_MONTH' | 'PER_FT_PER_YEAR' | 'SEASONAL' | 'OTHER'
+  wetRateValue: decimal('wet_rate_value', { precision: 12, scale: 2 }),
+  rackRateUnit: text('rack_rate_unit'),
+  rackRateValue: decimal('rack_rate_value', { precision: 12, scale: 2 }),
+  landRateUnit: text('land_rate_unit'), // 'PER_SQFT_PER_MONTH' | 'PER_SQFT_PER_YEAR' | 'OTHER'
+  landRateValue: decimal('land_rate_value', { precision: 12, scale: 2 }),
+  landStorageSqft: integer('land_storage_sqft'),
+  
+  // Utilization metrics
+  wetOccupancyPct: integer('wet_occupancy_pct'), // 0-100
+  rackUtilizationPct: integer('rack_utilization_pct'), // 0-100
+  
+  // Slip Mix (length bucket distributions for similarity scoring)
+  slipMix: jsonb('slip_mix').$type<{
+    slips_under_30ft?: number;
+    slips_30_40ft?: number;
+    slips_40_50ft?: number;
+    slips_50_60ft?: number;
+    slips_over_60ft?: number;
+    power_30a?: number;
+    power_50a?: number;
+    power_100a?: number;
+  }>().default({}),
+  
+  // Operational capabilities (for similarity scoring)
+  capabilities: jsonb('capabilities').$type<{
+    travelLiftTons?: number;
+    forkliftCapacity?: number;
+    maxLoaService?: number;
+    fuelDock?: boolean;
+    serviceYard?: boolean;
+    shipStore?: boolean;
+    brokerage?: boolean;
+    rentals?: boolean;
+    boatClub?: boolean;
+    waterfrontAccessNotes?: string;
+    bridgeClearance?: number;
+    channelDepth?: number;
+  }>().default({}),
+  
+  // Computed capacity index (slips + racks * 0.75)
+  capacityIndex: decimal('capacity_index', { precision: 10, scale: 2 }),
+  
+  // Source type for provenance tracking
+  sourceType: text('source_type'), // 'Manual' | 'BrokerQuote' | 'Website' | 'Survey' | 'Import'
+  sourceConfidence: integer('source_confidence'), // 0-100
+  
+  // Quality tier for condition scoring
+  qualityTier: text('quality_tier'), // 'A' | 'B' | 'C' | 'D'
 
   // Expandable data
   custom: jsonb('custom').$type<Record<string, unknown>>().default({}),
@@ -10959,6 +11065,375 @@ export type InsertRcMetricPoint = z.infer<typeof insertRcMetricPointSchema>;
 export type RcMetricAlert = typeof rcMetricAlerts.$inferSelect;
 export type InsertRcMetricAlert = z.infer<typeof insertRcMetricAlertSchema>;
 export type UpdateRcMetricAlert = z.infer<typeof updateRcMetricAlertSchema>;
+
+// ============================================================================
+// MARINA COMPS ENGINE - Advanced Comp Sets with Similarity Scoring
+// ============================================================================
+
+// Slip Mix type for length bucket distributions
+export const slipMixSchema = z.object({
+  slips_under_30ft: z.number().optional(),
+  slips_30_40ft: z.number().optional(),
+  slips_40_50ft: z.number().optional(),
+  slips_50_60ft: z.number().optional(),
+  slips_over_60ft: z.number().optional(),
+  power_30a: z.number().optional(),
+  power_50a: z.number().optional(),
+  power_100a: z.number().optional(),
+});
+export type SlipMix = z.infer<typeof slipMixSchema>;
+
+// Marina Capabilities type
+export const marinaCapabilitiesSchema = z.object({
+  travelLiftTons: z.number().optional(),
+  forkliftCapacity: z.number().optional(),
+  maxLoaService: z.number().optional(),
+  fuelDock: z.boolean().optional(),
+  serviceYard: z.boolean().optional(),
+  shipStore: z.boolean().optional(),
+  brokerage: z.boolean().optional(),
+  rentals: z.boolean().optional(),
+  boatClub: z.boolean().optional(),
+  waterfrontAccessNotes: z.string().optional(),
+  bridgeClearance: z.number().optional(),
+  channelDepth: z.number().optional(),
+});
+export type MarinaCapabilities = z.infer<typeof marinaCapabilitiesSchema>;
+
+// Deal Flags for Sales Comps
+export const dealFlagsSchema = z.object({
+  portfolio: z.boolean().optional(),
+  distressed: z.boolean().optional(),
+  relatedParty: z.boolean().optional(),
+  saleLeaseback: z.boolean().optional(),
+  bankruptcySale: z.boolean().optional(),
+  foreclosure: z.boolean().optional(),
+  offMarket: z.boolean().optional(),
+  auction: z.boolean().optional(),
+});
+export type DealFlags = z.infer<typeof dealFlagsSchema>;
+
+// Scoring Config for Comp Sets
+export const scoringConfigSchema = z.object({
+  weights: z.object({
+    geo: z.number().min(0).max(1).default(0.25),
+    travelTime: z.number().min(0).max(1).default(0.10),
+    capacity: z.number().min(0).max(1).default(0.20),
+    slipMix: z.number().min(0).max(1).default(0.15),
+    capabilities: z.number().min(0).max(1).default(0.20),
+    condition: z.number().min(0).max(1).default(0.10),
+  }).optional(),
+  exponentP: z.number().default(2),
+  useTravelTime: z.boolean().default(false),
+});
+export type ScoringConfig = z.infer<typeof scoringConfigSchema>;
+
+// Adjustment Config for Comp Sets
+export const adjustmentConfigSchema = z.object({
+  timeAdjustmentPctPerYear: z.number().optional(),
+  capabilityAdjustments: z.record(z.number()).optional(),
+  unitNormalization: z.object({
+    wetRateUnit: z.enum(['PER_FT_PER_MONTH', 'PER_SLIP_PER_MONTH', 'PER_FT_PER_YEAR', 'SEASONAL', 'OTHER']).optional(),
+    rackRateUnit: z.enum(['PER_FT_PER_MONTH', 'PER_SLIP_PER_MONTH', 'PER_FT_PER_YEAR', 'SEASONAL', 'OTHER']).optional(),
+    landRateUnit: z.enum(['PER_SQFT_PER_MONTH', 'PER_SQFT_PER_YEAR', 'OTHER']).optional(),
+  }).optional(),
+  outlierTrim: z.enum(['none', 'iqr', 'zscore']).default('none'),
+});
+export type AdjustmentConfig = z.infer<typeof adjustmentConfigSchema>;
+
+// Filters Config for Comp Sets
+export const compSetFiltersSchema = z.object({
+  radiusMiles: z.number().optional(),
+  states: z.array(z.string()).optional(),
+  regions: z.array(z.string()).optional(),
+  minSlips: z.number().optional(),
+  maxSlips: z.number().optional(),
+  minRacks: z.number().optional(),
+  maxRacks: z.number().optional(),
+  mustHaveFeatures: z.array(z.string()).optional(),
+  waterTypes: z.array(z.string()).optional(),
+  bodyOfWater: z.string().optional(),
+});
+export type CompSetFilters = z.infer<typeof compSetFiltersSchema>;
+
+// Compute Result for Rate Sets
+export const rateSetComputeResultSchema = z.object({
+  indicatedWetRate: z.number().optional(),
+  indicatedRackRate: z.number().optional(),
+  indicatedLandRate: z.number().optional(),
+  wetRateUnit: z.string().optional(),
+  rackRateUnit: z.string().optional(),
+  landRateUnit: z.string().optional(),
+  compsUsed: z.number(),
+  outliersTrimmed: z.number().optional(),
+  computedAt: z.string(),
+});
+export type RateSetComputeResult = z.infer<typeof rateSetComputeResultSchema>;
+
+// Compute Result for Sales Sets
+export const salesSetComputeResultSchema = z.object({
+  indicatedPricePerSlip: z.number().optional(),
+  indicatedPricePerRack: z.number().optional(),
+  indicatedPricePerCapacityIndex: z.number().optional(),
+  indicatedTotalValue: z.number().optional(),
+  subjectCapacityIndex: z.number().optional(),
+  compsUsed: z.number(),
+  outliersTrimmed: z.number().optional(),
+  computedAt: z.string(),
+});
+export type SalesSetComputeResult = z.infer<typeof salesSetComputeResultSchema>;
+
+// Marina Subjects - The target marina being compared against
+export const marinaSubjects = pgTable('marina_subjects', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  updatedBy: varchar('updated_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  deletedAt: timestamp('deleted_at'),
+
+  // Identity
+  name: text('name').notNull(),
+  
+  // Address
+  address: text('address'),
+  city: text('city'),
+  state: text('state'),
+  zip: text('zip'),
+  county: text('county'),
+  lat: decimal('lat', { precision: 10, scale: 7 }),
+  lng: decimal('lng', { precision: 10, scale: 7 }),
+  
+  // Capacity
+  slipsTotal: integer('slips_total'),
+  racksTotal: integer('racks_total'),
+  landStorageSqft: integer('land_storage_sqft'),
+  capacityIndex: decimal('capacity_index', { precision: 10, scale: 2 }), // slipsTotal + racksTotal * 0.75
+  
+  // Slip Mix (length bucket distributions)
+  slipMix: jsonb('slip_mix').$type<SlipMix>().default({}),
+  
+  // Operational capabilities
+  capabilities: jsonb('capabilities').$type<MarinaCapabilities>().default({}),
+  
+  // Water context
+  waterType: text('water_type'), // 'Coastal'|'Lake'|'River'
+  bodyOfWater: text('body_of_water'),
+  waterBodyName: text('water_body_name'),
+  
+  // Links
+  propertyId: varchar('property_id').references(() => crmProperties.id, { onDelete: 'set null' }),
+  dealId: varchar('deal_id').references(() => crmDeals.id, { onDelete: 'set null' }),
+  
+  notes: text('notes'),
+}, (table) => ({
+  orgIdx: index('marina_subjects_org_idx').on(table.orgId),
+  orgNameIdx: index('marina_subjects_org_name_idx').on(table.orgId, table.name),
+}));
+
+// Comp Sets - Saved filter configurations with scoring
+export const compSets = pgTable('comp_sets', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  updatedBy: varchar('updated_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  deletedAt: timestamp('deleted_at'),
+
+  // Identity
+  name: text('name').notNull(),
+  compType: text('comp_type').notNull(), // 'RATE' | 'SALE'
+  
+  // Subject reference
+  subjectId: varchar('subject_id').references(() => marinaSubjects.id, { onDelete: 'set null' }),
+  
+  // Configuration
+  filters: jsonb('filters').$type<CompSetFilters>().default({}),
+  scoringConfig: jsonb('scoring_config').$type<ScoringConfig>().default({}),
+  adjustmentConfig: jsonb('adjustment_config').$type<AdjustmentConfig>().default({}),
+  
+  // Last compute result
+  lastComputeResult: jsonb('last_compute_result').$type<RateSetComputeResult | SalesSetComputeResult>(),
+  lastComputedAt: timestamp('last_computed_at'),
+  lastComputedBy: varchar('last_computed_by').references(() => users.id, { onDelete: 'set null' }),
+  
+  notes: text('notes'),
+}, (table) => ({
+  orgIdx: index('comp_sets_org_idx').on(table.orgId),
+  orgTypeIdx: index('comp_sets_org_type_idx').on(table.orgId, table.compType),
+  subjectIdx: index('comp_sets_subject_idx').on(table.subjectId),
+}));
+
+// Comp Set Items - Junction table for selected comps with scoring
+export const compSetItems = pgTable('comp_set_items', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  compSetId: varchar('comp_set_id').notNull().references(() => compSets.id, { onDelete: 'cascade' }),
+  
+  // Comp reference (one of these will be set based on compType)
+  rateCompId: varchar('rate_comp_id').references(() => rateComps.id, { onDelete: 'cascade' }),
+  salesCompId: varchar('sales_comp_id').references(() => salesComps.id, { onDelete: 'cascade' }),
+  
+  // Selection status
+  included: boolean('included').notNull().default(true),
+  
+  // Scoring
+  similarityScore: integer('similarity_score'), // 0-100
+  normalizedWeight: decimal('normalized_weight', { precision: 5, scale: 4 }), // 0.0000 - 1.0000
+  manualWeightOverride: decimal('manual_weight_override', { precision: 5, scale: 4 }),
+  
+  // Score breakdown
+  geoScore: integer('geo_score'),
+  travelTimeScore: integer('travel_time_score'),
+  capacityScore: integer('capacity_score'),
+  slipMixScore: integer('slip_mix_score'),
+  capabilitiesScore: integer('capabilities_score'),
+  conditionScore: integer('condition_score'),
+  
+  // Adjustments applied
+  adjustedValue: decimal('adjusted_value', { precision: 15, scale: 2 }),
+  adjustmentDetails: jsonb('adjustment_details').$type<Record<string, number>>(),
+  
+  addedBy: varchar('added_by').notNull().references(() => users.id),
+  addedAt: timestamp('added_at').defaultNow(),
+  notes: text('notes'),
+}, (table) => ({
+  orgIdx: index('comp_set_items_org_idx').on(table.orgId),
+  compSetIdx: index('comp_set_items_comp_set_idx').on(table.compSetId),
+  rateCompIdx: index('comp_set_items_rate_comp_idx').on(table.rateCompId),
+  salesCompIdx: index('comp_set_items_sales_comp_idx').on(table.salesCompId),
+  uniqueRateItem: unique('comp_set_items_unique_rate').on(table.compSetId, table.rateCompId),
+  uniqueSalesItem: unique('comp_set_items_unique_sales').on(table.compSetId, table.salesCompId),
+}));
+
+// Marina Field Sources - Track field-level provenance
+export const marinaFieldSources = pgTable('marina_field_sources', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  // Entity reference
+  entityType: text('entity_type').notNull(), // 'rate_comp' | 'sales_comp' | 'subject'
+  entityId: varchar('entity_id').notNull(),
+  fieldName: text('field_name').notNull(),
+  
+  // Source info
+  sourceType: text('source_type').notNull(), // 'manual', 'broker_quote', 'website', 'survey', 'import', 'api', 'costar', 'reonomy', 'attom'
+  sourceRef: text('source_ref'), // URL, document name, or reference ID
+  sourceDate: timestamp('source_date'),
+  confidence: integer('confidence'), // 0-100
+  
+  // Value tracking
+  value: text('value'), // Stringified value for audit trail
+  previousValue: text('previous_value'),
+  
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  orgIdx: index('marina_field_sources_org_idx').on(table.orgId),
+  entityIdx: index('marina_field_sources_entity_idx').on(table.entityType, table.entityId),
+  entityFieldIdx: index('marina_field_sources_entity_field_idx').on(table.entityType, table.entityId, table.fieldName),
+}));
+
+// Marina Comp Audit Events - Track compute/export logs
+export const marinaCompAuditEvents = pgTable('marina_comp_audit_events', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  
+  // Event type
+  eventType: text('event_type').notNull(), // 'compute', 'export_excel', 'export_pdf', 'create_set', 'update_set', 'add_comp', 'remove_comp'
+  
+  // References
+  compSetId: varchar('comp_set_id').references(() => compSets.id, { onDelete: 'set null' }),
+  subjectId: varchar('subject_id').references(() => marinaSubjects.id, { onDelete: 'set null' }),
+  
+  // Event details
+  details: jsonb('details').$type<{
+    compsCount?: number;
+    indicatedValue?: number;
+    exportFormat?: string;
+    configSnapshot?: Record<string, unknown>;
+  }>(),
+  
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  orgIdx: index('marina_comp_audit_events_org_idx').on(table.orgId),
+  compSetIdx: index('marina_comp_audit_events_comp_set_idx').on(table.compSetId),
+  createdIdx: index('marina_comp_audit_events_created_idx').on(table.createdAt),
+}));
+
+// Insert/Update schemas for Marina Comps Engine
+export const insertMarinaSubjectSchema = createInsertSchema(marinaSubjects).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  deletedAt: true,
+});
+export const updateMarinaSubjectSchema = insertMarinaSubjectSchema.partial().omit({
+  orgId: true,
+  createdBy: true,
+});
+
+export const insertCompSetSchema = createInsertSchema(compSets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  deletedAt: true,
+  lastComputeResult: true,
+  lastComputedAt: true,
+  lastComputedBy: true,
+});
+export const updateCompSetSchema = insertCompSetSchema.partial().omit({
+  orgId: true,
+  createdBy: true,
+});
+
+export const insertCompSetItemSchema = createInsertSchema(compSetItems).omit({
+  id: true,
+  addedAt: true,
+  similarityScore: true,
+  normalizedWeight: true,
+  geoScore: true,
+  travelTimeScore: true,
+  capacityScore: true,
+  slipMixScore: true,
+  capabilitiesScore: true,
+  conditionScore: true,
+  adjustedValue: true,
+  adjustmentDetails: true,
+});
+export const updateCompSetItemSchema = insertCompSetItemSchema.partial().omit({
+  orgId: true,
+  compSetId: true,
+  addedBy: true,
+});
+
+export const insertMarinaFieldSourceSchema = createInsertSchema(marinaFieldSources).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertMarinaCompAuditEventSchema = createInsertSchema(marinaCompAuditEvents).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Types for Marina Comps Engine
+export type MarinaSubject = typeof marinaSubjects.$inferSelect;
+export type InsertMarinaSubject = z.infer<typeof insertMarinaSubjectSchema>;
+export type UpdateMarinaSubject = z.infer<typeof updateMarinaSubjectSchema>;
+export type CompSet = typeof compSets.$inferSelect;
+export type InsertCompSet = z.infer<typeof insertCompSetSchema>;
+export type UpdateCompSet = z.infer<typeof updateCompSetSchema>;
+export type CompSetItem = typeof compSetItems.$inferSelect;
+export type InsertCompSetItem = z.infer<typeof insertCompSetItemSchema>;
+export type UpdateCompSetItem = z.infer<typeof updateCompSetItemSchema>;
+export type MarinaFieldSource = typeof marinaFieldSources.$inferSelect;
+export type InsertMarinaFieldSource = z.infer<typeof insertMarinaFieldSourceSchema>;
+export type MarinaCompAuditEvent = typeof marinaCompAuditEvents.$inferSelect;
+export type InsertMarinaCompAuditEvent = z.infer<typeof insertMarinaCompAuditEventSchema>;
 
 // Types for Fuel Sales
 export type FuelSale = typeof fuelSales.$inferSelect;
