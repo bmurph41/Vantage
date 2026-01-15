@@ -4365,19 +4365,28 @@ export async function getProjectKPIs(
   startDate: string,
   endDate: string
 ): Promise<ProjectKPIs> {
+  // Parse start/end dates to extract year/month for filtering cash flows
+  const startParsed = new Date(startDate);
+  const endParsed = new Date(endDate);
+  const startYear = startParsed.getFullYear();
+  const startMonth = startParsed.getMonth() + 1;
+  const endYear = endParsed.getFullYear();
+  const endMonth = endParsed.getMonth() + 1;
+  
   const [revenueData, leaseData, cashFlowLeaseData, capacityData, configData, storageRevenueData] = await Promise.all([
+    // Query revenue from cash flows using year/month columns (RRA schema)
+    // Use YYYYMM range predicate for precise date filtering
     db
       .select({
-        totalRevenue: sql<string>`CAST(COALESCE(SUM(${leaseCashFlows.rentAmount}), 0) AS NUMERIC(12,2))`,
+        totalRevenue: sql<string>`CAST(COALESCE(SUM(${leaseCashFlows.amount}), 0) AS NUMERIC(12,2))`,
       })
       .from(leaseCashFlows)
       .innerJoin(leases, eq(leaseCashFlows.leaseId, leases.id))
-      .innerJoin(periods, eq(leaseCashFlows.periodId, periods.id))
       .where(
         and(
           eq(leases.locationId, locationId),
-          gte(periods.periodDate, startDate),
-          lte(periods.periodDate, endDate)
+          sql`(${leaseCashFlows.year} * 100 + ${leaseCashFlows.month}) >= ${startYear * 100 + startMonth}`,
+          sql`(${leaseCashFlows.year} * 100 + ${leaseCashFlows.month}) <= ${endYear * 100 + endMonth}`
         )
       ),
     
@@ -4401,12 +4410,10 @@ export async function getProjectKPIs(
       })
       .from(leaseCashFlows)
       .innerJoin(leases, eq(leaseCashFlows.leaseId, leases.id))
-      .innerJoin(periods, eq(leaseCashFlows.periodId, periods.id))
       .where(
         and(
           eq(leases.locationId, locationId),
-          gte(periods.periodDate, startDate),
-          lte(periods.periodDate, endDate)
+          sql`(${leaseCashFlows.year} * 100 + ${leaseCashFlows.month}) >= ${startYear * 100 + startMonth} AND (${leaseCashFlows.year} * 100 + ${leaseCashFlows.month}) <= ${endYear * 100 + endMonth}`
         )
       ),
     
@@ -4506,8 +4513,9 @@ export async function getProjectKPIs(
       return 6;
     }
     
-    // Return 0 for unknown cases (matches frontend behavior)
-    return 0;
+    // For leases with no date/term info, default to 1 month for display purposes
+    // This ensures lease amounts show up in KPIs rather than being zeroed out
+    return 1;
   };
   
   // For seasonal/annual rates: leaseAmount is already the total storage revenue
