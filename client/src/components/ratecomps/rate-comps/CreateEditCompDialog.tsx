@@ -405,22 +405,19 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
     mutationFn: rateCompsApi.createComp,
     onSuccess: async (newComp) => {
       // After creating the rate comp, save any pending rate tiers
-      if (pendingRateTiers.length > 0) {
+      const tiersToSave = pendingRateTiers.filter(t => !t.isEditing);
+      if (tiersToSave.length > 0) {
         try {
-          for (const tier of pendingRateTiers) {
-            if (!tier.isEditing) { // Only save tiers that have been confirmed
-              const tierData = rowDataToTier(tier);
-              await apiRequest(`/api/rate-comps/${newComp.id}/tiers`, {
-                method: 'POST',
-                body: JSON.stringify(tierData),
-              });
-            }
+          for (const tier of tiersToSave) {
+            const tierData = rowDataToTier(tier);
+            await apiRequest('POST', `/api/rate-comps/${newComp.id}/tiers`, tierData);
           }
           toast({
             title: "Success",
-            description: `Rate comp created with ${pendingRateTiers.filter(t => !t.isEditing).length} rate tier(s)`,
+            description: `Rate comp created with ${tiersToSave.length} rate tier(s)`,
           });
         } catch (error) {
+          console.error("Error saving rate tiers:", error);
           toast({
             title: "Warning",
             description: "Rate comp created but some rate tiers failed to save",
