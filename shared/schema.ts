@@ -20352,5 +20352,341 @@ export type Tenant = RraTenant;
 export type Period = RraPeriod;
 export type InsertTenant = InsertRraTenant;
 
+// ============================================================================
+// OPSSOS - Unified Inbox, Automations, Tasks, Statements, Integrations
+// ============================================================================
+
+// OpsOS Enums
+export const opssosConversationStatusEnum = pgEnum("opssos_conversation_status", ["open", "snoozed", "closed"]);
+export const opssosMessageDirectionEnum = pgEnum("opssos_message_direction", ["in", "out", "note"]);
+export const opssosMessageStatusEnum = pgEnum("opssos_message_status", ["draft", "scheduled", "sent", "failed"]);
+export const opssosAutomationRunStatusEnum = pgEnum("opssos_automation_run_status", ["pending", "running", "completed", "failed"]);
+export const opssosScheduledJobStatusEnum = pgEnum("opssos_scheduled_job_status", ["queued", "running", "done", "failed"]);
+export const opssosTaskStatusEnum = pgEnum("opssos_task_status", ["todo", "doing", "done"]);
+export const opssosStatementStatusEnum = pgEnum("opssos_statement_status", ["draft", "published"]);
+export const opssosExportFormatEnum = pgEnum("opssos_export_format", ["xlsx", "pdf", "zip"]);
+export const opssosWebhookDeliveryStatusEnum = pgEnum("opssos_webhook_delivery_status", ["pending", "sent", "failed"]);
+
+// Inbox - Conversations
+export const opssosConversations = pgTable("opssos_conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  contactId: varchar("contact_id").references(() => crmContacts.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  assetId: varchar("asset_id"),
+  channel: text("channel").default("internal").notNull(),
+  status: opssosConversationStatusEnum("status").default("open").notNull(),
+  assignedUserId: varchar("assigned_user_id").references(() => users.id),
+  lastMessageAt: timestamp("last_message_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("opssos_conversations_org_idx").on(table.orgId),
+  statusIdx: index("opssos_conversations_status_idx").on(table.orgId, table.status),
+  assignedIdx: index("opssos_conversations_assigned_idx").on(table.orgId, table.assignedUserId),
+}));
+
+// Inbox - Messages
+export const opssosMessages = pgTable("opssos_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  conversationId: varchar("conversation_id").notNull().references(() => opssosConversations.id, { onDelete: "cascade" }),
+  direction: opssosMessageDirectionEnum("direction").notNull(),
+  body: text("body").notNull(),
+  provider: text("provider"),
+  providerMessageId: text("provider_message_id"),
+  scheduledFor: timestamp("scheduled_for"),
+  sentAt: timestamp("sent_at"),
+  status: opssosMessageStatusEnum("status").default("sent").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  conversationIdx: index("opssos_messages_conversation_idx").on(table.conversationId),
+  orgIdx: index("opssos_messages_org_idx").on(table.orgId),
+}));
+
+// Message Templates
+export const opssosMessageTemplates = pgTable("opssos_message_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  groupName: text("group_name").notNull(),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("opssos_message_templates_org_idx").on(table.orgId),
+}));
+
+// Automation Rules
+export const opssosAutomationRules = pgTable("opssos_automation_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  enabled: boolean("enabled").default(true).notNull(),
+  triggerType: text("trigger_type").notNull(),
+  conditions: jsonb("conditions").default([]),
+  actions: jsonb("actions").default([]),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("opssos_automation_rules_org_idx").on(table.orgId),
+  enabledIdx: index("opssos_automation_rules_enabled_idx").on(table.orgId, table.enabled),
+}));
+
+// Automation Runs
+export const opssosAutomationRuns = pgTable("opssos_automation_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  ruleId: varchar("rule_id").notNull().references(() => opssosAutomationRules.id, { onDelete: "cascade" }),
+  status: opssosAutomationRunStatusEnum("status").default("pending").notNull(),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  finishedAt: timestamp("finished_at"),
+  log: jsonb("log").default([]),
+  errorText: text("error_text"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  ruleIdx: index("opssos_automation_runs_rule_idx").on(table.ruleId),
+  orgIdx: index("opssos_automation_runs_org_idx").on(table.orgId),
+}));
+
+// Scheduled Jobs
+export const opssosScheduledJobs = pgTable("opssos_scheduled_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  type: text("type").notNull(),
+  payload: jsonb("payload").default({}),
+  runAt: timestamp("run_at").notNull(),
+  status: opssosScheduledJobStatusEnum("status").default("queued").notNull(),
+  attempts: integer("attempts").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("opssos_scheduled_jobs_org_idx").on(table.orgId),
+  statusRunAtIdx: index("opssos_scheduled_jobs_status_run_at_idx").on(table.status, table.runAt),
+}));
+
+// Tasks
+export const opssosTasks = pgTable("opssos_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  assetId: varchar("asset_id"),
+  assignedUserId: varchar("assigned_user_id").references(() => users.id),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: opssosTaskStatusEnum("status").default("todo").notNull(),
+  dueAt: timestamp("due_at"),
+  costCents: integer("cost_cents"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("opssos_tasks_org_idx").on(table.orgId),
+  statusIdx: index("opssos_tasks_status_idx").on(table.orgId, table.status),
+  assignedIdx: index("opssos_tasks_assigned_idx").on(table.orgId, table.assignedUserId),
+  dealIdx: index("opssos_tasks_deal_idx").on(table.dealId),
+}));
+
+// Checklist Templates
+export const opssosChecklistTemplates = pgTable("opssos_checklist_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  items: jsonb("items").default([]),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("opssos_checklist_templates_org_idx").on(table.orgId),
+}));
+
+// Task Checklists
+export const opssosTaskChecklists = pgTable("opssos_task_checklists", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  taskId: varchar("task_id").notNull().references(() => opssosTasks.id, { onDelete: "cascade" }),
+  items: jsonb("items").default([]),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  taskIdx: index("opssos_task_checklists_task_idx").on(table.taskId),
+}));
+
+// Statement Templates
+export const opssosStatementTemplates = pgTable("opssos_statement_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  ownerContactId: varchar("owner_contact_id").references(() => crmContacts.id),
+  filters: jsonb("filters").default({}),
+  columns: jsonb("columns").default([]),
+  totals: jsonb("totals").default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("opssos_statement_templates_org_idx").on(table.orgId),
+}));
+
+// Statements
+export const opssosStatements = pgTable("opssos_statements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  templateId: varchar("template_id").notNull().references(() => opssosStatementTemplates.id),
+  periodStart: date("period_start").notNull(),
+  periodEnd: date("period_end").notNull(),
+  status: opssosStatementStatusEnum("status").default("draft").notNull(),
+  generatedAt: timestamp("generated_at").defaultNow().notNull(),
+  publishedAt: timestamp("published_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("opssos_statements_org_idx").on(table.orgId),
+  templateIdx: index("opssos_statements_template_idx").on(table.templateId),
+}));
+
+// Statement Exports
+export const opssosStatementExports = pgTable("opssos_statement_exports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  statementId: varchar("statement_id").notNull().references(() => opssosStatements.id, { onDelete: "cascade" }),
+  format: opssosExportFormatEnum("format").notNull(),
+  fileUrl: text("file_url").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  statementIdx: index("opssos_statement_exports_statement_idx").on(table.statementId),
+}));
+
+// Integrations
+export const opssosIntegrations = pgTable("opssos_integrations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  provider: text("provider").notNull(),
+  status: text("status").default("inactive").notNull(),
+  credentialsEncrypted: text("credentials_encrypted"),
+  settings: jsonb("settings").default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("opssos_integrations_org_idx").on(table.orgId),
+  providerIdx: index("opssos_integrations_provider_idx").on(table.orgId, table.provider),
+}));
+
+// Webhooks
+export const opssosWebhooks = pgTable("opssos_webhooks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  url: text("url").notNull(),
+  secret: text("secret"),
+  enabled: boolean("enabled").default(true).notNull(),
+  eventTypes: jsonb("event_types").default([]),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("opssos_webhooks_org_idx").on(table.orgId),
+  enabledIdx: index("opssos_webhooks_enabled_idx").on(table.orgId, table.enabled),
+}));
+
+// Webhook Deliveries
+export const opssosWebhookDeliveries = pgTable("opssos_webhook_deliveries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  webhookId: varchar("webhook_id").notNull().references(() => opssosWebhooks.id, { onDelete: "cascade" }),
+  eventType: text("event_type").notNull(),
+  payload: jsonb("payload").default({}),
+  status: opssosWebhookDeliveryStatusEnum("status").default("pending").notNull(),
+  responseCode: integer("response_code"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  webhookIdx: index("opssos_webhook_deliveries_webhook_idx").on(table.webhookId),
+  orgIdx: index("opssos_webhook_deliveries_org_idx").on(table.orgId),
+}));
+
+// OpsOS Types
+export type OpssosConversation = typeof opssosConversations.$inferSelect;
+export type InsertOpssosConversation = typeof opssosConversations.$inferInsert;
+export type OpssosMessage = typeof opssosMessages.$inferSelect;
+export type InsertOpssosMessage = typeof opssosMessages.$inferInsert;
+export type OpssosMessageTemplate = typeof opssosMessageTemplates.$inferSelect;
+export type InsertOpssosMessageTemplate = typeof opssosMessageTemplates.$inferInsert;
+export type OpssosAutomationRule = typeof opssosAutomationRules.$inferSelect;
+export type InsertOpssosAutomationRule = typeof opssosAutomationRules.$inferInsert;
+export type OpssosAutomationRun = typeof opssosAutomationRuns.$inferSelect;
+export type InsertOpssosAutomationRun = typeof opssosAutomationRuns.$inferInsert;
+export type OpssosScheduledJob = typeof opssosScheduledJobs.$inferSelect;
+export type InsertOpssosScheduledJob = typeof opssosScheduledJobs.$inferInsert;
+export type OpssosTask = typeof opssosTasks.$inferSelect;
+export type InsertOpssosTask = typeof opssosTasks.$inferInsert;
+export type OpssosChecklistTemplate = typeof opssosChecklistTemplates.$inferSelect;
+export type InsertOpssosChecklistTemplate = typeof opssosChecklistTemplates.$inferInsert;
+export type OpssosTaskChecklist = typeof opssosTaskChecklists.$inferSelect;
+export type InsertOpssosTaskChecklist = typeof opssosTaskChecklists.$inferInsert;
+export type OpssosStatementTemplate = typeof opssosStatementTemplates.$inferSelect;
+export type InsertOpssosStatementTemplate = typeof opssosStatementTemplates.$inferInsert;
+export type OpssosStatement = typeof opssosStatements.$inferSelect;
+export type InsertOpssosStatement = typeof opssosStatements.$inferInsert;
+export type OpssosStatementExport = typeof opssosStatementExports.$inferSelect;
+export type InsertOpssosStatementExport = typeof opssosStatementExports.$inferInsert;
+export type OpssosIntegration = typeof opssosIntegrations.$inferSelect;
+export type InsertOpssosIntegration = typeof opssosIntegrations.$inferInsert;
+export type OpssosWebhook = typeof opssosWebhooks.$inferSelect;
+export type InsertOpssosWebhook = typeof opssosWebhooks.$inferInsert;
+export type OpssosWebhookDelivery = typeof opssosWebhookDeliveries.$inferSelect;
+export type InsertOpssosWebhookDelivery = typeof opssosWebhookDeliveries.$inferInsert;
+
+// OpsOS Insert Schemas (Zod-based validation)
+export const insertOpssosConversationSchema = createInsertSchema(opssosConversations).omit({
+  id: true,
+  createdAt: true,
+  lastMessageAt: true,
+});
+export const insertOpssosMessageSchema = createInsertSchema(opssosMessages).omit({
+  id: true,
+  createdAt: true,
+  sentAt: true,
+});
+export const insertOpssosMessageTemplateSchema = createInsertSchema(opssosMessageTemplates).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertOpssosAutomationRuleSchema = createInsertSchema(opssosAutomationRules).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertOpssosAutomationRunSchema = createInsertSchema(opssosAutomationRuns).omit({
+  id: true,
+  createdAt: true,
+  startedAt: true,
+  finishedAt: true,
+});
+export const insertOpssosScheduledJobSchema = createInsertSchema(opssosScheduledJobs).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertOpssosTaskSchema = createInsertSchema(opssosTasks).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertOpssosChecklistTemplateSchema = createInsertSchema(opssosChecklistTemplates).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertOpssosTaskChecklistSchema = createInsertSchema(opssosTaskChecklists).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertOpssosStatementTemplateSchema = createInsertSchema(opssosStatementTemplates).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertOpssosStatementSchema = createInsertSchema(opssosStatements).omit({
+  id: true,
+  createdAt: true,
+  generatedAt: true,
+  publishedAt: true,
+});
+export const insertOpssosStatementExportSchema = createInsertSchema(opssosStatementExports).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertOpssosIntegrationSchema = createInsertSchema(opssosIntegrations).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertOpssosWebhookSchema = createInsertSchema(opssosWebhooks).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertOpssosWebhookDeliverySchema = createInsertSchema(opssosWebhookDeliveries).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Replit Auth models
 export * from "./models/auth";

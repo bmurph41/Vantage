@@ -41,6 +41,7 @@ import forecastingRoutes from "./routes/forecasting-routes";
 import phaseGatesRoutes from "./routes/phase-gates-routes";
 import redFlagRoutes from "./routes/red-flag-routes";
 import { getSlaRouter } from "./routes/sla-routes";
+import opssosRouter from "./routes/opssos";
 import { enterpriseAuthService } from "./services/enterprise-auth-service";
 import { registerCommentRoutes } from "./routes/comment-routes";
 import emailMarketingRoutes from "./routes/email-marketing-routes";
@@ -407,6 +408,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/boat-rentals", authenticateUser, boatRentalsRouter);
   app.use("/api/boat-club", authenticateUser, boatClubRouter);
   app.use("/api/boat-sales", authenticateUser, boatSalesRouter);
+  app.use("/api/opssos", authenticateUser, enforceTenant, opssosRouter);
   app.use("/api/integration", authenticateUser, integrationRouter);
   app.use("/api/marinamatch", authenticateUser, marinamatchRouter);
   app.use("/api/om", authenticateUser, omRouter);

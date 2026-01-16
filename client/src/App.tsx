@@ -114,6 +114,11 @@ const ResetPasswordPage = lazy(() => import("@/pages/auth/reset-password"));
 const DesignPreview = lazy(() => import("@/pages/design-preview"));
 const PacksSettings = lazy(() => import("@/pages/packs-settings"));
 const AccountMappingPage = lazy(() => import("@/pages/admin/AccountMappingPage"));
+const OpsInboxPage = lazy(() => import("@/pages/ops/InboxPage"));
+const OpsAutomationsPage = lazy(() => import("@/pages/ops/AutomationsPage"));
+const OpsTasksPage = lazy(() => import("@/pages/ops/TasksPage"));
+const OpsStatementsPage = lazy(() => import("@/pages/ops/StatementsPage"));
+const OpsIntegrationsPage = lazy(() => import("@/pages/ops/IntegrationsPage"));
 const FeatureGate = lazy(() => import("@/components/FeatureGate").then(m => ({ default: m.FeatureGate })));
 const CrmTasks = lazy(() => import("@/pages/crm-tasks"));
 const MarketingAutomation = lazy(() => import("@/pages/marketing-automation"));
@@ -717,6 +722,62 @@ function Router() {
             <UnifiedLayout>
               <Suspense fallback={<PageLoader />}>
                 <RentRollV2Reconciliation />
+              </Suspense>
+            </UnifiedLayout>
+          </AuthGuard>
+        )}
+      </Route>
+      {/* OpsOS Routes */}
+      <Route path="/ops/inbox">
+        {() => (
+          <AuthGuard>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <OpsInboxPage />
+              </Suspense>
+            </UnifiedLayout>
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/ops/automations">
+        {() => (
+          <AuthGuard>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <OpsAutomationsPage />
+              </Suspense>
+            </UnifiedLayout>
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/ops/tasks">
+        {() => (
+          <AuthGuard>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <OpsTasksPage />
+              </Suspense>
+            </UnifiedLayout>
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/ops/statements">
+        {() => (
+          <AuthGuard>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <OpsStatementsPage />
+              </Suspense>
+            </UnifiedLayout>
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/ops/integrations">
+        {() => (
+          <AuthGuard>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <OpsIntegrationsPage />
               </Suspense>
             </UnifiedLayout>
           </AuthGuard>
