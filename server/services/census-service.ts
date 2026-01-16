@@ -1,4 +1,7 @@
 import type { DemographicSummary } from "@shared/schema";
+import { createChildLogger } from "../lib/logger";
+
+const logger = createChildLogger({ module: 'census-service' });
 
 interface CensusApiResponse {
   [key: string]: string | number;
@@ -31,7 +34,7 @@ export class CensusService {
     radiusMiles: number
   ): Promise<DemographicSummary> {
     if (!this.apiKey) {
-      console.log("Census API key not configured, using mock data for radius query");
+      logger.debug({ centerLat, centerLng }, "Census API key not configured, using mock data for radius query");
       return CensusService.getMockDemographics(centerLat, centerLng);
     }
 
@@ -364,7 +367,7 @@ export class CensusService {
 
   async getDemographicsForLocation(latitude: number, longitude: number): Promise<DemographicSummary> {
     if (!this.apiKey) {
-      console.log("Census API key not configured, using mock data");
+      logger.debug({ latitude, longitude }, "Census API key not configured, using mock data");
       return CensusService.getMockDemographics(latitude, longitude);
     }
 

@@ -13,6 +13,9 @@
  */
 
 import { EventEmitter } from "events";
+import { createChildLogger } from "../lib/logger";
+
+const logger = createChildLogger({ module: 'cross-module-events' });
 
 // ============================================================================
 // Event Types
@@ -135,11 +138,12 @@ class CrossModuleEventBus {
     // Emit to global listeners
     this.emitter.emit('*', event);
 
-    console.log(`[CrossModuleEvent] ${eventKey}:`, {
+    logger.debug({
+      eventKey,
       entityId: event.entityId,
       orgId: event.orgId,
       data: event.data,
-    });
+    }, `Cross-module event: ${eventKey}`);
   }
 
   /**
@@ -405,7 +409,7 @@ eventBus.on('deal', 'stage_changed', async (event) => {
     toStage: string;
   };
   
-  console.log(`[Event Handler] Deal ${dealId} moved from ${fromStage} to ${toStage}`);
+  logger.info({ dealId, fromStage, toStage }, `Deal stage changed: ${fromStage} -> ${toStage}`);
   
   // Could trigger automatic DD project creation, notifications, etc.
   // These would be implemented based on business rules
@@ -414,8 +418,8 @@ eventBus.on('deal', 'stage_changed', async (event) => {
 // Handler: Log all entity links for audit purposes
 eventBus.on('*', '*', (event) => {
   if (event.action === 'linked' || event.action === 'unlinked') {
-    console.log(`[Event Handler] Entity link ${event.action}:`, event.data);
+    logger.debug({ action: event.action, data: event.data }, `Entity link ${event.action}`);
   }
 });
 
-console.log('[CrossModuleEvents] Event bus initialized with default handlers');
+logger.info('Event bus initialized with default handlers');
