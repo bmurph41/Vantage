@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   TrendingUp, DollarSign, Building2, MapPin, Calendar, Trash2, Plus, Search,
-  Link2, Star, Anchor, PercentIcon, X
+  Link2, Star, Anchor, PercentIcon, X, Warehouse, Package
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -141,6 +141,55 @@ function RateCompCard({ comp, linkMetadata, onUnlink }: {
           >
             <Trash2 className="w-4 h-4" />
           </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+interface StorageEntry {
+  id: string;
+  storageTypeName: string;
+  capacity: number;
+  occupied: number;
+  rate: string;
+  rateType: string;
+}
+
+function StorageEntryCard({ entry }: { entry: StorageEntry }) {
+  const capacity = entry.capacity ?? 0;
+  const occupied = entry.occupied ?? 0;
+  const occupancyRate = capacity > 0 ? (occupied / capacity) * 100 : 0;
+  const occupancyColor = occupancyRate >= 90 ? "text-green-600" : 
+                         occupancyRate >= 70 ? "text-yellow-600" : "text-red-600";
+  const rateValue = parseFloat(entry.rate || "0");
+  const rateType = entry.rateType || "monthly";
+  
+  return (
+    <Card className="border shadow-sm" data-testid={`storage-entry-${entry.id}`}>
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <Warehouse className="w-4 h-4 text-purple-600" />
+              <span className="font-semibold text-sm">{entry.storageTypeName || "Unknown Type"}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+              <div className="flex items-center gap-1">
+                <Package className="w-3 h-3" />
+                <span>Capacity: {capacity}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className={occupancyColor}>
+                  Occupied: {occupied}/{capacity} ({occupancyRate.toFixed(0)}%)
+                </span>
+              </div>
+              <div className="flex items-center gap-1 col-span-2">
+                <DollarSign className="w-3 h-3" />
+                <span>{formatCurrency(rateValue)}/{rateType}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -358,6 +407,11 @@ export default function PropertyIntegrationPanel({ propertyId, propertyTitle }: 
     enabled: !!propertyId,
   });
 
+  const { data: storageEntries = [], isLoading: storageLoading } = useQuery<StorageEntry[]>({
+    queryKey: ['/api/properties', propertyId, 'storage-entries'],
+    enabled: !!propertyId,
+  });
+
   const unlinkSalesCompMutation = useMutation({
     mutationFn: async (salesCompId: string) => {
       return apiRequest(`/api/integration/properties/${propertyId}/sales-comps/${salesCompId}`, {
@@ -397,24 +451,28 @@ export default function PropertyIntegrationPanel({ propertyId, propertyTitle }: 
             <div>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Link2 className="w-5 h-5 text-blue-600" />
-                Linked Comparables
+                Property Data
               </CardTitle>
               <CardDescription>
-                {totalLinked} comparable{totalLinked !== 1 ? "s" : ""} linked to this property
+                {totalLinked} comparable{totalLinked !== 1 ? "s" : ""} linked, {storageEntries.length} storage type{storageEntries.length !== 1 ? "s" : ""} defined
               </CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="px-0">
           <Tabs defaultValue="sales" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="sales" data-testid="tab-property-sales-comps">
                 <Building2 className="w-4 h-4 mr-2" />
-                Sales Comps ({salesComps.length})
+                Sales ({salesComps.length})
               </TabsTrigger>
               <TabsTrigger value="rate" data-testid="tab-property-rate-comps">
                 <TrendingUp className="w-4 h-4 mr-2" />
-                Rate Comps ({rateComps.length})
+                Rates ({rateComps.length})
+              </TabsTrigger>
+              <TabsTrigger value="storage" data-testid="tab-property-storage">
+                <Warehouse className="w-4 h-4 mr-2" />
+                Storage ({storageEntries.length})
               </TabsTrigger>
             </TabsList>
 
@@ -483,6 +541,27 @@ export default function PropertyIntegrationPanel({ propertyId, propertyTitle }: 
                       linkMetadata={comp.linkMetadata}
                       onUnlink={() => unlinkRateCompMutation.mutate(comp.id)}
                     />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="storage" className="mt-4 space-y-3">
+              {storageLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-20 w-full" />
+                </div>
+              ) : storageEntries.length === 0 ? (
+                <div className="text-center py-6 text-gray-500 border rounded-md">
+                  <Warehouse className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No storage types defined</p>
+                  <p className="text-xs mt-1">Add storage types from the property edit form</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {storageEntries.map((entry: StorageEntry) => (
+                    <StorageEntryCard key={entry.id} entry={entry} />
                   ))}
                 </div>
               )}

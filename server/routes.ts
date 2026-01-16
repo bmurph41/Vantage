@@ -99,6 +99,7 @@ import {
   insertCddDocumentSchema, insertKpiSchema, insertFindingSchema, insertRecommendationSchema,
   insertCrmTaskSchema, insertCrmFileSchema, insertCalendarSettingsSchema,
   crmTasks, crmFiles, crmContacts, crmDeals, crmCompanies, crmPipelines, crmPipelineStages, crmActivities, crmProperties, crmNotes,
+  salesComps, rateComps, propertySalesComps, propertyRateComps,
   type InsertCrmFile,
   insertScSavedSearchSchema,
   updateScSavedSearchSchema,
@@ -9694,6 +9695,75 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: "Failed to delete storage entry" });
     }
   });
+
+  // Property Cross-Module Aggregation - Get all linked data for a property
+  app.get("/api/properties/:id/aggregate", async (req: any, res) => {
+    try {
+      const propertyId = req.params.id;
+      const orgId = req.orgId || 'org-1';
+      
+      // Fetch property storage entries
+      const storageEntries = await storage.getPropertyStorageEntries(propertyId);
+      
+      // Fetch linked sales comps
+      const linkedSalesComps = await db.select({
+        id: propertySalesComps.id,
+        salesCompId: propertySalesComps.salesCompId,
+        isPrimary: propertySalesComps.isPrimary,
+        relevanceScore: propertySalesComps.relevanceScore,
+        notes: propertySalesComps.notes,
+        marina: salesComps.marina,
+        salePrice: salesComps.salePrice,
+        saleMonth: salesComps.saleMonth,
+        saleYear: salesComps.saleYear,
+        city: salesComps.city,
+        state: salesComps.state,
+        wetSlips: salesComps.wetSlips,
+        dryRacks: salesComps.dryRacks,
+        capRate: salesComps.capRate,
+        noi: salesComps.noi,
+      })
+      .from(propertySalesComps)
+      .innerJoin(salesComps, eq(propertySalesComps.salesCompId, salesComps.id))
+      .where(eq(propertySalesComps.propertyId, propertyId));
+      
+      // Fetch linked rate comps
+      const linkedRateComps = await db.select({
+        id: propertyRateComps.id,
+        rateCompId: propertyRateComps.rateCompId,
+        isPrimary: propertyRateComps.isPrimary,
+        notes: propertyRateComps.notes,
+        marina: rateComps.marina,
+        city: rateComps.city,
+        state: rateComps.state,
+        wetSlips: rateComps.wetSlips,
+        dryRacks: rateComps.dryRacks,
+        wetRateValue: rateComps.wetRateValue,
+        rateType: rateComps.rateType,
+        seasonality: rateComps.seasonality,
+        bodyOfWater: rateComps.bodyOfWater,
+      })
+      .from(propertyRateComps)
+      .innerJoin(rateComps, eq(propertyRateComps.rateCompId, rateComps.id))
+      .where(eq(propertyRateComps.propertyId, propertyId));
+      
+      // Fetch linked DD projects
+      const linkedProjects = await db.select()
+      .from(projects)
+      .where(eq(projects.propertyId, propertyId));
+      
+      res.json({
+        storageEntries,
+        linkedSalesComps,
+        linkedRateComps,
+        linkedProjects,
+      });
+    } catch (error: any) {
+      console.error("Failed to get property aggregate data:", error);
+      res.status(500).json({ error: "Failed to get property aggregate data" });
+    }
+  });
+
 
   // PATCH route for property updates (used by detail modal)
   app.patch("/api/properties/:id", async (req: any, res) => {

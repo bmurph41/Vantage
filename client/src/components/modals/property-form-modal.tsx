@@ -18,7 +18,17 @@ import { StateSelect } from "@/components/ui/state-select";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
-import { insertPropertySchema, type Property, type Contact, type Company } from "@shared/schema";
+import { insertPropertySchema, type Property, type Contact, type Company, PREDEFINED_CRM_STORAGE_TYPES, type CrmPropertyStorageEntry } from "@shared/schema";
+
+// Local type for form storage entries (before saving to DB)
+interface StorageEntryRow {
+  id?: string;
+  storageType: string;
+  capacity: string;
+  occupied: string;
+  rate: string;
+  rateType: "monthly" | "annual";
+}
 
 interface PropertyFormModalProps {
   isOpen: boolean;
@@ -75,6 +85,21 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
   const [selectedCompanyRelationship, setSelectedCompanyRelationship] = useState("owner");
   const [showContactSearch, setShowContactSearch] = useState(false);
   const [showCompanySearch, setShowCompanySearch] = useState(false);
+  
+  // Dynamic storage entries state
+  const [storageEntries, setStorageEntries] = useState<StorageEntryRow[]>([]);
+  const [customStorageType, setCustomStorageType] = useState("");
+
+  // Fetch existing storage entries (for edit mode)
+  const { data: existingStorageEntries = [] } = useQuery<CrmPropertyStorageEntry[]>({
+    queryKey: ['/api/properties', property?.id, 'storage-entries'],
+    queryFn: async () => {
+      const res = await fetch(`/api/properties/${property?.id}/storage-entries`);
+      if (!res.ok) throw new Error('Failed to fetch storage entries');
+      return res.json();
+    },
+    enabled: isOpen && !!property?.id,
+  });
 
   // Fetch linked contacts (for edit mode)
   const { data: linkedContacts = [], refetch: refetchLinkedContacts } = useQuery<LinkedContact[]>({
@@ -269,8 +294,67 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
       setLastSaleMonth("");
       setLastSaleYear("");
       setLastSalePrice("");
+      setStorageEntries([]);
     }
   }, [property, form, isOpen]);
+
+  // Load storage entries from server when editing
+  useEffect(() => {
+    if (existingStorageEntries.length > 0) {
+      setStorageEntries(existingStorageEntries.map(entry => ({
+        id: entry.id,
+        storageType: entry.storageTypeName, // API returns storageTypeName
+        capacity: entry.capacity?.toString() || "",
+        occupied: entry.occupied?.toString() || "",
+        rate: entry.rate?.toString() || "",
+        rateType: (entry.rateType as "monthly" | "annual") || "monthly",
+      })));
+    }
+  }, [existingStorageEntries]);
+
+  // Storage entry management functions
+  const addStorageEntry = (storageType: string) => {
+    if (!storageType.trim()) return;
+    if (storageEntries.some(e => e.storageType.toLowerCase() === storageType.toLowerCase())) {
+      toast({ title: "Storage type already added", variant: "destructive" });
+      return;
+    }
+    setStorageEntries([...storageEntries, {
+      storageType: storageType.trim(),
+      capacity: "",
+      occupied: "",
+      rate: "",
+      rateType: "monthly",
+    }]);
+    setCustomStorageType("");
+  };
+
+  const removeStorageEntry = (index: number) => {
+    setStorageEntries(storageEntries.filter((_, i) => i !== index));
+  };
+
+  const updateStorageEntry = (index: number, field: keyof StorageEntryRow, value: string) => {
+    const updated = [...storageEntries];
+    updated[index] = { ...updated[index], [field]: value };
+    setStorageEntries(updated);
+  };
+
+  // Save storage entries mutation
+  const saveStorageEntriesMutation = useMutation({
+    mutationFn: async (propertyId: string) => {
+      const entries = storageEntries.map(e => ({
+        storageTypeName: e.storageType, // API expects storageTypeName
+        capacity: e.capacity ? parseInt(e.capacity) : null,
+        occupied: e.occupied ? parseInt(e.occupied) : null,
+        rate: e.rate ? e.rate : null,
+        rateType: e.rateType,
+      }));
+      return await apiRequest('PUT', `/api/properties/${propertyId}/storage-entries`, { entries });
+    },
+    onSuccess: (_, propertyId) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/properties', propertyId, 'storage-entries'] });
+    },
+  });
 
   const createPropertyMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -310,7 +394,13 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
         }
       });
       
-      return await apiRequest('POST', '/api/properties', cleanData);
+      const result = await apiRequest('POST', '/api/properties', cleanData);
+      const createdProperty = await result.json();
+      // Save storage entries for the new property
+      if (storageEntries.length > 0 && createdProperty?.id) {
+        await saveStorageEntriesMutation.mutateAsync(createdProperty.id);
+      }
+      return createdProperty;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
@@ -325,6 +415,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
       setWaterDepth("");
       setLinearFeet("");
       setYearBuilt("");
+      setStorageEntries([]);
     },
     onError: (error: any) => {
       toast({ 
@@ -373,12 +464,16 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
         }
       });
       
-      return await apiRequest('PUT', `/api/properties/${property!.id}`, cleanData);
+      await apiRequest('PUT', `/api/properties/${property!.id}`, cleanData);
+      // Save storage entries for this property
+      await saveStorageEntriesMutation.mutateAsync(property!.id);
+      return property;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
       toast({ title: "Property updated successfully" });
       onClose();
+      setStorageEntries([]);
     },
     onError: (error: any) => {
       toast({ 
@@ -660,6 +755,138 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Dynamic Storage Types Section */}
+            <Separator className="my-4" />
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <FormLabel className="text-base font-medium">Storage Types</FormLabel>
+                <div className="flex gap-2 items-center">
+                  <Select onValueChange={(value) => addStorageEntry(value)}>
+                    <SelectTrigger className="w-[180px]" data-testid="select-storage-type">
+                      <SelectValue placeholder="Add storage type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PREDEFINED_CRM_STORAGE_TYPES.filter(
+                        type => !storageEntries.some(e => e.storageType.toLowerCase() === type.toLowerCase())
+                      ).map((type) => (
+                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Custom storage type input */}
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Or enter custom type..."
+                  value={customStorageType}
+                  onChange={(e) => setCustomStorageType(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addStorageEntry(customStorageType);
+                    }
+                  }}
+                  className="flex-1"
+                  data-testid="input-custom-storage-type"
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => addStorageEntry(customStorageType)}
+                  disabled={!customStorageType.trim()}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Storage entries table */}
+              {storageEntries.length > 0 && (
+                <div className="border rounded-md overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium">Type</th>
+                        <th className="px-3 py-2 text-left font-medium">Capacity</th>
+                        <th className="px-3 py-2 text-left font-medium">Occupied</th>
+                        <th className="px-3 py-2 text-left font-medium">Rate</th>
+                        <th className="px-3 py-2 text-left font-medium">Rate Type</th>
+                        <th className="px-3 py-2 w-8"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {storageEntries.map((entry, index) => (
+                        <tr key={index} className="border-t">
+                          <td className="px-3 py-2 font-medium">{entry.storageType}</td>
+                          <td className="px-3 py-1">
+                            <Input
+                              type="number"
+                              placeholder="0"
+                              value={entry.capacity}
+                              onChange={(e) => updateStorageEntry(index, 'capacity', e.target.value)}
+                              className="h-8 w-20"
+                            />
+                          </td>
+                          <td className="px-3 py-1">
+                            <Input
+                              type="number"
+                              placeholder="0"
+                              value={entry.occupied}
+                              onChange={(e) => updateStorageEntry(index, 'occupied', e.target.value)}
+                              className="h-8 w-20"
+                            />
+                          </td>
+                          <td className="px-3 py-1">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={entry.rate}
+                              onChange={(e) => updateStorageEntry(index, 'rate', e.target.value)}
+                              className="h-8 w-24"
+                            />
+                          </td>
+                          <td className="px-3 py-1">
+                            <Select 
+                              value={entry.rateType} 
+                              onValueChange={(val) => updateStorageEntry(index, 'rateType', val)}
+                            >
+                              <SelectTrigger className="h-8 w-24">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="monthly">Monthly</SelectItem>
+                                <SelectItem value="annual">Annual</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="px-3 py-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => removeStorageEntry(index)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {storageEntries.length === 0 && (
+                <div className="text-center py-4 text-muted-foreground text-sm border rounded-md border-dashed">
+                  No storage types added. Select from predefined types or enter a custom type.
+                </div>
+              )}
             </div>
 
             {/* Sale History Section */}
