@@ -8,13 +8,13 @@ import {
 import { cn } from "@/lib/utils";
 
 const coreNav = [
-  { name: "Dashboard", href: "/crm", icon: LayoutDashboard },
   { name: "Sales Pipeline", href: "/crm/pipeline", icon: Layers },
   { name: "Deals", href: "/crm/deals", icon: Handshake },
   { name: "Activities", href: "/crm/activities", icon: Calendar },
 ];
 
 const crmNav = [
+  { name: "Dashboard", href: "/crm", icon: LayoutDashboard },
   { name: "Leads", href: "/crm/leads", icon: UserCheck },
   { name: "Contacts", href: "/crm/contacts", icon: Users },
   { name: "Companies", href: "/crm/companies", icon: Building },

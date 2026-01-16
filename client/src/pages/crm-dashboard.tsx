@@ -1,11 +1,27 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, Building2, DollarSign, TrendingUp, Phone, Mail, Calendar, ArrowRight, Sparkles } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { 
+  Users, Building, DollarSign, TrendingUp, Phone, Mail, Calendar, 
+  ArrowRight, Sparkles, Home, Clock, CheckCircle2,
+  Layers, Activity, MapPin
+} from "lucide-react";
 import { Link } from "wouter";
 import { formatCurrency } from "@/lib/utils";
 import { FeatureChecklist } from "@/components/ui/feature-highlight";
-import { QuickStatBanner } from "@/components/ui/testimonial-quote";
+import { formatDistanceToNow } from "date-fns";
+
+const PIPELINE_STAGES = [
+  { key: "initial_contact", label: "Initial Contact", color: "bg-slate-500" },
+  { key: "qualification", label: "Qualification", color: "bg-blue-500" },
+  { key: "proposal", label: "Proposal", color: "bg-purple-500" },
+  { key: "negotiation", label: "Negotiation", color: "bg-amber-500" },
+  { key: "due_diligence", label: "Due Diligence", color: "bg-cyan-500" },
+  { key: "closed_won", label: "Closed Won", color: "bg-green-500" },
+  { key: "closed_lost", label: "Closed Lost", color: "bg-red-500" },
+];
 
 export default function CRMDashboard() {
   const { data: dealsData, isLoading: dealsLoading } = useQuery({
@@ -24,27 +40,59 @@ export default function CRMDashboard() {
     queryKey: ['/api/crm/companies'],
   });
 
+  const { data: propertiesData, isLoading: propertiesLoading } = useQuery({
+    queryKey: ['/api/crm/properties'],
+  });
+
+  const { data: activitiesData, isLoading: activitiesLoading } = useQuery({
+    queryKey: ['/api/crm/activities'],
+  });
+
   const deals = Array.isArray(dealsData) ? dealsData : (dealsData?.deals || dealsData?.data || []);
   const leads = Array.isArray(leadsData) ? leadsData : (leadsData?.leads || leadsData?.data || []);
   const contacts = Array.isArray(contactsData) ? contactsData : (contactsData?.contacts || contactsData?.data || []);
   const companies = Array.isArray(companiesData) ? companiesData : (companiesData?.companies || companiesData?.data || []);
+  const properties = Array.isArray(propertiesData) ? propertiesData : (propertiesData?.properties || propertiesData?.data || []);
+  const activities = Array.isArray(activitiesData) ? activitiesData : (activitiesData?.activities || activitiesData?.data || []);
 
   const safeDeals = Array.isArray(deals) ? deals : [];
   const safeLeads = Array.isArray(leads) ? leads : [];
   const safeContacts = Array.isArray(contacts) ? contacts : [];
   const safeCompanies = Array.isArray(companies) ? companies : [];
+  const safeProperties = Array.isArray(properties) ? properties : [];
+  const safeActivities = Array.isArray(activities) ? activities : [];
 
   const totalDealValue = safeDeals.reduce((sum: number, deal: any) => {
     const value = parseFloat(deal.value || deal.amount || '0');
     return sum + (isNaN(value) ? 0 : value);
   }, 0);
 
+  const pipelineByStage = PIPELINE_STAGES.map(stage => {
+    const stageDeals = safeDeals.filter((d: any) => d.stage === stage.key);
+    const stageValue = stageDeals.reduce((sum: number, d: any) => {
+      const value = parseFloat(d.value || d.amount || '0');
+      return sum + (isNaN(value) ? 0 : value);
+    }, 0);
+    return {
+      ...stage,
+      count: stageDeals.length,
+      value: stageValue,
+    };
+  }).filter(s => s.key !== 'closed_lost');
+
+  const activeDealsValue = safeDeals
+    .filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
+    .reduce((sum: number, deal: any) => {
+      const value = parseFloat(deal.value || deal.amount || '0');
+      return sum + (isNaN(value) ? 0 : value);
+    }, 0);
+
   const stats = [
     {
       title: "Total Deals",
       value: safeDeals.length,
       icon: DollarSign,
-      description: `${formatCurrency(totalDealValue)} in pipeline`,
+      description: `${formatCurrency(totalDealValue)} total value`,
       link: "/crm/deals",
       color: "text-green-600",
       bgColor: "bg-green-100",
@@ -70,13 +118,36 @@ export default function CRMDashboard() {
     {
       title: "Companies",
       value: safeCompanies.length,
-      icon: Building2,
+      icon: Building,
       description: "Active companies",
       link: "/crm/companies",
       color: "text-orange-600",
       bgColor: "bg-orange-100",
     },
+    {
+      title: "Properties",
+      value: safeProperties.length,
+      icon: Home,
+      description: "Marina properties tracked",
+      link: "/crm/properties",
+      color: "text-teal-600",
+      bgColor: "bg-teal-100",
+    },
   ];
+
+  const recentActivities = safeActivities
+    .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+    .slice(0, 6);
+
+  const getActivityIcon = (type: string) => {
+    switch (type) {
+      case 'call': return <Phone className="w-4 h-4 text-blue-600" />;
+      case 'email': return <Mail className="w-4 h-4 text-purple-600" />;
+      case 'meeting': return <Calendar className="w-4 h-4 text-green-600" />;
+      case 'task': return <CheckCircle2 className="w-4 h-4 text-amber-600" />;
+      default: return <Activity className="w-4 h-4 text-gray-600" />;
+    }
+  };
 
   return (
     <div className="p-8 space-y-8">
@@ -104,9 +175,10 @@ export default function CRMDashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
+          const isLoading = dealsLoading || leadsLoading || contactsLoading || companiesLoading || propertiesLoading;
           return (
             <Link key={stat.title} href={stat.link}>
               <Card className="cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group border-2 hover:border-primary/20" data-testid={`card-stat-${stat.title.toLowerCase().replace(' ', '-')}`}>
@@ -120,7 +192,7 @@ export default function CRMDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold" data-testid={`text-${stat.title.toLowerCase().replace(' ', '-')}-count`}>
-                    {dealsLoading || leadsLoading || contactsLoading || companiesLoading ? "..." : stat.value}
+                    {isLoading ? "..." : stat.value}
                   </div>
                   <div className="flex items-center justify-between mt-2">
                     <p className="text-xs text-muted-foreground">
@@ -135,49 +207,248 @@ export default function CRMDashboard() {
         })}
       </div>
 
-      {/* Recent Deals */}
-      <Card data-testid="card-recent-deals">
+      {/* Pipeline Summary */}
+      <Card data-testid="card-pipeline-summary">
         <CardHeader>
           <div className="flex justify-between items-center">
             <div>
-              <CardTitle>Recent Deals</CardTitle>
-              <CardDescription>Latest opportunities in your pipeline</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <Layers className="w-5 h-5 text-primary" />
+                Pipeline Summary
+              </CardTitle>
+              <CardDescription>
+                {formatCurrency(activeDealsValue)} in active pipeline
+              </CardDescription>
             </div>
-            <Link href="/crm/deals">
-              <Button variant="ghost" size="sm" data-testid="button-view-all-deals">
-                View All
+            <Link href="/crm/pipeline">
+              <Button variant="ghost" size="sm" data-testid="button-view-pipeline">
+                View Pipeline
+                <ArrowRight className="w-4 h-4 ml-1" />
               </Button>
             </Link>
           </div>
         </CardHeader>
         <CardContent>
           {dealsLoading ? (
-            <div className="text-center py-8 text-muted-foreground">Loading deals...</div>
-          ) : deals.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No deals yet. Create your first deal to get started!
+            <div className="space-y-3">
+              {[1, 2, 3, 4].map(i => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
             </div>
           ) : (
-            <div className="space-y-4">
-              {deals.slice(0, 5).map((deal: any) => (
-                <div
-                  key={deal.id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent transition-colors"
-                  data-testid={`row-deal-${deal.id}`}
-                >
-                  <div className="flex-1">
-                    <h3 className="font-medium" data-testid={`text-deal-title-${deal.id}`}>{deal.title}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {deal.marinaName || deal.description || "No description"}
-                    </p>
+            <div className="space-y-3">
+              {pipelineByStage.map((stage) => {
+                const percentage = totalDealValue > 0 ? (stage.value / totalDealValue) * 100 : 0;
+                return (
+                  <div key={stage.key} className="flex items-center gap-4">
+                    <div className="w-28 flex-shrink-0">
+                      <span className="text-sm font-medium">{stage.label}</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full ${stage.color} transition-all duration-500`}
+                            style={{ width: `${Math.max(percentage, stage.count > 0 ? 3 : 0)}%` }}
+                          />
+                        </div>
+                        <Badge variant="secondary" className="min-w-[40px] justify-center">
+                          {stage.count}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="w-24 text-right text-sm text-muted-foreground">
+                      {formatCurrency(stage.value)}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-semibold text-lg" data-testid={`text-deal-value-${deal.id}`}>
-                      {formatCurrency(parseFloat(deal.value || deal.amount || 0))}
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Deals */}
+        <Card data-testid="card-recent-deals">
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <div>
+                <CardTitle>Recent Deals</CardTitle>
+                <CardDescription>Latest opportunities in your pipeline</CardDescription>
+              </div>
+              <Link href="/crm/deals">
+                <Button variant="ghost" size="sm" data-testid="button-view-all-deals">
+                  View All
+                </Button>
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {dealsLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map(i => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : safeDeals.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <DollarSign className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                <p>No deals yet. Create your first deal to get started!</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {safeDeals.slice(0, 4).map((deal: any) => {
+                  const stageInfo = PIPELINE_STAGES.find(s => s.key === deal.stage);
+                  return (
+                    <div
+                      key={deal.id}
+                      className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent transition-colors"
+                      data-testid={`row-deal-${deal.id}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium truncate" data-testid={`text-deal-title-${deal.id}`}>
+                          {deal.title}
+                        </h3>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge 
+                            variant="secondary" 
+                            className={`text-xs text-white ${stageInfo?.color || 'bg-gray-500'}`}
+                          >
+                            {stageInfo?.label || deal.stage}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="text-right ml-4">
+                        <div className="font-semibold" data-testid={`text-deal-value-${deal.id}`}>
+                          {formatCurrency(parseFloat(deal.value || deal.amount || 0))}
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-sm text-muted-foreground capitalize">
-                      {deal.stage || "New"}
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Activity */}
+        <Card data-testid="card-recent-activity">
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="w-5 h-5" />
+                  Recent Activity
+                </CardTitle>
+                <CardDescription>Latest CRM interactions</CardDescription>
+              </div>
+              <Link href="/crm/activities">
+                <Button variant="ghost" size="sm" data-testid="button-view-all-activities">
+                  View All
+                </Button>
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {activitiesLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map(i => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : recentActivities.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Activity className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                <p>No activities recorded yet</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {recentActivities.map((activity: any) => (
+                  <div
+                    key={activity.id}
+                    className="flex items-start gap-3 p-2 rounded-lg hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="p-2 rounded-lg bg-muted">
+                      {getActivityIcon(activity.type)}
                     </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {activity.subject || activity.type}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {activity.createdAt 
+                          ? formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true })
+                          : 'Recently'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Properties Overview */}
+      <Card data-testid="card-properties-overview">
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Home className="w-5 h-5 text-teal-600" />
+                Properties Overview
+              </CardTitle>
+              <CardDescription>Marina properties in your portfolio</CardDescription>
+            </div>
+            <Link href="/crm/properties">
+              <Button variant="ghost" size="sm" data-testid="button-view-all-properties">
+                View All
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </Button>
+            </Link>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {propertiesLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[1, 2, 3].map(i => (
+                <Skeleton key={i} className="h-24 w-full" />
+              ))}
+            </div>
+          ) : safeProperties.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Home className="w-10 h-10 mx-auto mb-2 opacity-30" />
+              <p>No properties tracked yet</p>
+              <Link href="/crm/properties">
+                <Button variant="link" size="sm" className="mt-2">
+                  Add your first property
+                </Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {safeProperties.slice(0, 6).map((property: any) => (
+                <div
+                  key={property.id}
+                  className="p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                >
+                  <h4 className="font-medium truncate">{property.title}</h4>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                    <MapPin className="w-3 h-3" />
+                    <span className="truncate">
+                      {property.address || property.city || 'No address'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <Badge variant="outline" className="text-xs capitalize">
+                      {property.status?.replace('_', ' ') || 'Available'}
+                    </Badge>
+                    {property.listingPrice && (
+                      <span className="text-sm font-medium text-green-600">
+                        {formatCurrency(parseFloat(property.listingPrice))}
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
