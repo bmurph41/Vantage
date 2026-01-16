@@ -15,6 +15,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
+  EntityAvatar, 
+  ContactQuickActions,
+  formatPhoneDisplay,
+  formatCurrencyCompact 
+} from "@/components/ui/enhanced-card";
+import { 
   User, Building, MapPin, DollarSign, 
   Edit, X, Clock, Check, Loader2, Anchor, Home, Link2,
   TrendingUp, Calendar, Briefcase, FolderOpen, BarChart3, History

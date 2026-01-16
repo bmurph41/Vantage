@@ -14,6 +14,13 @@ import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
+  EntityAvatar, 
+  ContactQuickActions, 
+  StatusBadge,
+  formatPhoneDisplay,
+  formatCurrencyCompact 
+} from "@/components/ui/enhanced-card";
+import { 
   Building, Globe, MapPin, Phone, Mail, Users, Edit2, Save, X, FileText, 
   DollarSign, TrendingUp, Activity, Calendar, Clock, Check, Loader2,
   Plus, ExternalLink, Anchor, MessageSquare, CheckSquare, FolderOpen,
@@ -1061,34 +1068,45 @@ export default function CompanyDetailModal({
               ) : (
                 <div className="grid grid-cols-2 gap-4">
                   {companyContacts.map((contact) => (
-                    <Card key={contact.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onContactClick?.(contact)}>
-                      <CardContent className="p-4">
+                    <div 
+                      key={contact.id} 
+                      className="relative bg-card border rounded-xl shadow-sm overflow-hidden transition-all duration-200 ease-out hover:shadow-md hover:border-primary/20 hover:-translate-y-0.5 cursor-pointer group"
+                      onClick={() => onContactClick?.(contact)}
+                    >
+                      <div className="p-4">
                         <div className="flex items-start gap-3">
-                          <Avatar className="w-12 h-12">
-                            <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-                              {contact.firstName?.[0]}{contact.lastName?.[0]}
-                            </AvatarFallback>
-                          </Avatar>
+                          <EntityAvatar 
+                            name={`${contact.firstName || ''} ${contact.lastName || ''}`.trim()} 
+                            size="lg"
+                            className="group-hover:scale-105 transition-transform duration-200"
+                          />
                           <div className="flex-1 min-w-0">
-                            <h4 className="font-semibold">{contact.firstName} {contact.lastName}</h4>
+                            <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                              {contact.firstName} {contact.lastName}
+                            </h4>
                             <p className="text-sm text-muted-foreground">{contact.position || 'No title'}</p>
-                            <div className="flex items-center gap-3 mt-2 text-sm">
-                              {contact.email && (
-                                <a href={`mailto:${contact.email}`} className="text-primary hover:underline flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                                  <Mail className="w-3 h-3" /> Email
-                                </a>
-                              )}
-                              {contact.phone && (
-                                <a href={`tel:${contact.phone}`} className="text-primary hover:underline flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                                  <Phone className="w-3 h-3" /> Call
-                                </a>
-                              )}
-                            </div>
+                            {contact.email && (
+                              <div className="flex items-center gap-1.5 mt-1.5 text-xs text-muted-foreground">
+                                <Mail className="w-3 h-3" />
+                                <span className="truncate">{contact.email}</span>
+                              </div>
+                            )}
+                            {contact.phone && (
+                              <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
+                                <Phone className="w-3 h-3" />
+                                <span>{formatPhoneDisplay(contact.phone)}</span>
+                              </div>
+                            )}
                           </div>
-                          <ExternalLink className="w-4 h-4 text-muted-foreground" />
                         </div>
-                      </CardContent>
-                    </Card>
+                      </div>
+                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200" onClick={e => e.stopPropagation()}>
+                        <ContactQuickActions
+                          email={contact.email}
+                          phone={contact.phone}
+                        />
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
@@ -1195,32 +1213,41 @@ export default function CompanyDetailModal({
               ) : (
                 <div className="grid grid-cols-2 gap-4">
                   {allCompanyProperties.map((property) => (
-                    <Card key={property.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onPropertyClick?.(property)}>
-                      <CardContent className="p-4">
+                    <div 
+                      key={property.id} 
+                      className="relative bg-card border rounded-xl shadow-sm overflow-hidden transition-all duration-200 ease-out hover:shadow-md hover:border-primary/20 hover:-translate-y-0.5 cursor-pointer group"
+                      onClick={() => onPropertyClick?.(property)}
+                    >
+                      <div className="p-4">
                         <div className="flex items-start justify-between">
                           <div className="flex items-start gap-3">
-                            <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                            <div className="p-2.5 bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-900/50 dark:to-cyan-900/50 rounded-xl group-hover:scale-105 transition-transform duration-200">
                               <Anchor className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                             </div>
-                            <div>
-                              <h4 className="font-semibold">{property.title}</h4>
-                              <p className="text-sm text-muted-foreground">{property.address || 'No address'}</p>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors">{property.title}</h4>
+                              {property.address && (
+                                <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
+                                  <MapPin className="w-3 h-3" />
+                                  <span className="truncate">{property.address}</span>
+                                </div>
+                              )}
                               {property.listingPrice && (
-                                <p className="text-sm font-medium text-green-600 mt-1">
-                                  ${Number(property.listingPrice).toLocaleString()}
+                                <p className="text-sm font-semibold text-green-600 dark:text-green-400 mt-1.5">
+                                  {formatCurrencyCompact(property.listingPrice)}
                                 </p>
                               )}
                             </div>
                           </div>
-                          <div className="flex flex-col items-end gap-1">
-                            <Badge variant="outline">{property.type}</Badge>
-                            <Badge className={property.status === 'available' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
-                              {property.status}
+                          <div className="flex flex-col items-end gap-1.5 ml-2">
+                            <Badge variant="outline" className="text-xs capitalize">{property.type?.replace('_', ' ')}</Badge>
+                            <Badge className={property.status === 'available' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}>
+                              {property.status?.replace('_', ' ')}
                             </Badge>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}

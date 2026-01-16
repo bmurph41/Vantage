@@ -12,6 +12,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { User, Plus, Search, Mail, Phone, Building2, UserPlus, Clock } from "lucide-react";
+import { 
+  EntityAvatar, 
+  RoleBadge, 
+  ContactQuickActions,
+  formatPhoneDisplay 
+} from "@/components/ui/enhanced-card";
 import type { Contact, ProjectContact, ProjectPendingContact, PendingContact } from "@shared/schema";
 
 interface KeyContactsSectionProps {
@@ -272,33 +278,51 @@ contact.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pl-4">
                     {contacts.map((pc) => (
-                      <button
+                      <div
                         key={pc.id}
-                        onClick={() => handleContactClick(pc.contact)}
-                        className="flex items-start p-3 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50/50 transition-all text-left group"
+                        className="relative bg-card border rounded-xl shadow-sm overflow-hidden transition-all duration-200 ease-out hover:shadow-md hover:border-primary/20 hover:-translate-y-0.5 group"
                         data-testid={`contact-card-${pc.contact.id}`}
                       >
-                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold text-sm shadow-md group-hover:scale-110 transition-transform">
-                          {pc.contact.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="ml-3 flex-1 min-w-0">
-                          <div className="font-semibold text-sm text-gray-900 truncate group-hover:text-blue-700">
-                            {pc.contact.name}
+                        <button
+                          onClick={() => handleContactClick(pc.contact)}
+                          className="w-full flex items-start p-4 text-left"
+                        >
+                          <EntityAvatar 
+                            name={pc.contact.name} 
+                            size="md"
+                            className="group-hover:scale-105 transition-transform duration-200"
+                          />
+                          <div className="ml-3 flex-1 min-w-0">
+                            <div className="font-semibold text-sm text-foreground truncate group-hover:text-primary transition-colors">
+                              {pc.contact.name}
+                            </div>
+                            {pc.contact.company && (
+                              <div className="flex items-center text-xs text-muted-foreground mt-1 truncate">
+                                <Building2 className="h-3 w-3 mr-1.5 flex-shrink-0" />
+                                {pc.contact.company}
+                              </div>
+                            )}
+                            {pc.contact.email && (
+                              <div className="flex items-center text-xs text-muted-foreground mt-0.5 truncate">
+                                <Mail className="h-3 w-3 mr-1.5 flex-shrink-0" />
+                                {pc.contact.email}
+                              </div>
+                            )}
+                            {pc.contact.phone && (
+                              <div className="flex items-center text-xs text-muted-foreground mt-0.5 truncate">
+                                <Phone className="h-3 w-3 mr-1.5 flex-shrink-0" />
+                                {formatPhoneDisplay(pc.contact.phone)}
+                              </div>
+                            )}
                           </div>
-                          {pc.contact.company && (
-                            <div className="flex items-center text-xs text-gray-600 mt-0.5 truncate">
-                              <Building2 className="h-3 w-3 mr-1 flex-shrink-0" />
-                              {pc.contact.company}
-                            </div>
-                          )}
-                          {pc.contact.email && (
-                            <div className="flex items-center text-xs text-gray-500 mt-0.5 truncate">
-                              <Mail className="h-3 w-3 mr-1 flex-shrink-0" />
-                              {pc.contact.email}
-                            </div>
-                          )}
+                        </button>
+                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                          <ContactQuickActions
+                            email={pc.contact.email}
+                            phone={pc.contact.phone}
+                          />
                         </div>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -323,38 +347,58 @@ contact.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
                   {filteredContacts.map((contact) => {
                     const isOnProject = projectContacts.some((pc) => pc.contactId === contact.id);
                     return (
-                      <button
+                      <div
                         key={contact.id}
-                        onClick={() => handleContactClick(contact)}
-                        className="flex items-start p-3 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50/50 transition-all text-left group relative"
+                        className="relative bg-card border rounded-xl shadow-sm overflow-hidden transition-all duration-200 ease-out hover:shadow-md hover:border-primary/20 hover:-translate-y-0.5 group"
                         data-testid={`search-contact-card-${contact.id}`}
                       >
-                        {isOnProject && (
-                          <Badge className="absolute top-2 right-2 text-xs bg-green-100 text-green-800">
-                            On Project
-                          </Badge>
-                        )}
-                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold text-sm shadow-md group-hover:scale-110 transition-transform">
-                          {contact.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="ml-3 flex-1 min-w-0">
-                          <div className="font-semibold text-sm text-gray-900 truncate group-hover:text-blue-700">
-                            {contact.name}
+                        <button
+                          onClick={() => handleContactClick(contact)}
+                          className="w-full flex items-start p-4 text-left"
+                        >
+                          <EntityAvatar 
+                            name={contact.name} 
+                            size="md"
+                            className="group-hover:scale-105 transition-transform duration-200"
+                          />
+                          <div className="ml-3 flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-sm text-foreground truncate group-hover:text-primary transition-colors">
+                                {contact.name}
+                              </span>
+                              {isOnProject && (
+                                <Badge className="text-[10px] px-1.5 py-0 bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 border-0">
+                                  On Project
+                                </Badge>
+                              )}
+                            </div>
+                            {contact.company && (
+                              <div className="flex items-center text-xs text-muted-foreground mt-1 truncate">
+                                <Building2 className="h-3 w-3 mr-1.5 flex-shrink-0" />
+                                {contact.company}
+                              </div>
+                            )}
+                            {contact.email && (
+                              <div className="flex items-center text-xs text-muted-foreground mt-0.5 truncate">
+                                <Mail className="h-3 w-3 mr-1.5 flex-shrink-0" />
+                                {contact.email}
+                              </div>
+                            )}
+                            {contact.phone && (
+                              <div className="flex items-center text-xs text-muted-foreground mt-0.5 truncate">
+                                <Phone className="h-3 w-3 mr-1.5 flex-shrink-0" />
+                                {formatPhoneDisplay(contact.phone)}
+                              </div>
+                            )}
                           </div>
-                          {contact.company && (
-                            <div className="flex items-center text-xs text-gray-600 mt-0.5 truncate">
-                              <Building2 className="h-3 w-3 mr-1 flex-shrink-0" />
-                              {contact.company}
-                            </div>
-                          )}
-                          {contact.email && (
-                            <div className="flex items-center text-xs text-gray-500 mt-0.5 truncate">
-                              <Mail className="h-3 w-3 mr-1 flex-shrink-0" />
-                              {contact.email}
-                            </div>
-                          )}
+                        </button>
+                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                          <ContactQuickActions
+                            email={contact.email}
+                            phone={contact.phone}
+                          />
                         </div>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
