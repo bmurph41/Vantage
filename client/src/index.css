@@ -27,6 +27,9 @@
   --chart-3: hsl(42.0290 92.8251% 56.2745%);
   --chart-4: hsl(147.1429 78.5047% 41.9608%);
   --chart-5: hsl(341.4894 75.2000% 50.9804%);
+  --success: hsl(145 63% 42%);
+  --success-foreground: hsl(0 0% 100%);
+  --success-light: hsl(145 63% 95%);
   --teal: hsl(177 75% 28%);
   --teal-foreground: hsl(0 0% 100%);
   --teal-light: hsl(177 75% 95%);
@@ -83,6 +86,9 @@
   --chart-3: hsl(42.0290 92.8251% 56.2745%);
   --chart-4: hsl(147.1429 78.5047% 41.9608%);
   --chart-5: hsl(341.4894 75.2000% 50.9804%);
+  --success: hsl(145 63% 45%);
+  --success-foreground: hsl(0 0% 100%);
+  --success-light: hsl(145 63% 15%);
   --teal: hsl(177 75% 35%);
   --teal-foreground: hsl(0 0% 100%);
   --teal-light: hsl(177 75% 15%);
