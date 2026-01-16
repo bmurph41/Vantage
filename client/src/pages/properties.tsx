@@ -43,6 +43,13 @@ type Property = {
   listingAgentId?: string;
   createdAt: string;
   updatedAt: string;
+  wetSlips?: number;
+  drySlips?: number;
+  moorings?: number;
+  totalCapacity?: number;
+  lastSaleMonth?: number;
+  lastSaleYear?: number;
+  lastSalePrice?: number;
 };
 
 const propertyTypeColors: Record<string, string> = {
@@ -351,15 +358,42 @@ export default function Properties() {
         } />
         <CrmDetailField label="Price" value={formatPrice(selectedProperty.listingPrice)} />
         <CrmDetailField label="Address" value={selectedProperty.address} />
+        {(selectedProperty.lastSaleMonth || selectedProperty.lastSaleYear) && (
+          <CrmDetailField 
+            label="Last Sale" 
+            value={
+              selectedProperty.lastSaleMonth && selectedProperty.lastSaleYear
+                ? `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][selectedProperty.lastSaleMonth - 1]} ${selectedProperty.lastSaleYear}`
+                : selectedProperty.lastSaleYear?.toString() || null
+            } 
+          />
+        )}
+        {selectedProperty.lastSalePrice && (
+          <CrmDetailField label="Sale Price" value={formatPrice(selectedProperty.lastSalePrice?.toString())} />
+        )}
       </CrmDetailSection>
 
-      {selectedProperty.specifications && (
+      {(selectedProperty.specifications || selectedProperty.wetSlips || selectedProperty.drySlips || selectedProperty.moorings) && (
         <CrmDetailSection title="Specifications">
           {selectedProperty.type === 'marina' && (
             <>
-              <CrmDetailField label="Slip Count" value={selectedProperty.specifications.slipCount} />
-              <CrmDetailField label="Max Boat Length" value={selectedProperty.specifications.maxBoatLength ? `${selectedProperty.specifications.maxBoatLength}ft` : null} />
-              <CrmDetailField label="Dock Type" value={selectedProperty.specifications.dockType} />
+              {selectedProperty.wetSlips && selectedProperty.wetSlips > 0 && (
+                <CrmDetailField label="Wet Slips" value={selectedProperty.wetSlips} />
+              )}
+              {selectedProperty.drySlips && selectedProperty.drySlips > 0 && (
+                <CrmDetailField label="Dry Racks" value={selectedProperty.drySlips} />
+              )}
+              {selectedProperty.moorings && selectedProperty.moorings > 0 && (
+                <CrmDetailField label="Moorings" value={selectedProperty.moorings} />
+              )}
+              {selectedProperty.totalCapacity && selectedProperty.totalCapacity > 0 && (
+                <CrmDetailField label="Total Capacity" value={selectedProperty.totalCapacity} />
+              )}
+              {!selectedProperty.wetSlips && !selectedProperty.drySlips && !selectedProperty.moorings && selectedProperty.specifications?.slipCount && (
+                <CrmDetailField label="Slip Count" value={selectedProperty.specifications.slipCount} />
+              )}
+              <CrmDetailField label="Max Boat Length" value={selectedProperty.specifications?.maxBoatLength ? `${selectedProperty.specifications.maxBoatLength}ft` : null} />
+              <CrmDetailField label="Dock Type" value={selectedProperty.specifications?.dockType} />
             </>
           )}
           {selectedProperty.type === 'boat' && (

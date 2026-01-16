@@ -2298,6 +2298,12 @@ export const crmProperties = pgTable("crm_properties", {
   // Owner Company link
   ownerCompanyId: varchar("owner_company_id").references(() => crmCompanies.id),
   
+  // Sale History (for bi-directional sync with Sales Comps)
+  lastSaleMonth: integer("last_sale_month"), // 1-12
+  lastSaleYear: integer("last_sale_year"),
+  lastSalePrice: decimal("last_sale_price", { precision: 14, scale: 2 }),
+  linkedSalesCompId: varchar("linked_sales_comp_id"),
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

@@ -178,11 +178,18 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
 
   // Additional marina property fields
   const [wetSlips, setWetSlips] = useState("");
-  const [dryStorage, setDryStorage] = useState("");
+  const [drySlips, setDrySlips] = useState(""); // Changed from dryStorage to match schema
+  const [moorings, setMoorings] = useState("");
+  const [totalCapacity, setTotalCapacity] = useState("");
   const [totalAcres, setTotalAcres] = useState("");
   const [waterDepth, setWaterDepth] = useState("");
   const [linearFeet, setLinearFeet] = useState("");
   const [yearBuilt, setYearBuilt] = useState("");
+  
+  // Sale history fields
+  const [lastSaleMonth, setLastSaleMonth] = useState("");
+  const [lastSaleYear, setLastSaleYear] = useState("");
+  const [lastSalePrice, setLastSalePrice] = useState("");
 
   const form = useForm({
     resolver: zodResolver(insertPropertySchema.extend({
@@ -215,16 +222,29 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
       setState(property.state || "");
       setZipCode(property.zipCode || "");
       
-      // Load marina specifications from specifications object
+      // Load storage capacity from top-level fields (matching crmProperties schema)
+      const propAny = property as any;
+      setWetSlips(propAny.wetSlips?.toString() || "");
+      setDrySlips(propAny.drySlips?.toString() || "");
+      setMoorings(propAny.moorings?.toString() || "");
+      setTotalCapacity(propAny.totalCapacity?.toString() || "");
+      
+      // Load marina specifications from specifications object (legacy support)
       if (property.specifications && typeof property.specifications === 'object') {
         const specs = property.specifications as Record<string, any>;
-        setWetSlips(specs.wetSlips || "");
-        setDryStorage(specs.dryStorage || "");
         setTotalAcres(specs.totalAcres || "");
         setWaterDepth(specs.waterDepth || "");
         setLinearFeet(specs.linearFeet || "");
         setYearBuilt(specs.yearBuilt || "");
+        // Fallback: if top-level fields empty, try specifications
+        if (!propAny.wetSlips && specs.wetSlips) setWetSlips(specs.wetSlips.toString());
+        if (!propAny.drySlips && specs.dryStorage) setDrySlips(specs.dryStorage.toString());
       }
+      
+      // Load sale history from property
+      setLastSaleMonth(propAny.lastSaleMonth?.toString() || "");
+      setLastSaleYear(propAny.lastSaleYear?.toString() || "");
+      setLastSalePrice(propAny.lastSalePrice?.toString() || "");
     } else {
       form.reset({
         title: "",
@@ -239,25 +259,29 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
       setState("");
       setZipCode("");
       setWetSlips("");
-      setDryStorage("");
+      setDrySlips("");
+      setMoorings("");
+      setTotalCapacity("");
       setTotalAcres("");
       setWaterDepth("");
       setLinearFeet("");
       setYearBuilt("");
+      setLastSaleMonth("");
+      setLastSaleYear("");
+      setLastSalePrice("");
     }
   }, [property, form, isOpen]);
 
   const createPropertyMutation = useMutation({
     mutationFn: async (data: any) => {
+      // Store non-capacity specs in specifications object
       const specifications: Record<string, string> = {};
-      if (wetSlips) specifications.wetSlips = wetSlips;
-      if (dryStorage) specifications.dryStorage = dryStorage;
       if (totalAcres) specifications.totalAcres = totalAcres;
       if (waterDepth) specifications.waterDepth = waterDepth;
       if (linearFeet) specifications.linearFeet = linearFeet;
       if (yearBuilt) specifications.yearBuilt = yearBuilt;
 
-      const cleanData = { 
+      const cleanData: Record<string, any> = { 
         ...data,
         address: address.trim() || undefined,
         city: city.trim() || undefined,
@@ -265,6 +289,20 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
         zipCode: zipCode.trim() || undefined,
         specifications: Object.keys(specifications).length > 0 ? specifications : {},
       };
+      
+      // Add storage capacity to top-level fields (matching crmProperties schema)
+      if (wetSlips) cleanData.wetSlips = parseInt(wetSlips);
+      if (drySlips) cleanData.drySlips = parseInt(drySlips);
+      if (moorings) cleanData.moorings = parseInt(moorings);
+      if (totalCapacity) cleanData.totalCapacity = parseInt(totalCapacity);
+      
+      // Add sale history fields (ensure proper types for backend)
+      if (lastSaleMonth) cleanData.lastSaleMonth = parseInt(lastSaleMonth);
+      if (lastSaleYear) cleanData.lastSaleYear = parseInt(lastSaleYear);
+      if (lastSalePrice) {
+        const parsedPrice = parseFloat(lastSalePrice);
+        if (!isNaN(parsedPrice)) cleanData.lastSalePrice = parsedPrice.toFixed(2);
+      }
       
       Object.keys(cleanData).forEach(key => {
         if (cleanData[key] === "" || cleanData[key] === undefined) {
@@ -297,15 +335,14 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
 
   const updatePropertyMutation = useMutation({
     mutationFn: async (data: any) => {
+      // Store non-capacity specs in specifications object
       const specifications: Record<string, string> = {};
-      if (wetSlips) specifications.wetSlips = wetSlips;
-      if (dryStorage) specifications.dryStorage = dryStorage;
       if (totalAcres) specifications.totalAcres = totalAcres;
       if (waterDepth) specifications.waterDepth = waterDepth;
       if (linearFeet) specifications.linearFeet = linearFeet;
       if (yearBuilt) specifications.yearBuilt = yearBuilt;
 
-      const cleanData = { 
+      const cleanData: Record<string, any> = { 
         ...data,
         address: address.trim() || undefined,
         city: city.trim() || undefined,
@@ -313,6 +350,20 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
         zipCode: zipCode.trim() || undefined,
         specifications: Object.keys(specifications).length > 0 ? specifications : {},
       };
+      
+      // Add storage capacity to top-level fields (matching crmProperties schema)
+      if (wetSlips) cleanData.wetSlips = parseInt(wetSlips);
+      if (drySlips) cleanData.drySlips = parseInt(drySlips);
+      if (moorings) cleanData.moorings = parseInt(moorings);
+      if (totalCapacity) cleanData.totalCapacity = parseInt(totalCapacity);
+      
+      // Add sale history fields (ensure proper types for backend)
+      if (lastSaleMonth) cleanData.lastSaleMonth = parseInt(lastSaleMonth);
+      if (lastSaleYear) cleanData.lastSaleYear = parseInt(lastSaleYear);
+      if (lastSalePrice) {
+        const parsedPrice = parseFloat(lastSalePrice);
+        if (!isNaN(parsedPrice)) cleanData.lastSalePrice = parsedPrice.toFixed(2);
+      }
       
       Object.keys(cleanData).forEach(key => {
         if (cleanData[key] === "" || cleanData[key] === undefined) {
@@ -535,13 +586,33 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                   />
                 </div>
                 <div className="space-y-2">
-                  <FormLabel className="text-sm">Dry Storage</FormLabel>
+                  <FormLabel className="text-sm">Dry Racks</FormLabel>
                   <Input
                     type="number"
-                    placeholder="Number of dry storage units"
-                    value={dryStorage}
-                    onChange={(e) => setDryStorage(e.target.value)}
-                    data-testid="input-dry-storage"
+                    placeholder="Number of dry racks"
+                    value={drySlips}
+                    onChange={(e) => setDrySlips(e.target.value)}
+                    data-testid="input-dry-slips"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <FormLabel className="text-sm">Moorings</FormLabel>
+                  <Input
+                    type="number"
+                    placeholder="Number of moorings"
+                    value={moorings}
+                    onChange={(e) => setMoorings(e.target.value)}
+                    data-testid="input-moorings"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <FormLabel className="text-sm">Total Capacity</FormLabel>
+                  <Input
+                    type="number"
+                    placeholder="Total capacity"
+                    value={totalCapacity}
+                    onChange={(e) => setTotalCapacity(e.target.value)}
+                    data-testid="input-total-capacity"
                   />
                 </div>
                 <div className="space-y-2">
@@ -584,6 +655,56 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                     value={yearBuilt}
                     onChange={(e) => setYearBuilt(e.target.value)}
                     data-testid="input-year-built"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Sale History Section */}
+            <Separator className="my-4" />
+            <div className="space-y-4">
+              <FormLabel className="text-base font-medium">Sale History</FormLabel>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <FormLabel className="text-sm">Last Sale Month</FormLabel>
+                  <Select value={lastSaleMonth} onValueChange={setLastSaleMonth}>
+                    <SelectTrigger data-testid="select-last-sale-month">
+                      <SelectValue placeholder="Month" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">January</SelectItem>
+                      <SelectItem value="2">February</SelectItem>
+                      <SelectItem value="3">March</SelectItem>
+                      <SelectItem value="4">April</SelectItem>
+                      <SelectItem value="5">May</SelectItem>
+                      <SelectItem value="6">June</SelectItem>
+                      <SelectItem value="7">July</SelectItem>
+                      <SelectItem value="8">August</SelectItem>
+                      <SelectItem value="9">September</SelectItem>
+                      <SelectItem value="10">October</SelectItem>
+                      <SelectItem value="11">November</SelectItem>
+                      <SelectItem value="12">December</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <FormLabel className="text-sm">Last Sale Year</FormLabel>
+                  <Input
+                    type="number"
+                    placeholder="e.g. 2023"
+                    value={lastSaleYear}
+                    onChange={(e) => setLastSaleYear(e.target.value)}
+                    data-testid="input-last-sale-year"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <FormLabel className="text-sm">Sale Price</FormLabel>
+                  <Input
+                    type="number"
+                    placeholder="e.g. 5000000"
+                    value={lastSalePrice}
+                    onChange={(e) => setLastSalePrice(e.target.value)}
+                    data-testid="input-last-sale-price"
                   />
                 </div>
               </div>
