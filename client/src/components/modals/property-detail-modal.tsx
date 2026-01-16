@@ -21,7 +21,7 @@ import {
   formatCurrencyCompact 
 } from "@/components/ui/enhanced-card";
 import { 
-  User, Building, MapPin, DollarSign, 
+  User, Building, MapPin, DollarSign, Phone, Mail,
   Edit, X, Clock, Check, Loader2, Anchor, Home, Link2,
   TrendingUp, Calendar, Briefcase, FolderOpen, BarChart3, History
 } from "lucide-react";
@@ -138,13 +138,13 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
 
   // Fetch linked contacts
   const { data: linkedContacts = [] } = useQuery<ContactPropertyWithContact[]>({
-    queryKey: [`/api/properties/${property?.id}/contacts`],
+    queryKey: ['/api/properties', property?.id, 'contacts'],
     enabled: isOpen && !!property?.id,
   });
 
   // Fetch linked companies
   const { data: linkedCompanies = [] } = useQuery<CompanyPropertyWithCompany[]>({
-    queryKey: [`/api/properties/${property?.id}/companies`],
+    queryKey: ['/api/properties', property?.id, 'companies'],
     enabled: isOpen && !!property?.id,
   });
 
@@ -229,7 +229,7 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
       return await apiRequest('DELETE', `/api/properties/${property?.id}/contacts/${linkId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/properties/${property?.id}/contacts`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/properties', property?.id, 'contacts'] });
       toast({ title: "Contact unlinked" });
     },
     onError: () => {
@@ -243,7 +243,7 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
       return await apiRequest('DELETE', `/api/properties/${property?.id}/companies/${linkId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/properties/${property?.id}/companies`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/properties', property?.id, 'companies'] });
       toast({ title: "Company unlinked" });
     },
     onError: () => {
@@ -884,39 +884,72 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
                   <CardTitle className="text-lg flex items-center gap-2">
                     <User className="w-5 h-5" />
                     Linked Contacts
+                    {linkedContacts.length > 0 && (
+                      <Badge variant="secondary" className="ml-2">{linkedContacts.length}</Badge>
+                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   {linkedContacts.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <User className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                      <p>No contacts linked yet</p>
+                    <div className="text-center py-8 text-muted-foreground">
+                      <User className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p className="font-medium">No contacts linked yet</p>
+                      <p className="text-sm mt-1">Link contacts to track relationships with this property</p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
                       {linkedContacts.map((link) => (
-                        <div key={link.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                          <div>
-                            <div className="font-semibold">
-                              {link.contact?.firstName} {link.contact?.lastName}
+                        <div 
+                          key={link.id} 
+                          className="relative bg-card border rounded-xl shadow-sm overflow-hidden transition-all duration-200 ease-out hover:shadow-md hover:border-primary/20 group"
+                        >
+                          <div className="p-4">
+                            <div className="flex items-start gap-3">
+                              <EntityAvatar 
+                                name={`${link.contact?.firstName || ''} ${link.contact?.lastName || ''}`.trim()} 
+                                size="lg"
+                                className="group-hover:scale-105 transition-transform duration-200"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-semibold text-foreground">
+                                  {link.contact?.firstName} {link.contact?.lastName}
+                                </h4>
+                                {link.relationship && (
+                                  <Badge variant="outline" className="text-xs mt-1 capitalize">{link.relationship.replace('_', ' ')}</Badge>
+                                )}
+                                {link.contact?.email && (
+                                  <div className="flex items-center gap-1.5 mt-1.5 text-xs text-muted-foreground">
+                                    <Mail className="w-3 h-3" />
+                                    <span className="truncate">{link.contact.email}</span>
+                                  </div>
+                                )}
+                                {link.contact?.phone && (
+                                  <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
+                                    <Phone className="w-3 h-3" />
+                                    <span>{formatPhoneDisplay(link.contact.phone)}</span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                            {link.contact?.email && (
-                              <div className="text-sm text-gray-600">{link.contact.email}</div>
-                            )}
-                            {link.relationship && (
-                              <Badge variant="outline" className="text-xs mt-1">{link.relationship}</Badge>
-                            )}
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => unlinkContactMutation.mutate(link.id)}
-                            disabled={unlinkContactMutation.isPending}
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                            data-testid={`button-unlink-contact-${link.id}`}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
+                          <div className="absolute top-2 right-2 flex gap-1">
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                              <ContactQuickActions
+                                email={link.contact?.email}
+                                phone={link.contact?.phone}
+                              />
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => unlinkContactMutation.mutate(link.id)}
+                              disabled={unlinkContactMutation.isPending}
+                              className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                              data-testid={`button-unlink-contact-${link.id}`}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -931,34 +964,55 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Building className="w-5 h-5" />
                     Linked Companies
+                    {linkedCompanies.length > 0 && (
+                      <Badge variant="secondary" className="ml-2">{linkedCompanies.length}</Badge>
+                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   {linkedCompanies.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <Building className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                      <p>No companies linked yet</p>
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Building className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p className="font-medium">No companies linked yet</p>
+                      <p className="text-sm mt-1">Link companies associated with this property</p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
                       {linkedCompanies.map((link) => (
-                        <div key={link.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                          <div>
-                            <div className="font-semibold">{link.company?.name || 'Unknown Company'}</div>
-                            {link.relationship && (
-                              <Badge variant="outline" className="text-xs mt-1">{link.relationship}</Badge>
-                            )}
+                        <div 
+                          key={link.id} 
+                          className="relative bg-card border rounded-xl shadow-sm overflow-hidden transition-all duration-200 ease-out hover:shadow-md hover:border-primary/20 group"
+                        >
+                          <div className="p-4">
+                            <div className="flex items-start gap-3">
+                              <div className="p-2.5 bg-gradient-to-br from-purple-100 to-indigo-100 dark:from-purple-900/50 dark:to-indigo-900/50 rounded-xl group-hover:scale-105 transition-transform duration-200">
+                                <Building className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-semibold text-foreground">{link.company?.name || 'Unknown Company'}</h4>
+                                {link.relationship && (
+                                  <Badge variant="outline" className="text-xs mt-1 capitalize">{link.relationship.replace('_', ' ')}</Badge>
+                                )}
+                                {link.company?.industry && (
+                                  <div className="flex items-center gap-1.5 mt-1.5 text-xs text-muted-foreground">
+                                    <span className="truncate">{link.company.industry}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => unlinkCompanyMutation.mutate(link.id)}
-                            disabled={unlinkCompanyMutation.isPending}
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                            data-testid={`button-unlink-company-${link.id}`}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
+                          <div className="absolute top-2 right-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => unlinkCompanyMutation.mutate(link.id)}
+                              disabled={unlinkCompanyMutation.isPending}
+                              className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                              data-testid={`button-unlink-company-${link.id}`}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>
