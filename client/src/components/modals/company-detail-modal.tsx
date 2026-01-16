@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,8 @@ import {
   Building, Globe, MapPin, Phone, Mail, Users, Edit2, Save, X, FileText, 
   DollarSign, TrendingUp, Activity, Calendar, Clock, Check, Loader2,
   Plus, ExternalLink, Anchor, MessageSquare, CheckSquare, FolderOpen,
-  MoreVertical, Send, Filter, ArrowUpRight, Briefcase, Target, AlertCircle
+  MoreVertical, Send, Filter, ArrowUpRight, Briefcase, Target, AlertCircle,
+  Link2, FolderPlus, ChevronDown, Trash2, BarChart3
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -35,7 +36,9 @@ import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow, differenceInDays } from "date-fns";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { AddressInput, type AddressComponents } from "@/components/address-input";
-import type { Company, Contact, Deal, Property, Activity as ActivityType, Note, CrmTask, CrmFile } from "@shared/schema";
+import type { Company, Contact, Deal, Property, Activity as ActivityType, Note, CrmTask, CrmFile, SalesComp } from "@shared/schema";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface CompanyDetailModalProps {
   isOpen: boolean;
@@ -130,6 +133,24 @@ export default function CompanyDetailModal({
   const [activityFilter, setActivityFilter] = useState<string>("all");
   const isAutosaveRef = useRef(false);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  // Property management state
+  const [showLinkPropertyDialog, setShowLinkPropertyDialog] = useState(false);
+  const [showAddPropertyModal, setShowAddPropertyModal] = useState(false);
+  const [isPortfolioMode, setIsPortfolioMode] = useState(false);
+  const [selectedPropertyToLink, setSelectedPropertyToLink] = useState<string>("");
+  const [selectedPropertyRelationship, setSelectedPropertyRelationship] = useState("owner");
+  const [selectedSalesComp, setSelectedSalesComp] = useState<string>("");
+  
+  // Multi-property (portfolio) state
+  const [portfolioProperties, setPortfolioProperties] = useState<Array<{
+    title: string;
+    address: string;
+    type: string;
+    slips?: number;
+  }>>([{ title: "", address: "", type: "marina" }]);
+  const [portfolioName, setPortfolioName] = useState("");
+  const [isCreatingProperties, setIsCreatingProperties] = useState(false);
 
   const form = useForm<CompanyFormData>({
     resolver: zodResolver(companyFormSchema),
@@ -207,6 +228,145 @@ export default function CompanyDetailModal({
     queryKey: ['/api/crm/files', { entityType: 'company', entityId: company?.id }],
     enabled: isOpen && !!company?.id,
   });
+
+  // Fetch sales comps for linking to properties
+  const { data: salesComps = [] } = useQuery<SalesComp[]>({
+    queryKey: ['/api/sales-comps'],
+    enabled: isOpen && (showAddPropertyModal || showLinkPropertyDialog),
+  });
+
+  // Link property to company mutation
+  const linkPropertyMutation = useMutation({
+    mutationFn: async ({ propertyId, relationship }: { propertyId: string; relationship: string }) => {
+      return await apiRequest('POST', `/api/properties/${propertyId}/companies`, { 
+        companyId: company?.id, 
+        relationship 
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/companies', company?.id, 'properties'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
+      setShowLinkPropertyDialog(false);
+      setSelectedPropertyToLink("");
+      toast({ title: "Property linked successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to link property", variant: "destructive" });
+    },
+  });
+
+  // Create property mutation
+  const createPropertyMutation = useMutation({
+    mutationFn: async (propertyData: {
+      title: string;
+      address?: string;
+      type?: string;
+      ownerCompanyId?: string;
+      salesCompId?: string;
+      slips?: number;
+      isPortfolio?: boolean;
+      portfolioName?: string;
+    }) => {
+      return await apiRequest('POST', '/api/properties', propertyData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/companies', company?.id, 'properties'] });
+    },
+    onError: () => {
+      toast({ title: "Failed to create property", variant: "destructive" });
+    },
+  });
+
+  // Bulk create properties (portfolio mode)
+  const handleCreateProperties = async () => {
+    if (!company) return;
+    
+    setIsCreatingProperties(true);
+    
+    try {
+      if (isPortfolioMode) {
+        // Create multiple properties as a portfolio
+        const validProperties = portfolioProperties.filter(p => p.title.trim());
+        if (validProperties.length === 0) {
+          toast({ title: "Please add at least one property", variant: "destructive" });
+          setIsCreatingProperties(false);
+          return;
+        }
+        
+        const failed: string[] = [];
+        let successCount = 0;
+        
+        for (const prop of validProperties) {
+          try {
+            await createPropertyMutation.mutateAsync({
+              title: prop.title,
+              address: prop.address,
+              type: prop.type || 'marina',
+              ownerCompanyId: company.id,
+              salesCompId: selectedSalesComp || undefined,
+              slips: prop.slips,
+              isPortfolio: true,
+              portfolioName: portfolioName || `${company.name} Portfolio`,
+            });
+            successCount++;
+          } catch {
+            failed.push(prop.title);
+          }
+        }
+        
+        if (failed.length > 0) {
+          toast({ 
+            title: `Partially created: ${successCount} of ${validProperties.length} properties`,
+            description: `Failed: ${failed.join(', ')}`,
+            variant: "destructive"
+          });
+        } else {
+          toast({ 
+            title: `Portfolio created with ${successCount} properties`,
+            description: portfolioName || `${company.name} Portfolio`
+          });
+        }
+        
+        // Only close if at least one succeeded
+        if (successCount > 0) {
+          setShowAddPropertyModal(false);
+          setIsPortfolioMode(false);
+          setPortfolioProperties([{ title: "", address: "", type: "marina" }]);
+          setPortfolioName("");
+          setSelectedSalesComp("");
+        }
+      } else {
+        // Create single property
+        const prop = portfolioProperties[0];
+        if (!prop?.title.trim()) {
+          toast({ title: "Property name is required", variant: "destructive" });
+          setIsCreatingProperties(false);
+          return;
+        }
+        await createPropertyMutation.mutateAsync({
+          title: prop.title,
+          address: prop.address,
+          type: prop.type || 'marina',
+          ownerCompanyId: company.id,
+          salesCompId: selectedSalesComp || undefined,
+          slips: prop.slips,
+        });
+        toast({ title: "Property created successfully" });
+        
+        // Reset state
+        setShowAddPropertyModal(false);
+        setIsPortfolioMode(false);
+        setPortfolioProperties([{ title: "", address: "", type: "marina" }]);
+        setPortfolioName("");
+        setSelectedSalesComp("");
+      }
+    } catch (error) {
+      console.error('Failed to create properties:', error);
+    } finally {
+      setIsCreatingProperties(false);
+    }
+  };
 
   // Filter related entities
   const companyContacts = allContacts.filter(c => c.companyId === company?.id);
@@ -1197,17 +1357,66 @@ export default function CompanyDetailModal({
             <TabsContent value="properties" className="mt-0 space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Properties owned by {company.name}</h3>
-                <Button variant="outline" size="sm">
-                  <Plus className="w-4 h-4 mr-2" /> Link Property
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setShowLinkPropertyDialog(true)}
+                  >
+                    <Link2 className="w-4 h-4 mr-2" /> Link Property
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="sm" className="gap-2">
+                        <Plus className="w-4 h-4" /> Add Property
+                        <ChevronDown className="w-3 h-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => {
+                        setIsPortfolioMode(false);
+                        setPortfolioProperties([{ title: "", address: "", type: "marina" }]);
+                        setShowAddPropertyModal(true);
+                      }}>
+                        <Anchor className="w-4 h-4 mr-2" />
+                        Add Single Property
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => {
+                        setIsPortfolioMode(true);
+                        setPortfolioProperties([
+                          { title: "", address: "", type: "marina" },
+                          { title: "", address: "", type: "marina" }
+                        ]);
+                        setPortfolioName(`${company.name} Portfolio`);
+                        setShowAddPropertyModal(true);
+                      }}>
+                        <FolderPlus className="w-4 h-4 mr-2" />
+                        Add Portfolio (Multiple Properties)
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
 
               {allCompanyProperties.length === 0 ? (
                 <Card>
                   <CardContent className="text-center py-12 text-muted-foreground">
                     <Anchor className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p className="font-medium">No properties</p>
-                    <p className="text-sm mt-1">Link properties owned or managed by this company</p>
+                    <p className="font-medium">No properties linked to this company yet.</p>
+                    <p className="text-sm mt-1">Click the button above to link properties.</p>
+                    <div className="flex items-center justify-center gap-2 mt-4">
+                      <Button variant="outline" size="sm" onClick={() => setShowLinkPropertyDialog(true)}>
+                        <Link2 className="w-4 h-4 mr-2" /> Link Existing
+                      </Button>
+                      <Button size="sm" onClick={() => {
+                        setIsPortfolioMode(false);
+                        setPortfolioProperties([{ title: "", address: "", type: "marina" }]);
+                        setShowAddPropertyModal(true);
+                      }}>
+                        <Plus className="w-4 h-4 mr-2" /> Add New
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ) : (
@@ -1405,6 +1614,253 @@ export default function CompanyDetailModal({
           </ScrollArea>
         </Tabs>
       </DialogContent>
+
+      {/* Link Property Dialog */}
+      <Dialog open={showLinkPropertyDialog} onOpenChange={setShowLinkPropertyDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Link2 className="w-5 h-5" />
+              Link Property
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Select Property</Label>
+              <Select value={selectedPropertyToLink} onValueChange={setSelectedPropertyToLink}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose property" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allProperties
+                    .filter(p => !allCompanyProperties.some(cp => cp.id === p.id))
+                    .map(property => (
+                      <SelectItem key={property.id} value={property.id}>
+                        {property.title} {property.address && `- ${property.address}`}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Relationship</Label>
+              <Select value={selectedPropertyRelationship} onValueChange={setSelectedPropertyRelationship}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="owner">Owner</SelectItem>
+                  <SelectItem value="buyer">Buyer</SelectItem>
+                  <SelectItem value="seller">Seller</SelectItem>
+                  <SelectItem value="broker">Broker</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="investor">Investor</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowLinkPropertyDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => linkPropertyMutation.mutate({ 
+                propertyId: selectedPropertyToLink, 
+                relationship: selectedPropertyRelationship 
+              })}
+              disabled={!selectedPropertyToLink || linkPropertyMutation.isPending}
+            >
+              {linkPropertyMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Link Property
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Property Modal */}
+      <Dialog open={showAddPropertyModal} onOpenChange={setShowAddPropertyModal}>
+        <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {isPortfolioMode ? (
+                <>
+                  <FolderPlus className="w-5 h-5" />
+                  Add Portfolio
+                </>
+              ) : (
+                <>
+                  <Anchor className="w-5 h-5" />
+                  Add Property
+                </>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            {isPortfolioMode && (
+              <div className="space-y-2">
+                <Label>Portfolio Name</Label>
+                <Input 
+                  value={portfolioName} 
+                  onChange={(e) => setPortfolioName(e.target.value)}
+                  placeholder="e.g., Southeast Marina Portfolio"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Properties in this portfolio will be grouped together
+                </p>
+              </div>
+            )}
+
+            {/* Link to Sales Comp */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4" />
+                Link to Sales Comp (Optional)
+              </Label>
+              <Select value={selectedSalesComp} onValueChange={setSelectedSalesComp}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a sale transaction..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">None</SelectItem>
+                  {salesComps.map((comp: SalesComp) => (
+                    <SelectItem key={comp.id} value={comp.id}>
+                      {comp.marinaName || comp.propertyName} - ${Number(comp.salePrice || 0).toLocaleString()}
+                      {comp.saleDate && ` (${format(new Date(comp.saleDate), 'MMM yyyy')})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Link this property to a recorded sale in Sales Comps
+              </p>
+            </div>
+
+            <Separator />
+
+            {/* Property List */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label>{isPortfolioMode ? 'Properties in Portfolio' : 'Property Details'}</Label>
+                {isPortfolioMode && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPortfolioProperties([...portfolioProperties, { title: "", address: "", type: "marina" }])}
+                  >
+                    <Plus className="w-4 h-4 mr-1" /> Add Property
+                  </Button>
+                )}
+              </div>
+              
+              {portfolioProperties.map((prop, index) => (
+                <Card key={index} className="p-4">
+                  <div className="space-y-4">
+                    {isPortfolioMode && portfolioProperties.length > 1 && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-muted-foreground">Property #{index + 1}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setPortfolioProperties(portfolioProperties.filter((_, i) => i !== index))}
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Property Name *</Label>
+                        <Input
+                          value={prop.title}
+                          onChange={(e) => {
+                            const updated = [...portfolioProperties];
+                            updated[index].title = e.target.value;
+                            setPortfolioProperties(updated);
+                          }}
+                          placeholder="Marina name"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Type</Label>
+                        <Select 
+                          value={prop.type} 
+                          onValueChange={(value) => {
+                            const updated = [...portfolioProperties];
+                            updated[index].type = value;
+                            setPortfolioProperties(updated);
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="marina">Marina</SelectItem>
+                            <SelectItem value="boat_yard">Boat Yard</SelectItem>
+                            <SelectItem value="marina_yard">Marina & Yard</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2 col-span-2">
+                        <Label>Address</Label>
+                        <Input
+                          value={prop.address}
+                          onChange={(e) => {
+                            const updated = [...portfolioProperties];
+                            updated[index].address = e.target.value;
+                            setPortfolioProperties(updated);
+                          }}
+                          placeholder="Full address"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Slips</Label>
+                      <Input
+                        type="number"
+                        value={prop.slips || ""}
+                        onChange={(e) => {
+                          const updated = [...portfolioProperties];
+                          updated[index].slips = parseInt(e.target.value) || undefined;
+                          setPortfolioProperties(updated);
+                        }}
+                        placeholder="Number of slips"
+                      />
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button 
+              variant="outline" 
+              disabled={isCreatingProperties}
+              onClick={() => {
+                setShowAddPropertyModal(false);
+                setIsPortfolioMode(false);
+                setPortfolioProperties([{ title: "", address: "", type: "marina" }]);
+                setPortfolioName("");
+                setSelectedSalesComp("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCreateProperties}
+              disabled={isCreatingProperties}
+            >
+              {isCreatingProperties && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {isPortfolioMode ? `Create Portfolio (${portfolioProperties.filter(p => p.title.trim()).length} properties)` : 'Create Property'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
