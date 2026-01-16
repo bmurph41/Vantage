@@ -318,7 +318,9 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
       onClose();
       form.reset();
       setWetSlips("");
-      setDryStorage("");
+      setDrySlips("");
+      setMoorings("");
+      setTotalCapacity("");
       setTotalAcres("");
       setWaterDepth("");
       setLinearFeet("");
