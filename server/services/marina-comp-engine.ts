@@ -653,7 +653,7 @@ export async function computeCompSet(
             wetSlips: comp.wetSlips,
             dryRacks: comp.dryRacks,
             slipMix: comp.slipMix as SlipMix | null,
-            capabilities: comp.operationalProfile as MarinaCapabilities | null,
+            capabilities: comp.capabilities as MarinaCapabilities | null,
             qualityTier: comp.qualityTier,
           },
           scoringConfig

@@ -6481,7 +6481,7 @@ export const salesComps = pgTable('sales_comps', {
   }>().default({}),
   
   // Operational capabilities/profile (for similarity scoring)
-  operationalProfile: jsonb('operational_profile').$type<{
+  capabilities: jsonb('capabilities').$type<{
     travelLiftTons?: number;
     forkliftCapacity?: number;
     maxLoaService?: number;
