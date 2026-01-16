@@ -11724,7 +11724,14 @@ Current context: Project ${req.params.projectId}`;
       res.status(201).json(comp);
     } catch (error: any) {
       console.error("Error creating comp:", error);
-      res.status(500).json({ message: "Failed to create comp" });
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ 
+          message: "Validation error", 
+          errors: error.errors 
+        });
+      }
+      const errorMessage = error.message || "Failed to create comp";
+      res.status(500).json({ message: errorMessage, details: error.code || error.name });
     }
   });
 
