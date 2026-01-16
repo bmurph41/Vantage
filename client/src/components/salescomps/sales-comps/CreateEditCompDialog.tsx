@@ -53,14 +53,18 @@ const compFormSchema = z.object({
   daysOnMarket: z.union([z.string(), z.number()]).optional(),
   broker: z.string().optional(),
   brokerage: z.string().optional(),
+  brokerageCompanyId: z.string().optional(),
   agentFirstName: z.string().optional(),
   agentLastName: z.string().optional(),
+  agentName: z.string().optional(),
+  agentContactId: z.string().optional(),
   address: z.string().optional(),
   zip: z.string().optional(),
   seller: z.string().optional(),
   company: z.string().optional(),
   owner: z.string().optional(),
   listPrice: z.union([z.string(), z.number()]).optional(),
+  isMarketBid: z.boolean().default(false),
   estimatedPurchasePrice: z.union([z.string(), z.number()]).optional(),
   // Transaction parties
   sellerCompany: z.string().optional(),
@@ -161,6 +165,15 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
   // Merge predefined and custom storage types
   const allStorageTypes = [...STORAGE_TYPES, ...customStorageTypes.map(t => t.name)];
 
+  // Brokerage company search state
+  const [brokerageSearch, setBrokerageSearch] = useState("");
+  const [showBrokerageDropdown, setShowBrokerageDropdown] = useState(false);
+
+  // Agent state
+  const [showAgentDropdown, setShowAgentDropdown] = useState(false);
+  const [agentSearch, setAgentSearch] = useState("");
+  const [isNewAgent, setIsNewAgent] = useState(false);
+
   const form = useForm<CompFormData>({
     resolver: zodResolver(compFormSchema),
     defaultValues: {
@@ -187,8 +200,11 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       daysOnMarket: comp?.daysOnMarket || "",
       broker: comp?.broker || "",
       brokerage: comp?.brokerage || "",
+      brokerageCompanyId: (comp as any)?.brokerageCompanyId || "",
       agentFirstName: comp?.agentFirstName || "",
       agentLastName: comp?.agentLastName || "",
+      agentName: (comp as any)?.agentName || "",
+      agentContactId: (comp as any)?.agentContactId || "",
       address: comp?.address || "",
       zip: comp?.zip || "",
       seller: comp?.seller || "",
@@ -199,6 +215,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       buyerCompany: comp?.company || "",
       buyerPrincipal: comp?.buyerPrincipal || "",
       listPrice: comp?.listPrice ? Number(comp.listPrice) : "",
+      isMarketBid: (comp as any)?.isMarketBid ?? false,
       estimatedPurchasePrice: comp?.estimatedPurchasePrice ? Number(comp.estimatedPurchasePrice) : "",
       acres: comp?.acres ? Number(comp.acres) : "",
       occupancy: comp?.occupancy ? Number(comp.occupancy) : "",
@@ -238,6 +255,33 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
     },
   });
 
+  // Watch brokerage company id for contact filtering (must be after form initialization)
+  const selectedBrokerageCompanyId = form.watch("brokerageCompanyId");
+
+  // Fetch broker-tagged companies
+  const { data: brokerCompanies = [] } = useQuery<Array<{id: string; name: string; labels?: string[]}>>({
+    queryKey: ['/api/companies'],
+    enabled: open,
+  });
+
+  // Filter broker companies based on search and "Broker" label
+  const filteredBrokerCompanies = brokerCompanies.filter((company: any) =>
+    company.labels?.includes('Broker') &&
+    company.name.toLowerCase().includes(brokerageSearch.toLowerCase())
+  );
+
+  // Fetch contacts for selected brokerage company
+  const { data: brokerageContacts = [] } = useQuery<Array<{id: string; firstName?: string; lastName?: string; name?: string; companyId?: string}>>({
+    queryKey: ['/api/contacts', 'by-company', selectedBrokerageCompanyId],
+    queryFn: async () => {
+      if (!selectedBrokerageCompanyId) return [];
+      const res = await fetch(`/api/contacts?companyId=${selectedBrokerageCompanyId}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: open && !!selectedBrokerageCompanyId,
+  });
+
   useEffect(() => {
     if (comp) {
       setArticleUrls(comp.articleUrls && comp.articleUrls.length > 0 ? comp.articleUrls : [""]);
@@ -267,8 +311,11 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
         daysOnMarket: comp.daysOnMarket || "",
         broker: comp.broker || "",
         brokerage: comp.brokerage || "",
+        brokerageCompanyId: (comp as any).brokerageCompanyId || "",
         agentFirstName: comp.agentFirstName || "",
         agentLastName: comp.agentLastName || "",
+        agentName: (comp as any).agentName || "",
+        agentContactId: (comp as any).agentContactId || "",
         address: comp.address || "",
         zip: comp.zip || "",
         seller: comp.seller || "",
@@ -280,6 +327,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
         buyerCompany: comp.company || "",
         buyerPrincipal: comp.buyerPrincipal || "",
         listPrice: comp.listPrice ? Number(comp.listPrice) : "",
+        isMarketBid: (comp as any).isMarketBid ?? false,
         acres: comp.acres ? Number(comp.acres) : "",
         occupancy: comp.occupancy ? Number(comp.occupancy) : "",
         yearBuilt: comp.yearBuilt || "",
@@ -340,8 +388,11 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
         daysOnMarket: "",
         broker: "",
         brokerage: "",
+        brokerageCompanyId: "",
         agentFirstName: "",
         agentLastName: "",
+        agentName: "",
+        agentContactId: "",
         address: "",
         zip: "",
         seller: "",
@@ -352,6 +403,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
         buyerCompany: "",
         buyerPrincipal: "",
         listPrice: "",
+        isMarketBid: false,
         acres: "",
         occupancy: "",
         yearBuilt: "",
@@ -522,7 +574,8 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       wetSlips: data.wetSlips === "" ? undefined : Number(data.wetSlips),
       dryRacks: data.dryRacks === "" ? undefined : Number(data.dryRacks),
       daysOnMarket: data.daysOnMarket === "" ? undefined : Number(data.daysOnMarket),
-      listPrice: data.listPrice === "" ? undefined : Number(data.listPrice),
+      listPrice: data.isMarketBid ? undefined : (data.listPrice === "" ? undefined : Number(data.listPrice)),
+      isMarketBid: data.isMarketBid,
       estimatedPurchasePrice: data.estimatedPurchasePrice === "" ? undefined : Number(data.estimatedPurchasePrice),
       acres: data.acres === "" ? undefined : Number(data.acres),
       occupancy: data.occupancy === "" ? undefined : Number(data.occupancy),
@@ -539,8 +592,11 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       saleCondition: data.saleCondition || undefined,
       broker: data.broker || undefined,
       brokerage: data.brokerage || undefined,
+      brokerageCompanyId: data.brokerageCompanyId || undefined,
       agentFirstName: data.agentFirstName || undefined,
       agentLastName: data.agentLastName || undefined,
+      agentName: data.agentName || undefined,
+      agentContactId: data.agentContactId || undefined,
       address: data.address || undefined,
       zip: data.zip || undefined,
       seller: data.seller || undefined,
@@ -1204,20 +1260,51 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                         <FormField
                           control={form.control}
                           name="listPrice"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>List Price</FormLabel>
-                              <FormControl>
-                                <CurrencyInput
-                                  value={field.value}
-                                  onValueChange={(val) => field.onChange(val ?? "")}
-                                  placeholder="13,750,000"
-                                  data-testid="input-list-price"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
+                          render={({ field }) => {
+                            const isMarketBid = form.watch("isMarketBid");
+                            return (
+                              <FormItem>
+                                <div className="flex items-center justify-between">
+                                  <FormLabel>List Price</FormLabel>
+                                  <FormField
+                                    control={form.control}
+                                    name="isMarketBid"
+                                    render={({ field: marketBidField }) => (
+                                      <div className="flex items-center space-x-2">
+                                        <Checkbox
+                                          id="isMarketBid"
+                                          checked={marketBidField.value}
+                                          onCheckedChange={marketBidField.onChange}
+                                          data-testid="checkbox-market-bid"
+                                        />
+                                        <label htmlFor="isMarketBid" className="text-sm text-muted-foreground cursor-pointer">
+                                          Market Bid
+                                        </label>
+                                      </div>
+                                    )}
+                                  />
+                                </div>
+                                <FormControl>
+                                  {isMarketBid ? (
+                                    <Input 
+                                      value="Market Bid" 
+                                      disabled 
+                                      className="bg-muted text-muted-foreground"
+                                      data-testid="input-list-price" 
+                                    />
+                                  ) : (
+                                    <CurrencyInput
+                                      value={field.value}
+                                      onValueChange={(val) => field.onChange(val ?? "")}
+                                      placeholder="13,750,000"
+                                      data-testid="input-list-price"
+                                    />
+                                  )}
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            );
+                          }}
                         />
                       </div>
                       
@@ -1484,76 +1571,176 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                         )}
                       />
                       
+                      {/* Brokerage with autocomplete */}
                       <FormField
                         control={form.control}
                         name="brokerage"
                         render={({ field }) => {
                           const isOffMarket = form.watch("saleCondition") === "Off-Market";
                           return (
-                            <FormItem>
+                            <FormItem className="relative">
                               <FormLabel className={isOffMarket ? "text-muted-foreground" : ""}>Brokerage</FormLabel>
                               <FormControl>
                                 <Input 
                                   {...field} 
-                                  placeholder="Brokerage Company Name"
+                                  value={brokerageSearch || field.value || ""}
+                                  onChange={(e) => {
+                                    setBrokerageSearch(e.target.value);
+                                    field.onChange(e.target.value);
+                                    form.setValue("brokerageCompanyId", "");
+                                    setShowBrokerageDropdown(true);
+                                  }}
+                                  onFocus={() => setShowBrokerageDropdown(true)}
+                                  onBlur={() => setTimeout(() => setShowBrokerageDropdown(false), 200)}
+                                  placeholder="Search broker companies..."
                                   data-testid="input-brokerage"
                                   disabled={isOffMarket}
                                   className={isOffMarket ? "bg-muted text-muted-foreground" : ""}
+                                  autoComplete="off"
                                 />
                               </FormControl>
+                              {showBrokerageDropdown && filteredBrokerCompanies.length > 0 && (
+                                <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                                  {filteredBrokerCompanies.slice(0, 10).map((company: any) => (
+                                    <div
+                                      key={company.id}
+                                      className="px-3 py-2 cursor-pointer hover:bg-gray-100"
+                                      onMouseDown={() => {
+                                        field.onChange(company.name);
+                                        setBrokerageSearch(company.name);
+                                        form.setValue("brokerageCompanyId", company.id);
+                                        setShowBrokerageDropdown(false);
+                                        // Reset agent when brokerage changes
+                                        form.setValue("agentName", "");
+                                        form.setValue("agentContactId", "");
+                                        setIsNewAgent(false);
+                                      }}
+                                    >
+                                      <span className="font-medium">{company.name}</span>
+                                      <span className="ml-2 text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">Broker</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Search companies tagged as "Broker" in your CRM
+                              </p>
                               <FormMessage />
                             </FormItem>
                           );
                         }}
                       />
                       
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="agentFirstName"
-                          render={({ field }) => {
-                            const isOffMarket = form.watch("saleCondition") === "Off-Market";
-                            return (
-                              <FormItem>
-                                <FormLabel className={isOffMarket ? "text-muted-foreground" : ""}>Agent First Name</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    {...field} 
-                                    placeholder="First name"
-                                    data-testid="input-agent-first-name"
-                                    disabled={isOffMarket}
-                                    className={isOffMarket ? "bg-muted text-muted-foreground" : ""}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            );
-                          }}
-                        />
-                        
-                        <FormField
-                          control={form.control}
-                          name="agentLastName"
-                          render={({ field }) => {
-                            const isOffMarket = form.watch("saleCondition") === "Off-Market";
-                            return (
-                              <FormItem>
-                                <FormLabel className={isOffMarket ? "text-muted-foreground" : ""}>Agent Last Name</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    {...field} 
-                                    placeholder="Last name"
-                                    data-testid="input-agent-last-name"
-                                    disabled={isOffMarket}
-                                    className={isOffMarket ? "bg-muted text-muted-foreground" : ""}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            );
-                          }}
-                        />
-                      </div>
+                      {/* Agent - single field with dropdown from brokerage contacts */}
+                      <FormField
+                        control={form.control}
+                        name="agentName"
+                        render={({ field }) => {
+                          const isOffMarket = form.watch("saleCondition") === "Off-Market";
+                          const hasSelectedBrokerage = !!selectedBrokerageCompanyId;
+                          
+                          return (
+                            <FormItem className="relative">
+                              <FormLabel className={isOffMarket ? "text-muted-foreground" : ""}>Agent</FormLabel>
+                              <FormControl>
+                                {isNewAgent ? (
+                                  <div className="flex gap-2">
+                                    <Input 
+                                      {...field} 
+                                      value={agentSearch}
+                                      onChange={(e) => {
+                                        setAgentSearch(e.target.value);
+                                        field.onChange(e.target.value);
+                                      }}
+                                      placeholder="Enter new agent name"
+                                      data-testid="input-agent-name"
+                                      disabled={isOffMarket}
+                                      className={isOffMarket ? "bg-muted text-muted-foreground" : ""}
+                                    />
+                                    <Button 
+                                      type="button" 
+                                      variant="outline" 
+                                      size="sm"
+                                      onClick={() => {
+                                        setIsNewAgent(false);
+                                        setAgentSearch("");
+                                        field.onChange("");
+                                      }}
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div className="relative">
+                                    <Input 
+                                      value={field.value || agentSearch}
+                                      onChange={(e) => {
+                                        setAgentSearch(e.target.value);
+                                        field.onChange(e.target.value);
+                                        form.setValue("agentContactId", "");
+                                        setShowAgentDropdown(true);
+                                      }}
+                                      onFocus={() => setShowAgentDropdown(true)}
+                                      onBlur={() => setTimeout(() => setShowAgentDropdown(false), 200)}
+                                      placeholder={hasSelectedBrokerage ? "Select or add agent..." : "Enter agent name"}
+                                      data-testid="input-agent-name"
+                                      disabled={isOffMarket}
+                                      className={isOffMarket ? "bg-muted text-muted-foreground" : ""}
+                                      autoComplete="off"
+                                    />
+                                    {showAgentDropdown && hasSelectedBrokerage && (
+                                      <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                                        {brokerageContacts
+                                          .filter((c: any) => {
+                                            const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ') || c.name || '';
+                                            return fullName.toLowerCase().includes(agentSearch.toLowerCase());
+                                          })
+                                          .slice(0, 10)
+                                          .map((contact: any) => {
+                                            const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.name || 'Unnamed Contact';
+                                            return (
+                                              <div
+                                                key={contact.id}
+                                                className="px-3 py-2 cursor-pointer hover:bg-gray-100"
+                                                onMouseDown={() => {
+                                                  field.onChange(fullName);
+                                                  setAgentSearch(fullName);
+                                                  form.setValue("agentContactId", contact.id);
+                                                  setShowAgentDropdown(false);
+                                                }}
+                                              >
+                                                {fullName}
+                                              </div>
+                                            );
+                                          })}
+                                        <div
+                                          className="px-3 py-2 cursor-pointer hover:bg-blue-50 text-blue-600 border-t flex items-center gap-2"
+                                          onMouseDown={() => {
+                                            setIsNewAgent(true);
+                                            setAgentSearch("");
+                                            field.onChange("");
+                                            form.setValue("agentContactId", "");
+                                            setShowAgentDropdown(false);
+                                          }}
+                                        >
+                                          <Plus className="w-4 h-4" />
+                                          Add New Agent
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </FormControl>
+                              {hasSelectedBrokerage && brokerageContacts.length > 0 && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {brokerageContacts.length} agent(s) found at this brokerage
+                                </p>
+                              )}
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }}
+                      />
                     </CardContent>
                   </Card>
                 </div>

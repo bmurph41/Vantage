@@ -6256,9 +6256,11 @@ export const salesComps = pgTable('sales_comps', {
   saleCondition: text('sale_condition'),
   daysOnMarket: integer('days_on_market'),
   broker: text('broker'), // Legacy field - use brokerage + agent fields instead
-  brokerage: text('brokerage'), // Brokerage company name
-  agentFirstName: text('agent_first_name'), // Agent first name
-  agentLastName: text('agent_last_name'), // Agent last name
+  brokerage: text('brokerage'), // Brokerage company name (text fallback)
+  brokerageCompanyId: varchar('brokerage_company_id').references(() => crmCompanies.id, { onDelete: 'set null' }), // Link to CRM company for brokerage
+  agentFirstName: text('agent_first_name'), // Agent first name (legacy - use agentName instead)
+  agentLastName: text('agent_last_name'), // Agent last name (legacy - use agentName instead)
+  agentName: text('agent_name'), // Full agent name (combined)
   agentContactId: varchar('agent_contact_id').references(() => crmContacts.id, { onDelete: 'set null' }), // Link to CRM contact for broker/agent
   address: text('address'),
   zip: text('zip'),
@@ -6268,6 +6270,7 @@ export const salesComps = pgTable('sales_comps', {
   company: text('company'),
   owner: text('owner'),
   listPrice: integer('list_price'),
+  isMarketBid: boolean('is_market_bid').default(false), // When true, list price shows as "Market Bid"
   estimatedPurchasePrice: integer('estimated_purchase_price'), // Broker-provided estimate when actual price unavailable
   acres: integer('acres'),
   occupancy: integer('occupancy'),
