@@ -16,8 +16,10 @@ import {
   DollarSign,
   TrendingUp,
   Building2,
-  AlertCircle
+  AlertCircle,
+  Info
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -207,9 +209,70 @@ export default function AllProjectsSummaryPage() {
           <p className="text-gray-600">Generated on {format(new Date(), 'MMMM dd, yyyy')}</p>
         </div>
 
+        {/* Hostaway-Style Today's Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          {/* Upcoming Tasks */}
+          <Card className="border-l-4 border-l-amber-500">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  Upcoming Deadlines
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="w-4 h-4 text-muted-foreground" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Tasks due within the next 7 days</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </CardTitle>
+                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                  Next 7 Days
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold text-amber-600 mb-1">{overallStats.totalUpcoming}</div>
+              <p className="text-sm text-muted-foreground">Tasks due soon</p>
+            </CardContent>
+          </Card>
+
+          {/* Overdue Tasks */}
+          <Card className="border-l-4 border-l-red-500">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  Overdue Tasks
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="w-4 h-4 text-muted-foreground" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Tasks past their deadline</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </CardTitle>
+                {overallStats.totalOverdue > 0 && (
+                  <Badge variant="destructive">
+                    Action Required
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold text-red-600 mb-1">{overallStats.totalOverdue}</div>
+              <p className="text-sm text-muted-foreground">Past deadline</p>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Overall Statistics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card>
+          <Card className="border-l-4 border-l-blue-500">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-600">Total Projects</CardTitle>
             </CardHeader>
@@ -226,7 +289,7 @@ export default function AllProjectsSummaryPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-l-4 border-l-green-500">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-600">Overall Progress</CardTitle>
             </CardHeader>
@@ -244,7 +307,7 @@ export default function AllProjectsSummaryPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-l-4 border-l-purple-500">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-600">Action Items</CardTitle>
             </CardHeader>
@@ -268,7 +331,7 @@ export default function AllProjectsSummaryPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-l-4 border-l-emerald-500">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-600">Total Investment</CardTitle>
             </CardHeader>

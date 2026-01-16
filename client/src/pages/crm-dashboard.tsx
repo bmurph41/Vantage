@@ -5,13 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Users, Building, DollarSign, TrendingUp, Phone, Mail, Calendar, 
-  ArrowRight, Sparkles, Home, Clock, CheckCircle2,
-  Layers, Activity, MapPin
+  ArrowRight, Sparkles, Home, Clock, CheckCircle2, AlertCircle,
+  Layers, Activity, MapPin, MessageSquare, StickyNote, Info
 } from "lucide-react";
 import { Link } from "wouter";
 import { formatCurrency } from "@/lib/utils";
 import { FeatureChecklist } from "@/components/ui/feature-highlight";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, isToday, parseISO, isBefore, startOfDay } from "date-fns";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const PIPELINE_STAGES = [
   { key: "initial_contact", label: "Initial Contact", color: "bg-slate-500" },
@@ -22,6 +23,24 @@ const PIPELINE_STAGES = [
   { key: "closed_won", label: "Closed Won", color: "bg-green-500" },
   { key: "closed_lost", label: "Closed Lost", color: "bg-red-500" },
 ];
+
+const AVATAR_COLORS = [
+  "bg-blue-500", "bg-green-500", "bg-purple-500", "bg-orange-500", 
+  "bg-teal-500", "bg-pink-500", "bg-indigo-500", "bg-amber-500"
+];
+
+const getInitials = (name: string): string => {
+  if (!name) return "?";
+  const parts = name.trim().split(" ");
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+};
+
+const getAvatarColor = (name: string): string => {
+  if (!name) return AVATAR_COLORS[0];
+  const index = name.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return AVATAR_COLORS[index % AVATAR_COLORS.length];
+};
 
 export default function CRMDashboard() {
   const { data: dealsData, isLoading: dealsLoading } = useQuery({
@@ -139,6 +158,45 @@ export default function CRMDashboard() {
     .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
     .slice(0, 6);
 
+  // Today's follow-ups - activities due today or with type 'follow_up' scheduled for today
+  const todaysFollowUps = safeActivities.filter((a: any) => {
+    if (!a.dueDate) return false;
+    try {
+      const dueDate = new Date(a.dueDate);
+      return isToday(dueDate) && a.type !== 'meeting';
+    } catch { return false; }
+  });
+
+  // Today's meetings
+  const todaysMeetings = safeActivities.filter((a: any) => {
+    if (!a.dueDate && !a.scheduledAt) return false;
+    try {
+      const date = new Date(a.scheduledAt || a.dueDate);
+      return isToday(date) && a.type === 'meeting';
+    } catch { return false; }
+  });
+
+  // Overdue items - activities past due
+  const overdueItems = safeActivities.filter((a: any) => {
+    if (!a.dueDate || a.completed) return false;
+    try {
+      const dueDate = new Date(a.dueDate);
+      return isBefore(dueDate, startOfDay(new Date()));
+    } catch { return false; }
+  });
+
+  // Deals needing attention - stale deals (no activity in 7+ days) or deals in negotiation stage
+  const needsAttentionDeals = safeDeals.filter((d: any) => {
+    if (d.stage === 'closed_won' || d.stage === 'closed_lost') return false;
+    // Check for stale deals
+    if (d.updatedAt) {
+      const daysSinceUpdate = Math.floor((Date.now() - new Date(d.updatedAt).getTime()) / (1000 * 60 * 60 * 24));
+      if (daysSinceUpdate >= 7) return true;
+    }
+    // Deals in negotiation or due_diligence stages
+    return d.stage === 'negotiation' || d.stage === 'due_diligence';
+  }).slice(0, 5);
+
   const getActivityIcon = (type: string) => {
     switch (type) {
       case 'call': return <Phone className="w-4 h-4 text-blue-600" />;
@@ -206,6 +264,197 @@ export default function CRMDashboard() {
           );
         })}
       </div>
+
+      {/* Today's Activity Cards - Hostaway Style */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Today's Follow-ups */}
+        <Card className="border-l-4 border-l-orange-500">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  Today's Follow-ups
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="w-4 h-4 text-muted-foreground" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Activities and tasks due today</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </CardTitle>
+              </div>
+              <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                Current
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-4xl font-bold mb-1">{todaysFollowUps.length}</div>
+            <p className="text-sm text-muted-foreground mb-4">Follow-ups due today</p>
+            
+            {activitiesLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-full" />)}
+              </div>
+            ) : todaysFollowUps.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No follow-ups scheduled for today</p>
+            ) : (
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {todaysFollowUps.slice(0, 5).map((activity: any) => (
+                  <div key={activity.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors group">
+                    <div className={`w-8 h-8 rounded-full ${getAvatarColor(activity.contactName || activity.subject || '')} flex items-center justify-center text-white text-xs font-medium`}>
+                      {getInitials(activity.contactName || activity.subject || 'Task')}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{activity.subject || activity.type}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {activity.contactName || 'No contact assigned'}
+                      </p>
+                    </div>
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button variant="ghost" size="icon" className="h-7 w-7">
+                        <Phone className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7">
+                        <Mail className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Today's Meetings */}
+        <Card className="border-l-4 border-l-green-500">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  Today's Meetings
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="w-4 h-4 text-muted-foreground" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Meetings scheduled for today</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </CardTitle>
+              </div>
+              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                Current
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-4xl font-bold mb-1">{todaysMeetings.length}</div>
+            <p className="text-sm text-muted-foreground mb-4">Meetings today</p>
+            
+            {activitiesLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-full" />)}
+              </div>
+            ) : todaysMeetings.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No meetings scheduled for today</p>
+            ) : (
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {todaysMeetings.slice(0, 5).map((meeting: any) => (
+                  <div key={meeting.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors group">
+                    <div className={`w-8 h-8 rounded-full ${getAvatarColor(meeting.contactName || meeting.subject || '')} flex items-center justify-center text-white text-xs font-medium`}>
+                      {getInitials(meeting.contactName || meeting.subject || 'M')}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{meeting.subject || 'Meeting'}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {meeting.dueDate ? new Date(meeting.dueDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''} 
+                        {meeting.contactName ? ` • ${meeting.contactName}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button variant="ghost" size="icon" className="h-7 w-7">
+                        <Calendar className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Needs Attention Section */}
+      {(needsAttentionDeals.length > 0 || overdueItems.length > 0) && (
+        <Card className="border-2 border-amber-200 bg-amber-50/30 dark:bg-amber-950/10">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-amber-600" />
+                <CardTitle className="text-base">Needs Attention</CardTitle>
+                <Badge variant="secondary" className="bg-amber-100 text-amber-800">
+                  {needsAttentionDeals.length + overdueItems.length}
+                </Badge>
+              </div>
+              <Link href="/crm/deals">
+                <Button variant="ghost" size="sm">
+                  View All <ArrowRight className="w-4 h-4 ml-1" />
+                </Button>
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Overdue Activities */}
+              {overdueItems.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium text-amber-800 mb-2">Overdue Tasks ({overdueItems.length})</p>
+                  <div className="space-y-2">
+                    {overdueItems.slice(0, 3).map((item: any) => (
+                      <div key={item.id} className="flex items-center gap-2 text-sm p-2 bg-white dark:bg-gray-900 rounded border">
+                        <div className={`w-6 h-6 rounded-full ${getAvatarColor(item.contactName || '')} flex items-center justify-center text-white text-xs`}>
+                          {getInitials(item.contactName || 'T')}
+                        </div>
+                        <span className="truncate flex-1">{item.subject || item.type}</span>
+                        <Badge variant="destructive" className="text-xs">Overdue</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Stale Deals */}
+              {needsAttentionDeals.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium text-amber-800 mb-2">Deals Requiring Action ({needsAttentionDeals.length})</p>
+                  <div className="space-y-2">
+                    {needsAttentionDeals.slice(0, 3).map((deal: any) => {
+                      const stageInfo = PIPELINE_STAGES.find(s => s.key === deal.stage);
+                      return (
+                        <div key={deal.id} className="flex items-center gap-2 text-sm p-2 bg-white dark:bg-gray-900 rounded border">
+                          <div className={`w-6 h-6 rounded-full ${getAvatarColor(deal.title)} flex items-center justify-center text-white text-xs`}>
+                            {getInitials(deal.title)}
+                          </div>
+                          <span className="truncate flex-1">{deal.title}</span>
+                          <Badge variant="secondary" className={`text-xs text-white ${stageInfo?.color || 'bg-gray-500'}`}>
+                            {stageInfo?.label || deal.stage}
+                          </Badge>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Pipeline Summary */}
       <Card data-testid="card-pipeline-summary">
@@ -367,10 +616,10 @@ export default function CRMDashboard() {
                 {recentActivities.map((activity: any) => (
                   <div
                     key={activity.id}
-                    className="flex items-start gap-3 p-2 rounded-lg hover:bg-accent/50 transition-colors"
+                    className="flex items-start gap-3 p-2 rounded-lg hover:bg-accent/50 transition-colors group"
                   >
-                    <div className="p-2 rounded-lg bg-muted">
-                      {getActivityIcon(activity.type)}
+                    <div className={`w-9 h-9 rounded-full ${getAvatarColor(activity.contactName || activity.subject || '')} flex items-center justify-center text-white text-xs font-medium flex-shrink-0`}>
+                      {getInitials(activity.contactName || activity.subject || 'A')}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">
@@ -380,7 +629,19 @@ export default function CRMDashboard() {
                         {activity.createdAt 
                           ? formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true })
                           : 'Recently'}
+                        {activity.contactName ? ` • ${activity.contactName}` : ''}
                       </p>
+                    </div>
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Call">
+                        <Phone className="w-3.5 h-3.5 text-blue-600" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Email">
+                        <Mail className="w-3.5 h-3.5 text-purple-600" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Add Note">
+                        <StickyNote className="w-3.5 h-3.5 text-amber-600" />
+                      </Button>
                     </div>
                   </div>
                 ))}

@@ -13,7 +13,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Search, Pencil, Trash2, TrendingUp, BarChart3, FileSpreadsheet, Settings, PieChart } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, TrendingUp, BarChart3, FileSpreadsheet, Settings, PieChart, Info, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link } from 'wouter';
 import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
@@ -100,6 +102,19 @@ export default function ModelingProjectsPage() {
     );
   });
 
+  // Compute status counts for Hostaway-style cards
+  const statusCounts = {
+    active: projects.filter(p => p.dealOutcome === 'active').length,
+    underReview: projects.filter(p => p.dealOutcome === 'under_review').length,
+    won: projects.filter(p => p.dealOutcome === 'won').length,
+    lost: projects.filter(p => p.dealOutcome === 'lost').length,
+    passed: projects.filter(p => p.dealOutcome === 'passed').length,
+  };
+
+  const totalPipelineValue = projects
+    .filter(p => p.dealOutcome === 'active' || p.dealOutcome === 'under_review')
+    .reduce((sum, p) => sum + (p.purchasePrice || 0), 0);
+
   const getOutcomeBadgeColor = (outcome: string) => {
     switch (outcome) {
       case 'won':
@@ -176,6 +191,105 @@ export default function ModelingProjectsPage() {
           </Button>
         </div>
       </div>
+
+      {/* Hostaway-Style Status Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {/* Active Projects */}
+        <Card className="border-l-4 border-l-blue-500">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                Active Models
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="w-3.5 h-3.5" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Projects currently being modeled</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </span>
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                Current
+              </Badge>
+            </div>
+            <div className="text-3xl font-bold text-blue-600">{statusCounts.active}</div>
+            <p className="text-xs text-muted-foreground mt-1">In active modeling</p>
+          </div>
+        </Card>
+
+        {/* Under Review */}
+        <Card className="border-l-4 border-l-amber-500">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                Under Review
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="w-3.5 h-3.5" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Projects awaiting decision</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </span>
+              <Clock className="w-4 h-4 text-amber-500" />
+            </div>
+            <div className="text-3xl font-bold text-amber-600">{statusCounts.underReview}</div>
+            <p className="text-xs text-muted-foreground mt-1">Awaiting decision</p>
+          </div>
+        </Card>
+
+        {/* Won */}
+        <Card className="border-l-4 border-l-green-500">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-muted-foreground">Closed Won</span>
+              <CheckCircle className="w-4 h-4 text-green-500" />
+            </div>
+            <div className="text-3xl font-bold text-green-600">{statusCounts.won}</div>
+            <p className="text-xs text-muted-foreground mt-1">Successful acquisitions</p>
+          </div>
+        </Card>
+
+        {/* Lost/Passed */}
+        <Card className="border-l-4 border-l-gray-400">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-muted-foreground">Passed/Lost</span>
+              <XCircle className="w-4 h-4 text-gray-400" />
+            </div>
+            <div className="text-3xl font-bold text-gray-600">{statusCounts.lost + statusCounts.passed}</div>
+            <p className="text-xs text-muted-foreground mt-1">Not pursued</p>
+          </div>
+        </Card>
+      </div>
+
+      {/* Pipeline Value Banner */}
+      {totalPipelineValue > 0 && (
+        <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-blue-200">
+          <div className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                <TrendingUp className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Active Pipeline Value</p>
+                <p className="text-xs text-blue-600 dark:text-blue-400">
+                  {statusCounts.active + statusCounts.underReview} projects in pipeline
+                </p>
+              </div>
+            </div>
+            <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+              {formatCurrency(totalPipelineValue)}
+            </div>
+          </div>
+        </Card>
+      )}
 
       <Tabs defaultValue="projects" className="space-y-6">
         <TabsList>
