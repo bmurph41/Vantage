@@ -2310,6 +2310,38 @@ export const crmProperties = pgTable("crm_properties", {
   orgIdx: index("crm_properties_org_idx").on(table.orgId),
 }));
 
+// CRM Property Storage Types - Predefined and custom storage types for properties
+export const crmStorageTypes = pgTable("crm_storage_types", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  isDefault: boolean("is_default").default(false).notNull(), // Predefined types
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("crm_storage_types_org_idx").on(table.orgId),
+  orgNameIdx: index("crm_storage_types_org_name_idx").on(table.orgId, table.name),
+}));
+
+// CRM Property Storage Entries - Per-property storage with capacity/occupancy/rate
+export const crmPropertyStorageEntries = pgTable("crm_property_storage_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  propertyId: varchar("property_id").notNull().references(() => crmProperties.id, { onDelete: 'cascade' }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  storageTypeName: text("storage_type_name").notNull(), // Name of storage type (can be predefined or custom)
+  capacity: integer("capacity").default(0), // Total units/slips
+  occupied: integer("occupied").default(0), // Currently occupied units
+  rate: decimal("rate", { precision: 10, scale: 2 }), // Rate per unit (e.g., $/month)
+  rateType: text("rate_type").default('monthly'), // monthly, annual, daily, per_foot
+  notes: text("notes"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  propertyIdx: index("crm_property_storage_entries_property_idx").on(table.propertyId),
+  orgIdx: index("crm_property_storage_entries_org_idx").on(table.orgId),
+}));
+
 // Owned Assets - Acquired properties under management
 export const ownedAssets = pgTable("owned_assets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -5975,6 +6007,43 @@ export const insertCrmPropertySchema = createInsertSchema(crmProperties).omit({
   updatedAt: true,
 });
 export type InsertCrmProperty = z.infer<typeof insertCrmPropertySchema>;
+
+// CRM Storage Types schema
+export const insertCrmStorageTypeSchema = createInsertSchema(crmStorageTypes).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertCrmStorageType = z.infer<typeof insertCrmStorageTypeSchema>;
+export type CrmStorageType = typeof crmStorageTypes.$inferSelect;
+
+// CRM Property Storage Entries schema
+export const insertCrmPropertyStorageEntrySchema = createInsertSchema(crmPropertyStorageEntries).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCrmPropertyStorageEntry = z.infer<typeof insertCrmPropertyStorageEntrySchema>;
+export type CrmPropertyStorageEntry = typeof crmPropertyStorageEntries.$inferSelect;
+
+// Predefined CRM storage types (matches rraStorageTypeEnum for consistency across modules)
+export const PREDEFINED_CRM_STORAGE_TYPES = [
+  "Wet Slip",
+  "Lift Slip",
+  "Mooring",
+  "Jet Ski",
+  "Dry Rack - Indoor",
+  "Dry Rack - Outdoor",
+  "Houseboat",
+  "Land Storage",
+  "Boat on Trailer",
+  "Trailer Only",
+  "Carport",
+  "RV Site",
+  "Kayak/SUP",
+  "Other"
+] as const;
+
+export type PredefinedCrmStorageType = typeof PREDEFINED_CRM_STORAGE_TYPES[number];
 
 // Pending Property schema
 export const insertPendingPropertySchema = createInsertSchema(pendingProperties).omit({

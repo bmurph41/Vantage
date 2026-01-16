@@ -4,7 +4,7 @@ import {
   contacts, projectContacts, projectPendingContacts, notificationSubscriptions, notificationsLog, calendarEvents,
   documentRequirements, projectIntegrations, taskDependencies, taskFiles, userEmails, calendarGuests,
   cddDocuments, docPages, kpis, findings, recommendations, vectorChunks, cddReports, comps, checklistItems,
-  crmDeals, crmLeads, crmContacts, crmCompanies, crmProperties, crmContactProperties, crmCompanyProperties, crmContactCompanies, pendingProperties, pendingContacts, pendingCompanies, crmPipelines, crmPipelineStages, crmActivities, crmNotes, crmDealContacts, crmDealCompanies,
+  crmDeals, crmLeads, crmContacts, crmCompanies, crmProperties, crmStorageTypes, crmPropertyStorageEntries, crmContactProperties, crmCompanyProperties, crmContactCompanies, pendingProperties, pendingContacts, pendingCompanies, crmPipelines, crmPipelineStages, crmActivities, crmNotes, crmDealContacts, crmDealCompanies,
   crmImportJobs, crmImportedRecords, crmProspectingEntries, crmProspectingUserSettings, crmProspectingGoalTemplates,
   crmEmailSequences, crmEmailTemplates, crmEmailSequenceSteps, crmEmailSequenceEnrollments, crmEmailSequenceStepExecutions,
   calendarSettings,
@@ -22,7 +22,7 @@ import {
   type TimelineNote, type ProjectShare, type Risk, type DDContact, type ProjectContact, type ProjectPendingContact, type NotificationSubscription, type NotificationLog, type CalendarEvent,
   type DocumentRequirement, type ProjectIntegration, type TaskDependency, type TaskFile, type UserEmail, type CalendarGuest,
   type CddDocument, type DocPage, type Kpi, type Finding, type Recommendation, type VectorChunk, type CddReport, type Comp, type ChecklistItem,
-  type CrmDeal, type CrmLead, type CrmContact, type CrmCompany, type Property, type PendingProperty, type PendingContact, type PendingCompany, type CrmPipeline, type CrmPipelineStage, type CrmActivity, type CrmNote, type InsertCrmNote,
+  type CrmDeal, type CrmLead, type CrmContact, type CrmCompany, type Property, type CrmStorageType, type CrmPropertyStorageEntry, type PendingProperty, type PendingContact, type PendingCompany, type CrmPipeline, type CrmPipelineStage, type CrmActivity, type CrmNote, type InsertCrmNote,
   type CrmImportJob, type CrmImportedRecord, type ProspectingEntry, type CrmProspectingUserSettings, type CrmProspectingGoalTemplate,
   type EmailSequence, type EmailTemplate, type EmailSequenceStep, type EmailSequenceEnrollment, type EmailSequenceStepExecution,
   type CalendarSettings,
@@ -40,7 +40,7 @@ import {
   type InsertDDContact, type UpdateDDContact, type InsertProjectContact, type InsertProjectPendingContact, type InsertNotificationSubscription, type InsertNotificationLog, type InsertCalendarEvent,
   type InsertDocumentRequirement, type InsertProjectIntegration, type InsertTaskDependency, type InsertTaskFile, type InsertUserEmail, type InsertCalendarGuest,
   type InsertCddDocument, type InsertDocPage, type InsertKpi, type InsertFinding, type InsertRecommendation, type InsertVectorChunk, type InsertCddReport, type InsertComp, type InsertChecklistItem,
-  type InsertCrmDeal, type InsertCrmLead, type InsertCrmContact, type InsertCrmCompany, type InsertProperty, type InsertPendingProperty, type InsertPendingContact, type InsertPendingCompany, type InsertCrmPipeline, type InsertCrmPipelineStage, type InsertCrmActivity,
+  type InsertCrmDeal, type InsertCrmLead, type InsertCrmContact, type InsertCrmCompany, type InsertProperty, type InsertCrmStorageType, type InsertCrmPropertyStorageEntry, type InsertPendingProperty, type InsertPendingContact, type InsertPendingCompany, type InsertCrmPipeline, type InsertCrmPipelineStage, type InsertCrmActivity,
   type InsertCrmImportJob, type InsertCrmImportedRecord, type InsertProspectingEntry, type InsertCrmProspectingUserSettings, type InsertCrmProspectingGoalTemplate,
   type InsertEmailSequence, type InsertEmailTemplate, type InsertEmailSequenceStep, type InsertEmailSequenceEnrollment, type InsertEmailSequenceStepExecution,
   type InsertCalendarSettings,
@@ -391,6 +391,17 @@ export interface IStorage {
   createCrmProperty(property: InsertProperty): Promise<Property>;
   updateCrmProperty(id: string, updates: Partial<InsertProperty>): Promise<Property>;
   deleteCrmProperty(id: string): Promise<void>;
+  
+  // CRM - Property Storage Types
+  getCrmStorageTypes(orgId: string): Promise<CrmStorageType[]>;
+  createCrmStorageType(data: InsertCrmStorageType): Promise<CrmStorageType>;
+  
+  // CRM - Property Storage Entries
+  getPropertyStorageEntries(propertyId: string): Promise<CrmPropertyStorageEntry[]>;
+  createPropertyStorageEntry(data: InsertCrmPropertyStorageEntry): Promise<CrmPropertyStorageEntry>;
+  updatePropertyStorageEntry(id: string, updates: Partial<InsertCrmPropertyStorageEntry>): Promise<CrmPropertyStorageEntry>;
+  deletePropertyStorageEntry(id: string): Promise<void>;
+  bulkUpsertPropertyStorageEntries(propertyId: string, orgId: string, entries: Array<{ id?: string; storageTypeName: string; capacity?: number; occupied?: number; rate?: string; rateType?: string; notes?: string; sortOrder?: number }>): Promise<CrmPropertyStorageEntry[]>;
   
   // CRM - Property-Contact/Company Links
   getPropertyContacts(propertyId: string): Promise<Array<{ id: string; contactId: string; propertyId: string; relationship?: string | null; notes?: string | null; contact?: any }>>;
@@ -3243,6 +3254,80 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCrmProperty(id: string): Promise<void> {
     await db.delete(crmProperties).where(eq(crmProperties.id, id));
+  }
+
+  // CRM - Property Storage Types
+  async getCrmStorageTypes(orgId: string): Promise<CrmStorageType[]> {
+    return await db.select()
+      .from(crmStorageTypes)
+      .where(eq(crmStorageTypes.orgId, orgId))
+      .orderBy(asc(crmStorageTypes.name));
+  }
+
+  async createCrmStorageType(data: InsertCrmStorageType): Promise<CrmStorageType> {
+    const [created] = await db.insert(crmStorageTypes)
+      .values(data)
+      .returning();
+    return created;
+  }
+
+  // CRM - Property Storage Entries
+  async getPropertyStorageEntries(propertyId: string): Promise<CrmPropertyStorageEntry[]> {
+    return await db.select()
+      .from(crmPropertyStorageEntries)
+      .where(eq(crmPropertyStorageEntries.propertyId, propertyId))
+      .orderBy(asc(crmPropertyStorageEntries.sortOrder));
+  }
+
+  async createPropertyStorageEntry(data: InsertCrmPropertyStorageEntry): Promise<CrmPropertyStorageEntry> {
+    const [created] = await db.insert(crmPropertyStorageEntries)
+      .values(data)
+      .returning();
+    return created;
+  }
+
+  async updatePropertyStorageEntry(id: string, updates: Partial<InsertCrmPropertyStorageEntry>): Promise<CrmPropertyStorageEntry> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    const [updated] = await db.update(crmPropertyStorageEntries)
+      .set(updateData)
+      .where(eq(crmPropertyStorageEntries.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePropertyStorageEntry(id: string): Promise<void> {
+    await db.delete(crmPropertyStorageEntries).where(eq(crmPropertyStorageEntries.id, id));
+  }
+
+  async bulkUpsertPropertyStorageEntries(
+    propertyId: string, 
+    orgId: string, 
+    entries: Array<{ id?: string; storageTypeName: string; capacity?: number; occupied?: number; rate?: string; rateType?: string; notes?: string; sortOrder?: number }>
+  ): Promise<CrmPropertyStorageEntry[]> {
+    // Delete existing entries for this property
+    await db.delete(crmPropertyStorageEntries)
+      .where(eq(crmPropertyStorageEntries.propertyId, propertyId));
+    
+    // Insert new entries
+    if (entries.length === 0) return [];
+    
+    const toInsert = entries.map((entry, idx) => ({
+      propertyId,
+      orgId,
+      storageTypeName: entry.storageTypeName,
+      capacity: entry.capacity ?? 0,
+      occupied: entry.occupied ?? 0,
+      rate: entry.rate ?? null,
+      rateType: entry.rateType ?? 'monthly',
+      notes: entry.notes ?? null,
+      sortOrder: entry.sortOrder ?? idx,
+    }));
+    
+    const created = await db.insert(crmPropertyStorageEntries)
+      .values(toInsert)
+      .returning();
+    
+    return created;
   }
 
   // CRM - Property-Contact/Company Links

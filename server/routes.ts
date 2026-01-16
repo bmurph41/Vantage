@@ -9628,6 +9628,73 @@ Current context: Project ${req.params.projectId}`;
     }
   });
   
+  // Property Storage Types - Get all custom types for org
+  app.get("/api/crm-storage-types", async (req: any, res) => {
+    try {
+      const orgId = req.orgId || 'org-1';
+      const types = await storage.getCrmStorageTypes(orgId);
+      res.json(types);
+    } catch (error: any) {
+      console.error("Failed to get storage types:", error);
+      res.status(500).json({ error: "Failed to get storage types" });
+    }
+  });
+
+  // Property Storage Types - Create custom type
+  app.post("/api/crm-storage-types", async (req: any, res) => {
+    try {
+      const orgId = req.orgId || 'org-1';
+      const userId = req.userId || 'user-1';
+      const type = await storage.createCrmStorageType({
+        ...req.body,
+        orgId,
+        createdBy: userId,
+      });
+      res.json(type);
+    } catch (error: any) {
+      console.error("Failed to create storage type:", error);
+      res.status(500).json({ error: "Failed to create storage type" });
+    }
+  });
+
+  // Property Storage Entries - Get entries for a property
+  app.get("/api/properties/:id/storage-entries", async (req: any, res) => {
+    try {
+      const entries = await storage.getPropertyStorageEntries(req.params.id);
+      res.json(entries);
+    } catch (error: any) {
+      console.error("Failed to get storage entries:", error);
+      res.status(500).json({ error: "Failed to get storage entries" });
+    }
+  });
+
+  // Property Storage Entries - Bulk upsert entries for a property
+  app.put("/api/properties/:id/storage-entries", async (req: any, res) => {
+    try {
+      const orgId = req.orgId || 'org-1';
+      const entries = await storage.bulkUpsertPropertyStorageEntries(
+        req.params.id,
+        orgId,
+        req.body.entries || []
+      );
+      res.json(entries);
+    } catch (error: any) {
+      console.error("Failed to update storage entries:", error);
+      res.status(500).json({ error: "Failed to update storage entries" });
+    }
+  });
+
+  // Property Storage Entries - Delete a single entry
+  app.delete("/api/property-storage-entries/:id", async (req: any, res) => {
+    try {
+      await storage.deletePropertyStorageEntry(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Failed to delete storage entry:", error);
+      res.status(500).json({ error: "Failed to delete storage entry" });
+    }
+  });
+
   // PATCH route for property updates (used by detail modal)
   app.patch("/api/properties/:id", async (req: any, res) => {
     try {
