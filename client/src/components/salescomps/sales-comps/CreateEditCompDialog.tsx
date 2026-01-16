@@ -174,6 +174,20 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
   const [agentSearch, setAgentSearch] = useState("");
   const [isNewAgent, setIsNewAgent] = useState(false);
 
+  // Seller company/principal state
+  const [sellerCompanySearch, setSellerCompanySearch] = useState("");
+  const [showSellerCompanyDropdown, setShowSellerCompanyDropdown] = useState(false);
+  const [sellerPrincipalSearch, setSellerPrincipalSearch] = useState("");
+  const [showSellerPrincipalDropdown, setShowSellerPrincipalDropdown] = useState(false);
+  const [isNewSellerPrincipal, setIsNewSellerPrincipal] = useState(false);
+
+  // Buyer company/principal state
+  const [buyerCompanySearch, setBuyerCompanySearch] = useState("");
+  const [showBuyerCompanyDropdown, setShowBuyerCompanyDropdown] = useState(false);
+  const [buyerPrincipalSearch, setBuyerPrincipalSearch] = useState("");
+  const [showBuyerPrincipalDropdown, setShowBuyerPrincipalDropdown] = useState(false);
+  const [isNewBuyerPrincipal, setIsNewBuyerPrincipal] = useState(false);
+
   const form = useForm<CompFormData>({
     resolver: zodResolver(compFormSchema),
     defaultValues: {
@@ -211,9 +225,13 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       company: comp?.company || "",
       owner: comp?.owner || "",
       sellerCompany: comp?.seller || "",
+      sellerCompanyId: (comp as any)?.sellerCompanyId || "",
       sellerPrincipal: comp?.owner || "",
+      sellerContactId: (comp as any)?.sellerContactId || "",
       buyerCompany: comp?.company || "",
+      buyerCompanyId: (comp as any)?.buyerCompanyId || "",
       buyerPrincipal: comp?.buyerPrincipal || "",
+      buyerContactId: (comp as any)?.buyerContactId || "",
       listPrice: comp?.listPrice ? Number(comp.listPrice) : "",
       isMarketBid: (comp as any)?.isMarketBid ?? false,
       estimatedPurchasePrice: comp?.estimatedPurchasePrice ? Number(comp.estimatedPurchasePrice) : "",
@@ -255,19 +273,31 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
     },
   });
 
-  // Watch brokerage company id for contact filtering (must be after form initialization)
+  // Watch company IDs for contact filtering (must be after form initialization)
   const selectedBrokerageCompanyId = form.watch("brokerageCompanyId");
+  const selectedSellerCompanyId = form.watch("sellerCompanyId");
+  const selectedBuyerCompanyId = form.watch("buyerCompanyId");
 
-  // Fetch broker-tagged companies
-  const { data: brokerCompanies = [] } = useQuery<Array<{id: string; name: string; labels?: string[]}>>({
+  // Fetch all CRM companies for autocomplete
+  const { data: allCompanies = [] } = useQuery<Array<{id: string; name: string; labels?: string[]}>>({
     queryKey: ['/api/companies'],
     enabled: open,
   });
 
   // Filter broker companies based on search and "Broker" label
-  const filteredBrokerCompanies = brokerCompanies.filter((company: any) =>
+  const filteredBrokerCompanies = allCompanies.filter((company: any) =>
     company.labels?.includes('Broker') &&
     company.name.toLowerCase().includes(brokerageSearch.toLowerCase())
+  );
+
+  // Filter all companies for seller search (no label restriction)
+  const filteredSellerCompanies = allCompanies.filter((company: any) =>
+    company.name.toLowerCase().includes(sellerCompanySearch.toLowerCase())
+  );
+
+  // Filter all companies for buyer search (no label restriction)
+  const filteredBuyerCompanies = allCompanies.filter((company: any) =>
+    company.name.toLowerCase().includes(buyerCompanySearch.toLowerCase())
   );
 
   // Fetch contacts for selected brokerage company
@@ -280,6 +310,30 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       return res.json();
     },
     enabled: open && !!selectedBrokerageCompanyId,
+  });
+
+  // Fetch contacts for selected seller company
+  const { data: sellerContacts = [] } = useQuery<Array<{id: string; firstName?: string; lastName?: string; name?: string; companyId?: string}>>({
+    queryKey: ['/api/contacts', 'by-company', selectedSellerCompanyId],
+    queryFn: async () => {
+      if (!selectedSellerCompanyId) return [];
+      const res = await fetch(`/api/contacts?companyId=${selectedSellerCompanyId}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: open && !!selectedSellerCompanyId,
+  });
+
+  // Fetch contacts for selected buyer company
+  const { data: buyerContacts = [] } = useQuery<Array<{id: string; firstName?: string; lastName?: string; name?: string; companyId?: string}>>({
+    queryKey: ['/api/contacts', 'by-company', selectedBuyerCompanyId],
+    queryFn: async () => {
+      if (!selectedBuyerCompanyId) return [];
+      const res = await fetch(`/api/contacts?companyId=${selectedBuyerCompanyId}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: open && !!selectedBuyerCompanyId,
   });
 
   useEffect(() => {
@@ -323,9 +377,13 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
         owner: comp.owner || "",
         // Map database columns to form fields for transaction parties
         sellerCompany: comp.seller || "",
+        sellerCompanyId: (comp as any).sellerCompanyId || "",
         sellerPrincipal: comp.owner || "",
+        sellerContactId: (comp as any).sellerContactId || "",
         buyerCompany: comp.company || "",
+        buyerCompanyId: (comp as any).buyerCompanyId || "",
         buyerPrincipal: comp.buyerPrincipal || "",
+        buyerContactId: (comp as any).buyerContactId || "",
         listPrice: comp.listPrice ? Number(comp.listPrice) : "",
         isMarketBid: (comp as any).isMarketBid ?? false,
         acres: comp.acres ? Number(comp.acres) : "",
@@ -1756,78 +1814,326 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                     {/* Seller Section */}
                     <div className="space-y-4">
                       <h4 className="font-semibold text-sm text-gray-700">Seller</h4>
+                      
+                      {/* Seller Company with autocomplete */}
                       <FormField
                         control={form.control}
                         name="sellerCompany"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="relative">
                             <FormLabel>Company</FormLabel>
                             <FormControl>
                               <Input 
                                 {...field} 
-                                placeholder="Seller company name"
+                                value={sellerCompanySearch || field.value || ""}
+                                onChange={(e) => {
+                                  setSellerCompanySearch(e.target.value);
+                                  field.onChange(e.target.value);
+                                  form.setValue("sellerCompanyId", "");
+                                  setShowSellerCompanyDropdown(true);
+                                }}
+                                onFocus={() => setShowSellerCompanyDropdown(true)}
+                                onBlur={() => setTimeout(() => setShowSellerCompanyDropdown(false), 200)}
+                                placeholder="Search CRM companies..."
                                 data-testid="input-seller-company"
+                                autoComplete="off"
                               />
                             </FormControl>
+                            {showSellerCompanyDropdown && filteredSellerCompanies.length > 0 && (
+                              <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                                {filteredSellerCompanies.slice(0, 10).map((company: any) => (
+                                  <div
+                                    key={company.id}
+                                    className="px-3 py-2 cursor-pointer hover:bg-gray-100"
+                                    onMouseDown={() => {
+                                      field.onChange(company.name);
+                                      setSellerCompanySearch(company.name);
+                                      form.setValue("sellerCompanyId", company.id);
+                                      setShowSellerCompanyDropdown(false);
+                                      form.setValue("sellerPrincipal", "");
+                                      form.setValue("sellerContactId", "");
+                                      setIsNewSellerPrincipal(false);
+                                    }}
+                                  >
+                                    <span className="font-medium">{company.name}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Search companies in your CRM
+                            </p>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
+                      
+                      {/* Seller Principal with dropdown */}
                       <FormField
                         control={form.control}
                         name="sellerPrincipal"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Principal</FormLabel>
-                            <FormControl>
-                              <Input 
-                                {...field} 
-                                placeholder="Principal contact name"
-                                data-testid="input-seller-principal"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
+                        render={({ field }) => {
+                          const hasSelectedSellerCompany = !!selectedSellerCompanyId;
+                          return (
+                            <FormItem className="relative">
+                              <FormLabel>Principal</FormLabel>
+                              <FormControl>
+                                {isNewSellerPrincipal ? (
+                                  <div className="flex gap-2">
+                                    <Input 
+                                      {...field} 
+                                      value={sellerPrincipalSearch}
+                                      onChange={(e) => {
+                                        setSellerPrincipalSearch(e.target.value);
+                                        field.onChange(e.target.value);
+                                      }}
+                                      placeholder="Enter new principal name"
+                                      data-testid="input-seller-principal"
+                                    />
+                                    <Button 
+                                      type="button" 
+                                      variant="outline" 
+                                      size="sm"
+                                      onClick={() => {
+                                        setIsNewSellerPrincipal(false);
+                                        setSellerPrincipalSearch("");
+                                        field.onChange("");
+                                      }}
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div className="relative">
+                                    <Input 
+                                      value={field.value || sellerPrincipalSearch}
+                                      onChange={(e) => {
+                                        setSellerPrincipalSearch(e.target.value);
+                                        field.onChange(e.target.value);
+                                        form.setValue("sellerContactId", "");
+                                        setShowSellerPrincipalDropdown(true);
+                                      }}
+                                      onFocus={() => setShowSellerPrincipalDropdown(true)}
+                                      onBlur={() => setTimeout(() => setShowSellerPrincipalDropdown(false), 200)}
+                                      placeholder={hasSelectedSellerCompany ? "Select or add principal..." : "Enter principal name"}
+                                      data-testid="input-seller-principal"
+                                      autoComplete="off"
+                                    />
+                                    {showSellerPrincipalDropdown && hasSelectedSellerCompany && (
+                                      <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                                        {sellerContacts
+                                          .filter((c: any) => {
+                                            const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ') || c.name || '';
+                                            return fullName.toLowerCase().includes(sellerPrincipalSearch.toLowerCase());
+                                          })
+                                          .slice(0, 10)
+                                          .map((contact: any) => {
+                                            const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.name || 'Unnamed Contact';
+                                            return (
+                                              <div
+                                                key={contact.id}
+                                                className="px-3 py-2 cursor-pointer hover:bg-gray-100"
+                                                onMouseDown={() => {
+                                                  field.onChange(fullName);
+                                                  setSellerPrincipalSearch(fullName);
+                                                  form.setValue("sellerContactId", contact.id);
+                                                  setShowSellerPrincipalDropdown(false);
+                                                }}
+                                              >
+                                                {fullName}
+                                              </div>
+                                            );
+                                          })}
+                                        <div
+                                          className="px-3 py-2 cursor-pointer hover:bg-blue-50 text-blue-600 border-t flex items-center gap-2"
+                                          onMouseDown={() => {
+                                            setIsNewSellerPrincipal(true);
+                                            setSellerPrincipalSearch("");
+                                            field.onChange("");
+                                            form.setValue("sellerContactId", "");
+                                            setShowSellerPrincipalDropdown(false);
+                                          }}
+                                        >
+                                          <Plus className="w-4 h-4" />
+                                          Add New Principal
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </FormControl>
+                              {hasSelectedSellerCompany && sellerContacts.length > 0 && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {sellerContacts.length} contact(s) found at this company
+                                </p>
+                              )}
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }}
                       />
                     </div>
 
                     {/* Buyer Section */}
                     <div className="space-y-4">
                       <h4 className="font-semibold text-sm text-gray-700">Buyer</h4>
+                      
+                      {/* Buyer Company with autocomplete */}
                       <FormField
                         control={form.control}
                         name="buyerCompany"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="relative">
                             <FormLabel>Company</FormLabel>
                             <FormControl>
                               <Input 
                                 {...field} 
-                                placeholder="Buyer company name"
+                                value={buyerCompanySearch || field.value || ""}
+                                onChange={(e) => {
+                                  setBuyerCompanySearch(e.target.value);
+                                  field.onChange(e.target.value);
+                                  form.setValue("buyerCompanyId", "");
+                                  setShowBuyerCompanyDropdown(true);
+                                }}
+                                onFocus={() => setShowBuyerCompanyDropdown(true)}
+                                onBlur={() => setTimeout(() => setShowBuyerCompanyDropdown(false), 200)}
+                                placeholder="Search CRM companies..."
                                 data-testid="input-buyer-company"
+                                autoComplete="off"
                               />
                             </FormControl>
+                            {showBuyerCompanyDropdown && filteredBuyerCompanies.length > 0 && (
+                              <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                                {filteredBuyerCompanies.slice(0, 10).map((company: any) => (
+                                  <div
+                                    key={company.id}
+                                    className="px-3 py-2 cursor-pointer hover:bg-gray-100"
+                                    onMouseDown={() => {
+                                      field.onChange(company.name);
+                                      setBuyerCompanySearch(company.name);
+                                      form.setValue("buyerCompanyId", company.id);
+                                      setShowBuyerCompanyDropdown(false);
+                                      form.setValue("buyerPrincipal", "");
+                                      form.setValue("buyerContactId", "");
+                                      setIsNewBuyerPrincipal(false);
+                                    }}
+                                  >
+                                    <span className="font-medium">{company.name}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Search companies in your CRM
+                            </p>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
+                      
+                      {/* Buyer Principal with dropdown */}
                       <FormField
                         control={form.control}
                         name="buyerPrincipal"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Principal</FormLabel>
-                            <FormControl>
-                              <Input 
-                                {...field} 
-                                placeholder="Principal contact name"
-                                data-testid="input-buyer-principal"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
+                        render={({ field }) => {
+                          const hasSelectedBuyerCompany = !!selectedBuyerCompanyId;
+                          return (
+                            <FormItem className="relative">
+                              <FormLabel>Principal</FormLabel>
+                              <FormControl>
+                                {isNewBuyerPrincipal ? (
+                                  <div className="flex gap-2">
+                                    <Input 
+                                      {...field} 
+                                      value={buyerPrincipalSearch}
+                                      onChange={(e) => {
+                                        setBuyerPrincipalSearch(e.target.value);
+                                        field.onChange(e.target.value);
+                                      }}
+                                      placeholder="Enter new principal name"
+                                      data-testid="input-buyer-principal"
+                                    />
+                                    <Button 
+                                      type="button" 
+                                      variant="outline" 
+                                      size="sm"
+                                      onClick={() => {
+                                        setIsNewBuyerPrincipal(false);
+                                        setBuyerPrincipalSearch("");
+                                        field.onChange("");
+                                      }}
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div className="relative">
+                                    <Input 
+                                      value={field.value || buyerPrincipalSearch}
+                                      onChange={(e) => {
+                                        setBuyerPrincipalSearch(e.target.value);
+                                        field.onChange(e.target.value);
+                                        form.setValue("buyerContactId", "");
+                                        setShowBuyerPrincipalDropdown(true);
+                                      }}
+                                      onFocus={() => setShowBuyerPrincipalDropdown(true)}
+                                      onBlur={() => setTimeout(() => setShowBuyerPrincipalDropdown(false), 200)}
+                                      placeholder={hasSelectedBuyerCompany ? "Select or add principal..." : "Enter principal name"}
+                                      data-testid="input-buyer-principal"
+                                      autoComplete="off"
+                                    />
+                                    {showBuyerPrincipalDropdown && hasSelectedBuyerCompany && (
+                                      <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                                        {buyerContacts
+                                          .filter((c: any) => {
+                                            const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ') || c.name || '';
+                                            return fullName.toLowerCase().includes(buyerPrincipalSearch.toLowerCase());
+                                          })
+                                          .slice(0, 10)
+                                          .map((contact: any) => {
+                                            const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.name || 'Unnamed Contact';
+                                            return (
+                                              <div
+                                                key={contact.id}
+                                                className="px-3 py-2 cursor-pointer hover:bg-gray-100"
+                                                onMouseDown={() => {
+                                                  field.onChange(fullName);
+                                                  setBuyerPrincipalSearch(fullName);
+                                                  form.setValue("buyerContactId", contact.id);
+                                                  setShowBuyerPrincipalDropdown(false);
+                                                }}
+                                              >
+                                                {fullName}
+                                              </div>
+                                            );
+                                          })}
+                                        <div
+                                          className="px-3 py-2 cursor-pointer hover:bg-blue-50 text-blue-600 border-t flex items-center gap-2"
+                                          onMouseDown={() => {
+                                            setIsNewBuyerPrincipal(true);
+                                            setBuyerPrincipalSearch("");
+                                            field.onChange("");
+                                            form.setValue("buyerContactId", "");
+                                            setShowBuyerPrincipalDropdown(false);
+                                          }}
+                                        >
+                                          <Plus className="w-4 h-4" />
+                                          Add New Principal
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </FormControl>
+                              {hasSelectedBuyerCompany && buyerContacts.length > 0 && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {buyerContacts.length} contact(s) found at this company
+                                </p>
+                              )}
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }}
                       />
                     </div>
                   </div>
