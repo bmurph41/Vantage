@@ -2322,7 +2322,9 @@ export async function getExecutiveDashboardMetrics(
     if (term.includes('summer') || term.includes('winter') || term.includes('seasonal')) {
       return 6;
     }
-    return 0;
+    // Default to 12 months (annual) when no date or term information is available
+    // This ensures leases with valid monthly rates still contribute to revenue
+    return 12;
   };
   
   const isSeasonalOrAnnualRateType = (rateType: string | null | undefined): boolean => {
@@ -2351,7 +2353,9 @@ export async function getExecutiveDashboardMetrics(
   }
 
   // Occupancy Rate = Active Leases / Total Leasable Spaces (from storage locations capacity)
-  const occupancyRate = totalCapacity > 0 ? (activeLeases / totalCapacity) * 100 : 0;
+  // Fallback to totalLeases when storage location capacity isn't configured
+  const denominator = totalCapacity > 0 ? totalCapacity : totalLeases;
+  const occupancyRate = denominator > 0 ? (activeLeases / denominator) * 100 : 0;
   // Average Lease Value = Sum of individual lease values / Count of active leases
   // Uses the same rate type semantics as totalStorageRevenue for proper weighted average
   const activeLeaseCount = storageRevenueData.length;
