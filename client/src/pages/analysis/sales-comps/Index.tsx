@@ -425,10 +425,8 @@ export default function SalesCompsIndex() {
               </div>
               
               {!isSidebarCollapsed && (
-                <FiltersPanel 
-                {/* Source Filter Tabs */}
-                {!isSidebarCollapsed && (
-                  <div className="flex items-center gap-2 px-4 py-2 border-b">
+                <>
+                  <div className="flex items-center gap-2 px-4 py-2 border-b mb-3">
                     <span className="text-xs text-muted-foreground">Source:</span>
                     <div className="flex gap-1">
                       <Button
@@ -458,12 +456,13 @@ export default function SalesCompsIndex() {
                       </Button>
                     </div>
                   </div>
-                )}
-                  filters={filters}
-                  onFiltersChange={handleFilterChange}
-                  activeSavedSearchId={activeSavedSearchId}
-                  onActiveSavedSearchChange={handleActiveSavedSearchChange}
-                />
+                  <FiltersPanel 
+                    filters={filters}
+                    onFiltersChange={handleFilterChange}
+                    activeSavedSearchId={activeSavedSearchId}
+                    onActiveSavedSearchChange={handleActiveSavedSearchChange}
+                  />
+                </>
               )}
             </div>
             
