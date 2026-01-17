@@ -7,6 +7,7 @@ import { organizations, ssoConfigurations, users, userSessions } from '@shared/s
 import { eq, and, gt } from 'drizzle-orm';
 import { logger } from '../lib/logger';
 import { z } from 'zod';
+import { sendEmailVerification, sendMagicLinkEmail, generateVerificationToken } from '../services/email-service';
 
 declare global {
   namespace Express {
@@ -372,6 +373,172 @@ router.post('/logout', async (req: Request, res: Response) => {
   } catch (error) {
     logger.error({ error }, 'Logout error');
     res.status(500).json({ error: 'Logout failed' });
+  }
+});
+
+const magicLinkSchema = z.object({
+  email: z.string().email(),
+});
+
+router.post('/magic-link', async (req: Request, res: Response) => {
+  try {
+    const parsed = magicLinkSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Invalid email address' });
+    }
+
+    const { email } = parsed.data;
+    const user = await db.query.users.findFirst({
+      where: eq(users.email, email.toLowerCase())
+    });
+
+    if (user) {
+      const token = generateVerificationToken();
+      const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+      
+      await db.update(users)
+        .set({ 
+          emailVerificationToken: token,
+          emailVerificationExpires: expires 
+        })
+        .where(eq(users.id, user.id));
+
+      const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : process.env.REPLIT_DOMAIN
+        ? `https://${process.env.REPLIT_DOMAIN}`
+        : 'http://localhost:5000';
+      
+      const magicLinkUrl = `${baseUrl}/auth/magic-link/${token}`;
+      await sendMagicLinkEmail(user.email, magicLinkUrl, user.name);
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'If an account exists with this email, a login link has been sent.' 
+    });
+  } catch (error) {
+    logger.error({ error }, 'Magic link error');
+    res.json({ 
+      success: true, 
+      message: 'If an account exists with this email, a login link has been sent.' 
+    });
+  }
+});
+
+router.get('/magic-link/verify/:token', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    
+    const user = await db.query.users.findFirst({
+      where: and(
+        eq(users.emailVerificationToken, token),
+        gt(users.emailVerificationExpires, new Date())
+      )
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid or expired link' });
+    }
+
+    await db.update(users)
+      .set({ 
+        emailVerificationToken: null,
+        emailVerificationExpires: null,
+        emailVerified: true
+      })
+      .where(eq(users.id, user.id));
+
+    const deviceInfo = getDeviceInfo(req);
+    const session = await enterpriseAuthService.createSession(user.id, user.orgId, deviceInfo);
+
+    res.cookie('sessionToken', session.sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 8 * 60 * 60 * 1000,
+      path: '/',
+    });
+
+    res.json({ 
+      success: true, 
+      user: sanitizeUser(user),
+      redirectTo: '/'
+    });
+  } catch (error) {
+    logger.error({ error }, 'Magic link verification error');
+    res.status(500).json({ error: 'Verification failed' });
+  }
+});
+
+router.post('/verify-email/send', requireSession, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId)
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (user.emailVerified) {
+      return res.json({ success: true, message: 'Email already verified' });
+    }
+
+    const token = generateVerificationToken();
+    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    await db.update(users)
+      .set({ 
+        emailVerificationToken: token,
+        emailVerificationExpires: expires 
+      })
+      .where(eq(users.id, user.id));
+
+    const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+      : process.env.REPLIT_DOMAIN
+      ? `https://${process.env.REPLIT_DOMAIN}`
+      : 'http://localhost:5000';
+    
+    const verificationUrl = `${baseUrl}/auth/verify-email/${token}`;
+    await sendEmailVerification(user.email, verificationUrl, user.name);
+
+    res.json({ success: true, message: 'Verification email sent' });
+  } catch (error) {
+    logger.error({ error }, 'Send verification email error');
+    res.status(500).json({ error: 'Failed to send verification email' });
+  }
+});
+
+router.get('/verify-email/:token', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    
+    const user = await db.query.users.findFirst({
+      where: and(
+        eq(users.emailVerificationToken, token),
+        gt(users.emailVerificationExpires, new Date())
+      )
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid or expired verification link' });
+    }
+
+    await db.update(users)
+      .set({ 
+        emailVerificationToken: null,
+        emailVerificationExpires: null,
+        emailVerified: true
+      })
+      .where(eq(users.id, user.id));
+
+    res.json({ success: true, message: 'Email verified successfully' });
+  } catch (error) {
+    logger.error({ error }, 'Email verification error');
+    res.status(500).json({ error: 'Verification failed' });
   }
 });
 

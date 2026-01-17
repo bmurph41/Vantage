@@ -281,6 +281,15 @@ export const users = pgTable("users", {
   failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
   lockedUntil: timestamp("locked_until"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  // Email verification
+  emailVerified: boolean("email_verified").notNull().default(false),
+  emailVerificationToken: text("email_verification_token"),
+  emailVerificationExpires: timestamp("email_verification_expires"),
+  // Phone verification
+  phone: text("phone"),
+  phoneVerified: boolean("phone_verified").notNull().default(false),
+  phoneVerificationCode: text("phone_verification_code"),
+  phoneVerificationExpires: timestamp("phone_verification_expires"),
 });
 
 // User Sessions - Track active sessions with device info

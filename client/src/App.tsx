@@ -111,6 +111,9 @@ const LoginPage = lazy(() => import("@/pages/auth/login"));
 const SignupPage = lazy(() => import("@/pages/auth/signup"));
 const ForgotPasswordPage = lazy(() => import("@/pages/auth/forgot-password"));
 const ResetPasswordPage = lazy(() => import("@/pages/auth/reset-password"));
+const MagicLinkPage = lazy(() => import("@/pages/auth/magic-link"));
+const MagicLinkVerifyPage = lazy(() => import("@/pages/auth/magic-link-verify"));
+const VerifyEmailPage = lazy(() => import("@/pages/auth/verify-email"));
 const DesignPreview = lazy(() => import("@/pages/design-preview"));
 const PacksSettings = lazy(() => import("@/pages/packs-settings"));
 const AccountMappingPage = lazy(() => import("@/pages/admin/AccountMappingPage"));
@@ -342,6 +345,27 @@ function Router() {
         {() => (
           <Suspense fallback={<PageLoader />}>
             <ResetPasswordPage />
+          </Suspense>
+        )}
+      </Route>
+      <Route path="/magic-link">
+        {() => (
+          <Suspense fallback={<PageLoader />}>
+            <MagicLinkPage />
+          </Suspense>
+        )}
+      </Route>
+      <Route path="/auth/magic-link/:token">
+        {() => (
+          <Suspense fallback={<PageLoader />}>
+            <MagicLinkVerifyPage />
+          </Suspense>
+        )}
+      </Route>
+      <Route path="/auth/verify-email/:token">
+        {() => (
+          <Suspense fallback={<PageLoader />}>
+            <VerifyEmailPage />
           </Suspense>
         )}
       </Route>
