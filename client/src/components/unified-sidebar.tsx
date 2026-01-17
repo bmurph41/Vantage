@@ -14,6 +14,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 // CRM Navigation (Core CRM - Entity Management)
 const crmNav = [
+  { name: "Dashboard", href: "/crm", icon: LayoutDashboard },
   { name: "Contacts", href: "/crm/contacts", icon: Users },
   { name: "Companies", href: "/crm/companies", icon: Building },
   { name: "Properties", href: "/crm/properties", icon: Home },
@@ -227,7 +228,7 @@ export default function UnifiedSidebar() {
     // Determine which section the current page belongs to
     const isOperationsPage = location.startsWith('/operations/');
     // CRM: contacts, companies, properties (core entity management)
-    const isCrmPage = ['/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location);
+    const isCrmPage = ['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location);
     const isPendingPage = location.includes('/pending-');
     // Pipeline section: Deal Board, Activity Log, Follow-Ups, Forecast
     const isPipelinePage = ['/deal-workspace', '/crm/activity', '/crm/tasks', '/crm/forecast'].includes(location) || location.startsWith('/deal-workspace');
@@ -545,7 +546,7 @@ export default function UnifiedSidebar() {
               title="CRM" 
               expanded={crmExpanded} 
               onToggle={() => setCrmExpanded(!crmExpanded)}
-              isActive={['/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location)}
+              isActive={['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location)}
             />
             {crmExpanded && (
               <>
