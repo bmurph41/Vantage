@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation, useQueryClient, useQueries, keepPreviousData } from "@tanstack/react-query";
 import { BarChart3, FolderPlus, Trash2, ChevronLeft, ChevronRight, Filter, ChevronUp } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { SkeletonTableRows } from "@/components/ui/skeleton-variants";
 import { Link } from "wouter";
 import debounce from "lodash.debounce";
@@ -59,6 +60,7 @@ export default function RateCompsIndex() {
   });
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>("desc");
+  const [sourceScope, setSourceScope] = useState<"all" | "org" | "global">("all");
   const [columnUniqueValues, setColumnUniqueValues] = useState<Record<string, string[]>>({});
   const [activeSavedSearchId, setActiveSavedSearchId] = useState<string | null>(null);
   const [activeSavedSearchName, setActiveSavedSearchName] = useState<string | null>(null);
@@ -135,6 +137,8 @@ export default function RateCompsIndex() {
     sortDir,
     page,
     pageSize,
+    scope: sourceScope === "all" ? undefined : sourceScope,
+    includeGlobal: sourceScope === "all" ? "true" : undefined,
   }), [debouncedSearchQuery, filters, sortBy, sortDir, page, pageSize]);
 
   const { data: compsData, isLoading: compsLoading, error } = useQuery({
@@ -421,6 +425,39 @@ export default function RateCompsIndex() {
               
               {!isSidebarCollapsed && (
                 <FiltersPanel 
+                {/* Source Filter Tabs */}
+                {!isSidebarCollapsed && (
+                  <div className="flex items-center gap-2 px-4 py-2 border-b">
+                    <span className="text-xs text-muted-foreground">Source:</span>
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant={sourceScope === "all" ? "default" : "ghost"}
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setSourceScope("all")}
+                      >
+                        All
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={sourceScope === "org" ? "default" : "ghost"}
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setSourceScope("org")}
+                      >
+                        My Data
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={sourceScope === "global" ? "default" : "ghost"}
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setSourceScope("global")}
+                      >
+                        <Badge variant="secondary" className="h-4 px-1 mr-1 text-[10px]">MM</Badge>
+                        Curated
+                      </Button>
+                    </div>
+                  </div>
+                )}
                   filters={filters}
                   onFiltersChange={handleFilterChange}
                   activeSavedSearchId={activeSavedSearchId}
