@@ -39,6 +39,24 @@ The platform uses React 18 with TypeScript and Wouter for routing. The UI is bui
 - **OM Builder**: Professional offering memorandum creation with data binding and PDF export.
 - **Cross-Module Architecture**: Comprehensive system for connecting CRM, Due Diligence, Modeling, and DockTalk via database schema consolidation, a query key factory for cache invalidation, a Deal Orchestrator Service, Entity Linking API, and a Cross-Module Event System.
 
+### Dual-Sourced Data Architecture
+The platform implements a dual-sourced data model separating "Universal/Global" curated data from user-specific data:
+
+**Data Scopes** (dataScopeEnum: global/org/user):
+- **Global**: MarinaMatch curated data - available to pack subscribers only
+- **Organization**: Org-specific data - visible to org members
+- **User**: User-created data - private to the creator
+
+**Curated Data Tables**:
+- `salesComps`: Has scope, requiredPack, isCurated, curatedByUserId, curatedAt columns
+- `rateComps`: Has scope, requiredPack, isCurated, curatedByUserId, curatedAt columns
+- `industryStandards`: Global benchmarks with category, region, metrics, and pack-gated access
+
+**Admin Routes** (`/api/admin/curated/*`): Manage global curated data (owner/admin role required)
+
+**Pack Access Control**: Users see global data only if they have the required pack subscription
+
+
 ### Feature Specifications
 - **CRM**: Deals, leads, contacts, pipelines, activities, email sequences, marketing automation, user-defined lists, property status tracking, entity relationship management, and Comment Threads with @mentions and notifications.
 - **Due Diligence**: Project management, task tracking, template management, and DD Fees Tracker.
