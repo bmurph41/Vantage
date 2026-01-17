@@ -26,6 +26,7 @@ import boatRentalsRouter from "./boat-rentals-router";
 import boatClubRouter from "./boat-club-router";
 import boatSalesRouter from "./boat-sales-router";
 import integrationRouter from "./integration-routes";
+import { integrationsRouter } from "./integrations";
 import marinamatchRouter from "./marinamatch/routes";
 import omRouter from "./om/routes";
 import scraperV2Routes from "./docktalk/scraper_v2/routes";
@@ -412,6 +413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/opssos", authenticateUser, enforceTenant, opssosRouter);
   app.use("/api/admin", authenticateUser, enforceTenant, adminRouter);
   app.use("/api/integration", authenticateUser, integrationRouter);
+  app.use(authenticateUser, enforceTenant, integrationsRouter);
   app.use("/api/marinamatch", authenticateUser, marinamatchRouter);
   app.use("/api/om", authenticateUser, omRouter);
 

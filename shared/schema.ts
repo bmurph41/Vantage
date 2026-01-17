@@ -20698,6 +20698,89 @@ export const industryStandards = pgTable("industry_standards", {
   yearIdx: index("industry_standards_year_idx").on(table.effectiveYear, table.effectiveQuarter),
 }));
 
+// ============================================
+// Integrations Marketplace Schema
+// ============================================
+
+export const integrationAuthTypeEnum = pgEnum("integration_auth_type", ["oauth", "apiKey", "none"]);
+export const integrationStatusEnum = pgEnum("integration_status", ["available", "connected", "pending", "error"]);
+
+export const integrations = pgTable("integrations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: varchar("key").notNull().unique(),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  categories: jsonb("categories").$type<string[]>().default([]).notNull(),
+  contexts: jsonb("contexts").$type<string[]>().default([]).notNull(),
+  uiPlacements: jsonb("ui_placements").$type<string[]>().default([]).notNull(),
+  authType: integrationAuthTypeEnum("auth_type").default("none").notNull(),
+  websiteUrl: text("website_url"),
+  iconUrl: text("icon_url"),
+  capabilities: jsonb("capabilities").$type<{
+    dataRead: string[];
+    dataWrite: string[];
+    actions: string[];
+    uiHooks: string[];
+  }>().default({ dataRead: [], dataWrite: [], actions: [], uiHooks: [] }).notNull(),
+  settingsSchema: jsonb("settings_schema").$type<{
+    fields: Array<{
+      key: string;
+      label: string;
+      type: "string" | "number" | "boolean" | "select" | "secret";
+      required?: boolean;
+      options?: Array<{ label: string; value: string }>;
+      helpText?: string;
+    }>;
+  }>().default({ fields: [] }).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  keyIdx: index("integrations_key_idx").on(table.key),
+  contextsIdx: index("integrations_contexts_idx").on(table.contexts),
+  activeIdx: index("integrations_active_idx").on(table.isActive),
+}));
+
+export const userIntegrations = pgTable("user_integrations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").references(() => organizations.id),
+  integrationKey: varchar("integration_key").notNull().references(() => integrations.key),
+  isConnected: boolean("is_connected").default(false).notNull(),
+  encryptedAccessToken: text("encrypted_access_token"),
+  encryptedRefreshToken: text("encrypted_refresh_token"),
+  encryptedApiKey: text("encrypted_api_key"),
+  tokenExpiresAt: timestamp("token_expires_at"),
+  settings: jsonb("settings").$type<Record<string, any>>().default({}).notNull(),
+  oauthState: text("oauth_state"),
+  lastSyncAt: timestamp("last_sync_at"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  userIntegrationUnique: unique("user_integration_unique").on(table.userId, table.integrationKey),
+  userIdx: index("user_integrations_user_idx").on(table.userId),
+  orgIdx: index("user_integrations_org_idx").on(table.orgId),
+  integrationKeyIdx: index("user_integrations_key_idx").on(table.integrationKey),
+  connectedIdx: index("user_integrations_connected_idx").on(table.isConnected),
+}));
+
+export type Integration = typeof integrations.$inferSelect;
+export type InsertIntegration = typeof integrations.$inferInsert;
+export const insertIntegrationSchema = createInsertSchema(integrations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type UserIntegration = typeof userIntegrations.$inferSelect;
+export type InsertUserIntegration = typeof userIntegrations.$inferInsert;
+export const insertUserIntegrationSchema = createInsertSchema(userIntegrations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Industry Standards Types
 export type IndustryStandard = typeof industryStandards.$inferSelect;
 export type InsertIndustryStandard = typeof industryStandards.$inferInsert;

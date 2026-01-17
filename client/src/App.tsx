@@ -116,6 +116,8 @@ const MagicLinkVerifyPage = lazy(() => import("@/pages/auth/magic-link-verify"))
 const VerifyEmailPage = lazy(() => import("@/pages/auth/verify-email"));
 const DesignPreview = lazy(() => import("@/pages/design-preview"));
 const PacksSettings = lazy(() => import("@/pages/packs-settings"));
+const IntegrationsMarketplace = lazy(() => import("@/pages/integrations/IntegrationsMarketplace"));
+const IntegrationDetail = lazy(() => import("@/pages/integrations/IntegrationDetail"));
 const AccountMappingPage = lazy(() => import("@/pages/admin/AccountMappingPage"));
 const CuratedDataDashboard = lazy(() => import("@/pages/admin/CuratedDataDashboard"));
 const OpsInboxPage = lazy(() => import("@/pages/ops/InboxPage"));
@@ -445,10 +447,24 @@ function Router() {
           </UnifiedLayout>
         )}
       </Route>
+      <Route path="/settings/integrations">
+        {() => (
+          <UnifiedLayout>
+            <IntegrationsMarketplace />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/settings/integrations/:key">
+        {() => (
+          <UnifiedLayout>
+            <IntegrationDetail />
+          </UnifiedLayout>
+        )}
+      </Route>
       <Route path="/admin/curated-data">
         {() => (
           <UnifiedLayout>
-          <CuratedDataDashboard />
+            <CuratedDataDashboard />
           </UnifiedLayout>
         )}
       </Route>

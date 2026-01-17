@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Cloud, Database, FileSpreadsheet, Plug, CheckCircle2, XCircle, RefreshCw, Trash2, Settings as SettingsIcon, Eye, EyeOff } from "lucide-react";
 import { format } from "date-fns";
+import { ContextIntegrationsPanel } from "@/components/integrations/ContextIntegrationsPanel";
 
 type FuelIntegration = {
   id: string;
@@ -315,6 +316,8 @@ export default function IntegrationSettings() {
           Connect external systems to automatically sync fuel sales data
         </p>
       </div>
+
+      <ContextIntegrationsPanel contextKey="fuelSales" />
 
       {integration ? (
         <>

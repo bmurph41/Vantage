@@ -5,7 +5,7 @@ import {
   BarChart3, Users, Building, Handshake, Calendar, 
   Bot, Bell, Mail, PieChart, TrendingUp, Settings,
   LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight, ChevronLeft,
-  Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock, Receipt, RefreshCcw, Percent, Search, Wrench, Ship, ShoppingCart, PanelLeftClose, PanelLeft
+  Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock, Receipt, RefreshCcw, Percent, Search, Wrench, Ship, ShoppingCart, PanelLeftClose, PanelLeft, Plug
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DetailDrawer } from "@/components/crm/detail-drawer";
@@ -109,6 +109,11 @@ const marinalyticsNav = [
   { name: "Portfolio Analytics", href: "/analysis/marinalytics", icon: BarChart3 },
 ];
 
+// Integrations Navigation
+const integrationsNav = [
+  { name: "Marketplace", href: "/settings/integrations", icon: Plug },
+];
+
 type PendingItem = {
   id: string;
   status: string;
@@ -137,6 +142,7 @@ export default function UnifiedSidebar() {
   const [underwritingToolsExpanded, setUnderwritingToolsExpanded] = useState(false);
   const [investorServicesExpanded, setInvestorServicesExpanded] = useState(false);
   const [marinalyticsExpanded, setMarinalyticsExpanded] = useState(false);
+  const [integrationsExpanded, setIntegrationsExpanded] = useState(false);
   const [pendingExpanded, setPendingExpanded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
@@ -760,6 +766,23 @@ export default function UnifiedSidebar() {
             )}
           </div>
         )}
+
+        {/* Integrations Section */}
+        <div className="mb-2">
+          <SectionHeader
+            title="Integrations"
+            expanded={integrationsExpanded}
+            onToggle={() => setIntegrationsExpanded(!integrationsExpanded)}
+            isActive={location.startsWith("/settings/integrations")}
+          />
+          {integrationsExpanded && (
+            <div className="ml-4 mt-1 mb-2">
+              {integrationsNav.map((item) => (
+                <NavLink key={item.name} item={item} />
+              ))}
+            </div>
+          )}
+        </div>
       </nav>
       
       {/* Collapse Toggle Button */}

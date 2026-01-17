@@ -11,6 +11,7 @@ import {
   ArrowUpRight, Users
 } from "lucide-react";
 import { Link } from "wouter";
+import { ContextIntegrationsPanel } from "@/components/integrations/ContextIntegrationsPanel";
 
 interface RentalStats {
   totalRentals: number;
@@ -123,6 +124,7 @@ export default function BoatRentalsDashboard() {
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="fleet">Fleet</TabsTrigger>
               <TabsTrigger value="calendar">Calendar</TabsTrigger>
+              <TabsTrigger value="integrations">Integrations</TabsTrigger>
             </TabsList>
             <div className="flex gap-2">
               <Link href="/operations/boat-rentals/reservations">
@@ -330,6 +332,10 @@ export default function BoatRentalsDashboard() {
                 </Link>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="integrations">
+            <ContextIntegrationsPanel contextKey="boatRentals" />
           </TabsContent>
         </Tabs>
       </div>
