@@ -87,6 +87,9 @@ export const phoneTypeEnum = pgEnum("phone_type", ["office", "mobile", "home"]);
 export const dealOutcomeEnum = pgEnum("deal_outcome", ["won", "lost", "passed", "under_review", "active"]);
 export const dealSourceEnum = pgEnum("deal_source", ["direct_to_seller", "broker", "owned_marina"]);
 
+// Data scope enum for global vs org-specific data
+export const dataScopeEnum = pgEnum("data_scope", ["global", "org", "user"]);
+
 // VDR & Request Management enums
 export const vdrPermissionLevelEnum = pgEnum("vdr_permission_level", ["no_access", "view_only", "view_download", "view_download_print", "full_access"]);
 export const watermarkTypeEnum = pgEnum("watermark_type", ["static", "dynamic"]);
@@ -6501,6 +6504,13 @@ export const salesComps = pgTable('sales_comps', {
 
   // Expandable data
   custom: jsonb('custom').$type<Record<string, unknown>>().default({}),
+
+  // === GLOBAL/CURATED DATA GOVERNANCE ===
+  scope: dataScopeEnum("scope").default("org").notNull(), // global = curated by MarinaMatch, org = org-specific, user = user-specific
+  requiredPack: text("required_pack"), // Which pack is needed to see this global data (e.g., "analysis", "analytics_pro")
+  isCurated: boolean("is_curated").default(false).notNull(), // Whether this is admin-curated data
+  curatedByUserId: varchar("curated_by_user_id").references(() => users.id, { onDelete: "set null" }), // Who curated this data
+  curatedAt: timestamp("curated_at"), // When was this data curated
 }, (table) => ({
   orgIdx: index('sales_comps_org_idx').on(table.orgId),
   orgStateIdx: index('sales_comps_org_state_idx').on(table.orgId, table.state),
@@ -8051,6 +8061,13 @@ export const rateComps = pgTable('rate_comps', {
 
   // Expandable data
   custom: jsonb('custom').$type<Record<string, unknown>>().default({}),
+
+  // === GLOBAL/CURATED DATA GOVERNANCE ===
+  scope: dataScopeEnum("scope").default("org").notNull(), // global = curated by MarinaMatch, org = org-specific, user = user-specific
+  requiredPack: text("required_pack"), // Which pack is needed to see this global data (e.g., "analysis", "analytics_pro")
+  isCurated: boolean("is_curated").default(false).notNull(), // Whether this is admin-curated data
+  curatedByUserId: varchar("curated_by_user_id").references(() => users.id, { onDelete: "set null" }), // Who curated this data
+  curatedAt: timestamp("curated_at"), // When was this data curated
 }, (table) => ({
   orgIdx: index('rate_comps_org_idx').on(table.orgId),
   orgStateIdx: index('rate_comps_org_state_idx').on(table.orgId, table.state),
@@ -20619,6 +20636,67 @@ export type OpssosWebhook = typeof opssosWebhooks.$inferSelect;
 export type InsertOpssosWebhook = typeof opssosWebhooks.$inferInsert;
 export type OpssosWebhookDelivery = typeof opssosWebhookDeliveries.$inferSelect;
 export type InsertOpssosWebhookDelivery = typeof opssosWebhookDeliveries.$inferInsert;
+
+// ============================================================================
+// INDUSTRY STANDARDS - Global curated benchmarks and metrics
+// ============================================================================
+
+export const industryStandards = pgTable("industry_standards", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").references(() => organizations.id), // null for global standards
+  
+  // Core fields
+  name: text("name").notNull(),
+  category: text("category").notNull(), // "occupancy", "revenue", "expenses", "cap_rates", "valuations", "rates"
+  subCategory: text("sub_category"), // e.g., "wet_slip_rates", "dry_storage_rates"
+  
+  // Geographic/Market scope
+  region: text("region"), // "Northeast", "Southeast", "Gulf Coast", etc.
+  state: text("state"),
+  waterType: text("water_type"), // "Coastal", "Lake", "River"
+  marketSize: text("market_size"), // "Major Metro", "Secondary", "Tertiary"
+  
+  // Metric values
+  metricValue: decimal("metric_value", { precision: 12, scale: 4 }),
+  metricUnit: text("metric_unit"), // "percentage", "dollars", "dollars_per_foot", "dollars_per_slip"
+  lowRange: decimal("low_range", { precision: 12, scale: 4 }),
+  highRange: decimal("high_range", { precision: 12, scale: 4 }),
+  
+  // Time period
+  effectiveYear: integer("effective_year"),
+  effectiveQuarter: integer("effective_quarter"), // 1-4
+  
+  // Data source
+  dataSource: text("data_source"), // "MarinaMatch Research", "NMMA", "Industry Survey"
+  sampleSize: integer("sample_size"),
+  confidenceLevel: text("confidence_level"), // "high", "medium", "low"
+  sourceNotes: text("source_notes"),
+  
+  // Access control
+  scope: dataScopeEnum("scope").default("global").notNull(),
+  requiredPack: text("required_pack"), // "analytics_pro", "analysis", etc.
+  isCurated: boolean("is_curated").default(true).notNull(),
+  
+  // Audit fields
+  createdBy: varchar("created_by").references(() => users.id),
+  updatedBy: varchar("updated_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  categoryIdx: index("industry_standards_category_idx").on(table.category),
+  scopeIdx: index("industry_standards_scope_idx").on(table.scope, table.requiredPack),
+  regionIdx: index("industry_standards_region_idx").on(table.region, table.state),
+  yearIdx: index("industry_standards_year_idx").on(table.effectiveYear, table.effectiveQuarter),
+}));
+
+// Industry Standards Types
+export type IndustryStandard = typeof industryStandards.$inferSelect;
+export type InsertIndustryStandard = typeof industryStandards.$inferInsert;
+export const insertIndustryStandardSchema = createInsertSchema(industryStandards).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
 
 // OpsOS Insert Schemas (Zod-based validation)
 export const insertOpssosConversationSchema = createInsertSchema(opssosConversations).omit({
