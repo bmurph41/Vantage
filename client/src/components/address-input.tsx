@@ -3,15 +3,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MapPin, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { loadGoogleMaps } from '@/lib/googleMaps';
 
 export interface AddressComponents {
   street?: string;
-  streetAddress?: string; // Alias for street
+  streetAddress?: string;
   city?: string;
   state?: string;
   zipCode?: string;
   country?: string;
   fullAddress?: string;
+  placeId?: string;
   lat?: number;
   lng?: number;
   source?: 'google' | 'manual';
@@ -174,6 +176,8 @@ interface AddressInputProps {
   className?: string;
   testId?: string;
   countries?: string[];
+  biasCenter?: { lat: number; lng: number };
+  biasRadiusMeters?: number;
 }
 
 export function AddressInput({
@@ -187,6 +191,8 @@ export function AddressInput({
   className = '',
   testId = 'input-address',
   countries = ['us'],
+  biasCenter,
+  biasRadiusMeters = 50000,
 }: AddressInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
@@ -204,8 +210,7 @@ export function AddressInput({
   }, [onChange, onAddressSelect]);
 
   useEffect(() => {
-    // Load Google Maps API
-    const loadGoogleMaps = async () => {
+    const initGoogleMaps = async () => {
       if (typeof google !== 'undefined' && google.maps) {
         setApiReady(true);
         return;
@@ -213,40 +218,15 @@ export function AddressInput({
 
       setIsLoading(true);
       try {
-        let apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-        
-        if (!apiKey) {
-          try {
-            const response = await fetch('/api/config/google-maps-key');
-            const data = await response.json();
-            apiKey = data.apiKey;
-          } catch (err) {
-          }
-        }
-        
-        if (!apiKey) {
-          setIsLoading(false);
-          return;
-        }
-
-        const { Loader } = await import('@googlemaps/js-api-loader');
-        const loader = new Loader({
-          apiKey,
-          version: 'weekly',
-          libraries: ['places'],
-        });
-
-        await loader.load();
+        await loadGoogleMaps();
         setApiReady(true);
       } catch (error) {
-        // Improved error logging
         console.error('Failed to load Google Maps API:', error);
         
-        // Check if this is likely a referrer restriction issue
         const errorMessage = error instanceof Error ? error.message : '';
         const isReferrerIssue = errorMessage.includes('RefererNotAllowedMapError') || 
                                 errorMessage.includes('ApiNotActivatedMapError') ||
-                                error instanceof Event; // Script loading failures often appear as Events
+                                error instanceof Event;
         
         if (isReferrerIssue) {
           console.error(
@@ -267,7 +247,7 @@ export function AddressInput({
       }
     };
 
-    loadGoogleMaps();
+    initGoogleMaps();
   }, [toast]);
 
   // Stable handler using refs - won't change between renders
@@ -278,9 +258,9 @@ export function AddressInput({
       return;
     }
 
-    // Extract address components
     const components: AddressComponents = {
       fullAddress: place.formatted_address || '',
+      placeId: place.place_id,
       lat: place.geometry?.location?.lat(),
       lng: place.geometry?.location?.lng(),
       source: 'google',
@@ -341,10 +321,17 @@ export function AddressInput({
       autocompleteRef.current = new google.maps.places.Autocomplete(inputRef.current, {
         types: ['address'],
         componentRestrictions: { country: countries },
-        fields: ['address_components', 'formatted_address', 'geometry'],
+        fields: ['address_components', 'formatted_address', 'geometry', 'place_id'],
       });
 
-      // Listen for place selection
+      if (biasCenter) {
+        const circle = new google.maps.Circle({
+          center: biasCenter,
+          radius: biasRadiusMeters,
+        });
+        autocompleteRef.current.setBounds(circle.getBounds() as google.maps.LatLngBounds);
+      }
+
       autocompleteRef.current.addListener('place_changed', handlePlaceChanged);
     } catch (error) {
       console.error('Failed to initialize autocomplete:', error);
@@ -355,7 +342,7 @@ export function AddressInput({
         google.maps.event.clearInstanceListeners(autocompleteRef.current);
       }
     };
-  }, [apiReady, disabled, handlePlaceChanged, countries]);
+  }, [apiReady, disabled, handlePlaceChanged, countries, biasCenter, biasRadiusMeters]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (onChange) {
