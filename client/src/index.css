@@ -3,25 +3,25 @@
 @tailwind utilities;
 
 :root {
-  --background: hsl(0 0% 100%);
-  --foreground: hsl(222 84% 4.9%);
+  --background: hsl(220 14% 96%);
+  --foreground: hsl(220 26% 30%);
   --card: hsl(0 0% 100%);
-  --card-foreground: hsl(222 84% 4.9%);
+  --card-foreground: hsl(220 26% 30%);
   --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(222 84% 4.9%);
-  --primary: hsl(221 83% 35%);
-  --primary-foreground: hsl(210 40% 98%);
-  --secondary: hsl(214 32% 91%);
-  --secondary-foreground: hsl(222 84% 4.9%);
-  --muted: hsl(210 40% 96%);
-  --muted-foreground: hsl(215 16% 46%);
-  --accent: hsl(210 40% 96%);
-  --accent-foreground: hsl(222 84% 4.9%);
+  --popover-foreground: hsl(220 26% 30%);
+  --primary: hsl(168 64% 47%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(220 14% 96%);
+  --secondary-foreground: hsl(220 26% 30%);
+  --muted: hsl(220 14% 96%);
+  --muted-foreground: hsl(220 13% 46%);
+  --accent: hsl(220 26% 30%);
+  --accent-foreground: hsl(0 0% 100%);
   --destructive: hsl(0 84% 60%);
-  --destructive-foreground: hsl(210 40% 98%);
-  --border: hsl(214 32% 91%);
-  --input: hsl(214 32% 91%);
-  --ring: hsl(221 83% 35%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border: hsl(220 13% 90%);
+  --input: hsl(220 13% 90%);
+  --ring: hsl(168 64% 47%);
   --chart-1: hsl(221 83% 35%);
   --chart-2: hsl(159.7826 100% 36.0784%);
   --chart-3: hsl(42.0290 92.8251% 56.2745%);
@@ -45,7 +45,7 @@
   --sidebar-accent-foreground: hsl(221 83% 35%);
   --sidebar-border: hsl(205.0000 25.0000% 90.5882%);
   --sidebar-ring: hsl(221 83% 35%);
-  --font-sans: 'Nunito', 'Inter', system-ui, sans-serif;
+  --font-sans: 'Lato', 'Nunito', 'Inter', system-ui, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: 'JetBrains Mono', Menlo, monospace;
   --radius: 0.5rem;
@@ -59,6 +59,9 @@
   --shadow-2xl: 0 25px 50px -6px rgba(0, 0, 0, 0.15);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
+  --turno-teal: #29C2AF;
+  --turno-navy: #343E5C;
+  --turno-bg: #EFEFF4;
 }
 
 .dark {
