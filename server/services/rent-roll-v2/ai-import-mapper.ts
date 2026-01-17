@@ -8,11 +8,14 @@ import {
   ImportFieldDefinition,
 } from "@shared/rent-roll-import-schema";
 
-const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
+// Use Replit AI Integrations - provides OpenAI-compatible API access
+const openai = new OpenAI({
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+});
 
-const AI_ENABLED = !!openai;
+// Check if AI integrations are properly configured
+const AI_ENABLED = !!(process.env.AI_INTEGRATIONS_OPENAI_BASE_URL && process.env.AI_INTEGRATIONS_OPENAI_API_KEY);
 
 export class AIImportMapper {
   async suggestColumnMappings(
