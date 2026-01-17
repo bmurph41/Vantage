@@ -32,7 +32,7 @@ The platform uses React 18 with TypeScript and Wouter for routing. The UI is bui
 ### Technical Implementations
 - **Frontend**: React 18, TypeScript, Wouter, TanStack Query, React Hook Form with Zod.
 - **Backend**: Express.js with TypeScript, RESTful API, Drizzle ORM.
-- **Authentication**: Session-based, multi-tenant with PostgreSQL, RBAC, Zod validation, SQL injection prevention, audit trails.
+- **Authentication**: Session-based, multi-tenant with PostgreSQL, RBAC, Zod validation, SQL injection prevention, audit trails. Includes email verification via SendGrid, magic link login (15min expiry), and password-free authentication options. Phone/SMS verification can be added later via Twilio (user dismissed integration setup).
 - **Data Modeling**: Multi-case modeling with database-backed scenarios, Addbacks system for EBITDA normalization, and a Financial Kernel for enterprise-grade financial data (feature-flagged).
 - **Document Processing**: P&L Pipeline V2 for document extraction with human-in-the-loop review, OCR and LLM classification abstraction layers, and a marina-specific Chart of Accounts. Rent Roll Document Parser (`server/services/rent-roll-document-parser.ts`) provides unified CSV/Excel/PDF parsing with AI-powered extraction and heuristic fallbacks for QuickBooks, transaction reports, and marina-specific formats.
 - **Content Aggregation**: DockTalk 2.0 for industry intelligence with an institutional-grade scraper (feature-flagged) and Listing Ingestion V2 for robust listing aggregation (feature-flagged).
