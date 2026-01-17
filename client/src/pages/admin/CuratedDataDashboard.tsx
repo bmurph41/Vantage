@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import MainLayout from "@/components/layout/MainLayout";
@@ -74,6 +75,18 @@ const PACKS = [
 
 export default function CuratedDataDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
+  const { user } = useAuth();
+  
+  // Admin role check
+  if (user?.role !== "owner" && !user?.isAdmin) {
+    return (
+      <MainLayout title="Access Denied">
+        <div className="text-center py-12">
+          <p className="text-lg text-muted-foreground">You need admin privileges to access this page.</p>
+        </div>
+      </MainLayout>
+    );
+  }
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newStandard, setNewStandard] = useState<Partial<IndustryStandard>>({
     category: "occupancy",

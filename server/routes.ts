@@ -52,7 +52,7 @@ import aiAssistantRoutes from "./routes/ai-assistant-routes";
 import executiveDashboardRoutes from "./routes/executive-dashboard-routes";
 import marinaCompRoutes from "./routes/marina-comp-routes";
 import valuationTimelineRoutes from "./routes/valuation-timeline-routes";
-import { userSessions, insertProspectingEntrySchema, users, salesComps, rateComps } from "@shared/schema";
+import { userSessions, insertProspectingEntrySchema, users, salesComps, rateComps, industryStandards } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { rentRollService } from "./services/rent-roll-service";
 import { marketingService } from "./services/marketing-service";
@@ -25973,6 +25973,45 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   });
 
 
+
+  // Industry Standards - Public API (pack-gated access)
+  // Industry Standards - Public API (pack-gated access)
+  app.get('/api/industry-standards', authenticateUser, enforceTenant, async (req: any, res) => {
+    try {
+      const { category, region, year } = req.query;
+      const userPacks = req.user?.packs || [];
+      
+      const conditions = [eq(industryStandards.scope, "global")];
+      
+      if (category) {
+        conditions.push(eq(industryStandards.category, category as string));
+      }
+      if (region) {
+        conditions.push(eq(industryStandards.region, region as string));
+      }
+      if (year) {
+        conditions.push(eq(industryStandards.effectiveYear, parseInt(year as string)));
+      }
+
+      const allStandards = await db
+        .select()
+        .from(industryStandards)
+        .where(and(...conditions))
+        .orderBy(desc(industryStandards.effectiveYear), industryStandards.category)
+        .limit(200);
+
+      // Filter by pack access - only return standards where user has the required pack
+      const accessibleStandards = allStandards.filter(std => {
+        if (!std.requiredPack) return true; // No pack required
+        return userPacks.includes(std.requiredPack) || req.user?.role === 'owner';
+      });
+
+      res.json(accessibleStandards);
+    } catch (error) {
+      console.error("Error fetching industry standards:", error);
+      res.status(500).json({ error: "Failed to fetch industry standards" });
+    }
+  });
   app.get('/api/rate-comps/ids', async (req: any, res) => {
     try {
       const orgId = req.user.orgId;

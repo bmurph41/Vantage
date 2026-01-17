@@ -187,6 +187,7 @@ const SalesCompsPendingProfiles = lazy(() => import("@/pages/analysis/sales-comp
 const ScProjectsIndex = lazy(() => import("@/pages/analysis/projects/Index"));
 const ScProjectsReport = lazy(() => import("@/pages/analysis/projects/Report"));
 const RateCompsIndex = lazy(() => import("@/pages/analysis/rate-comps/Index"));
+const IndustryStandards = lazy(() => import("@/pages/analysis/IndustryStandards"));
 const RateCompsAnalytics = lazy(() => import("@/pages/analysis/rate-comps/Analytics"));
 const RateCompsDetail = lazy(() => import("@/pages/analysis/rate-comps/Detail"));
 const RateCompsUpload = lazy(() => import("@/pages/analysis/rate-comps/Upload"));
@@ -421,9 +422,11 @@ function Router() {
         )}
       </Route>
       <Route path="/admin/curated-data">
-        <ProtectedRoute requireAuth={true}>
+        {() => (
+          <UnifiedLayout>
           <CuratedDataDashboard />
-        </ProtectedRoute>
+          </UnifiedLayout>
+        )}
       </Route>
       <Route path="/admin/account-mapping">
         {() => (
@@ -1486,6 +1489,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <RateCompsIndex />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/industry-standards">
+        {() => (
+          <UnifiedLayout>
+          <IndustryStandards />
           </UnifiedLayout>
         )}
       </Route>
