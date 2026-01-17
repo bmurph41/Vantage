@@ -72,13 +72,14 @@ function getMigrationChecklist(integration: IntegrationItem) {
 
 export default function MigrationDashboard() {
   const [, setLocation] = useLocation();
-  const { data: integrations, isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["integrations"],
     queryFn: fetchIntegrations,
   });
 
-  const connectedIntegrations = integrations?.filter((i) => i.status === "connected") || [];
-  const availableIntegrations = integrations?.filter((i) => i.status !== "connected") || [];
+  const integrations = data?.items || [];
+  const connectedIntegrations = integrations.filter((i) => i.status === "connected");
+  const availableIntegrations = integrations.filter((i) => i.status !== "connected");
   
   const totalProgress = connectedIntegrations.length > 0
     ? connectedIntegrations.reduce((sum, i) => sum + getPhaseProgress(i), 0) / connectedIntegrations.length
