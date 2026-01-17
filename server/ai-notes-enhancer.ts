@@ -1,7 +1,11 @@
 import OpenAI from "openai";
 import type { Project, DDTask } from "@shared/schema";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Use Replit AI Integrations if available (billed to Replit credits), otherwise fall back to user's OpenAI key
+const openai = new OpenAI({ 
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || undefined,
+});
 
 interface NotesEnhancementResult {
   enhancedNarrative: string;
@@ -24,7 +28,7 @@ export class AINotesEnhancer {
    * Enhance user's notes into a compelling executive narrative
    */
   async enhanceNotes(context: NotesContext): Promise<NotesEnhancementResult> {
-    if (!process.env.OPENAI_API_KEY) {
+    if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY && !process.env.OPENAI_API_KEY) {
       throw new Error('OpenAI API key not configured');
     }
 

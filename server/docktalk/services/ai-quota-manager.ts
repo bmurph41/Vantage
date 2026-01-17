@@ -3,14 +3,20 @@ let lastQuotaCheck: Date | null = null;
 let consecutiveFailures = 0;
 let lastRequestTime = 0;
 let backoffMs = 0;
+let lastLogTime = 0;
 
 const MIN_REQUEST_INTERVAL_MS = 500;
 const MAX_BACKOFF_MS = 30 * 60 * 1000;
 const BASE_BACKOFF_MS = 5000;
-const MAX_CONSECUTIVE_FAILURES = 10;
+const MAX_CONSECUTIVE_FAILURES = 5;
+const LOG_COOLDOWN_MS = 60000;
+
+function hasAICredentials(): boolean {
+  return !!(process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY);
+}
 
 export function shouldSkipAIFeatures(): boolean {
-  if (!process.env.OPENAI_API_KEY) {
+  if (!hasAICredentials()) {
     return true;
   }
   if (openAIQuotaExhausted && lastQuotaCheck) {
@@ -46,18 +52,24 @@ export function reportOpenAISuccess(): void {
 
 export function reportOpenAIQuotaExhausted(): void {
   consecutiveFailures++;
+  const now = Date.now();
+  const shouldLog = now - lastLogTime > LOG_COOLDOWN_MS;
   
   if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
     if (!openAIQuotaExhausted) {
       openAIQuotaExhausted = true;
       lastQuotaCheck = new Date();
       console.log('[AI Quota] OpenAI quota exhausted after', consecutiveFailures, 'failures - AI features paused for 2 hours');
+      lastLogTime = now;
     }
     return;
   }
   
   backoffMs = Math.min(MAX_BACKOFF_MS, BASE_BACKOFF_MS * Math.pow(2, consecutiveFailures - 1));
-  console.log('[AI Quota] OpenAI rate limit hit - backing off for', Math.round(backoffMs / 1000), 'seconds');
+  if (shouldLog) {
+    console.log('[AI Quota] OpenAI rate limit hit - backing off for', Math.round(backoffMs / 1000), 'seconds');
+    lastLogTime = now;
+  }
 }
 
 export function getQuotaStatus(): { 

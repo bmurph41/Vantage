@@ -3,7 +3,11 @@ import * as cheerio from "cheerio";
 import { smartFetch, SmartFetchResult } from "./headless-fetcher";
 import { extractListingsWithDOM } from "./dom-extractor";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Use Replit AI Integrations if available (billed to Replit credits), otherwise fall back to user's OpenAI key
+const openai = new OpenAI({ 
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || undefined,
+});
 
 function isOpenAIRateLimitError(error: any): boolean {
   if (!error) return false;

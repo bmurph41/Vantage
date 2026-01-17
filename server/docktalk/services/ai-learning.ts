@@ -3,7 +3,11 @@ import { db } from "../db";
 import { articles as articlesTable, articleRemovalPatterns } from "@shared/docktalk-schema";
 import { eq, desc, isNotNull, sql, and, gte } from "drizzle-orm";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Use Replit AI Integrations if available (billed to Replit credits), otherwise fall back to user's OpenAI key
+const openai = new OpenAI({ 
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || undefined,
+});
 
 export interface LearningInsights {
   categoryPatterns: CategoryPattern[];

@@ -1,8 +1,11 @@
 import OpenAI from "openai";
 import type { Risk, DDTask, Project } from "@shared/schema";
 
-// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Use Replit AI Integrations if available (billed to Replit credits), otherwise fall back to user's OpenAI key
+const openai = new OpenAI({ 
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || undefined,
+});
 
 interface RiskAnalysisResult {
   overallRiskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
@@ -31,7 +34,7 @@ export class AIRiskAnalyzer {
    * Analyze risks using AI to provide intelligent insights
    */
   async analyzeRisks(context: RiskContext): Promise<RiskAnalysisResult> {
-    if (!process.env.OPENAI_API_KEY) {
+    if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY && !process.env.OPENAI_API_KEY) {
       throw new Error('OpenAI API key not configured');
     }
 

@@ -3,7 +3,7 @@ import { db } from "../db";
 import { articles as articlesTable } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 import { analyzeLearningPatterns, buildEnhancedTrainingContext } from "./ai-learning";
-import { reportOpenAIQuotaExhausted, shouldSkipAIFeatures } from "./ai-quota-manager";
+import { reportOpenAIQuotaExhausted, shouldSkipAIFeatures, reportOpenAISuccess } from "./ai-quota-manager";
 
 export interface CategoryResult {
   categories: string[];
@@ -45,8 +45,11 @@ export function invalidateCategorizerCache(): void {
   enhancedTrainingContextCache = "";
 }
 
-// This is using OpenAI's API, which points to OpenAI's API servers and requires your own API key.
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Use Replit AI Integrations if available (billed to Replit credits), otherwise fall back to user's OpenAI key
+const openai = new OpenAI({ 
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || undefined,
+});
 
 async function aiCategorizeAndTag(title: string, content: string): Promise<CategoryResult> {
   if (shouldSkipAIFeatures()) {
