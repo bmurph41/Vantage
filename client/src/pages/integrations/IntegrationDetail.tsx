@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRoute, Link } from "wouter";
+import { useRoute, Link, useLocation } from "wouter";
 import { 
   ArrowLeft, ExternalLink, Check, AlertCircle, Plug, Clock, 
   BookOpen, ArrowRight, Database, RefreshCw, Download, Upload
@@ -25,6 +25,7 @@ import {
 
 export default function IntegrationDetail() {
   const [, params] = useRoute("/settings/integrations/:key");
+  const [, setLocation] = useLocation();
   const key = params?.key || "";
   const qc = useQueryClient();
   const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
@@ -102,12 +103,10 @@ export default function IntegrationDetail() {
         <p className="text-muted-foreground mb-4">
           The integration you're looking for doesn't exist.
         </p>
-        <Link href="/settings/integrations">
-          <Button variant="outline">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Marketplace
-          </Button>
-        </Link>
+        <Button variant="outline" onClick={() => setLocation("/settings/integrations")}>
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Marketplace
+        </Button>
       </div>
     );
   }
@@ -121,11 +120,9 @@ export default function IntegrationDetail() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
-      <Link href="/settings/integrations">
-        <a className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4">
-          <ArrowLeft className="w-4 h-4 mr-1" />
-          Back to Marketplace
-        </a>
+      <Link href="/settings/integrations" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4">
+        <ArrowLeft className="w-4 h-4 mr-1" />
+        Back to Marketplace
       </Link>
 
       <div className="flex items-start gap-4 mb-6">

@@ -39,10 +39,8 @@ export function IntegrationCard({
               {integration.name.charAt(0)}
             </div>
             <div>
-              <Link href={`/settings/integrations/${integration.key}`}>
-                <a className="hover:underline">
-                  <CardTitle className="text-base">{integration.name}</CardTitle>
-                </a>
+              <Link href={`/settings/integrations/${integration.key}`} className="hover:underline">
+                <CardTitle className="text-base">{integration.name}</CardTitle>
               </Link>
               <div className="flex items-center gap-2 mt-1">
                 <StatusBadge status={integration.status} />

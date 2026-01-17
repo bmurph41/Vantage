@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link } from "wouter";
-import { Plug, Search, Grid, List, Anchor, Calendar, Wrench, MessageSquare, Calculator, ChevronRight } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { Plug, Search, Grid, List, Anchor, Calendar, Wrench, MessageSquare, Calculator, ChevronRight, ArrowRightLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -42,6 +42,7 @@ const CATEGORY_DESCRIPTIONS: Record<string, string> = {
 
 export default function IntegrationsMarketplace() {
   const qc = useQueryClient();
+  const [, setLocation] = useLocation();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -118,16 +119,22 @@ export default function IntegrationsMarketplace() {
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#1E4FAB] to-[#152d6b] flex items-center justify-center">
-            <Plug className="w-6 h-6 text-white" />
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#1E4FAB] to-[#152d6b] flex items-center justify-center">
+              <Plug className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold">Integrations Marketplace</h1>
+              <p className="text-muted-foreground">
+                Connect your marina software to consolidate operations in MarinaMatch
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold">Integrations Marketplace</h1>
-            <p className="text-muted-foreground">
-              Connect your marina software to consolidate operations in MarinaMatch
-            </p>
-          </div>
+          <Button variant="outline" onClick={() => setLocation("/settings/integrations/migration")}>
+            <ArrowRightLeft className="w-4 h-4 mr-2" />
+            Migration Dashboard
+          </Button>
         </div>
       </div>
 
@@ -295,10 +302,8 @@ export default function IntegrationsMarketplace() {
                   </li>
                 ))}
               </ol>
-              <Link href={`/settings/integrations/${selectedIntegration.key}`}>
-                <a className="text-sm text-[#1E4FAB] hover:underline flex items-center gap-1">
-                  View full setup guide <ChevronRight className="w-3 h-3" />
-                </a>
+              <Link href={`/settings/integrations/${selectedIntegration.key}`} className="text-sm text-[#1E4FAB] hover:underline flex items-center gap-1">
+                View full setup guide <ChevronRight className="w-3 h-3" />
               </Link>
             </div>
           )}
