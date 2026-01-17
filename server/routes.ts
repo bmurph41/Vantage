@@ -52,7 +52,7 @@ import aiAssistantRoutes from "./routes/ai-assistant-routes";
 import executiveDashboardRoutes from "./routes/executive-dashboard-routes";
 import marinaCompRoutes from "./routes/marina-comp-routes";
 import valuationTimelineRoutes from "./routes/valuation-timeline-routes";
-import { userSessions, insertProspectingEntrySchema, users } from "@shared/schema";
+import { userSessions, insertProspectingEntrySchema, users, salesComps, rateComps } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { rentRollService } from "./services/rent-roll-service";
 import { marketingService } from "./services/marketing-service";
@@ -11452,6 +11452,8 @@ Current context: Project ${req.params.projectId}`;
   app.get('/api/sales-comps', async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
+      const includeGlobal = req.query.includeGlobal === 'true';
+      const scopeFilter = req.query.scope as string | undefined; // 'all' | 'org' | 'global'
 
       res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.set('Pragma', 'no-cache');
@@ -11460,14 +11462,46 @@ Current context: Project ${req.params.projectId}`;
       const filters = compFiltersSchema.parse(req.query);
       const sqlFilters = filterBuilder.buildFilters(filters);
       
-      const { comps, total } = await storage.getComps({
-        orgId,
-        filters: sqlFilters,
-        sortBy: filters.sortBy,
-        sortDir: filters.sortDir,
-        page: filters.page,
-        pageSize: filters.pageSize,
-      });
+      // Fetch org-specific comps (unless filtering to global only)
+      let comps: any[] = [];
+      let total = 0;
+      
+      if (scopeFilter !== 'global') {
+        const orgResult = await storage.getComps({
+          orgId,
+          filters: sqlFilters,
+          sortBy: filters.sortBy,
+          sortDir: filters.sortDir,
+          page: filters.page,
+          pageSize: filters.pageSize,
+        });
+        comps = orgResult.comps.map((c: any) => ({ ...c, _source: 'org' }));
+        total = orgResult.total;
+      }
+      
+      // Include global curated comps if requested (users with Analysis pack)
+      if (includeGlobal || scopeFilter === 'all' || scopeFilter === 'global') {
+        try {
+          const globalComps = await db
+            .select()
+            .from(salesComps)
+            .where(eq(salesComps.scope, "global"))
+            .limit(filters.pageSize || 50);
+          
+          // Add source tag and merge
+          const taggedGlobal = globalComps.map((c: any) => ({ ...c, _source: 'global' }));
+          
+          if (scopeFilter === 'global') {
+            comps = taggedGlobal;
+            total = taggedGlobal.length;
+          } else {
+            comps = [...comps, ...taggedGlobal];
+            total += taggedGlobal.length;
+          }
+        } catch (globalErr) {
+          console.warn("Could not fetch global comps:", globalErr);
+        }
+      }
 
       res.json({ comps, total, page: filters.page, pageSize: filters.pageSize });
     } catch (error: any) {
@@ -11475,6 +11509,7 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ message: "Failed to fetch comps" });
     }
   });
+
 
   app.get('/api/sales-comps/ids', async (req: any, res) => {
     try {
@@ -25879,6 +25914,8 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   app.get('/api/rate-comps', async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
+      const includeGlobal = req.query.includeGlobal === 'true';
+      const scopeFilter = req.query.scope as string | undefined; // 'all' | 'org' | 'global'
 
       res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.set('Pragma', 'no-cache');
@@ -25887,14 +25924,46 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const filters = compFiltersSchema.parse(req.query);
       const sqlFilters = rcFilterBuilder.buildFilters(filters);
       
-      const { comps, total } = await storage.getRateComps({
-        orgId,
-        filters: sqlFilters,
-        sortBy: filters.sortBy,
-        sortDir: filters.sortDir,
-        page: filters.page,
-        pageSize: filters.pageSize,
-      });
+      // Fetch org-specific comps (unless filtering to global only)
+      let comps: any[] = [];
+      let total = 0;
+      
+      if (scopeFilter !== 'global') {
+        const orgResult = await storage.getRateComps({
+          orgId,
+          filters: sqlFilters,
+          sortBy: filters.sortBy,
+          sortDir: filters.sortDir,
+          page: filters.page,
+          pageSize: filters.pageSize,
+        });
+        comps = orgResult.comps.map((c: any) => ({ ...c, _source: 'org' }));
+        total = orgResult.total;
+      }
+      
+      // Include global curated comps if requested (users with Analysis pack)
+      if (includeGlobal || scopeFilter === 'all' || scopeFilter === 'global') {
+        try {
+          const globalComps = await db
+            .select()
+            .from(rateComps)
+            .where(eq(rateComps.scope, "global"))
+            .limit(filters.pageSize || 50);
+          
+          // Add source tag and merge
+          const taggedGlobal = globalComps.map((c: any) => ({ ...c, _source: 'global' }));
+          
+          if (scopeFilter === 'global') {
+            comps = taggedGlobal;
+            total = taggedGlobal.length;
+          } else {
+            comps = [...comps, ...taggedGlobal];
+            total += taggedGlobal.length;
+          }
+        } catch (globalErr) {
+          console.warn("Could not fetch global rate comps:", globalErr);
+        }
+      }
 
       res.json({ comps, total, page: filters.page, pageSize: filters.pageSize });
     } catch (error: any) {
@@ -25902,6 +25971,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       res.status(500).json({ message: "Failed to fetch rate comps" });
     }
   });
+
 
   app.get('/api/rate-comps/ids', async (req: any, res) => {
     try {
