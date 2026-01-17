@@ -15,14 +15,18 @@ export async function seedIntegrations(): Promise<void> {
           .set({
             name: item.name,
             description: item.description,
-            categories: item.categories,
+            category: item.category,
             contexts: item.contexts,
             uiPlacements: item.uiPlacements,
             authType: item.authType as any,
             websiteUrl: item.websiteUrl,
             iconUrl: item.iconUrl,
+            logoColor: item.logoColor,
             capabilities: item.capabilities,
             settingsSchema: item.settingsSchema,
+            connectionGuide: item.connectionGuide,
+            dataMappings: item.dataMappings,
+            migrationSupport: item.migrationSupport,
             updatedAt: new Date(),
           })
           .where(eq(integrations.key, item.key));
@@ -31,14 +35,18 @@ export async function seedIntegrations(): Promise<void> {
           key: item.key,
           name: item.name,
           description: item.description,
-          categories: item.categories,
+          category: item.category,
           contexts: item.contexts,
           uiPlacements: item.uiPlacements,
           authType: item.authType as any,
           websiteUrl: item.websiteUrl,
           iconUrl: item.iconUrl,
+          logoColor: item.logoColor,
           capabilities: item.capabilities,
           settingsSchema: item.settingsSchema,
+          connectionGuide: item.connectionGuide,
+          dataMappings: item.dataMappings,
+          migrationSupport: item.migrationSupport,
         });
       }
     } catch (error) {

@@ -9,6 +9,7 @@ import { startDockTalkCronJobs } from "./docktalk/cron-jobs";
 import { DatabaseStorage as DockTalkStorage } from "./docktalk/storage";
 import { initializeWebSocket } from "./docktalk/websocket";
 import { startMarinaMatchIntelCronJobs } from "./marinamatch/services/intel-cron";
+import { seedIntegrations } from "./integrations";
 
 import { configureSecurityMiddleware } from "./middleware/security";
 import { requestIdMiddleware, requestLoggingMiddleware } from "./middleware/logging";
@@ -140,6 +141,10 @@ app.get("/health/db", (req: Request, res: Response) => {
       }
 
       // Async services - run in background without awaiting
+      seedIntegrations()
+        .then(() => log('Integration catalog seeded'))
+        .catch((error) => log(`Failed to seed integrations: ${error}`));
+
       reconciliationService.start()
         .then(() => log('Document reconciliation service started'))
         .catch((error) => log(`Failed to start document reconciliation service: ${error}`));

@@ -20710,12 +20710,13 @@ export const integrations = pgTable("integrations", {
   key: varchar("key").notNull().unique(),
   name: varchar("name").notNull(),
   description: text("description"),
-  categories: jsonb("categories").$type<string[]>().default([]).notNull(),
+  category: varchar("category").notNull().default("Marina PMS"),
   contexts: jsonb("contexts").$type<string[]>().default([]).notNull(),
   uiPlacements: jsonb("ui_placements").$type<string[]>().default([]).notNull(),
   authType: integrationAuthTypeEnum("auth_type").default("none").notNull(),
   websiteUrl: text("website_url"),
   iconUrl: text("icon_url"),
+  logoColor: varchar("logo_color"),
   capabilities: jsonb("capabilities").$type<{
     dataRead: string[];
     dataWrite: string[];
@@ -20732,11 +20733,34 @@ export const integrations = pgTable("integrations", {
       helpText?: string;
     }>;
   }>().default({ fields: [] }).notNull(),
+  connectionGuide: jsonb("connection_guide").$type<{
+    overview: string;
+    prerequisites: string[];
+    steps: Array<{ title: string; description: string; screenshot?: string }>;
+    supportUrl?: string;
+    apiDocsUrl?: string;
+    estimatedTime: string;
+  } | null>().default(null),
+  dataMappings: jsonb("data_mappings").$type<Array<{
+    sourceEntity: string;
+    targetModule: string;
+    targetEntity: string;
+    fields: Array<{ source: string; target: string; transform?: string }>;
+    syncDirection: "read" | "write" | "bidirectional";
+    frequency: "realtime" | "hourly" | "daily" | "weekly" | "manual";
+  }>>().default([]),
+  migrationSupport: jsonb("migration_support").$type<{
+    canExportAll: boolean;
+    supportsHistoricalImport: boolean;
+    migrationComplexity: "low" | "medium" | "high";
+    estimatedMigrationDays: number;
+  } | null>().default(null),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
   keyIdx: index("integrations_key_idx").on(table.key),
+  categoryIdx: index("integrations_category_idx").on(table.category),
   contextsIdx: index("integrations_contexts_idx").on(table.contexts),
   activeIdx: index("integrations_active_idx").on(table.isActive),
 }));

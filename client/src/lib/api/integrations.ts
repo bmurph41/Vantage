@@ -16,18 +16,55 @@ export interface SettingsField {
   helpText?: string;
 }
 
+export interface ConnectionGuide {
+  overview: string;
+  prerequisites: string[];
+  steps: Array<{
+    title: string;
+    description: string;
+    screenshot?: string;
+  }>;
+  supportUrl?: string;
+  apiDocsUrl?: string;
+  estimatedTime: string;
+}
+
+export interface DataMapping {
+  sourceEntity: string;
+  targetModule: string;
+  targetEntity: string;
+  fields: Array<{
+    source: string;
+    target: string;
+    transform?: string;
+  }>;
+  syncDirection: "read" | "write" | "bidirectional";
+  frequency: "realtime" | "hourly" | "daily" | "weekly" | "manual";
+}
+
+export interface MigrationSupport {
+  canExportAll: boolean;
+  supportsHistoricalImport: boolean;
+  migrationComplexity: "low" | "medium" | "high";
+  estimatedMigrationDays: number;
+}
+
 export interface IntegrationItem {
   key: string;
   name: string;
   description: string | null;
-  categories: string[];
+  category: string;
   contexts: string[];
   uiPlacements?: string[];
   authType: "oauth" | "apiKey" | "none";
   websiteUrl: string | null;
   iconUrl: string | null;
+  logoColor?: string | null;
   capabilities: IntegrationCapabilities;
   settingsSchema: { fields: SettingsField[] };
+  connectionGuide?: ConnectionGuide | null;
+  dataMappings?: DataMapping[];
+  migrationSupport?: MigrationSupport | null;
   status: "available" | "connected" | "pending" | "error";
   lastSyncAt?: string | null;
   errorMessage?: string | null;

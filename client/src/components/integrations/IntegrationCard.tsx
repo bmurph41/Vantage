@@ -1,4 +1,5 @@
-import { ExternalLink, Settings } from "lucide-react";
+import { Link } from "wouter";
+import { ExternalLink, Settings, Clock, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "./StatusBadge";
@@ -22,29 +23,34 @@ export function IntegrationCard({
   isDisconnecting,
 }: IntegrationCardProps) {
   const isConnected = integration.status === "connected";
+  const logoStyle = integration.logoColor 
+    ? { background: integration.logoColor }
+    : undefined;
 
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#1E4FAB] to-[#152d6b] flex items-center justify-center text-white font-semibold text-sm">
+            <div 
+              className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#1E4FAB] to-[#152d6b] flex items-center justify-center text-white font-semibold text-sm"
+              style={logoStyle}
+            >
               {integration.name.charAt(0)}
             </div>
             <div>
-              <CardTitle className="text-base">{integration.name}</CardTitle>
+              <Link href={`/settings/integrations/${integration.key}`}>
+                <a className="hover:underline">
+                  <CardTitle className="text-base">{integration.name}</CardTitle>
+                </a>
+              </Link>
               <div className="flex items-center gap-2 mt-1">
                 <StatusBadge status={integration.status} />
-                {integration.websiteUrl && (
-                  <a
-                    href={integration.websiteUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1"
-                  >
-                    <ExternalLink className="w-3 h-3" />
-                    Website
-                  </a>
+                {integration.connectionGuide?.estimatedTime && !isConnected && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {integration.connectionGuide.estimatedTime}
+                  </span>
                 )}
               </div>
             </div>
@@ -52,18 +58,13 @@ export function IntegrationCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        <CardDescription className="text-sm">{integration.description}</CardDescription>
+        <CardDescription className="text-sm line-clamp-2">{integration.description}</CardDescription>
 
-        {integration.categories && integration.categories.length > 0 && (
+        {integration.category && (
           <div className="flex flex-wrap gap-1">
-            {integration.categories.map((cat) => (
-              <span
-                key={cat}
-                className="px-2 py-0.5 bg-muted rounded text-xs text-muted-foreground"
-              >
-                {cat}
-              </span>
-            ))}
+            <span className="px-2 py-0.5 bg-muted rounded text-xs text-muted-foreground">
+              {integration.category}
+            </span>
           </div>
         )}
 

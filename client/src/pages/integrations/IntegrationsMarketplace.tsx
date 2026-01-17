@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plug, Search, Filter, Grid, List } from "lucide-react";
+import { Link } from "wouter";
+import { Plug, Search, Grid, List, Anchor, Calendar, Wrench, MessageSquare, Calculator, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,30 @@ import {
   disconnectIntegration,
   type IntegrationItem,
 } from "@/lib/api/integrations";
+
+const CATEGORY_ORDER = [
+  "Marina PMS",
+  "Reservations & Booking",
+  "Service & Maintenance",
+  "Communications",
+  "Accounting",
+];
+
+const CATEGORY_ICONS: Record<string, any> = {
+  "Marina PMS": Anchor,
+  "Reservations & Booking": Calendar,
+  "Service & Maintenance": Wrench,
+  "Communications": MessageSquare,
+  "Accounting": Calculator,
+};
+
+const CATEGORY_DESCRIPTIONS: Record<string, string> = {
+  "Marina PMS": "Property management systems for slip inventory, tenants, and billing",
+  "Reservations & Booking": "Online booking platforms and slip marketplaces",
+  "Service & Maintenance": "Work orders, boat handling, and yard management",
+  "Communications": "Tenant messaging, access control, and notifications",
+  "Accounting": "Financial systems, invoicing, and payment processing",
+};
 
 export default function IntegrationsMarketplace() {
   const qc = useQueryClient();
@@ -69,7 +93,9 @@ export default function IntegrationsMarketplace() {
 
   const items = data?.items ?? [];
   
-  const allCategories = [...new Set(items.flatMap((i) => i.categories))].sort();
+  const allCategories = CATEGORY_ORDER.filter(cat => 
+    items.some(i => i.category === cat)
+  );
 
   const filteredItems = items.filter((item) => {
     const matchesSearch =
@@ -77,23 +103,32 @@ export default function IntegrationsMarketplace() {
       item.name.toLowerCase().includes(search.toLowerCase()) ||
       item.description?.toLowerCase().includes(search.toLowerCase());
     const matchesCategory =
-      categoryFilter === "all" || item.categories.includes(categoryFilter);
+      categoryFilter === "all" || item.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
 
   const connectedItems = filteredItems.filter((i) => i.status === "connected");
   const availableItems = filteredItems.filter((i) => i.status !== "connected");
 
+  const groupedByCategory = CATEGORY_ORDER.reduce((acc, cat) => {
+    acc[cat] = filteredItems.filter(i => i.category === cat);
+    return acc;
+  }, {} as Record<string, IntegrationItem[]>);
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <div className="mb-6">
+      <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
-          <Plug className="w-8 h-8 text-[#1E4FAB]" />
-          <h1 className="text-2xl font-bold">Integrations Marketplace</h1>
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#1E4FAB] to-[#152d6b] flex items-center justify-center">
+            <Plug className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">Integrations Marketplace</h1>
+            <p className="text-muted-foreground">
+              Connect your marina software to consolidate operations in MarinaMatch
+            </p>
+          </div>
         </div>
-        <p className="text-muted-foreground">
-          Connect third-party tools and services to enhance your marina management workflow.
-        </p>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -106,20 +141,6 @@ export default function IntegrationsMarketplace() {
             className="pl-9"
           />
         </div>
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[180px]">
-            <Filter className="w-4 h-4 mr-2" />
-            <SelectValue placeholder="All Categories" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            {allCategories.map((cat) => (
-              <SelectItem key={cat} value={cat}>
-                {cat}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
         <div className="flex border rounded-md">
           <Button
             variant={viewMode === "grid" ? "secondary" : "ghost"}
@@ -136,6 +157,33 @@ export default function IntegrationsMarketplace() {
             <List className="w-4 h-4" />
           </Button>
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-6">
+        <Button
+          variant={categoryFilter === "all" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setCategoryFilter("all")}
+          className={categoryFilter === "all" ? "bg-[#1E4FAB] hover:bg-[#1a4294]" : ""}
+        >
+          All ({items.length})
+        </Button>
+        {allCategories.map((cat) => {
+          const Icon = CATEGORY_ICONS[cat] || Plug;
+          const count = items.filter(i => i.category === cat).length;
+          return (
+            <Button
+              key={cat}
+              variant={categoryFilter === cat ? "default" : "outline"}
+              size="sm"
+              onClick={() => setCategoryFilter(cat)}
+              className={categoryFilter === cat ? "bg-[#1E4FAB] hover:bg-[#1a4294]" : ""}
+            >
+              <Icon className="w-4 h-4 mr-1" />
+              {cat} ({count})
+            </Button>
+          );
+        })}
       </div>
 
       <Tabs defaultValue="all" className="space-y-4">
@@ -160,14 +208,46 @@ export default function IntegrationsMarketplace() {
         ) : (
           <>
             <TabsContent value="all">
-              <IntegrationGrid
-                items={filteredItems}
-                viewMode={viewMode}
-                onConnect={handleConnect}
-                onDisconnect={(item) => disconnectMut.mutate(item.key)}
-                isConnecting={connectMut.isPending}
-                isDisconnecting={disconnectMut.isPending}
-              />
+              {categoryFilter === "all" ? (
+                <div className="space-y-8">
+                  {CATEGORY_ORDER.map((cat) => {
+                    const catItems = groupedByCategory[cat] || [];
+                    if (catItems.length === 0) return null;
+                    const Icon = CATEGORY_ICONS[cat] || Plug;
+                    return (
+                      <div key={cat}>
+                        <div className="flex items-center gap-2 mb-3">
+                          <Icon className="w-5 h-5 text-[#1E4FAB]" />
+                          <h2 className="text-lg font-semibold">{cat}</h2>
+                          <span className="text-sm text-muted-foreground">
+                            ({catItems.length})
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          {CATEGORY_DESCRIPTIONS[cat]}
+                        </p>
+                        <IntegrationGrid
+                          items={catItems}
+                          viewMode={viewMode}
+                          onConnect={handleConnect}
+                          onDisconnect={(item) => disconnectMut.mutate(item.key)}
+                          isConnecting={connectMut.isPending}
+                          isDisconnecting={disconnectMut.isPending}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <IntegrationGrid
+                  items={filteredItems}
+                  viewMode={viewMode}
+                  onConnect={handleConnect}
+                  onDisconnect={(item) => disconnectMut.mutate(item.key)}
+                  isConnecting={connectMut.isPending}
+                  isDisconnecting={disconnectMut.isPending}
+                />
+              )}
             </TabsContent>
             <TabsContent value="connected">
               <IntegrationGrid
@@ -194,14 +274,36 @@ export default function IntegrationsMarketplace() {
       </Tabs>
 
       <Dialog open={apiKeyDialogOpen} onOpenChange={setApiKeyDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Connect {selectedIntegration?.name}</DialogTitle>
             <DialogDescription>
               Enter your API key to connect this integration. Your key will be stored securely with encryption.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          
+          {selectedIntegration?.connectionGuide && (
+            <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+              <h4 className="font-medium text-sm">Quick Setup Guide</h4>
+              <ol className="space-y-2">
+                {selectedIntegration.connectionGuide.steps.slice(0, 3).map((step, idx) => (
+                  <li key={idx} className="flex gap-2 text-sm">
+                    <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[#1E4FAB] text-white text-xs flex items-center justify-center">
+                      {idx + 1}
+                    </span>
+                    <span className="text-muted-foreground">{step.description}</span>
+                  </li>
+                ))}
+              </ol>
+              <Link href={`/settings/integrations/${selectedIntegration.key}`}>
+                <a className="text-sm text-[#1E4FAB] hover:underline flex items-center gap-1">
+                  View full setup guide <ChevronRight className="w-3 h-3" />
+                </a>
+              </Link>
+            </div>
+          )}
+          
+          <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label htmlFor="apiKey">API Key</Label>
               <Input
