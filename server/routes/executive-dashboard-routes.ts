@@ -213,4 +213,107 @@ router.get("/seasonal-move-events", async (req: Request, res: Response, next: Ne
   }
 });
 
+// ============================================================================
+// KPI MODAL DETAIL ROUTES
+// ============================================================================
+
+router.get("/leases-by-project", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { startDate, endDate, projectType, projectIds, storageTypes } = req.query;
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "startDate and endDate are required" });
+    }
+    
+    const data = await rentRollService.getExecutiveLeasesByProject(
+      orgId,
+      startDate as string,
+      endDate as string,
+      {
+        projectType: projectType as string | undefined,
+        projectIds: projectIds ? (projectIds as string).split(',') : undefined,
+        storageTypes: storageTypes ? (storageTypes as string).split(',') : undefined,
+      }
+    );
+    res.json(data);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/revenue-by-project", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { startDate, endDate, projectType, projectIds, storageTypes } = req.query;
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "startDate and endDate are required" });
+    }
+    
+    const data = await rentRollService.getExecutiveRevenueByProject(
+      orgId,
+      startDate as string,
+      endDate as string,
+      {
+        projectType: projectType as string | undefined,
+        projectIds: projectIds ? (projectIds as string).split(',') : undefined,
+        storageTypes: storageTypes ? (storageTypes as string).split(',') : undefined,
+      }
+    );
+    res.json(data);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/revenue-by-month", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { startDate, endDate, projectType, projectIds, storageTypes } = req.query;
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "startDate and endDate are required" });
+    }
+    
+    const data = await rentRollService.getExecutiveRevenueByMonth(
+      orgId,
+      startDate as string,
+      endDate as string,
+      {
+        projectType: projectType as string | undefined,
+        projectIds: projectIds ? (projectIds as string).split(',') : undefined,
+        storageTypes: storageTypes ? (storageTypes as string).split(',') : undefined,
+      }
+    );
+    res.json(data);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/revenue-by-storage-type", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { startDate, endDate, projectType, projectIds } = req.query;
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "startDate and endDate are required" });
+    }
+    
+    const data = await rentRollService.getExecutiveRevenueByStorageTypeModal(
+      orgId,
+      startDate as string,
+      endDate as string,
+      {
+        projectType: projectType as string | undefined,
+        projectIds: projectIds ? (projectIds as string).split(',') : undefined,
+      }
+    );
+    res.json(data);
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

@@ -2376,6 +2376,522 @@ export async function getExecutiveDashboardMetrics(
   };
 }
 
+// ============================================================================
+// KPI MODAL DETAIL ENDPOINTS
+// ============================================================================
+
+export interface ProjectLeases {
+  projectId: string;
+  projectName: string;
+  projectType: "OWNED" | "DEAL";
+  activeLeases: number;
+  totalLeases: number;
+  vacantSlips: number;
+  unusableSlips: number;
+  notPayingSlips: number;
+}
+
+export interface ProjectRevenue {
+  projectId: string;
+  projectName: string;
+  projectType: "OWNED" | "DEAL";
+  revenue: string;
+  leaseCount: number;
+  percentage: number;
+}
+
+export interface MonthlyRevenue {
+  month: string;
+  revenue: string;
+  leaseCount: number;
+}
+
+export interface StorageTypeRevenue {
+  storageType: string;
+  revenue: string;
+  leaseCount: number;
+  percentage: number;
+}
+
+/**
+ * Get active leases breakdown by project for Active Leases Modal
+ */
+export async function getExecutiveLeasesByProject(
+  orgId: string,
+  startDate: string,
+  endDate: string,
+  filterOptions?: KpiFilterOptions & { storageTypes?: string[] }
+): Promise<ProjectLeases[]> {
+  const baseFilterCondition = buildProjectFilterConditions(marinaLocations, filterOptions);
+  const filterCondition = and(
+    eq(marinaLocations.orgId, orgId),
+    baseFilterCondition || sql`1=1`
+  );
+  
+  const hasStorageTypeFilter = filterOptions?.storageTypes && filterOptions.storageTypes.length > 0;
+  
+  const query = hasStorageTypeFilter
+    ? db
+        .select({
+          projectId: marinaLocations.id,
+          projectName: marinaLocations.name,
+          projectType: marinaLocations.projectType,
+          totalLeases: sql<number>`CAST(COUNT(*) AS INTEGER)`,
+          activeLeases: sql<number>`CAST(COALESCE(SUM(CASE 
+            WHEN (${leases.slipStatus} IS NULL OR ${leases.slipStatus} NOT IN ('Vacant', 'Unusable', 'Occupied; Not-Paying'))
+            THEN 1 ELSE 0 END), 0) AS INTEGER)`,
+          vacantSlips: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${leases.slipStatus} = 'Vacant' THEN 1 ELSE 0 END), 0) AS INTEGER)`,
+          unusableSlips: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${leases.slipStatus} = 'Unusable' THEN 1 ELSE 0 END), 0) AS INTEGER)`,
+          notPayingSlips: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${leases.slipStatus} = 'Occupied; Not-Paying' THEN 1 ELSE 0 END), 0) AS INTEGER)`,
+        })
+        .from(leases)
+        .innerJoin(marinaLocations, eq(leases.locationId, marinaLocations.id))
+        .innerJoin(storageLocations, eq(leases.storageLocationId, storageLocations.id))
+        .where(
+          and(
+            filterCondition,
+            eq(leases.isActive, true),
+            sql`(${leases.leaseCommencement} IS NULL OR ${leases.leaseCommencement} <= ${endDate})`,
+            sql`(${leases.leaseExpiration} IS NULL OR ${leases.leaseExpiration} >= ${startDate})`,
+            inArray(storageLocations.storageType, filterOptions.storageTypes!)
+          )
+        )
+        .groupBy(marinaLocations.id, marinaLocations.name, marinaLocations.projectType)
+    : db
+        .select({
+          projectId: marinaLocations.id,
+          projectName: marinaLocations.name,
+          projectType: marinaLocations.projectType,
+          totalLeases: sql<number>`CAST(COUNT(*) AS INTEGER)`,
+          activeLeases: sql<number>`CAST(COALESCE(SUM(CASE 
+            WHEN (${leases.slipStatus} IS NULL OR ${leases.slipStatus} NOT IN ('Vacant', 'Unusable', 'Occupied; Not-Paying'))
+            THEN 1 ELSE 0 END), 0) AS INTEGER)`,
+          vacantSlips: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${leases.slipStatus} = 'Vacant' THEN 1 ELSE 0 END), 0) AS INTEGER)`,
+          unusableSlips: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${leases.slipStatus} = 'Unusable' THEN 1 ELSE 0 END), 0) AS INTEGER)`,
+          notPayingSlips: sql<number>`CAST(COALESCE(SUM(CASE WHEN ${leases.slipStatus} = 'Occupied; Not-Paying' THEN 1 ELSE 0 END), 0) AS INTEGER)`,
+        })
+        .from(leases)
+        .innerJoin(marinaLocations, eq(leases.locationId, marinaLocations.id))
+        .where(
+          and(
+            filterCondition,
+            eq(leases.isActive, true),
+            sql`(${leases.leaseCommencement} IS NULL OR ${leases.leaseCommencement} <= ${endDate})`,
+            sql`(${leases.leaseExpiration} IS NULL OR ${leases.leaseExpiration} >= ${startDate})`
+          )
+        )
+        .groupBy(marinaLocations.id, marinaLocations.name, marinaLocations.projectType);
+
+  const results = await query;
+
+  return results.map(r => ({
+    projectId: r.projectId,
+    projectName: r.projectName || "Unknown",
+    projectType: r.projectType as "OWNED" | "DEAL",
+    activeLeases: r.activeLeases,
+    totalLeases: r.totalLeases,
+    vacantSlips: r.vacantSlips,
+    unusableSlips: r.unusableSlips,
+    notPayingSlips: r.notPayingSlips,
+  }));
+}
+
+/**
+ * Get revenue breakdown by project for Total Revenue Modal
+ */
+export async function getExecutiveRevenueByProject(
+  orgId: string,
+  startDate: string,
+  endDate: string,
+  filterOptions?: KpiFilterOptions & { storageTypes?: string[] }
+): Promise<ProjectRevenue[]> {
+  const baseFilterCondition = buildProjectFilterConditions(marinaLocations, filterOptions);
+  const filterCondition = and(
+    eq(marinaLocations.orgId, orgId),
+    baseFilterCondition || sql`1=1`
+  );
+  
+  const hasStorageTypeFilter = filterOptions?.storageTypes && filterOptions.storageTypes.length > 0;
+  
+  const query = hasStorageTypeFilter
+    ? db
+        .select({
+          projectId: marinaLocations.id,
+          projectName: marinaLocations.name,
+          projectType: marinaLocations.projectType,
+          leaseAmount: leases.leaseAmount,
+          rateType: leases.rateType,
+          numMonths: leases.numMonths,
+          contractTerm: leases.contractTerm,
+          leaseCommencement: leases.leaseCommencement,
+          leaseExpiration: leases.leaseExpiration,
+        })
+        .from(leases)
+        .innerJoin(marinaLocations, eq(leases.locationId, marinaLocations.id))
+        .innerJoin(storageLocations, eq(leases.storageLocationId, storageLocations.id))
+        .where(
+          and(
+            filterCondition,
+            eq(leases.isActive, true),
+            sql`(${leases.leaseCommencement} IS NULL OR ${leases.leaseCommencement} <= ${endDate})`,
+            sql`(${leases.leaseExpiration} IS NULL OR ${leases.leaseExpiration} >= ${startDate})`,
+            inArray(storageLocations.storageType, filterOptions.storageTypes!)
+          )
+        )
+    : db
+        .select({
+          projectId: marinaLocations.id,
+          projectName: marinaLocations.name,
+          projectType: marinaLocations.projectType,
+          leaseAmount: leases.leaseAmount,
+          rateType: leases.rateType,
+          numMonths: leases.numMonths,
+          contractTerm: leases.contractTerm,
+          leaseCommencement: leases.leaseCommencement,
+          leaseExpiration: leases.leaseExpiration,
+        })
+        .from(leases)
+        .innerJoin(marinaLocations, eq(leases.locationId, marinaLocations.id))
+        .where(
+          and(
+            filterCondition,
+            eq(leases.isActive, true),
+            sql`(${leases.leaseCommencement} IS NULL OR ${leases.leaseCommencement} <= ${endDate})`,
+            sql`(${leases.leaseExpiration} IS NULL OR ${leases.leaseExpiration} >= ${startDate})`
+          )
+        );
+
+  const leaseData = await query;
+
+  const isAnnualContract = (contractTerm: string | null): boolean => {
+    if (!contractTerm) return false;
+    const term = contractTerm.toLowerCase();
+    return term === 'annual' || term === 'yearly' || term === '12 month' || term === '12 months';
+  };
+  
+  const calculateEffectiveNumMonths = (
+    contractTerm: string | null,
+    numMonths: number | null,
+    leaseCommencement: string | null,
+    leaseExpiration: string | null
+  ): number => {
+    if (isAnnualContract(contractTerm)) return 12;
+    if (numMonths && numMonths > 0) return numMonths;
+    if (leaseCommencement && leaseExpiration) {
+      const start = new Date(leaseCommencement);
+      const end = new Date(leaseExpiration);
+      const yearDiff = end.getFullYear() - start.getFullYear();
+      const monthDiff = end.getMonth() - start.getMonth();
+      let months = yearDiff * 12 + monthDiff;
+      if (end.getDate() >= start.getDate()) months += 1;
+      return Math.max(1, months);
+    }
+    const term = (contractTerm || '').toLowerCase();
+    if (term.includes('summer') || term.includes('winter') || term.includes('seasonal')) return 6;
+    return 12;
+  };
+  
+  const isSeasonalOrAnnualRateType = (rateType: string | null | undefined): boolean => {
+    if (!rateType) return false;
+    const rt = rateType.toLowerCase();
+    return rt.includes('/season') || rt.includes('/yr') || rt.includes('/year') || 
+           rt.includes('per season') || rt.includes('per year') || rt === 'annual' ||
+           rt.includes('$/ft/season') || rt.includes('$/ft/yr');
+  };
+
+  const projectRevenueMap = new Map<string, { name: string; type: string; revenue: number; count: number }>();
+  
+  for (const lease of leaseData) {
+    const baseRent = lease.leaseAmount ? parseFloat(String(lease.leaseAmount)) : 0;
+    let leaseRevenue = 0;
+    
+    if (isSeasonalOrAnnualRateType(lease.rateType)) {
+      leaseRevenue = baseRent;
+    } else {
+      const effectiveMonths = calculateEffectiveNumMonths(
+        lease.contractTerm,
+        lease.numMonths,
+        lease.leaseCommencement,
+        lease.leaseExpiration
+      );
+      leaseRevenue = baseRent * effectiveMonths;
+    }
+    
+    const existing = projectRevenueMap.get(lease.projectId);
+    if (existing) {
+      existing.revenue += leaseRevenue;
+      existing.count += 1;
+    } else {
+      projectRevenueMap.set(lease.projectId, {
+        name: lease.projectName || "Unknown",
+        type: lease.projectType || "OWNED",
+        revenue: leaseRevenue,
+        count: 1,
+      });
+    }
+  }
+
+  const totalRevenue = Array.from(projectRevenueMap.values()).reduce((sum, p) => sum + p.revenue, 0);
+
+  return Array.from(projectRevenueMap.entries()).map(([id, data]) => ({
+    projectId: id,
+    projectName: data.name,
+    projectType: data.type as "OWNED" | "DEAL",
+    revenue: data.revenue.toFixed(2),
+    leaseCount: data.count,
+    percentage: totalRevenue > 0 ? (data.revenue / totalRevenue) * 100 : 0,
+  })).sort((a, b) => parseFloat(b.revenue) - parseFloat(a.revenue));
+}
+
+/**
+ * Get monthly revenue breakdown for Total Revenue Modal
+ * Correctly distributes annual/seasonal rates across months
+ */
+export async function getExecutiveRevenueByMonth(
+  orgId: string,
+  startDate: string,
+  endDate: string,
+  filterOptions?: KpiFilterOptions & { storageTypes?: string[] }
+): Promise<MonthlyRevenue[]> {
+  const baseFilterCondition = buildProjectFilterConditions(marinaLocations, filterOptions);
+  const filterCondition = and(
+    eq(marinaLocations.orgId, orgId),
+    baseFilterCondition || sql`1=1`
+  );
+  
+  const hasStorageTypeFilter = filterOptions?.storageTypes && filterOptions.storageTypes.length > 0;
+  
+  const query = hasStorageTypeFilter
+    ? db
+        .select({
+          leaseAmount: leases.leaseAmount,
+          rateType: leases.rateType,
+          numMonths: leases.numMonths,
+          contractTerm: leases.contractTerm,
+          leaseCommencement: leases.leaseCommencement,
+          leaseExpiration: leases.leaseExpiration,
+        })
+        .from(leases)
+        .innerJoin(marinaLocations, eq(leases.locationId, marinaLocations.id))
+        .innerJoin(storageLocations, eq(leases.storageLocationId, storageLocations.id))
+        .where(
+          and(
+            filterCondition,
+            eq(leases.isActive, true),
+            sql`(${leases.leaseCommencement} IS NULL OR ${leases.leaseCommencement} <= ${endDate})`,
+            sql`(${leases.leaseExpiration} IS NULL OR ${leases.leaseExpiration} >= ${startDate})`,
+            inArray(storageLocations.storageType, filterOptions.storageTypes!)
+          )
+        )
+    : db
+        .select({
+          leaseAmount: leases.leaseAmount,
+          rateType: leases.rateType,
+          numMonths: leases.numMonths,
+          contractTerm: leases.contractTerm,
+          leaseCommencement: leases.leaseCommencement,
+          leaseExpiration: leases.leaseExpiration,
+        })
+        .from(leases)
+        .innerJoin(marinaLocations, eq(leases.locationId, marinaLocations.id))
+        .where(
+          and(
+            filterCondition,
+            eq(leases.isActive, true),
+            sql`(${leases.leaseCommencement} IS NULL OR ${leases.leaseCommencement} <= ${endDate})`,
+            sql`(${leases.leaseExpiration} IS NULL OR ${leases.leaseExpiration} >= ${startDate})`
+          )
+        );
+
+  const leaseData = await query;
+  
+  const isSeasonalOrAnnualRateType = (rateType: string | null | undefined): boolean => {
+    if (!rateType) return false;
+    const rt = rateType.toLowerCase();
+    return rt.includes('/season') || rt.includes('/yr') || rt.includes('/year') || 
+           rt.includes('per season') || rt.includes('per year') || rt === 'annual' ||
+           rt.includes('$/ft/season') || rt.includes('$/ft/yr');
+  };
+
+  const isAnnualContract = (contractTerm: string | null): boolean => {
+    if (!contractTerm) return false;
+    const term = contractTerm.toLowerCase();
+    return term === 'annual' || term === 'yearly' || term === '12 month' || term === '12 months';
+  };
+  
+  const getEffectiveMonthsForLease = (
+    contractTerm: string | null,
+    numMonths: number | null,
+    leaseCommencement: string | null,
+    leaseExpiration: string | null
+  ): number => {
+    if (isAnnualContract(contractTerm)) return 12;
+    if (numMonths && numMonths > 0) return numMonths;
+    if (leaseCommencement && leaseExpiration) {
+      const start = new Date(leaseCommencement);
+      const end = new Date(leaseExpiration);
+      const yearDiff = end.getFullYear() - start.getFullYear();
+      const monthDiff = end.getMonth() - start.getMonth();
+      let months = yearDiff * 12 + monthDiff;
+      if (end.getDate() >= start.getDate()) months += 1;
+      return Math.max(1, months);
+    }
+    const term = (contractTerm || '').toLowerCase();
+    if (term.includes('summer') || term.includes('winter') || term.includes('seasonal')) return 6;
+    return 12;
+  };
+
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const months: MonthlyRevenue[] = [];
+  
+  let current = new Date(start.getFullYear(), start.getMonth(), 1);
+  while (current <= end) {
+    const monthLabel = current.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    let monthRevenue = 0;
+    let activeLeaseCount = 0;
+    
+    for (const lease of leaseData) {
+      const baseRent = lease.leaseAmount ? parseFloat(String(lease.leaseAmount)) : 0;
+      
+      if (isSeasonalOrAnnualRateType(lease.rateType)) {
+        const effectiveMonths = getEffectiveMonthsForLease(
+          lease.contractTerm,
+          lease.numMonths,
+          lease.leaseCommencement,
+          lease.leaseExpiration
+        );
+        monthRevenue += baseRent / effectiveMonths;
+      } else {
+        monthRevenue += baseRent;
+      }
+      activeLeaseCount += 1;
+    }
+    
+    months.push({
+      month: monthLabel,
+      revenue: monthRevenue.toFixed(2),
+      leaseCount: activeLeaseCount,
+    });
+    
+    current.setMonth(current.getMonth() + 1);
+  }
+  
+  return months;
+}
+
+/**
+ * Get revenue breakdown by storage type for Total Revenue Modal
+ */
+export async function getExecutiveRevenueByStorageTypeModal(
+  orgId: string,
+  startDate: string,
+  endDate: string,
+  filterOptions?: KpiFilterOptions
+): Promise<StorageTypeRevenue[]> {
+  const baseFilterCondition = buildProjectFilterConditions(marinaLocations, filterOptions);
+  const filterCondition = and(
+    eq(marinaLocations.orgId, orgId),
+    baseFilterCondition || sql`1=1`
+  );
+  
+  const query = db
+    .select({
+      storageType: leases.storageType,
+      leaseAmount: leases.leaseAmount,
+      rateType: leases.rateType,
+      numMonths: leases.numMonths,
+      contractTerm: leases.contractTerm,
+      leaseCommencement: leases.leaseCommencement,
+      leaseExpiration: leases.leaseExpiration,
+    })
+    .from(leases)
+    .innerJoin(marinaLocations, eq(leases.locationId, marinaLocations.id))
+    .where(
+      and(
+        filterCondition,
+        eq(leases.isActive, true),
+        sql`(${leases.leaseCommencement} IS NULL OR ${leases.leaseCommencement} <= ${endDate})`,
+        sql`(${leases.leaseExpiration} IS NULL OR ${leases.leaseExpiration} >= ${startDate})`
+      )
+    );
+
+  const leaseData = await query;
+
+  const isAnnualContract = (contractTerm: string | null): boolean => {
+    if (!contractTerm) return false;
+    const term = contractTerm.toLowerCase();
+    return term === 'annual' || term === 'yearly' || term === '12 month' || term === '12 months';
+  };
+  
+  const calculateEffectiveNumMonths = (
+    contractTerm: string | null,
+    numMonths: number | null,
+    leaseCommencement: string | null,
+    leaseExpiration: string | null
+  ): number => {
+    if (isAnnualContract(contractTerm)) return 12;
+    if (numMonths && numMonths > 0) return numMonths;
+    if (leaseCommencement && leaseExpiration) {
+      const start = new Date(leaseCommencement);
+      const end = new Date(leaseExpiration);
+      const yearDiff = end.getFullYear() - start.getFullYear();
+      const monthDiff = end.getMonth() - start.getMonth();
+      let months = yearDiff * 12 + monthDiff;
+      if (end.getDate() >= start.getDate()) months += 1;
+      return Math.max(1, months);
+    }
+    const term = (contractTerm || '').toLowerCase();
+    if (term.includes('summer') || term.includes('winter') || term.includes('seasonal')) return 6;
+    return 12;
+  };
+  
+  const isSeasonalOrAnnualRateType = (rateType: string | null | undefined): boolean => {
+    if (!rateType) return false;
+    const rt = rateType.toLowerCase();
+    return rt.includes('/season') || rt.includes('/yr') || rt.includes('/year') || 
+           rt.includes('per season') || rt.includes('per year') || rt === 'annual' ||
+           rt.includes('$/ft/season') || rt.includes('$/ft/yr');
+  };
+
+  const typeRevenueMap = new Map<string, { revenue: number; count: number }>();
+  
+  for (const lease of leaseData) {
+    const baseRent = lease.leaseAmount ? parseFloat(String(lease.leaseAmount)) : 0;
+    let leaseRevenue = 0;
+    
+    if (isSeasonalOrAnnualRateType(lease.rateType)) {
+      leaseRevenue = baseRent;
+    } else {
+      const effectiveMonths = calculateEffectiveNumMonths(
+        lease.contractTerm,
+        lease.numMonths,
+        lease.leaseCommencement,
+        lease.leaseExpiration
+      );
+      leaseRevenue = baseRent * effectiveMonths;
+    }
+    
+    const storageType = lease.storageType || "Unknown";
+    const existing = typeRevenueMap.get(storageType);
+    if (existing) {
+      existing.revenue += leaseRevenue;
+      existing.count += 1;
+    } else {
+      typeRevenueMap.set(storageType, { revenue: leaseRevenue, count: 1 });
+    }
+  }
+
+  const totalRevenue = Array.from(typeRevenueMap.values()).reduce((sum, t) => sum + t.revenue, 0);
+
+  return Array.from(typeRevenueMap.entries()).map(([type, data]) => ({
+    storageType: type,
+    revenue: data.revenue.toFixed(2),
+    leaseCount: data.count,
+    percentage: totalRevenue > 0 ? (data.revenue / totalRevenue) * 100 : 0,
+  })).sort((a, b) => parseFloat(b.revenue) - parseFloat(a.revenue));
+}
+
 /**
  * Get executive revenue trend (aggregated monthly data)
  */
