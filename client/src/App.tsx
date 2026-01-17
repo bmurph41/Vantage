@@ -114,6 +114,7 @@ const ResetPasswordPage = lazy(() => import("@/pages/auth/reset-password"));
 const DesignPreview = lazy(() => import("@/pages/design-preview"));
 const PacksSettings = lazy(() => import("@/pages/packs-settings"));
 const AccountMappingPage = lazy(() => import("@/pages/admin/AccountMappingPage"));
+const CuratedDataDashboard = lazy(() => import("@/pages/admin/CuratedDataDashboard"));
 const OpsInboxPage = lazy(() => import("@/pages/ops/InboxPage"));
 const OpsAutomationsPage = lazy(() => import("@/pages/ops/AutomationsPage"));
 const OpsTasksPage = lazy(() => import("@/pages/ops/TasksPage"));
@@ -418,6 +419,11 @@ function Router() {
             <PacksSettings />
           </UnifiedLayout>
         )}
+      </Route>
+      <Route path="/admin/curated-data">
+        <ProtectedRoute requireAuth={true}>
+          <CuratedDataDashboard />
+        </ProtectedRoute>
       </Route>
       <Route path="/admin/account-mapping">
         {() => (
