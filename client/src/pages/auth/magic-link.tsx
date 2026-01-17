@@ -58,7 +58,7 @@ export default function MagicLinkPage() {
         <div className="flex-1 flex flex-col bg-white">
           <div className="p-6 flex items-center">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-[#29C2AF] flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full bg-[#1E4FAB] flex items-center justify-center">
                 <Anchor className="h-4 w-4 text-white" />
               </div>
               <span className="text-xl font-bold text-[#343E5C]">MarinaMatch</span>
@@ -67,8 +67,8 @@ export default function MagicLinkPage() {
 
           <div className="flex-1 flex items-center justify-center px-8 pb-8">
             <div className="w-full max-w-sm text-center">
-              <div className="w-16 h-16 rounded-full bg-[#29C2AF]/10 flex items-center justify-center mx-auto mb-6">
-                <CheckCircle className="h-8 w-8 text-[#29C2AF]" />
+              <div className="w-16 h-16 rounded-full bg-[#1E4FAB]/10 flex items-center justify-center mx-auto mb-6">
+                <CheckCircle className="h-8 w-8 text-[#1E4FAB]" />
               </div>
               
               <h1 className="text-xl font-semibold text-[#343E5C] mb-2">
@@ -108,7 +108,7 @@ export default function MagicLinkPage() {
           </div>
         </div>
 
-        <div className="hidden lg:flex flex-1 bg-gradient-to-br from-[#29C2AF] to-[#1E8A7D] items-center justify-center p-12">
+        <div className="hidden lg:flex flex-1 bg-gradient-to-br from-[#1E4FAB] to-[#152d6b] items-center justify-center p-12">
           <div className="text-center text-white max-w-lg">
             <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-6">
               <Mail className="w-10 h-10 text-white" />
@@ -128,7 +128,7 @@ export default function MagicLinkPage() {
       <div className="flex-1 flex flex-col bg-white">
         <div className="p-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-[#29C2AF] flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-[#1E4FAB] flex items-center justify-center">
               <Anchor className="h-4 w-4 text-white" />
             </div>
             <span className="text-xl font-bold text-[#343E5C]">MarinaMatch</span>
@@ -158,7 +158,7 @@ export default function MagicLinkPage() {
                           type="email"
                           placeholder="example@email.com"
                           autoComplete="email"
-                          className="h-11 border-gray-200 focus:border-[#29C2AF] focus:ring-[#29C2AF]"
+                          className="h-11 border-gray-200 focus:border-[#1E4FAB] focus:ring-[#1E4FAB]"
                         />
                       </FormControl>
                       <FormMessage />
@@ -168,7 +168,7 @@ export default function MagicLinkPage() {
 
                 <Button
                   type="submit"
-                  className="w-full h-11 bg-[#29C2AF] hover:bg-[#24B09E] text-white font-medium"
+                  className="w-full h-11 bg-[#1E4FAB] hover:bg-[#1a4294] text-white font-medium"
                   disabled={magicLinkMutation.isPending}
                 >
                   {magicLinkMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -176,7 +176,7 @@ export default function MagicLinkPage() {
                 </Button>
 
                 <div className="text-center">
-                  <Link href="/login" className="text-sm text-[#343E5C] hover:text-[#29C2AF]">
+                  <Link href="/login" className="text-sm text-[#343E5C] hover:text-[#1E4FAB]">
                     Back to login with password
                   </Link>
                 </div>
@@ -194,7 +194,7 @@ export default function MagicLinkPage() {
         </div>
       </div>
 
-      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-[#29C2AF] to-[#1E8A7D] items-center justify-center p-12">
+      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-[#1E4FAB] to-[#152d6b] items-center justify-center p-12">
         <div className="text-center text-white max-w-lg">
           <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-6">
             <Mail className="w-10 h-10 text-white" />

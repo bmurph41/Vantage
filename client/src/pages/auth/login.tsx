@@ -120,7 +120,7 @@ export default function LoginPage() {
         <div className="flex-1 flex items-center justify-center bg-white p-8">
           <div className="w-full max-w-sm">
             <div className="flex items-center gap-2 mb-8">
-              <div className="w-8 h-8 rounded-full bg-[#29C2AF] flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full bg-[#1E4FAB] flex items-center justify-center">
                 <Anchor className="h-4 w-4 text-white" />
               </div>
               <span className="text-xl font-bold text-[#343E5C]">MarinaMatch</span>
@@ -146,7 +146,7 @@ export default function LoginPage() {
                           {...field}
                           placeholder="000000"
                           maxLength={6}
-                          className="text-center text-2xl tracking-widest h-12 border-gray-200 focus:border-[#29C2AF] focus:ring-[#29C2AF]"
+                          className="text-center text-2xl tracking-widest h-12 border-gray-200 focus:border-[#1E4FAB] focus:ring-[#1E4FAB]"
                           data-testid="input-mfa-code"
                         />
                       </FormControl>
@@ -157,7 +157,7 @@ export default function LoginPage() {
 
                 <Button
                   type="submit"
-                  className="w-full h-11 bg-[#29C2AF] hover:bg-[#24B09E] text-white font-medium"
+                  className="w-full h-11 bg-[#1E4FAB] hover:bg-[#1a4294] text-white font-medium"
                   disabled={mfaMutation.isPending}
                   data-testid="button-verify-mfa"
                 >
@@ -168,7 +168,7 @@ export default function LoginPage() {
                 <Button
                   type="button"
                   variant="ghost"
-                  className="w-full text-[#343E5C] hover:text-[#29C2AF]"
+                  className="w-full text-[#343E5C] hover:text-[#1E4FAB]"
                   onClick={() => {
                     setMfaRequired(false);
                     setMfaData(null);
@@ -182,7 +182,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="hidden lg:flex flex-1 bg-gradient-to-br from-[#29C2AF] to-[#1E8A7D] items-center justify-center p-12">
+        <div className="hidden lg:flex flex-1 bg-gradient-to-br from-[#1E4FAB] to-[#152d6b] items-center justify-center p-12">
           <div className="text-center text-white">
             <div className="w-48 h-48 mx-auto mb-8 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-sm">
               <div className="w-32 h-32 rounded-xl bg-white/20 flex items-center justify-center">
@@ -204,7 +204,7 @@ export default function LoginPage() {
       <div className="flex-1 flex flex-col bg-white">
         <div className="p-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-[#29C2AF] flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-[#1E4FAB] flex items-center justify-center">
               <Anchor className="h-4 w-4 text-white" />
             </div>
             <span className="text-xl font-bold text-[#343E5C]">MarinaMatch</span>
@@ -222,7 +222,7 @@ export default function LoginPage() {
               </h1>
               <span className="text-sm text-gray-500">
                 or{" "}
-                <Link href="/signup" className="text-[#343E5C] hover:text-[#29C2AF] font-medium" data-testid="link-signup">
+                <Link href="/signup" className="text-[#343E5C] hover:text-[#1E4FAB] font-medium" data-testid="link-signup">
                   create an account
                 </Link>
               </span>
@@ -242,7 +242,7 @@ export default function LoginPage() {
                           type="email"
                           placeholder="example@email.com"
                           autoComplete="email"
-                          className="h-11 border-gray-200 focus:border-[#29C2AF] focus:ring-[#29C2AF]"
+                          className="h-11 border-gray-200 focus:border-[#1E4FAB] focus:ring-[#1E4FAB]"
                           data-testid="input-email"
                         />
                       </FormControl>
@@ -264,7 +264,7 @@ export default function LoginPage() {
                             type={showPassword ? "text" : "password"}
                             placeholder="Enter your password"
                             autoComplete="current-password"
-                            className="h-11 border-gray-200 focus:border-[#29C2AF] focus:ring-[#29C2AF] pr-10"
+                            className="h-11 border-gray-200 focus:border-[#1E4FAB] focus:ring-[#1E4FAB] pr-10"
                             data-testid="input-password"
                           />
                           <Button
@@ -297,7 +297,7 @@ export default function LoginPage() {
                         <Checkbox
                           checked={field.value}
                           onCheckedChange={field.onChange}
-                          className="border-gray-300 data-[state=checked]:bg-[#29C2AF] data-[state=checked]:border-[#29C2AF]"
+                          className="border-gray-300 data-[state=checked]:bg-[#1E4FAB] data-[state=checked]:border-[#1E4FAB]"
                         />
                       </FormControl>
                       <FormLabel className="text-sm text-gray-600 font-normal cursor-pointer">
@@ -309,7 +309,7 @@ export default function LoginPage() {
 
                 <Button
                   type="submit"
-                  className="w-full h-11 bg-[#29C2AF] hover:bg-[#24B09E] text-white font-medium"
+                  className="w-full h-11 bg-[#1E4FAB] hover:bg-[#1a4294] text-white font-medium"
                   disabled={loginMutation.isPending}
                   data-testid="button-login"
                 >
@@ -320,13 +320,13 @@ export default function LoginPage() {
                 <div className="flex items-center justify-between text-sm">
                   <Link 
                     href="/magic-link" 
-                    className="text-[#29C2AF] hover:underline"
+                    className="text-[#1E4FAB] hover:underline"
                   >
                     Password-free log in
                   </Link>
                   <Link 
                     href="/forgot-password" 
-                    className="text-[#343E5C] hover:text-[#29C2AF]"
+                    className="text-[#343E5C] hover:text-[#1E4FAB]"
                     data-testid="link-forgot-password"
                   >
                     Recover account
@@ -346,11 +346,11 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-[#29C2AF] to-[#1E8A7D] items-center justify-center p-12">
+      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-[#1E4FAB] to-[#152d6b] items-center justify-center p-12">
         <div className="text-center text-white max-w-lg">
           <div className="w-80 h-48 mx-auto mb-8 bg-white rounded-lg shadow-2xl flex items-center justify-center">
             <div className="text-center">
-              <div className="w-12 h-12 rounded-full bg-[#29C2AF] flex items-center justify-center mx-auto mb-3">
+              <div className="w-12 h-12 rounded-full bg-[#1E4FAB] flex items-center justify-center mx-auto mb-3">
                 <Anchor className="w-6 h-6 text-white" />
               </div>
               <span className="text-2xl font-bold text-[#343E5C]">MarinaMatch</span>

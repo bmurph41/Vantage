@@ -9,7 +9,7 @@
   --card-foreground: hsl(220 26% 30%);
   --popover: hsl(0 0% 100%);
   --popover-foreground: hsl(220 26% 30%);
-  --primary: hsl(168 64% 47%);
+  --primary: hsl(221 83% 35%);
   --primary-foreground: hsl(0 0% 100%);
   --secondary: hsl(220 14% 96%);
   --secondary-foreground: hsl(220 26% 30%);
@@ -21,7 +21,7 @@
   --destructive-foreground: hsl(0 0% 100%);
   --border: hsl(220 13% 90%);
   --input: hsl(220 13% 90%);
-  --ring: hsl(168 64% 47%);
+  --ring: hsl(221 83% 35%);
   --chart-1: hsl(221 83% 35%);
   --chart-2: hsl(159.7826 100% 36.0784%);
   --chart-3: hsl(42.0290 92.8251% 56.2745%);
@@ -59,9 +59,9 @@
   --shadow-2xl: 0 25px 50px -6px rgba(0, 0, 0, 0.15);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
-  --turno-teal: #29C2AF;
-  --turno-navy: #343E5C;
-  --turno-bg: #EFEFF4;
+  --marina-blue: #1E4FAB;
+  --marina-navy: #343E5C;
+  --marina-bg: #EFEFF4;
 }
 
 .dark {

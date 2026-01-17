@@ -43,7 +43,7 @@ export default function MagicLinkVerifyPage() {
       <div className="flex-1 flex flex-col bg-white">
         <div className="p-6 flex items-center">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-[#29C2AF] flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-[#1E4FAB] flex items-center justify-center">
               <Anchor className="h-4 w-4 text-white" />
             </div>
             <span className="text-xl font-bold text-[#343E5C]">MarinaMatch</span>
@@ -54,7 +54,7 @@ export default function MagicLinkVerifyPage() {
           <div className="w-full max-w-sm text-center">
             {status === "loading" && (
               <>
-                <Loader2 className="h-12 w-12 animate-spin text-[#29C2AF] mx-auto mb-6" />
+                <Loader2 className="h-12 w-12 animate-spin text-[#1E4FAB] mx-auto mb-6" />
                 <h1 className="text-xl font-semibold text-[#343E5C] mb-2">
                   Verifying your login...
                 </h1>
@@ -90,7 +90,7 @@ export default function MagicLinkVerifyPage() {
                 <div className="space-y-3">
                   <Button
                     onClick={() => setLocation("/magic-link")}
-                    className="w-full bg-[#29C2AF] hover:bg-[#24B09E]"
+                    className="w-full bg-[#1E4FAB] hover:bg-[#1a4294]"
                   >
                     Request a new link
                   </Button>
@@ -112,11 +112,11 @@ export default function MagicLinkVerifyPage() {
         </div>
       </div>
 
-      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-[#29C2AF] to-[#1E8A7D] items-center justify-center p-12">
+      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-[#1E4FAB] to-[#152d6b] items-center justify-center p-12">
         <div className="text-center text-white max-w-lg">
           <div className="w-80 h-48 mx-auto mb-8 bg-white rounded-lg shadow-2xl flex items-center justify-center">
             <div className="text-center">
-              <div className="w-12 h-12 rounded-full bg-[#29C2AF] flex items-center justify-center mx-auto mb-3">
+              <div className="w-12 h-12 rounded-full bg-[#1E4FAB] flex items-center justify-center mx-auto mb-3">
                 <Anchor className="w-6 h-6 text-white" />
               </div>
               <span className="text-2xl font-bold text-[#343E5C]">MarinaMatch</span>
