@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 
 export type NormalizedAddress = {
   formattedAddress?: string;
+  name?: string;
   line1?: string;
   line2?: string;
   city?: string;
@@ -15,6 +16,8 @@ export type NormalizedAddress = {
   lat?: number;
   lng?: number;
 };
+
+export type PlaceSearchType = "address" | "establishment" | "geocode" | "(regions)" | "(cities)" | "all";
 
 type Props = {
   value?: string;
@@ -27,6 +30,7 @@ type Props = {
   inputId?: string;
   biasCenter?: { lat: number; lng: number };
   biasRadiusMeters?: number;
+  searchType?: PlaceSearchType;
 };
 
 function getComponent(components: google.maps.GeocoderAddressComponent[], type: string) {
@@ -63,6 +67,7 @@ function normalizePlace(place: google.maps.places.PlaceResult): NormalizedAddres
 
   return {
     formattedAddress: place.formatted_address,
+    name: place.name || undefined,
     line1,
     line2,
     city: city || undefined,
@@ -79,13 +84,14 @@ export function AddressAutocompleteInput({
   value,
   onChangeText,
   onSelectAddress,
-  placeholder = "Start typing an address...",
+  placeholder = "Start typing an address or place name...",
   className,
   countryCode = "us",
   disabled,
   inputId,
   biasCenter,
   biasRadiusMeters = 50000,
+  searchType = "all",
 }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [internalValue, setInternalValue] = useState(value ?? "");
@@ -102,6 +108,13 @@ export function AddressAutocompleteInput({
     [countryCode]
   );
 
+  const autocompleteTypes = useMemo(() => {
+    if (searchType === "all") {
+      return undefined;
+    }
+    return [searchType];
+  }, [searchType]);
+
   useEffect(() => {
     let autocomplete: google.maps.places.Autocomplete | null = null;
     let listener: google.maps.MapsEventListener | null = null;
@@ -112,16 +125,22 @@ export function AddressAutocompleteInput({
         setIsLoaded(true);
         if (!inputRef.current) return;
 
-        autocomplete = new g.maps.places.Autocomplete(inputRef.current, {
-          types: ["address"],
+        const options: google.maps.places.AutocompleteOptions = {
           componentRestrictions,
-        });
+        };
+        
+        if (autocompleteTypes) {
+          options.types = autocompleteTypes;
+        }
+
+        autocomplete = new g.maps.places.Autocomplete(inputRef.current, options);
 
         autocomplete.setFields?.([
           "address_components",
           "formatted_address",
           "geometry",
           "place_id",
+          "name",
         ]);
 
         if (biasCenter) {
@@ -136,7 +155,7 @@ export function AddressAutocompleteInput({
           const place = autocomplete!.getPlace();
           const normalized = normalizePlace(place);
 
-          const nextText = normalized.formattedAddress ?? inputRef.current!.value;
+          const nextText = normalized.name || normalized.formattedAddress || inputRef.current!.value;
           setInternalValue(nextText);
           onChangeText?.(nextText);
 
@@ -151,7 +170,7 @@ export function AddressAutocompleteInput({
       if (listener) listener.remove();
       autocomplete = null;
     };
-  }, [componentRestrictions, biasCenter, biasRadiusMeters, onChangeText, onSelectAddress]);
+  }, [componentRestrictions, autocompleteTypes, biasCenter, biasRadiusMeters, onChangeText, onSelectAddress]);
 
   return (
     <Input
