@@ -32,7 +32,7 @@ export type IntegrationRegistryItem = {
   description: string;
   category: "Marina PMS" | "Reservations & Booking" | "Service & Maintenance" | "Communications" | "Accounting";
   contexts: Array<
-    "boatRentals" | "fuelSales" | "financials" | "crm" | "documents" | "analytics" | "marketing" | "rentRoll" | "shipStore" | string
+    "boatRentals" | "fuelSales" | "financials" | "crm" | "documents" | "analytics" | "marketing" | "rentRoll" | "shipStore" | "dockit" | "service" | "bookkeeping" | string
   >;
   uiPlacements: string[];
   authType: AuthType;
@@ -718,8 +718,8 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
     name: "Boatyard",
     description: "Digital service management for marine service centers. Track work orders, parts, and customer communications.",
     category: "Service & Maintenance",
-    contexts: ["rentRoll", "crm"],
-    uiPlacements: ["rentRoll.integrations.panel"],
+    contexts: ["rentRoll", "crm", "service"],
+    uiPlacements: ["rentRoll.integrations.panel", "service.integrations.panel"],
     authType: "apiKey",
     websiteUrl: "https://boatyard.com/",
     iconUrl: "/assets/integrations/boatyard.svg",
@@ -772,8 +772,8 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
     name: "SpeedyDock",
     description: "Streamlined boat handling and scheduling. Coordinate haul-outs, launches, and service appointments efficiently.",
     category: "Service & Maintenance",
-    contexts: ["rentRoll", "boatRentals"],
-    uiPlacements: ["rentRoll.integrations.panel"],
+    contexts: ["rentRoll", "boatRentals", "dockit"],
+    uiPlacements: ["rentRoll.integrations.panel", "dockit.integrations.panel"],
     authType: "apiKey",
     websiteUrl: "https://speedydock.com/",
     iconUrl: "/assets/integrations/speedydock.svg",
@@ -935,8 +935,8 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
     name: "QuickBooks Online",
     description: "Industry-standard accounting software. Sync your P&L, Chart of Accounts, invoices, and payments for complete financial visibility.",
     category: "Accounting",
-    contexts: ["financials"],
-    uiPlacements: ["financials.integrations.panel", "financials.toolbar.importButton"],
+    contexts: ["financials", "bookkeeping"],
+    uiPlacements: ["financials.integrations.panel", "financials.toolbar.importButton", "bookkeeping.integrations.panel"],
     authType: "oauth",
     websiteUrl: "https://quickbooks.intuit.com/",
     iconUrl: "/assets/integrations/quickbooks.svg",
