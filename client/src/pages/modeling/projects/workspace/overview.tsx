@@ -21,6 +21,7 @@ import {
   Layers
 } from 'lucide-react';
 import type { ModelingProject } from '@shared/schema';
+import { LiveDataStatusPanel } from '@/components/modeling/LiveDataStatusPanel';
 
 interface WorkspaceOverviewProps {
   project: ModelingProject;
@@ -304,6 +305,11 @@ export default function WorkspaceOverview({ project, onTabChange }: WorkspaceOve
           </CardContent>
         </Card>
       </div>
+
+      <LiveDataStatusPanel 
+        projectId={project.id} 
+        dealSource={(project as any).dealSource} 
+      />
     </div>
   );
 }

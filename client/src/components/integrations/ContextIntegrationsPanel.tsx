@@ -200,11 +200,9 @@ export function ContextIntegrationsPanel({
           )}
 
           <div className="pt-2 border-t">
-            <Link href="/settings/integrations">
-              <a className="text-sm text-[#1E4FAB] hover:underline flex items-center gap-1">
-                View all integrations
-                <ChevronRight className="w-4 h-4" />
-              </a>
+            <Link href="/settings/integrations" className="text-sm text-[#1E4FAB] hover:underline flex items-center gap-1">
+              View all integrations
+              <ChevronRight className="w-4 h-4" />
             </Link>
           </div>
         </CardContent>
