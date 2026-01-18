@@ -3,8 +3,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Mail } from "lucide-react";
+import { StandardDialogShell } from "@/components/ui/standard-dialog-shell";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -115,107 +115,95 @@ export function SequenceFormModal({ open, onClose, sequence }: SequenceFormModal
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl" data-testid="modal-sequence-form">
-        <DialogHeader>
-          <DialogTitle>
-            {isEditing ? "Edit Email Sequence" : "Create Email Sequence"}
-          </DialogTitle>
-          <DialogDescription>
-            {isEditing 
-              ? "Update the details of your email sequence"
-              : "Create a new email sequence to automate your outreach"}
-          </DialogDescription>
-        </DialogHeader>
+    <StandardDialogShell
+      open={open}
+      onOpenChange={(open) => !open && onClose()}
+      title={isEditing ? "Edit Email Sequence" : "Create Email Sequence"}
+      description={isEditing 
+        ? "Update the details of your email sequence"
+        : "Create a new email sequence to automate your outreach"}
+      icon={Mail}
+      size="lg"
+      primaryAction={{
+        label: isEditing ? "Update Sequence" : "Create Sequence",
+        onClick: form.handleSubmit(onSubmit),
+        disabled: isPending,
+        loading: isPending,
+      }}
+      secondaryAction={{
+        label: "Cancel",
+        onClick: onClose,
+        disabled: isPending,
+      }}
+    >
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" data-testid="modal-sequence-form">
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Name *</FormLabel>
+                <FormControl>
+                  <Input 
+                    placeholder="e.g., Welcome Series, Onboarding Flow" 
+                    {...field} 
+                    data-testid="input-sequence-name"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Name *</FormLabel>
+          <FormField
+            control={form.control}
+            name="description"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Description</FormLabel>
+                <FormControl>
+                  <Textarea
+                    placeholder="Describe the purpose of this sequence..."
+                    {...field}
+                    data-testid="input-sequence-description"
+                  />
+                </FormControl>
+                <FormDescription>
+                  Optional description to help you remember what this sequence is for
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="status"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Status *</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
-                    <Input 
-                      placeholder="e.g., Welcome Series, Onboarding Flow" 
-                      {...field} 
-                      data-testid="input-sequence-name"
-                    />
+                    <SelectTrigger data-testid="select-sequence-status">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Describe the purpose of this sequence..."
-                      {...field}
-                      data-testid="input-sequence-description"
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Optional description to help you remember what this sequence is for
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Status *</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger data-testid="select-sequence-status">
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="draft">Draft</SelectItem>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="paused">Paused</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    Active sequences will automatically send emails. Draft and paused sequences won't send.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="flex justify-end gap-2 pt-4">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={onClose}
-                disabled={isPending}
-                data-testid="button-cancel"
-              >
-                Cancel
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={isPending}
-                data-testid="button-submit"
-              >
-                {isPending ? "Saving..." : isEditing ? "Update Sequence" : "Create Sequence"}
-              </Button>
-            </div>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="paused">Paused</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormDescription>
+                  Active sequences will automatically send emails. Draft and paused sequences won't send.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </form>
+      </Form>
+    </StandardDialogShell>
   );
 }

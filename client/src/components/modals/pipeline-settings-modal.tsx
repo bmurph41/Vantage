@@ -1,12 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { StandardDialogShell } from "@/components/ui/standard-dialog-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Edit2, Trash2, GripVertical, Check, X, Settings2 } from "lucide-react";
+import { Plus, Edit2, Trash2, GripVertical, Check, X, Settings } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { PipelineStage, Pipeline } from "@shared/schema";
@@ -171,151 +171,35 @@ export default function PipelineSettingsModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Settings2 className="w-5 h-5" />
-            Pipeline Settings - {currentPipeline?.name || "Pipeline"}
-          </DialogTitle>
-          <p className="text-sm text-gray-600 mt-1">
-            Manage stages for this pipeline. Drag to reorder, click to edit.
-          </p>
-        </DialogHeader>
-
-        <div className="flex-1 overflow-y-auto py-4">
-          <div className="space-y-3">
-            {stages.map((stage, index) => (
-              <Card key={stage.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  {editingStageId === stage.id ? (
-                    // Edit Mode
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label>Stage Name</Label>
-                          <Input
-                            value={editName}
-                            onChange={(e) => setEditName(e.target.value)}
-                            placeholder="Enter stage name"
-                            data-testid="input-edit-stage-name"
-                          />
-                        </div>
-                        <div>
-                          <Label>Win Probability (%)</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={editProbability}
-                            onChange={(e) => setEditProbability(parseInt(e.target.value) || 0)}
-                            data-testid="input-edit-stage-probability"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <Label>Stage Color</Label>
-                        <div className="flex items-center gap-2 mt-2">
-                          {defaultColors.map((color) => (
-                            <button
-                              key={color}
-                              onClick={() => setEditColor(color)}
-                              className={`w-8 h-8 rounded-full border-2 transition-all ${
-                                editColor === color ? "border-gray-900 scale-110" : "border-gray-300"
-                              }`}
-                              style={{ backgroundColor: color }}
-                              data-testid={`color-${color}`}
-                            />
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 justify-end">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={cancelEditing}
-                          data-testid="button-cancel-edit"
-                        >
-                          <X className="w-4 h-4 mr-1" />
-                          Cancel
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => saveEdit(stage.id)}
-                          disabled={updateStageMutation.isPending}
-                          data-testid="button-save-edit"
-                        >
-                          <Check className="w-4 h-4 mr-1" />
-                          Save
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    // View Mode
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 flex-1">
-                        <GripVertical className="w-5 h-5 text-gray-400 cursor-move" />
-                        <div
-                          className="w-4 h-4 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: stage.color || defaultColors[0] }}
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-semibold text-gray-900" data-testid={`stage-name-${index}`}>
-                              {stage.name}
-                            </h4>
-                            <Badge variant="secondary" className="text-xs">
-                              Order: {stage.stageOrder}
-                            </Badge>
-                            {stage.probability !== null && stage.probability !== undefined && (
-                              <Badge variant="outline" className="text-xs">
-                                {stage.probability}% win probability
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => startEditing(stage)}
-                          data-testid={`button-edit-stage-${index}`}
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteStage(stage.id)}
-                          disabled={deleteStageMutation.isPending}
-                          data-testid={`button-delete-stage-${index}`}
-                        >
-                          <Trash2 className="w-4 h-4 text-red-600" />
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-
-            {/* Add New Stage */}
-            {isAddingNew ? (
-              <Card className="border-2 border-dashed border-blue-300 bg-blue-50/50">
-                <CardContent className="p-4">
+    <StandardDialogShell
+      open={open}
+      onOpenChange={onOpenChange}
+      title={`Pipeline Settings - ${currentPipeline?.name || "Pipeline"}`}
+      description="Manage stages for this pipeline. Drag to reorder, click to edit."
+      icon={Settings}
+      size="lg"
+      secondaryAction={{
+        label: "Close",
+        onClick: () => onOpenChange(false),
+      }}
+      className="max-h-[80vh] overflow-hidden flex flex-col"
+    >
+      <div className="flex-1 overflow-y-auto">
+        <div className="space-y-3">
+          {stages.map((stage, index) => (
+            <Card key={stage.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                {editingStageId === stage.id ? (
+                  // Edit Mode
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label>Stage Name</Label>
                         <Input
-                          value={newStageName}
-                          onChange={(e) => setNewStageName(e.target.value)}
-                          placeholder="e.g., Qualified, Proposal"
-                          data-testid="input-new-stage-name"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          placeholder="Enter stage name"
+                          data-testid="input-edit-stage-name"
                         />
                       </div>
                       <div>
@@ -324,9 +208,9 @@ export default function PipelineSettingsModal({
                           type="number"
                           min="0"
                           max="100"
-                          value={newStageProbability}
-                          onChange={(e) => setNewStageProbability(parseInt(e.target.value) || 0)}
-                          data-testid="input-new-stage-probability"
+                          value={editProbability}
+                          onChange={(e) => setEditProbability(parseInt(e.target.value) || 0)}
+                          data-testid="input-edit-stage-probability"
                         />
                       </div>
                     </div>
@@ -337,12 +221,12 @@ export default function PipelineSettingsModal({
                         {defaultColors.map((color) => (
                           <button
                             key={color}
-                            onClick={() => setNewStageColor(color)}
+                            onClick={() => setEditColor(color)}
                             className={`w-8 h-8 rounded-full border-2 transition-all ${
-                              newStageColor === color ? "border-gray-900 scale-110" : "border-gray-300"
+                              editColor === color ? "border-gray-900 scale-110" : "border-gray-300"
                             }`}
                             style={{ backgroundColor: color }}
-                            data-testid={`new-color-${color}`}
+                            data-testid={`color-${color}`}
                           />
                         ))}
                       </div>
@@ -352,54 +236,160 @@ export default function PipelineSettingsModal({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => {
-                          setIsAddingNew(false);
-                          setNewStageName("");
-                          setNewStageColor(defaultColors[0]);
-                          setNewStageProbability(50);
-                        }}
-                        data-testid="button-cancel-new"
+                        onClick={cancelEditing}
+                        data-testid="button-cancel-edit"
                       >
                         <X className="w-4 h-4 mr-1" />
                         Cancel
                       </Button>
                       <Button
                         size="sm"
-                        onClick={handleCreateStage}
-                        disabled={createStageMutation.isPending}
-                        data-testid="button-create-stage"
+                        onClick={() => saveEdit(stage.id)}
+                        disabled={updateStageMutation.isPending}
+                        data-testid="button-save-edit"
                       >
                         <Check className="w-4 h-4 mr-1" />
-                        Create Stage
+                        Save
                       </Button>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <Button
-                variant="outline"
-                className="w-full border-2 border-dashed hover:border-blue-500 hover:bg-blue-50"
-                onClick={() => setIsAddingNew(true)}
-                data-testid="button-add-stage"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add New Stage
-              </Button>
-            )}
-          </div>
-        </div>
+                ) : (
+                  // View Mode
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 flex-1">
+                      <GripVertical className="w-5 h-5 text-gray-400 cursor-move" />
+                      <div
+                        className="w-4 h-4 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: stage.color || defaultColors[0] }}
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold text-gray-900" data-testid={`stage-name-${index}`}>
+                            {stage.name}
+                          </h4>
+                          <Badge variant="secondary" className="text-xs">
+                            Order: {stage.stageOrder}
+                          </Badge>
+                          {stage.probability !== null && stage.probability !== undefined && (
+                            <Badge variant="outline" className="text-xs">
+                              {stage.probability}% win probability
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
 
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            data-testid="button-close-settings"
-          >
-            Close
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => startEditing(stage)}
+                        data-testid={`button-edit-stage-${index}`}
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteStage(stage.id)}
+                        disabled={deleteStageMutation.isPending}
+                        data-testid={`button-delete-stage-${index}`}
+                      >
+                        <Trash2 className="w-4 h-4 text-red-600" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+
+          {/* Add New Stage */}
+          {isAddingNew ? (
+            <Card className="border-2 border-dashed border-blue-300 bg-blue-50/50">
+              <CardContent className="p-4">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Stage Name</Label>
+                      <Input
+                        value={newStageName}
+                        onChange={(e) => setNewStageName(e.target.value)}
+                        placeholder="e.g., Qualified, Proposal"
+                        data-testid="input-new-stage-name"
+                      />
+                    </div>
+                    <div>
+                      <Label>Win Probability (%)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={newStageProbability}
+                        onChange={(e) => setNewStageProbability(parseInt(e.target.value) || 0)}
+                        data-testid="input-new-stage-probability"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Stage Color</Label>
+                    <div className="flex items-center gap-2 mt-2">
+                      {defaultColors.map((color) => (
+                        <button
+                          key={color}
+                          onClick={() => setNewStageColor(color)}
+                          className={`w-8 h-8 rounded-full border-2 transition-all ${
+                            newStageColor === color ? "border-gray-900 scale-110" : "border-gray-300"
+                          }`}
+                          style={{ backgroundColor: color }}
+                          data-testid={`new-color-${color}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setIsAddingNew(false);
+                        setNewStageName("");
+                        setNewStageColor(defaultColors[0]);
+                        setNewStageProbability(50);
+                      }}
+                      data-testid="button-cancel-new"
+                    >
+                      <X className="w-4 h-4 mr-1" />
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleCreateStage}
+                      disabled={createStageMutation.isPending}
+                      data-testid="button-create-stage"
+                    >
+                      <Check className="w-4 h-4 mr-1" />
+                      Create Stage
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Button
+              variant="outline"
+              className="w-full border-2 border-dashed hover:border-blue-500 hover:bg-blue-50"
+              onClick={() => setIsAddingNew(true)}
+              data-testid="button-add-stage"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add New Stage
+            </Button>
+          )}
+        </div>
+      </div>
+    </StandardDialogShell>
   );
 }

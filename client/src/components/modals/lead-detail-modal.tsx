@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { StandardDialogShell } from "@/components/ui/standard-dialog-shell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { 
   User, Building, Mail, Phone, Calendar, Star, TrendingUp, 
   MapPin, Globe, Linkedin, Activity, MessageSquare, Edit, X,
-  Clock, Target, Save, Check, Loader2
+  Clock, Target, Save, Check, Loader2, Users
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -239,74 +239,75 @@ export default function LeadDetailModal({ isOpen, onClose, lead }: LeadDetailMod
   const relatedContact = contacts.find(c => c.email === lead.email);
   const leadActivities = activities.filter(a => a.entityType === 'lead' && a.entityId === lead.id);
 
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-hidden flex flex-col" data-testid="modal-lead-detail">
-        <DialogHeader className="flex-shrink-0">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <DialogTitle className="text-2xl font-bold">
-                {form.watch('firstName')} {form.watch('lastName')}
-              </DialogTitle>
-              <div className="flex items-center gap-2 mt-2">
-                <Badge className={statusColors[form.watch('leadStatus') as keyof typeof statusColors]}>
-                  {form.watch('leadStatus').replace('_', ' ')}
-                </Badge>
-                <Badge variant="outline" className="capitalize">
-                  {form.watch('prospectStatus').replace('_', ' ')}
-                </Badge>
-              </div>
-            </div>
-            <div className="flex gap-2 items-center">
-              {isEditing && (
-                <div className="flex items-center gap-1.5 text-sm mr-2" data-testid="text-save-status">
-                  {saveStatus === 'saving' && (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                      <span className="text-gray-600">Saving...</span>
-                    </>
-                  )}
-                  {saveStatus === 'saved' && (
-                    <>
-                      <Check className="w-4 h-4 text-green-600" />
-                      <span className="text-green-600">Saved</span>
-                    </>
-                  )}
-                </div>
-              )}
-              {isEditing ? (
-                <>
-                  <Button 
-                    onClick={() => {
-                      setIsEditing(false);
-                      form.reset();
-                      setSaveStatus('idle');
-                    }} 
-                    variant="outline" 
-                    size="sm"
-                    data-testid="button-done-edit"
-                  >
-                    Done
-                  </Button>
-                </>
-              ) : (
-                <Button 
-                  onClick={() => setIsEditing(true)} 
-                  variant="outline" 
-                  size="sm" 
-                  data-testid="button-edit-lead"
-                >
-                  <Edit className="w-4 h-4 mr-2" />
-                  Edit
-                </Button>
-              )}
-              <Button onClick={onClose} variant="ghost" size="sm" data-testid="button-close-detail">
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </DialogHeader>
+  const leadName = lead ? `${form.watch('firstName')} ${form.watch('lastName')}`.trim() : '';
+  const modalTitle = leadName || 'Lead Details';
 
+  const footerContent = (
+    <div className="flex items-center justify-between w-full">
+      <div className="flex items-center gap-2">
+        <Badge className={statusColors[form.watch('leadStatus') as keyof typeof statusColors]}>
+          {form.watch('leadStatus').replace('_', ' ')}
+        </Badge>
+        <Badge variant="outline" className="capitalize">
+          {form.watch('prospectStatus').replace('_', ' ')}
+        </Badge>
+      </div>
+      <div className="flex gap-2 items-center">
+        {isEditing && (
+          <div className="flex items-center gap-1.5 text-sm mr-2" data-testid="text-save-status">
+            {saveStatus === 'saving' && (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                <span className="text-gray-600">Saving...</span>
+              </>
+            )}
+            {saveStatus === 'saved' && (
+              <>
+                <Check className="w-4 h-4 text-green-600" />
+                <span className="text-green-600">Saved</span>
+              </>
+            )}
+          </div>
+        )}
+        {isEditing ? (
+          <Button 
+            onClick={() => {
+              setIsEditing(false);
+              form.reset();
+              setSaveStatus('idle');
+            }} 
+            variant="outline" 
+            size="sm"
+            data-testid="button-done-edit"
+          >
+            Done
+          </Button>
+        ) : (
+          <Button 
+            onClick={() => setIsEditing(true)} 
+            variant="outline" 
+            size="sm" 
+            data-testid="button-edit-lead"
+          >
+            <Edit className="w-4 h-4 mr-2" />
+            Edit
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <StandardDialogShell
+      open={isOpen}
+      onOpenChange={onClose}
+      title={modalTitle}
+      icon={Users}
+      size="lg"
+      footer={footerContent}
+      className="max-h-[90vh] overflow-hidden flex flex-col"
+    >
+      <div data-testid="modal-lead-detail">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
           <TabsList className="grid w-full grid-cols-4 flex-shrink-0">
             <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
@@ -781,7 +782,7 @@ export default function LeadDetailModal({ isOpen, onClose, lead }: LeadDetailMod
             </TabsContent>
           </div>
         </Tabs>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </StandardDialogShell>
   );
 }

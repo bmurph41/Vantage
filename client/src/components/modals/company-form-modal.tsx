@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { StandardDialogShell } from "@/components/ui/standard-dialog-shell";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -638,15 +638,25 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
   }, [availableContacts]);
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto" data-testid="company-form-modal">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Building className="h-5 w-5 text-blue-600" />
-            {company ? 'Edit Company' : 'Add New Company'}
-          </DialogTitle>
-        </DialogHeader>
-        
+    <StandardDialogShell
+      open={isOpen}
+      onOpenChange={onClose}
+      title={company ? 'Edit Company' : 'Create Company'}
+      icon={Building}
+      size="lg"
+      primaryAction={{
+        label: isLoading ? 'Saving...' : ((company?.id || pendingCompanyId) ? 'Update Company' : 'Create Company'),
+        onClick: form.handleSubmit(onSubmit),
+        disabled: isLoading,
+        loading: isLoading,
+      }}
+      secondaryAction={{
+        label: 'Cancel',
+        onClick: onClose,
+        disabled: isLoading,
+      }}
+    >
+      <div data-testid="company-form-modal">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="basic" className="flex items-center gap-2">
@@ -890,24 +900,6 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                   </CardContent>
                 </Card>
 
-                <div className="flex justify-end space-x-3 pt-4">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={onClose}
-                    disabled={isLoading}
-                    data-testid="button-cancel"
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    type="submit" 
-                    disabled={isLoading}
-                    data-testid="button-save-company"
-                  >
-                    {isLoading ? 'Saving...' : ((company?.id || pendingCompanyId) ? 'Update Company' : 'Create Company')}
-                  </Button>
-                </div>
               </form>
             </Form>
           </TabsContent>
@@ -1420,7 +1412,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                 )}
           </TabsContent>
         </Tabs>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </StandardDialogShell>
   );
 }

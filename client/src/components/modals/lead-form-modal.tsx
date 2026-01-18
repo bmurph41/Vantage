@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { StandardDialogShell } from "@/components/ui/standard-dialog-shell";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, User, Building, Home, Plus, ArrowRight } from "lucide-react";
+import { Search, User, Building, Home, Plus, ArrowRight, UserPlus } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { getLeadAttributionData } from "@/utils/utm-tracker";
@@ -61,8 +61,8 @@ export default function LeadFormModal({ isOpen, onClose, lead, onCompanyCreated,
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("manual");
   const [searchTerm, setSearchTerm] = useState("");
+  const formRef = useRef<HTMLFormElement>(null);
 
-  // Fetch data for search functionality
   const { data: contacts = [] } = useQuery<Contact[]>({
     queryKey: ['/api/contacts'],
     enabled: isOpen && activeTab !== "manual",
@@ -78,7 +78,6 @@ export default function LeadFormModal({ isOpen, onClose, lead, onCompanyCreated,
     enabled: isOpen && activeTab !== "manual",
   });
 
-  // Fetch users for assignedToId dropdown
   const { data: users = [] } = useQuery<UserType[]>({
     queryKey: ['/api/users'],
     enabled: isOpen,
@@ -123,7 +122,6 @@ export default function LeadFormModal({ isOpen, onClose, lead, onCompanyCreated,
         description: "",
       });
     } else if (isOpen && users.length > 0 && !form.getValues('assignedToId')) {
-      // Only set defaults when modal opens and assignedToId is not already set
       form.reset({
         firstName: "",
         lastName: "",
@@ -142,33 +140,27 @@ export default function LeadFormModal({ isOpen, onClose, lead, onCompanyCreated,
 
   const createLeadMutation = useMutation({
     mutationFn: async (data: any) => {
-      // Get UTM attribution data for new leads
       const attributionData = getLeadAttributionData();
       
-      // Required fields that should never be deleted
       const requiredFields = ['email', 'firstName', 'lastName', 'assignedToId', 'leadStatus', 'leadSource'];
       
       const cleanData = { 
         ...data,
-        ...attributionData, // Include attribution data for new leads
+        ...attributionData,
         firstVisitDate: new Date().toISOString(),
         lastVisitDate: new Date().toISOString(),
-        // Fallback: if assignedToId is still empty, use first available user
         assignedToId: data.assignedToId || (users.length > 0 ? users[0].id : undefined),
       };
       
-      // Remove empty optional fields, but keep required fields even if empty
       Object.keys(cleanData).forEach(key => {
         if (!requiredFields.includes(key) && (cleanData[key] === "" || cleanData[key] === undefined)) {
           delete cleanData[key];
         }
       });
       
-      // Create the lead
       const leadResponse = await apiRequest('POST', '/api/leads', cleanData);
       const lead = await leadResponse.json();
       
-      // Create company if company name was provided
       let companyId = null;
       if (data.company && data.company.trim()) {
         const companyData = {
@@ -179,7 +171,6 @@ export default function LeadFormModal({ isOpen, onClose, lead, onCompanyCreated,
         companyId = company.id;
       }
       
-      // Create contact from lead data
       const contactData = {
         firstName: data.firstName,
         lastName: data.lastName,
@@ -252,6 +243,12 @@ export default function LeadFormModal({ isOpen, onClose, lead, onCompanyCreated,
     }
   };
 
+  const handlePrimaryAction = () => {
+    if (activeTab === "manual") {
+      formRef.current?.requestSubmit();
+    }
+  };
+
   const populateFromContact = (contact: Contact) => {
     form.setValue("firstName", contact.firstName);
     form.setValue("lastName", contact.lastName);
@@ -302,12 +299,25 @@ export default function LeadFormModal({ isOpen, onClose, lead, onCompanyCreated,
   const isLoading = createLeadMutation.isPending || updateLeadMutation.isPending;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto" data-testid="modal-lead-form">
-        <DialogHeader>
-          <DialogTitle>{lead ? "Edit Lead" : "Create Lead"}</DialogTitle>
-        </DialogHeader>
-        
+    <StandardDialogShell
+      open={isOpen}
+      onOpenChange={onClose}
+      title={lead ? "Edit Lead" : "Create Lead"}
+      icon={UserPlus}
+      size="lg"
+      primaryAction={activeTab === "manual" ? {
+        label: lead ? "Update Lead" : "Create Lead",
+        onClick: handlePrimaryAction,
+        disabled: isLoading,
+        loading: isLoading,
+      } : undefined}
+      secondaryAction={activeTab === "manual" ? {
+        label: "Cancel",
+        onClick: onClose,
+        disabled: isLoading,
+      } : undefined}
+    >
+      <div data-testid="modal-lead-form">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="manual">New Contact</TabsTrigger>
@@ -414,7 +424,7 @@ export default function LeadFormModal({ isOpen, onClose, lead, onCompanyCreated,
 
           <TabsContent value="manual" className="space-y-4">
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <form ref={formRef} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -606,30 +616,11 @@ export default function LeadFormModal({ isOpen, onClose, lead, onCompanyCreated,
                     </FormItem>
                   )}
                 />
-
-                <div className="flex justify-end space-x-2 pt-4">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={onClose} 
-                    disabled={isLoading}
-                    data-testid="button-cancel"
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    type="submit" 
-                    disabled={isLoading}
-                    data-testid="button-submit"
-                  >
-                    {isLoading ? "Saving..." : (lead ? "Update Lead" : "Create Lead")}
-                  </Button>
-                </div>
               </form>
             </Form>
           </TabsContent>
         </Tabs>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </StandardDialogShell>
   );
 }

@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { StandardDialogShell } from "@/components/ui/standard-dialog-shell";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building, Users, TrendingUp, Calendar, Globe, Briefcase, Home } from "lucide-react";
+import { Building, Users, TrendingUp, Calendar, Globe, Briefcase, Home, BarChart3 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { KpiConfigItem } from "@shared/schema";
@@ -105,113 +104,110 @@ export default function KpiSettingsModal({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
-          <DialogTitle>Customize KPI Cards</DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-6 py-4">
-          {config.map((kpi, index) => (
-            <div key={index} className="flex items-start gap-4 p-4 border rounded-lg bg-gray-50">
-              {getIconPreview(kpi.icon, kpi.color)}
+    <StandardDialogShell
+      open={isOpen}
+      onOpenChange={onClose}
+      title="KPI Settings"
+      description="Customize your dashboard KPI cards"
+      icon={BarChart3}
+      size="lg"
+      primaryAction={{
+        label: "Save Changes",
+        onClick: handleSave,
+        disabled: savePreferencesMutation.isPending,
+        loading: savePreferencesMutation.isPending,
+      }}
+      secondaryAction={{
+        label: "Cancel",
+        onClick: onClose,
+      }}
+    >
+      <div className="space-y-6">
+        {config.map((kpi, index) => (
+          <div key={index} className="flex items-start gap-4 p-4 border rounded-lg bg-gray-50">
+            {getIconPreview(kpi.icon, kpi.color)}
+            
+            <div className="flex-1 space-y-3">
+              <div className="space-y-1">
+                <Label htmlFor={`title-${index}`} className="text-sm text-gray-600">
+                  Card Title
+                </Label>
+                <Input
+                  id={`title-${index}`}
+                  value={kpi.title}
+                  onChange={(e) => updateKpi(index, 'title', e.target.value)}
+                  placeholder="Enter title..."
+                  className="h-9"
+                  data-testid={`input-kpi-title-${index}`}
+                />
+              </div>
               
-              <div className="flex-1 space-y-3">
-                <div className="space-y-1">
-                  <Label htmlFor={`title-${index}`} className="text-sm text-gray-600">
-                    Card Title
-                  </Label>
-                  <Input
-                    id={`title-${index}`}
-                    value={kpi.title}
-                    onChange={(e) => updateKpi(index, 'title', e.target.value)}
-                    placeholder="Enter title..."
-                    className="h-9"
-                    data-testid={`input-kpi-title-${index}`}
-                  />
-                </div>
-                
-                <div className="space-y-1">
-                  <Label htmlFor={`metric-${index}`} className="text-sm text-gray-600">
-                    Metric Type
-                  </Label>
+              <div className="space-y-1">
+                <Label htmlFor={`metric-${index}`} className="text-sm text-gray-600">
+                  Metric Type
+                </Label>
+                <Select
+                  value={kpi.metricType}
+                  onValueChange={(value) => updateKpi(index, 'metricType', value)}
+                >
+                  <SelectTrigger className="h-9" data-testid={`select-kpi-metric-${index}`}>
+                    <SelectValue placeholder="Select metric" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableMetrics.map((metric) => (
+                      <SelectItem key={metric.value} value={metric.value}>
+                        {metric.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex gap-2">
+                <div className="flex-1 space-y-1">
+                  <Label className="text-sm text-gray-600">Color</Label>
                   <Select
-                    value={kpi.metricType}
-                    onValueChange={(value) => updateKpi(index, 'metricType', value)}
+                    value={kpi.color || 'blue'}
+                    onValueChange={(value) => updateKpi(index, 'color', value)}
                   >
-                    <SelectTrigger className="h-9" data-testid={`select-kpi-metric-${index}`}>
-                      <SelectValue placeholder="Select metric" />
+                    <SelectTrigger className="h-9" data-testid={`select-kpi-color-${index}`}>
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableMetrics.map((metric) => (
-                        <SelectItem key={metric.value} value={metric.value}>
-                          {metric.label}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="blue">Blue</SelectItem>
+                      <SelectItem value="purple">Purple</SelectItem>
+                      <SelectItem value="green">Green</SelectItem>
+                      <SelectItem value="orange">Orange</SelectItem>
+                      <SelectItem value="teal">Teal</SelectItem>
+                      <SelectItem value="indigo">Indigo</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-
-                <div className="flex gap-2">
-                  <div className="flex-1 space-y-1">
-                    <Label className="text-sm text-gray-600">Color</Label>
-                    <Select
-                      value={kpi.color || 'blue'}
-                      onValueChange={(value) => updateKpi(index, 'color', value)}
-                    >
-                      <SelectTrigger className="h-9" data-testid={`select-kpi-color-${index}`}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="blue">Blue</SelectItem>
-                        <SelectItem value="purple">Purple</SelectItem>
-                        <SelectItem value="green">Green</SelectItem>
-                        <SelectItem value="orange">Orange</SelectItem>
-                        <SelectItem value="teal">Teal</SelectItem>
-                        <SelectItem value="indigo">Indigo</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex-1 space-y-1">
-                    <Label className="text-sm text-gray-600">Icon</Label>
-                    <Select
-                      value={kpi.icon || 'building'}
-                      onValueChange={(value) => updateKpi(index, 'icon', value)}
-                    >
-                      <SelectTrigger className="h-9" data-testid={`select-kpi-icon-${index}`}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="building">Building</SelectItem>
-                        <SelectItem value="users">Users</SelectItem>
-                        <SelectItem value="trendingUp">Trending Up</SelectItem>
-                        <SelectItem value="briefcase">Briefcase</SelectItem>
-                        <SelectItem value="calendar">Calendar</SelectItem>
-                        <SelectItem value="globe">Globe</SelectItem>
-                        <SelectItem value="home">Home</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="flex-1 space-y-1">
+                  <Label className="text-sm text-gray-600">Icon</Label>
+                  <Select
+                    value={kpi.icon || 'building'}
+                    onValueChange={(value) => updateKpi(index, 'icon', value)}
+                  >
+                    <SelectTrigger className="h-9" data-testid={`select-kpi-icon-${index}`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="building">Building</SelectItem>
+                      <SelectItem value="users">Users</SelectItem>
+                      <SelectItem value="trendingUp">Trending Up</SelectItem>
+                      <SelectItem value="briefcase">Briefcase</SelectItem>
+                      <SelectItem value="calendar">Calendar</SelectItem>
+                      <SelectItem value="globe">Globe</SelectItem>
+                      <SelectItem value="home">Home</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>
-          ))}
-        </div>
-
-        <div className="flex justify-end gap-3 pt-4 border-t">
-          <Button variant="outline" onClick={onClose} data-testid="button-cancel-kpi-settings">
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleSave} 
-            disabled={savePreferencesMutation.isPending}
-            className="bg-blue-600 hover:bg-blue-700"
-            data-testid="button-save-kpi-settings"
-          >
-            {savePreferencesMutation.isPending ? "Saving..." : "Save Changes"}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+          </div>
+        ))}
+      </div>
+    </StandardDialogShell>
   );
 }

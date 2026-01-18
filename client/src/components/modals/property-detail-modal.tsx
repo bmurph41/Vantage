@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { StandardDialogShell } from "@/components/ui/standard-dialog-shell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -342,101 +342,102 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-hidden flex flex-col" data-testid="modal-property-detail">
-        <DialogHeader className="flex-shrink-0">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start gap-4 flex-1">
-              {/* Property Icon */}
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center text-white shadow-md flex-shrink-0">
-                {getPropertyIcon(form.watch('type'))}
-              </div>
-              
-              <div className="flex-1">
-                <DialogTitle className="text-2xl font-bold">
-                  {form.watch('title')}
-                </DialogTitle>
-                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                  <Badge className={propertyTypeColors[form.watch('type') as keyof typeof propertyTypeColors]}>
-                    {form.watch('type').replace('_', ' ')}
-                  </Badge>
-                  <Badge className={statusColors[form.watch('status') as keyof typeof statusColors]}>
-                    {form.watch('status').replace('_', ' ')}
-                  </Badge>
-                  {form.watch('listingPrice') && (
-                    <Badge variant="outline" className="text-green-700 border-green-500">
-                      {formatPrice(form.watch('listingPrice'))}
-                    </Badge>
-                  )}
-                  {portfolioStatus?.isOwnedAsset && (
-                    <Badge className="bg-purple-100 text-purple-800 border-purple-200" data-testid="badge-owned-asset">
-                      <Briefcase className="w-3 h-3 mr-1" />
-                      Owned Asset
-                    </Badge>
-                  )}
-                  {portfolioStatus && portfolioStatus.portfolioMemberships.length > 0 && (
-                    <Badge className="bg-indigo-100 text-indigo-800 border-indigo-200" data-testid="badge-portfolio-count">
-                      <FolderOpen className="w-3 h-3 mr-1" />
-                      In {portfolioStatus.portfolioMemberships.length} Portfolio{portfolioStatus.portfolioMemberships.length > 1 ? 's' : ''}
-                    </Badge>
-                  )}
-                  {salesHistoryData && salesHistoryData.matches.length > 0 && (
-                    <Badge className="bg-blue-100 text-blue-800 border-blue-200" data-testid="badge-sales-history">
-                      <History className="w-3 h-3 mr-1" />
-                      {salesHistoryData.matches.length} Sale{salesHistoryData.matches.length > 1 ? 's' : ''}
-                    </Badge>
-                  )}
-                </div>
-              </div>
+    <StandardDialogShell
+      open={isOpen}
+      onOpenChange={onClose}
+      title={property?.title || "Property Details"}
+      icon={MapPin}
+      size="lg"
+      className="max-h-[90vh] overflow-hidden flex flex-col"
+    >
+      <div className="flex flex-col h-full" data-testid="modal-property-detail">
+        <div className="flex items-start justify-between mb-4 flex-shrink-0">
+          <div className="flex items-start gap-4 flex-1">
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center text-white shadow-md flex-shrink-0">
+              {getPropertyIcon(form.watch('type'))}
             </div>
             
-            <div className="flex gap-2 items-center flex-shrink-0">
-              {isEditing && (
-                <div className="flex items-center gap-1.5 text-sm mr-2" data-testid="text-save-status">
-                  {saveStatus === 'saving' && (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                      <span className="text-gray-600">Saving...</span>
-                    </>
-                  )}
-                  {saveStatus === 'saved' && (
-                    <>
-                      <Check className="w-4 h-4 text-green-600" />
-                      <span className="text-green-600">Saved</span>
-                    </>
-                  )}
-                </div>
-              )}
-              {isEditing ? (
-                <Button 
-                  onClick={() => {
-                    setIsEditing(false);
-                    form.reset();
-                    setSaveStatus('idle');
-                  }} 
-                  variant="outline" 
-                  size="sm"
-                  data-testid="button-done-edit"
-                >
-                  Done
-                </Button>
-              ) : (
-                <Button 
-                  onClick={() => setIsEditing(true)} 
-                  variant="outline" 
-                  size="sm" 
-                  data-testid="button-edit-property"
-                >
-                  <Edit className="w-4 h-4 mr-2" />
-                  Edit
-                </Button>
-              )}
-              <Button onClick={onClose} variant="ghost" size="sm" data-testid="button-close-detail">
-                <X className="w-4 h-4" />
-              </Button>
+            <div className="flex-1">
+              <h3 className="text-xl font-bold">
+                {form.watch('title')}
+              </h3>
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <Badge className={propertyTypeColors[form.watch('type') as keyof typeof propertyTypeColors]}>
+                  {form.watch('type').replace('_', ' ')}
+                </Badge>
+                <Badge className={statusColors[form.watch('status') as keyof typeof statusColors]}>
+                  {form.watch('status').replace('_', ' ')}
+                </Badge>
+                {form.watch('listingPrice') && (
+                  <Badge variant="outline" className="text-green-700 border-green-500">
+                    {formatPrice(form.watch('listingPrice'))}
+                  </Badge>
+                )}
+                {portfolioStatus?.isOwnedAsset && (
+                  <Badge className="bg-purple-100 text-purple-800 border-purple-200" data-testid="badge-owned-asset">
+                    <Briefcase className="w-3 h-3 mr-1" />
+                    Owned Asset
+                  </Badge>
+                )}
+                {portfolioStatus && portfolioStatus.portfolioMemberships.length > 0 && (
+                  <Badge className="bg-indigo-100 text-indigo-800 border-indigo-200" data-testid="badge-portfolio-count">
+                    <FolderOpen className="w-3 h-3 mr-1" />
+                    In {portfolioStatus.portfolioMemberships.length} Portfolio{portfolioStatus.portfolioMemberships.length > 1 ? 's' : ''}
+                  </Badge>
+                )}
+                {salesHistoryData && salesHistoryData.matches.length > 0 && (
+                  <Badge className="bg-blue-100 text-blue-800 border-blue-200" data-testid="badge-sales-history">
+                    <History className="w-3 h-3 mr-1" />
+                    {salesHistoryData.matches.length} Sale{salesHistoryData.matches.length > 1 ? 's' : ''}
+                  </Badge>
+                )}
+              </div>
             </div>
           </div>
-        </DialogHeader>
+          
+          <div className="flex gap-2 items-center flex-shrink-0">
+            {isEditing && (
+              <div className="flex items-center gap-1.5 text-sm mr-2" data-testid="text-save-status">
+                {saveStatus === 'saving' && (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                    <span className="text-gray-600">Saving...</span>
+                  </>
+                )}
+                {saveStatus === 'saved' && (
+                  <>
+                    <Check className="w-4 h-4 text-green-600" />
+                    <span className="text-green-600">Saved</span>
+                  </>
+                )}
+              </div>
+            )}
+            {isEditing ? (
+              <Button 
+                onClick={() => {
+                  setIsEditing(false);
+                  form.reset();
+                  setSaveStatus('idle');
+                }} 
+                variant="outline" 
+                size="sm"
+                data-testid="button-done-edit"
+              >
+                Done
+              </Button>
+            ) : (
+              <Button 
+                onClick={() => setIsEditing(true)} 
+                variant="outline" 
+                size="sm" 
+                data-testid="button-edit-property"
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Edit
+              </Button>
+            )}
+          </div>
+        </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
           <TabsList className="grid w-full grid-cols-8 flex-shrink-0">
@@ -1124,7 +1125,7 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
             </TabsContent>
           </div>
         </Tabs>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </StandardDialogShell>
   );
 }

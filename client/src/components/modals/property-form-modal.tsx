@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { StandardDialogShell } from "@/components/ui/standard-dialog-shell";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -79,6 +79,7 @@ type LinkedCompany = {
 export default function PropertyFormModal({ isOpen, onClose, property }: PropertyFormModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const formRef = useRef<HTMLFormElement>(null);
   const [contactSearch, setContactSearch] = useState("");
   const [companySearch, setCompanySearch] = useState("");
   const [selectedContactRelationship, setSelectedContactRelationship] = useState("owner");
@@ -504,15 +505,32 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
 
   const isLoading = createPropertyMutation.isPending || updatePropertyMutation.isPending;
 
+  const handlePrimaryClick = () => {
+    formRef.current?.requestSubmit();
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="property-form-modal">
-        <DialogHeader>
-          <DialogTitle>{property ? 'Edit Property' : 'Add New Property'}</DialogTitle>
-        </DialogHeader>
-        
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+    <StandardDialogShell
+      open={isOpen}
+      onOpenChange={onClose}
+      title={property ? 'Edit Property' : 'Add New Property'}
+      icon={MapPin}
+      size="lg"
+      className="max-h-[90vh] overflow-y-auto"
+      primaryAction={{
+        label: property ? "Update Property" : "Create Property",
+        onClick: handlePrimaryClick,
+        disabled: isLoading,
+        loading: isLoading,
+      }}
+      secondaryAction={{
+        label: "Cancel",
+        onClick: onClose,
+        disabled: isLoading,
+      }}
+    >
+      <Form {...form}>
+        <form ref={formRef} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" data-testid="property-form-modal">
             <FormField
               control={form.control}
               name="title"
@@ -1121,27 +1139,8 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
               </>
             )}
 
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={onClose} 
-                disabled={isLoading}
-                data-testid="button-cancel"
-              >
-                Cancel
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={isLoading}
-                data-testid="button-submit"
-              >
-                {isLoading ? "Saving..." : (property ? "Update Property" : "Create Property")}
-              </Button>
-            </div>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+        </form>
+      </Form>
+    </StandardDialogShell>
   );
 }

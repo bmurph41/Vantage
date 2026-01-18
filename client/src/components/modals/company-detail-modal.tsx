@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { StandardDialogShell } from "@/components/ui/standard-dialog-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +22,7 @@ import {
   formatCurrencyCompact 
 } from "@/components/ui/enhanced-card";
 import { 
-  Building, Globe, MapPin, Phone, Mail, Users, Edit2, Save, X, FileText, 
+  Building, Building2, Globe, MapPin, Phone, Mail, Users, Edit2, Save, X, FileText, 
   DollarSign, TrendingUp, Activity, Calendar, Clock, Check, Loader2,
   Plus, ExternalLink, Anchor, MessageSquare, CheckSquare, FolderOpen,
   MoreVertical, Send, Filter, ArrowUpRight, Briefcase, Target, AlertCircle,
@@ -558,8 +559,15 @@ export default function CompanyDetailModal({
   const sizeCategory = getSizeCategory(company.size);
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[1100px] max-h-[95vh] overflow-hidden flex flex-col p-0" data-testid="modal-company-detail">
+    <StandardDialogShell
+      open={isOpen}
+      onOpenChange={onClose}
+      title={company?.name || "Company Details"}
+      icon={Building2}
+      size="lg"
+      className="sm:max-w-[1100px] max-h-[95vh] overflow-hidden flex flex-col p-0"
+    >
+      <div data-testid="modal-company-detail" className="-mx-4 -mt-4">
         {/* Enhanced Header */}
         <div className="bg-gradient-to-r from-slate-50 to-purple-50 dark:from-slate-900 dark:to-purple-950 px-6 py-5 border-b">
           <div className="flex items-start justify-between">
@@ -1613,7 +1621,7 @@ export default function CompanyDetailModal({
             </TabsContent>
           </ScrollArea>
         </Tabs>
-      </DialogContent>
+      </div>
 
       {/* Link Property Dialog */}
       <Dialog open={showLinkPropertyDialog} onOpenChange={setShowLinkPropertyDialog}>
@@ -1861,6 +1869,6 @@ export default function CompanyDetailModal({
           </div>
         </DialogContent>
       </Dialog>
-    </Dialog>
+    </StandardDialogShell>
   );
 }

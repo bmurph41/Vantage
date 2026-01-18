@@ -1,5 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { StandardDialogShell } from "@/components/ui/standard-dialog-shell";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DollarSign, Building, User, Calendar, ExternalLink } from "lucide-react";
@@ -81,113 +80,108 @@ export default function CommissionDealsModal({
     : 'Closed deals contributing to realized commissions';
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh]" data-testid="commission-deals-modal">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <DollarSign className="w-5 h-5" />
-            {modalTitle}
-          </DialogTitle>
-          <p className="text-sm text-gray-600">{modalSubtitle}</p>
-        </DialogHeader>
-
-        <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
-          <div className="text-center">
-            <p className="text-sm text-gray-600">Total Deals</p>
-            <p className="text-2xl font-bold text-gray-900">{filteredDeals.length}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-sm text-gray-600">Total Value</p>
-            <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalDealValue)}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-sm text-gray-600">Total Commission</p>
-            <p className="text-2xl font-bold text-blue-600">{formatCurrency(totalCommission)}</p>
-          </div>
+    <StandardDialogShell
+      open={open}
+      onOpenChange={onOpenChange}
+      title={modalTitle}
+      description={modalSubtitle}
+      icon={DollarSign}
+      size="lg"
+      secondaryAction={{
+        label: "Close",
+        onClick: () => onOpenChange(false),
+      }}
+    >
+      <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
+        <div className="text-center">
+          <p className="text-sm text-gray-600">Total Deals</p>
+          <p className="text-2xl font-bold text-gray-900">{filteredDeals.length}</p>
         </div>
+        <div className="text-center">
+          <p className="text-sm text-gray-600">Total Value</p>
+          <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalDealValue)}</p>
+        </div>
+        <div className="text-center">
+          <p className="text-sm text-gray-600">Total Commission</p>
+          <p className="text-2xl font-bold text-blue-600">{formatCurrency(totalCommission)}</p>
+        </div>
+      </div>
 
-        <ScrollArea className="h-96">
-          <div className="space-y-3">
-            {filteredDeals.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <DollarSign className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                <p>No {type === 'potential' ? 'active' : 'closed'} deals found</p>
-              </div>
-            ) : (
-              filteredDeals.map((deal) => {
-                const dealValue = Number(deal.amount || deal.value) || 0;
-                const commission = dealValue * DEFAULT_COMMISSION_RATE;
+      <ScrollArea className="h-96">
+        <div className="space-y-3">
+          {filteredDeals.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <DollarSign className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+              <p>No {type === 'potential' ? 'active' : 'closed'} deals found</p>
+            </div>
+          ) : (
+            filteredDeals.map((deal) => {
+              const dealValue = Number(deal.amount || deal.value) || 0;
+              const commission = dealValue * DEFAULT_COMMISSION_RATE;
 
-                return (
-                  <div
-                    key={deal.id}
-                    className="p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => handleDealClick(deal.id)}
-                    data-testid={`deal-item-${deal.id}`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="font-semibold text-gray-900">{deal.title}</h3>
-                          <ExternalLink className="w-4 h-4 text-gray-400" />
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-                          <div className="flex items-center gap-2">
-                            <DollarSign className="w-4 h-4" />
-                            <span>Value: {formatCurrency(dealValue)}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <DollarSign className="w-4 h-4 text-green-600" />
-                            <span>Commission: {formatCurrency(commission)}</span>
-                          </div>
-                          
-                          {deal.contact && (
-                            <div className="flex items-center gap-2">
-                              <User className="w-4 h-4" />
-                              <span>{deal.contact.firstName} {deal.contact.lastName}</span>
-                            </div>
-                          )}
-                          
-                          {deal.company && (
-                            <div className="flex items-center gap-2">
-                              <Building className="w-4 h-4" />
-                              <span>{deal.company.name}</span>
-                            </div>
-                          )}
-                          
-                          {deal.expectedCloseDate && (
-                            <div className="flex items-center gap-2">
-                              <Calendar className="w-4 h-4" />
-                              <span>Close: {new Date(deal.expectedCloseDate).toLocaleDateString()}</span>
-                            </div>
-                          )}
-                        </div>
+              return (
+                <div
+                  key={deal.id}
+                  className="p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => handleDealClick(deal.id)}
+                  data-testid={`deal-item-${deal.id}`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="font-semibold text-gray-900">{deal.title}</h3>
+                        <ExternalLink className="w-4 h-4 text-gray-400" />
                       </div>
                       
-                      <div className="flex flex-col items-end gap-2">
-                        <Badge className={getStageColor(deal.stage)}>
-                          {deal.stage}
-                        </Badge>
-                        <div className="text-right">
-                          <p className="text-sm text-gray-500">Priority</p>
-                          <p className="text-sm font-medium capitalize">{deal.priority}</p>
+                      <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="w-4 h-4" />
+                          <span>Value: {formatCurrency(dealValue)}</span>
                         </div>
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="w-4 h-4 text-green-600" />
+                          <span>Commission: {formatCurrency(commission)}</span>
+                        </div>
+                        
+                        {deal.contact && (
+                          <div className="flex items-center gap-2">
+                            <User className="w-4 h-4" />
+                            <span>{deal.contact.firstName} {deal.contact.lastName}</span>
+                          </div>
+                        )}
+                        
+                        {deal.company && (
+                          <div className="flex items-center gap-2">
+                            <Building className="w-4 h-4" />
+                            <span>{deal.company.name}</span>
+                          </div>
+                        )}
+                        
+                        {deal.expectedCloseDate && (
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4" />
+                            <span>Close: {new Date(deal.expectedCloseDate).toLocaleDateString()}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col items-end gap-2">
+                      <Badge className={getStageColor(deal.stage)}>
+                        {deal.stage}
+                      </Badge>
+                      <div className="text-right">
+                        <p className="text-sm text-gray-500">Priority</p>
+                        <p className="text-sm font-medium capitalize">{deal.priority}</p>
                       </div>
                     </div>
                   </div>
-                );
-              })
-            )}
-          </div>
-        </ScrollArea>
-
-        <div className="flex justify-end gap-2 pt-4 border-t">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
+                </div>
+              );
+            })
+          )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </ScrollArea>
+    </StandardDialogShell>
   );
 }

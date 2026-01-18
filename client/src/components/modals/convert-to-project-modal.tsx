@@ -2,15 +2,14 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { StandardDialogShell } from "@/components/ui/standard-dialog-shell";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, AlertCircle, CheckCircle2, FileText } from "lucide-react";
+import { AlertCircle, CheckCircle2, FolderOpen } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
@@ -101,19 +100,40 @@ export default function ConvertToProjectModal({ isOpen, onClose, deal }: Convert
     }
   };
 
-  return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="modal-convert-to-project">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Convert Deal to DD Project
-          </DialogTitle>
-          <DialogDescription>
-            Create a new Due Diligence project from this deal. Data will be mapped automatically.
-          </DialogDescription>
-        </DialogHeader>
+  const successFooter = (
+    <>
+      <Button variant="outline" onClick={handleClose} data-testid="button-close">
+        Stay Here
+      </Button>
+      <Button onClick={handleViewProject} className="bg-[#1E4FAB] hover:bg-[#1a4294]" data-testid="button-view-project">
+        View DD Project
+      </Button>
+    </>
+  );
 
+  return (
+    <StandardDialogShell
+      open={isOpen}
+      onOpenChange={handleClose}
+      title="Convert to Project"
+      description="Create a new Due Diligence project from this deal. Data will be mapped automatically."
+      icon={FolderOpen}
+      size="md"
+      footer={createdProjectId ? successFooter : undefined}
+      primaryAction={!createdProjectId ? {
+        label: "Convert to DD Project",
+        onClick: form.handleSubmit(handleSubmit),
+        disabled: convertMutation.isPending,
+        loading: convertMutation.isPending,
+      } : undefined}
+      secondaryAction={!createdProjectId ? {
+        label: "Cancel",
+        onClick: handleClose,
+        disabled: convertMutation.isPending,
+      } : undefined}
+      className="max-h-[90vh] overflow-y-auto"
+    >
+      <div data-testid="modal-convert-to-project">
         {createdProjectId ? (
           <div className="space-y-4">
             <Alert className="bg-green-50 border-green-200">
@@ -124,15 +144,6 @@ export default function ConvertToProjectModal({ isOpen, onClose, deal }: Convert
                 Your Due Diligence project has been created with all selected data from the deal.
               </AlertDescription>
             </Alert>
-
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={handleClose} data-testid="button-close">
-                Stay Here
-              </Button>
-              <Button onClick={handleViewProject} data-testid="button-view-project">
-                View DD Project
-              </Button>
-            </div>
           </div>
         ) : (
           <Form {...form}>
@@ -316,36 +327,10 @@ export default function ConvertToProjectModal({ isOpen, onClose, deal }: Convert
                   </FormItem>
                 )}
               />
-
-              <div className="flex gap-2 justify-end">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleClose}
-                  disabled={convertMutation.isPending}
-                  data-testid="button-cancel"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={convertMutation.isPending}
-                  data-testid="button-convert"
-                >
-                  {convertMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Converting...
-                    </>
-                  ) : (
-                    "Convert to DD Project"
-                  )}
-                </Button>
-              </div>
             </form>
           </Form>
         )}
-      </DialogContent>
-    </Dialog>
+      </div>
+    </StandardDialogShell>
   );
 }

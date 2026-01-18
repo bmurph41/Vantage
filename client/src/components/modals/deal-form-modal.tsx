@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { StandardDialogShell } from "@/components/ui/standard-dialog-shell";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { 
   CalendarIcon, Percent, DollarSign, Anchor, MapPin, 
   FileText, Users, TrendingUp, Calendar as CalendarClock, Clock, Plus, X, Trash2,
-  Sparkles, Zap, Info, CheckCircle2
+  Zap, Info
 } from "lucide-react";
 import { format, addDays, parseISO } from "date-fns";
 import { addBusinessDays } from "@/lib/business-days";
@@ -837,46 +837,56 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
     "$0";
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto" data-testid="deal-form-modal">
-        <DialogHeader className="space-y-3">
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent flex items-center gap-2">
-              <Sparkles className="w-6 h-6 text-blue-600" />
-              {deal ? 'Edit Deal' : 'Create New Deal'}
-            </DialogTitle>
-            {!deal && dealAmount && (
-              <div className="text-right">
-                <div className="text-xs text-gray-500 font-medium">Deal Value</div>
-                <div className="text-xl font-bold text-green-600">{formattedDealValue}</div>
-              </div>
-            )}
+    <StandardDialogShell
+      open={isOpen}
+      onOpenChange={onClose}
+      title={deal ? 'Edit Deal' : 'Create Deal'}
+      icon={Anchor}
+      size="xl"
+      className="max-h-[90vh] overflow-y-auto"
+      primaryAction={{
+        label: deal ? 'Update Deal' : 'Create Deal',
+        onClick: form.handleSubmit(onSubmit),
+        disabled: isLoading,
+        loading: isLoading,
+      }}
+      secondaryAction={{
+        label: 'Cancel',
+        onClick: onClose,
+        disabled: isLoading,
+      }}
+    >
+      <div data-testid="deal-form-modal">
+        {!deal && dealAmount && (
+          <div className="text-right mb-4">
+            <div className="text-xs text-gray-500 font-medium">Deal Value</div>
+            <div className="text-xl font-bold text-green-600">{formattedDealValue}</div>
           </div>
-          {!deal && (
-            <div className="flex items-center gap-2 pt-2">
-              <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                <Zap className="w-3.5 h-3.5" />
-                <span className="font-medium">Quick Start:</span>
-              </div>
-              {dealTemplates.map((template) => {
-                const Icon = template.icon;
-                return (
-                  <Button
-                    key={template.name}
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className={`text-xs h-7 bg-gradient-to-r ${template.color} text-white border-0 hover:opacity-90 transition-opacity`}
-                    onClick={() => applyTemplate(template)}
-                  >
-                    <Icon className="w-3 h-3 mr-1" />
-                    {template.name}
-                  </Button>
-                );
-              })}
+        )}
+        {!deal && (
+          <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <Zap className="w-3.5 h-3.5" />
+              <span className="font-medium">Quick Start:</span>
             </div>
-          )}
-        </DialogHeader>
+            {dealTemplates.map((template) => {
+              const Icon = template.icon;
+              return (
+                <Button
+                  key={template.name}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className={`text-xs h-7 bg-gradient-to-r ${template.color} text-white border-0 hover:opacity-90 transition-opacity`}
+                  onClick={() => applyTemplate(template)}
+                >
+                  <Icon className="w-3 h-3 mr-1" />
+                  {template.name}
+                </Button>
+              );
+            })}
+          </div>
+        )}
         
         {/* Quick Stage Selector */}
         {deal && (
@@ -2565,46 +2575,10 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
               </TabsContent>
             </Tabs>
 
-            <div className="flex items-center justify-between pt-4 border-t bg-gray-50 -mx-6 px-6 py-4 -mb-6 rounded-b-lg">
-              <div className="flex items-center gap-2 text-xs text-gray-500">
-                <Info className="w-3.5 h-3.5" />
-                <span>Press <kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-xs font-mono">Esc</kbd> to cancel</span>
-              </div>
-              <div className="flex gap-3">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={onClose}
-                  disabled={isLoading}
-                  data-testid="button-cancel"
-                  className="hover:bg-gray-100"
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  type="submit" 
-                  disabled={isLoading}
-                  data-testid="button-save-deal"
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white min-w-[140px]"
-                >
-                  {isLoading ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Saving...</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>{deal ? 'Update Deal' : 'Create Deal'}</span>
-                    </div>
-                  )}
-                </Button>
-              </div>
-            </div>
           </form>
         </Form>
         </TooltipProvider>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </StandardDialogShell>
   );
 }

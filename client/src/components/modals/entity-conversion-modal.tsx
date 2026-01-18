@@ -3,12 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { StandardDialogShell } from "@/components/ui/standard-dialog-shell";
 import {
   Form,
   FormControl,
@@ -37,7 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { X, User, Building, Handshake, DollarSign, Target, Tag, Percent, AlertCircle } from "lucide-react";
+import { ArrowRightLeft, User, Building, Handshake, DollarSign, Target, Tag, Percent, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { Contact, Company, Deal, PipelineStage, Lead } from "@shared/schema";
@@ -314,34 +309,47 @@ export default function EntityConversionModal({
   const EntityIcon = getEntityIcon();
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto" data-testid="entity-conversion-modal">
-        <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${conversionType === 'deal' ? 'bg-blue-100' : 'bg-green-100'}`}>
-              {conversionType === 'deal' ? (
-                <Handshake className={`w-5 h-5 ${conversionType === 'deal' ? 'text-blue-600' : 'text-green-600'}`} />
-              ) : (
-                <Target className="w-5 h-5 text-green-600" />
-              )}
-            </div>
-            <div>
-              <DialogTitle className="text-xl font-semibold">
-                Convert to {conversionType === 'deal' ? 'Deal' : 'Lead'}
-              </DialogTitle>
-              <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
-                <EntityIcon className="w-4 h-4" />
-                <span>From {sourceType}: {getEntityDisplayName()}</span>
-              </div>
-            </div>
+    <StandardDialogShell
+      open={isOpen}
+      onOpenChange={onClose}
+      title={`Convert to ${conversionType === 'deal' ? 'Deal' : 'Lead'}`}
+      description={`From ${sourceType}: ${getEntityDisplayName()}`}
+      icon={ArrowRightLeft}
+      size="xl"
+      className="max-h-[90vh] overflow-y-auto"
+      footer={
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <AlertCircle className="w-4 h-4" />
+            <span>Converting {sourceType}: {getEntityDisplayName()}</span>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose} data-testid="button-close-conversion">
-            <X className="w-4 h-4" />
-          </Button>
-        </DialogHeader>
-
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              data-testid="button-cancel-conversion"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="entity-conversion-form"
+              disabled={conversionMutation.isPending}
+              data-testid="button-save-conversion"
+              className={conversionType === 'deal' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'}
+            >
+              {conversionMutation.isPending 
+                ? 'Converting...' 
+                : `Create ${conversionType === 'deal' ? 'Deal' : 'Lead'}`
+              }
+            </Button>
+          </div>
+        </div>
+      }
+    >
+      <Form {...form}>
+        <form id="entity-conversion-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid grid-cols-3 w-full">
                 <TabsTrigger value="basic" className="text-sm">Basic Info</TabsTrigger>
@@ -867,40 +875,8 @@ export default function EntityConversionModal({
                 </div>
               </TabsContent>
             </Tabs>
-
-            <Separator />
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <AlertCircle className="w-4 h-4" />
-                <span>Converting {sourceType}: {getEntityDisplayName()}</span>
-              </div>
-              
-              <div className="flex gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={onClose}
-                  data-testid="button-cancel-conversion"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={conversionMutation.isPending}
-                  data-testid="button-save-conversion"
-                  className={conversionType === 'deal' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'}
-                >
-                  {conversionMutation.isPending 
-                    ? 'Converting...' 
-                    : `Create ${conversionType === 'deal' ? 'Deal' : 'Lead'}`
-                  }
-                </Button>
-              </div>
-            </div>
           </form>
         </Form>
-      </DialogContent>
-    </Dialog>
+    </StandardDialogShell>
   );
 }

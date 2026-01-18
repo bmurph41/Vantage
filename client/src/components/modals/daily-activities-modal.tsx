@@ -529,13 +529,12 @@ export function DailyActivitiesModal({
       </DialogContent>
 
       {/* Activity Composer Dialog */}
-      <Dialog open={showActivityComposer} onOpenChange={setShowActivityComposer}>
-        <ActivityComposerModal 
-          templates={templates} 
-          onClose={() => setShowActivityComposer(false)}
-          defaultDate={date}
-        />
-      </Dialog>
+      <ActivityComposerModal 
+        open={showActivityComposer}
+        onOpenChange={setShowActivityComposer}
+        templates={templates} 
+        defaultDate={date}
+      />
 
       {/* Past Day Warning Dialog */}
       <AlertDialog open={showPastDayWarning} onOpenChange={setShowPastDayWarning}>

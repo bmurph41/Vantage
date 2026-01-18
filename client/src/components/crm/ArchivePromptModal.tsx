@@ -1,14 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { StandardDialogShell } from "@/components/ui/standard-dialog-shell";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -116,13 +108,17 @@ export function ArchivePromptModal({
 
   if (isLoading) {
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[500px]">
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        </DialogContent>
-      </Dialog>
+      <StandardDialogShell
+        open={open}
+        onOpenChange={onOpenChange}
+        title="Archive Seller Information"
+        icon={Archive}
+        size="sm"
+      >
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </StandardDialogShell>
     );
   }
 
@@ -135,146 +131,130 @@ export function ArchivePromptModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[550px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Archive className="h-5 w-5 text-amber-500" />
-            Archive Seller Information
-          </DialogTitle>
-          <DialogDescription>
-            This property has been marked as sold. Would you like to archive the seller's contact and company information?
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4 py-4">
-          <Card className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
-                <div className="text-sm text-amber-800 dark:text-amber-200">
-                  <p className="font-medium">Why archive?</p>
-                  <p className="mt-1">
-                    Since the property was sold, the seller is likely no longer the owner and may be out of the industry.
-                    Archiving keeps your CRM clean while preserving the historical record.
-                  </p>
-                </div>
+    <StandardDialogShell
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Archive Seller Information"
+      description="This property has been marked as sold. Would you like to archive the seller's contact and company information?"
+      icon={Archive}
+      size="sm"
+      secondaryAction={{
+        label: "Keep Active",
+        onClick: handleSkip,
+      }}
+      primaryAction={{
+        label: "Archive Selected",
+        loadingLabel: "Archiving...",
+        onClick: handleArchive,
+        disabled: archiveMutation.isPending,
+        loading: archiveMutation.isPending,
+        variant: "destructive",
+      }}
+    >
+      <div className="space-y-4">
+        <Card className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
+              <div className="text-sm text-amber-800 dark:text-amber-200">
+                <p className="font-medium">Why archive?</p>
+                <p className="mt-1">
+                  Since the property was sold, the seller is likely no longer the owner and may be out of the industry.
+                  Archiving keeps your CRM clean while preserving the historical record.
+                </p>
               </div>
-            </CardContent>
-          </Card>
-
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <MapPin className="h-4 w-4" />
-              <span>Property: <span className="font-medium text-foreground">{archiveCheck?.propertyName}</span></span>
             </div>
-            {archiveCheck?.saleDate && (
-              <Badge variant="outline" className="text-xs">
-                Sold: {new Date(archiveCheck.saleDate).toLocaleDateString()}
-              </Badge>
-            )}
+          </CardContent>
+        </Card>
+
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <MapPin className="h-4 w-4" />
+            <span>Property: <span className="font-medium text-foreground">{archiveCheck?.propertyName}</span></span>
           </div>
-
-          <Separator />
-
-          <div className="space-y-4">
-            {archiveCheck?.sellerContact && (
-              <div className="flex items-start space-x-3">
-                <Checkbox
-                  id="archive-contact"
-                  checked={archiveContact}
-                  onCheckedChange={(checked) => setArchiveContact(checked as boolean)}
-                />
-                <div className="flex-1">
-                  <Label
-                    htmlFor="archive-contact"
-                    className="text-sm font-medium cursor-pointer flex items-center gap-2"
-                  >
-                    <User className="h-4 w-4 text-blue-500" />
-                    Archive Contact
-                  </Label>
-                  <Card className="mt-2 bg-muted/50">
-                    <CardContent className="p-3">
-                      <p className="font-medium">
-                        {archiveCheck.sellerContact.firstName} {archiveCheck.sellerContact.lastName}
-                      </p>
-                      {archiveCheck.sellerContact.email && (
-                        <p className="text-sm text-muted-foreground">{archiveCheck.sellerContact.email}</p>
-                      )}
-                      {archiveCheck.sellerContact.company && (
-                        <p className="text-sm text-muted-foreground">{archiveCheck.sellerContact.company}</p>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-            )}
-
-            {archiveCheck?.sellerCompany && (
-              <div className="flex items-start space-x-3">
-                <Checkbox
-                  id="archive-company"
-                  checked={archiveCompany}
-                  onCheckedChange={(checked) => setArchiveCompany(checked as boolean)}
-                />
-                <div className="flex-1">
-                  <Label
-                    htmlFor="archive-company"
-                    className="text-sm font-medium cursor-pointer flex items-center gap-2"
-                  >
-                    <Building2 className="h-4 w-4 text-purple-500" />
-                    Archive Company
-                  </Label>
-                  <Card className="mt-2 bg-muted/50">
-                    <CardContent className="p-3">
-                      <p className="font-medium">{archiveCheck.sellerCompany.name}</p>
-                      {archiveCheck.sellerCompany.domain && (
-                        <p className="text-sm text-muted-foreground">{archiveCheck.sellerCompany.domain}</p>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="archive-notes" className="text-sm">
-              Archive Notes (Optional)
-            </Label>
-            <Textarea
-              id="archive-notes"
-              placeholder="Add any notes about this archive..."
-              value={archiveNotes}
-              onChange={(e) => setArchiveNotes(e.target.value)}
-              rows={2}
-            />
-          </div>
+          {archiveCheck?.saleDate && (
+            <Badge variant="outline" className="text-xs">
+              Sold: {new Date(archiveCheck.saleDate).toLocaleDateString()}
+            </Badge>
+          )}
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={handleSkip}>
-            Keep Active
-          </Button>
-          <Button
-            onClick={handleArchive}
-            disabled={archiveMutation.isPending}
-            className="bg-amber-600 hover:bg-amber-700"
-          >
-            {archiveMutation.isPending ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Archiving...
-              </>
-            ) : (
-              <>
-                <Archive className="h-4 w-4 mr-2" />
-                Archive Selected
-              </>
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        <Separator />
+
+        <div className="space-y-4">
+          {archiveCheck?.sellerContact && (
+            <div className="flex items-start space-x-3">
+              <Checkbox
+                id="archive-contact"
+                checked={archiveContact}
+                onCheckedChange={(checked) => setArchiveContact(checked as boolean)}
+              />
+              <div className="flex-1">
+                <Label
+                  htmlFor="archive-contact"
+                  className="text-sm font-medium cursor-pointer flex items-center gap-2"
+                >
+                  <User className="h-4 w-4 text-blue-500" />
+                  Archive Contact
+                </Label>
+                <Card className="mt-2 bg-muted/50">
+                  <CardContent className="p-3">
+                    <p className="font-medium">
+                      {archiveCheck.sellerContact.firstName} {archiveCheck.sellerContact.lastName}
+                    </p>
+                    {archiveCheck.sellerContact.email && (
+                      <p className="text-sm text-muted-foreground">{archiveCheck.sellerContact.email}</p>
+                    )}
+                    {archiveCheck.sellerContact.company && (
+                      <p className="text-sm text-muted-foreground">{archiveCheck.sellerContact.company}</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+
+          {archiveCheck?.sellerCompany && (
+            <div className="flex items-start space-x-3">
+              <Checkbox
+                id="archive-company"
+                checked={archiveCompany}
+                onCheckedChange={(checked) => setArchiveCompany(checked as boolean)}
+              />
+              <div className="flex-1">
+                <Label
+                  htmlFor="archive-company"
+                  className="text-sm font-medium cursor-pointer flex items-center gap-2"
+                >
+                  <Building2 className="h-4 w-4 text-purple-500" />
+                  Archive Company
+                </Label>
+                <Card className="mt-2 bg-muted/50">
+                  <CardContent className="p-3">
+                    <p className="font-medium">{archiveCheck.sellerCompany.name}</p>
+                    {archiveCheck.sellerCompany.domain && (
+                      <p className="text-sm text-muted-foreground">{archiveCheck.sellerCompany.domain}</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="archive-notes" className="text-sm">
+            Archive Notes (Optional)
+          </Label>
+          <Textarea
+            id="archive-notes"
+            placeholder="Add any notes about this archive..."
+            value={archiveNotes}
+            onChange={(e) => setArchiveNotes(e.target.value)}
+            rows={2}
+          />
+        </div>
+      </div>
+    </StandardDialogShell>
   );
 }

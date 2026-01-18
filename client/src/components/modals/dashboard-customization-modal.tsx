@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { StandardDialogShell } from "@/components/ui/standard-dialog-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,10 +17,8 @@ import {
   Activity, 
   BarChart3,
   PieChart,
-  Target,
   Briefcase,
   CheckCircle,
-  XCircle,
   RotateCcw,
   Save,
   Sparkles
@@ -158,7 +156,6 @@ export default function DashboardCustomizationModal({
       newSelected.delete(widgetKey);
     } else {
       newSelected.add(widgetKey);
-      // Set default size if not already set
       if (!widgetSizes[widgetKey]) {
         const widget = widgets.find(w => w.widgetKey === widgetKey);
         const defaultSize = widget?.defaultSize === 'full' ? 3 : 
@@ -174,7 +171,6 @@ export default function DashboardCustomizationModal({
   };
 
   const handleSave = () => {
-    // Build layout from selected widgets
     const widgetsArray = Array.from(selectedWidgets);
     const layoutWidgets = widgetsArray.map((widgetKey, index) => {
       const size = widgetSizes[widgetKey] || 1;
@@ -215,167 +211,15 @@ export default function DashboardCustomizationModal({
   const categories = Object.keys(groupedWidgets).sort();
 
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <LayoutGrid className="h-5 w-5" />
-            Customize Dashboard
-          </DialogTitle>
-          <DialogDescription>
-            Select widgets to display on your dashboard and configure their layout
-          </DialogDescription>
-        </DialogHeader>
-
-        <Tabs defaultValue="widgets" className="flex-1">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="widgets">
-              <Sparkles className="h-4 w-4 mr-2" />
-              Select Widgets
-            </TabsTrigger>
-            <TabsTrigger value="layout">
-              <LayoutGrid className="h-4 w-4 mr-2" />
-              Preview Layout ({selectedWidgets.size})
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="widgets" className="flex-1">
-            <ScrollArea className="h-[500px] pr-4">
-              <div className="space-y-6">
-                {categories.length === 0 && (
-                  <div className="text-center py-12 text-gray-500">
-                    <LayoutGrid className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                    <p>No widgets available</p>
-                  </div>
-                )}
-
-                {categories.map((category) => {
-                  const Icon = CATEGORY_ICONS[category] || Activity;
-                  return (
-                    <div key={category}>
-                      <div className="flex items-center gap-2 mb-3">
-                        <Icon className="h-4 w-4 text-gray-600" />
-                        <h3 className="font-semibold text-gray-900 capitalize">
-                          {category.replace('_', ' ')}
-                        </h3>
-                        <Badge variant="secondary" className="ml-auto">
-                          {groupedWidgets[category].length}
-                        </Badge>
-                      </div>
-
-                      <div className="grid grid-cols-1 gap-3 mb-4">
-                        {groupedWidgets[category].map((widget) => (
-                          <Card 
-                            key={widget.widgetKey}
-                            className={`cursor-pointer transition-all ${
-                              selectedWidgets.has(widget.widgetKey) 
-                                ? 'border-blue-500 bg-blue-50' 
-                                : 'hover:border-gray-400'
-                            }`}
-                            onClick={() => handleToggleWidget(widget.widgetKey)}
-                          >
-                            <CardHeader className="pb-3">
-                              <div className="flex items-start justify-between">
-                                <div className="flex items-start gap-3 flex-1">
-                                  <Checkbox
-                                    checked={selectedWidgets.has(widget.widgetKey)}
-                                    onCheckedChange={() => handleToggleWidget(widget.widgetKey)}
-                                    onClick={(e) => e.stopPropagation()}
-                                  />
-                                  <div className="flex-1">
-                                    <CardTitle className="text-sm">{widget.title}</CardTitle>
-                                    <CardDescription className="text-xs mt-1">
-                                      {widget.description}
-                                    </CardDescription>
-                                  </div>
-                                </div>
-                                <Badge className={CATEGORY_COLORS[category]}>
-                                  {widget.dataSource}
-                                </Badge>
-                              </div>
-                            </CardHeader>
-                            
-                            {selectedWidgets.has(widget.widgetKey) && (
-                              <CardContent className="pt-0">
-                                <div className="flex items-center gap-2 text-xs text-gray-600">
-                                  <span>Size:</span>
-                                  <div className="flex gap-1">
-                                    {[1, 2, 3].map((size) => (
-                                      <Button
-                                        key={size}
-                                        size="sm"
-                                        variant={widgetSizes[widget.widgetKey] === size ? "default" : "outline"}
-                                        className="h-6 px-2 text-xs"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleSizeChange(widget.widgetKey, size);
-                                        }}
-                                      >
-                                        {size === 1 ? 'Small' : size === 2 ? 'Medium' : 'Large'}
-                                      </Button>
-                                    ))}
-                                  </div>
-                                </div>
-                              </CardContent>
-                            )}
-                          </Card>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </ScrollArea>
-          </TabsContent>
-
-          <TabsContent value="layout" className="flex-1">
-            <ScrollArea className="h-[500px] pr-4">
-              {selectedWidgets.size === 0 ? (
-                <div className="flex items-center justify-center h-64 text-gray-500">
-                  <div className="text-center">
-                    <LayoutGrid className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                    <p>No widgets selected</p>
-                    <p className="text-sm mt-1">Select widgets from the "Select Widgets" tab</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-3 gap-4">
-                  {Array.from(selectedWidgets).map((widgetKey) => {
-                    const widget = widgets.find(w => w.widgetKey === widgetKey);
-                    const size = widgetSizes[widgetKey] || 1;
-                    return (
-                      <Card 
-                        key={widgetKey}
-                        className={`${
-                          size === 3 ? 'col-span-3' : size === 2 ? 'col-span-2' : 'col-span-1'
-                        } border-2 border-dashed border-gray-300`}
-                      >
-                        <CardHeader>
-                          <CardTitle className="text-sm flex items-center justify-between">
-                            {widget?.title}
-                            <Badge variant="secondary" className="text-xs">
-                              {size === 1 ? 'Small' : size === 2 ? 'Medium' : 'Large'}
-                            </Badge>
-                          </CardTitle>
-                          <CardDescription className="text-xs">
-                            {widget?.description}
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="h-24 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-xs">
-                            Widget Preview
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              )}
-            </ScrollArea>
-          </TabsContent>
-        </Tabs>
-
-        <DialogFooter className="gap-2">
+    <StandardDialogShell
+      open={open}
+      onOpenChange={(isOpen) => !isOpen && onClose()}
+      title="Customize Dashboard"
+      description="Select widgets to display on your dashboard and configure their layout"
+      icon={LayoutGrid}
+      size="lg"
+      footer={
+        <>
           <Button
             variant="outline"
             onClick={handleReset}
@@ -390,12 +234,161 @@ export default function DashboardCustomizationModal({
           <Button 
             onClick={handleSave}
             disabled={saveLayoutMutation.isPending || selectedWidgets.size === 0}
+            className="bg-[#1E4FAB] hover:bg-[#1a4294]"
           >
             <Save className="h-4 w-4 mr-2" />
             {saveLayoutMutation.isPending ? 'Saving...' : 'Save Layout'}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </>
+      }
+    >
+      <Tabs defaultValue="widgets" className="flex-1">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="widgets">
+            <Sparkles className="h-4 w-4 mr-2" />
+            Select Widgets
+          </TabsTrigger>
+          <TabsTrigger value="layout">
+            <LayoutGrid className="h-4 w-4 mr-2" />
+            Preview Layout ({selectedWidgets.size})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="widgets" className="flex-1">
+          <ScrollArea className="h-[500px] pr-4">
+            <div className="space-y-6">
+              {categories.length === 0 && (
+                <div className="text-center py-12 text-gray-500">
+                  <LayoutGrid className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>No widgets available</p>
+                </div>
+              )}
+
+              {categories.map((category) => {
+                const Icon = CATEGORY_ICONS[category] || Activity;
+                return (
+                  <div key={category}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Icon className="h-4 w-4 text-gray-600" />
+                      <h3 className="font-semibold text-gray-900 capitalize">
+                        {category.replace('_', ' ')}
+                      </h3>
+                      <Badge variant="secondary" className="ml-auto">
+                        {groupedWidgets[category].length}
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 mb-4">
+                      {groupedWidgets[category].map((widget) => (
+                        <Card 
+                          key={widget.widgetKey}
+                          className={`cursor-pointer transition-all ${
+                            selectedWidgets.has(widget.widgetKey) 
+                              ? 'border-blue-500 bg-blue-50' 
+                              : 'hover:border-gray-400'
+                          }`}
+                          onClick={() => handleToggleWidget(widget.widgetKey)}
+                        >
+                          <CardHeader className="pb-3">
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-start gap-3 flex-1">
+                                <Checkbox
+                                  checked={selectedWidgets.has(widget.widgetKey)}
+                                  onCheckedChange={() => handleToggleWidget(widget.widgetKey)}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                                <div className="flex-1">
+                                  <CardTitle className="text-sm">{widget.title}</CardTitle>
+                                  <CardDescription className="text-xs mt-1">
+                                    {widget.description}
+                                  </CardDescription>
+                                </div>
+                              </div>
+                              <Badge className={CATEGORY_COLORS[category]}>
+                                {widget.dataSource}
+                              </Badge>
+                            </div>
+                          </CardHeader>
+                          
+                          {selectedWidgets.has(widget.widgetKey) && (
+                            <CardContent className="pt-0">
+                              <div className="flex items-center gap-2 text-xs text-gray-600">
+                                <span>Size:</span>
+                                <div className="flex gap-1">
+                                  {[1, 2, 3].map((size) => (
+                                    <Button
+                                      key={size}
+                                      size="sm"
+                                      variant={widgetSizes[widget.widgetKey] === size ? "default" : "outline"}
+                                      className="h-6 px-2 text-xs"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSizeChange(widget.widgetKey, size);
+                                      }}
+                                    >
+                                      {size === 1 ? 'Small' : size === 2 ? 'Medium' : 'Large'}
+                                    </Button>
+                                  ))}
+                                </div>
+                              </div>
+                            </CardContent>
+                          )}
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </ScrollArea>
+        </TabsContent>
+
+        <TabsContent value="layout" className="flex-1">
+          <ScrollArea className="h-[500px] pr-4">
+            {selectedWidgets.size === 0 ? (
+              <div className="flex items-center justify-center h-64 text-gray-500">
+                <div className="text-center">
+                  <LayoutGrid className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>No widgets selected</p>
+                  <p className="text-sm mt-1">Select widgets from the "Select Widgets" tab</p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-4">
+                {Array.from(selectedWidgets).map((widgetKey) => {
+                  const widget = widgets.find(w => w.widgetKey === widgetKey);
+                  const size = widgetSizes[widgetKey] || 1;
+                  return (
+                    <Card 
+                      key={widgetKey}
+                      className={`${
+                        size === 3 ? 'col-span-3' : size === 2 ? 'col-span-2' : 'col-span-1'
+                      } border-2 border-dashed border-gray-300`}
+                    >
+                      <CardHeader>
+                        <CardTitle className="text-sm flex items-center justify-between">
+                          {widget?.title}
+                          <Badge variant="secondary" className="text-xs">
+                            {size === 1 ? 'Small' : size === 2 ? 'Medium' : 'Large'}
+                          </Badge>
+                        </CardTitle>
+                        <CardDescription className="text-xs">
+                          {widget?.description}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-24 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-xs">
+                          Widget Preview
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </ScrollArea>
+        </TabsContent>
+      </Tabs>
+    </StandardDialogShell>
   );
 }

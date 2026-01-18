@@ -1,11 +1,7 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
-import {
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Activity } from "lucide-react";
+import { StandardDialogShell } from "@/components/ui/standard-dialog-shell";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,18 +21,21 @@ const activityFormSchema = insertActivitySchema.extend({
 type ActivityFormValues = z.infer<typeof activityFormSchema>;
 
 interface ActivityComposerModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   templates: ActivityTemplate[];
-  onClose: () => void;
   defaultDate?: Date;
 }
 
 export function ActivityComposerModal({ 
+  open,
+  onOpenChange,
   templates, 
-  onClose,
   defaultDate
 }: ActivityComposerModalProps) {
   const { toast } = useToast();
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  const formRef = useRef<HTMLFormElement>(null);
 
   const form = useForm<ActivityFormValues>({
     resolver: zodResolver(activityFormSchema),
@@ -49,10 +48,8 @@ export function ActivityComposerModal({
       entityType: "general",
       entityId: undefined,
       scheduledAt: defaultDate ? (() => {
-        // Set time to noon to avoid timezone boundary issues
         const d = new Date(defaultDate);
         d.setHours(12, 0, 0, 0);
-        // Format for datetime-local input (YYYY-MM-DDTHH:MM)
         const year = d.getFullYear();
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const day = String(d.getDate()).padStart(2, '0');
@@ -79,7 +76,7 @@ export function ActivityComposerModal({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/activities'] });
       toast({ title: "Activity created successfully" });
-      onClose();
+      onOpenChange(false);
     },
     onError: (error: Error) => {
       toast({ title: "Failed to create activity", description: error.message, variant: "destructive" });
@@ -106,105 +103,66 @@ export function ActivityComposerModal({
     createMutation.mutate(values);
   };
 
+  const handlePrimaryAction = () => {
+    formRef.current?.requestSubmit();
+  };
+
   return (
-    <DialogContent className="max-w-2xl" data-testid="modal-activity-composer">
-      <DialogHeader>
-        <DialogTitle>Create Activity</DialogTitle>
-      </DialogHeader>
-
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          {templates.length > 0 && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Template</label>
-              <Select value={selectedTemplate} onValueChange={handleTemplateSelect}>
-                <SelectTrigger data-testid="select-activity-template">
-                  <SelectValue placeholder="Choose a template..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {templates.map((template) => (
-                    <SelectItem key={template.id} value={template.id}>
-                      {template.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          <FormField
-            control={form.control}
-            name="type"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Activity Type</FormLabel>
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger data-testid="select-activity-type">
-                    <SelectValue />
+    <StandardDialogShell
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Create Activity"
+      icon={Activity}
+      size="lg"
+      primaryAction={{
+        label: "Create Activity",
+        onClick: handlePrimaryAction,
+        disabled: createMutation.isPending,
+        loading: createMutation.isPending,
+      }}
+      secondaryAction={{
+        label: "Cancel",
+        onClick: () => onOpenChange(false),
+      }}
+    >
+      <div data-testid="modal-activity-composer">
+        <Form {...form}>
+          <form ref={formRef} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {templates.length > 0 && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Template</label>
+                <Select value={selectedTemplate} onValueChange={handleTemplateSelect}>
+                  <SelectTrigger data-testid="select-activity-template">
+                    <SelectValue placeholder="Choose a template..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="call">Call</SelectItem>
-                    <SelectItem value="email">Email</SelectItem>
-                    <SelectItem value="sms">SMS</SelectItem>
-                    <SelectItem value="meeting">Meeting</SelectItem>
-                    <SelectItem value="showing">Property Showing</SelectItem>
-                    <SelectItem value="note">Note</SelectItem>
+                    {templates.map((template) => (
+                      <SelectItem key={template.id} value={template.id}>
+                        {template.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-                <FormMessage />
-              </FormItem>
+              </div>
             )}
-          />
 
-          <FormField
-            control={form.control}
-            name="subject"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Subject</FormLabel>
-                <FormControl>
-                  <Input {...field} value={field.value || ""} placeholder="Activity subject" data-testid="input-activity-subject" />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="description"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Description</FormLabel>
-                <FormControl>
-                  <Textarea 
-                    {...field} 
-                    placeholder="Activity details..." 
-                    rows={4}
-                    data-testid="textarea-activity-description"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <div className="grid grid-cols-2 gap-4">
             <FormField
               control={form.control}
-              name="status"
+              name="type"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Status</FormLabel>
-                  <Select value={field.value || "completed"} onValueChange={field.onChange}>
-                    <SelectTrigger data-testid="select-activity-status">
+                  <FormLabel>Activity Type</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger data-testid="select-activity-type">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="scheduled">Scheduled</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                      <SelectItem value="call">Call</SelectItem>
+                      <SelectItem value="email">Email</SelectItem>
+                      <SelectItem value="sms">SMS</SelectItem>
+                      <SelectItem value="meeting">Meeting</SelectItem>
+                      <SelectItem value="showing">Property Showing</SelectItem>
+                      <SelectItem value="note">Note</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -214,54 +172,102 @@ export function ActivityComposerModal({
 
             <FormField
               control={form.control}
-              name="direction"
+              name="subject"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Direction</FormLabel>
-                  <Select value={field.value || ""} onValueChange={field.onChange}>
-                    <SelectTrigger data-testid="select-activity-direction">
-                      <SelectValue placeholder="Select direction" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="inbound">Inbound</SelectItem>
-                      <SelectItem value="outbound">Outbound</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <FormLabel>Subject</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value || ""} placeholder="Activity subject" data-testid="input-activity-subject" />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-          </div>
 
-          <FormField
-            control={form.control}
-            name="scheduledAt"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Scheduled Date/Time</FormLabel>
-                <FormControl>
-                  <Input 
-                    type="datetime-local" 
-                    {...field} 
-                    value={field.value || ""}
-                    data-testid="input-activity-scheduled"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      {...field} 
+                      placeholder="Activity details..." 
+                      rows={4}
+                      data-testid="textarea-activity-description"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onClose} data-testid="button-cancel-activity">
-              Cancel
-            </Button>
-            <Button type="submit" disabled={createMutation.isPending} data-testid="button-save-activity">
-              {createMutation.isPending ? "Creating..." : "Create Activity"}
-            </Button>
-          </div>
-        </form>
-      </Form>
-    </DialogContent>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select value={field.value || "completed"} onValueChange={field.onChange}>
+                      <SelectTrigger data-testid="select-activity-status">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="scheduled">Scheduled</SelectItem>
+                        <SelectItem value="in_progress">In Progress</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="direction"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Direction</FormLabel>
+                    <Select value={field.value || ""} onValueChange={field.onChange}>
+                      <SelectTrigger data-testid="select-activity-direction">
+                        <SelectValue placeholder="Select direction" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="inbound">Inbound</SelectItem>
+                        <SelectItem value="outbound">Outbound</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="scheduledAt"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Scheduled Date/Time</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="datetime-local" 
+                      {...field} 
+                      value={field.value || ""}
+                      data-testid="input-activity-scheduled"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </form>
+        </Form>
+      </div>
+    </StandardDialogShell>
   );
 }

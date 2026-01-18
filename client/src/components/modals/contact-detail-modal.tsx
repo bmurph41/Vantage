@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { StandardDialogShell } from "@/components/ui/standard-dialog-shell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -373,9 +373,18 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
     default: 'text-gray-600 bg-gray-100',
   };
 
+  const contactName = contact ? `${contact.firstName} ${contact.lastName}`.trim() : "Contact Details";
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[1100px] max-h-[95vh] overflow-hidden flex flex-col p-0" data-testid="modal-contact-detail">
+    <StandardDialogShell
+      open={isOpen}
+      onOpenChange={onClose}
+      title={contactName || "Contact Details"}
+      icon={User}
+      size="lg"
+      className="sm:max-w-[1100px] max-h-[95vh] overflow-hidden flex flex-col p-0"
+    >
+      <div data-testid="modal-contact-detail" className="-mt-4">
         {/* Enhanced Header */}
         <div className="bg-gradient-to-r from-slate-50 to-blue-50 dark:from-slate-900 dark:to-blue-950 px-6 py-5 border-b">
           <div className="flex items-start justify-between">
@@ -403,9 +412,9 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
               
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3">
-                  <DialogTitle className="text-2xl font-bold truncate">
+                  <h3 className="text-2xl font-bold truncate">
                     {form.watch('firstName')} {form.watch('lastName')}
-                  </DialogTitle>
+                  </h3>
                   {isEditing && (
                     <div className="flex items-center gap-1.5 text-sm" data-testid="text-save-status">
                       {saveStatus === 'saving' && (
@@ -1240,7 +1249,7 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
             </TabsContent>
           </ScrollArea>
         </Tabs>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </StandardDialogShell>
   );
 }

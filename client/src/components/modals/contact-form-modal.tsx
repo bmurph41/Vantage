@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { StandardDialogShell } from "@/components/ui/standard-dialog-shell";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -383,24 +383,26 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
   const isLoading = createContactMutation.isPending || updateContactMutation.isPending;
 
   return (
-    <Dialog open={isOpen} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-5xl max-h-[92vh] p-0 overflow-hidden" data-testid="contact-form-modal">
-        <DialogHeader className="px-8 pt-8 pb-4 border-b bg-muted/30">
-          <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-              <User className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <DialogTitle className="text-2xl font-semibold">
-                {isEdit ? "Edit Contact" : "Add Contact"}
-              </DialogTitle>
-              <DialogDescription className="text-sm text-muted-foreground mt-1">
-                Business-ready contact card. Only the essentials.
-              </DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
-
+    <StandardDialogShell
+      open={isOpen}
+      onOpenChange={(v) => { if (!v) onClose(); }}
+      title={isEdit ? "Edit Contact" : "Create Contact"}
+      description="Business-ready contact card. Only the essentials."
+      icon={User}
+      size="lg"
+      className="max-w-5xl max-h-[92vh] p-0 overflow-hidden"
+      primaryAction={{
+        label: isEdit ? "Save Changes" : "Add Contact",
+        onClick: handleSave,
+        disabled: isLoading,
+        loading: isLoading,
+      }}
+      secondaryAction={{
+        label: "Cancel",
+        onClick: onClose,
+        disabled: isLoading,
+      }}
+    >
         {/* Body */}
         <div className="px-8 py-6 overflow-y-auto max-h-[calc(92vh-200px)] space-y-6">
           {/* Photo + Basic Info Card */}
@@ -923,33 +925,6 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
             </CardContent>
           </Card>
         </div>
-
-        <DialogFooter className="px-8 py-5 border-t bg-muted/30 flex items-center justify-between sticky bottom-0">
-          <p className="text-xs text-muted-foreground flex items-center gap-1">
-            Press <kbd className="px-2 py-1 bg-muted border rounded-md text-xs font-mono">Esc</kbd> to close
-          </p>
-          <div className="flex items-center gap-3">
-            <Button 
-              variant="outline" 
-              onClick={onClose}
-              disabled={isLoading}
-              data-testid="button-cancel"
-              className="min-w-24"
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleSave} 
-              className="min-w-32 bg-primary hover:bg-primary/90"
-              disabled={isLoading}
-              data-testid="button-save-contact"
-              size="lg"
-            >
-              {isLoading ? "Saving..." : (isEdit ? "Save Changes" : "Add Contact")}
-            </Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </StandardDialogShell>
   );
 }

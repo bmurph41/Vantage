@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { StandardDialogShell } from "@/components/ui/standard-dialog-shell";
 import { Button } from "@/components/ui/button";
-import { User, Building, Handshake, Calendar } from "lucide-react";
+import { User, Building, Handshake, Calendar, PlusCircle } from "lucide-react";
 import ContactFormModal from "./contact-form-modal";
 import CompanyFormModal from "./company-form-modal";
 import DealFormModal from "./deal-form-modal";
@@ -17,7 +17,7 @@ export default function AddNewModal({ isOpen, onClose }: AddNewModalProps) {
 
   const handleModalOpen = (modalType: string) => {
     setActiveModal(modalType);
-    onClose(); // Close the main modal
+    onClose();
   };
 
   const handleModalClose = () => {
@@ -57,30 +57,31 @@ export default function AddNewModal({ isOpen, onClose }: AddNewModalProps) {
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-md" data-testid="add-new-modal">
-          <DialogHeader>
-            <DialogTitle>Add New</DialogTitle>
-          </DialogHeader>
-          <div className="grid grid-cols-2 gap-4 py-4">
-            {options.map((option) => (
-              <Button
-                key={option.id}
-                variant="outline"
-                className="flex flex-col items-center p-6 h-auto space-y-3 hover:bg-gray-50"
-                onClick={() => handleModalOpen(option.id)}
-                data-testid={`button-add-${option.id}`}
-              >
-                <option.icon className={`w-8 h-8 ${option.color}`} />
-                <div className="text-center">
-                  <div className="font-medium text-sm">{option.title}</div>
-                  <div className="text-xs text-gray-500 mt-1">{option.description}</div>
-                </div>
-              </Button>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <StandardDialogShell
+        open={isOpen}
+        onOpenChange={onClose}
+        title="Add New"
+        icon={PlusCircle}
+        size="sm"
+      >
+        <div className="grid grid-cols-2 gap-4" data-testid="add-new-modal">
+          {options.map((option) => (
+            <Button
+              key={option.id}
+              variant="outline"
+              className="flex flex-col items-center p-6 h-auto space-y-3 hover:bg-gray-50"
+              onClick={() => handleModalOpen(option.id)}
+              data-testid={`button-add-${option.id}`}
+            >
+              <option.icon className={`w-8 h-8 ${option.color}`} />
+              <div className="text-center">
+                <div className="font-medium text-sm">{option.title}</div>
+                <div className="text-xs text-gray-500 mt-1">{option.description}</div>
+              </div>
+            </Button>
+          ))}
+        </div>
+      </StandardDialogShell>
 
       {/* Sub-modals */}
       <ContactFormModal

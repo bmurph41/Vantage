@@ -1,17 +1,11 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useLocation } from 'wouter';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { StandardDialogShell } from '@/components/ui/standard-dialog-shell';
 import {
   Form,
   FormControl,
@@ -44,7 +38,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Loader2, Check, ChevronsUpDown, User, Building2 } from 'lucide-react';
+import { Loader2, Check, ChevronsUpDown, User, Building2, Calculator } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { normalizeState } from '@shared/utils/state-normalization';
@@ -333,294 +327,85 @@ export default function ModelingProjectFormDialog({
     : null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {mode === 'create' ? 'New Project' : 'Edit Modeling Project'}
-          </DialogTitle>
-          <DialogDescription>
-            {mode === 'create'
-              ? 'Add a new valuation/financial modeling project'
-              : 'Update the modeling project details'}
-          </DialogDescription>
-        </DialogHeader>
-
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="marinaName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Marina Name *</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="Enter marina name" data-testid="input-marina-name" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="address"
-              render={({ field }) => (
-                <FormItem>
-                  <FormControl>
-                    <AddressInput
-                      value={field.value || ''}
-                      onChange={(value) => field.onChange(value)}
-                      onAddressSelect={handleAddressSelect}
-                      label="Address"
-                      placeholder="Start typing an address..."
-                      testId="input-address"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-3 gap-4">
-              <FormField
-                control={form.control}
-                name="city"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>City</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value || ''} placeholder="City" data-testid="input-city" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="state"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>State</FormLabel>
-                    <FormControl>
-                      <Input 
-                        {...field} 
-                        value={field.value || ''} 
-                        placeholder="FL" 
-                        data-testid="input-state"
-                        onBlur={(e) => {
-                          field.onBlur();
-                          handleStateBlur();
-                        }}
-                        maxLength={20}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="zipCode"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Zip Code</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value || ''} placeholder="12345" data-testid="input-zipcode" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <FormField
-              control={form.control}
-              name="region"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Region</FormLabel>
-                  <Select
-                    onValueChange={(value) => field.onChange(value === 'none' ? '' : value)}
-                    value={field.value || 'none'}
-                  >
-                    <FormControl>
-                      <SelectTrigger data-testid="select-region">
-                        <SelectValue placeholder="Select a region" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">No region</SelectItem>
-                      {sortedRegions 
-                        ? sortedRegions.map((region) => (
-                            <SelectItem key={region.id} value={region.name}>
-                              {region.name}
-                            </SelectItem>
-                          ))
-                        : US_REGIONS.map((region) => (
-                            <SelectItem key={region} value={region}>
-                              {region}
-                            </SelectItem>
-                          ))
-                      }
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="dealSource"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Deal Source</FormLabel>
-                  <Select 
-                    onValueChange={(value) => field.onChange(value === 'none' ? null : value)} 
-                    value={field.value || 'none'}
-                  >
-                    <FormControl>
-                      <SelectTrigger data-testid="select-deal-source">
-                        <SelectValue placeholder="Select deal source" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">No source selected</SelectItem>
-                      <SelectItem value="direct_to_seller">Direct to Seller</SelectItem>
-                      <SelectItem value="broker">Broker</SelectItem>
-                      <SelectItem value="owned_marina">Owned Marina</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {dealSource === 'broker' && (
-              <FormField
-                control={form.control}
-                name="brokerId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Broker</FormLabel>
-                    <Popover open={brokerPopoverOpen} onOpenChange={setBrokerPopoverOpen}>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            className={cn(
-                              "w-full justify-between",
-                              !selectedBrokerDisplay && "text-muted-foreground"
-                            )}
-                            data-testid="button-select-broker"
-                          >
-                            {selectedBrokerDisplay || "Search for a broker..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[400px] p-0" align="start">
-                        <Command shouldFilter={false}>
-                          <CommandInput 
-                            placeholder="Search brokers by name or company..."
-                            value={brokerSearch}
-                            onValueChange={setBrokerSearch}
-                            data-testid="input-broker-search"
-                          />
-                          <CommandList>
-                            {brokerSearch.length < 2 ? (
-                              <CommandEmpty>Type at least 2 characters to search...</CommandEmpty>
-                            ) : isSearchingBrokers ? (
-                              <div className="flex items-center justify-center py-6">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              </div>
-                            ) : (
-                              <>
-                                {brokerResults?.contacts && brokerResults.contacts.length > 0 && (
-                                  <CommandGroup heading="Contacts">
-                                    {brokerResults.contacts.map((contact) => (
-                                      <CommandItem
-                                        key={contact.id}
-                                        value={contact.id}
-                                        onSelect={() => handleSelectBroker(contact)}
-                                        data-testid={`broker-contact-${contact.id}`}
-                                      >
-                                        <User className="mr-2 h-4 w-4" />
-                                        <div className="flex flex-col">
-                                          <span>{contact.firstName} {contact.lastName}</span>
-                                          {contact.companyName && (
-                                            <span className="text-xs text-muted-foreground">{contact.companyName}</span>
-                                          )}
-                                        </div>
-                                        {field.value === contact.id && (
-                                          <Check className="ml-auto h-4 w-4" />
-                                        )}
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                )}
-                                {brokerResults?.contacts && brokerResults.contacts.length > 0 && 
-                                 brokerResults?.companies && brokerResults.companies.length > 0 && (
-                                  <CommandSeparator />
-                                )}
-                                {brokerResults?.companies && brokerResults.companies.length > 0 && (
-                                  <CommandGroup heading="Companies">
-                                    {brokerResults.companies.map((company) => (
-                                      <CommandItem
-                                        key={company.id}
-                                        value={company.id}
-                                        onSelect={() => handleSelectCompany(company)}
-                                        data-testid={`broker-company-${company.id}`}
-                                      >
-                                        <Building2 className="mr-2 h-4 w-4" />
-                                        <span>{company.name}</span>
-                                        {form.getValues('brokerCompanyId') === company.id && !form.getValues('brokerId') && (
-                                          <Check className="ml-auto h-4 w-4" />
-                                        )}
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                )}
-                                {(!brokerResults?.contacts || brokerResults.contacts.length === 0) && 
-                                 (!brokerResults?.companies || brokerResults.companies.length === 0) && (
-                                  <CommandEmpty>No brokers found</CommandEmpty>
-                                )}
-                              </>
-                            )}
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+    <StandardDialogShell
+      open={open}
+      onOpenChange={onOpenChange}
+      title={mode === 'create' ? 'Create Project' : 'Edit Project'}
+      description={mode === 'create'
+        ? 'Add a new valuation/financial modeling project'
+        : 'Update the modeling project details'}
+      icon={Calculator}
+      size="lg"
+      className="max-h-[90vh] overflow-y-auto"
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isPending}
+            data-testid="button-cancel"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="modeling-project-form"
+            disabled={isPending}
+            data-testid="button-submit"
+          >
+            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {mode === 'create' ? 'Create' : 'Update'}
+          </Button>
+        </div>
+      }
+    >
+      <Form {...form}>
+        <form id="modeling-project-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <FormField
+            control={form.control}
+            name="marinaName"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Marina Name *</FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="Enter marina name" data-testid="input-marina-name" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
             )}
+          />
 
+          <FormField
+            control={form.control}
+            name="address"
+            render={({ field }) => (
+              <FormItem>
+                <FormControl>
+                  <AddressInput
+                    value={field.value || ''}
+                    onChange={(value) => field.onChange(value)}
+                    onAddressSelect={handleAddressSelect}
+                    label="Address"
+                    placeholder="Start typing an address..."
+                    testId="input-address"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <div className="grid grid-cols-3 gap-4">
             <FormField
               control={form.control}
-              name="dealOutcome"
+              name="city"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Deal Status</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger data-testid="select-outcome">
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="under_review">Under Review</SelectItem>
-                      <SelectItem value="won">Won</SelectItem>
-                      <SelectItem value="lost">Lost</SelectItem>
-                      <SelectItem value="passed">Passed</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <FormLabel>City</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value || ''} placeholder="City" data-testid="input-city" />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -628,17 +413,21 @@ export default function ModelingProjectFormDialog({
 
             <FormField
               control={form.control}
-              name="notes"
+              name="state"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notes</FormLabel>
+                  <FormLabel>State</FormLabel>
                   <FormControl>
-                    <Textarea
-                      {...field}
-                      value={field.value || ''}
-                      placeholder="Additional notes or comments..."
-                      rows={3}
-                      data-testid="textarea-notes"
+                    <Input 
+                      {...field} 
+                      value={field.value || ''} 
+                      placeholder="FL" 
+                      data-testid="input-state"
+                      onBlur={(e) => {
+                        field.onBlur();
+                        handleStateBlur();
+                      }}
+                      maxLength={20}
                     />
                   </FormControl>
                   <FormMessage />
@@ -646,24 +435,232 @@ export default function ModelingProjectFormDialog({
               )}
             />
 
-            <div className="flex justify-end gap-2 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={isPending}
-                data-testid="button-cancel"
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isPending} data-testid="button-submit">
-                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {mode === 'create' ? 'Create' : 'Update'}
-              </Button>
-            </div>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+            <FormField
+              control={form.control}
+              name="zipCode"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Zip Code</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value || ''} placeholder="12345" data-testid="input-zipcode" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          <FormField
+            control={form.control}
+            name="region"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Region</FormLabel>
+                <Select
+                  onValueChange={(value) => field.onChange(value === 'none' ? '' : value)}
+                  value={field.value || 'none'}
+                >
+                  <FormControl>
+                    <SelectTrigger data-testid="select-region">
+                      <SelectValue placeholder="Select a region" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="none">No region</SelectItem>
+                    {sortedRegions 
+                      ? sortedRegions.map((region) => (
+                          <SelectItem key={region.id} value={region.name}>
+                            {region.name}
+                          </SelectItem>
+                        ))
+                      : US_REGIONS.map((region) => (
+                          <SelectItem key={region} value={region}>
+                            {region}
+                          </SelectItem>
+                        ))
+                    }
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="dealSource"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Deal Source</FormLabel>
+                <Select 
+                  onValueChange={(value) => field.onChange(value === 'none' ? null : value)} 
+                  value={field.value || 'none'}
+                >
+                  <FormControl>
+                    <SelectTrigger data-testid="select-deal-source">
+                      <SelectValue placeholder="Select deal source" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="none">No source selected</SelectItem>
+                    <SelectItem value="direct_to_seller">Direct to Seller</SelectItem>
+                    <SelectItem value="broker">Broker</SelectItem>
+                    <SelectItem value="owned_marina">Owned Marina</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {dealSource === 'broker' && (
+            <FormField
+              control={form.control}
+              name="brokerId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Broker</FormLabel>
+                  <Popover open={brokerPopoverOpen} onOpenChange={setBrokerPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className={cn(
+                            "w-full justify-between",
+                            !selectedBrokerDisplay && "text-muted-foreground"
+                          )}
+                          data-testid="button-select-broker"
+                        >
+                          {selectedBrokerDisplay || "Search for a broker..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[400px] p-0" align="start">
+                      <Command shouldFilter={false}>
+                        <CommandInput 
+                          placeholder="Search brokers by name or company..."
+                          value={brokerSearch}
+                          onValueChange={setBrokerSearch}
+                          data-testid="input-broker-search"
+                        />
+                        <CommandList>
+                          {brokerSearch.length < 2 ? (
+                            <CommandEmpty>Type at least 2 characters to search...</CommandEmpty>
+                          ) : isSearchingBrokers ? (
+                            <div className="flex items-center justify-center py-6">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            </div>
+                          ) : (
+                            <>
+                              {brokerResults?.contacts && brokerResults.contacts.length > 0 && (
+                                <CommandGroup heading="Contacts">
+                                  {brokerResults.contacts.map((contact) => (
+                                    <CommandItem
+                                      key={contact.id}
+                                      value={contact.id}
+                                      onSelect={() => handleSelectBroker(contact)}
+                                      data-testid={`broker-contact-${contact.id}`}
+                                    >
+                                      <User className="mr-2 h-4 w-4" />
+                                      <div className="flex flex-col">
+                                        <span>{contact.firstName} {contact.lastName}</span>
+                                        {contact.companyName && (
+                                          <span className="text-xs text-muted-foreground">{contact.companyName}</span>
+                                        )}
+                                      </div>
+                                      {field.value === contact.id && (
+                                        <Check className="ml-auto h-4 w-4" />
+                                      )}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              )}
+                              {brokerResults?.contacts && brokerResults.contacts.length > 0 && 
+                               brokerResults?.companies && brokerResults.companies.length > 0 && (
+                                <CommandSeparator />
+                              )}
+                              {brokerResults?.companies && brokerResults.companies.length > 0 && (
+                                <CommandGroup heading="Companies">
+                                  {brokerResults.companies.map((company) => (
+                                    <CommandItem
+                                      key={company.id}
+                                      value={company.id}
+                                      onSelect={() => handleSelectCompany(company)}
+                                      data-testid={`broker-company-${company.id}`}
+                                    >
+                                      <Building2 className="mr-2 h-4 w-4" />
+                                      <span>{company.name}</span>
+                                      {form.getValues('brokerCompanyId') === company.id && !form.getValues('brokerId') && (
+                                        <Check className="ml-auto h-4 w-4" />
+                                      )}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              )}
+                              {(!brokerResults?.contacts || brokerResults.contacts.length === 0) && 
+                               (!brokerResults?.companies || brokerResults.companies.length === 0) && (
+                                <CommandEmpty>No brokers found</CommandEmpty>
+                              )}
+                            </>
+                          )}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+
+          <FormField
+            control={form.control}
+            name="dealOutcome"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Deal Status</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger data-testid="select-outcome">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="under_review">Under Review</SelectItem>
+                    <SelectItem value="won">Won</SelectItem>
+                    <SelectItem value="lost">Lost</SelectItem>
+                    <SelectItem value="passed">Passed</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="notes"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Notes</FormLabel>
+                <FormControl>
+                  <Textarea
+                    {...field}
+                    value={field.value || ''}
+                    placeholder="Additional notes or comments..."
+                    rows={3}
+                    data-testid="textarea-notes"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </form>
+      </Form>
+    </StandardDialogShell>
   );
 }
