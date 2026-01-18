@@ -341,7 +341,7 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
             if (!open) completeOnboarding();
             setShowOnboarding(open);
           }}
-          userName={user?.firstName || user?.email?.split('@')[0]}
+          userName={user?.name?.split(' ')[0] || user?.email?.split('@')[0]}
         />
       </Suspense>
     </div>
