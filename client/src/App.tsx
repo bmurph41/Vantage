@@ -180,6 +180,7 @@ const ServiceTabbed = lazy(() => import("@/pages/operations/ServiceTabbed"));
 const BoatRentalsTabbed = lazy(() => import("@/pages/operations/BoatRentalsTabbed"));
 const BoatClubTabbed = lazy(() => import("@/pages/operations/BoatClubTabbed"));
 const BoatSalesTabbed = lazy(() => import("@/pages/operations/BoatSalesTabbed"));
+const BookkeepingTabbed = lazy(() => import("@/pages/operations/BookkeepingTabbed"));
 const SalesCompsIndex = lazy(() => import("@/pages/analysis/sales-comps/Index"));
 const SalesCompsAnalytics = lazy(() => import("@/pages/analysis/sales-comps/Analytics"));
 const SalesCompsProjects = lazy(() => import("@/pages/analysis/sales-comps/Projects"));
@@ -935,6 +936,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <BoatSalesTabbed />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/operations/bookkeeping">
+        {() => (
+          <UnifiedLayout>
+            <BookkeepingTabbed />
           </UnifiedLayout>
         )}
       </Route>

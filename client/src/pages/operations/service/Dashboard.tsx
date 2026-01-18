@@ -11,6 +11,7 @@ import {
   ArrowUpRight, ArrowDownRight
 } from "lucide-react";
 import { Link } from "wouter";
+import { ContextIntegrationsPanel } from "@/components/integrations/ContextIntegrationsPanel";
 
 interface ServiceStats {
   total: number;
@@ -331,6 +332,12 @@ export default function ServiceDashboard() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <ContextIntegrationsPanel 
+        contextKey="service"
+        title="Service Integrations"
+        description="Connect service and work order software to sync data with MarinaMatch."
+      />
     </div>
   );
 }

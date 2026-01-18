@@ -12,6 +12,7 @@ import {
   PauseCircle, Timer, Users, ArrowUpDown
 } from "lucide-react";
 import DockitAppShell, { LaunchFilters, defaultFilters } from "@/components/dockit/DockitAppShell";
+import { ContextIntegrationsPanel } from "@/components/integrations/ContextIntegrationsPanel";
 import { startOfDay, startOfWeek, startOfMonth, startOfQuarter, startOfYear, endOfDay, endOfWeek, endOfMonth, endOfQuarter, endOfYear, isWithinInterval, parseISO } from "date-fns";
 
 interface DashboardStats {
@@ -455,6 +456,13 @@ export default function DockitDashboard() {
             )}
           </CardContent>
         </Card>
+
+        {/* Integrations Panel */}
+        <ContextIntegrationsPanel 
+          contextKey="dockit"
+          title="Dockit Integrations"
+          description="Connect launch and scheduling software to sync data with MarinaMatch."
+        />
       </div>
     </DockitAppShell>
   );

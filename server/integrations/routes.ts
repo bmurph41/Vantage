@@ -299,6 +299,56 @@ integrationsRouter.patch('/api/integrations/:key/settings', async (req: Request,
   }
 });
 
+integrationsRouter.get('/api/integrations/pipeline/status', async (req: Request, res: Response) => {
+  const userId = requireUser(req, res);
+  if (!userId) return;
+  const orgId = getOrgId(req) || 'org-1';
+
+  try {
+    const { IntegrationDataPipelineService } = await import('../services/integration-data-pipeline');
+    const pipeline = new IntegrationDataPipelineService(orgId, userId);
+    
+    const [syncStatus, connectedIntegrations] = await Promise.all([
+      pipeline.getBookkeepingSyncStatus(),
+      pipeline.getConnectedIntegrationsForModeling(),
+    ]);
+
+    res.json({
+      bookkeeping: syncStatus,
+      liveDataSources: connectedIntegrations,
+    });
+  } catch (error) {
+    console.error('Error fetching pipeline status:', error);
+    res.status(500).json({ error: 'Failed to fetch pipeline status' });
+  }
+});
+
+integrationsRouter.get('/api/integrations/pipeline/project/:projectId', async (req: Request, res: Response) => {
+  const userId = requireUser(req, res);
+  if (!userId) return;
+  const orgId = getOrgId(req) || 'org-1';
+  const { projectId } = req.params;
+
+  try {
+    const { IntegrationDataPipelineService } = await import('../services/integration-data-pipeline');
+    const pipeline = new IntegrationDataPipelineService(orgId, userId);
+    
+    const [isEligible, operationsData] = await Promise.all([
+      pipeline.isProjectEligibleForLiveData(projectId),
+      pipeline.getOperationsDataForProject(projectId),
+    ]);
+
+    res.json({
+      projectId,
+      isEligibleForLiveData: isEligible,
+      operationsData,
+    });
+  } catch (error) {
+    console.error('Error fetching project pipeline data:', error);
+    res.status(500).json({ error: 'Failed to fetch project data' });
+  }
+});
+
 integrationsRouter.get('/api/integrations/:key/oauth/authorize', async (req: Request, res: Response) => {
   const { key } = req.params;
   const { state } = req.query;

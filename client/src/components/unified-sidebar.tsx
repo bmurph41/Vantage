@@ -5,7 +5,7 @@ import {
   BarChart3, Users, Building, Handshake, Calendar, 
   Bot, Bell, Mail, PieChart, TrendingUp, Settings,
   LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight, ChevronLeft,
-  Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock, Receipt, RefreshCcw, Percent, Search, Wrench, Ship, ShoppingCart, PanelLeftClose, PanelLeft, Plug
+  Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock, Receipt, RefreshCcw, Percent, Search, Wrench, Ship, ShoppingCart, PanelLeftClose, PanelLeft, Plug, BookOpen
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DetailDrawer } from "@/components/crm/detail-drawer";
@@ -62,6 +62,7 @@ const operationsModulesNav = [
   { name: "Boat Rentals", href: "/operations/boat-rentals", icon: Ship },
   { name: "Boat Club", href: "/operations/boat-club", icon: Users },
   { name: "Boat Sales", href: "/operations/boat-sales", icon: ShoppingCart },
+  { name: "Bookkeeping", href: "/operations/bookkeeping", icon: BookOpen },
 ];
 
 // Deal Workspace Navigation - Consolidated DD, VDR, and Modeling

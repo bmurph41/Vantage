@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { LayoutDashboard, Box, CreditCard, BarChart3, DollarSign, Package, TrendingUp, ShoppingCart, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AssetSelector } from "@/components/AssetSelector";
+import { ContextIntegrationsPanel } from "@/components/integrations/ContextIntegrationsPanel";
 
 export default function ShipStoreDashboard() {
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
@@ -170,6 +171,12 @@ export default function ShipStoreDashboard() {
             </CardContent>
           </Card>
         </div>
+
+        <ContextIntegrationsPanel 
+          contextKey="shipStore"
+          title="Ship Store Integrations"
+          description="Connect POS and inventory systems to sync data with MarinaMatch."
+        />
       </div>
     </div>
   );
