@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { AddressAutocompleteInput, type NormalizedAddress } from "@/components/ui/address-autocomplete-input";
 import { 
   Building2, 
   Anchor, 
@@ -40,19 +41,36 @@ interface OnboardingWizardProps {
 type DealType = "acquisition" | "refinance" | "owned_marina" | null;
 type DealStructure = "single" | "portfolio" | null;
 
+interface MarinaAddress {
+  line1: string;
+  line2: string;
+  city: string;
+  state: string;
+  zip: string;
+  lat?: number;
+  lng?: number;
+  placeId?: string;
+}
+
 interface PortfolioMarina {
   name: string;
-  location: string;
-  purchasePrice: string;
+  address: MarinaAddress;
 }
+
+const emptyAddress: MarinaAddress = {
+  line1: "",
+  line2: "",
+  city: "",
+  state: "",
+  zip: "",
+};
 
 interface WizardState {
   step: number;
   dealStructure: DealStructure;
   marinaName: string;
-  location: string;
+  marinaAddress: MarinaAddress;
   dealType: DealType;
-  purchasePrice: string;
   portfolioName: string;
   portfolioMarinas: PortfolioMarina[];
   featuresToExplore: string[];
@@ -120,11 +138,10 @@ export function OnboardingWizard({ open, onOpenChange, userName }: OnboardingWiz
     step: 1,
     dealStructure: null,
     marinaName: "",
-    location: "",
+    marinaAddress: { ...emptyAddress },
     dealType: null,
-    purchasePrice: "",
     portfolioName: "",
-    portfolioMarinas: [{ name: "", location: "", purchasePrice: "" }],
+    portfolioMarinas: [{ name: "", address: { ...emptyAddress } }],
     featuresToExplore: [],
   });
 
@@ -132,55 +149,123 @@ export function OnboardingWizard({ open, onOpenChange, userName }: OnboardingWiz
     mutationFn: async (data: {
       dealStructure: DealStructure;
       marinaName: string;
-      location: string;
+      marinaAddress: MarinaAddress;
       dealType: DealType;
-      purchasePrice: string;
       portfolioName: string;
       portfolioMarinas: PortfolioMarina[];
     }) => {
       if (data.dealStructure === "portfolio") {
-        const validMarinas = data.portfolioMarinas.filter(m => m.name.trim());
+        const validMarinas = data.portfolioMarinas.filter(m => m.name.trim() && m.address.city && m.address.state);
+        if (validMarinas.length === 0) {
+          throw new Error("Please add at least one marina with a name, city, and state");
+        }
+        
         const results = await Promise.all(
-          validMarinas.map((marina, index) =>
-            apiRequest('/api/modeling/projects', {
-              method: 'POST',
-              body: JSON.stringify({
-                marinaName: marina.name,
-                city: marina.location.split(',')[0]?.trim(),
-                state: marina.location.split(',')[1]?.trim(),
-                dealSource: data.dealType,
-                purchasePrice: marina.purchasePrice ? parseFloat(marina.purchasePrice.replace(/[^0-9.]/g, '')) : null,
-                dealOutcome: 'active',
-                portfolioName: data.portfolioName || 'Untitled Portfolio',
-                isPortfolio: true,
-              }),
-            })
-          )
+          validMarinas.map(async (marina) => {
+            const propertyRes = await apiRequest('POST', '/api/crm/properties', {
+              name: marina.name,
+              address: marina.address.line1,
+              addressLine2: marina.address.line2 || null,
+              city: marina.address.city,
+              state: marina.address.state,
+              zipCode: marina.address.zip,
+              latitude: marina.address.lat?.toString(),
+              longitude: marina.address.lng?.toString(),
+              placeId: marina.address.placeId,
+              propertyType: 'marina',
+              status: 'prospect',
+            });
+            const crmProperty = await propertyRes.json();
+            
+            const dealRes = await apiRequest('POST', '/api/crm/deals', {
+              name: `${marina.name} - ${data.dealType === 'acquisition' ? 'Acquisition' : data.dealType === 'refinance' ? 'Refinance' : 'Operations'}`,
+              propertyId: crmProperty.id,
+              dealSource: data.dealType,
+              status: 'lead',
+              portfolioName: data.portfolioName || 'Untitled Portfolio',
+            });
+            const crmDeal = await dealRes.json();
+            
+            const projectRes = await apiRequest('POST', '/api/modeling/projects', {
+              marinaName: marina.name,
+              address: marina.address.line1,
+              addressLine2: marina.address.line2 || null,
+              city: marina.address.city,
+              state: marina.address.state,
+              zipCode: marina.address.zip,
+              latitude: marina.address.lat,
+              longitude: marina.address.lng,
+              dealSource: data.dealType,
+              dealOutcome: 'active',
+              portfolioName: data.portfolioName || 'Untitled Portfolio',
+              isPortfolio: true,
+              crmDealId: crmDeal.id,
+              crmPropertyId: crmProperty.id,
+            });
+            const modelingProject = await projectRes.json();
+            
+            return { crmProperty, crmDeal, modelingProject };
+          })
         );
         return results;
       } else {
-        return apiRequest('/api/modeling/projects', {
-          method: 'POST',
-          body: JSON.stringify({
-            marinaName: data.marinaName,
-            city: data.location.split(',')[0]?.trim(),
-            state: data.location.split(',')[1]?.trim(),
-            dealSource: data.dealType,
-            purchasePrice: data.purchasePrice ? parseFloat(data.purchasePrice.replace(/[^0-9.]/g, '')) : null,
-            dealOutcome: 'active',
-          }),
+        if (!data.marinaName.trim() || !data.marinaAddress.city || !data.marinaAddress.state) {
+          throw new Error("Please provide a marina name, city, and state");
+        }
+        
+        const propertyRes = await apiRequest('POST', '/api/crm/properties', {
+          name: data.marinaName,
+          address: data.marinaAddress.line1,
+          addressLine2: data.marinaAddress.line2 || null,
+          city: data.marinaAddress.city,
+          state: data.marinaAddress.state,
+          zipCode: data.marinaAddress.zip,
+          latitude: data.marinaAddress.lat?.toString(),
+          longitude: data.marinaAddress.lng?.toString(),
+          placeId: data.marinaAddress.placeId,
+          propertyType: 'marina',
+          status: 'prospect',
         });
+        const crmProperty = await propertyRes.json();
+        
+        const dealRes = await apiRequest('POST', '/api/crm/deals', {
+          name: `${data.marinaName} - ${data.dealType === 'acquisition' ? 'Acquisition' : data.dealType === 'refinance' ? 'Refinance' : 'Operations'}`,
+          propertyId: crmProperty.id,
+          dealSource: data.dealType,
+          status: 'lead',
+        });
+        const crmDeal = await dealRes.json();
+        
+        const projectRes = await apiRequest('POST', '/api/modeling/projects', {
+          marinaName: data.marinaName,
+          address: data.marinaAddress.line1,
+          addressLine2: data.marinaAddress.line2 || null,
+          city: data.marinaAddress.city,
+          state: data.marinaAddress.state,
+          zipCode: data.marinaAddress.zip,
+          latitude: data.marinaAddress.lat,
+          longitude: data.marinaAddress.lng,
+          dealSource: data.dealType,
+          dealOutcome: 'active',
+          crmDealId: crmDeal.id,
+          crmPropertyId: crmProperty.id,
+        });
+        const modelingProject = await projectRes.json();
+        
+        return { crmProperty, crmDeal, modelingProject };
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/deals'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/properties'] });
       const isPortfolio = state.dealStructure === "portfolio";
       const projectCount = isPortfolio ? state.portfolioMarinas.filter(m => m.name.trim()).length : 1;
       toast({ 
-        title: isPortfolio ? "Portfolio Created!" : "Project Created!", 
+        title: isPortfolio ? "Portfolio Created!" : "Deal Created!", 
         description: isPortfolio 
-          ? `${projectCount} marina${projectCount > 1 ? 's' : ''} added to "${state.portfolioName || 'Untitled Portfolio'}".`
-          : `${state.marinaName} has been added to your projects.` 
+          ? `${projectCount} marina${projectCount > 1 ? 's' : ''} added to CRM and Valuator.`
+          : `${state.marinaName} has been added to CRM and Valuator.` 
       });
     },
     onError: () => {
@@ -214,9 +299,8 @@ export function OnboardingWizard({ open, onOpenChange, userName }: OnboardingWiz
       createDealMutation.mutate({
         dealStructure: state.dealStructure,
         marinaName: state.marinaName,
-        location: state.location,
+        marinaAddress: state.marinaAddress,
         dealType: state.dealType,
-        purchasePrice: state.purchasePrice,
         portfolioName: state.portfolioName,
         portfolioMarinas: state.portfolioMarinas,
       });
@@ -238,7 +322,7 @@ export function OnboardingWizard({ open, onOpenChange, userName }: OnboardingWiz
   function addPortfolioMarina() {
     setState(s => ({
       ...s,
-      portfolioMarinas: [...s.portfolioMarinas, { name: "", location: "", purchasePrice: "" }]
+      portfolioMarinas: [...s.portfolioMarinas, { name: "", address: { ...emptyAddress } }]
     }));
   }
 
@@ -249,13 +333,46 @@ export function OnboardingWizard({ open, onOpenChange, userName }: OnboardingWiz
     }));
   }
 
-  function updatePortfolioMarina(index: number, field: keyof PortfolioMarina, value: string) {
+  function updatePortfolioMarinaName(index: number, name: string) {
     setState(s => ({
       ...s,
       portfolioMarinas: s.portfolioMarinas.map((m, i) => 
-        i === index ? { ...m, [field]: value } : m
+        i === index ? { ...m, name } : m
       )
     }));
+  }
+
+  function updatePortfolioMarinaAddress(index: number, field: keyof MarinaAddress, value: string) {
+    setState(s => ({
+      ...s,
+      portfolioMarinas: s.portfolioMarinas.map((m, i) => 
+        i === index ? { ...m, address: { ...m.address, [field]: value } } : m
+      )
+    }));
+  }
+
+  function handleAddressAutocomplete(addr: NormalizedAddress, index?: number) {
+    const newAddress: MarinaAddress = {
+      line1: addr.line1 || "",
+      line2: addr.line2 || "",
+      city: addr.city || "",
+      state: addr.state || "",
+      zip: addr.postalCode || "",
+      lat: addr.lat,
+      lng: addr.lng,
+      placeId: addr.placeId,
+    };
+    
+    if (index !== undefined) {
+      setState(s => ({
+        ...s,
+        portfolioMarinas: s.portfolioMarinas.map((m, i) => 
+          i === index ? { ...m, address: newAddress } : m
+        )
+      }));
+    } else {
+      setState(s => ({ ...s, marinaAddress: newAddress }));
+    }
   }
 
   function toggleFeature(featureId: string) {
@@ -368,10 +485,10 @@ export function OnboardingWizard({ open, onOpenChange, userName }: OnboardingWiz
               <div className="text-center mb-6">
                 <h3 className="text-lg font-semibold">Tell us about your marina</h3>
                 <p className="text-sm text-muted-foreground">
-                  We'll create a project to get you started
+                  We'll create a CRM property and modeling project
                 </p>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="space-y-2">
                   <Label htmlFor="marinaName">Marina Name</Label>
                   <Input
@@ -382,22 +499,54 @@ export function OnboardingWizard({ open, onOpenChange, userName }: OnboardingWiz
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="location">Location (City, State)</Label>
-                  <Input
-                    id="location"
-                    placeholder="e.g., Miami, FL"
-                    value={state.location}
-                    onChange={(e) => setState(s => ({ ...s, location: e.target.value }))}
+                  <Label>Address</Label>
+                  <AddressAutocompleteInput
+                    value={state.marinaAddress.line1}
+                    placeholder="Start typing an address..."
+                    onChangeText={(text) => setState(s => ({ ...s, marinaAddress: { ...s.marinaAddress, line1: text } }))}
+                    onSelectAddress={(addr) => handleAddressAutocomplete(addr)}
+                    searchType="address"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="purchasePrice">Purchase Price (Optional)</Label>
+                  <Label htmlFor="addressLine2">Address Line 2 (Optional)</Label>
                   <Input
-                    id="purchasePrice"
-                    placeholder="e.g., $5,000,000"
-                    value={state.purchasePrice}
-                    onChange={(e) => setState(s => ({ ...s, purchasePrice: e.target.value }))}
+                    id="addressLine2"
+                    placeholder="Suite, Unit, etc."
+                    value={state.marinaAddress.line2}
+                    onChange={(e) => setState(s => ({ ...s, marinaAddress: { ...s.marinaAddress, line2: e.target.value } }))}
                   />
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="city">City</Label>
+                    <Input
+                      id="city"
+                      placeholder="City"
+                      value={state.marinaAddress.city}
+                      onChange={(e) => setState(s => ({ ...s, marinaAddress: { ...s.marinaAddress, city: e.target.value } }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="state">State</Label>
+                    <Input
+                      id="state"
+                      placeholder="FL"
+                      maxLength={2}
+                      value={state.marinaAddress.state}
+                      onChange={(e) => setState(s => ({ ...s, marinaAddress: { ...s.marinaAddress, state: e.target.value.toUpperCase() } }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="zip">Zip</Label>
+                    <Input
+                      id="zip"
+                      placeholder="33139"
+                      maxLength={10}
+                      value={state.marinaAddress.zip}
+                      onChange={(e) => setState(s => ({ ...s, marinaAddress: { ...s.marinaAddress, zip: e.target.value } }))}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -420,7 +569,7 @@ export function OnboardingWizard({ open, onOpenChange, userName }: OnboardingWiz
                   onChange={(e) => setState(s => ({ ...s, portfolioName: e.target.value }))}
                 />
               </div>
-              <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+              <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
                 {state.portfolioMarinas.map((marina, index) => (
                   <div key={index} className="p-3 rounded-lg border bg-muted/30 space-y-2">
                     <div className="flex items-center justify-between">
@@ -440,18 +589,37 @@ export function OnboardingWizard({ open, onOpenChange, userName }: OnboardingWiz
                     <Input
                       placeholder="Marina name"
                       value={marina.name}
-                      onChange={(e) => updatePortfolioMarina(index, 'name', e.target.value)}
+                      onChange={(e) => updatePortfolioMarinaName(index, e.target.value)}
                     />
-                    <div className="grid grid-cols-2 gap-2">
+                    <AddressAutocompleteInput
+                      value={marina.address.line1}
+                      placeholder="Address"
+                      onChangeText={(text) => updatePortfolioMarinaAddress(index, 'line1', text)}
+                      onSelectAddress={(addr) => handleAddressAutocomplete(addr, index)}
+                      searchType="address"
+                    />
+                    <Input
+                      placeholder="Address Line 2 (optional)"
+                      value={marina.address.line2}
+                      onChange={(e) => updatePortfolioMarinaAddress(index, 'line2', e.target.value)}
+                    />
+                    <div className="grid grid-cols-3 gap-2">
                       <Input
-                        placeholder="Location (City, State)"
-                        value={marina.location}
-                        onChange={(e) => updatePortfolioMarina(index, 'location', e.target.value)}
+                        placeholder="City"
+                        value={marina.address.city}
+                        onChange={(e) => updatePortfolioMarinaAddress(index, 'city', e.target.value)}
                       />
                       <Input
-                        placeholder="Price (optional)"
-                        value={marina.purchasePrice}
-                        onChange={(e) => updatePortfolioMarina(index, 'purchasePrice', e.target.value)}
+                        placeholder="State"
+                        maxLength={2}
+                        value={marina.address.state}
+                        onChange={(e) => updatePortfolioMarinaAddress(index, 'state', e.target.value.toUpperCase())}
+                      />
+                      <Input
+                        placeholder="Zip"
+                        maxLength={10}
+                        value={marina.address.zip}
+                        onChange={(e) => updatePortfolioMarinaAddress(index, 'zip', e.target.value)}
                       />
                     </div>
                   </div>
