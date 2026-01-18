@@ -23,6 +23,7 @@ import ModelingProjectFormDialog from './form-dialog';
 import ModelingAnalytics from './analytics';
 import { DealTemplateSelector } from '@/components/modeling/DealTemplateSelector';
 import { ModelingEmptyState } from '@/components/ui/enhanced-empty-state';
+import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 
 type ModelingProject = {
   id: string;
@@ -57,6 +58,7 @@ export default function ModelingProjectsPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [isTemplateOpen, setIsTemplateOpen] = useState(false);
+  const [isNewProjectWizardOpen, setIsNewProjectWizardOpen] = useState(false);
 
   const { data: projects = [], isLoading } = useQuery<ModelingProject[]>({
     queryKey: ['/api/modeling/projects'],
@@ -78,9 +80,11 @@ export default function ModelingProjectsPage() {
   });
 
   const handleCreate = () => {
-    setSelectedProject(null);
-    setFormMode('create');
-    setIsFormOpen(true);
+    setIsNewProjectWizardOpen(true);
+  };
+
+  const handleProjectCreated = (projectId: string) => {
+    setLocation(`/modeling/projects/${projectId}`);
   };
 
   const handleEdit = (project: ModelingProject) => {
@@ -436,6 +440,13 @@ export default function ModelingProjectsPage() {
         onOpenChange={setIsFormOpen}
         mode={formMode}
         project={selectedProject}
+      />
+
+      <OnboardingWizard
+        open={isNewProjectWizardOpen}
+        onOpenChange={setIsNewProjectWizardOpen}
+        mode="new_project"
+        onProjectCreated={handleProjectCreated}
       />
 
       <DealTemplateSelector
