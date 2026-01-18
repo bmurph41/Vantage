@@ -911,14 +911,39 @@ export default function Deals() {
         
       <main className="flex-1 overflow-y-auto p-6" data-testid="deals-main">
         {!deals || deals.length === 0 ? (
-          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-            <Handshake className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No deals yet</h3>
-            <p className="text-gray-500 mb-6">Get started by adding your first deal</p>
-            <Button onClick={handleAdd} data-testid="button-add-first-deal" className="bg-blue-600 hover:bg-blue-700">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Deal
-            </Button>
+          <div className="bg-white rounded-lg border border-gray-200 border-dashed">
+            <div className="flex flex-col items-center justify-center text-center py-12 px-8">
+              <div className="w-16 h-16 rounded-full bg-[#1E4FAB]/10 flex items-center justify-center mb-4">
+                <Handshake className="w-8 h-8 text-[#1E4FAB]" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">No deals yet</h3>
+              <p className="text-muted-foreground max-w-sm mb-6">
+                Start tracking your marina acquisition pipeline by adding your first deal.
+              </p>
+              <Button onClick={handleAdd} data-testid="button-add-first-deal" className="bg-[#1E4FAB] hover:bg-[#1a4294]">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Your First Deal
+              </Button>
+              <div className="mt-8 pt-6 border-t w-full max-w-md">
+                <p className="text-sm text-muted-foreground mb-3 flex items-center justify-center gap-2">
+                  <span className="font-medium">Quick Tips</span>
+                </p>
+                <ul className="space-y-2 text-left text-sm text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <span className="text-[#1E4FAB]">→</span>
+                    Deals flow through your pipeline from Lead to Closed
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-[#1E4FAB]">→</span>
+                    Link deals to modeling projects for valuation tracking
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-[#1E4FAB]">→</span>
+                    Add contacts and companies to build your network
+                  </li>
+                </ul>
+              </div>
+            </div>
           </div>
         ) : filteredDeals.length === 0 ? (
           <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">

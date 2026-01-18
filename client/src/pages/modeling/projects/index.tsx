@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Search, Pencil, Trash2, TrendingUp, BarChart3, FileSpreadsheet, Settings, PieChart, Info, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, TrendingUp, BarChart3, FileSpreadsheet, Settings, PieChart, Info, Clock, CheckCircle, XCircle, AlertCircle, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link } from 'wouter';
@@ -21,6 +21,8 @@ import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 import ModelingProjectFormDialog from './form-dialog';
 import ModelingAnalytics from './analytics';
+import { DealTemplateSelector } from '@/components/modeling/DealTemplateSelector';
+import { ModelingEmptyState } from '@/components/ui/enhanced-empty-state';
 
 type ModelingProject = {
   id: string;
@@ -54,6 +56,7 @@ export default function ModelingProjectsPage() {
   const [selectedProject, setSelectedProject] = useState<ModelingProject | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
+  const [isTemplateOpen, setIsTemplateOpen] = useState(false);
 
   const { data: projects = [], isLoading } = useQuery<ModelingProject[]>({
     queryKey: ['/api/modeling/projects'],
@@ -185,6 +188,10 @@ export default function ModelingProjectsPage() {
               Settings
             </Button>
           </Link>
+          <Button variant="outline" onClick={() => setIsTemplateOpen(true)} data-testid="button-use-template">
+            <Sparkles className="h-4 w-4 mr-2" />
+            Use Template
+          </Button>
           <Button onClick={handleCreate} data-testid="button-create-project">
             <Plus className="h-4 w-4 mr-2" />
             New Project
@@ -429,6 +436,11 @@ export default function ModelingProjectsPage() {
         onOpenChange={setIsFormOpen}
         mode={formMode}
         project={selectedProject}
+      />
+
+      <DealTemplateSelector
+        open={isTemplateOpen}
+        onOpenChange={setIsTemplateOpen}
       />
     </div>
   );

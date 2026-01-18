@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState, useEffect } from "react";
 import { Switch, Route, useLocation, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
@@ -246,6 +246,7 @@ const ExitWaterfall = lazy(() => import("@/pages/modeling/exit/Waterfall"));
 const ExitIRRCalculator = lazy(() => import("@/pages/modeling/exit/IRRCalculator"));
 const ExitSensitivity = lazy(() => import("@/pages/modeling/exit/Sensitivity"));
 const ExitAIInsights = lazy(() => import("@/pages/modeling/exit/AIInsights"));
+const ExitScenarioComparison = lazy(() => import("@/pages/modeling/exit/ScenarioComparison"));
 
 // Document Intelligence
 const DocumentIntelligence = lazy(() => import("@/pages/modeling/doc-intel/DocumentIntelligence"));
@@ -267,6 +268,9 @@ const OMTemplates = lazy(() => import("@/modules/om-builder/pages/om-templates")
 const OMBrandKits = lazy(() => import("@/modules/om-builder/pages/om-brand-kits"));
 const OMCanvasEditor = lazy(() => import("@/pages/om-builder-editor"));
 
+// Onboarding Wizard (lazy loaded)
+const OnboardingWizard = lazy(() => import("@/components/onboarding/OnboardingWizard").then(m => ({ default: m.OnboardingWizard })));
+
 // Lightweight sidebar loader for initial render
 function SidebarLoader() {
   return (
@@ -274,10 +278,31 @@ function SidebarLoader() {
   );
 }
 
+// Hook to check if user should see onboarding
+function useOnboardingCheck() {
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  
+  useEffect(() => {
+    const hasSeenOnboarding = localStorage.getItem('marinamatch_onboarding_complete');
+    if (!hasSeenOnboarding) {
+      const timer = setTimeout(() => setShowOnboarding(true), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  const completeOnboarding = () => {
+    localStorage.setItem('marinamatch_onboarding_complete', 'true');
+    setShowOnboarding(false);
+  };
+
+  return { showOnboarding, setShowOnboarding, completeOnboarding };
+}
+
 // Unified Layout wrapper with sidebar for both DD Tracker and CRM
 // Includes auth guard to redirect unauthenticated users to login
 function UnifiedLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
+  const { showOnboarding, setShowOnboarding, completeOnboarding } = useOnboardingCheck();
   
   if (isLoading) {
     return (
@@ -309,6 +334,16 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
       </div>
       <CommandPalette />
       <AIAssistant />
+      <Suspense fallback={null}>
+        <OnboardingWizard 
+          open={showOnboarding} 
+          onOpenChange={(open) => {
+            if (!open) completeOnboarding();
+            setShowOnboarding(open);
+          }}
+          userName={user?.firstName || user?.email?.split('@')[0]}
+        />
+      </Suspense>
     </div>
   );
 }
@@ -1803,6 +1838,13 @@ function Router() {
         {(params) => (
           <UnifiedLayout>
             <ExitAIInsights {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/modeling/projects/:projectId/exit/compare">
+        {(params) => (
+          <UnifiedLayout>
+            <ExitScenarioComparison {...params} />
           </UnifiedLayout>
         )}
       </Route>

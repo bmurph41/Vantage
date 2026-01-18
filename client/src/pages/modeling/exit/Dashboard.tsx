@@ -19,7 +19,8 @@ import {
   Landmark,
   HandCoins,
   Award,
-  ChevronRight
+  ChevronRight,
+  GitCompare
 } from "lucide-react";
 import type { ModelingProject, ExitScenario } from "@shared/schema";
 
@@ -117,6 +118,15 @@ const exitTools = [
     path: "/ai-insights",
     color: "text-pink-500",
     bgColor: "bg-pink-50"
+  },
+  { 
+    id: "compare", 
+    name: "Compare Scenarios", 
+    description: "Side-by-side scenario analysis", 
+    icon: GitCompare,
+    path: "/compare",
+    color: "text-[#1E4FAB]",
+    bgColor: "bg-[#1E4FAB]/10"
   },
 ];
 
