@@ -28,6 +28,7 @@ import {
   Calendar,
   RefreshCw
 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface WorkspaceProFormaProps {
   projectId: string;
@@ -39,6 +40,7 @@ export default function WorkspaceProForma({ projectId }: WorkspaceProFormaProps)
   const [viewMode, setViewMode] = useState<'monthly' | 'annual'>('annual');
   const [selectedYear, setSelectedYear] = useState('2026');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['revenue']));
+  const { toast } = useToast();
 
   const { data: config } = useQuery<any>({
     queryKey: ['/api/modeling/projects', projectId, 'config'],
@@ -131,6 +133,37 @@ export default function WorkspaceProForma({ projectId }: WorkspaceProFormaProps)
   const grossProfitByYear = revenueByYear.map((rev, i) => rev - cogsByYear[i]);
   const noiByYear = grossProfitByYear.map((gp, i) => gp - expensesByYear[i]);
 
+  const exportProForma = () => {
+    const csvRows: string[] = [];
+    
+    csvRows.push(['Category', 'Line Item', ...years.map(y => `Year ${y}`)].join(','));
+    
+    Object.entries(data.categories).forEach(([category, items]: [string, any]) => {
+      Object.entries(items).forEach(([item, values]: [string, any]) => {
+        csvRows.push([category, item, ...values.map((v: number) => v.toString())].join(','));
+      });
+      csvRows.push([category, 'Total', ...years.map((_, i) => getCategoryTotal(category, i).toString())].join(','));
+      csvRows.push('');
+    });
+    
+    csvRows.push(['Summary', 'Gross Profit', ...grossProfitByYear.map(v => v.toString())].join(','));
+    csvRows.push(['Summary', 'NOI', ...noiByYear.map(v => v.toString())].join(','));
+    
+    const csvContent = csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `pro-forma-${projectId}-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+    
+    toast({
+      title: "Export Complete",
+      description: "Pro forma data exported to CSV",
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -171,7 +204,7 @@ export default function WorkspaceProForma({ projectId }: WorkspaceProFormaProps)
               </SelectContent>
             </Select>
           )}
-          <Button variant="outline" size="sm" data-testid="button-export-proforma">
+          <Button variant="outline" size="sm" onClick={exportProForma} data-testid="button-export-proforma">
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>

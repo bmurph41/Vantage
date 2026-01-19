@@ -256,9 +256,9 @@ function DealCard({ deal, onClick }: DealCardProps) {
               <div 
                 className="w-7 h-7 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white text-xs font-semibold shadow-sm"
                 data-testid={`deal-owner-${deal.id}`}
-                title="Deal Owner"
+                title={deal.contact ? `${deal.contact.firstName || ''} ${deal.contact.lastName || ''}`.trim() || "Deal Owner" : "Deal Owner"}
               >
-                {getInitials()}
+                {getInitials(deal.contact?.firstName, deal.contact?.lastName)}
               </div>
             </div>
           </div>

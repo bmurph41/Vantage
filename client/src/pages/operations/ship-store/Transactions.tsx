@@ -12,6 +12,8 @@ export default function Transactions() {
   const [searchTerm, setSearchTerm] = useState("");
   const [minAmount, setMinAmount] = useState("");
   const [maxAmount, setMaxAmount] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const limit = 20;
@@ -59,7 +61,11 @@ export default function Transactions() {
     const matchesMinAmount = !minAmount || Number(transaction.total) >= Number(minAmount);
     const matchesMaxAmount = !maxAmount || Number(transaction.total) <= Number(maxAmount);
     
-    return matchesPaymentMethod && matchesSearch && matchesMinAmount && matchesMaxAmount;
+    const transactionDate = new Date(transaction.createdAt);
+    const matchesStartDate = !startDate || transactionDate >= new Date(startDate);
+    const matchesEndDate = !endDate || transactionDate <= new Date(endDate + 'T23:59:59');
+    
+    return matchesPaymentMethod && matchesSearch && matchesMinAmount && matchesMaxAmount && matchesStartDate && matchesEndDate;
   }) || [];
 
   const generateReceipt = (transaction: any) => {
@@ -96,15 +102,23 @@ export default function Transactions() {
           <Input
             type="date"
             className="w-40"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
             data-testid="start-date"
           />
           <Input
             type="date"
             className="w-40"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
             data-testid="end-date"
           />
-          <Button data-testid="filter-dates">
-            Filter
+          <Button 
+            onClick={() => { setStartDate(""); setEndDate(""); }}
+            variant="outline"
+            data-testid="clear-dates"
+          >
+            Clear
           </Button>
         </div>
       </div>
