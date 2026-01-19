@@ -118,8 +118,11 @@ export function DealTemplateSelector({ open, onOpenChange }: DealTemplateSelecto
   const [step, setStep] = useState<"select" | "details">("select");
   const [selectedTemplate, setSelectedTemplate] = useState<DealTemplate | null>(null);
   const [marinaName, setMarinaName] = useState("");
+  const [address, setAddress] = useState("");
+  const [address2, setAddress2] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
+  const [zipCode, setZipCode] = useState("");
   const [purchasePrice, setPurchasePrice] = useState("");
 
   const createProjectMutation = useMutation({
@@ -130,8 +133,11 @@ export function DealTemplateSelector({ open, onOpenChange }: DealTemplateSelecto
         method: 'POST',
         body: JSON.stringify({
           marinaName,
+          address: address || null,
+          addressLine2: address2 || null,
           city: city || null,
           state: state || null,
+          zipCode: zipCode || null,
           dealSource: selectedTemplate.dealSource,
           purchasePrice: purchasePrice ? parseFloat(purchasePrice.replace(/[^0-9.]/g, '')) : null,
           dealOutcome: 'active',
@@ -165,8 +171,11 @@ export function DealTemplateSelector({ open, onOpenChange }: DealTemplateSelecto
     setStep("select");
     setSelectedTemplate(null);
     setMarinaName("");
+    setAddress("");
+    setAddress2("");
     setCity("");
     setState("");
+    setZipCode("");
     setPurchasePrice("");
   }
 
@@ -272,12 +281,32 @@ export function DealTemplateSelector({ open, onOpenChange }: DealTemplateSelecto
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="address" className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Address
+                </Label>
+                <Input
+                  id="address"
+                  placeholder="e.g., 123 Marina Drive"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="address2">Suite, Apt, Unit, etc.</Label>
+                <Input
+                  id="address2"
+                  placeholder="e.g., Suite 100"
+                  value={address2}
+                  onChange={(e) => setAddress2(e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="city" className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4" />
-                    City
-                  </Label>
+                  <Label htmlFor="city">City</Label>
                   <Input
                     id="city"
                     placeholder="e.g., Miami"
@@ -295,12 +324,22 @@ export function DealTemplateSelector({ open, onOpenChange }: DealTemplateSelecto
                     maxLength={2}
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="zipCode">Zip Code</Label>
+                  <Input
+                    id="zipCode"
+                    placeholder="e.g., 33139"
+                    value={zipCode}
+                    onChange={(e) => setZipCode(e.target.value)}
+                    maxLength={10}
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="purchasePrice" className="flex items-center gap-2">
                   <DollarSign className="h-4 w-4" />
-                  Purchase Price (Optional)
+                  Purchase Price
                 </Label>
                 <Input
                   id="purchasePrice"
