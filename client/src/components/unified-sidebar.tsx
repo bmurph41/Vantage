@@ -193,10 +193,10 @@ export default function UnifiedSidebar() {
     return activePacks.includes(packType);
   };
 
-  // Helper function to check if user has access to Rent Roll (requires owner, investor, broker, or operations pack)
-  // Operations pack includes Rent Roll as a bundled feature
+  // Helper function to check if user has access to Rent Roll (requires owner, investor, broker, operations, or modeling_tools pack)
+  // Operations pack and Underwriting Tools (modeling_tools) pack include Rent Roll as a bundled feature
   const hasRentRollAccess = (): boolean => {
-    return hasPack('owner') || hasPack('investor') || hasPack('broker') || hasPack('operations');
+    return hasPack('owner') || hasPack('investor') || hasPack('broker') || hasPack('operations') || hasPack('modeling_tools');
   };
 
   // Filter operations nav to hide Rent Roll if user doesn't have access
