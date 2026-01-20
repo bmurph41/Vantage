@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import type { DashboardStats, TransactionsResponse } from "@/types/fuel-api";
 import { getBusinessDay } from "@/lib/fuel-utils";
 import { AssetSelector } from "@/components/AssetSelector";
+import { PageTour } from "@/components/onboarding/PageTour";
+import { TOUR_IDS, fuelSalesTourSteps } from "@/lib/tour-configs";
 import { 
   DollarSign, 
   Fuel, 
@@ -187,6 +189,7 @@ export default function Dashboard() {
 
   return (
     <>
+      <PageTour tourId={TOUR_IDS.FUEL_SALES} steps={fuelSalesTourSteps} />
       <Header 
         title="Fuel Sales Dashboard"
         subtitle="Welcome back! Here's what's happening with your fuel sales."
@@ -221,7 +224,7 @@ export default function Dashboard() {
         </div>
 
         {/* Key Metrics Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" data-tour="fuel-summary">
           <MetricCard
             title="Today's Sales"
             value={`$${todaysSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
@@ -271,7 +274,7 @@ export default function Dashboard() {
         </div>
 
         {/* Recent Transactions */}
-        <Card>
+        <Card data-tour="fuel-transactions">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle data-testid="recent-transactions-title">Recent Transactions</CardTitle>
             <Button variant="ghost" size="sm" className="text-primary hover:text-primary/80" data-testid="button-view-all-transactions">
@@ -375,7 +378,7 @@ export default function Dashboard() {
         )}
 
         {/* Financial Projection Section */}
-        <Card>
+        <Card data-tour="fuel-pricing">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle data-testid="financial-projections-title">Financial Projections</CardTitle>

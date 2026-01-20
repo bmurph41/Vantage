@@ -5,6 +5,8 @@ import { LayoutDashboard, Box, CreditCard, BarChart3, DollarSign, Package, Trend
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AssetSelector } from "@/components/AssetSelector";
 import { ContextIntegrationsPanel } from "@/components/integrations/ContextIntegrationsPanel";
+import { PageTour } from "@/components/onboarding/PageTour";
+import { TOUR_IDS, shipStoreTourSteps } from "@/lib/tour-configs";
 
 export default function ShipStoreDashboard() {
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
@@ -44,6 +46,7 @@ export default function ShipStoreDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageTour tourId={TOUR_IDS.SHIP_STORE} steps={shipStoreTourSteps} />
       <div className="p-8 max-w-7xl mx-auto space-y-8">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-2">
@@ -63,7 +66,7 @@ export default function ShipStoreDashboard() {
 
         {/* Key Metrics */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card data-testid="card-total-sales">
+          <Card data-testid="card-total-sales" data-tour="store-sales">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -80,7 +83,7 @@ export default function ShipStoreDashboard() {
             </CardContent>
           </Card>
 
-          <Card data-testid="card-inventory-value">
+          <Card data-testid="card-inventory-value" data-tour="store-inventory">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Inventory Value</CardTitle>
               <Box className="h-4 w-4 text-muted-foreground" />
@@ -130,7 +133,7 @@ export default function ShipStoreDashboard() {
 
         {/* Quick Actions */}
         <div className="grid gap-4 md:grid-cols-2">
-          <Card data-testid="card-quick-actions">
+          <Card data-testid="card-quick-actions" data-tour="store-pos">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ShoppingCart className="h-5 w-5" />

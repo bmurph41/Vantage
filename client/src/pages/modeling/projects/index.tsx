@@ -5,6 +5,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PageTour } from '@/components/onboarding/PageTour';
+import { TOUR_IDS, valuatorTourSteps } from '@/lib/tour-configs';
 import {
   Table,
   TableBody,
@@ -452,6 +454,12 @@ export default function ModelingProjectsPage() {
       <DealTemplateSelector
         open={isTemplateOpen}
         onOpenChange={setIsTemplateOpen}
+      />
+
+      <PageTour 
+        tourId={TOUR_IDS.VALUATOR} 
+        steps={valuatorTourSteps}
+        videoTitle="Valuator Walkthrough"
       />
     </div>
   );

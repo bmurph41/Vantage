@@ -107,6 +107,7 @@ export default function SalesCompsHeader({
                   <Button
                     onClick={onAddCompClick}
                     data-testid="button-add-comp"
+                    data-tour="comps-add"
                     className="bg-blue-700 hover:bg-blue-800 text-white"
                   >
                     <Plus className="h-4 w-4 mr-2" />

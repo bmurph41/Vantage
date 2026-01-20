@@ -316,11 +316,11 @@ export default function ProjectWorkspace() {
           <WorkspaceOverview project={project} onTabChange={setActiveTab} />
         </TabsContent>
 
-        <TabsContent value="inputs" className="space-y-6">
+        <TabsContent value="inputs" className="space-y-6" data-tour="valuator-inputs">
           <WorkspaceInputs projectId={projectId!} />
         </TabsContent>
 
-        <TabsContent value="cases" className="space-y-6">
+        <TabsContent value="cases" className="space-y-6" data-tour="valuator-scenarios">
           <CaseConfiguration projectId={projectId!} />
         </TabsContent>
 
@@ -336,7 +336,7 @@ export default function ProjectWorkspace() {
           <WorkspaceHistoricalPL projectId={projectId!} />
         </TabsContent>
 
-        <TabsContent value="analytics" className="space-y-6">
+        <TabsContent value="analytics" className="space-y-6" data-tour="valuator-analysis">
           <AnalyticsNormalization projectId={projectId!} />
         </TabsContent>
 
@@ -348,7 +348,7 @@ export default function ProjectWorkspace() {
           <DealPricing projectId={projectId!} />
         </TabsContent>
 
-        <TabsContent value="summary" className="space-y-6">
+        <TabsContent value="summary" className="space-y-6" data-tour="valuator-export">
           <WorkspaceExecutiveSummary projectId={projectId!} />
         </TabsContent>
 
@@ -360,7 +360,7 @@ export default function ProjectWorkspace() {
           <CapitalStackWorkspace projectId={projectId!} />
         </TabsContent>
 
-        <TabsContent value="exit" className="space-y-6">
+        <TabsContent value="exit" className="space-y-6" data-tour="valuator-exit">
           <WorkspaceExitStrategy projectId={projectId!} />
         </TabsContent>
 

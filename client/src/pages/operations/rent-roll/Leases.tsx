@@ -647,7 +647,7 @@ function LeasesTable({
   };
 
   return (
-    <div className="border rounded-lg">
+    <div className="border rounded-lg" data-tour="rentroll-units">
       <Table>
         <TableHeader>
           <TableRow>
@@ -895,11 +895,11 @@ export default function RentRollLeases() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" data-testid="btn-export-leases">
+          <Button variant="outline" data-testid="btn-export-leases" data-tour="rentroll-export">
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
-          <Button variant="outline" onClick={() => setImportDrawerOpen(true)} data-testid="btn-import-leases">
+          <Button variant="outline" onClick={() => setImportDrawerOpen(true)} data-testid="btn-import-leases" data-tour="rentroll-import">
             <Upload className="h-4 w-4 mr-2" />
             Import
           </Button>
@@ -910,7 +910,7 @@ export default function RentRollLeases() {
         </div>
       </div>
 
-      <Card>
+      <Card data-tour="rentroll-analysis">
         <CardContent className="pt-6">
           <div className="flex flex-wrap items-center gap-4 mb-4">
             <div className="relative flex-1 min-w-[200px] max-w-md">

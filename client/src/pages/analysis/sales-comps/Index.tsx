@@ -9,6 +9,8 @@ import { salesCompsApi } from "@/lib/salescomps/api";
 import { queryKeys } from "@/lib/salescomps/queryKeys";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/salescomps/authUtils";
+import { PageTour } from "@/components/onboarding/PageTour";
+import { TOUR_IDS, salesCompsTourSteps } from "@/lib/tour-configs";
 import SalesCompsHeader from "@/components/salescomps/sales-comps/SalesCompsHeader";
 import FiltersPanel from "@/components/salescomps/sales-comps/FiltersPanel";
 import CompsDataGrid from "@/components/salescomps/sales-comps/CompsDataGrid";
@@ -293,6 +295,7 @@ export default function SalesCompsIndex() {
 
   return (
     <div className="flex flex-1 bg-background min-h-screen">
+      <PageTour tourId={TOUR_IDS.SALES_COMPS} steps={salesCompsTourSteps} />
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="flex-1 min-h-0 flex flex-col">
@@ -467,7 +470,7 @@ export default function SalesCompsIndex() {
             </div>
             
             {/* Data Grid */}
-            <div className="flex-1 min-h-0 overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-hidden" data-tour="comps-table">
               <CompsDataGrid
                 data={data}
                 loading={compsLoading}

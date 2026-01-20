@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FolderLock, FileText, Users, Clock, Plus } from "lucide-react";
+import { PageTour } from "@/components/onboarding/PageTour";
+import { TOUR_IDS, vdrTourSteps } from "@/lib/tour-configs";
 
 // Component to fetch and display project statistics
 function ProjectStats({ projectId }: { projectId: string }) {
@@ -70,6 +72,7 @@ export default function VDRDashboard() {
 
   return (
     <div className="p-8 space-y-6">
+      <PageTour tourId={TOUR_IDS.VDR} steps={vdrTourSteps} />
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900" data-testid="text-vdr-title">Virtual Data Room</h1>
@@ -130,7 +133,7 @@ export default function VDRDashboard() {
 
       {activeProjects.length > 0 && (
         <div className="space-y-4">
-          <h2 className="text-2xl font-semibold text-gray-900">Active Projects</h2>
+          <h2 className="text-2xl font-semibold text-gray-900" data-tour="vdr-folders">Active Projects</h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {activeProjects.map((project: any) => (
               <Card key={project.id} className="hover:shadow-lg transition-shadow flex flex-col h-full">

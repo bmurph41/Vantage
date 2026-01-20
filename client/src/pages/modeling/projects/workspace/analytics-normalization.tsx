@@ -514,7 +514,7 @@ export default function AnalyticsNormalization({ projectId }: AnalyticsNormaliza
       </Card>
 
       {adjustments.length > 0 && (
-        <Card>
+        <Card data-tour="valuator-addbacks">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5" />

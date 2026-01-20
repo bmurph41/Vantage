@@ -112,7 +112,7 @@ export default function SalesCompsMapView() {
         hasData={salesComps.length > 0}
       />
 
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden" data-tour="comps-map">
         <CompsMap
           config={SALE_COMPS_CONFIG}
           items={mapItems}

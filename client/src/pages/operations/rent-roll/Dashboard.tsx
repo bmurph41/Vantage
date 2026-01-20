@@ -3,6 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageTour } from "@/components/onboarding/PageTour";
+import { TOUR_IDS, rentRollTourSteps } from "@/lib/tour-configs";
 import { 
   Building2, 
   TrendingUp, 
@@ -258,7 +260,13 @@ export default function RentRollDashboard() {
 
   return (
     <div className="container mx-auto p-6 space-y-6" data-testid="page-rent-roll-dashboard">
-      <div className="flex items-center justify-between">
+      <PageTour 
+        tourId={TOUR_IDS.RENT_ROLL} 
+        steps={rentRollTourSteps}
+        videoTitle="Rent Roll Deep Dive"
+      />
+      
+      <div className="flex items-center justify-between" data-tour="rentroll-summary">
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2" data-testid="heading-rent-roll-dashboard">
             Rent Roll Dashboard
