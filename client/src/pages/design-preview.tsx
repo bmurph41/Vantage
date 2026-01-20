@@ -1,144 +1,144 @@
-import { useState } from "react";
 import { Link } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { 
   Anchor, 
-  Building2, 
-  TrendingUp, 
   FileText, 
   Users, 
   BarChart3,
-  ChevronDown,
-  ExternalLink,
   ArrowRight,
-  Waves,
-  Ship,
-  MapPin,
-  DollarSign,
-  Calendar,
-  Newspaper
+  CheckCircle2,
+  Shield,
+  Zap,
+  LineChart,
+  FolderLock,
+  Target,
+  Calculator,
+  PieChart
 } from "lucide-react";
 
-const stats = [
-  { value: "$2.4B+", label: "Marina Assets Analyzed", icon: TrendingUp },
-  { value: "847", label: "Active Deals Tracked", icon: Building2 },
-  { value: "156", label: "Marinas in Database", icon: Anchor },
-  { value: "12,400+", label: "Slip Inventory Managed", icon: Ship },
-];
-
-const servicePillars = [
+const platformFeatures = [
   { 
     title: "CRM & Pipeline", 
-    description: "Complete relationship management for marina acquisitions",
+    description: "Track leads, contacts, companies, and deals through your entire acquisition funnel. Email sequences, task automation, and deal analytics.",
     icon: Users,
-    color: "bg-blue-500"
+    color: "bg-blue-500",
+    highlights: ["Deal Pipeline Kanban", "Contact Management", "Email Automation", "Activity Tracking"]
   },
   { 
     title: "Due Diligence", 
-    description: "Comprehensive DD tracking with automated task management",
+    description: "Comprehensive DD project tracking with templates, task management, and team collaboration built for marina transactions.",
     icon: FileText,
-    color: "bg-emerald-500"
+    color: "bg-emerald-500",
+    highlights: ["DD Templates", "Task Checklists", "Document Management", "Progress Reports"]
   },
   { 
     title: "Financial Modeling", 
-    description: "Pro forma analysis with exit strategy suite",
-    icon: BarChart3,
-    color: "bg-violet-500"
+    description: "Pro forma analysis, exit strategy suite, capital stack modeling, and scenario comparison purpose-built for marina valuations.",
+    icon: Calculator,
+    color: "bg-violet-500",
+    highlights: ["Pro Forma Builder", "Exit Scenarios", "IRR Calculator", "Sensitivity Analysis"]
   },
   { 
     title: "Rent Roll Analytics", 
-    description: "Marina-specific lease management and cash flow analysis",
-    icon: TrendingUp,
-    color: "bg-amber-500"
+    description: "Marina-specific lease management with slip inventory, occupancy tracking, and cash flow projections.",
+    icon: PieChart,
+    color: "bg-amber-500",
+    highlights: ["Slip Inventory", "Lease Management", "Occupancy Trends", "Revenue Forecasting"]
   },
   { 
     title: "Market Intelligence", 
-    description: "Industry news, sales comps, and rate benchmarking",
-    icon: Newspaper,
-    color: "bg-rose-500"
+    description: "Sales comps, rate benchmarking, demographics data, and industry news aggregation to inform your investment decisions.",
+    icon: LineChart,
+    color: "bg-cyan-500",
+    highlights: ["Sales Comparables", "Rate Comps", "Demographics", "Industry News"]
+  },
+  { 
+    title: "Virtual Data Room", 
+    description: "Secure document sharing with granular permissions, external user access, and complete audit trails.",
+    icon: FolderLock,
+    color: "bg-rose-500",
+    highlights: ["Secure Sharing", "Permission Controls", "Audit Logging", "External Access"]
   },
 ];
 
-const featuredDeals = [
-  { 
-    name: "Sunset Marina & Yacht Club",
-    location: "Naples, FL",
-    askingPrice: "$24,500,000",
-    slips: 186,
-    capRate: "6.25%",
-    status: "Under LOI"
+const benefits = [
+  {
+    icon: Zap,
+    title: "Close Deals Faster",
+    description: "Streamlined workflows reduce time from LOI to closing by up to 40%"
   },
-  { 
-    name: "Harbor Point Marina",
-    location: "Annapolis, MD",
-    askingPrice: "$18,750,000",
-    slips: 142,
-    capRate: "5.85%",
-    status: "Active"
+  {
+    icon: Shield,
+    title: "Enterprise Security",
+    description: "Bank-grade encryption, role-based access, and comprehensive audit trails"
   },
-  { 
-    name: "Pacific Coast Yacht Harbor",
-    location: "San Diego, CA",
-    askingPrice: "$42,000,000",
-    slips: 312,
-    capRate: "5.20%",
-    status: "Due Diligence"
+  {
+    icon: Target,
+    title: "Marina-Specific",
+    description: "Purpose-built for marina acquisitions, not adapted from generic CRM tools"
   },
-  { 
-    name: "Lakefront Marina Resort",
-    location: "Lake Geneva, WI",
-    askingPrice: "$12,200,000",
-    slips: 98,
-    capRate: "7.10%",
-    status: "Active"
+  {
+    icon: BarChart3,
+    title: "Data-Driven Decisions",
+    description: "Market intelligence and analytics to identify and validate opportunities"
   },
 ];
 
-const newsArticles = [
+const pricingTiers = [
   {
-    category: "M&A Activity",
-    title: "Safe Harbor Acquires Three Gulf Coast Marinas in $67M Deal",
-    excerpt: "The acquisition adds 450 slips to Safe Harbor's growing portfolio...",
-    date: "Jan 12, 2026"
+    name: "Starter",
+    price: "Free",
+    description: "Get started with core CRM and pipeline management",
+    features: [
+      "Up to 50 contacts",
+      "Basic deal pipeline",
+      "5 active deals",
+      "Email integration",
+      "Mobile access"
+    ],
+    cta: "Start Free",
+    popular: false
   },
   {
-    category: "Market Trends",
-    title: "Marina Cap Rates Compress as Institutional Interest Grows",
-    excerpt: "Average cap rates for Class A marinas have dropped to 5.2%...",
-    date: "Jan 10, 2026"
+    name: "Professional",
+    price: "$199",
+    period: "/month",
+    description: "Full platform access for active acquirers",
+    features: [
+      "Unlimited contacts & deals",
+      "Due diligence tracking",
+      "Financial modeling",
+      "Rent roll analytics",
+      "Market intelligence",
+      "Virtual data room",
+      "Priority support"
+    ],
+    cta: "Start 14-Day Trial",
+    popular: true
   },
   {
-    category: "Industry News",
-    title: "NMMA Reports Record Boat Sales for 2025 Season",
-    excerpt: "Strong demand continues to drive marina occupancy rates...",
-    date: "Jan 8, 2026"
+    name: "Enterprise",
+    price: "Custom",
+    description: "For institutional investors and portfolio operators",
+    features: [
+      "Everything in Professional",
+      "Multi-portfolio management",
+      "LP Portal access",
+      "Fund management tools",
+      "API access",
+      "Dedicated success manager",
+      "Custom integrations"
+    ],
+    cta: "Contact Sales",
+    popular: false
   },
-];
-
-const mediaLogos = [
-  "Marina Dock Age",
-  "Boating Industry",
-  "Trade Only Today",
-  "Marina World",
-  "Soundings Trade Only",
-  "PropellMM",
 ];
 
 export default function DesignPreview() {
-  const [expandedService, setExpandedService] = useState<number | null>(null);
-
   return (
     <div className="min-h-screen bg-background">
-      {/* Announcement Banner */}
-      <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white py-2 px-4 text-center text-sm font-medium">
-        <span className="flex items-center justify-center gap-2">
-          MarinaMatch 2.0 Now Available - Introducing AI-Powered Document Intelligence
-          <ExternalLink className="h-3.5 w-3.5" />
-        </span>
-      </div>
-
       {/* Navigation */}
       <nav className="sticky top-0 z-50 bg-slate-900/95 backdrop-blur-sm border-b border-slate-700">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -150,11 +150,8 @@ export default function DesignPreview() {
               <span className="text-xl font-bold text-white tracking-tight">MARINAMATCH</span>
             </div>
             <div className="hidden md:flex items-center gap-6 text-sm">
-              <span className="text-slate-300 hover:text-white cursor-pointer">CRM</span>
-              <span className="text-slate-300 hover:text-white cursor-pointer">Due Diligence</span>
-              <span className="text-slate-300 hover:text-white cursor-pointer">Modeling</span>
-              <span className="text-slate-300 hover:text-white cursor-pointer">Rent Roll</span>
-              <span className="text-slate-300 hover:text-white cursor-pointer">Analytics</span>
+              <a href="#features" className="text-slate-300 hover:text-white cursor-pointer">Features</a>
+              <a href="#pricing" className="text-slate-300 hover:text-white cursor-pointer">Pricing</a>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -170,37 +167,32 @@ export default function DesignPreview() {
         </div>
       </nav>
 
-      {/* Hero Section - Surmount Style */}
-      <section className="relative h-[85vh] flex items-center justify-center overflow-hidden">
-        {/* Background gradient simulating marina imagery */}
+      {/* Hero Section */}
+      <section className="relative py-24 md:py-32 flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-slate-900 via-cyan-950 to-slate-900" />
         <div className="absolute inset-0 opacity-20">
           <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0id2F2ZXMiIHBhdHRlcm5Vbml0cz0idXNlclNwYWNlT25Vc2UiIHdpZHRoPSIxMDAiIGhlaWdodD0iMjAiPjxwYXRoIGQ9Ik0wIDEwIFEgMjUgMCwgNTAgMTAgVCA1MCAxMCBRIDc1IDIwLCAxMDAgMTAiIHN0cm9rZT0iIzA4OTFiMiIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI3dhdmVzKSIvPjwvc3ZnPg==')] bg-repeat" />
         </div>
         
-        <div className="relative z-10 text-center px-6">
-          {/* Logo Icon */}
+        <div className="relative z-10 text-center px-6 max-w-4xl mx-auto">
           <div className="mb-8 flex justify-center">
-            <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-2xl shadow-cyan-500/30">
-              <Anchor className="h-14 w-14 text-white" />
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-2xl shadow-cyan-500/30">
+              <Anchor className="h-12 w-12 text-white" />
             </div>
           </div>
           
-          {/* Brand Name */}
-          <h1 className="text-5xl md:text-7xl font-bold text-white tracking-tight mb-4">
-            MARINAMATCH
+          <h1 className="text-4xl md:text-6xl font-bold text-white tracking-tight mb-6">
+            The Complete Marina Acquisition Platform
           </h1>
           
-          {/* Tagline */}
-          <p className="text-xl md:text-2xl text-cyan-200 font-light mb-8">
-            The Complete Marina Acquisition Intelligence Platform
+          <p className="text-lg md:text-xl text-cyan-200 font-light mb-8 max-w-2xl mx-auto">
+            CRM, Due Diligence, Financial Modeling, and Market Intelligence - unified in one purpose-built platform for marina investors.
           </p>
           
-          {/* CTA Buttons */}
-          <div className="flex items-center justify-center gap-4">
+          <div className="flex items-center justify-center gap-4 flex-wrap">
             <Link href="/signup">
               <Button size="lg" className="bg-cyan-500 hover:bg-cyan-600 text-white px-8">
-                Get Started Free
+                Start Free Trial <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </Link>
             <Link href="/login">
@@ -209,124 +201,62 @@ export default function DesignPreview() {
               </Button>
             </Link>
           </div>
-        </div>
-
-        {/* Scroll Indicator */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
-          <div className="w-6 h-10 border-2 border-cyan-400 rounded-full flex items-start justify-center p-1">
-            <div className="w-1.5 h-3 bg-cyan-400 rounded-full animate-pulse" />
-          </div>
+          
+          <p className="text-slate-400 text-sm mt-4">
+            No credit card required. 14-day free trial.
+          </p>
         </div>
       </section>
 
-      {/* Statistics Section */}
+      {/* Benefits Grid */}
       <section className="bg-slate-900 py-16 border-y border-slate-700">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {stats.map((stat, index) => (
+          <div className="grid md:grid-cols-4 gap-8">
+            {benefits.map((benefit, index) => (
               <div key={index} className="text-center">
-                <div className="flex justify-center mb-3">
-                  <stat.icon className="h-8 w-8 text-cyan-400" />
+                <div className="flex justify-center mb-4">
+                  <div className="w-14 h-14 rounded-xl bg-cyan-500/20 flex items-center justify-center">
+                    <benefit.icon className="h-7 w-7 text-cyan-400" />
+                  </div>
                 </div>
-                <div className="text-4xl md:text-5xl font-bold text-white mb-2">
-                  {stat.value}
-                </div>
-                <div className="text-slate-400 text-sm uppercase tracking-wider">
-                  {stat.label}
-                </div>
+                <h3 className="text-lg font-semibold text-white mb-2">{benefit.title}</h3>
+                <p className="text-slate-400 text-sm">{benefit.description}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Service Pillars */}
-      <section className="py-20 bg-slate-950">
+      {/* Platform Features */}
+      <section id="features" className="py-20 bg-slate-950">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-12">
+          <div className="text-center mb-16">
+            <Badge className="bg-cyan-500/20 text-cyan-400 border-cyan-500/30 mb-4">PLATFORM FEATURES</Badge>
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              One Platform. Complete Marina Intelligence.
+              Everything You Need to Close Marina Deals
             </h2>
             <p className="text-slate-400 text-lg max-w-2xl mx-auto">
-              From first contact to closing, MarinaMatch powers every step of your marina acquisition journey.
+              From first contact to closing, MarinaMatch powers every step of your acquisition journey.
             </p>
           </div>
           
-          <div className="grid md:grid-cols-5 gap-4">
-            {servicePillars.map((service, index) => (
-              <div 
-                key={index}
-                className="group bg-slate-900 border border-slate-700 rounded-xl p-6 hover:border-cyan-500/50 transition-all cursor-pointer"
-                onClick={() => setExpandedService(expandedService === index ? null : index)}
-              >
-                <div className={`w-12 h-12 ${service.color} rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                  <service.icon className="h-6 w-6 text-white" />
-                </div>
-                <h3 className="text-lg font-semibold text-white mb-2">{service.title}</h3>
-                <p className="text-slate-400 text-sm">{service.description}</p>
-                <ChevronDown className={`h-4 w-4 text-slate-500 mt-4 transition-transform ${expandedService === index ? 'rotate-180' : ''}`} />
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Featured Deals - Property Cards */}
-      <section className="py-20 bg-slate-900">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex items-center justify-between mb-12">
-            <div>
-              <Badge className="bg-cyan-500/20 text-cyan-400 border-cyan-500/30 mb-2">ACTIVE OPPORTUNITIES</Badge>
-              <h2 className="text-3xl font-bold text-white">Featured Deals</h2>
-            </div>
-            <Button variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800">
-              View All Listings <ArrowRight className="h-4 w-4 ml-2" />
-            </Button>
-          </div>
-          
-          <div className="grid md:grid-cols-4 gap-6">
-            {featuredDeals.map((deal, index) => (
-              <Card key={index} className="bg-slate-800 border-slate-700 overflow-hidden group hover:border-cyan-500/50 transition-all">
-                {/* Image Placeholder */}
-                <div className="h-40 bg-gradient-to-br from-cyan-900 to-slate-800 flex items-center justify-center relative">
-                  <Waves className="h-16 w-16 text-cyan-600/30" />
-                  <Badge className={`absolute top-3 left-3 ${
-                    deal.status === 'Under LOI' ? 'bg-amber-500' :
-                    deal.status === 'Due Diligence' ? 'bg-violet-500' : 'bg-emerald-500'
-                  }`}>
-                    {deal.status}
-                  </Badge>
-                </div>
-                
-                <CardContent className="p-4">
-                  {/* Price */}
-                  <div className="text-2xl font-bold text-white mb-1">
-                    {deal.askingPrice}
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {platformFeatures.map((feature, index) => (
+              <Card key={index} className="bg-slate-900 border-slate-700 overflow-hidden hover:border-cyan-500/50 transition-all">
+                <CardContent className="p-6">
+                  <div className={`w-12 h-12 ${feature.color} rounded-lg flex items-center justify-center mb-4`}>
+                    <feature.icon className="h-6 w-6 text-white" />
                   </div>
-                  
-                  {/* Cap Rate Badge */}
-                  <div className="flex items-center gap-2 mb-3">
-                    <Badge variant="outline" className="text-cyan-400 border-cyan-500/30">
-                      Cap Rate: {deal.capRate}
-                    </Badge>
-                    <Badge variant="outline" className="text-slate-400 border-slate-600">
-                      {deal.slips} Slips
-                    </Badge>
-                  </div>
-                  
-                  {/* Name & Location */}
-                  <h3 className="font-semibold text-white mb-1 group-hover:text-cyan-400 transition-colors">
-                    {deal.name}
-                  </h3>
-                  <div className="flex items-center gap-1 text-slate-400 text-sm">
-                    <MapPin className="h-3.5 w-3.5" />
-                    {deal.location}
-                  </div>
-                  
-                  {/* CTA */}
-                  <Button className="w-full mt-4 bg-slate-700 hover:bg-cyan-600 text-white">
-                    View Details
-                  </Button>
+                  <h3 className="text-xl font-semibold text-white mb-2">{feature.title}</h3>
+                  <p className="text-slate-400 text-sm mb-4">{feature.description}</p>
+                  <ul className="space-y-2">
+                    {feature.highlights.map((highlight, i) => (
+                      <li key={i} className="flex items-center gap-2 text-sm text-slate-300">
+                        <CheckCircle2 className="h-4 w-4 text-cyan-400 flex-shrink-0" />
+                        {highlight}
+                      </li>
+                    ))}
+                  </ul>
                 </CardContent>
               </Card>
             ))}
@@ -334,36 +264,49 @@ export default function DesignPreview() {
         </div>
       </section>
 
-      {/* Media/News Section */}
-      <section className="py-20 bg-slate-950">
+      {/* Pricing Section */}
+      <section id="pricing" className="py-20 bg-slate-900">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="flex items-center justify-between mb-12">
-            <h2 className="text-3xl font-bold text-white">Industry Intelligence</h2>
-            <Button variant="link" className="text-cyan-400">
-              View All News <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
+          <div className="text-center mb-16">
+            <Badge className="bg-cyan-500/20 text-cyan-400 border-cyan-500/30 mb-4">PRICING</Badge>
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+              Simple, Transparent Pricing
+            </h2>
+            <p className="text-slate-400 text-lg max-w-2xl mx-auto">
+              Start free and scale as your portfolio grows.
+            </p>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-6">
-            {newsArticles.map((article, index) => (
-              <Card key={index} className="bg-slate-900 border-slate-700 overflow-hidden group hover:border-cyan-500/50 transition-all cursor-pointer">
-                <div className="h-48 bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center">
-                  <Newspaper className="h-16 w-16 text-slate-700" />
-                </div>
-                <CardContent className="p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Badge className="bg-cyan-500/20 text-cyan-400 border-cyan-500/30">
-                      {article.category}
-                    </Badge>
-                    <span className="text-slate-500 text-xs">{article.date}</span>
+          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            {pricingTiers.map((tier, index) => (
+              <Card key={index} className={`bg-slate-800 border-slate-700 overflow-hidden relative ${tier.popular ? 'ring-2 ring-cyan-500' : ''}`}>
+                {tier.popular && (
+                  <div className="absolute top-0 left-0 right-0 bg-cyan-500 text-white text-center text-sm py-1 font-medium">
+                    Most Popular
                   </div>
-                  <h3 className="font-semibold text-white mb-2 group-hover:text-cyan-400 transition-colors line-clamp-2">
-                    {article.title}
-                  </h3>
-                  <p className="text-slate-400 text-sm line-clamp-2">{article.excerpt}</p>
-                  <Button variant="link" className="text-cyan-400 px-0 mt-3">
-                    Read More <ArrowRight className="h-3 w-3 ml-1" />
-                  </Button>
+                )}
+                <CardContent className={`p-6 ${tier.popular ? 'pt-10' : ''}`}>
+                  <h3 className="text-xl font-semibold text-white mb-2">{tier.name}</h3>
+                  <div className="mb-4">
+                    <span className="text-4xl font-bold text-white">{tier.price}</span>
+                    {tier.period && <span className="text-slate-400">{tier.period}</span>}
+                  </div>
+                  <p className="text-slate-400 text-sm mb-6">{tier.description}</p>
+                  
+                  <ul className="space-y-3 mb-6">
+                    {tier.features.map((feature, i) => (
+                      <li key={i} className="flex items-center gap-2 text-sm text-slate-300">
+                        <CheckCircle2 className="h-4 w-4 text-cyan-400 flex-shrink-0" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                  
+                  <Link href="/signup">
+                    <Button className={`w-full ${tier.popular ? 'bg-cyan-500 hover:bg-cyan-600' : 'bg-slate-700 hover:bg-slate-600'} text-white`}>
+                      {tier.cta}
+                    </Button>
+                  </Link>
                 </CardContent>
               </Card>
             ))}
@@ -371,32 +314,16 @@ export default function DesignPreview() {
         </div>
       </section>
 
-      {/* Featured In - Logo Carousel */}
-      <section className="py-12 bg-slate-900 border-y border-slate-700 overflow-hidden">
-        <div className="max-w-7xl mx-auto px-6">
-          <p className="text-center text-slate-500 text-sm uppercase tracking-wider mb-8">
-            Trusted by Industry Leaders
-          </p>
-          <div className="flex items-center justify-center gap-12 flex-wrap opacity-60">
-            {mediaLogos.map((logo, index) => (
-              <div key={index} className="text-slate-400 font-semibold text-lg hover:text-white transition-colors cursor-pointer">
-                {logo}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
+      {/* Final CTA */}
       <section className="py-20 bg-gradient-to-b from-cyan-950 to-slate-900">
         <div className="max-w-4xl mx-auto px-6 text-center">
-          <h2 className="text-4xl font-bold text-white mb-4">
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
             Ready to Transform Your Marina Acquisitions?
           </h2>
           <p className="text-cyan-200 text-lg mb-8">
-            Join the leading marina investment firms using MarinaMatch to source, analyze, and close deals faster.
+            Join marina investment firms using MarinaMatch to source, analyze, and close deals faster.
           </p>
-          <div className="flex items-center justify-center gap-4">
+          <div className="flex items-center justify-center gap-4 flex-wrap">
             <Link href="/signup">
               <Button size="lg" className="bg-cyan-500 hover:bg-cyan-600 text-white px-8">
                 Start Free Trial
@@ -414,7 +341,7 @@ export default function DesignPreview() {
       {/* Footer */}
       <footer className="bg-slate-950 py-12 border-t border-slate-800">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
                 <Anchor className="h-5 w-5 text-white" />
