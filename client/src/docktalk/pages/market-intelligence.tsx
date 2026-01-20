@@ -10,6 +10,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "../lib/queryClient";
+import { usePacks } from "@/contexts/PackContext";
+import { PaywallModal } from "@/components/PaywallModal";
 import { 
   TrendingUp, 
   Sparkles, 
@@ -21,8 +23,15 @@ import {
   X,
   Crown,
   Lock,
-  BarChart3
+  BarChart3,
+  AlertTriangle,
+  Target,
+  Lightbulb,
+  Building,
+  RefreshCw,
+  Loader2
 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface CategorySummary {
   id: number;
@@ -69,6 +78,188 @@ const CATEGORY_ICONS: Record<string, string> = {
   'Business Planning': '📋',
   'International': '🌐'
 };
+
+interface CrossModuleInsight {
+  id: string;
+  category: 'market_trend' | 'deal_opportunity' | 'risk_alert' | 'strategic_recommendation' | 'competitive_intel';
+  title: string;
+  summary: string;
+  details: string;
+  confidence: 'high' | 'medium' | 'low';
+  priority: number;
+  relatedModules: string[];
+  actionItems?: string[];
+}
+
+interface MarketIntelligenceProReport {
+  executiveSummary: string;
+  insights: CrossModuleInsight[];
+  marketOverview: {
+    totalDealsInPipeline: number;
+    totalDealValue: number;
+    activeDdProjects: number;
+    modelingProjectsCount: number;
+    recentNewsCount: number;
+  };
+  trends: {
+    dealVelocity: string;
+    marketSentiment: string;
+    competitiveActivity: string;
+  };
+  generatedAt: string;
+}
+
+const INSIGHT_ICONS: Record<string, typeof TrendingUp> = {
+  market_trend: TrendingUp,
+  deal_opportunity: Target,
+  risk_alert: AlertTriangle,
+  strategic_recommendation: Lightbulb,
+  competitive_intel: Building,
+};
+
+const INSIGHT_COLORS: Record<string, string> = {
+  market_trend: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  deal_opportunity: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+  risk_alert: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+  strategic_recommendation: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+  competitive_intel: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+};
+
+function ProInsightsSection() {
+  const { toast } = useToast();
+  
+  const { data: report, isLoading, error, refetch, isFetching } = useQuery<MarketIntelligenceProReport>({
+    queryKey: ['/api/analytics/market-intelligence-pro/insights'],
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  if (isLoading) {
+    return (
+      <Card className="p-6 mb-6">
+        <div className="flex items-center gap-3 mb-4">
+          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          <span className="text-muted-foreground">Analyzing cross-module data...</span>
+        </div>
+        <div className="space-y-3">
+          {[1, 2, 3].map(i => (
+            <Skeleton key={i} className="h-24 w-full" />
+          ))}
+        </div>
+      </Card>
+    );
+  }
+
+  if (error || !report) {
+    return (
+      <Card className="p-6 mb-6 border-red-200 bg-red-50 dark:bg-red-900/10">
+        <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
+          <AlertTriangle className="h-5 w-5" />
+          <span>Unable to load cross-module insights. Please try again.</span>
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="mb-8">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-amber-500" />
+          <h2 className="text-xl font-semibold">Cross-Module Intelligence</h2>
+          <Badge variant="secondary" className="bg-amber-100 text-amber-700">
+            AI-Powered
+          </Badge>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => refetch()}
+          disabled={isFetching}
+        >
+          <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Executive Summary */}
+      <Card className="p-4 mb-4 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+        <p className="text-sm font-medium text-muted-foreground mb-1">Executive Summary</p>
+        <p className="text-foreground">{report.executiveSummary}</p>
+      </Card>
+
+      {/* Market Overview Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+        <Card className="p-3 text-center">
+          <p className="text-2xl font-bold text-primary">{report.marketOverview.totalDealsInPipeline}</p>
+          <p className="text-xs text-muted-foreground">Active Deals</p>
+        </Card>
+        <Card className="p-3 text-center">
+          <p className="text-2xl font-bold text-green-600">
+            ${(report.marketOverview.totalDealValue / 1000000).toFixed(1)}M
+          </p>
+          <p className="text-xs text-muted-foreground">Pipeline Value</p>
+        </Card>
+        <Card className="p-3 text-center">
+          <p className="text-2xl font-bold text-blue-600">{report.marketOverview.activeDdProjects}</p>
+          <p className="text-xs text-muted-foreground">DD Projects</p>
+        </Card>
+        <Card className="p-3 text-center">
+          <p className="text-2xl font-bold text-purple-600">{report.marketOverview.modelingProjectsCount}</p>
+          <p className="text-xs text-muted-foreground">Models</p>
+        </Card>
+        <Card className="p-3 text-center">
+          <p className="text-2xl font-bold text-amber-600">{report.marketOverview.recentNewsCount}</p>
+          <p className="text-xs text-muted-foreground">News Articles</p>
+        </Card>
+      </div>
+
+      {/* Insights List */}
+      <div className="space-y-3">
+        {report.insights.map((insight) => {
+          const Icon = INSIGHT_ICONS[insight.category] || Sparkles;
+          const colorClass = INSIGHT_COLORS[insight.category] || 'bg-gray-100 text-gray-800';
+          
+          return (
+            <Card key={insight.id} className="p-4">
+              <div className="flex items-start gap-3">
+                <div className={`p-2 rounded-lg ${colorClass}`}>
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-medium text-foreground">{insight.title}</h3>
+                    <Badge variant="outline" className="text-xs">
+                      {insight.confidence} confidence
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-2">{insight.summary}</p>
+                  <p className="text-sm text-foreground">{insight.details}</p>
+                  {insight.actionItems && insight.actionItems.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {insight.actionItems.map((action, idx) => (
+                        <Badge key={idx} variant="secondary" className="text-xs">
+                          {action}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  <div className="mt-2 flex gap-1">
+                    {insight.relatedModules.map((mod, idx) => (
+                      <Badge key={idx} variant="outline" className="text-xs">
+                        {mod}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function SummaryCard({ 
   summary, 
@@ -335,9 +526,11 @@ export default function MarketIntelligence() {
   const { isAuthenticated, user } = useAuth();
   const [, navigate] = useLocation();
   const [periodFilter, setPeriodFilter] = useState<"daily" | "weekly" | "">("");
+  const [showPaywall, setShowPaywall] = useState(false);
   
-  // Admins always get Pro access for building/testing
-  const isPro = user?.subscriptionTier === "pro" || user?.role === "admin";
+  // Check for analytics_pro pack or admin role for Pro access
+  const { hasAnalyticsPro, isLoading: packsLoading } = usePacks();
+  const isPro = hasAnalyticsPro || user?.role === "admin";
   const canEdit = user?.role && ['admin', 'analyst', 'partner'].includes(user.role);
   
   const { data: summaries, isLoading, error } = useQuery<CategorySummary[]>({
@@ -444,7 +637,7 @@ export default function MarketIntelligence() {
                 <Button 
                   size="lg" 
                   className="bg-amber-500 hover:bg-amber-600"
-                  onClick={() => navigate("/packs-settings")}
+                  onClick={() => setShowPaywall(true)}
                   data-testid="button-upgrade-pro"
                 >
                   <Crown className="h-5 w-5 mr-2" />
@@ -454,6 +647,11 @@ export default function MarketIntelligence() {
                   Preview available below with limited access
                 </p>
               </Card>
+            )}
+
+            {/* Cross-Module Insights Section - Pro Only */}
+            {isAuthenticated && isPro && (
+              <ProInsightsSection />
             )}
 
             {/* Loading State */}
@@ -540,6 +738,14 @@ export default function MarketIntelligence() {
               </div>
             )}
         </div>
+        
+        {/* Paywall Modal */}
+        <PaywallModal
+          open={showPaywall}
+          onOpenChange={setShowPaywall}
+          packType="analytics_pro"
+          featureName="Market Intelligence Pro"
+        />
     </div>
   );
 }

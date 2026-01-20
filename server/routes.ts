@@ -13854,6 +13854,48 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ message: "Failed to generate insights" });
     }
   });
+  // ========================================
+  // MARKET INTELLIGENCE PRO ENDPOINTS
+  // ========================================
+
+  // Get Market Intelligence Pro cross-module insights (requires analytics_pro pack)
+  app.get('/api/analytics/market-intelligence-pro/insights', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      
+      // Check for analytics_pro pack
+      const { packService } = await import("./services/pack-service"); const activePacks = await packService.getActivePacks(orgId); const hasProAccess = activePacks.includes("analytics_pro") || 
+                          req.user.role === 'admin';
+      
+      if (!hasProAccess) {
+        return res.status(403).json({ 
+          message: "Market Intelligence Pro requires the Analytics Pro pack",
+          requiredPack: "analytics_pro"
+        });
+      }
+      
+      const { generateCrossModuleInsights } = await import('./services/market-intelligence-pro-service');
+      const report = await generateCrossModuleInsights(orgId);
+      res.json(report);
+    } catch (error: any) {
+      console.error("Error generating Market Intelligence Pro insights:", error);
+      res.status(500).json({ message: "Failed to generate insights" });
+    }
+  });
+
+  // Get Market Intelligence Pro summary/status
+  app.get('/api/analytics/market-intelligence-pro/summary', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { getMarketIntelligenceProSummary } = await import('./services/market-intelligence-pro-service');
+      const summary = await getMarketIntelligenceProSummary(orgId);
+      res.json(summary);
+    } catch (error: any) {
+      console.error("Error getting Market Intelligence Pro summary:", error);
+      res.status(500).json({ message: "Failed to get summary" });
+    }
+  });
+
 
   // ========================================
   // CUSTOMER ANALYTICS ENDPOINTS
