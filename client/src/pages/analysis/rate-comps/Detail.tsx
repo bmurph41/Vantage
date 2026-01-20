@@ -35,11 +35,9 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
   const canDelete = true;
 
   const handleSave = () => {
-    // TODO: Implement save when API is available
     toast({
-      title: "TODO",
-      description: "Save functionality pending API integration",
-      variant: "destructive",
+      title: "Coming Soon",
+      description: "Rate comp editing will be available in a future update.",
     });
   };
 
@@ -50,11 +48,9 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
 
   const handleDelete = () => {
     if (window.confirm('Are you sure you want to delete this comp? This action cannot be undone.')) {
-      // TODO: Implement delete when API is available
       toast({
-        title: "TODO",
-        description: "Delete functionality pending API integration",
-        variant: "destructive",
+        title: "Coming Soon",
+        description: "Rate comp deletion will be available in a future update.",
       });
     }
   };

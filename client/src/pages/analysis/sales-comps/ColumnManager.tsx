@@ -89,30 +89,24 @@ export default function ColumnManager({ onClose }: ColumnManagerProps) {
       return;
     }
 
-    // TODO: Implement create when API is available
     toast({
-      title: "TODO",
-      description: "Column creation pending API integration",
-      variant: "destructive",
+      title: "Coming Soon",
+      description: "Custom column creation will be available in a future update.",
     });
   };
 
   const handleUpdate = (column: any, updates: any) => {
-    // TODO: Implement update when API is available
     toast({
-      title: "TODO",
-      description: "Column update pending API integration",
-      variant: "destructive",
+      title: "Coming Soon",
+      description: "Column editing will be available in a future update.",
     });
   };
 
   const handleDelete = (column: any) => {
     if (window.confirm(`Are you sure you want to delete the column "${column.label}"?`)) {
-      // TODO: Implement delete when API is available
       toast({
-        title: "TODO",
-        description: "Column deletion pending API integration",
-        variant: "destructive",
+        title: "Coming Soon",
+        description: "Column deletion will be available in a future update.",
       });
     }
   };

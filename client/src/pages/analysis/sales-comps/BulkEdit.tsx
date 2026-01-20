@@ -61,11 +61,9 @@ export default function BulkEdit({ selectedIds, onClose }: BulkEditProps) {
       return;
     }
 
-    // TODO: Implement bulk update when API is available
     toast({
-      title: "TODO",
-      description: "Bulk update functionality pending API integration",
-      variant: "destructive",
+      title: "Coming Soon",
+      description: "Bulk editing will be available in a future update.",
     });
   };
 
