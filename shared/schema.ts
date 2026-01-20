@@ -3860,6 +3860,98 @@ export const crmDeals = pgTable("crm_deals", {
   createdAtIdx: index("crm_deals_created_at").on(table.createdAt),
 }));
 
+// CRM Deal Stage History - Tracks all stage transitions for analytics
+export const crmDealStageHistory = pgTable("crm_deal_stage_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").notNull().references(() => crmDeals.id, { onDelete: "cascade" }),
+  stageId: varchar("stage_id").notNull().references(() => crmPipelineStages.id),
+  stageName: text("stage_name").notNull(), // Denormalized for historical accuracy
+  pipelineId: varchar("pipeline_id").references(() => crmPipelines.id),
+  enteredAt: timestamp("entered_at").notNull().defaultNow(),
+  exitedAt: timestamp("exited_at"),
+  durationSeconds: integer("duration_seconds"), // Calculated when exiting stage
+  durationBusinessDays: integer("duration_business_days"), // Calculated excluding weekends/holidays
+  transitionReason: text("transition_reason"), // Optional note for why stage changed
+  transitionedBy: varchar("transitioned_by").references(() => users.id),
+  isCurrentStage: boolean("is_current_stage").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  dealIdx: index("crm_deal_stage_history_deal_idx").on(table.dealId),
+  stageIdx: index("crm_deal_stage_history_stage_idx").on(table.stageId),
+  enteredAtIdx: index("crm_deal_stage_history_entered_at_idx").on(table.enteredAt),
+  currentStageIdx: index("crm_deal_stage_history_current_idx").on(table.dealId, table.isCurrentStage),
+}));
+
+// CRM Timeline Events - Unified event tracking across entities
+export const crmTimelineEventTypeEnum = pgEnum("crm_timeline_event_type", [
+  "stage_change",
+  "deal_created",
+  "deal_won",
+  "deal_lost",
+  "activity_logged",
+  "note_added",
+  "file_uploaded",
+  "email_sent",
+  "email_received",
+  "call_logged",
+  "meeting_scheduled",
+  "meeting_completed",
+  "task_created",
+  "task_completed",
+  "contact_added",
+  "company_added",
+  "property_linked",
+  "value_changed",
+  "owner_changed",
+  "comment_added",
+  "document_signed",
+  "milestone_reached",
+  "custom"
+]);
+
+export const crmTimelineEvents = pgTable("crm_timeline_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  eventType: crmTimelineEventTypeEnum("event_type").notNull(),
+  entityType: text("entity_type").notNull(), // deal, contact, company, property
+  entityId: varchar("entity_id").notNull(),
+  relatedEntityType: text("related_entity_type"), // For events that link entities
+  relatedEntityId: varchar("related_entity_id"),
+  title: text("title").notNull(),
+  description: text("description"),
+  metadata: jsonb("metadata").default({}).notNull(), // Flexible payload for event-specific data
+  occurredAt: timestamp("occurred_at").notNull().defaultNow(),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("crm_timeline_events_org_idx").on(table.orgId),
+  entityIdx: index("crm_timeline_events_entity_idx").on(table.entityType, table.entityId),
+  occurredAtIdx: index("crm_timeline_events_occurred_at_idx").on(table.occurredAt),
+  eventTypeIdx: index("crm_timeline_events_type_idx").on(table.eventType),
+}));
+
+// CRM Deal Engagement Scores - Tracks engagement metrics for win probability
+export const crmDealEngagementScores = pgTable("crm_deal_engagement_scores", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").notNull().references(() => crmDeals.id, { onDelete: "cascade" }).unique(),
+  engagementScore: integer("engagement_score").default(0).notNull(), // 0-100 composite score
+  activityScore: integer("activity_score").default(0), // Based on activity frequency
+  responseScore: integer("response_score").default(0), // Based on email/call response rates
+  meetingScore: integer("meeting_score").default(0), // Based on meeting attendance
+  documentScore: integer("document_score").default(0), // Based on document activity
+  recencyScore: integer("recency_score").default(0), // Based on last activity recency
+  stageVelocityScore: integer("stage_velocity_score").default(0), // Based on stage progression speed
+  winProbability: integer("win_probability").default(10), // 0-100 calculated probability
+  factors: jsonb("factors").default({}).notNull(), // Detailed breakdown of score factors
+  lastCalculatedAt: timestamp("last_calculated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  dealIdx: index("crm_deal_engagement_deal_idx").on(table.dealId),
+  scoreIdx: index("crm_deal_engagement_score_idx").on(table.engagementScore),
+  probabilityIdx: index("crm_deal_engagement_probability_idx").on(table.winProbability),
+}));
+
 // Products table - for revenue tracking
 
 export const crmProducts = pgTable("crm_products", {
@@ -5719,6 +5811,11 @@ export type CrmPipeline = typeof crmPipelines.$inferSelect;
 export type CrmPipelineStage = typeof crmPipelineStages.$inferSelect;
 export type CrmActivity = typeof crmActivities.$inferSelect;
 
+// Deal Analytics Type Exports
+export type CrmDealStageHistory = typeof crmDealStageHistory.$inferSelect;
+export type CrmTimelineEvent = typeof crmTimelineEvents.$inferSelect;
+export type CrmDealEngagementScore = typeof crmDealEngagementScores.$inferSelect;
+
 // CRM Insert Schemas
 export const insertCrmDealSchema = createInsertSchema(crmDeals).omit({
   id: true,
@@ -5995,6 +6092,27 @@ export const insertCrmActivitySchema = createInsertSchema(crmActivities).omit({
   createdAt: true,
 });
 export type InsertCrmActivity = z.infer<typeof insertCrmActivitySchema>;
+
+// Deal Analytics Insert Schemas
+export const insertCrmDealStageHistorySchema = createInsertSchema(crmDealStageHistory).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertCrmDealStageHistory = z.infer<typeof insertCrmDealStageHistorySchema>;
+
+export const insertCrmTimelineEventSchema = createInsertSchema(crmTimelineEvents).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertCrmTimelineEvent = z.infer<typeof insertCrmTimelineEventSchema>;
+
+export const insertCrmDealEngagementScoreSchema = createInsertSchema(crmDealEngagementScores).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastCalculatedAt: true,
+});
+export type InsertCrmDealEngagementScore = z.infer<typeof insertCrmDealEngagementScoreSchema>;
 
 // CRM Workflow schema
 export const insertCrmWorkflowSchema = createInsertSchema(crmWorkflows).omit({
