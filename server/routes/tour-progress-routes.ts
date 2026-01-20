@@ -102,15 +102,17 @@ router.post("/api/tour-progress", async (req, res) => {
 router.delete("/api/tour-progress/:tourId", async (req, res) => {
   try {
     const userId = req.user?.id;
+    const orgId = req.user?.orgId;
     const { tourId } = req.params;
 
-    if (!userId) {
+    if (!userId || !orgId) {
       return res.status(401).json({ error: "Authentication required" });
     }
 
     await db.delete(userTourProgress).where(
       and(
         eq(userTourProgress.userId, userId),
+        eq(userTourProgress.orgId, orgId),
         eq(userTourProgress.tourId, tourId)
       )
     );
@@ -125,13 +127,17 @@ router.delete("/api/tour-progress/:tourId", async (req, res) => {
 router.delete("/api/tour-progress", async (req, res) => {
   try {
     const userId = req.user?.id;
+    const orgId = req.user?.orgId;
 
-    if (!userId) {
+    if (!userId || !orgId) {
       return res.status(401).json({ error: "Authentication required" });
     }
 
     await db.delete(userTourProgress).where(
-      eq(userTourProgress.userId, userId)
+      and(
+        eq(userTourProgress.userId, userId),
+        eq(userTourProgress.orgId, orgId)
+      )
     );
 
     return res.json({ success: true });

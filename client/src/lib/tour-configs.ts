@@ -109,22 +109,10 @@ export const dueDiligenceTourSteps: TourStep[] = [
 export const docktalkTourSteps: TourStep[] = [
   {
     target: '[data-tour="docktalk-feed"]',
-    content: "Your curated feed of marina industry news, M&A activity, and market trends.",
-    title: "Industry Intelligence",
+    content: "Your curated feed of marina M&A activity and market trends. Track deal flow, recent transactions, and investment opportunities across the marina industry.",
+    title: "M&A Spotlight",
     placement: "bottom",
     disableBeacon: true,
-  },
-  {
-    target: '[data-tour="docktalk-sources"]',
-    content: "We aggregate news from trusted marina industry sources. Configure your preferences to customize your feed.",
-    title: "News Sources",
-    placement: "left",
-  },
-  {
-    target: '[data-tour="docktalk-alerts"]',
-    content: "Set up alerts for specific topics, regions, or companies to never miss important updates.",
-    title: "Smart Alerts",
-    placement: "bottom",
   },
 ];
 
@@ -197,28 +185,10 @@ export const commercialTenantsTourSteps: TourStep[] = [
 export const vdrTourSteps: TourStep[] = [
   {
     target: '[data-tour="vdr-folders"]',
-    content: "Organize documents in secure folders with customizable access controls.",
+    content: "Your secure Virtual Data Room for managing transaction documents. Organize files by project with granular access controls, upload documents securely, and track all activity with audit logging.",
     title: "Virtual Data Room",
-    placement: "right",
-    disableBeacon: true,
-  },
-  {
-    target: '[data-tour="vdr-upload"]',
-    content: "Upload documents securely. We support all major file formats with automatic virus scanning.",
-    title: "Secure Upload",
     placement: "bottom",
-  },
-  {
-    target: '[data-tour="vdr-permissions"]',
-    content: "Grant granular access to external parties like buyers, lenders, or attorneys.",
-    title: "Access Control",
-    placement: "left",
-  },
-  {
-    target: '[data-tour="vdr-audit"]',
-    content: "Every view, download, and share is logged. Know who accessed what and when.",
-    title: "Audit Trail",
-    placement: "top",
+    disableBeacon: true,
   },
 ];
 
