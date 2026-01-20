@@ -334,7 +334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Fall back to demo user in development if no session
       if (!req.user && process.env.NODE_ENV !== 'production') {
-        req.user = { id: "user-1", orgId: "org-1", role: "owner", email: "brettmurphy41@gmail.com", name: "Demo User" };
+        req.user = { id: "85c9cd7a-c453-4dba-9817-d032d5712c4e", orgId: "cd3719c3-ef82-4ccc-acb9-261c80fb64b4", role: "owner", email: "brettmurphy41@gmail.com", name: "Demo User" };
       }
       
       if (!req.user) {

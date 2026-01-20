@@ -3,13 +3,15 @@ import { db } from "../db";
 import { userTourProgress } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
+import type { AuthenticatedRequest } from "../middleware/auth-resolver";
 
 const router = Router();
 
-router.get("/api/tour-progress/:tourId", async (req, res) => {
+router.get("/api/tour-progress/:tourId", async (req: AuthenticatedRequest, res) => {
   try {
-    const userId = req.user?.id;
-    const orgId = req.user?.orgId;
+    // Use validatedUserId/validatedOrgId from auth resolver (supports dev mock auth)
+    const userId = (req as any).validatedUserId || req.user?.id;
+    const orgId = (req as any).validatedOrgId || req.user?.orgId;
     const { tourId } = req.params;
 
     if (!userId || !orgId) {
@@ -30,10 +32,10 @@ router.get("/api/tour-progress/:tourId", async (req, res) => {
   }
 });
 
-router.get("/api/tour-progress", async (req, res) => {
+router.get("/api/tour-progress", async (req: AuthenticatedRequest, res) => {
   try {
-    const userId = req.user?.id;
-    const orgId = req.user?.orgId;
+    const userId = (req as any).validatedUserId || req.user?.id;
+    const orgId = (req as any).validatedOrgId || req.user?.orgId;
 
     if (!userId || !orgId) {
       return res.json({ tours: [] });
@@ -57,12 +59,15 @@ router.get("/api/tour-progress", async (req, res) => {
 
 const completeTourSchema = z.object({
   tourId: z.string().min(1).max(100),
+  status: z.enum(["completed", "skipped", "in_progress"]).optional().default("completed"),
+  lastStepIndex: z.number().int().min(0).optional(),
+  totalSteps: z.number().int().min(0).optional(),
 });
 
-router.post("/api/tour-progress", async (req, res) => {
+router.post("/api/tour-progress", async (req: AuthenticatedRequest, res) => {
   try {
-    const userId = req.user?.id;
-    const orgId = req.user?.orgId;
+    const userId = (req as any).validatedUserId || req.user?.id;
+    const orgId = (req as any).validatedOrgId || req.user?.orgId;
 
     if (!userId || !orgId) {
       return res.status(401).json({ error: "Authentication required" });
@@ -70,10 +75,10 @@ router.post("/api/tour-progress", async (req, res) => {
 
     const parseResult = completeTourSchema.safeParse(req.body);
     if (!parseResult.success) {
-      return res.status(400).json({ error: "Invalid tour ID" });
+      return res.status(400).json({ error: "Invalid tour data" });
     }
 
-    const { tourId } = parseResult.data;
+    const { tourId, status, lastStepIndex, totalSteps } = parseResult.data;
 
     const existing = await db.query.userTourProgress.findFirst({
       where: and(
@@ -83,13 +88,28 @@ router.post("/api/tour-progress", async (req, res) => {
     });
 
     if (existing) {
-      return res.json({ success: true, message: "Tour already completed" });
+      // Update existing record with new status/step info
+      await db.update(userTourProgress)
+        .set({
+          status: status || existing.status,
+          lastStepIndex: lastStepIndex ?? existing.lastStepIndex,
+          totalSteps: totalSteps ?? existing.totalSteps,
+          completedAt: new Date(),
+        })
+        .where(and(
+          eq(userTourProgress.userId, userId),
+          eq(userTourProgress.tourId, tourId)
+        ));
+      return res.json({ success: true, message: "Tour progress updated" });
     }
 
     await db.insert(userTourProgress).values({
       userId,
       orgId,
       tourId,
+      status: status || "completed",
+      lastStepIndex: lastStepIndex ?? 0,
+      totalSteps: totalSteps ?? null,
     });
 
     return res.json({ success: true });
@@ -99,10 +119,10 @@ router.post("/api/tour-progress", async (req, res) => {
   }
 });
 
-router.delete("/api/tour-progress/:tourId", async (req, res) => {
+router.delete("/api/tour-progress/:tourId", async (req: AuthenticatedRequest, res) => {
   try {
-    const userId = req.user?.id;
-    const orgId = req.user?.orgId;
+    const userId = (req as any).validatedUserId || req.user?.id;
+    const orgId = (req as any).validatedOrgId || req.user?.orgId;
     const { tourId } = req.params;
 
     if (!userId || !orgId) {
@@ -124,10 +144,10 @@ router.delete("/api/tour-progress/:tourId", async (req, res) => {
   }
 });
 
-router.delete("/api/tour-progress", async (req, res) => {
+router.delete("/api/tour-progress", async (req: AuthenticatedRequest, res) => {
   try {
-    const userId = req.user?.id;
-    const orgId = req.user?.orgId;
+    const userId = (req as any).validatedUserId || req.user?.id;
+    const orgId = (req as any).validatedOrgId || req.user?.orgId;
 
     if (!userId || !orgId) {
       return res.status(401).json({ error: "Authentication required" });

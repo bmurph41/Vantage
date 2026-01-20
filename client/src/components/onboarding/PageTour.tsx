@@ -98,11 +98,17 @@ export function PageTour({
   });
 
   const completeTourMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest("POST", "/api/tour-progress", { tourId });
+    mutationFn: async (data: { status: "completed" | "skipped"; lastStepIndex: number }) => {
+      return apiRequest("POST", "/api/tour-progress", { 
+        tourId,
+        status: data.status,
+        lastStepIndex: data.lastStepIndex,
+        totalSteps: steps.length,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tour-progress"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tour-progress", tourId] });
       onComplete?.();
     },
   });
@@ -126,7 +132,12 @@ export function PageTour({
 
     if (finishedStatuses.includes(status)) {
       setRun(false);
-      completeTourMutation.mutate();
+      // Track whether user completed the tour or skipped it
+      const tourStatus = status === STATUS.FINISHED ? "completed" : "skipped";
+      completeTourMutation.mutate({ 
+        status: tourStatus, 
+        lastStepIndex: index 
+      });
     } else if (type === EVENTS.STEP_AFTER || type === EVENTS.TARGET_NOT_FOUND) {
       setStepIndex(index + (action === ACTIONS.PREV ? -1 : 1));
     }

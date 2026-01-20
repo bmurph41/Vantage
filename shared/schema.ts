@@ -21284,6 +21284,9 @@ export const userTourProgress = pgTable("user_tour_progress", {
   userId: varchar("user_id").notNull().references(() => users.id),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
   tourId: varchar("tour_id", { length: 100 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("completed"), // completed, skipped, in_progress
+  lastStepIndex: integer("last_step_index").default(0),
+  totalSteps: integer("total_steps"),
   completedAt: timestamp("completed_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
