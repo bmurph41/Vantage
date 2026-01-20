@@ -1,6 +1,6 @@
 import { db } from "../db";
 import { crmDealStageHistory, crmTimelineEvents, crmDealEngagementScores, crmDeals, crmPipelineStages, crmActivities } from "@shared/schema";
-import { eq, and, desc, sql, isNull, gte, lte, count } from "drizzle-orm";
+import { eq, and, desc, sql, isNull, isNotNull, gte, lte, count } from "drizzle-orm";
 
 export interface StageTransitionInput {
   dealId: string;
@@ -169,7 +169,7 @@ export class DealStageHistoryService {
   }
 
   async getStageVelocityMetrics(orgId: string, startDate?: Date, endDate?: Date): Promise<DealVelocityMetrics> {
-    const conditions = [isNull(crmDealStageHistory.exitedAt).not()];
+    const conditions = [isNotNull(crmDealStageHistory.exitedAt)];
     
     if (startDate) {
       conditions.push(gte(crmDealStageHistory.enteredAt, startDate));
@@ -206,7 +206,7 @@ export class DealStageHistoryService {
         totalDays: sql<number>`SUM(${crmDealStageHistory.durationBusinessDays})`.as("total_days"),
       })
       .from(crmDealStageHistory)
-      .where(isNull(crmDealStageHistory.exitedAt).not())
+      .where(isNotNull(crmDealStageHistory.exitedAt))
       .groupBy(crmDealStageHistory.dealId);
 
     const cycleDays = dealCycles.map(d => d.totalDays || 0).filter(d => d > 0);
