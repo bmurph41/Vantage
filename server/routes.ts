@@ -308,6 +308,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
   // Enterprise authentication middleware with session support
   const authenticateUser = async (req: any, res: any, next: any) => {
+    // Skip authentication for non-API routes (let SPA handle auth)
+    if (!req.path.startsWith('/api/')){return next();}
     try {
       // Check for session token in cookie
       const sessionToken = req.cookies?.sessionToken;
