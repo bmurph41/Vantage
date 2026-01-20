@@ -3,6 +3,7 @@ import { Search, Bell, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import AddNewModal from "@/components/modals/add-new-modal";
+import { HelpMenu } from "@/components/onboarding/HelpMenu";
 
 interface TopBarProps {
   title: string;
@@ -38,6 +39,8 @@ export default function TopBar({ title, subtitle }: TopBarProps) {
                 data-testid="input-search"
               />
             </div>
+            
+            <HelpMenu />
             
             <button
               className="relative p-2 text-gray-400 hover:text-gray-600"

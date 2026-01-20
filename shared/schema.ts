@@ -21275,5 +21275,29 @@ export type InsertCommercialTenantAmendment = z.infer<typeof insertCommercialTen
 export type CommercialTenantScenario = typeof commercialTenantScenarios.$inferSelect;
 export type InsertCommercialTenantScenario = z.infer<typeof insertCommercialTenantScenarioSchema>;
 
+// ============================================================================
+// User Tour Progress - Track page tour completion and preferences
+// ============================================================================
+
+export const userTourProgress = pgTable("user_tour_progress", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  tourId: varchar("tour_id", { length: 100 }).notNull(),
+  completedAt: timestamp("completed_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userTourUnique: unique().on(table.userId, table.tourId),
+  userIdIdx: index("user_tour_progress_user_id_idx").on(table.userId),
+}));
+
+export const insertUserTourProgressSchema = createInsertSchema(userTourProgress).omit({
+  id: true,
+  completedAt: true,
+  createdAt: true,
+});
+export type UserTourProgress = typeof userTourProgress.$inferSelect;
+export type InsertUserTourProgress = z.infer<typeof insertUserTourProgressSchema>;
+
 // Replit Auth models
 export * from "./models/auth";

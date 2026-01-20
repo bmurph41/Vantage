@@ -36,6 +36,8 @@ import { StatGrid } from "@/components/dashboard/charts/StatGrid";
 import { QuickAccessSection } from "@/components/quick-access";
 import { FundSelector } from "@/components/dashboard/FundSelector";
 import { DashboardPersonaHeader } from "@/components/dashboard/DashboardPersonaHeader";
+import { PageTour } from "@/components/onboarding/PageTour";
+import { TOUR_IDS, dashboardTourSteps } from "@/lib/tour-configs";
 
 type DashboardModule = {
   id: string;
@@ -974,7 +976,7 @@ export default function Dashboard() {
       link: '/projects',
       data: dashboardData?.dueDiligence,
       renderContent: (data) => (
-        <div className="space-y-4">
+        <div className="space-y-4" data-tour="dashboard-tasks">
           <MetricGrid columns={2}>
             <EnhancedMetricCard
               label="Active Projects"
@@ -1593,6 +1595,7 @@ export default function Dashboard() {
 
   return (
     <div className="flex-1 overflow-auto bg-gray-50" data-testid="page-dashboard">
+      <PageTour tourId={TOUR_IDS.DASHBOARD} steps={dashboardTourSteps} />
       <div className="container mx-auto p-4 sm:p-6 max-w-7xl">
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -1644,7 +1647,7 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Access - Always at top */}
-        <div className="mb-6">
+        <div className="mb-6" data-tour="dashboard-kpis">
           <QuickAccessSection />
         </div>
 
@@ -1655,7 +1658,7 @@ export default function Dashboard() {
           onDragEnd={handleDragEnd}
         >
           <SortableContext items={extendedModuleOrder} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" data-tour="dashboard-pipeline">
               {orderedModules.map((module) => (
                 <SortableModule 
                   key={module.id} 

@@ -7,6 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Building2, Calendar, DollarSign, MapPin, TrendingUp, Anchor } from "lucide-react";
 import type { DocktalkDeal } from "@shared/schema";
 import { format } from "date-fns";
+import { PageTour } from "@/components/onboarding/PageTour";
+import { TOUR_IDS, docktalkTourSteps } from "@/lib/tour-configs";
 
 export default function DockTalkPage() {
   const [selectedOrigin, setSelectedOrigin] = useState<'all' | 'marinaMatch' | 'aiExtraction'>('marinaMatch');
@@ -59,6 +61,7 @@ export default function DockTalkPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <PageTour tourId={TOUR_IDS.DOCKTALK} steps={docktalkTourSteps} />
       {/* Header */}
       <div className="border-b bg-card">
         <div className="container mx-auto px-6 py-8">
@@ -129,7 +132,7 @@ export default function DockTalkPage() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" data-testid="grid-deals">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" data-testid="grid-deals" data-tour="docktalk-feed">
                 {deals.map((deal) => (
                   <Card 
                     key={deal.id} 

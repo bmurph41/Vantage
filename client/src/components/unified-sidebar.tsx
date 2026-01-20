@@ -527,7 +527,7 @@ export default function UnifiedSidebar() {
           </div>
       
       {/* Scrollable Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4" data-testid="sidebar-navigation">
+      <nav className="flex-1 overflow-y-auto py-4" data-testid="sidebar-navigation" data-tour="sidebar-nav">
         {/* Dashboard Link */}
         <div className="mb-4">
           <NavLink item={{ name: "Dashboard", href: "/dashboard", icon: LayoutDashboard }} />

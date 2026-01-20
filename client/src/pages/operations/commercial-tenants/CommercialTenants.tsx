@@ -42,6 +42,8 @@ import { format, differenceInDays, parseISO } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { CommercialTenant } from "@shared/schema";
+import { PageTour } from "@/components/onboarding/PageTour";
+import { TOUR_IDS, commercialTenantsTourSteps } from "@/lib/tour-configs";
 import { TenantFormDialog } from "./TenantFormDialog";
 import { TenantDetailSheet } from "./TenantDetailSheet";
 import { LeaseImportWizard } from "./LeaseImportWizard";
@@ -165,12 +167,13 @@ export default function CommercialTenants() {
 
   return (
     <div className="p-6 space-y-6">
+      <PageTour tourId={TOUR_IDS.COMMERCIAL_TENANTS} steps={commercialTenantsTourSteps} />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Commercial Tenants</h1>
           <p className="text-muted-foreground">Manage retail and commercial lease abstracts</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2" data-tour="tenants-add">
           <Button variant="outline" onClick={() => setIsImportOpen(true)}>
             <Upload className="h-4 w-4 mr-2" />
             Import Leases
@@ -183,7 +186,7 @@ export default function CommercialTenants() {
       </div>
 
       {summary && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4" data-tour="tenants-analytics">
           <Card>
             <CardContent className="pt-4">
               <div className="flex items-center gap-2">
@@ -294,7 +297,7 @@ export default function CommercialTenants() {
               </div>
             </div>
           ) : (
-            <Table>
+            <Table data-tour="tenants-list">
               <TableHeader>
                 <TableRow>
                   <TableHead>Tenant</TableHead>

@@ -22,6 +22,8 @@ import { DealKanbanBoard } from "@/components/deals/DealKanbanBoard";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
+import { PageTour } from "@/components/onboarding/PageTour";
+import { TOUR_IDS, crmDealsTourSteps } from "@/lib/tour-configs";
 import type { Deal, Contact, Company, PipelineStage } from "@shared/schema";
 
 type DealWithRelations = Deal & { contact?: Contact | null; company?: Company | null };
@@ -487,8 +489,9 @@ export default function Deals() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
+      <PageTour tourId={TOUR_IDS.CRM_DEALS} steps={crmDealsTourSteps} />
       {/* Clean Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
+      <div className="bg-white border-b border-gray-200 px-6 py-4" data-tour="deals-header">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <h1 className="text-lg font-semibold text-gray-900" data-testid="deals-title">Deals</h1>
@@ -628,6 +631,7 @@ export default function Deals() {
               size="sm" 
               onClick={handleAdd}
               data-testid="add-deal-button"
+              data-tour="deals-add"
             >
               <Plus className="h-4 w-4 mr-1" />
               Deal
@@ -697,7 +701,7 @@ export default function Deals() {
 
       {/* Advanced Filter Panel */}
       {showFilters && (
-        <div className="bg-gray-50 border-b border-gray-200 px-6 py-4" data-testid="filter-panel">
+        <div className="bg-gray-50 border-b border-gray-200 px-6 py-4" data-testid="filter-panel" data-tour="deals-filter">
           <Card className="border border-gray-200 shadow-sm">
             <CardContent className="p-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1068,7 +1072,7 @@ export default function Deals() {
           </div>
         ) : (
           /* Table View */
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden" data-tour="deals-table">
             <div className="overflow-x-auto">
               <table className="w-full" data-testid="deals-table">
                 <thead className="bg-gray-50 border-b border-gray-200">
