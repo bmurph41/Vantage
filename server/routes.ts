@@ -54,6 +54,7 @@ import executiveDashboardRoutes from "./routes/executive-dashboard-routes";
 import marinaCompRoutes from "./routes/marina-comp-routes";
 import valuationTimelineRoutes from "./routes/valuation-timeline-routes";
 import dealAnalyticsRoutes from "./routes/deal-analytics-routes";
+import commercialTenantsRoutes from "./routes/commercial-tenants-routes";
 import { userSessions, insertProspectingEntrySchema, users, salesComps, rateComps, industryStandards } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { rentRollService } from "./services/rent-roll-service";
@@ -374,6 +375,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/email-marketing", authenticateUser, emailMarketingRoutes);
   app.use("/api/archive", authenticateUser, archiveRoutes);
   app.use("/api/marinalytics", authenticateUser, marinalyticsRoutes);
+  app.use("/api/commercial-tenants", authenticateUser, commercialTenantsRoutes);
   // Apply authentication to CRM route aliases
   app.use("/api/leads", authenticateUser, enforceTenant);
   app.use("/api/deals", authenticateUser, enforceTenant);
