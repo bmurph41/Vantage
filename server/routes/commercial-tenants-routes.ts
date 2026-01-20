@@ -25,7 +25,7 @@ const upload = multer({
 // GET /api/commercial-tenants - List all commercial tenants
 router.get("/", async (req: Request, res: Response) => {
   try {
-    const { orgId } = req.auth!;
+    const { orgId } = req.user!;
     const { 
       modelingProjectId, 
       marinaId, 
@@ -87,7 +87,7 @@ router.get("/", async (req: Request, res: Response) => {
 // GET /api/commercial-tenants/:id - Get single tenant with full details
 router.get("/:id", async (req: Request, res: Response) => {
   try {
-    const { orgId } = req.auth!;
+    const { orgId } = req.user!;
     const { id } = req.params;
 
     const [tenant] = await db.select()
@@ -133,7 +133,7 @@ router.get("/:id", async (req: Request, res: Response) => {
 // POST /api/commercial-tenants - Create new tenant
 router.post("/", async (req: Request, res: Response) => {
   try {
-    const { orgId, userId } = req.auth!;
+    const { orgId, userId } = req.user!;
     
     const validated = insertCommercialTenantSchema.parse({
       ...req.body,
@@ -160,7 +160,7 @@ router.post("/", async (req: Request, res: Response) => {
 // PATCH /api/commercial-tenants/:id - Update tenant
 router.patch("/:id", async (req: Request, res: Response) => {
   try {
-    const { orgId, userId } = req.auth!;
+    const { orgId, userId } = req.user!;
     const { id } = req.params;
 
     const [existing] = await db.select()
@@ -193,7 +193,7 @@ router.patch("/:id", async (req: Request, res: Response) => {
 // DELETE /api/commercial-tenants/:id - Delete tenant
 router.delete("/:id", async (req: Request, res: Response) => {
   try {
-    const { orgId } = req.auth!;
+    const { orgId } = req.user!;
     const { id } = req.params;
 
     const [existing] = await db.select()
@@ -218,7 +218,7 @@ router.delete("/:id", async (req: Request, res: Response) => {
 // POST /api/commercial-tenants/:id/rent-schedule - Regenerate rent schedule
 router.post("/:id/rent-schedule", async (req: Request, res: Response) => {
   try {
-    const { orgId } = req.auth!;
+    const { orgId } = req.user!;
     const { id } = req.params;
 
     const [tenant] = await db.select()
@@ -248,7 +248,7 @@ router.post("/:id/rent-schedule", async (req: Request, res: Response) => {
 // POST /api/commercial-tenants/:id/amendments - Add amendment
 router.post("/:id/amendments", async (req: Request, res: Response) => {
   try {
-    const { orgId, userId } = req.auth!;
+    const { orgId, userId } = req.user!;
     const { id } = req.params;
 
     const [tenant] = await db.select()
@@ -288,7 +288,7 @@ router.post("/:id/amendments", async (req: Request, res: Response) => {
 // POST /api/commercial-tenants/:id/scenarios - Add modeling scenario
 router.post("/:id/scenarios", async (req: Request, res: Response) => {
   try {
-    const { orgId, userId } = req.auth!;
+    const { orgId, userId } = req.user!;
     const { id } = req.params;
 
     const [tenant] = await db.select()
@@ -322,7 +322,7 @@ router.post("/:id/scenarios", async (req: Request, res: Response) => {
 // PATCH /api/commercial-tenants/scenarios/:scenarioId - Update scenario
 router.patch("/scenarios/:scenarioId", async (req: Request, res: Response) => {
   try {
-    const { userId } = req.auth!;
+    const { userId } = req.user!;
     const { scenarioId } = req.params;
 
     const [updated] = await db.update(commercialTenantScenarios)
@@ -368,7 +368,7 @@ router.post("/parse", upload.single("file"), async (req: Request, res: Response)
 // POST /api/commercial-tenants/bulk-import - Bulk import from parsed document
 router.post("/bulk-import", async (req: Request, res: Response) => {
   try {
-    const { orgId, userId } = req.auth!;
+    const { orgId, userId } = req.user!;
     const { leases, modelingProjectId, marinaId, ddProjectId } = req.body;
 
     if (!Array.isArray(leases) || leases.length === 0) {
@@ -421,7 +421,7 @@ router.post("/bulk-import", async (req: Request, res: Response) => {
 // GET /api/commercial-tenants/analytics/summary - Get portfolio summary
 router.get("/analytics/summary", async (req: Request, res: Response) => {
   try {
-    const { orgId } = req.auth!;
+    const { orgId } = req.user!;
     const { modelingProjectId, marinaId } = req.query;
 
     const conditions = [eq(commercialTenants.orgId, orgId)];
@@ -477,7 +477,7 @@ router.get("/analytics/summary", async (req: Request, res: Response) => {
 // GET /api/commercial-tenants/analytics/expirations - Get lease expiration schedule
 router.get("/analytics/expirations", async (req: Request, res: Response) => {
   try {
-    const { orgId } = req.auth!;
+    const { orgId } = req.user!;
     const { modelingProjectId, marinaId, years = 5 } = req.query;
 
     const conditions = [eq(commercialTenants.orgId, orgId)];
