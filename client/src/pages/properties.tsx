@@ -18,6 +18,9 @@ import { CrmDetailsPanel, CrmDetailSection, CrmDetailField } from "@/components/
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
+const toTitleCase = (str: string) => 
+  str.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
 type Property = {
   id: string;
   title: string;
@@ -213,7 +216,7 @@ export default function Properties() {
       header: 'Type',
       render: (property) => (
         <Badge className={propertyTypeColors[property.type] || 'bg-gray-100 text-gray-800'}>
-          {property.type.replace('_', ' ')}
+          {toTitleCase(property.type)}
         </Badge>
       )
     },
@@ -222,13 +225,13 @@ export default function Properties() {
       header: 'Status',
       render: (property) => (
         <Badge className={statusColors[property.status] || 'bg-gray-100 text-gray-800'}>
-          {property.status.replace('_', ' ')}
+          {toTitleCase(property.status)}
         </Badge>
       )
     },
     {
       key: 'price',
-      header: 'Price',
+      header: 'Est. Price',
       render: (property) => (
         <div className="flex items-center gap-1.5 text-sm font-medium text-gray-900">
           <DollarSign className="w-3.5 h-3.5 text-gray-400" />
@@ -348,15 +351,15 @@ export default function Properties() {
       <CrmDetailSection title="Property Information">
         <CrmDetailField label="Type" value={
           <Badge className={propertyTypeColors[selectedProperty.type] || 'bg-gray-100 text-gray-800'}>
-            {selectedProperty.type.replace('_', ' ')}
+            {toTitleCase(selectedProperty.type)}
           </Badge>
         } />
         <CrmDetailField label="Status" value={
           <Badge className={statusColors[selectedProperty.status] || 'bg-gray-100 text-gray-800'}>
-            {selectedProperty.status.replace('_', ' ')}
+            {toTitleCase(selectedProperty.status)}
           </Badge>
         } />
-        <CrmDetailField label="Price" value={formatPrice(selectedProperty.listingPrice)} />
+        <CrmDetailField label="Est. Price" value={formatPrice(selectedProperty.listingPrice)} />
         <CrmDetailField label="Address" value={selectedProperty.address} />
         {(selectedProperty.lastSaleMonth || selectedProperty.lastSaleYear) && (
           <CrmDetailField 
