@@ -84,8 +84,9 @@ export function requireAnalyticsPro() {
 }
 
 /**
- * Require one of the Rent Roll access packs (Owner, Investor, or Broker).
+ * Require one of the Rent Roll access packs (Owner, Investor, Broker, or Operations).
  * Any one of these packs grants access to the Rent Roll module.
+ * The Operations pack includes Rent Roll as a bundled feature.
  */
 export function requireRentRoll() {
   return async (req: Request, res: Response, next: NextFunction) => {
@@ -98,7 +99,8 @@ export function requireRentRoll() {
       const activePacks = await packService.getActivePacks(user.orgId);
       req.activePacks = activePacks;
 
-      const rentRollPacks: PackType[] = ["owner", "investor", "broker"];
+      // Operations pack includes Rent Roll access as a bundled feature
+      const rentRollPacks: PackType[] = ["owner", "investor", "broker", "operations"];
       const hasAccess = rentRollPacks.some(pack => activePacks.includes(pack));
 
       if (!hasAccess) {
@@ -106,7 +108,7 @@ export function requireRentRoll() {
           error: "Pack required",
           code: "RENT_ROLL_PACK_REQUIRED",
           requiredPacks: rentRollPacks,
-          message: "Access to Rent Roll requires an Owner, Investor, or Broker pack. Please upgrade your subscription.",
+          message: "Access to Rent Roll requires an Owner, Investor, Broker, or Operations pack. Please upgrade your subscription.",
           upgradeUrl: "/settings/packs?category=rent-roll",
         });
       }

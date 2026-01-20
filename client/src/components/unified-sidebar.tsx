@@ -120,7 +120,7 @@ type PendingItem = {
   status: string;
 };
 
-type PackType = 'fund_management' | 'lp_portal' | 'prospecting' | 'analytics_pro' | 'owner' | 'investor' | 'broker';
+type PackType = 'fund_management' | 'lp_portal' | 'prospecting' | 'analytics_pro' | 'owner' | 'investor' | 'broker' | 'operations';
 
 type BootstrapData = {
   persona: any;
@@ -192,9 +192,10 @@ export default function UnifiedSidebar() {
     return activePacks.includes(packType);
   };
 
-  // Helper function to check if user has access to Rent Roll (requires owner, investor, or broker pack)
+  // Helper function to check if user has access to Rent Roll (requires owner, investor, broker, or operations pack)
+  // Operations pack includes Rent Roll as a bundled feature
   const hasRentRollAccess = (): boolean => {
-    return hasPack('owner') || hasPack('investor') || hasPack('broker');
+    return hasPack('owner') || hasPack('investor') || hasPack('broker') || hasPack('operations');
   };
 
   // Filter operations nav to hide Rent Roll if user doesn't have access

@@ -78,13 +78,15 @@ const PACK_INFO: Record<PackType, { name: string; description: string; features:
   },
   operations: {
     name: "Operations",
-    description: "Marina operations management including rent roll, fuel sales, ship store, and launch scheduling.",
+    description: "Marina operations management including full Rent Roll module access, fuel sales, ship store, and launch scheduling.",
     features: [
-      "Rent roll management",
+      "Full Rent Roll module access (included)",
+      "Lease management and analytics",
       "Fuel sales tracking",
       "Ship store inventory",
       "Dockit launch scheduling",
       "Marketing campaigns",
+      "Executive dashboard",
       "Customer analytics",
     ],
     isCore: true,
