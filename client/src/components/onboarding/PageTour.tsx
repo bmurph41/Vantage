@@ -238,12 +238,12 @@ export function TourTriggerButton({
   variant = "ghost",
   size = "sm" 
 }: TourTriggerButtonProps) {
-  const { resetTour } = useTourTrigger(tourId);
+  const { resetTour, isResetting } = useTourTrigger(tourId);
 
   return (
-    <Button variant={variant} size={size} onClick={resetTour}>
+    <Button variant={variant} size={size} onClick={resetTour} disabled={isResetting}>
       <PlayCircle className="h-4 w-4 mr-1" />
-      {label}
+      {isResetting ? "Loading..." : label}
     </Button>
   );
 }
