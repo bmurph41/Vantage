@@ -223,8 +223,8 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
               dealOutcome: data.dealStatus,
               portfolioName: data.portfolioName || 'Untitled Portfolio',
               isPortfolio: true,
-              crmDealId: crmDeal.id,
-              crmPropertyId: crmProperty.id,
+              dealId: crmDeal.id,
+              propertyId: crmProperty.id,
             });
             const modelingProject = await projectRes.json();
             
@@ -272,8 +272,8 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
           longitude: data.marinaAddress.lng,
           dealSource: data.dealType,
           dealOutcome: data.dealStatus,
-          crmDealId: crmDeal.id,
-          crmPropertyId: crmProperty.id,
+          dealId: crmDeal.id,
+          propertyId: crmProperty.id,
         });
         const modelingProject = await projectRes.json();
         

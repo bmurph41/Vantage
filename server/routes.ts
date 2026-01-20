@@ -15523,42 +15523,49 @@ Current context: Project ${req.params.projectId}`;
       
       // Use database transaction to ensure atomicity
       const result = await db.transaction(async (tx) => {
-        // Fetch default pipeline and stage for the organization
-        const pipelines = await storage.getCrmPipelinesForOrg(orgId);
-        const defaultPipeline = pipelines[0]; // Get first pipeline as default
+        let dealIdToUse = data.dealId;
         
-        let pipelineId: string | undefined;
-        let stageId: string | undefined;
-        
-        if (defaultPipeline) {
-          pipelineId = defaultPipeline.id;
-          // Get first stage of the pipeline
-          const stages = await storage.getCrmPipelineStagesForPipeline(pipelineId);
-          if (stages && stages.length > 0) {
-            stageId = stages[0].id;
+        // Only create a new CRM deal if one wasn't provided
+        if (!dealIdToUse) {
+          // Fetch default pipeline and stage for the organization
+          const pipelines = await storage.getCrmPipelinesForOrg(orgId);
+          const defaultPipeline = pipelines[0]; // Get first pipeline as default
+          
+          let pipelineId: string | undefined;
+          let stageId: string | undefined;
+          
+          if (defaultPipeline) {
+            pipelineId = defaultPipeline.id;
+            // Get first stage of the pipeline
+            const stages = await storage.getCrmPipelineStagesForPipeline(pipelineId);
+            if (stages && stages.length > 0) {
+              stageId = stages[0].id;
+            }
           }
+          
+          // Create a corresponding CRM deal for this modeling project
+          // Only include pipelineId/stageId if they exist (omit undefined fields)
+          const [deal] = await tx.insert(crmDeals).values({
+            title: data.marinaName,
+            type: 'marina_acquisition',
+            marinaName: data.marinaName,
+            city: data.city,
+            state: data.state,
+            stage: 'modeling',
+            ...(pipelineId && { pipelineId }),
+            ...(stageId && { stageId }),
+            ownerId: userId,
+          }).returning();
+          
+          dealIdToUse = deal.id;
         }
-        
-        // Create a corresponding CRM deal for this modeling project
-        // Only include pipelineId/stageId if they exist (omit undefined fields)
-        const [deal] = await tx.insert(crmDeals).values({
-          title: data.marinaName,
-          type: 'marina_acquisition',
-          marinaName: data.marinaName,
-          city: data.city,
-          state: data.state,
-          stage: 'modeling',
-          ...(pipelineId && { pipelineId }),
-          ...(stageId && { stageId }),
-          ownerId: userId,
-        }).returning();
         
         // Create the modeling project and link it to the deal
         const [project] = await tx.insert(modelingProjects).values({ 
           ...data as any, 
           orgId, 
           createdBy: userId,
-          dealId: deal.id 
+          dealId: dealIdToUse 
         }).returning();
         
         return project;
