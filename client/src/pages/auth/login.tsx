@@ -8,8 +8,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Loader2, Anchor, Eye, EyeOff } from "lucide-react";
+import { Loader2, Anchor, Eye, EyeOff, Waves } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const loginSchema = z.object({
@@ -116,37 +117,42 @@ export default function LoginPage() {
 
   if (mfaRequired) {
     return (
-      <div className="min-h-screen flex">
-        <div className="flex-1 flex items-center justify-center bg-white p-8">
-          <div className="w-full max-w-sm">
-            <div className="flex items-center gap-2 mb-8">
-              <div className="w-8 h-8 rounded-full bg-[#1E4FAB] flex items-center justify-center">
-                <Anchor className="h-4 w-4 text-white" />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute top-1/4 -left-20 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
+        </div>
+        
+        <Card className="relative w-full max-w-md bg-white/95 backdrop-blur-sm border-0 shadow-2xl">
+          <CardContent className="p-8">
+            <div className="flex items-center gap-3 mb-8">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
+                <Anchor className="h-5 w-5 text-white" />
               </div>
-              <span className="text-xl font-bold text-[#343E5C]">MarinaMatch</span>
+              <span className="text-xl font-bold text-slate-800">MarinaMatch</span>
             </div>
 
-            <h1 className="text-xl font-semibold text-[#343E5C] mb-2" data-testid="text-mfa-title">
+            <h1 className="text-2xl font-bold text-slate-800 mb-2" data-testid="text-mfa-title">
               Two-Factor Authentication
             </h1>
-            <p className="text-sm text-gray-500 mb-6" data-testid="text-mfa-description">
+            <p className="text-slate-500 mb-6" data-testid="text-mfa-description">
               Enter the 6-digit code from your authenticator app
             </p>
 
             <Form {...mfaForm}>
-              <form onSubmit={mfaForm.handleSubmit(onMfaSubmit)} className="space-y-4">
+              <form onSubmit={mfaForm.handleSubmit(onMfaSubmit)} className="space-y-5">
                 <FormField
                   control={mfaForm.control}
                   name="token"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-[#343E5C] text-sm">Verification Code</FormLabel>
+                      <FormLabel className="text-slate-700">Verification Code</FormLabel>
                       <FormControl>
                         <Input
                           {...field}
                           placeholder="000000"
                           maxLength={6}
-                          className="text-center text-2xl tracking-widest h-12 border-gray-200 focus:border-[#1E4FAB] focus:ring-[#1E4FAB]"
+                          className="text-center text-2xl tracking-widest h-14 border-slate-200 focus:border-cyan-500 focus:ring-cyan-500"
                           data-testid="input-mfa-code"
                         />
                       </FormControl>
@@ -157,18 +163,18 @@ export default function LoginPage() {
 
                 <Button
                   type="submit"
-                  className="w-full h-11 bg-[#1E4FAB] hover:bg-[#1a4294] text-white font-medium"
+                  className="w-full h-12 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-medium shadow-lg shadow-cyan-500/25"
                   disabled={mfaMutation.isPending}
                   data-testid="button-verify-mfa"
                 >
                   {mfaMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Verify
+                  Verify Code
                 </Button>
 
                 <Button
                   type="button"
                   variant="ghost"
-                  className="w-full text-[#343E5C] hover:text-[#1E4FAB]"
+                  className="w-full text-slate-600 hover:text-cyan-600"
                   onClick={() => {
                     setMfaRequired(false);
                     setMfaData(null);
@@ -179,70 +185,58 @@ export default function LoginPage() {
                 </Button>
               </form>
             </Form>
-          </div>
-        </div>
-
-        <div className="hidden lg:flex flex-1 bg-gradient-to-br from-[#1E4FAB] to-[#152d6b] items-center justify-center p-12">
-          <div className="text-center text-white">
-            <div className="w-48 h-48 mx-auto mb-8 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-sm">
-              <div className="w-32 h-32 rounded-xl bg-white/20 flex items-center justify-center">
-                <Anchor className="w-16 h-16 text-white" />
-              </div>
-            </div>
-            <h2 className="text-2xl font-bold mb-4">MarinaMatch</h2>
-            <p className="text-white/90 max-w-md">
-              The smart way to manage marina acquisitions, track due diligence, and close deals faster.
-            </p>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex">
-      <div className="flex-1 flex flex-col bg-white">
-        <div className="p-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-[#1E4FAB] flex items-center justify-center">
-              <Anchor className="h-4 w-4 text-white" />
-            </div>
-            <span className="text-xl font-bold text-[#343E5C]">MarinaMatch</span>
-          </div>
-          <select className="text-sm text-gray-500 border-none bg-transparent cursor-pointer">
-            <option>English</option>
-          </select>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute top-1/4 -left-20 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] opacity-5">
+          <Waves className="w-full h-full text-cyan-400" strokeWidth={0.5} />
         </div>
+      </div>
 
-        <div className="flex-1 flex items-center justify-center px-8 pb-8">
-          <div className="w-full max-w-sm">
-            <div className="flex items-center justify-between mb-6">
-              <h1 className="text-xl font-semibold text-[#343E5C]" data-testid="text-login-title">
-                Log in
+      <div className="relative w-full max-w-md">
+        <Link href="/">
+          <div className="flex items-center justify-center gap-3 mb-8 cursor-pointer group">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30 group-hover:shadow-cyan-500/50 transition-shadow">
+              <Anchor className="h-7 w-7 text-white" />
+            </div>
+            <span className="text-2xl font-bold text-white">MarinaMatch</span>
+          </div>
+        </Link>
+
+        <Card className="bg-white/95 backdrop-blur-sm border-0 shadow-2xl">
+          <CardContent className="p-8">
+            <div className="text-center mb-6">
+              <h1 className="text-2xl font-bold text-slate-800 mb-1" data-testid="text-login-title">
+                Welcome back
               </h1>
-              <span className="text-sm text-gray-500">
-                or{" "}
-                <Link href="/signup" className="text-[#343E5C] hover:text-[#1E4FAB] font-medium" data-testid="link-signup">
-                  create an account
-                </Link>
-              </span>
+              <p className="text-slate-500">
+                Sign in to your MarinaMatch account
+              </p>
             </div>
 
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
                 <FormField
                   control={form.control}
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-[#343E5C] text-sm">Email</FormLabel>
+                      <FormLabel className="text-slate-700">Email</FormLabel>
                       <FormControl>
                         <Input
                           {...field}
                           type="email"
-                          placeholder="example@email.com"
+                          placeholder="you@company.com"
                           autoComplete="email"
-                          className="h-11 border-gray-200 focus:border-[#1E4FAB] focus:ring-[#1E4FAB]"
+                          className="h-12 border-slate-200 focus:border-cyan-500 focus:ring-cyan-500 bg-slate-50/50"
                           data-testid="input-email"
                         />
                       </FormControl>
@@ -256,7 +250,7 @@ export default function LoginPage() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-[#343E5C] text-sm">Password</FormLabel>
+                      <FormLabel className="text-slate-700">Password</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <Input
@@ -264,21 +258,21 @@ export default function LoginPage() {
                             type={showPassword ? "text" : "password"}
                             placeholder="Enter your password"
                             autoComplete="current-password"
-                            className="h-11 border-gray-200 focus:border-[#1E4FAB] focus:ring-[#1E4FAB] pr-10"
+                            className="h-12 border-slate-200 focus:border-cyan-500 focus:ring-cyan-500 pr-12 bg-slate-50/50"
                             data-testid="input-password"
                           />
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                            className="absolute right-1 top-1/2 -translate-y-1/2 h-10 w-10 hover:bg-slate-100"
                             onClick={() => setShowPassword(!showPassword)}
                             data-testid="button-toggle-password"
                           >
                             {showPassword ? (
-                              <EyeOff className="h-4 w-4 text-gray-400" />
+                              <EyeOff className="h-4 w-4 text-slate-400" />
                             ) : (
-                              <Eye className="h-4 w-4 text-gray-400" />
+                              <Eye className="h-4 w-4 text-slate-400" />
                             )}
                           </Button>
                         </div>
@@ -288,78 +282,77 @@ export default function LoginPage() {
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="rememberMe"
-                  render={({ field }) => (
-                    <FormItem className="flex items-center space-x-2 space-y-0">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          className="border-gray-300 data-[state=checked]:bg-[#1E4FAB] data-[state=checked]:border-[#1E4FAB]"
-                        />
-                      </FormControl>
-                      <FormLabel className="text-sm text-gray-600 font-normal cursor-pointer">
-                        Remember me
-                      </FormLabel>
-                    </FormItem>
-                  )}
-                />
+                <div className="flex items-center justify-between">
+                  <FormField
+                    control={form.control}
+                    name="rememberMe"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            className="border-slate-300 data-[state=checked]:bg-cyan-500 data-[state=checked]:border-cyan-500"
+                          />
+                        </FormControl>
+                        <FormLabel className="text-sm text-slate-600 font-normal cursor-pointer">
+                          Remember me
+                        </FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                  <Link 
+                    href="/forgot-password" 
+                    className="text-sm text-cyan-600 hover:text-cyan-700 font-medium"
+                    data-testid="link-forgot-password"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
 
                 <Button
                   type="submit"
-                  className="w-full h-11 bg-[#1E4FAB] hover:bg-[#1a4294] text-white font-medium"
+                  className="w-full h-12 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-medium shadow-lg shadow-cyan-500/25"
                   disabled={loginMutation.isPending}
                   data-testid="button-login"
                 >
                   {loginMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Log In
+                  Sign In
                 </Button>
 
-                <div className="flex items-center justify-between text-sm">
-                  <Link 
-                    href="/magic-link" 
-                    className="text-[#1E4FAB] hover:underline"
-                  >
-                    Password-free log in
-                  </Link>
-                  <Link 
-                    href="/forgot-password" 
-                    className="text-[#343E5C] hover:text-[#1E4FAB]"
-                    data-testid="link-forgot-password"
-                  >
-                    Recover account
-                  </Link>
+                <div className="relative my-6">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-200" />
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="px-4 bg-white text-slate-400">or</span>
+                  </div>
                 </div>
+
+                <Link href="/magic-link">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full h-12 border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-cyan-300"
+                  >
+                    Sign in with Magic Link
+                  </Button>
+                </Link>
               </form>
             </Form>
-          </div>
-        </div>
 
-        <div className="p-6 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
-          <div className="flex items-center gap-4">
-            <a href="#" className="hover:text-[#343E5C]">Help</a>
-            <a href="#" className="hover:text-[#343E5C]">Privacy Policy</a>
-          </div>
-          <span>&copy; 2026 MarinaMatch. All rights reserved.</span>
-        </div>
-      </div>
+            <p className="text-center text-sm text-slate-500 mt-6">
+              Don't have an account?{" "}
+              <Link href="/signup" className="text-cyan-600 hover:text-cyan-700 font-medium" data-testid="link-signup">
+                Create one
+              </Link>
+            </p>
+          </CardContent>
+        </Card>
 
-      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-[#1E4FAB] to-[#152d6b] items-center justify-center p-12">
-        <div className="text-center text-white max-w-lg">
-          <div className="w-80 h-48 mx-auto mb-8 bg-white rounded-lg shadow-2xl flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-12 h-12 rounded-full bg-[#1E4FAB] flex items-center justify-center mx-auto mb-3">
-                <Anchor className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-2xl font-bold text-[#343E5C]">MarinaMatch</span>
-            </div>
-          </div>
-          <p className="text-lg text-white/95 leading-relaxed">
-            The smart way to manage marina acquisitions, track due diligence, analyze deals, and close transactions faster.
-          </p>
-        </div>
+        <p className="text-center text-sm text-slate-400 mt-6">
+          &copy; 2026 MarinaMatch. All rights reserved.
+        </p>
       </div>
     </div>
   );

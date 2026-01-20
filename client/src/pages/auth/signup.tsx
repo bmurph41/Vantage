@@ -12,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Anchor, Eye, EyeOff, Check, Building, Calculator, ChartLine, Briefcase, Users, Target, BarChart3 } from "lucide-react";
+import { Loader2, Anchor, Eye, EyeOff, Check, Building, Calculator, ChartLine, Briefcase, Users, Target, BarChart3, Waves } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 type CorePackType = 'crm_pipeline' | 'modeling_tools' | 'analysis' | 'operations';
@@ -335,152 +335,175 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
-      <Card className="w-full max-w-md" data-testid="card-signup">
-        <CardHeader className="space-y-1 text-center">
-          <div className="flex justify-center mb-4">
-            <div className="p-3 rounded-full bg-primary/10">
-              <Anchor className="h-8 w-8 text-primary" />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute top-1/4 -left-20 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] opacity-5">
+          <Waves className="w-full h-full text-cyan-400" strokeWidth={0.5} />
+        </div>
+      </div>
+
+      <div className="relative w-full max-w-md">
+        <Link href="/">
+          <div className="flex items-center justify-center gap-3 mb-8 cursor-pointer group">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30 group-hover:shadow-cyan-500/50 transition-shadow">
+              <Anchor className="h-7 w-7 text-white" />
             </div>
+            <span className="text-2xl font-bold text-white">MarinaMatch</span>
           </div>
-          <CardTitle className="text-2xl font-bold" data-testid="text-signup-title">
-            Create Your Account
-          </CardTitle>
-          <CardDescription data-testid="text-signup-description">
-            Get started with MarinaMatch in minutes
-          </CardDescription>
-        </CardHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onAccountSubmit)}>
-            <CardContent className="space-y-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Full Name</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="John Smith"
-                        autoComplete="name"
-                        data-testid="input-name"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="email"
-                        placeholder="you@example.com"
-                        autoComplete="email"
-                        data-testid="input-email"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="orgName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Company</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="Company Name"
-                        autoComplete="organization"
-                        data-testid="input-org-name"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <div className="relative">
+        </Link>
+
+        <Card className="bg-white/95 backdrop-blur-sm border-0 shadow-2xl" data-testid="card-signup">
+          <CardHeader className="space-y-1 text-center pb-2">
+            <CardTitle className="text-2xl font-bold text-slate-800" data-testid="text-signup-title">
+              Create Your Account
+            </CardTitle>
+            <CardDescription data-testid="text-signup-description">
+              Get started with MarinaMatch in minutes
+            </CardDescription>
+          </CardHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onAccountSubmit)}>
+              <CardContent className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-slate-700">Full Name</FormLabel>
+                      <FormControl>
                         <Input
                           {...field}
-                          type={showPassword ? "text" : "password"}
-                          placeholder="At least 8 characters"
-                          autoComplete="new-password"
-                          data-testid="input-password"
+                          placeholder="John Smith"
+                          autoComplete="name"
+                          className="h-11 border-slate-200 focus:border-cyan-500 focus:ring-cyan-500 bg-slate-50/50"
+                          data-testid="input-name"
                         />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                          onClick={() => setShowPassword(!showPassword)}
-                          data-testid="button-toggle-password"
-                        >
-                          {showPassword ? (
-                            <EyeOff className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <Eye className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </Button>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Confirm Password</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="password"
-                        placeholder="Confirm your password"
-                        autoComplete="new-password"
-                        data-testid="input-confirm-password"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-            <CardFooter className="flex flex-col space-y-4">
-              <Button
-                type="submit"
-                className="w-full"
-                data-testid="button-continue"
-              >
-                Continue to Pack Selection
-              </Button>
-              <div className="text-center text-sm text-muted-foreground">
-                Already have an account?{" "}
-                <Link href="/login" className="text-primary hover:underline" data-testid="link-login">
-                  Sign in
-                </Link>
-              </div>
-            </CardFooter>
-          </form>
-        </Form>
-      </Card>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-slate-700">Email</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type="email"
+                          placeholder="you@company.com"
+                          autoComplete="email"
+                          className="h-11 border-slate-200 focus:border-cyan-500 focus:ring-cyan-500 bg-slate-50/50"
+                          data-testid="input-email"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="orgName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-slate-700">Company</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="Company Name"
+                          autoComplete="organization"
+                          className="h-11 border-slate-200 focus:border-cyan-500 focus:ring-cyan-500 bg-slate-50/50"
+                          data-testid="input-org-name"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-slate-700">Password</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Input
+                            {...field}
+                            type={showPassword ? "text" : "password"}
+                            placeholder="At least 8 characters"
+                            autoComplete="new-password"
+                            className="h-11 border-slate-200 focus:border-cyan-500 focus:ring-cyan-500 pr-12 bg-slate-50/50"
+                            data-testid="input-password"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-1 top-1/2 -translate-y-1/2 h-9 w-9 hover:bg-slate-100"
+                            onClick={() => setShowPassword(!showPassword)}
+                            data-testid="button-toggle-password"
+                          >
+                            {showPassword ? (
+                              <EyeOff className="h-4 w-4 text-slate-400" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-slate-400" />
+                            )}
+                          </Button>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-slate-700">Confirm Password</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type="password"
+                          placeholder="Confirm your password"
+                          autoComplete="new-password"
+                          className="h-11 border-slate-200 focus:border-cyan-500 focus:ring-cyan-500 bg-slate-50/50"
+                          data-testid="input-confirm-password"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+              <CardFooter className="flex flex-col space-y-4 pt-2">
+                <Button
+                  type="submit"
+                  className="w-full h-12 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-medium shadow-lg shadow-cyan-500/25"
+                  data-testid="button-continue"
+                >
+                  Continue to Pack Selection
+                </Button>
+                <div className="text-center text-sm text-slate-500">
+                  Already have an account?{" "}
+                  <Link href="/login" className="text-cyan-600 hover:text-cyan-700 font-medium" data-testid="link-login">
+                    Sign in
+                  </Link>
+                </div>
+              </CardFooter>
+            </form>
+          </Form>
+        </Card>
+
+        <p className="text-center text-sm text-slate-400 mt-6">
+          &copy; 2026 MarinaMatch. All rights reserved.
+        </p>
+      </div>
     </div>
   );
 }
