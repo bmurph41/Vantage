@@ -208,11 +208,21 @@ export function PageTour({
 export function useTourTrigger(tourId: string) {
   const queryClient = useQueryClient();
 
-  const resetTour = useCallback(() => {
-    queryClient.setQueryData(["/api/tour-progress", tourId], { completed: false });
-  }, [queryClient, tourId]);
+  const resetTourMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("DELETE", `/api/tour-progress/${tourId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tour-progress"] });
+      queryClient.setQueryData(["/api/tour-progress", tourId], { completed: false });
+    },
+  });
 
-  return { resetTour };
+  const resetTour = useCallback(() => {
+    resetTourMutation.mutate();
+  }, [resetTourMutation]);
+
+  return { resetTour, isResetting: resetTourMutation.isPending };
 }
 
 interface TourTriggerButtonProps {

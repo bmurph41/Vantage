@@ -8732,7 +8732,6 @@ Current context: Project ${req.params.projectId}`;
       // Check if entry exists
       const existingEntry = await storage.getProspectingEntryByWeek(req.user.id, year, quarter, weekNumber);
       
-      console.log('[DEBUG] PUT prospecting entry - checking existing entry', { userId: req.user?.id, year, quarter, weekNumber });
       // Convert date strings to Date objects before validation
       const bodyData = { ...req.body };
       if (bodyData.weekStartDate && typeof bodyData.weekStartDate === 'string') {
