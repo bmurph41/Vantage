@@ -53,6 +53,7 @@ import aiAssistantRoutes from "./routes/ai-assistant-routes";
 import executiveDashboardRoutes from "./routes/executive-dashboard-routes";
 import marinaCompRoutes from "./routes/marina-comp-routes";
 import valuationTimelineRoutes from "./routes/valuation-timeline-routes";
+import dealAnalyticsRoutes from "./routes/deal-analytics-routes";
 import { userSessions, insertProspectingEntrySchema, users, salesComps, rateComps, industryStandards } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { rentRollService } from "./services/rent-roll-service";
@@ -366,6 +367,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/crm/forecasting", forecastingRoutes);
   app.use("/api/crm/phase-gates", phaseGatesRoutes);
   app.use("/api/crm/red-flags", redFlagRoutes);
+  app.use("/api", authenticateUser, dealAnalyticsRoutes);
   app.use("/api/prospecting", authenticateUser, requireProspecting());
   app.use("/api/sla", getSlaRouter());
   registerCommentRoutes(app);
