@@ -21000,5 +21000,280 @@ export const insertOpssosWebhookDeliverySchema = createInsertSchema(opssosWebhoo
   createdAt: true,
 });
 
+// =====================
+// COMMERCIAL TENANTS MODULE
+// =====================
+
+// Enums for commercial lease types and structures
+export const leaseTypeEnum = pgEnum("lease_type", ["nnn", "modified_gross", "full_service", "absolute_net", "double_net"]);
+export const escalationTypeEnum = pgEnum("escalation_type", ["fixed_dollar", "fixed_percent", "cpi", "fair_market_value", "none"]);
+export const rentStructureEnum = pgEnum("rent_structure", ["base_only", "base_plus_percentage", "percentage_only"]);
+export const tenantStatusEnum = pgEnum("tenant_status", ["active", "pending", "expired", "terminated", "month_to_month"]);
+
+// Commercial Tenants - Main tenant/lease records
+export const commercialTenants = pgTable('commercial_tenants', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  
+  // Link to marina/modeling project
+  modelingProjectId: varchar('modeling_project_id').references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  marinaId: varchar('marina_id'), // For owned marinas
+  ddProjectId: varchar('dd_project_id').references(() => projects.id), // Link to DD project for underwriting
+  
+  // Basic Tenant Information
+  tenantName: text('tenant_name').notNull(),
+  tradeName: text('trade_name'), // DBA name if different
+  contactName: text('contact_name'),
+  contactEmail: text('contact_email'),
+  contactPhone: text('contact_phone'),
+  
+  // Space Information
+  suiteNumber: text('suite_number'),
+  squareFootage: decimal('square_footage', { precision: 12, scale: 2 }),
+  proRataShare: decimal('pro_rata_share', { precision: 8, scale: 4 }), // Percentage (e.g., 12.5000%)
+  permittedUse: text('permitted_use'),
+  useRestrictions: text('use_restrictions'),
+  
+  // Lease Dates
+  leaseExecutionDate: date('lease_execution_date'),
+  leaseCommencementDate: date('lease_commencement_date').notNull(),
+  rentStartDate: date('rent_start_date'),
+  leaseExpirationDate: date('lease_expiration_date').notNull(),
+  
+  // Lease Structure
+  leaseType: leaseTypeEnum('lease_type').notNull().default('nnn'),
+  rentStructure: rentStructureEnum('rent_structure').notNull().default('base_only'),
+  tenantStatus: tenantStatusEnum('tenant_status').notNull().default('active'),
+  
+  // Base Rent
+  currentBaseRent: decimal('current_base_rent', { precision: 15, scale: 2 }), // Annual amount
+  baseRentPerSF: decimal('base_rent_per_sf', { precision: 10, scale: 2 }), // Per SF per year
+  rentFreePeriodMonths: integer('rent_free_period_months').default(0),
+  
+  // Rent Escalations
+  escalationType: escalationTypeEnum('escalation_type').default('fixed_percent'),
+  escalationRate: decimal('escalation_rate', { precision: 6, scale: 4 }), // e.g., 0.0300 = 3%
+  escalationAmount: decimal('escalation_amount', { precision: 10, scale: 2 }), // Fixed dollar increase per SF
+  escalationFrequency: integer('escalation_frequency').default(12), // Months between escalations
+  nextEscalationDate: date('next_escalation_date'),
+  cpiIndex: text('cpi_index'), // e.g., "CPI-U All Urban Consumers"
+  cpiFloor: decimal('cpi_floor', { precision: 6, scale: 4 }), // Minimum CPI increase
+  cpiCeiling: decimal('cpi_ceiling', { precision: 6, scale: 4 }), // Maximum CPI increase
+  
+  // Security Deposit
+  securityDeposit: decimal('security_deposit', { precision: 15, scale: 2 }),
+  letterOfCreditAmount: decimal('letter_of_credit_amount', { precision: 15, scale: 2 }),
+  guarantorName: text('guarantor_name'),
+  guarantorType: text('guarantor_type'), // Personal, corporate, etc.
+  
+  // Percentage Rent (Retail-specific)
+  percentageRentRate: decimal('percentage_rent_rate', { precision: 6, scale: 4 }), // e.g., 0.0600 = 6%
+  naturalBreakpoint: decimal('natural_breakpoint', { precision: 18, scale: 2 }), // Calculated: base rent / %
+  artificialBreakpoint: decimal('artificial_breakpoint', { precision: 18, scale: 2 }), // Negotiated
+  salesReportingFrequency: text('sales_reporting_frequency'), // Monthly, quarterly, annually
+  lastReportedSales: decimal('last_reported_sales', { precision: 18, scale: 2 }),
+  lastReportedSalesDate: date('last_reported_sales_date'),
+  auditRights: boolean('audit_rights').default(false),
+  
+  // NNN / Operating Expenses
+  estimatedCamPerSF: decimal('estimated_cam_per_sf', { precision: 10, scale: 2 }),
+  estimatedTaxPerSF: decimal('estimated_tax_per_sf', { precision: 10, scale: 2 }),
+  estimatedInsurancePerSF: decimal('estimated_insurance_per_sf', { precision: 10, scale: 2 }),
+  totalEstimatedNNN: decimal('total_estimated_nnn', { precision: 15, scale: 2 }), // Annual
+  camCapPercent: decimal('cam_cap_percent', { precision: 6, scale: 4 }), // Annual increase cap
+  baseYearExpenses: decimal('base_year_expenses', { precision: 15, scale: 2 }), // For modified gross
+  baseYear: integer('base_year'), // Year for expense stops
+  controllableCamCap: decimal('controllable_cam_cap', { precision: 6, scale: 4 }),
+  excludedCamItems: text('excluded_cam_items').array(), // Items tenant doesn't pay
+  adminFeePercent: decimal('admin_fee_percent', { precision: 6, scale: 4 }), // Management fee on CAM
+  
+  // Renewal Options
+  renewalOptions: integer('renewal_options').default(0), // Number of options
+  renewalTermYears: integer('renewal_term_years'), // Length of each renewal
+  renewalNoticeMonths: integer('renewal_notice_months'), // Notice period required
+  renewalRentTerms: text('renewal_rent_terms'), // FMV, fixed increase, etc.
+  
+  // Termination Rights
+  hasTerminationOption: boolean('has_termination_option').default(false),
+  terminationOptionDate: date('termination_option_date'),
+  terminationFee: decimal('termination_fee', { precision: 15, scale: 2 }),
+  terminationNoticeMonths: integer('termination_notice_months'),
+  
+  // Expansion Rights
+  hasExpansionOption: boolean('has_expansion_option').default(false),
+  rofrSquareFootage: decimal('rofr_square_footage', { precision: 12, scale: 2 }), // Right of first refusal SF
+  expansionNoticeMonths: integer('expansion_notice_months'),
+  
+  // Co-Tenancy (Retail-specific)
+  hasOpeningCoTenancy: boolean('has_opening_co_tenancy').default(false),
+  openingCoTenancyRequirements: text('opening_co_tenancy_requirements'),
+  hasOperatingCoTenancy: boolean('has_operating_co_tenancy').default(false),
+  operatingCoTenancyRequirements: text('operating_co_tenancy_requirements'),
+  coTenancyRemedies: text('co_tenancy_remedies'), // Rent reduction, termination, etc.
+  
+  // Operating Requirements
+  requiredOperatingHours: text('required_operating_hours'),
+  canGoDark: boolean('can_go_dark').default(false),
+  exclusiveUseClause: text('exclusive_use_clause'),
+  signageRights: text('signage_rights'),
+  parkingSpaces: integer('parking_spaces'),
+  
+  // TI Allowance
+  tiAllowance: decimal('ti_allowance', { precision: 15, scale: 2 }),
+  tiAllowancePerSF: decimal('ti_allowance_per_sf', { precision: 10, scale: 2 }),
+  tiDeliveryCondition: text('ti_delivery_condition'), // Shell, turnkey, etc.
+  
+  // Maintenance Responsibilities
+  tenantMaintenance: text('tenant_maintenance').array(), // HVAC, interior, etc.
+  landlordMaintenance: text('landlord_maintenance').array(), // Roof, structure, etc.
+  hvacResponsibility: text('hvac_responsibility'), // Tenant or landlord
+  
+  // Insurance Requirements
+  requiredLiabilityLimit: decimal('required_liability_limit', { precision: 15, scale: 2 }),
+  requiredPropertyLimit: decimal('required_property_limit', { precision: 15, scale: 2 }),
+  
+  // Document references
+  leaseDocumentId: varchar('lease_document_id'), // VDR document reference
+  originalLeasePageRef: text('original_lease_page_ref'), // Page numbers for abstracted items
+  
+  // Import/parse metadata
+  importSource: text('import_source'), // manual, pdf_parse, excel_import
+  parseConfidence: decimal('parse_confidence', { precision: 5, scale: 2 }), // AI confidence score
+  needsReview: boolean('needs_review').default(false),
+  reviewedAt: timestamp('reviewed_at'),
+  reviewedBy: varchar('reviewed_by').references(() => users.id),
+  
+  // Notes and custom fields
+  notes: text('notes'),
+  customFields: jsonb('custom_fields').default(sql`'{}'`),
+  
+  // Audit
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  updatedBy: varchar('updated_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('commercial_tenants_org_idx').on(table.orgId),
+  modelingProjectIdx: index('commercial_tenants_modeling_project_idx').on(table.modelingProjectId),
+  marinaIdx: index('commercial_tenants_marina_idx').on(table.marinaId),
+  tenantNameIdx: index('commercial_tenants_tenant_name_idx').on(table.tenantName),
+  statusIdx: index('commercial_tenants_status_idx').on(table.tenantStatus),
+  expirationIdx: index('commercial_tenants_expiration_idx').on(table.leaseExpirationDate),
+}));
+
+// Commercial Tenant Rent Schedule - Multi-year rent projections
+export const commercialTenantRentSchedule = pgTable('commercial_tenant_rent_schedule', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar('tenant_id').notNull().references(() => commercialTenants.id, { onDelete: 'cascade' }),
+  
+  periodStart: date('period_start').notNull(),
+  periodEnd: date('period_end').notNull(),
+  yearNumber: integer('year_number').notNull(), // 1, 2, 3, etc.
+  
+  baseRentAnnual: decimal('base_rent_annual', { precision: 15, scale: 2 }),
+  baseRentMonthly: decimal('base_rent_monthly', { precision: 15, scale: 2 }),
+  baseRentPerSF: decimal('base_rent_per_sf', { precision: 10, scale: 2 }),
+  
+  estimatedPercentageRent: decimal('estimated_percentage_rent', { precision: 15, scale: 2 }),
+  estimatedNNNAnnual: decimal('estimated_nnn_annual', { precision: 15, scale: 2 }),
+  totalRentAnnual: decimal('total_rent_annual', { precision: 15, scale: 2 }),
+  
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index('rent_schedule_tenant_idx').on(table.tenantId),
+  periodIdx: index('rent_schedule_period_idx').on(table.periodStart, table.periodEnd),
+}));
+
+// Commercial Tenant Amendments - Track lease modifications
+export const commercialTenantAmendments = pgTable('commercial_tenant_amendments', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar('tenant_id').notNull().references(() => commercialTenants.id, { onDelete: 'cascade' }),
+  
+  amendmentNumber: integer('amendment_number').notNull(),
+  effectiveDate: date('effective_date').notNull(),
+  executionDate: date('execution_date'),
+  
+  amendmentType: text('amendment_type'), // Extension, rent modification, space change, etc.
+  summary: text('summary').notNull(),
+  changedFields: jsonb('changed_fields').default(sql`'{}'`), // Field name -> old/new values
+  
+  documentId: varchar('document_id'), // VDR reference
+  notes: text('notes'),
+  
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index('amendments_tenant_idx').on(table.tenantId),
+  dateIdx: index('amendments_date_idx').on(table.effectiveDate),
+}));
+
+// Commercial Tenant Scenarios - For Valuator modeling flexibility
+export const commercialTenantScenarios = pgTable('commercial_tenant_scenarios', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar('tenant_id').notNull().references(() => commercialTenants.id, { onDelete: 'cascade' }),
+  modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  
+  scenarioName: text('scenario_name').notNull(), // Base Case, Aggressive, Conservative, Custom
+  caseType: text('case_type').notNull().default('custom'), // base, aggressive, conservative, custom
+  
+  // Override values for this scenario (null = use base lease values)
+  overrideBaseRent: decimal('override_base_rent', { precision: 15, scale: 2 }),
+  overrideEscalationRate: decimal('override_escalation_rate', { precision: 6, scale: 4 }),
+  overridePercentageRent: decimal('override_percentage_rent', { precision: 6, scale: 4 }),
+  overrideNNNPerSF: decimal('override_nnn_per_sf', { precision: 10, scale: 2 }),
+  overrideVacancyRate: decimal('override_vacancy_rate', { precision: 6, scale: 4 }),
+  
+  // Renewal assumptions
+  assumeRenewal: boolean('assume_renewal').default(true),
+  renewalProbability: decimal('renewal_probability', { precision: 5, scale: 2 }), // e.g., 75%
+  renewalRentBumpPercent: decimal('renewal_rent_bump_percent', { precision: 6, scale: 4 }),
+  
+  // Downtime assumptions
+  releaseDowntimeMonths: integer('release_downtime_months').default(6),
+  releaseCommissionPercent: decimal('release_commission_percent', { precision: 6, scale: 4 }),
+  releaseTIPerSF: decimal('release_ti_per_sf', { precision: 10, scale: 2 }),
+  
+  notes: text('notes'),
+  isActive: boolean('is_active').default(true),
+  
+  createdBy: varchar('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index('tenant_scenarios_tenant_idx').on(table.tenantId),
+  projectIdx: index('tenant_scenarios_project_idx').on(table.modelingProjectId),
+  caseTypeIdx: index('tenant_scenarios_case_type_idx').on(table.caseType),
+}));
+
+// Import types and validation schemas
+export const insertCommercialTenantSchema = createInsertSchema(commercialTenants).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const insertCommercialTenantRentScheduleSchema = createInsertSchema(commercialTenantRentSchedule).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertCommercialTenantAmendmentSchema = createInsertSchema(commercialTenantAmendments).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertCommercialTenantScenarioSchema = createInsertSchema(commercialTenantScenarios).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type CommercialTenant = typeof commercialTenants.$inferSelect;
+export type InsertCommercialTenant = z.infer<typeof insertCommercialTenantSchema>;
+export type CommercialTenantRentSchedule = typeof commercialTenantRentSchedule.$inferSelect;
+export type InsertCommercialTenantRentSchedule = z.infer<typeof insertCommercialTenantRentScheduleSchema>;
+export type CommercialTenantAmendment = typeof commercialTenantAmendments.$inferSelect;
+export type InsertCommercialTenantAmendment = z.infer<typeof insertCommercialTenantAmendmentSchema>;
+export type CommercialTenantScenario = typeof commercialTenantScenarios.$inferSelect;
+export type InsertCommercialTenantScenario = z.infer<typeof insertCommercialTenantScenarioSchema>;
+
 // Replit Auth models
 export * from "./models/auth";
