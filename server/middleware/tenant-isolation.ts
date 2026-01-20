@@ -29,6 +29,11 @@ export function requireTenantMatch(req: Request, res: Response, next: NextFuncti
 }
 
 export function enforceTenant(req: Request, res: Response, next: NextFunction) {
+  // Skip tenant enforcement for non-API routes (let SPA handle auth)
+  if (!req.path.startsWith('/api/')) {
+    return next();
+  }
+  
   const user = (req as any).user;
   
   if (!user) {
