@@ -56,6 +56,7 @@ const operationsModulesNav = [
   { name: "Portfolio", href: "/portfolio", icon: Building2 },
   { name: "Dockit", href: "/operations/dockit", icon: Anchor },
   { name: "Rent Roll", href: "/rent-roll/executive", icon: Building2 },
+  { name: "Commercial Tenants", href: "/operations/commercial-tenants", icon: Building2 },
   { name: "Fuel Sales", href: "/operations/fuel", icon: Fuel },
   { name: "Ship Store", href: "/operations/ship-store", icon: ShoppingCart },
   { name: "Service Dept", href: "/operations/service", icon: Wrench },

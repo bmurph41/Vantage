@@ -132,6 +132,7 @@ const MarketingAutomation = lazy(() => import("@/pages/marketing-automation"));
 const CalendarSettings = lazy(() => import("@/pages/calendar-settings"));
 const CustomerAnalytics = lazy(() => import("@/pages/operations/CustomerAnalytics"));
 const OwnedMarinas = lazy(() => import("@/pages/operations/OwnedMarinas"));
+const CommercialTenants = lazy(() => import("@/pages/operations/commercial-tenants"));
 const Portfolio = lazy(() => import("@/pages/Portfolio"));
 const MarinalyticsPage = lazy(() => import("@/pages/marinalytics"));
 const MarinaDetail = lazy(() => import("@/pages/portfolio/MarinaDetail"));
@@ -932,6 +933,13 @@ function Router() {
       {/* Redirect old rent-roll route to new V2 module */}
       <Route path="/operations/rent-roll">
         {() => <Redirect to="/rent-roll/executive" />}
+      </Route>
+      <Route path="/operations/commercial-tenants">
+        {() => (
+          <UnifiedLayout>
+            <CommercialTenants />
+          </UnifiedLayout>
+        )}
       </Route>
       <Route path="/operations/fuel">
         {() => (
