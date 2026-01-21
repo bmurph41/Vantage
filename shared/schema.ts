@@ -18118,6 +18118,11 @@ export type UpdateBrokerPortalSubmission = z.infer<typeof updateBrokerPortalSubm
 export const marinaListings = pgTable("marina_listings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
   orgId: varchar("org_id").notNull(),
+  scope: varchar("scope", { length: 20 }).default("org").notNull(),
+  requiredPack: varchar("required_pack", { length: 50 }),
+  isCurated: boolean("is_curated").default(false),
+  curatedByUserId: varchar("curated_by_user_id"),
+  curatedAt: timestamp("curated_at"),
   sourcePlatform: varchar("source_platform", { length: 100 }).notNull(),
   sourceUrl: text("source_url").notNull(),
   sourceListingId: varchar("source_listing_id"),
@@ -18482,6 +18487,8 @@ export const marinaMatchGoalProgress = pgTable("marina_match_goal_progress", {
 export const marinaScrapeources = pgTable("marina_scrape_sources", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
   orgId: varchar("org_id").notNull(),
+  scope: varchar("scope", { length: 20 }).default("org").notNull(),
+  isGlobalSource: boolean("is_global_source").default(false),
   platform: varchar("platform", { length: 100 }).notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   baseUrl: text("base_url"),

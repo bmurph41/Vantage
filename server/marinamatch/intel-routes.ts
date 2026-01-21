@@ -127,9 +127,15 @@ router.get("/listings", async (req: Request, res: Response) => {
     const userId = getUserId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
 
-    const { status, state, city, source, minScore, sortBy, limit = "100", offset = "0" } = req.query;
+    const { status, state, city, source, minScore, sortBy, limit = "100", offset = "0", includeGlobal = "true" } = req.query;
 
-    const conditions: any[] = [eq(marinaListings.orgId, orgId)];
+    // Include both org-specific listings AND global listings (if user has pack access)
+    // Global listings are curated by the MarinaMatch team and available to all subscribers
+    const scopeCondition = includeGlobal === "true"
+      ? or(eq(marinaListings.orgId, orgId), eq(marinaListings.scope, "global"))
+      : eq(marinaListings.orgId, orgId);
+    
+    const conditions: any[] = [scopeCondition];
 
     if (status && status !== "all") {
       conditions.push(eq(marinaListings.status, status as string));

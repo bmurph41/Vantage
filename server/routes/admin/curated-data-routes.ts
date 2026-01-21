@@ -4,9 +4,11 @@ import {
   salesComps, 
   rateComps, 
   industryStandards,
-  users
+  users,
+  marinaListings,
+  marinaScrapeources
 } from "../../../shared/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, or, isNull } from "drizzle-orm";
 
 export const curatedDataRouter = Router();
 
@@ -374,14 +376,319 @@ curatedDataRouter.get("/stats", async (req, res) => {
       .select({ count: sql<number>`count(*)::int` })
       .from(industryStandards);
 
+    const [listingsStats] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(marinaListings)
+      .where(eq(marinaListings.scope, "global"));
+
+    const [sourcesStats] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(marinaScrapeources)
+      .where(eq(marinaScrapeources.isGlobalSource, true));
+
     res.json({
       salesComps: salesStats?.count || 0,
       rateComps: rateStats?.count || 0,
       industryStandards: standardsStats?.count || 0,
+      globalListings: listingsStats?.count || 0,
+      globalSources: sourcesStats?.count || 0,
     });
   } catch (error) {
     console.error("Error fetching curated data stats:", error);
     res.status(500).json({ error: "Failed to fetch stats" });
+  }
+});
+
+// =====================================================
+// GLOBAL MARINA LISTINGS
+// =====================================================
+
+// Get all global/curated marina listings
+curatedDataRouter.get("/listings", async (req, res) => {
+  try {
+    const { status, state, limit = "100", offset = "0" } = req.query;
+    
+    const conditions: any[] = [eq(marinaListings.scope, "global")];
+    
+    if (status && status !== "all") {
+      conditions.push(eq(marinaListings.status, status as string));
+    }
+    if (state && state !== "all") {
+      conditions.push(eq(marinaListings.state, state as string));
+    }
+
+    const listings = await db
+      .select()
+      .from(marinaListings)
+      .where(and(...conditions))
+      .orderBy(desc(marinaListings.createdAt))
+      .limit(parseInt(limit as string))
+      .offset(parseInt(offset as string));
+
+    const [countResult] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(marinaListings)
+      .where(and(...conditions));
+
+    res.json({
+      listings,
+      total: countResult?.count || 0,
+      page: Math.floor(parseInt(offset as string) / parseInt(limit as string)) + 1,
+      pageSize: parseInt(limit as string),
+    });
+  } catch (error) {
+    console.error("Error fetching global listings:", error);
+    res.status(500).json({ error: "Failed to fetch global listings" });
+  }
+});
+
+// Promote org listing to global
+curatedDataRouter.post("/listings/:id/promote", async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const { id } = req.params;
+    const { requiredPack = "analysis" } = req.body;
+
+    const [listing] = await db
+      .update(marinaListings)
+      .set({
+        scope: "global",
+        isCurated: true,
+        curatedByUserId: userId,
+        curatedAt: new Date(),
+        requiredPack,
+        updatedAt: new Date(),
+      })
+      .where(eq(marinaListings.id, id))
+      .returning();
+
+    if (!listing) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+
+    res.json(listing);
+  } catch (error) {
+    console.error("Error promoting listing to global:", error);
+    res.status(500).json({ error: "Failed to promote listing" });
+  }
+});
+
+// Demote global listing back to org-scoped
+curatedDataRouter.post("/listings/:id/demote", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [listing] = await db
+      .update(marinaListings)
+      .set({
+        scope: "org",
+        isCurated: false,
+        requiredPack: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(marinaListings.id, id))
+      .returning();
+
+    if (!listing) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+
+    res.json(listing);
+  } catch (error) {
+    console.error("Error demoting listing:", error);
+    res.status(500).json({ error: "Failed to demote listing" });
+  }
+});
+
+// Update global listing
+curatedDataRouter.patch("/listings/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+
+    const [listing] = await db
+      .update(marinaListings)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(marinaListings.id, id),
+        eq(marinaListings.scope, "global")
+      ))
+      .returning();
+
+    if (!listing) {
+      return res.status(404).json({ error: "Global listing not found" });
+    }
+
+    res.json(listing);
+  } catch (error) {
+    console.error("Error updating global listing:", error);
+    res.status(500).json({ error: "Failed to update listing" });
+  }
+});
+
+// Delete global listing
+curatedDataRouter.delete("/listings/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [deleted] = await db
+      .delete(marinaListings)
+      .where(and(
+        eq(marinaListings.id, id),
+        eq(marinaListings.scope, "global")
+      ))
+      .returning();
+
+    if (!deleted) {
+      return res.status(404).json({ error: "Global listing not found" });
+    }
+
+    res.json({ success: true, deleted });
+  } catch (error) {
+    console.error("Error deleting global listing:", error);
+    res.status(500).json({ error: "Failed to delete listing" });
+  }
+});
+
+// =====================================================
+// GLOBAL SCRAPE SOURCES
+// =====================================================
+
+// Get all global scrape sources
+curatedDataRouter.get("/scrape-sources", async (req, res) => {
+  try {
+    const sources = await db
+      .select()
+      .from(marinaScrapeources)
+      .where(eq(marinaScrapeources.isGlobalSource, true))
+      .orderBy(desc(marinaScrapeources.createdAt));
+
+    res.json(sources);
+  } catch (error) {
+    console.error("Error fetching global scrape sources:", error);
+    res.status(500).json({ error: "Failed to fetch global sources" });
+  }
+});
+
+// Create a new global scrape source
+curatedDataRouter.post("/scrape-sources", async (req, res) => {
+  try {
+    const orgId = (req as any).user?.orgId || (req as any).tenant?.orgId;
+    const data = req.body;
+
+    const [source] = await db
+      .insert(marinaScrapeources)
+      .values({
+        ...data,
+        orgId: orgId || "system",
+        scope: "global",
+        isGlobalSource: true,
+        isManaged: true,
+      })
+      .returning();
+
+    res.json(source);
+  } catch (error) {
+    console.error("Error creating global scrape source:", error);
+    res.status(500).json({ error: "Failed to create global source" });
+  }
+});
+
+// Update a global scrape source
+curatedDataRouter.patch("/scrape-sources/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+
+    const [source] = await db
+      .update(marinaScrapeources)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(marinaScrapeources.id, id),
+        eq(marinaScrapeources.isGlobalSource, true)
+      ))
+      .returning();
+
+    if (!source) {
+      return res.status(404).json({ error: "Global source not found" });
+    }
+
+    res.json(source);
+  } catch (error) {
+    console.error("Error updating global scrape source:", error);
+    res.status(500).json({ error: "Failed to update source" });
+  }
+});
+
+// Delete a global scrape source
+curatedDataRouter.delete("/scrape-sources/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [deleted] = await db
+      .delete(marinaScrapeources)
+      .where(and(
+        eq(marinaScrapeources.id, id),
+        eq(marinaScrapeources.isGlobalSource, true)
+      ))
+      .returning();
+
+    if (!deleted) {
+      return res.status(404).json({ error: "Global source not found" });
+    }
+
+    res.json({ success: true, deleted });
+  } catch (error) {
+    console.error("Error deleting global scrape source:", error);
+    res.status(500).json({ error: "Failed to delete source" });
+  }
+});
+
+// Trigger scrape for a global source
+curatedDataRouter.post("/scrape-sources/:id/scrape", async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get the source
+    const [source] = await db
+      .select()
+      .from(marinaScrapeources)
+      .where(and(
+        eq(marinaScrapeources.id, id),
+        eq(marinaScrapeources.isGlobalSource, true)
+      ));
+
+    if (!source) {
+      return res.status(404).json({ error: "Global source not found" });
+    }
+
+    // Mark as scraping started
+    await db
+      .update(marinaScrapeources)
+      .set({
+        lastScrapeAt: new Date(),
+        lastScrapeStatus: "running",
+      })
+      .where(eq(marinaScrapeources.id, id));
+
+    // Return immediately - scrape will run in background
+    res.json({ 
+      success: true, 
+      message: "Scrape initiated",
+      sourceId: id,
+      sourceName: source.name,
+    });
+
+    // TODO: Trigger actual scrape via job queue
+  } catch (error) {
+    console.error("Error triggering scrape:", error);
+    res.status(500).json({ error: "Failed to trigger scrape" });
   }
 });
 
