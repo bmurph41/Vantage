@@ -601,11 +601,6 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
     return true;
   }) || [];
 
-  const { data: allListings } = useQuery<MarinaListing[]>({
-    queryKey: ["/api/marinamatch/intel/listings"],
-    staleTime: 60000,
-  });
-
   const uniqueStates = [...new Set(allListings?.map(l => l.state).filter(Boolean))].sort();
   const uniqueCities = [...new Set(
     allListings?.filter(l => stateFilter === "all" || l.state === stateFilter)
