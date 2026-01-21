@@ -41,6 +41,8 @@ type ModelingProject = {
   year1CapRate: number | null;
   totalStorageUnits: number | null;
   ebitda: number | null;
+  t12Ebitda: number | null;
+  year1Ebitda: number | null;
   dealOutcome: string;
   ddProjectId: string | null;
   salesCompId: string | null;
@@ -345,8 +347,8 @@ export default function ModelingProjectsPage() {
                       <TableHead>Location</TableHead>
                       <TableHead className="text-right">Purchase Price</TableHead>
                       <TableHead className="text-right">Year 1 Cap Rate</TableHead>
-                      <TableHead className="text-right">Size (Units)</TableHead>
-                      <TableHead className="text-right">EBITDA</TableHead>
+                      <TableHead className="text-right">T12 EBITDA</TableHead>
+                      <TableHead className="text-right">Yr. 1 EBITDA</TableHead>
                       <TableHead className="text-center">Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -371,11 +373,11 @@ export default function ModelingProjectsPage() {
                         <TableCell className="text-right" data-testid={`text-cap-rate-${project.id}`}>
                           {formatPercent(project.year1CapRate)}
                         </TableCell>
-                        <TableCell className="text-right" data-testid={`text-units-${project.id}`}>
-                          {formatNumber(project.totalStorageUnits)}
+                        <TableCell className="text-right" data-testid={`text-t12-ebitda-${project.id}`}>
+                          {formatCurrency(project.t12Ebitda)}
                         </TableCell>
-                        <TableCell className="text-right" data-testid={`text-ebitda-${project.id}`}>
-                          {formatCurrency(project.ebitda)}
+                        <TableCell className="text-right" data-testid={`text-yr1-ebitda-${project.id}`}>
+                          {formatCurrency(project.year1Ebitda)}
                         </TableCell>
                         <TableCell className="text-center">
                           <span

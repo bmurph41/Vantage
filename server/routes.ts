@@ -15526,7 +15526,31 @@ Current context: Project ${req.params.projectId}`;
     try {
       const orgId = req.user.orgId;
       const projects = await storage.getModelingProjects(orgId);
-      res.json(projects);
+      
+      const { modelingFinancialPeriods } = await import('@shared/schema');
+      
+      const projectsWithEbitda = await Promise.all(projects.map(async (project) => {
+        const financialPeriods = await db.select({
+          periodType: modelingFinancialPeriods.periodType,
+          noi: modelingFinancialPeriods.noi,
+        })
+        .from(modelingFinancialPeriods)
+        .where(and(
+          eq(modelingFinancialPeriods.modelingProjectId, project.id),
+          eq(modelingFinancialPeriods.orgId, orgId)
+        ));
+        
+        const t12Period = financialPeriods.find(p => p.periodType === 't12');
+        const year1Period = financialPeriods.find(p => p.periodType === 'year_1');
+        
+        return {
+          ...project,
+          t12Ebitda: t12Period?.noi ? parseFloat(t12Period.noi) : null,
+          year1Ebitda: year1Period?.noi ? parseFloat(year1Period.noi) : null,
+        };
+      }));
+      
+      res.json(projectsWithEbitda);
     } catch (error: any) {
       console.error('Failed to fetch modeling projects:', error);
       res.status(500).json({ error: 'Failed to fetch modeling projects' });
