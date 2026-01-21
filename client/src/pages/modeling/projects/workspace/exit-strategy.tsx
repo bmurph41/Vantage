@@ -428,21 +428,33 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
       </Card>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2">
-              <div className="p-2 bg-blue-50 rounded-lg">
-                <Building2 className="h-4 w-4 text-blue-500" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Purchase Price</p>
-                <p className="text-lg font-bold" data-testid="text-exit-purchase-price">
-                  {formatCurrency(purchasePrice)}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card className="cursor-pointer hover:border-blue-300 transition-colors" onClick={() => onTabChange?.('pricing')}>
+                <CardContent className="pt-4">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-blue-50 rounded-lg">
+                      <Building2 className="h-4 w-4 text-blue-500" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        Purchase Price
+                        <Link2 className="h-3 w-3 text-blue-400" />
+                      </p>
+                      <p className="text-lg font-bold" data-testid="text-exit-purchase-price">
+                        {purchasePrice > 0 ? formatCurrency(purchasePrice) : <span className="text-muted-foreground text-sm">Not set</span>}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">Click to update in Pricing tab</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
 
         <Card>
           <CardContent className="pt-4">
