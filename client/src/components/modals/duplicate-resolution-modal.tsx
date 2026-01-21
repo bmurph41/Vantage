@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
 import { 
   AlertCircle, 
   Check, 
@@ -20,12 +19,10 @@ import {
   Globe, 
   Briefcase,
   DollarSign,
-  Calendar,
   FileText,
   GitCompare,
   Info,
   CheckCircle2,
-  XCircle,
   MinusCircle
 } from "lucide-react";
 import type { PendingContact, PendingCompany, PendingProperty, CrmContact, CrmCompany, Property } from "@shared/schema";
