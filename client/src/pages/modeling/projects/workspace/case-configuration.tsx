@@ -69,6 +69,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import ScenarioComparison from './scenario-comparison';
 
 interface CaseConfigurationProps {
   projectId: string;
@@ -977,6 +978,10 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
           )}
         </div>
       )}
+
+      {/* Scenario Comparison Section */}
+      <Separator className="my-8" />
+      <ScenarioComparison projectId={projectId} />
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
