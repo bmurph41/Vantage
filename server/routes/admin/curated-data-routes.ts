@@ -700,7 +700,7 @@ curatedDataRouter.post("/scrape-sources/run-all", async (req, res) => {
       message: "Full scrape initiated - running in background",
     });
 
-    runScheduledScrape().then(result => {
+    runScheduledScrape(true).then(result => {
       console.log("[Admin] Full scrape completed:", result);
     }).catch(err => {
       console.error("[Admin] Full scrape failed:", err);

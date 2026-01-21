@@ -7,6 +7,7 @@ const SCRAPE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const MIN_SCRAPE_INTERVAL_MS = 60 * 60 * 1000;
 
 let schedulerInterval: NodeJS.Timeout | null = null;
+let startupTimeout: NodeJS.Timeout | null = null;
 let isScrapingInProgress = false;
 
 export interface SchedulerStatus {
@@ -21,7 +22,7 @@ export interface SchedulerStatus {
 let lastCheckAt: Date | null = null;
 let schedulerStartedAt: Date | null = null;
 
-export async function runScheduledScrape(): Promise<{
+export async function runScheduledScrape(forceAll: boolean = false): Promise<{
   sourcesProcessed: number;
   totalListings: number;
   newListings: number;
@@ -43,22 +44,35 @@ export async function runScheduledScrape(): Promise<{
   };
 
   try {
-    console.log("[Scheduler] Starting scheduled scrape of all global sources...");
+    console.log(`[Scheduler] Starting ${forceAll ? 'forced' : 'scheduled'} scrape of all global sources...`);
 
-    const staleThreshold = new Date(Date.now() - MIN_SCRAPE_INTERVAL_MS);
+    let sourcesToScrape;
     
-    const sourcesToScrape = await db
-      .select()
-      .from(marinaScrapeources)
-      .where(and(
-        eq(marinaScrapeources.isGlobalSource, true),
-        eq(marinaScrapeources.isActive, true),
-        or(
-          isNull(marinaScrapeources.lastScrapeAt),
-          lte(marinaScrapeources.lastScrapeAt, staleThreshold)
-        )
-      ))
-      .orderBy(marinaScrapeources.lastScrapeAt);
+    if (forceAll) {
+      sourcesToScrape = await db
+        .select()
+        .from(marinaScrapeources)
+        .where(and(
+          eq(marinaScrapeources.isGlobalSource, true),
+          eq(marinaScrapeources.isActive, true)
+        ))
+        .orderBy(marinaScrapeources.lastScrapeAt);
+    } else {
+      const staleThreshold = new Date(Date.now() - MIN_SCRAPE_INTERVAL_MS);
+      
+      sourcesToScrape = await db
+        .select()
+        .from(marinaScrapeources)
+        .where(and(
+          eq(marinaScrapeources.isGlobalSource, true),
+          eq(marinaScrapeources.isActive, true),
+          or(
+            isNull(marinaScrapeources.lastScrapeAt),
+            lte(marinaScrapeources.lastScrapeAt, staleThreshold)
+          )
+        ))
+        .orderBy(marinaScrapeources.lastScrapeAt);
+    }
 
     console.log(`[Scheduler] Found ${sourcesToScrape.length} sources needing scrape`);
 
@@ -212,7 +226,7 @@ export function startScheduler(): void {
   schedulerStartedAt = new Date();
   console.log("[Scheduler] Starting listing scrape scheduler (every 6 hours)...");
 
-  setTimeout(() => {
+  startupTimeout = setTimeout(() => {
     console.log("[Scheduler] Running initial scrape check...");
     runScheduledScrape().catch(console.error);
   }, 30000);
@@ -225,6 +239,10 @@ export function startScheduler(): void {
 }
 
 export function stopScheduler(): void {
+  if (startupTimeout) {
+    clearTimeout(startupTimeout);
+    startupTimeout = null;
+  }
   if (schedulerInterval) {
     clearInterval(schedulerInterval);
     schedulerInterval = null;
