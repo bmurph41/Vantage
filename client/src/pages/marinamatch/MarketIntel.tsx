@@ -15,13 +15,15 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiRequest } from "@/lib/queryClient";
 import { formatCurrency, formatPercent } from "@/lib/utils";
 import { 
   RefreshCw, Search, MapPin, DollarSign, Anchor, 
   ExternalLink, Star, Clock, Filter, Fuel, Store,
   Wrench, ArrowUpDown, Building, Info, Globe, Loader2,
-  Settings, ChevronDown, ChevronUp, Plus, Check, X, Radar, Pencil, Mail, AlertTriangle, Flag, MessageSquareWarning, Trash2
+  Settings, ChevronDown, ChevronUp, Plus, Check, X, Radar, Pencil, Mail, AlertTriangle, Flag, MessageSquareWarning, Trash2,
+  ShoppingBag, FolderKanban, Rss, Crown
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -226,6 +228,7 @@ interface MarketIntelTabProps {
 export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<string>("marketplace");
   const [searchTerm, setSearchTerm] = useState("");
   const [stateFilter, setStateFilter] = useState<string>("all");
   const [cityFilter, setCityFilter] = useState<string>("all");
@@ -289,21 +292,23 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
     queryKey: ["/api/marinamatch/intel/analytics/overview"],
   });
 
-  const buildListingsUrl = () => {
+  const buildListingsUrl = (includeGlobal: boolean = true) => {
     const params = new URLSearchParams();
     if (stateFilter && stateFilter !== "all") params.set("state", stateFilter);
     if (cityFilter && cityFilter !== "all") params.set("city", cityFilter);
     if (sourceFilter && sourceFilter !== "all") params.set("source", sourceFilter);
     if (statusFilter && statusFilter !== "all") params.set("status", statusFilter);
     if (minScoreFilter && minScoreFilter !== "0") params.set("minScore", minScoreFilter);
+    params.set("includeGlobal", includeGlobal ? "true" : "false");
     const queryString = params.toString();
-    return queryString ? `/api/marinamatch/intel/listings?${queryString}` : "/api/marinamatch/intel/listings";
+    return `/api/marinamatch/intel/listings?${queryString}`;
   };
   
-  const listingsUrl = buildListingsUrl();
+  const listingsUrl = buildListingsUrl(true);
+  const pipelineUrl = buildListingsUrl(false);
     
-  const { data: listings, isLoading: listingsLoading, refetch: refetchListings } = useQuery<MarinaListing[]>({
-    queryKey: ["/api/marinamatch/intel/listings", stateFilter, cityFilter, sourceFilter, statusFilter, minScoreFilter],
+  const { data: allListings, isLoading: listingsLoading, refetch: refetchListings } = useQuery<MarinaListing[]>({
+    queryKey: ["/api/marinamatch/intel/listings", stateFilter, cityFilter, sourceFilter, statusFilter, minScoreFilter, "all"],
     queryFn: async () => {
       const response = await fetch(listingsUrl);
       if (!response.ok) throw new Error("Failed to fetch listings");
@@ -314,6 +319,18 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
       return false;
     },
   });
+  
+  const { data: pipelineListings, isLoading: pipelineLoading, refetch: refetchPipeline } = useQuery<MarinaListing[]>({
+    queryKey: ["/api/marinamatch/intel/listings", stateFilter, cityFilter, sourceFilter, statusFilter, minScoreFilter, "pipeline"],
+    queryFn: async () => {
+      const response = await fetch(pipelineUrl);
+      if (!response.ok) throw new Error("Failed to fetch pipeline listings");
+      return response.json();
+    },
+  });
+  
+  const marketplaceListings = allListings?.filter(l => l.scope === "global") || [];
+  const listings = activeTab === "marketplace" ? marketplaceListings : pipelineListings;
 
   const { data: scrapeStats, isLoading: statsLoading } = useQuery({
     queryKey: ["/api/marinamatch/intel/scrape/stats"],
@@ -640,34 +657,518 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
   const lastSync = getLastSyncTime();
   const isSyncing = syncStatus?.isScraping || false;
 
+  const renderListingsSection = (listingsData: MarinaListing[], isLoading: boolean, isMarketplace: boolean) => {
+    const filtered = listingsData?.filter(listing => {
+      if (!searchTerm) return true;
+      const search = searchTerm.toLowerCase();
+      return (
+        listing.title?.toLowerCase().includes(search) ||
+        listing.propertyName?.toLowerCase().includes(search) ||
+        listing.city?.toLowerCase().includes(search) ||
+        listing.state?.toLowerCase().includes(search)
+      );
+    }) || [];
+
+    if (isLoading) {
+      return (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="space-y-4">
+              {[1, 2, 3].map(i => (
+                <Skeleton key={i} className="h-24 w-full" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    if (filtered.length === 0) {
+      return (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center py-12">
+              {isMarketplace ? (
+                <>
+                  <Crown className="h-16 w-16 mx-auto text-blue-300 mb-6" />
+                  <p className="text-xl font-semibold mb-2">Marketplace Coming Soon</p>
+                  <p className="text-muted-foreground max-w-lg mx-auto mb-6">
+                    We're building partnerships with top marina brokers and listing platforms. 
+                    Curated listings will appear here as they become available.
+                  </p>
+                  <div className="flex items-center justify-center gap-4 mt-6">
+                    <Button variant="outline" onClick={() => setActiveTab("pipeline")}>
+                      <FolderKanban className="h-4 w-4 mr-2" />
+                      View Your Pipeline
+                    </Button>
+                    <Button variant="outline" onClick={() => setActiveTab("sources")}>
+                      <Rss className="h-4 w-4 mr-2" />
+                      Add Your Sources
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Anchor className="h-16 w-16 mx-auto text-primary/30 mb-6" />
+                  <p className="text-xl font-semibold mb-2">Build Your Marina Deal Pipeline</p>
+                  <p className="text-muted-foreground max-w-lg mx-auto mb-2">
+                    Your broker network is your best source for off-market marina deals. Start by connecting 
+                    with marina brokers who can submit deals directly to your pipeline.
+                  </p>
+                  
+                  <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+                    <div className="p-6 bg-primary/5 rounded-lg border-2 border-dashed border-primary/30">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="p-2 bg-primary/10 rounded-full">
+                          <Plus className="h-5 w-5 text-primary" />
+                        </div>
+                        <h4 className="font-semibold">Quick Submit</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Got a deal from a broker? Submit it directly to add it to your pipeline.
+                      </p>
+                      <Button 
+                        variant="default"
+                        onClick={() => setBrokerSubmitOpen(true)}
+                        className="w-full"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Submit Listing
+                      </Button>
+                    </div>
+
+                    <div className="p-6 bg-blue-50 dark:bg-blue-950/30 rounded-lg border-2 border-dashed border-blue-200 dark:border-blue-800">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-full">
+                          <Radar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <h4 className="font-semibold">Broker Network</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Build your broker relationships and let them submit deals via shareable portal links.
+                      </p>
+                      <Button 
+                        variant="outline"
+                        onClick={onNavigateToBrokers}
+                        className="w-full"
+                      >
+                        <Radar className="h-4 w-4 mr-2" />
+                        Manage Brokers
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search listings..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            
+            <Select value={stateFilter} onValueChange={setStateFilter}>
+              <SelectTrigger className="w-[100px]">
+                <MapPin className="h-4 w-4 mr-1" />
+                <SelectValue placeholder="State" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All States</SelectItem>
+                {US_STATES.map(s => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={sourceFilter} onValueChange={setSourceFilter}>
+              <SelectTrigger className="w-[120px]">
+                <Globe className="h-4 w-4 mr-1" />
+                <SelectValue placeholder="Source" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Sources</SelectItem>
+                {Object.keys(analytics?.listingsBySource || {}).map(source => (
+                  <SelectItem key={source} value={source}>{source}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={minScoreFilter} onValueChange={setMinScoreFilter}>
+              <SelectTrigger className="w-[120px]">
+                <Star className="h-4 w-4 mr-1" />
+                <SelectValue placeholder="Score" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">Any Score</SelectItem>
+                <SelectItem value="50">50+ Score</SelectItem>
+                <SelectItem value="70">70+ Score</SelectItem>
+                <SelectItem value="80">80+ Score</SelectItem>
+                <SelectItem value="90">90+ Score</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {!isMarketplace && (
+              <Button variant="default" onClick={() => setBrokerSubmitOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Submit Listing
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        
+        <CardContent>
+          <ScrollArea className="h-[600px]">
+            <div className="space-y-3">
+              {filtered.map((listing) => (
+                <div
+                  key={listing.id}
+                  className="border rounded-lg overflow-hidden hover:bg-muted/50 cursor-pointer transition-colors"
+                  onClick={() => setSelectedListing(listing)}
+                >
+                  <div className="flex">
+                    <div className="w-40 h-32 flex-shrink-0 bg-muted relative">
+                      {listing.heroImageUrl ? (
+                        <img 
+                          src={listing.heroImageUrl} 
+                          alt={listing.propertyName || listing.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Anchor className="h-12 w-12 text-muted-foreground/30" />
+                        </div>
+                      )}
+                      {listing.bestMatchScore !== undefined && listing.bestMatchScore > 0 && (
+                        <div className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-bold text-white shadow-lg ${getScoreColor(listing.bestMatchScore)}`}>
+                          {listing.bestMatchScore}%
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="flex-1 p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-semibold text-base">{listing.propertyName || listing.title}</h3>
+                            {listing.scope === 'global' && (
+                              <Badge variant="default" className="text-xs bg-blue-500 hover:bg-blue-600">
+                                <Crown className="h-3 w-3 mr-1" />
+                                Marketplace
+                              </Badge>
+                            )}
+                            <Badge variant="outline" className={`text-xs ${getSourceBadgeStyle(listing.sourcePlatform)}`}>
+                              {listing.sourcePlatform}
+                            </Badge>
+                            {listing.askingPrice && (
+                              <span className="flex items-center gap-1 font-semibold text-green-600 dark:text-green-400 ml-auto text-sm">
+                                <DollarSign className="h-4 w-4" />
+                                {formatPrice(listing.askingPrice)}
+                              </span>
+                            )}
+                          </div>
+                          
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
+                            {listing.city && listing.state && (
+                              <span className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                {listing.city}, {listing.state}
+                              </span>
+                            )}
+                            {listing.totalSlips && (
+                              <span className="flex items-center gap-1">
+                                <Anchor className="h-3 w-3" />
+                                {listing.totalSlips} slips
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderSourcesSection = () => {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Rss className="h-5 w-5" />
+            Your Listing Sources
+          </CardTitle>
+          <CardDescription>
+            Configure which commercial real estate platforms and broker sites to monitor for marina listings.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Alert className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-800">
+            <Radar className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-sm">
+              <span className="font-medium text-foreground">Automated Listing Aggregation</span>
+              <ul className="mt-2 space-y-1 text-muted-foreground text-xs list-disc list-inside">
+                <li><strong>Live Monitoring:</strong> Sources are polled regularly to detect new marina listings</li>
+                <li><strong>AI Matching:</strong> Listings are scored against your investment criteria profiles</li>
+                <li><strong>Deduplication:</strong> Identical listings across platforms are merged automatically</li>
+              </ul>
+            </AlertDescription>
+          </Alert>
+          
+          {sourcesLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : scrapeSources?.length === 0 ? (
+            <div className="text-center py-8 border-2 border-dashed rounded-lg">
+              <Rss className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
+              <p className="font-medium mb-2">No listing sources configured</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                Add broker sites and listing platforms to automatically aggregate marina listings.
+              </p>
+              <Button onClick={() => setAddSourceExpanded(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Your First Source
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {scrapeSources?.map(source => (
+                <div 
+                  key={source.id} 
+                  className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                >
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={source.isActive}
+                      onCheckedChange={(checked) => 
+                        toggleSourceMutation.mutate({ id: source.id, isActive: checked })
+                      }
+                      disabled={toggleSourceMutation.isPending}
+                    />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{source.name}</span>
+                        <Badge 
+                          variant="outline" 
+                          className={getSourceBadgeStyle(source.platform)}
+                        >
+                          {source.platform}
+                        </Badge>
+                      </div>
+                      {source.searchUrl && (
+                        <p className="text-xs text-muted-foreground truncate max-w-md">
+                          {source.searchUrl}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {source.lastScrapeAt && (
+                      <span className="text-xs text-muted-foreground">
+                        Last sync: {formatDistanceToNow(new Date(source.lastScrapeAt), { addSuffix: true })}
+                      </span>
+                    )}
+                    <span className="text-xs text-muted-foreground font-medium">
+                      {analytics?.listingsBySource?.[source.platform] || 0} listings
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => openEditDialog(source)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={() => deleteSourceMutation.mutate(source.id)}
+                      disabled={deleteSourceMutation.isPending}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <Separator />
+
+          <Collapsible open={addSourceExpanded} onOpenChange={setAddSourceExpanded}>
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-medium">Add Custom Source</h4>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  {addSourceExpanded ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                </Button>
+              </CollapsibleTrigger>
+            </div>
+            
+            <CollapsibleContent className="space-y-4 mt-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Platform</Label>
+                  <Input
+                    placeholder="e.g., LoopNet, Custom Broker"
+                    value={newSourceForm.platform}
+                    onChange={(e) => setNewSourceForm(prev => ({ ...prev, platform: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Display Name</Label>
+                  <Input
+                    placeholder="My Marina Source"
+                    value={newSourceForm.name}
+                    onChange={(e) => setNewSourceForm(prev => ({ ...prev, name: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Search URL</Label>
+                  <Input
+                    placeholder="https://example.com/search"
+                    value={newSourceForm.searchUrl}
+                    onChange={(e) => setNewSourceForm(prev => ({ ...prev, searchUrl: e.target.value }))}
+                  />
+                </div>
+              </div>
+              
+              <Button 
+                onClick={() => addSourceMutation.mutate(newSourceForm)}
+                disabled={addSourceMutation.isPending || !newSourceForm.platform || !newSourceForm.name}
+              >
+                {addSourceMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Source
+                  </>
+                )}
+              </Button>
+            </CollapsibleContent>
+          </Collapsible>
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
     <div className="space-y-6">
-      <Alert className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-800" data-testid="aggregator-disclaimer">
-        <Info className="h-4 w-4 text-blue-600" />
-        <AlertDescription className="text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">Aggregated Listings:</span> These marina listings are sourced from third-party commercial real estate platforms including LoopNet, Crexi, CoStar, BizBuySell, and broker websites. MarinaMatch does not own, endorse, or guarantee the accuracy of these listings. For accurate, up-to-date information, please contact the listing broker directly or visit the original source.
-          <span className="block mt-1 text-xs">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <div className="flex items-center justify-between mb-4">
+          <TabsList className="bg-muted/50">
+            <TabsTrigger value="marketplace" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Crown className="h-4 w-4" />
+              Marketplace
+              {marketplaceListings.length > 0 && (
+                <Badge variant="secondary" className="ml-1 text-xs">{marketplaceListings.length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="pipeline" className="gap-2">
+              <FolderKanban className="h-4 w-4" />
+              My Pipeline
+              {pipelineListings && pipelineListings.length > 0 && (
+                <Badge variant="secondary" className="ml-1 text-xs">{pipelineListings.length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="sources" className="gap-2">
+              <Rss className="h-4 w-4" />
+              My Sources
+              <Badge variant="outline" className="ml-1 text-xs">
+                {scrapeSources?.filter(s => s.isActive).length || 0}
+              </Badge>
+            </TabsTrigger>
+          </TabsList>
+          
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
             {isSyncing ? (
               <>
-                <RefreshCw className="h-3 w-3 inline mr-1 animate-spin" />
+                <RefreshCw className="h-3 w-3 animate-spin" />
                 Syncing new listings...
               </>
             ) : lastSync ? (
               <>
-                <Clock className="h-3 w-3 inline mr-1" />
-                Last synchronized: {formatDistanceToNow(new Date(lastSync), { addSuffix: true })}
+                <Clock className="h-3 w-3" />
+                Last sync: {formatDistanceToNow(new Date(lastSync), { addSuffix: true })}
               </>
-            ) : (
-              <>
-                <Clock className="h-3 w-3 inline mr-1" />
-                Auto-sync enabled
-              </>
-            )}
-          </span>
-        </AlertDescription>
-      </Alert>
+            ) : null}
+          </div>
+        </div>
 
-      <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <TabsContent value="marketplace" className="space-y-4 mt-0">
+          <Alert className="border-blue-200 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 dark:from-blue-950/30 dark:to-indigo-950/30 dark:border-blue-800">
+            <Crown className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-sm">
+              <span className="font-medium text-foreground">MarinaMatch Marketplace</span>
+              <span className="text-muted-foreground ml-1">
+                — Curated marina listings from our verified broker network and platform partnerships. Available to all subscribers.
+              </span>
+            </AlertDescription>
+          </Alert>
+          
+          {renderListingsSection(marketplaceListings, listingsLoading, true)}
+        </TabsContent>
+
+        <TabsContent value="pipeline" className="space-y-4 mt-0">
+          <Alert className="border-green-200 bg-green-50/50 dark:bg-green-950/20 dark:border-green-800">
+            <FolderKanban className="h-4 w-4 text-green-600" />
+            <AlertDescription className="text-sm">
+              <span className="font-medium text-foreground">Your Deal Pipeline</span>
+              <span className="text-muted-foreground ml-1">
+                — Broker submissions and listings from your own sources. These are private to your organization.
+              </span>
+            </AlertDescription>
+          </Alert>
+          
+          {renderListingsSection(pipelineListings || [], pipelineLoading, false)}
+        </TabsContent>
+
+        <TabsContent value="sources" className="space-y-4 mt-0">
+          <Alert className="border-purple-200 bg-purple-50/50 dark:bg-purple-950/20 dark:border-purple-800">
+            <Rss className="h-4 w-4 text-purple-600" />
+            <AlertDescription className="text-sm">
+              <span className="font-medium text-foreground">Your Listing Sources</span>
+              <span className="text-muted-foreground ml-1">
+                — Configure custom scrape channels and broker feeds. Listings from these sources appear in your pipeline.
+              </span>
+            </AlertDescription>
+          </Alert>
+          
+          {renderSourcesSection()}
+        </TabsContent>
+      </Tabs>
+
+      <Collapsible open={settingsOpen && activeTab !== "sources"} onOpenChange={setSettingsOpen} className={activeTab === "sources" ? "hidden" : ""}>
         <Card className="border-dashed">
           <CardHeader className="py-3">
             <CollapsibleTrigger asChild>
