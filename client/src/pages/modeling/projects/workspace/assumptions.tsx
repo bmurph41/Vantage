@@ -403,10 +403,23 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
     };
   }
 
+  const statusResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSaveRef = useRef(false);
+  const changesSinceSaveRef = useRef(false);
+  const hasChangesRef = useRef(false);
+
+  useEffect(() => {
+    hasChangesRef.current = hasChanges;
+    if (pendingSaveRef.current) {
+      changesSinceSaveRef.current = true;
+    }
+  }, [hasChanges, growthRates, expenseGrowth, occupancy, margins, storageGrowth]);
+
   const saveMutation = useMutation({
     mutationFn: ({ createNewVersion, isAutosave }: { createNewVersion: boolean; isAutosave?: boolean }) => {
       if (isAutosave) {
         setAutosaveStatus('saving');
+        changesSinceSaveRef.current = false;
       }
       if (!activeScenario) {
         return apiRequest('POST', `/api/modeling/projects/${projectId}/scenarios`, {
@@ -424,10 +437,15 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
     },
     onSuccess: (_, { createNewVersion, isAutosave }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'scenarios'] });
-      setHasChanges(false);
+      if (!changesSinceSaveRef.current) {
+        setHasChanges(false);
+      }
       if (isAutosave) {
         setAutosaveStatus('saved');
-        setTimeout(() => setAutosaveStatus('idle'), 3000);
+        if (statusResetTimerRef.current) {
+          clearTimeout(statusResetTimerRef.current);
+        }
+        statusResetTimerRef.current = setTimeout(() => setAutosaveStatus('idle'), 3000);
       } else {
         toast({ 
           title: createNewVersion ? 'New Version Created' : 'Saved', 
@@ -440,9 +458,23 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
     onError: (_, { isAutosave }) => {
       if (isAutosave) {
         setAutosaveStatus('error');
-        setTimeout(() => setAutosaveStatus('idle'), 5000);
+        if (statusResetTimerRef.current) {
+          clearTimeout(statusResetTimerRef.current);
+        }
+        statusResetTimerRef.current = setTimeout(() => setAutosaveStatus('idle'), 5000);
       } else {
         toast({ title: 'Error', description: 'Failed to save assumptions.', variant: 'destructive' });
+      }
+    },
+    onSettled: () => {
+      pendingSaveRef.current = false;
+      if (changesSinceSaveRef.current && hasChangesRef.current) {
+        autosaveTimerRef.current = setTimeout(() => {
+          if (!pendingSaveRef.current && hasChangesRef.current) {
+            pendingSaveRef.current = true;
+            saveMutation.mutate({ createNewVersion: false, isAutosave: true });
+          }
+        }, 500);
       }
     },
   });
@@ -452,11 +484,14 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
       clearTimeout(autosaveTimerRef.current);
     }
     autosaveTimerRef.current = setTimeout(() => {
-      if (hasChanges && activeScenario) {
+      if (!pendingSaveRef.current && hasChangesRef.current) {
+        pendingSaveRef.current = true;
         saveMutation.mutate({ createNewVersion: false, isAutosave: true });
+      } else if (pendingSaveRef.current) {
+        changesSinceSaveRef.current = true;
       }
     }, 2000);
-  }, [hasChanges, activeScenario, saveMutation]);
+  }, [saveMutation]);
 
   useEffect(() => {
     if (hasChanges) {
@@ -468,6 +503,14 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
       }
     };
   }, [hasChanges, growthRates, expenseGrowth, occupancy, margins, storageGrowth]);
+
+  useEffect(() => {
+    return () => {
+      if (statusResetTimerRef.current) {
+        clearTimeout(statusResetTimerRef.current);
+      }
+    };
+  }, []);
 
   const submitMutation = useMutation({
     mutationFn: () => apiRequest('POST', `/api/modeling/projects/${projectId}/scenarios/${activeScenario?.id}/submit`),
