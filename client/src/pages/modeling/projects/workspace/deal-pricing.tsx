@@ -257,6 +257,28 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
     }
     const projectedExitNOI = year1NOI * Math.pow(1 + netGrowth, holdYears);
     
+    // Helper to update derived cap rates from price
+    const updateDerivedRates = (newPrice: number) => {
+      if (newPrice > 0) {
+        // Derive Going-In Cap Rate = Year 1 NOI / Price
+        const derivedGoingInCap = (year1NOI / newPrice) * 100;
+        const currentGoingIn = parsePercentInput(goingInCapRate);
+        if (Math.abs(derivedGoingInCap - currentGoingIn) > 0.1) {
+          setGoingInCapRate(derivedGoingInCap.toFixed(2));
+        }
+        
+        // Derive Exit Cap Rate = Exit NOI / Exit Value
+        // Exit Value ≈ Price * (1 + appreciation)^holdYears
+        const appreciation = 0.02; // 2% annual appreciation assumption
+        const estimatedExitValue = newPrice * Math.pow(1 + appreciation, holdYears);
+        const derivedExitCap = (projectedExitNOI / estimatedExitValue) * 100;
+        const currentExitCap = parsePercentInput(exitCapRate);
+        if (Math.abs(derivedExitCap - currentExitCap) > 0.1 && pricingDriver !== 'exitCap') {
+          setExitCapRate(derivedExitCap.toFixed(2));
+        }
+      }
+    };
+    
     if (pricingDriver === 'exitCap') {
       // Exit Cap Rate drives Price
       const exitCap = parsePercentInput(exitCapRate) / 100;
@@ -269,6 +291,9 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
         const currentPrice = parseCurrencyInput(manualPurchasePrice);
         if (Math.abs(derivedPrice - currentPrice) > 50000 && derivedPrice > 0) {
           setManualPurchasePrice(Math.round(derivedPrice).toLocaleString());
+          // Update derived going-in cap from new price
+          const derivedGoingInCap = (year1NOI / derivedPrice) * 100;
+          setGoingInCapRate(derivedGoingInCap.toFixed(2));
         }
       }
     } else if (pricingDriver === 'targetIRR') {
@@ -292,6 +317,8 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
         const currentPrice = parseCurrencyInput(manualPurchasePrice);
         if (Math.abs(derivedPrice - currentPrice) > 50000 && derivedPrice > 0) {
           setManualPurchasePrice(Math.round(derivedPrice).toLocaleString());
+          // Update derived cap rates from new price
+          updateDerivedRates(derivedPrice);
         }
       }
     } else if (pricingDriver === 'goingInCap') {
@@ -460,79 +487,61 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
         </Card>
       )}
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Hold Period</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Select value={holdPeriod} onValueChange={setHoldPeriod}>
-              <SelectTrigger data-testid="select-hold-period">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {[3, 5, 7, 10].map(y => (
-                  <SelectItem key={y} value={String(y)}>{y} Years</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </CardContent>
-        </Card>
-        <Card className={pricingDriver === 'exitCap' && isLinked ? 'ring-2 ring-primary/50' : ''}>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium">Exit Cap Rate</CardTitle>
-              {pricingDriver === 'exitCap' && isLinked && (
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                  Driving
-                </Badge>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="relative">
-              <Input
-                value={exitCapRate}
-                onChange={(e) => handleExitCapRateChange(e.target.value)}
-                className="pr-8"
-                data-testid="input-exit-cap-rate"
-              />
-              <Percent className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Revenue Growth</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="relative">
-              <Input
-                value={revenueGrowthRate}
-                onChange={(e) => setRevenueGrowthRate(e.target.value)}
-                className="pr-8"
-                data-testid="input-revenue-growth"
-              />
-              <Percent className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Expense Growth</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="relative">
-              <Input
-                value={expenseGrowthRate}
-                onChange={(e) => setExpenseGrowthRate(e.target.value)}
-                className="pr-8"
-                data-testid="input-expense-growth"
-              />
-              <Percent className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            </div>
-          </CardContent>
-        </Card>
+      <div className="flex flex-wrap items-end gap-3 p-3 bg-muted/30 rounded-lg border">
+        <div className="flex-shrink-0">
+          <Label className="text-xs text-muted-foreground mb-1 block">Hold Period</Label>
+          <Select value={holdPeriod} onValueChange={setHoldPeriod}>
+            <SelectTrigger className="w-24 h-9" data-testid="select-hold-period">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[3, 5, 7, 10].map(y => (
+                <SelectItem key={y} value={String(y)}>{y} Years</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className={`flex-shrink-0 ${pricingDriver === 'exitCap' && isLinked ? 'ring-2 ring-purple-500/50 rounded-md p-1 -m-1' : ''}`}>
+          <div className="flex items-center gap-1 mb-1">
+            <Label className="text-xs text-muted-foreground">Exit Cap</Label>
+            {pricingDriver === 'exitCap' && isLinked && (
+              <Badge className="bg-purple-600 text-white text-[8px] px-1 py-0 h-4">Drive</Badge>
+            )}
+          </div>
+          <div className="relative">
+            <Input
+              value={exitCapRate}
+              onChange={(e) => handleExitCapRateChange(e.target.value)}
+              className="w-20 h-9 pr-6 text-sm"
+              data-testid="input-exit-cap-rate"
+            />
+            <Percent className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+          </div>
+        </div>
+        <div className="flex-shrink-0">
+          <Label className="text-xs text-muted-foreground mb-1 block">Rev Growth</Label>
+          <div className="relative">
+            <Input
+              value={revenueGrowthRate}
+              onChange={(e) => setRevenueGrowthRate(e.target.value)}
+              className="w-20 h-9 pr-6 text-sm"
+              data-testid="input-revenue-growth"
+            />
+            <Percent className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+          </div>
+        </div>
+        <div className="flex-shrink-0">
+          <Label className="text-xs text-muted-foreground mb-1 block">Exp Growth</Label>
+          <div className="relative">
+            <Input
+              value={expenseGrowthRate}
+              onChange={(e) => setExpenseGrowthRate(e.target.value)}
+              className="w-20 h-9 pr-6 text-sm"
+              data-testid="input-expense-growth"
+            />
+            <Percent className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+          </div>
+        </div>
       </div>
 
       <Separator />
@@ -575,58 +584,55 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card className={`border-2 ${pricingDriver === 'price' && isLinked ? 'border-primary ring-2 ring-primary/30' : 'border-primary/20'}`}>
-          <CardHeader>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card className={`border ${pricingDriver === 'price' && isLinked ? 'border-primary ring-2 ring-primary/30' : ''}`}>
+          <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-primary" />
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <DollarSign className="h-4 w-4 text-primary" />
                 From Purchase Price
               </CardTitle>
-              {pricingDriver === 'price' && isLinked && (
-                <Badge className="bg-primary text-primary-foreground text-[10px] px-1.5">
-                  Driving
-                </Badge>
-              )}
-            </div>
-            <CardDescription>
-              Enter a purchase price to see resulting returns
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <Label>Purchase Price</Label>
+              <div className="flex items-center gap-1">
+                {pricingDriver === 'price' && isLinked && (
+                  <Badge className="bg-primary text-primary-foreground text-[9px] px-1.5 py-0">
+                    Driving
+                  </Badge>
+                )}
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
                         variant={isLinked ? "default" : "outline"}
                         size="sm"
-                        className="h-6 px-2 text-[10px] gap-1"
+                        className="h-5 px-1.5 text-[9px] gap-0.5"
                         onClick={() => setIsLinked(!isLinked)}
                       >
-                        <Link2 className={`h-3 w-3 ${!isLinked ? 'opacity-50' : ''}`} />
-                        {isLinked ? 'Linked' : 'Unlinked'}
+                        <Link2 className={`h-2.5 w-2.5 ${!isLinked ? 'opacity-50' : ''}`} />
+                        {isLinked ? 'Link' : 'Off'}
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-[200px]">
+                    <TooltipContent side="top" className="max-w-[180px]">
                       <p className="text-xs">
                         {isLinked 
-                          ? 'Price & Exit Cap are linked. Editing one updates the other.' 
-                          : 'Price & Exit Cap are independent. Click to link.'}
+                          ? 'Metrics are linked. Editing one updates others.' 
+                          : 'Metrics are independent. Click to link.'}
                       </p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               </div>
-              <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0">
+            <div>
+              <Label className="text-xs text-muted-foreground">Purchase Price</Label>
+              <div className="relative mt-1">
+                <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <Input
                   value={manualPurchasePrice}
                   onChange={(e) => handlePurchasePriceChange(e.target.value)}
                   placeholder="10,000,000"
-                  className="pl-8"
+                  className="pl-7 h-9 w-40"
                   data-testid="input-purchase-price"
                 />
               </div>
@@ -694,35 +700,32 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
           </CardContent>
         </Card>
 
-        <Card className={`border-2 ${pricingDriver === 'targetIRR' && isLinked ? 'border-green-500 ring-2 ring-green-500/30' : 'border-green-500/20'}`}>
-          <CardHeader>
+        <Card className={`border ${pricingDriver === 'targetIRR' && isLinked ? 'border-green-500 ring-2 ring-green-500/30' : ''}`}>
+          <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-green-600" />
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <Target className="h-4 w-4 text-green-600" />
                 From Target IRR
               </CardTitle>
               {pricingDriver === 'targetIRR' && isLinked && (
-                <Badge className="bg-green-600 text-white text-[10px] px-1.5">
+                <Badge className="bg-green-600 text-white text-[9px] px-1.5 py-0">
                   Driving
                 </Badge>
               )}
             </div>
-            <CardDescription>
-              Enter your target IRR to find the max purchase price
-            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3 pt-0">
             <div>
-              <Label>Target IRR</Label>
+              <Label className="text-xs text-muted-foreground">Target IRR</Label>
               <div className="relative mt-1">
                 <Input
                   value={targetIRR}
                   onChange={(e) => handleTargetIRRChange(e.target.value)}
                   placeholder="15"
-                  className="pr-8"
+                  className="pr-6 h-9 w-24"
                   data-testid="input-target-irr"
                 />
-                <Percent className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Percent className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
               </div>
             </div>
 
@@ -775,32 +778,29 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
         <Card className={`border-2 ${pricingDriver === 'goingInCap' && isLinked ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-blue-500/20'}`}>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Percent className="h-5 w-5 text-blue-600" />
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <Percent className="h-4 w-4 text-blue-600" />
                 From Going-In Cap Rate
               </CardTitle>
               {pricingDriver === 'goingInCap' && isLinked && (
-                <Badge className="bg-blue-600 text-white text-[10px] px-1.5">
+                <Badge className="bg-blue-600 text-white text-[9px] px-1.5 py-0">
                   Driving
                 </Badge>
               )}
             </div>
-            <CardDescription>
-              Enter a Year 1 cap rate to calculate price from NOI
-            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3 pt-0">
             <div>
-              <Label>Going-In Cap Rate (Year 1)</Label>
+              <Label className="text-xs text-muted-foreground">Cap Rate (Year 1)</Label>
               <div className="relative mt-1">
                 <Input
                   value={goingInCapRate}
                   onChange={(e) => handleGoingInCapRateChange(e.target.value)}
                   placeholder="7.5"
-                  className="pr-8"
+                  className="pr-6 h-9 w-24"
                   data-testid="input-going-in-cap"
                 />
-                <Percent className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Percent className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
               </div>
             </div>
 
@@ -850,22 +850,19 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-purple-500/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-purple-600" />
+        <Card className="border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-1.5">
+              <TrendingUp className="h-4 w-4 text-purple-600" />
               From Target Year Cap Rate
             </CardTitle>
-            <CardDescription>
-              Price based on projected stabilized NOI in a future year
-            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+          <CardContent className="space-y-3 pt-0">
+            <div className="flex items-end gap-3">
               <div>
-                <Label>Target Year</Label>
+                <Label className="text-xs text-muted-foreground">Year</Label>
                 <Select value={targetYear} onValueChange={setTargetYear}>
-                  <SelectTrigger className="mt-1" data-testid="select-target-year">
+                  <SelectTrigger className="mt-1 w-24 h-9" data-testid="select-target-year">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -876,16 +873,16 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 </Select>
               </div>
               <div>
-                <Label>Target Cap Rate</Label>
+                <Label className="text-xs text-muted-foreground">Cap Rate</Label>
                 <div className="relative mt-1">
                   <Input
                     value={targetYearCapRate}
                     onChange={(e) => setTargetYearCapRate(e.target.value)}
                     placeholder="7.0"
-                    className="pr-8"
+                    className="pr-6 h-9 w-24"
                     data-testid="input-target-year-cap"
                   />
-                  <Percent className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Percent className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
                 </div>
               </div>
             </div>
