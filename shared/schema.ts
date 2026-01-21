@@ -19184,6 +19184,50 @@ export type InsertOmPageLayout = z.infer<typeof insertOmPageLayoutSchema>;
 // Enum for addback period types
 export const addbackPeriodTypeEnum = pgEnum("addback_period_type", ["monthly", "yearly"]);
 
+// Enum for scenario template scope
+export const scenarioTemplateScopeEnum = pgEnum("scenario_template_scope", ["global", "org", "user"]);
+
+// ============================================================================
+// GLOBAL SCENARIO TEMPLATES
+// Reusable scenario templates that can be applied across any project
+// ============================================================================
+
+export const modelingScenarioTemplates = pgTable("modeling_scenario_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").references(() => organizations.id), // Nullable for global templates
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  
+  name: text("name").notNull(), // e.g., "Base Case", "Aggressive Growth", "Conservative"
+  description: text("description"),
+  scope: scenarioTemplateScopeEnum("scope").notNull().default("org"), // global/org/user
+  color: varchar("color", { length: 50 }).default("blue"),
+  
+  // Core assumptions
+  revenueGrowthRate: decimal("revenue_growth_rate", { precision: 8, scale: 4 }),
+  expenseGrowthRate: decimal("expense_growth_rate", { precision: 8, scale: 4 }),
+  exitCapRate: decimal("exit_cap_rate", { precision: 8, scale: 4 }),
+  occupancyRate: decimal("occupancy_rate", { precision: 8, scale: 4 }),
+  discountRate: decimal("discount_rate", { precision: 8, scale: 4 }),
+  holdPeriodYears: integer("hold_period_years"),
+  
+  // Lease-up assumptions (stored as JSON for flexibility)
+  leaseUpSchedule: jsonb("lease_up_schedule").default(sql`'[]'`),
+  
+  // Additional custom assumptions as JSON
+  customAssumptions: jsonb("custom_assumptions").default(sql`'{}'`),
+  
+  // Metadata
+  isSystem: boolean("is_system").notNull().default(false), // System-provided templates
+  usageCount: integer("usage_count").notNull().default(0), // Track popularity
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("scenario_templates_org_idx").on(table.orgId),
+  scopeIdx: index("scenario_templates_scope_idx").on(table.scope),
+  nameIdx: index("scenario_templates_name_idx").on(table.name),
+}));
+
 // Modeling Cases - Individual case definitions for a modeling project
 export const modelingCases = pgTable("modeling_cases", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -19429,6 +19473,21 @@ export const crmListItems = pgTable("crm_list_items", {
 }));
 
 // ============================================================================
+// MODELING SCENARIO TEMPLATES - RELATIONS
+// ============================================================================
+
+export const modelingScenarioTemplatesRelations = relations(modelingScenarioTemplates, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [modelingScenarioTemplates.orgId],
+    references: [organizations.id],
+  }),
+  creator: one(users, {
+    fields: [modelingScenarioTemplates.createdBy],
+    references: [users.id],
+  }),
+}));
+
+// ============================================================================
 // MODELING CASES - RELATIONS
 // ============================================================================
 
@@ -19514,6 +19573,18 @@ export const crmListItemsRelations = relations(crmListItems, ({ one }) => ({
 // MODELING CASES - INSERT/SELECT SCHEMAS
 // ============================================================================
 
+// Scenario Templates
+export const insertModelingScenarioTemplateSchema = createInsertSchema(modelingScenarioTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  usageCount: true,
+});
+export const updateModelingScenarioTemplateSchema = insertModelingScenarioTemplateSchema.partial();
+export type ModelingScenarioTemplate = typeof modelingScenarioTemplates.$inferSelect;
+export type InsertModelingScenarioTemplate = z.infer<typeof insertModelingScenarioTemplateSchema>;
+
+// Modeling Cases
 export const insertModelingCaseSchema = createInsertSchema(modelingCases).omit({
   id: true,
   createdAt: true,

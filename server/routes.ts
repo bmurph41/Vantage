@@ -50,6 +50,7 @@ import emailMarketingRoutes from "./routes/email-marketing-routes";
 import archiveRoutes from "./routes/archive-routes";
 import marinalyticsRoutes from "./routes/marinalytics-routes";
 import aiAssistantRoutes from "./routes/ai-assistant-routes";
+import scenarioTemplateRoutes from "./routes/scenario-template-routes";
 import executiveDashboardRoutes from "./routes/executive-dashboard-routes";
 import marinaCompRoutes from "./routes/marina-comp-routes";
 import valuationTimelineRoutes from "./routes/valuation-timeline-routes";
@@ -375,6 +376,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerCommentRoutes(app);
   app.use("/api/email-marketing", authenticateUser, emailMarketingRoutes);
   app.use("/api/archive", authenticateUser, archiveRoutes);
+  app.use("/api/modeling/scenario-templates", authenticateUser, scenarioTemplateRoutes);
   app.use("/api/marinalytics", authenticateUser, marinalyticsRoutes);
   app.use("/api/commercial-tenants", authenticateUser, commercialTenantsRoutes);
   app.use(authenticateUser, tourProgressRoutes);

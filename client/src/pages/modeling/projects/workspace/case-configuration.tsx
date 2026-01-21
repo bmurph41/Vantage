@@ -39,7 +39,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import type { ModelingProject, ModelingCase } from '@shared/schema';
+import type { ModelingProject, ModelingCase, ModelingScenarioTemplate } from '@shared/schema';
 import {
   Plus,
   Save,
@@ -56,7 +56,12 @@ import {
   Calendar,
   ChevronDown,
   ChevronUp,
-  Info
+  Info,
+  FileText,
+  Globe,
+  Building2,
+  User,
+  Bookmark
 } from 'lucide-react';
 import {
   Tooltip,
@@ -160,6 +165,10 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
   const { data: cases = [], isLoading: casesLoading, refetch: refetchCases } = useQuery<ModelingCase[]>({
     queryKey: ['/api/modeling/projects', projectId, 'cases'],
     enabled: !!projectId,
+  });
+
+  const { data: templates = [] } = useQuery<ModelingScenarioTemplate[]>({
+    queryKey: ['/api/modeling/scenario-templates'],
   });
 
   useEffect(() => {
@@ -278,6 +287,39 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
     },
     onError: (error: any) => {
       toast({ title: 'Error', description: error.message || 'Failed to clone scenario.', variant: 'destructive' });
+    },
+  });
+
+  const applyTemplateMutation = useMutation({
+    mutationFn: async (templateId: string) => {
+      const response = await apiRequest('POST', `/api/modeling/scenario-templates/apply/${templateId}/project/${projectId}`);
+      return response.json();
+    },
+    onSuccess: (newCase) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'cases'] });
+      setActiveCaseId(newCase.id);
+      toast({ title: 'Template Applied', description: `Created "${newCase.name}" from template.` });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to apply template.', variant: 'destructive' });
+    },
+  });
+
+  const saveAsTemplateMutation = useMutation({
+    mutationFn: async (data: { caseId: string; name: string; description?: string; scope: string }) => {
+      const response = await apiRequest('POST', `/api/modeling/scenario-templates/save-from-case/${data.caseId}`, {
+        name: data.name,
+        description: data.description,
+        scope: data.scope,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/scenario-templates'] });
+      toast({ title: 'Template Saved', description: 'Scenario saved as reusable template.' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to save template.', variant: 'destructive' });
     },
   });
 
@@ -481,6 +523,49 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
                 </div>
               </ScrollArea>
             </CardContent>
+            
+            {templates.length > 0 && (
+              <>
+                <Separator />
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Bookmark className="h-4 w-4" />
+                    Global Templates
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="space-y-1">
+                    {templates.slice(0, 5).map((template) => {
+                      const templateColor = getCaseColorClass(template.color || 'blue');
+                      const ScopeIcon = template.scope === 'global' ? Globe : template.scope === 'org' ? Building2 : User;
+                      return (
+                        <Button
+                          key={template.id}
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start gap-2 h-auto py-2"
+                          onClick={() => applyTemplateMutation.mutate(template.id)}
+                          disabled={applyTemplateMutation.isPending}
+                        >
+                          <div className={`w-2 h-2 rounded-full ${templateColor.bg}`} />
+                          <span className="flex-1 text-left truncate">{template.name}</span>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <ScopeIcon className="h-3 w-3 text-muted-foreground" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {template.scope === 'global' ? 'Global template' : template.scope === 'org' ? 'Organization template' : 'Your template'}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </>
+            )}
           </Card>
 
           {activeCase && editedCase && (
@@ -515,7 +600,28 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
                             <Copy className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Clone Case</TooltipContent>
+                        <TooltipContent>Clone Scenario</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => saveAsTemplateMutation.mutate({
+                              caseId: activeCase.id,
+                              name: activeCase.name,
+                              description: activeCase.description || '',
+                              scope: 'org'
+                            })}
+                            disabled={saveAsTemplateMutation.isPending}
+                            data-testid="button-save-as-template"
+                          >
+                            <Bookmark className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Save as Reusable Template</TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                     {!activeCase.isDefault && (
