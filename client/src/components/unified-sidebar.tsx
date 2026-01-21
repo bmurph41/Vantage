@@ -297,9 +297,11 @@ export default function UnifiedSidebar() {
   };
 
   const NavLink = ({ item }: { item: { name: string; href: string; icon: any; badge?: string; disabled?: boolean } }) => {
-    // For Sales Comps, also match sub-routes like analytics and projects
+    // Check if current location is a child of this nav item's href
+    // Exact match OR location starts with href followed by / or ?
     const isActive = location === item.href || 
-      (item.href === '/analysis/sales-comps' && location.startsWith('/analysis/sales-comps/'));
+      (item.href !== '/' && location.startsWith(item.href + '/')) ||
+      (item.href !== '/' && location.startsWith(item.href + '?'));
     const isDisabled = item.disabled || false;
     
     if (isDisabled) {
