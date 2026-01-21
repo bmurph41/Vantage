@@ -9,6 +9,7 @@ import { startDockTalkCronJobs } from "./docktalk/cron-jobs";
 import { DatabaseStorage as DockTalkStorage } from "./docktalk/storage";
 import { initializeWebSocket } from "./docktalk/websocket";
 import { startMarinaMatchIntelCronJobs } from "./marinamatch/services/intel-cron";
+import { startScheduler as startListingScheduler } from "./marinamatch/services/listing-scheduler";
 import { seedIntegrations } from "./integrations";
 
 import { configureSecurityMiddleware } from "./middleware/security";
@@ -126,6 +127,13 @@ app.get("/health/db", (req: Request, res: Response) => {
         log('MarinaMatch Intel background jobs started');
       } catch (error) {
         log(`Failed to start MarinaMatch Intel background jobs: ${error}`);
+      }
+
+      try {
+        startListingScheduler();
+        log('MarinaMatch listing scrape scheduler started');
+      } catch (error) {
+        log(`Failed to start MarinaMatch listing scheduler: ${error}`);
       }
 
       // Skip DockTalk WebSocket in development to avoid conflict with Vite HMR WebSocket

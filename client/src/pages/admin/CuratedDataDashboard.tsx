@@ -221,6 +221,33 @@ export default function CuratedDataDashboard() {
     },
   });
 
+  const runAllSourcesMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("/api/admin/curated/scrape-sources/run-all", { method: "POST" });
+    },
+    onSuccess: () => {
+      toast({ 
+        title: "Scraping all sources", 
+        description: "Scraping all broker sources in the background. This may take a few minutes." 
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error running scrape", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const { data: schedulerStatus, refetch: refetchSchedulerStatus } = useQuery<{
+    isRunning: boolean;
+    isScrapingInProgress: boolean;
+    lastCheckAt: string | null;
+    nextScheduledRun: string | null;
+    activeSources: number;
+    totalListings: number;
+  }>({
+    queryKey: ["/api/admin/curated/scheduler/status"],
+    refetchInterval: 30000,
+  });
+
   const demoteListingMutation = useMutation({
     mutationFn: async (id: string) => {
       return apiRequest(`/api/admin/curated/listings/${id}/demote`, { method: "POST" });
@@ -520,7 +547,21 @@ export default function CuratedDataDashboard() {
                     Broker sites and listing platforms scraped for marina listings
                   </CardDescription>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
+                  {schedulerStatus && (
+                    <Badge variant={schedulerStatus.isRunning ? "default" : "secondary"} className="mr-2">
+                      {schedulerStatus.isScrapingInProgress ? "Scraping..." : schedulerStatus.isRunning ? "Auto-scrape ON" : "Auto-scrape OFF"}
+                    </Badge>
+                  )}
+                  <Button 
+                    variant="default" 
+                    size="sm" 
+                    onClick={() => runAllSourcesMutation.mutate()}
+                    disabled={runAllSourcesMutation.isPending || schedulerStatus?.isScrapingInProgress}
+                  >
+                    <Play className="h-4 w-4 mr-2" />
+                    {runAllSourcesMutation.isPending ? "Running..." : "Run All Sources"}
+                  </Button>
                   <Button 
                     variant="outline" 
                     size="sm" 

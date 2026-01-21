@@ -10,6 +10,13 @@ import {
 } from "../../../shared/schema";
 import { eq, and, desc, sql, or, isNull } from "drizzle-orm";
 import { seedGlobalBrokerSources, GLOBAL_BROKER_SOURCES } from "../../marinamatch/services/global-broker-sources";
+import { 
+  runScheduledScrape, 
+  runSingleSourceScrape, 
+  getSchedulerStatus,
+  startScheduler,
+  stopScheduler
+} from "../../marinamatch/services/listing-scheduler";
 
 export const curatedDataRouter = Router();
 
@@ -656,7 +663,6 @@ curatedDataRouter.post("/scrape-sources/:id/scrape", async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Get the source
     const [source] = await db
       .select()
       .from(marinaScrapeources)
@@ -669,27 +675,71 @@ curatedDataRouter.post("/scrape-sources/:id/scrape", async (req, res) => {
       return res.status(404).json({ error: "Global source not found" });
     }
 
-    // Mark as scraping started
-    await db
-      .update(marinaScrapeources)
-      .set({
-        lastScrapeAt: new Date(),
-        lastScrapeStatus: "running",
-      })
-      .where(eq(marinaScrapeources.id, id));
-
-    // Return immediately - scrape will run in background
     res.json({ 
       success: true, 
-      message: "Scrape initiated",
+      message: "Scrape initiated - running in background",
       sourceId: id,
       sourceName: source.name,
     });
 
-    // TODO: Trigger actual scrape via job queue
+    runSingleSourceScrape(id).then(result => {
+      console.log(`[Admin] Scrape completed for ${source.name}:`, result);
+    }).catch(err => {
+      console.error(`[Admin] Background scrape failed for ${source.name}:`, err);
+    });
   } catch (error) {
     console.error("Error triggering scrape:", error);
     res.status(500).json({ error: "Failed to trigger scrape" });
+  }
+});
+
+curatedDataRouter.post("/scrape-sources/run-all", async (req, res) => {
+  try {
+    res.json({ 
+      success: true, 
+      message: "Full scrape initiated - running in background",
+    });
+
+    runScheduledScrape().then(result => {
+      console.log("[Admin] Full scrape completed:", result);
+    }).catch(err => {
+      console.error("[Admin] Full scrape failed:", err);
+    });
+  } catch (error) {
+    console.error("Error triggering full scrape:", error);
+    res.status(500).json({ error: "Failed to trigger full scrape" });
+  }
+});
+
+curatedDataRouter.get("/scheduler/status", async (req, res) => {
+  try {
+    const status = await getSchedulerStatus();
+    res.json(status);
+  } catch (error) {
+    console.error("Error getting scheduler status:", error);
+    res.status(500).json({ error: "Failed to get scheduler status" });
+  }
+});
+
+curatedDataRouter.post("/scheduler/start", async (req, res) => {
+  try {
+    startScheduler();
+    const status = await getSchedulerStatus();
+    res.json({ success: true, message: "Scheduler started", status });
+  } catch (error) {
+    console.error("Error starting scheduler:", error);
+    res.status(500).json({ error: "Failed to start scheduler" });
+  }
+});
+
+curatedDataRouter.post("/scheduler/stop", async (req, res) => {
+  try {
+    stopScheduler();
+    const status = await getSchedulerStatus();
+    res.json({ success: true, message: "Scheduler stopped", status });
+  } catch (error) {
+    console.error("Error stopping scheduler:", error);
+    res.status(500).json({ error: "Failed to stop scheduler" });
   }
 });
 
