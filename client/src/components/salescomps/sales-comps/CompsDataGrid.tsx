@@ -864,7 +864,13 @@ export default function CompsDataGrid({
         if (!comp.isPriceDisclosed) {
           return <span className="text-muted-foreground" title="Price not disclosed">Undisclosed</span>;
         }
-        return value ? formatCurrency(Number(value)) : '—';
+        if (value) {
+          return formatCurrency(Number(value));
+        }
+        if (comp.estimatedPurchasePrice) {
+          return <span title="Estimated price">Est. {formatCurrency(Number(comp.estimatedPurchasePrice))}</span>;
+        }
+        return '—';
       case 'listPrice':
         return value ? formatCurrency(Number(value)) : '—';
       case 'noi':
