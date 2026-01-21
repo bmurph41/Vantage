@@ -10,6 +10,7 @@ import { DatabaseStorage as DockTalkStorage } from "./docktalk/storage";
 import { initializeWebSocket } from "./docktalk/websocket";
 import { startMarinaMatchIntelCronJobs } from "./marinamatch/services/intel-cron";
 import { startScheduler as startListingScheduler } from "./marinamatch/services/listing-scheduler";
+import { autoSeedGlobalBrokerSources } from "./marinamatch/services/global-broker-sources";
 import { seedIntegrations } from "./integrations";
 
 import { configureSecurityMiddleware } from "./middleware/security";
@@ -132,6 +133,15 @@ app.get("/health/db", (req: Request, res: Response) => {
       try {
         startListingScheduler();
         log('MarinaMatch listing scrape scheduler started');
+        
+        // Auto-seed global broker sources in background
+        autoSeedGlobalBrokerSources().then(result => {
+          if (result.created > 0 || result.updated > 0) {
+            log(`[Global Brokers] Auto-seeded: ${result.created} created, ${result.updated} updated`);
+          }
+        }).catch(err => {
+          log(`[Global Brokers] Auto-seed failed: ${err.message}`);
+        });
       } catch (error) {
         log(`Failed to start MarinaMatch listing scheduler: ${error}`);
       }

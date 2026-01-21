@@ -746,7 +746,7 @@ curatedDataRouter.post("/scheduler/stop", async (req, res) => {
 // Seed global broker sources (marina-specific brokers)
 curatedDataRouter.post("/scrape-sources/seed", async (req, res) => {
   try {
-    const orgId = req.tenant?.orgId;
+    const orgId = (req as any).user?.orgId || (req as any).tenant?.orgId;
     if (!orgId) {
       return res.status(400).json({ error: "Organization required" });
     }

@@ -96,6 +96,9 @@ interface ScrapeSource {
   respectRobotsTxt: boolean;
   userAgent?: string;
   isActive: boolean;
+  isGlobalSource?: boolean;
+  isManaged?: boolean;
+  scope?: string;
   ingestionMethod?: string;
   propertyType?: string;
   keywordsInclude?: string[];
@@ -974,7 +977,7 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
               {scrapeSources?.map(source => (
                 <div 
                   key={source.id} 
-                  className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                  className={`flex items-center justify-between p-3 rounded-lg border bg-card ${source.isGlobalSource ? 'border-primary/30 bg-primary/5' : ''}`}
                 >
                   <div className="flex items-center gap-3">
                     <Switch
@@ -982,7 +985,7 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
                       onCheckedChange={(checked) => 
                         toggleSourceMutation.mutate({ id: source.id, isActive: checked })
                       }
-                      disabled={toggleSourceMutation.isPending}
+                      disabled={toggleSourceMutation.isPending || source.isGlobalSource}
                     />
                     <div>
                       <div className="flex items-center gap-2">
@@ -993,10 +996,20 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
                         >
                           {source.platform}
                         </Badge>
+                        {source.isGlobalSource && (
+                          <Badge variant="secondary" className="text-xs">
+                            Global
+                          </Badge>
+                        )}
                       </div>
                       {source.searchUrl && (
                         <p className="text-xs text-muted-foreground truncate max-w-md">
                           {source.searchUrl}
+                        </p>
+                      )}
+                      {source.isGlobalSource && source.capabilityNotes && (
+                        <p className="text-xs text-muted-foreground mt-1 italic">
+                          {source.capabilityNotes}
                         </p>
                       )}
                     </div>
@@ -1010,23 +1023,27 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
                     <span className="text-xs text-muted-foreground font-medium">
                       {analytics?.listingsBySource?.[source.platform] || 0} listings
                     </span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => openEditDialog(source)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => deleteSourceMutation.mutate(source.id)}
-                      disabled={deleteSourceMutation.isPending}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {!source.isGlobalSource && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => openEditDialog(source)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => deleteSourceMutation.mutate(source.id)}
+                          disabled={deleteSourceMutation.isPending}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}

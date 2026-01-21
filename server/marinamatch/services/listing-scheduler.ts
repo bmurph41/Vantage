@@ -1,7 +1,8 @@
 import { db } from "../../db";
 import { eq, and, lte, or, isNull, sql, desc } from "drizzle-orm";
 import { marinaScrapeources, marinaScrapeRuns, marinaListings } from "@shared/schema";
-import { scrapeSourceWithMultiPage, runScrapeJob } from "./cre-scraper";
+import { scrapeSourceWithMultiPage, ListingData, generateDedupeHash } from "./cre-scraper";
+import { matchScoringService } from "./match-scoring-service";
 
 const SCRAPE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const MIN_SCRAPE_INTERVAL_MS = 60 * 60 * 1000;
@@ -91,13 +92,14 @@ export async function runScheduledScrape(forceAll: boolean = false): Promise<{
         const scrapeResult = await scrapeSourceWithMultiPage(source);
 
         if (scrapeResult.listings.length > 0) {
-          const orgId = source.orgId;
-          const platforms = [source.platform];
-          
-          const jobResult = await runScrapeJob(orgId, platforms);
-          result.newListings += jobResult.newListings;
-          result.totalListings += jobResult.totalFound;
-          result.errors.push(...jobResult.errors);
+          const savedResult = await saveGlobalListings(
+            scrapeResult.listings, 
+            source.platform, 
+            source.id
+          );
+          result.newListings += savedResult.newListings;
+          result.totalListings += savedResult.totalListings;
+          result.errors.push(...savedResult.errors);
         }
 
         await db
@@ -276,4 +278,107 @@ export async function getSchedulerStatus(): Promise<SchedulerStatus> {
     activeSources: sourceCount?.count || 0,
     totalListings: listingCount?.count || 0,
   };
+}
+
+async function saveGlobalListings(
+  listings: ListingData[],
+  platform: string,
+  sourceId: string
+): Promise<{
+  newListings: number;
+  totalListings: number;
+  errors: string[];
+}> {
+  const result = {
+    newListings: 0,
+    totalListings: listings.length,
+    errors: [] as string[],
+  };
+
+  for (const listing of listings) {
+    try {
+      const dedupeHash = generateDedupeHash(listing, platform);
+      
+      const [existing] = await db
+        .select({ id: marinaListings.id })
+        .from(marinaListings)
+        .where(eq(marinaListings.dedupeHash, dedupeHash))
+        .limit(1);
+
+      if (existing) {
+        await db
+          .update(marinaListings)
+          .set({
+            lastScrapedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(marinaListings.id, existing.id));
+        continue;
+      }
+
+      const [newListing] = await db.insert(marinaListings).values({
+        orgId: "system-global-sources",
+        scope: "global",
+        isCurated: true,
+        sourcePlatform: platform,
+        sourceUrl: listing.sourceUrl,
+        sourceListingId: listing.sourceListingId,
+        dedupeHash,
+        title: listing.title,
+        propertyName: listing.propertyName,
+        propertyAddress: listing.propertyAddress,
+        city: listing.city,
+        state: listing.state,
+        zipCode: listing.zipCode,
+        marinaType: listing.marinaType,
+        propertyType: listing.propertyType,
+        dealType: listing.dealType,
+        totalSlips: listing.totalSlips,
+        wetSlips: listing.wetSlips,
+        dryStorageSpaces: listing.dryStorageSpaces,
+        acreage: listing.acreage?.toString(),
+        waterFrontage: listing.waterFrontage?.toString(),
+        hasFuel: listing.hasFuel,
+        hasShipStore: listing.hasShipStore,
+        hasRestaurant: listing.hasRestaurant,
+        hasRepairShop: listing.hasRepairShop,
+        hasDryStorage: listing.hasDryStorage,
+        hasBoatRamp: listing.hasBoatRamp,
+        askingPrice: listing.askingPrice?.toString(),
+        pricePerSlip: listing.pricePerSlip?.toString(),
+        grossRevenue: listing.grossRevenue?.toString(),
+        noi: listing.noi?.toString(),
+        ebitda: listing.ebitda?.toString(),
+        capRate: listing.capRate?.toString(),
+        occupancyRate: listing.occupancyRate?.toString(),
+        brokerName: listing.brokerName,
+        brokerCompany: listing.brokerCompany,
+        brokerPhone: listing.brokerPhone,
+        brokerEmail: listing.brokerEmail,
+        attributionText: listing.attributionText,
+        originalDescription: listing.originalDescription,
+        heroImageUrl: listing.heroImageUrl,
+        images: listing.images,
+        services: listing.services,
+        tenantSummary: listing.tenantSummary,
+        extractionConfidence: listing.confidence,
+        listingDate: listing.listingDate,
+        status: "active",
+      }).returning();
+
+      result.newListings++;
+
+      try {
+        await matchScoringService.scoreListing(newListing.id, "system-global-sources");
+      } catch (scoreError: any) {
+        console.log(`[Scheduler] Warning: Could not score listing ${newListing.id}: ${scoreError.message}`);
+      }
+
+    } catch (error: any) {
+      result.errors.push(`Insert error for "${listing.title}": ${error.message}`);
+    }
+  }
+
+  console.log(`[Scheduler] Saved ${result.newListings} new listings from ${platform} (${listings.length} total)`);
+  return result;
 }

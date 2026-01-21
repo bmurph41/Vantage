@@ -18,7 +18,7 @@ import { extractListingsWithAI, validateExtractedListing, type ExtractedListing 
 import { MultiPageCrawler, discoverListingUrls, estimateCrawlCost, type CrawlConfig } from "./multi-page-crawler";
 import { isMarinaRelatedListing, calculateDaysOnMarket } from "./global-broker-sources";
 
-interface ListingData {
+export interface ListingData {
   title: string;
   propertyName?: string;
   propertyAddress?: string;
@@ -127,7 +127,7 @@ async function checkRobotsTxt(baseUrl: string, path: string): Promise<{ allowed:
   }
 }
 
-function generateDedupeHash(listing: Partial<ListingData>, platform: string): string {
+export function generateDedupeHash(listing: Partial<ListingData>, platform: string): string {
   const normalizedAddress = (listing.propertyAddress || "").toLowerCase().replace(/\s+/g, " ").trim();
   const normalizedName = (listing.propertyName || listing.title || "").toLowerCase().replace(/\s+/g, " ").trim();
   const city = (listing.city || "").toLowerCase().trim();

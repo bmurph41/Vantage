@@ -420,3 +420,8 @@ export function calculateDaysOnMarket(listingDate: Date | string | null | undefi
   
   return diffDays >= 0 ? diffDays : null;
 }
+
+export async function autoSeedGlobalBrokerSources(): Promise<{ created: number; updated: number; errors: string[] }> {
+  const SYSTEM_ORG_ID = "system-global-sources";
+  return seedGlobalBrokerSources(SYSTEM_ORG_ID);
+}

@@ -1018,10 +1018,20 @@ router.get("/scrape-sources", async (req: Request, res: Response) => {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
 
+    const { includeGlobal = "true" } = req.query;
+
+    // Include both org-specific sources AND global broker sources
+    const whereCondition = includeGlobal === "true"
+      ? or(
+          eq(marinaScrapeources.orgId, orgId),
+          eq(marinaScrapeources.isGlobalSource, true)
+        )
+      : eq(marinaScrapeources.orgId, orgId);
+
     const sources = await db
       .select()
       .from(marinaScrapeources)
-      .where(eq(marinaScrapeources.orgId, orgId))
+      .where(whereCondition)
       .orderBy(asc(marinaScrapeources.platform), asc(marinaScrapeources.name));
 
     res.json(sources);
