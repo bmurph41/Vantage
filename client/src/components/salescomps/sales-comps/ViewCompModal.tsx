@@ -62,7 +62,11 @@ export default function ViewCompModal({ open, onClose, comp, onEdit }: ViewCompM
           <div className="p-3 text-center border-r border-border/50">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Sale Price</p>
             <p className="text-base font-bold text-primary" data-testid="text-sale-price-hero">
-              {comp.salePrice ? formatCurrency(comp.salePrice) : '—'}
+              {comp.salePrice 
+                ? formatCurrency(comp.salePrice) 
+                : comp.estimatedPurchasePrice 
+                  ? `Est. ${formatCurrency(comp.estimatedPurchasePrice)}`
+                  : '—'}
             </p>
             {!comp.isPriceDisclosed && comp.salePrice && (
               <Badge variant="outline" className="text-[9px] mt-0.5">Undisclosed</Badge>
@@ -96,7 +100,7 @@ export default function ViewCompModal({ open, onClose, comp, onEdit }: ViewCompM
                 <h4 className="text-xs font-semibold uppercase tracking-wide">Financials</h4>
               </div>
               <div className="space-y-0">
-                <DataRow label="Sale Price" value={comp.salePrice ? formatCurrency(comp.salePrice) : '—'} testId="text-sale-price" />
+                <DataRow label="Sale Price" value={comp.salePrice ? formatCurrency(comp.salePrice) : comp.estimatedPurchasePrice ? `Est. ${formatCurrency(comp.estimatedPurchasePrice)}` : '—'} testId="text-sale-price" />
                 <DataRow label="List Price" value={comp.listPrice ? formatCurrency(comp.listPrice) : '—'} testId="text-list-price" />
                 <DataRow label="NOI" value={comp.noi ? formatCurrency(comp.noi) : '—'} testId="text-noi" />
                 <DataRow label="Cap Rate" value={comp.capRate ? formatPercent(Number(comp.capRate) / 100) : '—'} testId="text-cap-rate" />
