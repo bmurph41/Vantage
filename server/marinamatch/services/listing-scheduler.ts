@@ -369,7 +369,7 @@ async function saveGlobalListings(
       result.newListings++;
 
       try {
-        await matchScoringService.scoreListing(newListing.id, "system-global-sources");
+        await matchScoringService.scoreAndSaveListing(newListing.id, "system-global-sources");
       } catch (scoreError: any) {
         console.log(`[Scheduler] Warning: Could not score listing ${newListing.id}: ${scoreError.message}`);
       }

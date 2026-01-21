@@ -129,12 +129,23 @@ async function checkRobotsTxt(baseUrl: string, path: string): Promise<{ allowed:
 
 export function generateDedupeHash(listing: Partial<ListingData>, platform: string): string {
   const normalizedAddress = (listing.propertyAddress || "").toLowerCase().replace(/\s+/g, " ").trim();
-  const normalizedName = (listing.propertyName || listing.title || "").toLowerCase().replace(/\s+/g, " ").trim();
+  const normalizedName = normalizePropertyName(listing.propertyName || listing.title || "");
   const city = (listing.city || "").toLowerCase().trim();
   const state = (listing.state || "").toLowerCase().trim();
   
-  const input = `${platform}|${normalizedName}|${normalizedAddress}|${city}|${state}`;
+  const input = `${normalizedName}|${normalizedAddress}|${city}|${state}`;
   return crypto.createHash("md5").update(input).digest("hex");
+}
+
+function normalizePropertyName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[-–—|,].*$/, "")
+    .replace(/\d+\s*(wet\s*)?slips?/gi, "")
+    .replace(/\s*(marina|boat|yacht|harbor|club|inc|llc|corp|confidential)\s*/gi, " marina ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function generateCrossplatformHash(listing: Partial<ListingData>): string | null {
