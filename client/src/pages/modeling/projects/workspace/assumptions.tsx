@@ -70,7 +70,16 @@ import {
   Plus,
   Layers,
   MapPin,
-  Globe
+  Globe,
+  Waves,
+  Car,
+  Home,
+  Utensils,
+  Users,
+  Store,
+  Wrench,
+  Container,
+  Sailboat
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -179,36 +188,76 @@ const storageTypesConfig = [
     { id: 'wet_slips_c_dock', name: 'C Dock' },
     { id: 'wet_slips_premium', name: 'Premium Slips' },
   ]},
-  { id: 'dry_storage', name: 'Dry Storage', icon: <Warehouse className="h-4 w-4" />, locations: [
-    { id: 'dry_storage_covered', name: 'Covered Racks' },
-    { id: 'dry_storage_outdoor', name: 'Outdoor Racks' },
-    { id: 'dry_storage_forklift', name: 'Forklift Access' },
+  { id: 'lift_slips', name: 'Lift Slips', icon: <Waves className="h-4 w-4" />, locations: [
+    { id: 'lift_slips_main', name: 'Main Dock' },
   ]},
-  { id: 'mooring', name: 'Mooring', icon: <Anchor className="h-4 w-4" />, locations: [
-    { id: 'mooring_inner', name: 'Inner Harbor' },
-    { id: 'mooring_outer', name: 'Outer Harbor' },
+  { id: 'moorings', name: 'Moorings', icon: <Anchor className="h-4 w-4" />, locations: [
+    { id: 'moorings_inner', name: 'Inner Harbor' },
+    { id: 'moorings_outer', name: 'Outer Harbor' },
   ]},
-  { id: 'covered_slips', name: 'Covered Slips', icon: <Warehouse className="h-4 w-4" />, locations: [
-    { id: 'covered_slips_main', name: 'Main Marina' },
-    { id: 'covered_slips_annex', name: 'Annex' },
+  { id: 'dinghies', name: 'Dinghies', icon: <Sailboat className="h-4 w-4" />, locations: [
+    { id: 'dinghies_main', name: 'Main Dock' },
   ]},
-  { id: 'trailer_storage', name: 'Trailer Storage', icon: <Warehouse className="h-4 w-4" />, locations: [
-    { id: 'trailer_storage_lot_a', name: 'Lot A' },
-    { id: 'trailer_storage_lot_b', name: 'Lot B' },
+  { id: 'jet_skis', name: 'Jet Skis', icon: <Waves className="h-4 w-4" />, locations: [
+    { id: 'jet_skis_main', name: 'PWC Dock' },
+  ]},
+  { id: 'dry_racks_indoor', name: 'Dry Racks – Indoor', icon: <Warehouse className="h-4 w-4" />, locations: [
+    { id: 'dry_racks_indoor_main', name: 'Main Building' },
+    { id: 'dry_racks_indoor_annex', name: 'Annex Building' },
+  ]},
+  { id: 'dry_racks_outdoor', name: 'Dry Racks – Outdoor', icon: <Container className="h-4 w-4" />, locations: [
+    { id: 'dry_racks_outdoor_lot_a', name: 'Lot A' },
+    { id: 'dry_racks_outdoor_lot_b', name: 'Lot B' },
+  ]},
+  { id: 'land_storage', name: 'Land Storage', icon: <MapPin className="h-4 w-4" />, locations: [
+    { id: 'land_storage_main', name: 'Main Lot' },
+  ]},
+  { id: 'boats_on_trailers', name: 'Boats on Trailers', icon: <Ship className="h-4 w-4" />, locations: [
+    { id: 'boats_on_trailers_lot', name: 'Trailer Lot' },
+  ]},
+  { id: 'trailers', name: 'Trailers', icon: <Car className="h-4 w-4" />, locations: [
+    { id: 'trailers_lot', name: 'Trailer Storage Lot' },
+  ]},
+  { id: 'carports', name: 'Carports', icon: <Home className="h-4 w-4" />, locations: [
+    { id: 'carports_main', name: 'Main Carport Area' },
+  ]},
+  { id: 'houseboats', name: 'Houseboats', icon: <Home className="h-4 w-4" />, locations: [
+    { id: 'houseboats_dock', name: 'Houseboat Dock' },
+  ]},
+  { id: 'rv_sites', name: 'RV Sites', icon: <Car className="h-4 w-4" />, locations: [
+    { id: 'rv_sites_main', name: 'RV Park' },
   ]},
 ];
 
-const allRevenueCategories = [
-  { id: 'wet_slips', name: 'Wet Slips', icon: <Anchor className="h-4 w-4" /> },
-  { id: 'dry_storage', name: 'Dry Storage', icon: <Warehouse className="h-4 w-4" /> },
-  { id: 'annual_storage', name: 'Annual Storage', icon: <Warehouse className="h-4 w-4" /> },
-  { id: 'rental_boats', name: 'Rental Boats', icon: <Ship className="h-4 w-4" /> },
-  { id: 'fuel', name: 'Fuel Sales', icon: <Fuel className="h-4 w-4" /> },
-  { id: 'ship_store', name: 'Ship Store', icon: <ShoppingCart className="h-4 w-4" /> },
-  { id: 'service_repair', name: 'Service & Repair' },
-  { id: 'third_party_leases', name: 'Third-Party Leases' },
-  { id: 'other_revenue', name: 'Other Revenue' },
+const storageTypeCategories = [
+  { id: 'wet_slips', name: 'Wet Slips', icon: <Anchor className="h-4 w-4" />, section: 'storage' },
+  { id: 'lift_slips', name: 'Lift Slips', icon: <Waves className="h-4 w-4" />, section: 'storage' },
+  { id: 'moorings', name: 'Moorings', icon: <Anchor className="h-4 w-4" />, section: 'storage' },
+  { id: 'dinghies', name: 'Dinghies', icon: <Sailboat className="h-4 w-4" />, section: 'storage' },
+  { id: 'jet_skis', name: 'Jet Skis', icon: <Waves className="h-4 w-4" />, section: 'storage' },
+  { id: 'dry_racks_indoor', name: 'Dry Racks – Indoor', icon: <Warehouse className="h-4 w-4" />, section: 'storage' },
+  { id: 'dry_racks_outdoor', name: 'Dry Racks – Outdoor', icon: <Container className="h-4 w-4" />, section: 'storage' },
+  { id: 'land_storage', name: 'Land Storage', icon: <MapPin className="h-4 w-4" />, section: 'storage' },
+  { id: 'boats_on_trailers', name: 'Boats on Trailers', icon: <Ship className="h-4 w-4" />, section: 'storage' },
+  { id: 'trailers', name: 'Trailers', icon: <Car className="h-4 w-4" />, section: 'storage' },
+  { id: 'carports', name: 'Carports', icon: <Home className="h-4 w-4" />, section: 'storage' },
+  { id: 'houseboats', name: 'Houseboats', icon: <Home className="h-4 w-4" />, section: 'storage' },
+  { id: 'rv_sites', name: 'RV Sites', icon: <Car className="h-4 w-4" />, section: 'storage' },
 ];
+
+const designatedSpaceCategories = [
+  { id: 'boat_sales', name: 'Boat Sales', icon: <Store className="h-4 w-4" />, section: 'designated' },
+  { id: 'service', name: 'Service', icon: <Wrench className="h-4 w-4" />, section: 'designated' },
+  { id: 'commercial_tenants', name: 'Commercial Tenants', icon: <Warehouse className="h-4 w-4" />, section: 'designated' },
+  { id: 'rental_boats', name: 'Rental Boats', icon: <Ship className="h-4 w-4" />, section: 'designated' },
+  { id: 'boat_club', name: 'Boat Club', icon: <Users className="h-4 w-4" />, section: 'designated' },
+  { id: 'fuel_dock', name: 'Fuel Dock', icon: <Fuel className="h-4 w-4" />, section: 'designated' },
+  { id: 'transient', name: 'Transient', icon: <Anchor className="h-4 w-4" />, section: 'designated' },
+  { id: 'restaurant', name: 'Restaurant', icon: <Utensils className="h-4 w-4" />, section: 'designated' },
+  { id: 'ship_store', name: 'Ship Store', icon: <ShoppingCart className="h-4 w-4" />, section: 'designated' },
+];
+
+const allRevenueCategories = [...storageTypeCategories, ...designatedSpaceCategories];
 
 const expenseCategories = [
   { id: 'payroll', name: 'Payroll & Benefits' },
@@ -224,9 +273,18 @@ const expenseCategories = [
 
 const storageOptions = [
   { id: 'wet_slips', name: 'Wet Slips', totalUnits: 150 },
-  { id: 'dry_racks', name: 'Dry Racks', totalUnits: 200 },
-  { id: 'covered_slips', name: 'Covered Slips', totalUnits: 50 },
-  { id: 'mooring_balls', name: 'Mooring Balls', totalUnits: 25 },
+  { id: 'lift_slips', name: 'Lift Slips', totalUnits: 30 },
+  { id: 'moorings', name: 'Moorings', totalUnits: 25 },
+  { id: 'dinghies', name: 'Dinghies', totalUnits: 20 },
+  { id: 'jet_skis', name: 'Jet Skis', totalUnits: 15 },
+  { id: 'dry_racks_indoor', name: 'Dry Racks – Indoor', totalUnits: 100 },
+  { id: 'dry_racks_outdoor', name: 'Dry Racks – Outdoor', totalUnits: 100 },
+  { id: 'land_storage', name: 'Land Storage', totalUnits: 50 },
+  { id: 'boats_on_trailers', name: 'Boats on Trailers', totalUnits: 40 },
+  { id: 'trailers', name: 'Trailers', totalUnits: 30 },
+  { id: 'carports', name: 'Carports', totalUnits: 20 },
+  { id: 'houseboats', name: 'Houseboats', totalUnits: 10 },
+  { id: 'rv_sites', name: 'RV Sites', totalUnits: 25 },
 ];
 
 const scenarioTypeConfig: Record<ScenarioType, { label: string; color: string; icon: any }> = {
@@ -372,7 +430,7 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
 
   function getDefaultMargins(): MarginData {
     return {
-      fuel: { historical: 15, projected: 18 },
+      fuel_dock: { historical: 15, projected: 18 },
       ship_store: { historical: 35, projected: 38 },
     };
   }
@@ -1072,7 +1130,7 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
-                {['fuel', 'ship_store'].map((categoryId) => {
+                {['fuel_dock', 'ship_store'].map((categoryId) => {
                   const category = revenueCategories.find(c => c.id === categoryId);
                   const margin = margins[categoryId] || { historical: 0, projected: 0 };
                   

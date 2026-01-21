@@ -28,33 +28,58 @@ import {
   ShoppingCart,
   FileText,
   Warehouse,
-  RefreshCw
+  RefreshCw,
+  Waves,
+  Car,
+  Home,
+  Utensils,
+  Users,
+  Store,
+  Wrench,
+  MapPin,
+  Container,
+  Sailboat
 } from 'lucide-react';
 
 interface WorkspaceInputsProps {
   projectId: string;
 }
 
-type DepartmentConfig = {
+type StorageTypeConfig = {
   id: string;
   name: string;
-  category: 'revenue' | 'expense' | 'cogs';
+  section: 'storage' | 'designated';
   isYearRound: boolean;
   isEnabled: boolean;
   icon: React.ReactNode;
-  description: string;
 };
 
-const defaultDepartments: DepartmentConfig[] = [
-  { id: 'wet_slips', name: 'Wet Slips', category: 'revenue', isYearRound: false, isEnabled: true, icon: <Anchor className="h-4 w-4" />, description: 'Marina dock and slip rentals' },
-  { id: 'dry_storage', name: 'Dry Storage', category: 'revenue', isYearRound: false, isEnabled: true, icon: <Warehouse className="h-4 w-4" />, description: 'Dry rack and indoor storage' },
-  { id: 'annual_storage', name: 'Annual Storage', category: 'revenue', isYearRound: true, isEnabled: false, icon: <Calendar className="h-4 w-4" />, description: 'Year-round storage contracts' },
-  { id: 'rental_boats', name: 'Rental Boats', category: 'revenue', isYearRound: false, isEnabled: false, icon: <Ship className="h-4 w-4" />, description: 'Boat rental operations' },
-  { id: 'fuel', name: 'Fuel Sales', category: 'revenue', isYearRound: false, isEnabled: true, icon: <Fuel className="h-4 w-4" />, description: 'Marine fuel operations' },
-  { id: 'ship_store', name: 'Ship Store', category: 'revenue', isYearRound: false, isEnabled: true, icon: <ShoppingCart className="h-4 w-4" />, description: 'Retail and convenience store' },
-  { id: 'service_repair', name: 'Service & Repair', category: 'revenue', isYearRound: false, isEnabled: false, icon: <RefreshCw className="h-4 w-4" />, description: 'Boat service and repair' },
-  { id: 'third_party_leases', name: 'Third-Party Leases', category: 'revenue', isYearRound: true, isEnabled: false, icon: <FileText className="h-4 w-4" />, description: 'Restaurant, retail tenant leases' },
-  { id: 'other_revenue', name: 'Other Revenue', category: 'revenue', isYearRound: true, isEnabled: false, icon: <Building2 className="h-4 w-4" />, description: 'Miscellaneous income' },
+const defaultStorageTypes: StorageTypeConfig[] = [
+  { id: 'wet_slips', name: 'Wet Slips', section: 'storage', isYearRound: false, isEnabled: true, icon: <Anchor className="h-4 w-4" /> },
+  { id: 'lift_slips', name: 'Lift Slips', section: 'storage', isYearRound: false, isEnabled: false, icon: <Waves className="h-4 w-4" /> },
+  { id: 'moorings', name: 'Moorings', section: 'storage', isYearRound: false, isEnabled: false, icon: <Anchor className="h-4 w-4" /> },
+  { id: 'dinghies', name: 'Dinghies', section: 'storage', isYearRound: false, isEnabled: false, icon: <Sailboat className="h-4 w-4" /> },
+  { id: 'jet_skis', name: 'Jet Skis', section: 'storage', isYearRound: false, isEnabled: false, icon: <Waves className="h-4 w-4" /> },
+  { id: 'dry_racks_indoor', name: 'Dry Racks – Indoor', section: 'storage', isYearRound: true, isEnabled: true, icon: <Warehouse className="h-4 w-4" /> },
+  { id: 'dry_racks_outdoor', name: 'Dry Racks – Outdoor', section: 'storage', isYearRound: false, isEnabled: false, icon: <Container className="h-4 w-4" /> },
+  { id: 'land_storage', name: 'Land Storage', section: 'storage', isYearRound: true, isEnabled: false, icon: <MapPin className="h-4 w-4" /> },
+  { id: 'boats_on_trailers', name: 'Boats on Trailers', section: 'storage', isYearRound: false, isEnabled: false, icon: <Ship className="h-4 w-4" /> },
+  { id: 'trailers', name: 'Trailers', section: 'storage', isYearRound: true, isEnabled: false, icon: <Car className="h-4 w-4" /> },
+  { id: 'carports', name: 'Carports', section: 'storage', isYearRound: true, isEnabled: false, icon: <Home className="h-4 w-4" /> },
+  { id: 'houseboats', name: 'Houseboats', section: 'storage', isYearRound: false, isEnabled: false, icon: <Home className="h-4 w-4" /> },
+  { id: 'rv_sites', name: 'RV Sites', section: 'storage', isYearRound: false, isEnabled: false, icon: <Car className="h-4 w-4" /> },
+];
+
+const defaultDesignatedSpaces: StorageTypeConfig[] = [
+  { id: 'boat_sales', name: 'Boat Sales', section: 'designated', isYearRound: false, isEnabled: false, icon: <Store className="h-4 w-4" /> },
+  { id: 'service', name: 'Service', section: 'designated', isYearRound: false, isEnabled: false, icon: <Wrench className="h-4 w-4" /> },
+  { id: 'commercial_tenants', name: 'Commercial Tenants', section: 'designated', isYearRound: true, isEnabled: false, icon: <Building2 className="h-4 w-4" /> },
+  { id: 'rental_boats', name: 'Rental Boats', section: 'designated', isYearRound: false, isEnabled: false, icon: <Ship className="h-4 w-4" /> },
+  { id: 'boat_club', name: 'Boat Club', section: 'designated', isYearRound: false, isEnabled: false, icon: <Users className="h-4 w-4" /> },
+  { id: 'fuel_dock', name: 'Fuel Dock', section: 'designated', isYearRound: false, isEnabled: true, icon: <Fuel className="h-4 w-4" /> },
+  { id: 'transient', name: 'Transient', section: 'designated', isYearRound: false, isEnabled: false, icon: <Anchor className="h-4 w-4" /> },
+  { id: 'restaurant', name: 'Restaurant', section: 'designated', isYearRound: false, isEnabled: false, icon: <Utensils className="h-4 w-4" /> },
+  { id: 'ship_store', name: 'Ship Store', section: 'designated', isYearRound: false, isEnabled: true, icon: <ShoppingCart className="h-4 w-4" /> },
 ];
 
 const months = [
@@ -81,7 +106,8 @@ export default function WorkspaceInputs({ projectId }: WorkspaceInputsProps) {
   const [startDate, setStartDate] = useState<string>('2026-01-31');
   const [cashFlowGranularity, setCashFlowGranularity] = useState<string>('annual');
   const [seasonMonths, setSeasonMonths] = useState<number[]>([4, 5, 6, 7, 8, 9, 10]);
-  const [departments, setDepartments] = useState<DepartmentConfig[]>(defaultDepartments);
+  const [storageTypes, setStorageTypes] = useState<StorageTypeConfig[]>(defaultStorageTypes);
+  const [designatedSpaces, setDesignatedSpaces] = useState<StorageTypeConfig[]>(defaultDesignatedSpaces);
 
   const { status, triggerAutosave, forceSave } = useLocalAutosave({
     entityId: projectId,
@@ -93,16 +119,19 @@ export default function WorkspaceInputs({ projectId }: WorkspaceInputsProps) {
   });
 
   const getCurrentData = () => {
-    const departmentSettings: Record<string, { isYearRound: boolean; isEnabled: boolean }> = {};
-    departments.forEach(dept => {
-      departmentSettings[dept.id] = { isYearRound: dept.isYearRound, isEnabled: dept.isEnabled };
+    const storageSettings: Record<string, { isYearRound: boolean; isEnabled: boolean; section: string }> = {};
+    storageTypes.forEach(item => {
+      storageSettings[item.id] = { isYearRound: item.isYearRound, isEnabled: item.isEnabled, section: 'storage' };
+    });
+    designatedSpaces.forEach(item => {
+      storageSettings[item.id] = { isYearRound: item.isYearRound, isEnabled: item.isEnabled, section: 'designated' };
     });
     return {
       holdPeriod,
       startDate,
       cashFlowGranularity,
       seasonMonths,
-      departments: departmentSettings,
+      departments: storageSettings,
     };
   };
 
@@ -113,10 +142,15 @@ export default function WorkspaceInputs({ projectId }: WorkspaceInputsProps) {
       setCashFlowGranularity(config.cashFlowGranularity || 'annual');
       setSeasonMonths(config.seasonMonths || [4, 5, 6, 7, 8, 9, 10]);
       if (config.departments) {
-        setDepartments(prev => prev.map(dept => ({
-          ...dept,
-          isYearRound: config.departments[dept.id]?.isYearRound ?? dept.isYearRound,
-          isEnabled: config.departments[dept.id]?.isEnabled ?? dept.isEnabled
+        setStorageTypes(prev => prev.map(item => ({
+          ...item,
+          isYearRound: config.departments[item.id]?.isYearRound ?? item.isYearRound,
+          isEnabled: config.departments[item.id]?.isEnabled ?? item.isEnabled
+        })));
+        setDesignatedSpaces(prev => prev.map(item => ({
+          ...item,
+          isYearRound: config.departments[item.id]?.isYearRound ?? item.isYearRound,
+          isEnabled: config.departments[item.id]?.isEnabled ?? item.isEnabled
         })));
       }
     }
@@ -126,7 +160,7 @@ export default function WorkspaceInputs({ projectId }: WorkspaceInputsProps) {
     if (config) {
       triggerAutosave(getCurrentData());
     }
-  }, [holdPeriod, startDate, cashFlowGranularity, seasonMonths, departments]);
+  }, [holdPeriod, startDate, cashFlowGranularity, seasonMonths, storageTypes, designatedSpaces]);
 
   const toggleSeasonMonth = (month: number) => {
     setSeasonMonths(prev => 
@@ -136,16 +170,28 @@ export default function WorkspaceInputs({ projectId }: WorkspaceInputsProps) {
     );
   };
 
-  const toggleDepartmentYearRound = (deptId: string) => {
-    setDepartments(prev => prev.map(dept => 
-      dept.id === deptId ? { ...dept, isYearRound: !dept.isYearRound } : dept
-    ));
+  const toggleItemYearRound = (itemId: string, section: 'storage' | 'designated') => {
+    if (section === 'storage') {
+      setStorageTypes(prev => prev.map(item => 
+        item.id === itemId ? { ...item, isYearRound: !item.isYearRound } : item
+      ));
+    } else {
+      setDesignatedSpaces(prev => prev.map(item => 
+        item.id === itemId ? { ...item, isYearRound: !item.isYearRound } : item
+      ));
+    }
   };
 
-  const toggleDepartmentEnabled = (deptId: string) => {
-    setDepartments(prev => prev.map(dept => 
-      dept.id === deptId ? { ...dept, isEnabled: !dept.isEnabled } : dept
-    ));
+  const toggleItemEnabled = (itemId: string, section: 'storage' | 'designated') => {
+    if (section === 'storage') {
+      setStorageTypes(prev => prev.map(item => 
+        item.id === itemId ? { ...item, isEnabled: !item.isEnabled } : item
+      ));
+    } else {
+      setDesignatedSpaces(prev => prev.map(item => 
+        item.id === itemId ? { ...item, isEnabled: !item.isEnabled } : item
+      ));
+    }
   };
 
   const handleSave = () => {
@@ -299,56 +345,117 @@ export default function WorkspaceInputs({ projectId }: WorkspaceInputsProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Department Configuration</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Warehouse className="h-5 w-5" />
+            Storage Configuration
+          </CardTitle>
           <CardDescription>
-            Enable departments that apply to this property and configure seasonality. 
-            Only enabled departments will appear in Growth Rates and Pro Forma.
+            Enable storage types that apply to this property. Only enabled items will appear in Growth Rates and Pro Forma.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {departments.map((dept) => (
-              <div
-                key={dept.id}
-                className={`flex items-center justify-between p-3 rounded-lg border ${
-                  dept.isEnabled 
-                    ? 'bg-muted/30 border-border' 
-                    : 'bg-muted/10 border-dashed opacity-60'
-                }`}
-                data-testid={`department-${dept.id}`}
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <input
-                    type="checkbox"
-                    checked={dept.isEnabled}
-                    onChange={() => toggleDepartmentEnabled(dept.id)}
-                    className="h-4 w-4 rounded border-muted-foreground/50 text-primary focus:ring-primary cursor-pointer"
-                    data-testid={`checkbox-${dept.id}-enabled`}
-                  />
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    dept.isEnabled ? 'bg-background' : 'bg-muted/30'
-                  }`}>
-                    {dept.icon}
-                  </div>
-                  <span className={`font-medium text-sm truncate ${!dept.isEnabled && 'text-muted-foreground'}`}>
-                    {dept.name}
-                  </span>
-                </div>
-                {dept.isEnabled && (
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <span className="text-xs text-muted-foreground">
-                      {dept.isYearRound ? 'Year-Round' : 'Seasonal'}
-                    </span>
-                    <Switch
-                      checked={dept.isYearRound}
-                      onCheckedChange={() => toggleDepartmentYearRound(dept.id)}
-                      className="scale-75"
-                      data-testid={`switch-${dept.id}-year-round`}
+        <CardContent className="space-y-6">
+          <div>
+            <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <Anchor className="h-4 w-4" />
+              Storage Types
+            </h4>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {storageTypes.map((item) => (
+                <div
+                  key={item.id}
+                  className={`flex items-center justify-between p-3 rounded-lg border ${
+                    item.isEnabled 
+                      ? 'bg-muted/30 border-border' 
+                      : 'bg-muted/10 border-dashed opacity-60'
+                  }`}
+                  data-testid={`storage-${item.id}`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <input
+                      type="checkbox"
+                      checked={item.isEnabled}
+                      onChange={() => toggleItemEnabled(item.id, 'storage')}
+                      className="h-4 w-4 rounded border-muted-foreground/50 text-primary focus:ring-primary cursor-pointer"
+                      data-testid={`checkbox-${item.id}-enabled`}
                     />
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      item.isEnabled ? 'bg-background' : 'bg-muted/30'
+                    }`}>
+                      {item.icon}
+                    </div>
+                    <span className={`font-medium text-sm truncate ${!item.isEnabled && 'text-muted-foreground'}`}>
+                      {item.name}
+                    </span>
                   </div>
-                )}
-              </div>
-            ))}
+                  {item.isEnabled && (
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <span className="text-xs text-muted-foreground">
+                        {item.isYearRound ? 'Year-Round' : 'Seasonal'}
+                      </span>
+                      <Switch
+                        checked={item.isYearRound}
+                        onCheckedChange={() => toggleItemYearRound(item.id, 'storage')}
+                        className="scale-75"
+                        data-testid={`switch-${item.id}-year-round`}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <Separator />
+
+          <div>
+            <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <MapPin className="h-4 w-4" />
+              Designated Spaces
+            </h4>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {designatedSpaces.map((item) => (
+                <div
+                  key={item.id}
+                  className={`flex items-center justify-between p-3 rounded-lg border ${
+                    item.isEnabled 
+                      ? 'bg-muted/30 border-border' 
+                      : 'bg-muted/10 border-dashed opacity-60'
+                  }`}
+                  data-testid={`designated-${item.id}`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <input
+                      type="checkbox"
+                      checked={item.isEnabled}
+                      onChange={() => toggleItemEnabled(item.id, 'designated')}
+                      className="h-4 w-4 rounded border-muted-foreground/50 text-primary focus:ring-primary cursor-pointer"
+                      data-testid={`checkbox-${item.id}-enabled`}
+                    />
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      item.isEnabled ? 'bg-background' : 'bg-muted/30'
+                    }`}>
+                      {item.icon}
+                    </div>
+                    <span className={`font-medium text-sm truncate ${!item.isEnabled && 'text-muted-foreground'}`}>
+                      {item.name}
+                    </span>
+                  </div>
+                  {item.isEnabled && (
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <span className="text-xs text-muted-foreground">
+                        {item.isYearRound ? 'Year-Round' : 'Seasonal'}
+                      </span>
+                      <Switch
+                        checked={item.isYearRound}
+                        onCheckedChange={() => toggleItemYearRound(item.id, 'designated')}
+                        className="scale-75"
+                        data-testid={`switch-${item.id}-year-round`}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>
