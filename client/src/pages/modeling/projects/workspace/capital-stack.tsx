@@ -1055,17 +1055,29 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                 </Card>
 
                 <Tabs defaultValue="debt" className="space-y-4">
-                  <TabsList>
-                    <TabsTrigger value="debt" className="gap-2">
-                      <DollarSign className="h-4 w-4" />
-                      Debt Tranches ({debtTranches.length})
+                  <TabsList className="flex-wrap h-auto gap-1">
+                    <TabsTrigger value="debt" className="gap-1.5 text-xs">
+                      <DollarSign className="h-3.5 w-3.5" />
+                      Debt ({debtTranches.length})
                     </TabsTrigger>
-                    <TabsTrigger value="equity" className="gap-2">
-                      <PieChart className="h-4 w-4" />
-                      Equity Layers ({equityLayers.length})
+                    <TabsTrigger value="equity" className="gap-1.5 text-xs">
+                      <PieChart className="h-3.5 w-3.5" />
+                      Equity ({equityLayers.length})
                     </TabsTrigger>
-                    <TabsTrigger value="projections" className="gap-2">
-                      <TrendingUp className="h-4 w-4" />
+                    <TabsTrigger value="waterfall" className="gap-1.5 text-xs">
+                      <Layers className="h-3.5 w-3.5" />
+                      Waterfall
+                    </TabsTrigger>
+                    <TabsTrigger value="partners" className="gap-1.5 text-xs">
+                      <Briefcase className="h-3.5 w-3.5" />
+                      Partners
+                    </TabsTrigger>
+                    <TabsTrigger value="returns" className="gap-1.5 text-xs">
+                      <TrendingUp className="h-3.5 w-3.5" />
+                      Returns
+                    </TabsTrigger>
+                    <TabsTrigger value="projections" className="gap-1.5 text-xs">
+                      <Calculator className="h-3.5 w-3.5" />
                       Projections
                     </TabsTrigger>
                   </TabsList>
@@ -1767,6 +1779,434 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                         </CardContent>
                       </Card>
                     )}
+                  </TabsContent>
+
+                  {/* WATERFALL TAB - Fund Distribution Structure */}
+                  <TabsContent value="waterfall" className="space-y-4">
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle className="text-lg flex items-center gap-2">
+                              <Layers className="h-5 w-5" />
+                              Distribution Waterfall
+                            </CardTitle>
+                            <CardDescription>Configure 4-tier waterfall structure with promote and catch-up</CardDescription>
+                          </div>
+                          <Select defaultValue="american">
+                            <SelectTrigger className="w-40">
+                              <SelectValue placeholder="Structure Type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="american">American (Deal)</SelectItem>
+                              <SelectItem value="european">European (Fund)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
+                        {/* 4-Tier Waterfall Visual */}
+                        <div className="grid gap-3">
+                          {/* Tier 1: Return of Capital */}
+                          <div className="flex items-center gap-4 p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-sm">1</div>
+                            <div className="flex-1">
+                              <div className="font-medium">Return of Capital</div>
+                              <div className="text-sm text-muted-foreground">100% to LPs until initial capital is returned</div>
+                            </div>
+                            <Badge variant="secondary">100% LP</Badge>
+                          </div>
+
+                          {/* Tier 2: Preferred Return */}
+                          <div className="flex items-center gap-4 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center font-bold text-sm">2</div>
+                            <div className="flex-1">
+                              <div className="font-medium">Preferred Return</div>
+                              <div className="text-sm text-muted-foreground">100% to LPs until target IRR achieved</div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Input className="w-16 h-8 text-sm" defaultValue="8.0%" />
+                              <span className="text-xs text-muted-foreground">IRR</span>
+                            </div>
+                          </div>
+
+                          {/* Tier 3: GP Catch-Up */}
+                          <div className="flex items-center gap-4 p-4 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center font-bold text-sm">3</div>
+                            <div className="flex-1">
+                              <div className="font-medium">GP Catch-Up</div>
+                              <div className="text-sm text-muted-foreground">GP receives distributions until promote target achieved</div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Input className="w-16 h-8 text-sm" defaultValue="100%" />
+                              <span className="text-xs text-muted-foreground">to GP</span>
+                              <Switch defaultChecked />
+                            </div>
+                          </div>
+
+                          {/* Tier 4: Carried Interest / Promote */}
+                          <div className="flex items-center gap-4 p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-500 text-white flex items-center justify-center font-bold text-sm">4</div>
+                            <div className="flex-1">
+                              <div className="font-medium">Carried Interest / Promote</div>
+                              <div className="text-sm text-muted-foreground">Split remaining profits between LP and GP</div>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <span className="text-muted-foreground">LP</span>
+                              <Input className="w-14 h-8 text-sm" defaultValue="80%" />
+                              <span className="text-muted-foreground">/</span>
+                              <Input className="w-14 h-8 text-sm" defaultValue="20%" />
+                              <span className="text-muted-foreground">GP</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <Separator />
+
+                        {/* Tiered Promote Schedule */}
+                        <div>
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="font-medium">Tiered Promote Schedule</div>
+                            <Button variant="outline" size="sm">
+                              <Plus className="h-3 w-3 mr-1" />
+                              Add Tier
+                            </Button>
+                          </div>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>IRR Hurdle</TableHead>
+                                <TableHead>LP Split</TableHead>
+                                <TableHead>GP Split (Promote)</TableHead>
+                                <TableHead className="w-16"></TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              <TableRow>
+                                <TableCell>0% - 8%</TableCell>
+                                <TableCell>100%</TableCell>
+                                <TableCell>0%</TableCell>
+                                <TableCell></TableCell>
+                              </TableRow>
+                              <TableRow>
+                                <TableCell>8% - 12%</TableCell>
+                                <TableCell>80%</TableCell>
+                                <TableCell>20%</TableCell>
+                                <TableCell><Button variant="ghost" size="sm"><Trash2 className="h-3 w-3" /></Button></TableCell>
+                              </TableRow>
+                              <TableRow>
+                                <TableCell>12% - 18%</TableCell>
+                                <TableCell>70%</TableCell>
+                                <TableCell>30%</TableCell>
+                                <TableCell><Button variant="ghost" size="sm"><Trash2 className="h-3 w-3" /></Button></TableCell>
+                              </TableRow>
+                              <TableRow>
+                                <TableCell>18%+</TableCell>
+                                <TableCell>60%</TableCell>
+                                <TableCell>40%</TableCell>
+                                <TableCell><Button variant="ghost" size="sm"><Trash2 className="h-3 w-3" /></Button></TableCell>
+                              </TableRow>
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  {/* PARTNERS TAB - LP/GP Management */}
+                  <TabsContent value="partners" className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold">Partners & Commitments</h3>
+                      <Button size="sm">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Partner
+                      </Button>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {/* GP Card */}
+                      <Card className="border-2 border-primary/30">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm flex items-center gap-2">
+                            <Badge className="bg-primary">GP</Badge>
+                            General Partner
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Co-Investment</span>
+                            <span className="font-medium">$500,000 (5%)</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Promote (at 20% IRR)</span>
+                            <span className="font-medium">20% of profits</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Management Fee</span>
+                            <span className="font-medium">2.0% annually</span>
+                          </div>
+                          <Separator />
+                          <div className="flex justify-between text-sm font-medium">
+                            <span>Projected Returns</span>
+                            <span className="text-green-600">$1,250,000</span>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* LP Cards */}
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm flex items-center gap-2">
+                            <Badge variant="secondary">LP</Badge>
+                            Limited Partners (3)
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Total LP Capital</span>
+                            <span className="font-medium">$9,500,000 (95%)</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Preferred Return</span>
+                            <span className="font-medium">8.0% IRR</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Capital Called</span>
+                            <span className="font-medium">$7,125,000 (75%)</span>
+                          </div>
+                          <Separator />
+                          <div className="flex justify-between text-sm font-medium">
+                            <span>Projected Returns</span>
+                            <span className="text-green-600">$14,250,000</span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Partner List Table */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm">Investor Detail</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Investor</TableHead>
+                              <TableHead>Type</TableHead>
+                              <TableHead>Commitment</TableHead>
+                              <TableHead>Called</TableHead>
+                              <TableHead>Ownership %</TableHead>
+                              <TableHead>Pref Return</TableHead>
+                              <TableHead>Proj. IRR</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            <TableRow>
+                              <TableCell className="font-medium">Marina Capital GP LLC</TableCell>
+                              <TableCell><Badge className="bg-primary text-xs">GP</Badge></TableCell>
+                              <TableCell>$500,000</TableCell>
+                              <TableCell>$500,000</TableCell>
+                              <TableCell>5.0%</TableCell>
+                              <TableCell>—</TableCell>
+                              <TableCell className="text-green-600 font-medium">42.5%</TableCell>
+                            </TableRow>
+                            <TableRow>
+                              <TableCell className="font-medium">Harbor Investments LLC</TableCell>
+                              <TableCell><Badge variant="secondary" className="text-xs">LP</Badge></TableCell>
+                              <TableCell>$5,000,000</TableCell>
+                              <TableCell>$3,750,000</TableCell>
+                              <TableCell>50.0%</TableCell>
+                              <TableCell>8.0%</TableCell>
+                              <TableCell className="text-green-600 font-medium">18.2%</TableCell>
+                            </TableRow>
+                            <TableRow>
+                              <TableCell className="font-medium">Coastal Family Office</TableCell>
+                              <TableCell><Badge variant="secondary" className="text-xs">LP</Badge></TableCell>
+                              <TableCell>$3,000,000</TableCell>
+                              <TableCell>$2,250,000</TableCell>
+                              <TableCell>30.0%</TableCell>
+                              <TableCell>8.0%</TableCell>
+                              <TableCell className="text-green-600 font-medium">18.2%</TableCell>
+                            </TableRow>
+                            <TableRow>
+                              <TableCell className="font-medium">Anchor Capital Partners</TableCell>
+                              <TableCell><Badge variant="secondary" className="text-xs">LP</Badge></TableCell>
+                              <TableCell>$1,500,000</TableCell>
+                              <TableCell>$1,125,000</TableCell>
+                              <TableCell>15.0%</TableCell>
+                              <TableCell>8.0%</TableCell>
+                              <TableCell className="text-green-600 font-medium">18.2%</TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  {/* RETURNS TAB - Investor Returns Analysis */}
+                  <TabsContent value="returns" className="space-y-4">
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle className="text-lg flex items-center gap-2">
+                              <TrendingUp className="h-5 w-5" />
+                              Investor Returns Analysis
+                            </CardTitle>
+                            <CardDescription>Waterfall distribution based on exit scenario</CardDescription>
+                          </div>
+                          <Button variant="outline" size="sm">
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Calculate Returns
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        {/* Summary Cards */}
+                        <div className="grid gap-4 md:grid-cols-4 mb-6">
+                          <Card className="bg-blue-500/10 border-blue-500/20">
+                            <CardContent className="pt-4 text-center">
+                              <div className="text-2xl font-bold text-blue-600">$15,500,000</div>
+                              <div className="text-xs text-muted-foreground">Total Proceeds</div>
+                            </CardContent>
+                          </Card>
+                          <Card className="bg-green-500/10 border-green-500/20">
+                            <CardContent className="pt-4 text-center">
+                              <div className="text-2xl font-bold text-green-600">$5,500,000</div>
+                              <div className="text-xs text-muted-foreground">Total Profit</div>
+                            </CardContent>
+                          </Card>
+                          <Card className="bg-purple-500/10 border-purple-500/20">
+                            <CardContent className="pt-4 text-center">
+                              <div className="text-2xl font-bold text-purple-600">18.5%</div>
+                              <div className="text-xs text-muted-foreground">Fund IRR</div>
+                            </CardContent>
+                          </Card>
+                          <Card className="bg-orange-500/10 border-orange-500/20">
+                            <CardContent className="pt-4 text-center">
+                              <div className="text-2xl font-bold text-orange-600">1.55x</div>
+                              <div className="text-xs text-muted-foreground">Equity Multiple</div>
+                            </CardContent>
+                          </Card>
+                        </div>
+
+                        {/* Waterfall Distribution Table */}
+                        <div className="space-y-3">
+                          <h4 className="font-medium">Waterfall Distribution</h4>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Tier</TableHead>
+                                <TableHead>Description</TableHead>
+                                <TableHead>Amount</TableHead>
+                                <TableHead>LP Share</TableHead>
+                                <TableHead>GP Share</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              <TableRow className="bg-blue-500/5">
+                                <TableCell><Badge variant="outline">Tier 1</Badge></TableCell>
+                                <TableCell>Return of Capital</TableCell>
+                                <TableCell className="font-medium">$10,000,000</TableCell>
+                                <TableCell>$9,500,000</TableCell>
+                                <TableCell>$500,000</TableCell>
+                              </TableRow>
+                              <TableRow className="bg-green-500/5">
+                                <TableCell><Badge variant="outline">Tier 2</Badge></TableCell>
+                                <TableCell>Preferred Return (8% IRR)</TableCell>
+                                <TableCell className="font-medium">$3,200,000</TableCell>
+                                <TableCell>$3,200,000</TableCell>
+                                <TableCell>$0</TableCell>
+                              </TableRow>
+                              <TableRow className="bg-orange-500/5">
+                                <TableCell><Badge variant="outline">Tier 3</Badge></TableCell>
+                                <TableCell>GP Catch-Up (100%)</TableCell>
+                                <TableCell className="font-medium">$800,000</TableCell>
+                                <TableCell>$0</TableCell>
+                                <TableCell>$800,000</TableCell>
+                              </TableRow>
+                              <TableRow className="bg-purple-500/5">
+                                <TableCell><Badge variant="outline">Tier 4</Badge></TableCell>
+                                <TableCell>Promote Split (80/20)</TableCell>
+                                <TableCell className="font-medium">$1,500,000</TableCell>
+                                <TableCell>$1,200,000</TableCell>
+                                <TableCell>$300,000</TableCell>
+                              </TableRow>
+                              <TableRow className="font-bold border-t-2">
+                                <TableCell></TableCell>
+                                <TableCell>Total Distributions</TableCell>
+                                <TableCell>$15,500,000</TableCell>
+                                <TableCell className="text-blue-600">$13,900,000</TableCell>
+                                <TableCell className="text-green-600">$1,600,000</TableCell>
+                              </TableRow>
+                            </TableBody>
+                          </Table>
+                        </div>
+
+                        <Separator className="my-6" />
+
+                        {/* LP vs GP Returns Comparison */}
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <Card>
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm">LP Returns Summary</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Capital Invested</span>
+                                <span>$9,500,000</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Total Distributions</span>
+                                <span>$13,900,000</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Net Profit</span>
+                                <span className="text-green-600">$4,400,000</span>
+                              </div>
+                              <Separator />
+                              <div className="flex justify-between font-medium">
+                                <span>LP IRR</span>
+                                <span className="text-green-600">16.8%</span>
+                              </div>
+                              <div className="flex justify-between font-medium">
+                                <span>LP Multiple</span>
+                                <span className="text-green-600">1.46x</span>
+                              </div>
+                            </CardContent>
+                          </Card>
+                          <Card>
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm">GP Returns Summary</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Capital Invested</span>
+                                <span>$500,000</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Co-Invest Return</span>
+                                <span>$500,000</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Promote (Carry)</span>
+                                <span className="text-green-600">$1,100,000</span>
+                              </div>
+                              <Separator />
+                              <div className="flex justify-between font-medium">
+                                <span>GP IRR</span>
+                                <span className="text-green-600">42.5%</span>
+                              </div>
+                              <div className="flex justify-between font-medium">
+                                <span>GP Multiple</span>
+                                <span className="text-green-600">3.20x</span>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      </CardContent>
+                    </Card>
                   </TabsContent>
                 </Tabs>
 
