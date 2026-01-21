@@ -551,39 +551,33 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
               <Badge className="bg-purple-600 text-white text-[8px] px-1 py-0 h-4">Drive</Badge>
             )}
           </div>
-          <div className="relative">
-            <Input
-              value={exitCapRate}
-              onChange={(e) => handleExitCapRateChange(e.target.value)}
-              className="w-20 h-9 pr-6 text-sm"
-              data-testid="input-exit-cap-rate"
-            />
-            <Percent className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-          </div>
+          <Input
+            value={exitCapRate ? `${exitCapRate}%` : ''}
+            onChange={(e) => handleExitCapRateChange(e.target.value.replace('%', ''))}
+            className="w-24 h-9 text-sm"
+            placeholder="7.5%"
+            data-testid="input-exit-cap-rate"
+          />
         </div>
         <div className="flex-shrink-0">
           <Label className="text-xs text-muted-foreground mb-1 block">Rev Growth</Label>
-          <div className="relative">
-            <Input
-              value={revenueGrowthRate}
-              onChange={(e) => setRevenueGrowthRate(e.target.value)}
-              className="w-20 h-9 pr-6 text-sm"
-              data-testid="input-revenue-growth"
-            />
-            <Percent className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-          </div>
+          <Input
+            value={revenueGrowthRate ? `${revenueGrowthRate}%` : ''}
+            onChange={(e) => setRevenueGrowthRate(e.target.value.replace('%', ''))}
+            className="w-24 h-9 text-sm"
+            placeholder="3.0%"
+            data-testid="input-revenue-growth"
+          />
         </div>
         <div className="flex-shrink-0">
           <Label className="text-xs text-muted-foreground mb-1 block">Exp Growth</Label>
-          <div className="relative">
-            <Input
-              value={expenseGrowthRate}
-              onChange={(e) => setExpenseGrowthRate(e.target.value)}
-              className="w-20 h-9 pr-6 text-sm"
-              data-testid="input-expense-growth"
-            />
-            <Percent className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-          </div>
+          <Input
+            value={expenseGrowthRate ? `${expenseGrowthRate}%` : ''}
+            onChange={(e) => setExpenseGrowthRate(e.target.value.replace('%', ''))}
+            className="w-24 h-9 text-sm"
+            placeholder="2.0%"
+            data-testid="input-expense-growth"
+          />
         </div>
       </div>
 
@@ -669,16 +663,13 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
           <CardContent className="space-y-3 pt-0">
             <div>
               <Label className="text-xs text-muted-foreground">Purchase Price</Label>
-              <div className="relative mt-1">
-                <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  value={manualPurchasePrice}
-                  onChange={(e) => handlePurchasePriceChange(e.target.value)}
-                  placeholder="10,000,000"
-                  className="pl-7 h-9 w-40"
-                  data-testid="input-purchase-price"
-                />
-              </div>
+              <Input
+                value={manualPurchasePrice ? `$${manualPurchasePrice}` : ''}
+                onChange={(e) => handlePurchasePriceChange(e.target.value.replace(/^\$/, ''))}
+                placeholder="$10,000,000"
+                className="h-9 w-36 mt-1"
+                data-testid="input-purchase-price"
+              />
             </div>
 
             {calculateMutation.isPending ? (
@@ -760,16 +751,13 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
           <CardContent className="space-y-3 pt-0">
             <div>
               <Label className="text-xs text-muted-foreground">Target IRR</Label>
-              <div className="relative mt-1">
-                <Input
-                  value={targetIRR}
-                  onChange={(e) => handleTargetIRRChange(e.target.value)}
-                  placeholder="15"
-                  className="pr-6 h-9 w-24"
-                  data-testid="input-target-irr"
-                />
-                <Percent className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-              </div>
+              <Input
+                value={targetIRR ? `${targetIRR}%` : ''}
+                onChange={(e) => handleTargetIRRChange(e.target.value.replace('%', ''))}
+                placeholder="15.0%"
+                className="h-9 w-24 mt-1"
+                data-testid="input-target-irr"
+              />
             </div>
 
             {calculateMutation.isPending ? (
@@ -835,16 +823,13 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
           <CardContent className="space-y-3 pt-0">
             <div>
               <Label className="text-xs text-muted-foreground">Cap Rate (Year 1)</Label>
-              <div className="relative mt-1">
-                <Input
-                  value={goingInCapRate}
-                  onChange={(e) => handleGoingInCapRateChange(e.target.value)}
-                  placeholder="7.5"
-                  className="pr-6 h-9 w-24"
-                  data-testid="input-going-in-cap"
-                />
-                <Percent className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-              </div>
+              <Input
+                value={goingInCapRate ? `${goingInCapRate}%` : ''}
+                onChange={(e) => handleGoingInCapRateChange(e.target.value.replace('%', ''))}
+                placeholder="7.5%"
+                className="h-9 w-24 mt-1"
+                data-testid="input-going-in-cap"
+              />
             </div>
 
             {calculateMutation.isPending ? (
@@ -917,16 +902,13 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">Cap Rate</Label>
-                <div className="relative mt-1">
-                  <Input
-                    value={targetYearCapRate}
-                    onChange={(e) => setTargetYearCapRate(e.target.value)}
-                    placeholder="7.0"
-                    className="pr-6 h-9 w-24"
-                    data-testid="input-target-year-cap"
-                  />
-                  <Percent className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                </div>
+                <Input
+                  value={targetYearCapRate ? `${targetYearCapRate}%` : ''}
+                  onChange={(e) => setTargetYearCapRate(e.target.value.replace('%', ''))}
+                  placeholder="7.0%"
+                  className="h-9 w-24 mt-1"
+                  data-testid="input-target-year-cap"
+                />
               </div>
             </div>
 

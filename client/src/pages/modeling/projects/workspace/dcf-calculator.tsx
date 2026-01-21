@@ -228,30 +228,22 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div className="space-y-2">
               <Label>Purchase Price</Label>
-              <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="number"
-                  value={liveInputs.purchasePrice}
-                  onChange={(e) => handleInputChange('purchasePrice', parseFloat(e.target.value) || 0)}
-                  className="pl-9"
-                  data-testid="input-purchase-price"
-                />
-              </div>
+              <Input
+                value={liveInputs.purchasePrice ? `$${liveInputs.purchasePrice.toLocaleString()}` : ''}
+                onChange={(e) => handleInputChange('purchasePrice', parseFloat(e.target.value.replace(/[$,]/g, '')) || 0)}
+                placeholder="$10,000,000"
+                data-testid="input-purchase-price"
+              />
             </div>
 
             <div className="space-y-2">
               <Label>Year 1 NOI</Label>
-              <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="number"
-                  value={liveInputs.year1NOI}
-                  onChange={(e) => handleInputChange('year1NOI', parseFloat(e.target.value) || 0)}
-                  className="pl-9"
-                  data-testid="input-year1-noi"
-                />
-              </div>
+              <Input
+                value={liveInputs.year1NOI ? `$${liveInputs.year1NOI.toLocaleString()}` : ''}
+                onChange={(e) => handleInputChange('year1NOI', parseFloat(e.target.value.replace(/[$,]/g, '')) || 0)}
+                placeholder="$500,000"
+                data-testid="input-year1-noi"
+              />
             </div>
 
             <div className="space-y-2">
@@ -316,16 +308,12 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
 
             <div className="space-y-2">
               <Label>Loan Amount</Label>
-              <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="number"
-                  value={liveInputs.loanAmount}
-                  onChange={(e) => handleInputChange('loanAmount', parseFloat(e.target.value) || 0)}
-                  className="pl-9"
-                  data-testid="input-loan-amount"
-                />
-              </div>
+              <Input
+                value={liveInputs.loanAmount ? `$${liveInputs.loanAmount.toLocaleString()}` : ''}
+                onChange={(e) => handleInputChange('loanAmount', parseFloat(e.target.value.replace(/[$,]/g, '')) || 0)}
+                placeholder="$7,500,000"
+                data-testid="input-loan-amount"
+              />
             </div>
 
             <div className="space-y-2">
