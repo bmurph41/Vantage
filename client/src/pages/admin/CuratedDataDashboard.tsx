@@ -10,9 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/lib/utils";
 import { 
   Database, 
   TrendingUp, 
@@ -23,13 +26,54 @@ import {
   Trash2,
   Globe,
   Building,
-  RefreshCw
+  RefreshCw,
+  Anchor,
+  Radar,
+  ExternalLink,
+  Play,
+  MapPin,
+  ArrowUpDown
 } from "lucide-react";
 
 interface CuratedStats {
   salesComps: number;
   rateComps: number;
   industryStandards: number;
+  globalListings: number;
+  globalSources: number;
+}
+
+interface GlobalListing {
+  id: string;
+  title: string;
+  propertyName?: string;
+  city?: string;
+  state?: string;
+  askingPrice?: string;
+  totalSlips?: number;
+  sourcePlatform: string;
+  sourceUrl: string;
+  status: string;
+  scope: string;
+  requiredPack?: string;
+  isCurated: boolean;
+  curatedAt?: string;
+  createdAt: string;
+}
+
+interface GlobalSource {
+  id: string;
+  platform: string;
+  name: string;
+  baseUrl?: string;
+  searchUrl?: string;
+  isActive: boolean;
+  isGlobalSource: boolean;
+  lastScrapeAt?: string;
+  lastScrapeStatus?: string;
+  lastScrapeCount?: number;
+  totalListingsFound: number;
+  createdAt: string;
 }
 
 interface IndustryStandard {
@@ -103,6 +147,91 @@ export default function CuratedDataDashboard() {
     queryKey: ["/api/admin/curated/industry-standards"],
   });
 
+  const { data: listingsData, isLoading: listingsLoading, refetch: refetchListings } = useQuery<{ listings: GlobalListing[]; total: number }>({
+    queryKey: ["/api/admin/curated/listings"],
+  });
+
+  const { data: sources = [], isLoading: sourcesLoading, refetch: refetchSources } = useQuery<GlobalSource[]>({
+    queryKey: ["/api/admin/curated/scrape-sources"],
+  });
+
+  const [showAddSourceDialog, setShowAddSourceDialog] = useState(false);
+  const [newSource, setNewSource] = useState({ platform: "", name: "", searchUrl: "" });
+
+  const createSourceMutation = useMutation({
+    mutationFn: async (data: { platform: string; name: string; searchUrl: string }) => {
+      return apiRequest("/api/admin/curated/scrape-sources", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/curated/scrape-sources"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/curated/stats"] });
+      setShowAddSourceDialog(false);
+      setNewSource({ platform: "", name: "", searchUrl: "" });
+      toast({ title: "Source created successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error creating source", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteSourceMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest(`/api/admin/curated/scrape-sources/${id}`, { method: "DELETE" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/curated/scrape-sources"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/curated/stats"] });
+      toast({ title: "Source deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error deleting source", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const triggerScrapeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest(`/api/admin/curated/scrape-sources/${id}/scrape`, { method: "POST" });
+    },
+    onSuccess: () => {
+      toast({ title: "Scrape initiated", description: "The source will be scraped in the background" });
+      refetchSources();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error triggering scrape", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const demoteListingMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest(`/api/admin/curated/listings/${id}/demote`, { method: "POST" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/curated/listings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/curated/stats"] });
+      toast({ title: "Listing demoted to org-scoped" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error demoting listing", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteListingMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest(`/api/admin/curated/listings/${id}`, { method: "DELETE" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/curated/listings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/curated/stats"] });
+      toast({ title: "Listing deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error deleting listing", description: error.message, variant: "destructive" });
+    },
+  });
+
   const createStandardMutation = useMutation({
     mutationFn: async (data: Partial<IndustryStandard>) => {
       return apiRequest("/api/admin/curated/industry-standards", {
@@ -150,10 +279,18 @@ export default function CuratedDataDashboard() {
     <MainLayout title="Curated Data Management" subtitle="Manage global benchmarks and industry standards">
       <div className="space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-flex">
+          <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-flex">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <Database className="h-4 w-4" />
               Overview
+            </TabsTrigger>
+            <TabsTrigger value="listings" className="flex items-center gap-2">
+              <Anchor className="h-4 w-4" />
+              Listings
+            </TabsTrigger>
+            <TabsTrigger value="sources" className="flex items-center gap-2">
+              <Radar className="h-4 w-4" />
+              Sources
             </TabsTrigger>
             <TabsTrigger value="sales-comps" className="flex items-center gap-2">
               <DollarSign className="h-4 w-4" />
@@ -165,45 +302,69 @@ export default function CuratedDataDashboard() {
             </TabsTrigger>
             <TabsTrigger value="standards" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
-              Industry Standards
+              Standards
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6 mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">Global Sales Comps</CardTitle>
+                  <CardTitle className="text-sm font-medium">Global Listings</CardTitle>
+                  <Anchor className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats?.globalListings || 0}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Curated marina listings
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">Global Sources</CardTitle>
+                  <Radar className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats?.globalSources || 0}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Active scrape sources
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">Sales Comps</CardTitle>
                   <Globe className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{stats?.salesComps || 0}</div>
                   <p className="text-xs text-muted-foreground">
-                    Curated marina sale transactions
+                    Sale transactions
                   </p>
                 </CardContent>
               </Card>
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">Global Rate Comps</CardTitle>
+                  <CardTitle className="text-sm font-medium">Rate Comps</CardTitle>
                   <TrendingUp className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{stats?.rateComps || 0}</div>
                   <p className="text-xs text-muted-foreground">
-                    Curated rate benchmarks
+                    Rate benchmarks
                   </p>
                 </CardContent>
               </Card>
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">Industry Standards</CardTitle>
+                  <CardTitle className="text-sm font-medium">Standards</CardTitle>
                   <BarChart3 className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{stats?.industryStandards || 0}</div>
                   <p className="text-xs text-muted-foreground">
-                    Market benchmarks & metrics
+                    Industry metrics
                   </p>
                 </CardContent>
               </Card>
@@ -231,6 +392,259 @@ export default function CuratedDataDashboard() {
                     <span className="text-sm">User-created data - private to the user</span>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="listings" className="space-y-6 mt-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Global Marina Listings</CardTitle>
+                  <CardDescription>
+                    Curated marina listings available to all platform subscribers
+                  </CardDescription>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => refetchListings()}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {listingsLoading ? (
+                  <div className="text-center py-8">Loading listings...</div>
+                ) : !listingsData?.listings?.length ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Anchor className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No global listings yet</p>
+                    <p className="text-sm">Promote listings from organization data or run scrape jobs.</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Property</TableHead>
+                        <TableHead>Location</TableHead>
+                        <TableHead>Price</TableHead>
+                        <TableHead>Slips</TableHead>
+                        <TableHead>Source</TableHead>
+                        <TableHead>Pack</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {listingsData.listings.map((listing) => (
+                        <TableRow key={listing.id}>
+                          <TableCell>
+                            <div className="font-medium">{listing.title || listing.propertyName}</div>
+                            <Badge variant={listing.status === 'active' ? 'default' : 'secondary'} className="text-xs mt-1">
+                              {listing.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3 text-muted-foreground" />
+                              {listing.city}, {listing.state}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {listing.askingPrice ? formatCurrency(parseFloat(listing.askingPrice)) : '-'}
+                          </TableCell>
+                          <TableCell>{listing.totalSlips || '-'}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{listing.sourcePlatform}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{listing.requiredPack || 'analysis'}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => window.open(listing.sourceUrl, '_blank')}
+                                title="View source"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => demoteListingMutation.mutate(listing.id)}
+                                title="Demote to org-scoped"
+                              >
+                                <ArrowUpDown className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => deleteListingMutation.mutate(listing.id)}
+                                title="Delete"
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="sources" className="space-y-6 mt-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Global Scrape Sources</CardTitle>
+                  <CardDescription>
+                    Broker sites and listing platforms scraped for marina listings
+                  </CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => refetchSources()}>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Refresh
+                  </Button>
+                  <Dialog open={showAddSourceDialog} onOpenChange={setShowAddSourceDialog}>
+                    <DialogTrigger asChild>
+                      <Button size="sm">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Source
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Add Global Scrape Source</DialogTitle>
+                        <DialogDescription>
+                          Add a new broker site or listing platform to scrape
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                          <Label>Platform Name *</Label>
+                          <Input
+                            placeholder="e.g., MerleMarine"
+                            value={newSource.platform}
+                            onChange={(e) => setNewSource({ ...newSource, platform: e.target.value })}
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Display Name *</Label>
+                          <Input
+                            placeholder="e.g., Merle Marine Brokerage"
+                            value={newSource.name}
+                            onChange={(e) => setNewSource({ ...newSource, name: e.target.value })}
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Search URL</Label>
+                          <Input
+                            placeholder="https://..."
+                            value={newSource.searchUrl}
+                            onChange={(e) => setNewSource({ ...newSource, searchUrl: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowAddSourceDialog(false)}>Cancel</Button>
+                        <Button
+                          onClick={() => createSourceMutation.mutate(newSource)}
+                          disabled={!newSource.platform || !newSource.name || createSourceMutation.isPending}
+                        >
+                          {createSourceMutation.isPending ? "Creating..." : "Create Source"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {sourcesLoading ? (
+                  <div className="text-center py-8">Loading sources...</div>
+                ) : sources.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Radar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No global scrape sources yet</p>
+                    <p className="text-sm">Add broker sites or listing platforms to start collecting data.</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Source</TableHead>
+                        <TableHead>Platform</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Last Scrape</TableHead>
+                        <TableHead>Listings Found</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sources.map((source) => (
+                        <TableRow key={source.id}>
+                          <TableCell>
+                            <div className="font-medium">{source.name}</div>
+                            {source.searchUrl && (
+                              <a
+                                href={source.searchUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-muted-foreground hover:underline"
+                              >
+                                {new URL(source.searchUrl).hostname}
+                              </a>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{source.platform}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={source.isActive ? 'default' : 'secondary'}>
+                              {source.isActive ? 'Active' : 'Inactive'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {source.lastScrapeAt ? (
+                              <div>
+                                <div className="text-sm">{new Date(source.lastScrapeAt).toLocaleDateString()}</div>
+                                <Badge variant={source.lastScrapeStatus === 'success' ? 'default' : 'destructive'} className="text-xs">
+                                  {source.lastScrapeStatus}
+                                </Badge>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">Never</span>
+                            )}
+                          </TableCell>
+                          <TableCell>{source.totalListingsFound}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => triggerScrapeMutation.mutate(source.id)}
+                                disabled={triggerScrapeMutation.isPending}
+                                title="Run scrape"
+                              >
+                                <Play className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => deleteSourceMutation.mutate(source.id)}
+                                title="Delete"
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
