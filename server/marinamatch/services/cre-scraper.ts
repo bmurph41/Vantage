@@ -16,6 +16,7 @@ import {
 } from "@shared/schema";
 import { extractListingsWithAI, validateExtractedListing, type ExtractedListing } from "./ai-extractor";
 import { MultiPageCrawler, discoverListingUrls, estimateCrawlCost, type CrawlConfig } from "./multi-page-crawler";
+import { isMarinaRelatedListing, calculateDaysOnMarket } from "./global-broker-sources";
 
 interface ListingData {
   title: string;
@@ -134,6 +135,49 @@ function generateDedupeHash(listing: Partial<ListingData>, platform: string): st
   
   const input = `${platform}|${normalizedName}|${normalizedAddress}|${city}|${state}`;
   return crypto.createHash("md5").update(input).digest("hex");
+}
+
+function generateCrossplatformHash(listing: Partial<ListingData>): string | null {
+  const normalizedAddress = (listing.propertyAddress || "").toLowerCase().replace(/\s+/g, " ").trim();
+  const normalizedName = (listing.propertyName || listing.title || "").toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/marina|boat|yacht|club|inc|llc|corp/gi, "")
+    .trim();
+  const city = (listing.city || "").toLowerCase().trim();
+  const state = (listing.state || "").toLowerCase().trim();
+  
+  const hasName = normalizedName.length >= 3;
+  const hasAddress = normalizedAddress.length >= 5;
+  const hasLocation = city.length >= 2 && state.length === 2;
+  
+  if (!hasName && !hasAddress) return null;
+  if (!hasLocation) return null;
+  
+  const input = `${normalizedName}|${normalizedAddress}|${city}|${state}`;
+  return crypto.createHash("md5").update(input).digest("hex");
+}
+
+const PLATFORM_PRIORITY: Record<string, number> = {
+  "Simply Marinas": 10,
+  "SVN Marinas": 9,
+  "National Marina Sales": 8,
+  "Colliers Leisure": 8,
+  "Leisure Investment Properties": 7,
+  "Waterfront Investment Properties": 7,
+  "CBRE": 6,
+  "Marcus & Millichap": 5,
+  "LoopNet": 3,
+  "Crexi": 3,
+  "BizBuySell": 2,
+};
+
+function getPlatformPriority(platform: string): number {
+  for (const [key, priority] of Object.entries(PLATFORM_PRIORITY)) {
+    if (platform.toLowerCase().includes(key.toLowerCase())) {
+      return priority;
+    }
+  }
+  return 1;
 }
 
 function extractPrice(text: string): number | undefined {
@@ -432,13 +476,27 @@ export async function applyMarinaKeywordFilterWithPatterns(
   listing: ListingData,
   config: SourceConfig
 ): Promise<{ include: boolean; reason?: string }> {
-  // First apply standard filters
+  // FIRST: Apply strict marina-only validation
+  const marinaCheck = isMarinaRelatedListing(
+    listing.title || "",
+    listing.originalDescription || "",
+    listing.propertyType
+  );
+  
+  if (!marinaCheck.isMarina) {
+    return { 
+      include: false, 
+      reason: `Not marina-related (confidence ${marinaCheck.confidence}%): ${marinaCheck.reason}` 
+    };
+  }
+  
+  // SECOND: Apply standard keyword/geo/price filters
   const standardResult = applyMarinaKeywordFilter(listing, config);
   if (!standardResult.include) {
     return standardResult;
   }
   
-  // Then check learned patterns
+  // THIRD: Check learned patterns from admin rejections
   const patterns = await loadLearnedPatterns();
   if (patterns.length > 0) {
     const patternMatch = matchesLearnedPattern(listing, patterns);
@@ -1338,6 +1396,8 @@ export async function runScrapeJob(
     for (const { data, platform } of allListings) {
       try {
         const dedupeHash = generateDedupeHash(data, platform);
+        const crossplatformHash = generateCrossplatformHash(data);
+        const newPlatformPriority = getPlatformPriority(platform);
         
         const [existingListing] = await db
           .select()
@@ -1361,8 +1421,76 @@ export async function runScrapeJob(
             .where(eq(marinaListings.id, existingListing.id));
           
           results.updatedListings++;
-        } else {
-          const [newListing] = await db.insert(marinaListings).values({
+          continue;
+        }
+
+        let crossPlatformDupe: typeof marinaListings.$inferSelect | undefined = undefined;
+        
+        if (crossplatformHash) {
+          const potentialDupes = await db
+            .select()
+            .from(marinaListings)
+            .where(and(
+              eq(marinaListings.orgId, orgId),
+              eq(marinaListings.state, data.state || ""),
+              eq(marinaListings.city, data.city || "")
+            ));
+          
+          crossPlatformDupe = potentialDupes.find(listing => {
+            const existingHash = generateCrossplatformHash({
+              propertyName: listing.propertyName || undefined,
+              title: listing.title,
+              propertyAddress: listing.propertyAddress || undefined,
+              city: listing.city || undefined,
+              state: listing.state || undefined,
+            });
+            return existingHash === crossplatformHash;
+          });
+        }
+
+        if (crossPlatformDupe) {
+          const existingPriority = getPlatformPriority(crossPlatformDupe.sourcePlatform);
+          
+          if (newPlatformPriority > existingPriority) {
+            await db
+              .update(marinaListings)
+              .set({
+                sourcePlatform: platform,
+                sourceUrl: data.sourceUrl,
+                sourceListingId: data.sourceListingId,
+                dedupeHash,
+                brokerName: data.brokerName || crossPlatformDupe.brokerName,
+                brokerCompany: data.brokerCompany || crossPlatformDupe.brokerCompany,
+                brokerPhone: data.brokerPhone || crossPlatformDupe.brokerPhone,
+                brokerEmail: data.brokerEmail || crossPlatformDupe.brokerEmail,
+                askingPrice: data.askingPrice?.toString() || crossPlatformDupe.askingPrice,
+                noi: data.noi?.toString() || crossPlatformDupe.noi,
+                capRate: data.capRate?.toString() || crossPlatformDupe.capRate,
+                totalSlips: data.totalSlips || crossPlatformDupe.totalSlips,
+                dryStorageSpaces: data.dryStorageSpaces || crossPlatformDupe.dryStorageSpaces,
+                lastScrapedAt: new Date(),
+                updatedAt: new Date(),
+                scrapeRunId: scrapeRun.id,
+              })
+              .where(eq(marinaListings.id, crossPlatformDupe.id));
+            
+            results.updatedListings++;
+            console.log(`[Scraper] Upgraded listing "${data.title}" from ${crossPlatformDupe.sourcePlatform} to ${platform}`);
+          } else {
+            const updates: Record<string, any> = { lastScrapedAt: new Date(), updatedAt: new Date() };
+            if (data.brokerName && !crossPlatformDupe.brokerName) updates.brokerName = data.brokerName;
+            if (data.brokerCompany && !crossPlatformDupe.brokerCompany) updates.brokerCompany = data.brokerCompany;
+            if (data.noi && !crossPlatformDupe.noi) updates.noi = data.noi.toString();
+            if (data.capRate && !crossPlatformDupe.capRate) updates.capRate = data.capRate.toString();
+            if (data.totalSlips && !crossPlatformDupe.totalSlips) updates.totalSlips = data.totalSlips;
+            
+            await db.update(marinaListings).set(updates).where(eq(marinaListings.id, crossPlatformDupe.id));
+            console.log(`[Scraper] Merged data into existing listing "${crossPlatformDupe.title}" from ${crossPlatformDupe.sourcePlatform}`);
+          }
+          continue;
+        }
+
+        const [newListing] = await db.insert(marinaListings).values({
             orgId,
             sourcePlatform: platform,
             sourceUrl: data.sourceUrl,
@@ -1414,7 +1542,6 @@ export async function runScrapeJob(
           results.newListings++;
           
           await scoreListing(newListing.id, orgId);
-        }
       } catch (error: any) {
         results.errors.push(`Insert error: ${error.message}`);
       }

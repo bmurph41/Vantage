@@ -614,6 +614,16 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
     return formatCurrency(price);
   };
 
+  const getDaysOnMarket = (listingDate?: string, createdAt?: string) => {
+    const date = listingDate || createdAt;
+    if (!date) return null;
+    const parsedDate = new Date(date);
+    if (isNaN(parsedDate.getTime())) return null;
+    const diffMs = Date.now() - parsedDate.getTime();
+    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    return days >= 0 ? days : null;
+  };
+
   const getScoreColor = (score: number | undefined) => {
     if (!score) return "bg-muted";
     if (score >= 80) return "bg-green-500";
@@ -623,18 +633,20 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
   };
 
   const getSourceBadgeStyle = (source: string) => {
-    switch (source.toLowerCase()) {
-      case 'loopnet':
-        return 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900 dark:text-blue-200';
-      case 'crexi':
-        return 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900 dark:text-purple-200';
-      case 'bizbuysell':
-        return 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900 dark:text-orange-200';
-      case 'costar':
-        return 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-800 dark:text-gray-200';
-    }
+    const s = source.toLowerCase();
+    if (s.includes('loopnet')) return 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900 dark:text-blue-200';
+    if (s.includes('crexi')) return 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900 dark:text-purple-200';
+    if (s.includes('simply marinas')) return 'bg-teal-100 text-teal-800 border-teal-300 dark:bg-teal-900 dark:text-teal-200';
+    if (s.includes('svn')) return 'bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-900 dark:text-indigo-200';
+    if (s.includes('national marina')) return 'bg-cyan-100 text-cyan-800 border-cyan-300 dark:bg-cyan-900 dark:text-cyan-200';
+    if (s.includes('colliers')) return 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-900 dark:text-rose-200';
+    if (s.includes('leisure investment')) return 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900 dark:text-amber-200';
+    if (s.includes('waterfront investment')) return 'bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-900 dark:text-sky-200';
+    if (s.includes('marcus') || s.includes('millichap')) return 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900 dark:text-emerald-200';
+    if (s.includes('cbre')) return 'bg-lime-100 text-lime-800 border-lime-300 dark:bg-lime-900 dark:text-lime-200';
+    if (s.includes('bizbuysell')) return 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900 dark:text-orange-200';
+    if (s.includes('costar')) return 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-200';
+    return 'bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-800 dark:text-gray-200';
   };
 
   const getLastSyncTime = () => {
@@ -888,6 +900,17 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
                               <span className="flex items-center gap-1">
                                 <Anchor className="h-3 w-3" />
                                 {listing.totalSlips} slips
+                              </span>
+                            )}
+                            {getDaysOnMarket(listing.listingDate, listing.createdAt) !== null && (
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {getDaysOnMarket(listing.listingDate, listing.createdAt)} days
+                              </span>
+                            )}
+                            {listing.brokerCompany && (
+                              <span className="text-xs">
+                                via {listing.brokerCompany}
                               </span>
                             )}
                           </div>

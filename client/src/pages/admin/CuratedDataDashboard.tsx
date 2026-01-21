@@ -204,6 +204,23 @@ export default function CuratedDataDashboard() {
     },
   });
 
+  const seedBrokerSourcesMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("/api/admin/curated/scrape-sources/seed", { method: "POST" });
+    },
+    onSuccess: (data: any) => {
+      toast({ 
+        title: "Broker sources seeded", 
+        description: `Created ${data.created} new sources, updated ${data.updated} existing` 
+      });
+      refetchSources();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/curated/stats"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error seeding broker sources", description: error.message, variant: "destructive" });
+    },
+  });
+
   const demoteListingMutation = useMutation({
     mutationFn: async (id: string) => {
       return apiRequest(`/api/admin/curated/listings/${id}/demote`, { method: "POST" });
@@ -504,6 +521,15 @@ export default function CuratedDataDashboard() {
                   </CardDescription>
                 </div>
                 <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => seedBrokerSourcesMutation.mutate()}
+                    disabled={seedBrokerSourcesMutation.isPending}
+                  >
+                    <Database className="h-4 w-4 mr-2" />
+                    {seedBrokerSourcesMutation.isPending ? "Seeding..." : "Seed Marina Brokers"}
+                  </Button>
                   <Button variant="outline" size="sm" onClick={() => refetchSources()}>
                     <RefreshCw className="h-4 w-4 mr-2" />
                     Refresh

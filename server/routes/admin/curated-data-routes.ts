@@ -9,6 +9,7 @@ import {
   marinaScrapeources
 } from "../../../shared/schema";
 import { eq, and, desc, sql, or, isNull } from "drizzle-orm";
+import { seedGlobalBrokerSources, GLOBAL_BROKER_SOURCES } from "../../marinamatch/services/global-broker-sources";
 
 export const curatedDataRouter = Router();
 
@@ -689,6 +690,58 @@ curatedDataRouter.post("/scrape-sources/:id/scrape", async (req, res) => {
   } catch (error) {
     console.error("Error triggering scrape:", error);
     res.status(500).json({ error: "Failed to trigger scrape" });
+  }
+});
+
+// Seed global broker sources (marina-specific brokers)
+curatedDataRouter.post("/scrape-sources/seed", async (req, res) => {
+  try {
+    const orgId = req.tenant?.orgId;
+    if (!orgId) {
+      return res.status(400).json({ error: "Organization required" });
+    }
+
+    const result = await seedGlobalBrokerSources(orgId);
+    
+    res.json({
+      success: true,
+      message: `Seeded ${result.created} new sources, updated ${result.updated} existing sources`,
+      ...result,
+      totalAvailable: GLOBAL_BROKER_SOURCES.length,
+    });
+  } catch (error) {
+    console.error("Error seeding global broker sources:", error);
+    res.status(500).json({ error: "Failed to seed global broker sources" });
+  }
+});
+
+// Get available broker sources (not yet seeded)
+curatedDataRouter.get("/scrape-sources/available", async (req, res) => {
+  try {
+    const existingSources = await db
+      .select({ platform: marinaScrapeources.platform })
+      .from(marinaScrapeources)
+      .where(eq(marinaScrapeources.isGlobalSource, true));
+
+    const existingPlatforms = new Set(existingSources.map(s => s.platform));
+    
+    const available = GLOBAL_BROKER_SOURCES.map(source => ({
+      platform: source.platform,
+      name: source.name,
+      baseUrl: source.baseUrl,
+      searchUrl: source.searchUrl,
+      isSeeded: existingPlatforms.has(source.platform),
+      capabilityNotes: source.capabilityNotes,
+    }));
+
+    res.json({
+      total: GLOBAL_BROKER_SOURCES.length,
+      seeded: existingPlatforms.size,
+      available,
+    });
+  } catch (error) {
+    console.error("Error getting available sources:", error);
+    res.status(500).json({ error: "Failed to get available sources" });
   }
 });
 
