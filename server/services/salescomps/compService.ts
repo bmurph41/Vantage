@@ -18,7 +18,6 @@ export class CompService {
   async createComp(compData: InsertSalesComp, userId: string): Promise<SalesComp> {
     // Try to auto-match property by name/city/state before creating
     let propertyId = compData.propertyId;
-    let pendingPropertyId: string | undefined;
     
     if (!propertyId && compData.marina) {
       try {
@@ -32,16 +31,12 @@ export class CompService {
         if (matchedProperty) {
           propertyId = matchedProperty.id;
           console.log(`[CompService] Auto-matched "${compData.marina}" to existing property ${matchedProperty.id}`);
-        } else {
-          // Don't auto-create property - this will be done after creating the comp
-          // so we have a compId to reference in pending_properties
-          pendingPropertyId = 'pending';
-          console.log(`[CompService] No existing property match for "${compData.marina}" - will create pending property`);
         }
+        // NOTE: Pending properties are NOT auto-created from sales comps.
+        // Sales comps are the source of truth for transaction data.
+        // Pending sales comps are only created when users add transaction data to CRM Properties.
       } catch (error) {
         console.error(`[CompService] FAILED to match property for "${compData.marina}":`, error);
-        // Still mark as pending so we don't lose the data
-        pendingPropertyId = 'pending';
       }
     }
 
@@ -68,54 +63,9 @@ export class CompService {
       parentPortfolioId,
     });
     
-    // Create pending property if no match was found
-    // IMPORTANT: Skip pending property creation for portfolio parent comps
-    // Only child comps and individual comps should create properties
-    const isPortfolioParent = compData.isPortfolio === true;
-    if (pendingPropertyId === 'pending' && compData.marina && !isPortfolioParent) {
-      try {
-        const address = [
-          compData.address,
-          compData.city && compData.state ? `${compData.city}, ${compData.state}` : compData.city || compData.state
-        ].filter(Boolean).join(', ');
-
-        // Find similar properties for suggested duplicates
-        const similarProperties = await this.storage.findSimilarProperties(
-          compData.orgId,
-          compData.marina,
-          compData.city,
-          compData.state
-        );
-
-        const pendingProperty = await this.storage.createPendingProperty({
-          orgId: compData.orgId,
-          sourceType: 'sales_comp',
-          compId: comp.id,
-          marinaName: compData.marina,
-          city: compData.city || null,
-          state: compData.state || null,
-          address: address || null,
-          salePrice: compData.salePrice || null,
-          status: 'pending',
-          compMetadata: {
-            saleYear: compData.saleYear,
-            saleMonth: compData.saleMonth,
-            wetSlips: compData.wetSlips,
-            dryRacks: compData.dryRacks,
-            bodyOfWater: compData.bodyOfWater,
-          },
-          suggestedDuplicates: similarProperties.map(p => p.id),
-          createdBy: userId,
-          reviewedBy: null,
-        });
-        
-        const compType = compData.isChild ? 'portfolio child comp' : 'individual comp';
-        console.log(`[CompService] Created pending property for "${compData.marina}" (${compType}), pending ID: ${pendingProperty.id}`);
-      } catch (error) {
-        console.error(`[CompService] FAILED to create pending property for "${compData.marina}":`, error);
-      }
-    } else if (isPortfolioParent) {
-    }
+    // NOTE: Pending properties are NOT auto-created from sales comps.
+    // Sales comps are the source of truth for transaction data.
+    // Pending sales comps are only created when users add transaction data to CRM Properties.
     
     // Create pending companies from buyer/seller company data (if not already linked to CRM)
     // Note: The 'company' field typically represents the buyer/current owner
