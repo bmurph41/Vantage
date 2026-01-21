@@ -330,10 +330,53 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
         const currentPrice = parseCurrencyInput(manualPurchasePrice);
         if (Math.abs(derivedPrice - currentPrice) > 50000 && derivedPrice > 0) {
           setManualPurchasePrice(Math.round(derivedPrice).toLocaleString());
+          
+          // Derive Exit Cap Rate from new price
+          const appreciation = 0.02;
+          const estimatedExitValue = derivedPrice * Math.pow(1 + appreciation, holdYears);
+          const derivedExitCap = (projectedExitNOI / estimatedExitValue) * 100;
+          const currentExitCap = parsePercentInput(exitCapRate);
+          if (Math.abs(derivedExitCap - currentExitCap) > 0.1) {
+            setExitCapRate(derivedExitCap.toFixed(2));
+          }
+          
+          // Derive Target IRR from new price
+          // IRR is the rate where: Price = sum(CF/(1+r)^t) + ExitValue/(1+r)^n
+          // Newton-Raphson approximation
+          let irr = 0.15; // initial guess
+          for (let iter = 0; iter < 10; iter++) {
+            let npv = -derivedPrice;
+            let dnpv = 0;
+            for (let i = 1; i <= holdYears; i++) {
+              const yearCF = year1NOI * Math.pow(1 + netGrowth, i - 1);
+              npv += yearCF / Math.pow(1 + irr, i);
+              dnpv -= i * yearCF / Math.pow(1 + irr, i + 1);
+            }
+            const exitValue = projectedExitNOI / (parsePercentInput(exitCapRate) / 100 || 0.075);
+            npv += exitValue / Math.pow(1 + irr, holdYears);
+            dnpv -= holdYears * exitValue / Math.pow(1 + irr, holdYears + 1);
+            if (Math.abs(dnpv) > 0.0001) {
+              irr = irr - npv / dnpv;
+            }
+          }
+          const derivedIRR = irr * 100;
+          const currentIRR = parsePercentInput(targetIRR);
+          if (Math.abs(derivedIRR - currentIRR) > 0.5 && derivedIRR > 0 && derivedIRR < 100) {
+            setTargetIRR(derivedIRR.toFixed(1));
+          }
+          
+          // Derive Target Year Cap Rate from new price
+          const currentTargetYear = parseInt(targetYear) || 3;
+          const targetYearNOI = year1NOI * Math.pow(1 + netGrowth, currentTargetYear - 1);
+          const derivedTargetYearCap = (targetYearNOI / derivedPrice) * 100;
+          const currentTargetYearCap = parsePercentInput(targetYearCapRate);
+          if (Math.abs(derivedTargetYearCap - currentTargetYearCap) > 0.1) {
+            setTargetYearCapRate(derivedTargetYearCap.toFixed(1));
+          }
         }
       }
     }
-  }, [exitCapRate, targetIRR, goingInCapRate, pricingDriver, isLinked, holdPeriod, revenueGrowthRate, expenseGrowthRate, pricingData?.projectFinancials?.year1NOI]);
+  }, [exitCapRate, targetIRR, goingInCapRate, targetYear, targetYearCapRate, pricingDriver, isLinked, holdPeriod, revenueGrowthRate, expenseGrowthRate, pricingData?.projectFinancials?.year1NOI]);
 
   const handleSavePurchasePrice = (price: number, capRate?: number) => {
     saveMutation.mutate({ 
