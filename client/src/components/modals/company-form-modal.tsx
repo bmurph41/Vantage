@@ -683,7 +683,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                     <FormItem>
                       <FormLabel>Company Name *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Acme Corporation" {...field} data-testid="input-company-name" />
+                        <Input placeholder="Acme Corporation" className="bg-white dark:bg-slate-900" {...field} data-testid="input-company-name" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -697,7 +697,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                     <FormItem>
                       <FormLabel>Website</FormLabel>
                       <FormControl>
-                        <Input placeholder="https://acme.com" {...field} data-testid="input-website" />
+                        <Input placeholder="https://acme.com" className="bg-white dark:bg-slate-900" {...field} data-testid="input-website" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -713,7 +713,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                         <FormLabel>Company Type *</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
-                            <SelectTrigger data-testid="select-company-type">
+                            <SelectTrigger className="bg-white dark:bg-slate-900" data-testid="select-company-type">
                               <SelectValue placeholder="Select company type" />
                             </SelectTrigger>
                           </FormControl>
@@ -738,7 +738,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                         <FormLabel>Company Size</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
-                            <SelectTrigger data-testid="select-size">
+                            <SelectTrigger className="bg-white dark:bg-slate-900" data-testid="select-size">
                               <SelectValue placeholder="Select size" />
                             </SelectTrigger>
                           </FormControl>
@@ -764,7 +764,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                     <FormItem>
                       <FormLabel>Phone</FormLabel>
                       <FormControl>
-                        <Input placeholder="+1 (555) 123-4567" {...field} data-testid="input-phone" />
+                        <Input placeholder="+1 (555) 123-4567" className="bg-white dark:bg-slate-900" {...field} data-testid="input-phone" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -804,6 +804,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                         value={unit}
                         onChange={(e) => setUnit(e.target.value)}
                         placeholder="Apt 4B, Suite 100, etc."
+                        className="bg-white dark:bg-slate-900"
                         data-testid="input-unit"
                       />
                     </div>
@@ -815,6 +816,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                           value={city}
                           onChange={(e) => setCity(e.target.value)}
                           placeholder="City"
+                          className="bg-white dark:bg-slate-900"
                           data-testid="input-city"
                         />
                       </div>
@@ -824,6 +826,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                           value={state}
                           onValueChange={setState}
                           placeholder="Select state"
+                          className="bg-white dark:bg-slate-900"
                         />
                       </div>
                       <div className="space-y-2">
@@ -833,6 +836,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                           value={zipCode}
                           onChange={(e) => setZipCode(e.target.value)}
                           placeholder="12345"
+                          className="bg-white dark:bg-slate-900"
                           data-testid="input-zip-code"
                         />
                       </div>
@@ -850,6 +854,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                         <Textarea 
                           placeholder="Brief description of the company..." 
                           rows={3}
+                          className="bg-white dark:bg-slate-900"
                           {...field} 
                           data-testid="textarea-description"
                         />
@@ -893,6 +898,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                           value={capitalPartner}
                           onChange={(e) => setCapitalPartner(e.target.value)}
                           placeholder="Enter capital partner name..."
+                          className="bg-white dark:bg-slate-900"
                           data-testid="input-capital-partner"
                         />
                       </div>
@@ -1111,6 +1117,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                             placeholder="e.g., CEO, Manager"
                             value={contactRole}
                             onChange={(e) => setContactRole(e.target.value)}
+                            className="bg-white dark:bg-slate-900"
                             data-testid="input-contact-role"
                           />
                         </div>
@@ -1156,7 +1163,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                               <FormItem>
                                 <FormLabel>First Name</FormLabel>
                                 <FormControl>
-                                  <Input placeholder="John" {...field} data-testid="input-new-contact-first-name" />
+                                  <Input placeholder="John" className="bg-white dark:bg-slate-900" {...field} data-testid="input-new-contact-first-name" />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -1169,7 +1176,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                               <FormItem>
                                 <FormLabel>Last Name</FormLabel>
                                 <FormControl>
-                                  <Input placeholder="Doe" {...field} data-testid="input-new-contact-last-name" />
+                                  <Input placeholder="Doe" className="bg-white dark:bg-slate-900" {...field} data-testid="input-new-contact-last-name" />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -1183,7 +1190,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                             <FormItem>
                               <FormLabel>Email</FormLabel>
                               <FormControl>
-                                <Input type="email" placeholder="john@example.com" {...field} data-testid="input-new-contact-email" />
+                                <Input type="email" placeholder="john@example.com" className="bg-white dark:bg-slate-900" {...field} data-testid="input-new-contact-email" />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -1197,7 +1204,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                               <FormItem>
                                 <FormLabel>Phone</FormLabel>
                                 <FormControl>
-                                  <Input placeholder="+1 (555) 123-4567" {...field} data-testid="input-new-contact-phone" />
+                                  <Input placeholder="+1 (555) 123-4567" className="bg-white dark:bg-slate-900" {...field} data-testid="input-new-contact-phone" />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -1210,7 +1217,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                               <FormItem>
                                 <FormLabel>Position</FormLabel>
                                 <FormControl>
-                                  <Input placeholder="CEO, Manager, etc." {...field} data-testid="input-new-contact-position" />
+                                  <Input placeholder="CEO, Manager, etc." className="bg-white dark:bg-slate-900" {...field} data-testid="input-new-contact-position" />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -1223,6 +1230,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                             placeholder="e.g., Decision Maker, Technical Contact"
                             value={contactRole}
                             onChange={(e) => setContactRole(e.target.value)}
+                            className="bg-white dark:bg-slate-900"
                             data-testid="input-new-contact-company-role"
                           />
                         </div>
@@ -1373,7 +1381,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                       <div>
                         <label className="text-sm font-medium">Select Property</label>
                         <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
-                          <SelectTrigger data-testid="select-property">
+                          <SelectTrigger className="bg-white dark:bg-slate-900" data-testid="select-property">
                             <SelectValue placeholder="Choose property" />
                           </SelectTrigger>
                           <SelectContent>

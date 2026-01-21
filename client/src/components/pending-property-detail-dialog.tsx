@@ -357,6 +357,7 @@ export function PendingPropertyDetailDialog({
                             value={currentData.marinaName}
                             onChange={(e) => setEditedData({ ...editedData, marinaName: e.target.value })}
                             placeholder="Enter marina name..."
+                            className="bg-white dark:bg-slate-900"
                             data-testid="input-marinaName"
                           />
                         ) : (
@@ -403,6 +404,7 @@ export function PendingPropertyDetailDialog({
                               value={currentData.city || ''}
                               onChange={(e) => setEditedData({ ...editedData, city: e.target.value })}
                               placeholder="San Diego"
+                              className="bg-white dark:bg-slate-900"
                               data-testid="input-city"
                             />
                           ) : (
@@ -418,6 +420,7 @@ export function PendingPropertyDetailDialog({
                               value={currentData.state || ''}
                               onChange={(e) => setEditedData({ ...editedData, state: e.target.value })}
                               placeholder="CA"
+                              className="bg-white dark:bg-slate-900"
                               data-testid="input-state"
                             />
                           ) : (
@@ -433,6 +436,7 @@ export function PendingPropertyDetailDialog({
                               value={(editedData.compMetadata as any)?.zip || currentData.compMetadata?.zip || ''}
                               onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, zip: e.target.value } })}
                               placeholder="92101"
+                              className="bg-white dark:bg-slate-900"
                               data-testid="input-zip"
                             />
                           ) : (
@@ -458,6 +462,7 @@ export function PendingPropertyDetailDialog({
                               value={(editedData.compMetadata as any)?.wetSlips || currentData.compMetadata?.wetSlips || ''}
                               onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, wetSlips: parseInt(e.target.value) || undefined } })}
                               placeholder="156"
+                              className="bg-white dark:bg-slate-900"
                               data-testid="input-wetSlips"
                             />
                           ) : (
@@ -473,6 +478,7 @@ export function PendingPropertyDetailDialog({
                               value={(editedData.compMetadata as any)?.dryRacks || currentData.compMetadata?.dryRacks || ''}
                               onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, dryRacks: parseInt(e.target.value) || undefined } })}
                               placeholder="89"
+                              className="bg-white dark:bg-slate-900"
                               data-testid="input-dryRacks"
                             />
                           ) : (
@@ -491,6 +497,7 @@ export function PendingPropertyDetailDialog({
                               value={(editedData.compMetadata as any)?.acres || currentData.compMetadata?.acres || ''}
                               onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, acres: parseFloat(e.target.value) || undefined } })}
                               placeholder="12.5"
+                              className="bg-white dark:bg-slate-900"
                               data-testid="input-acres"
                             />
                           ) : (
@@ -506,6 +513,7 @@ export function PendingPropertyDetailDialog({
                               value={(editedData.compMetadata as any)?.yearBuilt || currentData.compMetadata?.yearBuilt || ''}
                               onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, yearBuilt: parseInt(e.target.value) || undefined } })}
                               placeholder="1987"
+                              className="bg-white dark:bg-slate-900"
                               data-testid="input-yearBuilt"
                             />
                           ) : (
@@ -524,6 +532,7 @@ export function PendingPropertyDetailDialog({
                             value={(editedData.compMetadata as any)?.occupancy || currentData.compMetadata?.occupancy || ''}
                             onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, occupancy: parseInt(e.target.value) || undefined } })}
                             placeholder="95"
+                            className="bg-white dark:bg-slate-900"
                             data-testid="input-occupancy"
                           />
                         ) : (
@@ -538,6 +547,7 @@ export function PendingPropertyDetailDialog({
                             value={(editedData.compMetadata as any)?.bodyOfWater || currentData.compMetadata?.bodyOfWater || ''}
                             onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, bodyOfWater: e.target.value } })}
                             placeholder="Pacific Ocean"
+                            className="bg-white dark:bg-slate-900"
                             data-testid="input-bodyOfWater"
                           />
                         ) : (
@@ -565,6 +575,7 @@ export function PendingPropertyDetailDialog({
                             value={currentData.salePrice || ''}
                             onChange={(e) => setEditedData({ ...editedData, salePrice: parseInt(e.target.value) || null })}
                             placeholder="5000000"
+                            className="bg-white dark:bg-slate-900"
                             data-testid="input-salePrice"
                           />
                         ) : (
@@ -581,6 +592,7 @@ export function PendingPropertyDetailDialog({
                             value={(editedData.compMetadata as any)?.listPrice || currentData.compMetadata?.listPrice || ''}
                             onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, listPrice: parseInt(e.target.value) || undefined } })}
                             placeholder="5500000"
+                            className="bg-white dark:bg-slate-900"
                             data-testid="input-listPrice"
                           />
                         ) : (
@@ -597,6 +609,7 @@ export function PendingPropertyDetailDialog({
                             value={(editedData.compMetadata as any)?.noi || currentData.compMetadata?.noi || ''}
                             onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, noi: parseInt(e.target.value) || undefined } })}
                             placeholder="450000"
+                            className="bg-white dark:bg-slate-900"
                             data-testid="input-noi"
                           />
                         ) : (
@@ -614,6 +627,7 @@ export function PendingPropertyDetailDialog({
                             value={(editedData.compMetadata as any)?.capRate || currentData.compMetadata?.capRate || ''}
                             onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, capRate: parseFloat(e.target.value) || undefined } })}
                             placeholder="9.0"
+                            className="bg-white dark:bg-slate-900"
                             data-testid="input-capRate"
                           />
                         ) : (
@@ -632,6 +646,7 @@ export function PendingPropertyDetailDialog({
                               value={(editedData.compMetadata as any)?.saleMonth || currentData.compMetadata?.saleMonth || ''}
                               onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, saleMonth: parseInt(e.target.value) || undefined } })}
                               placeholder="6"
+                              className="bg-white dark:bg-slate-900"
                               data-testid="input-saleMonth"
                             />
                           ) : (
@@ -647,6 +662,7 @@ export function PendingPropertyDetailDialog({
                               value={(editedData.compMetadata as any)?.saleYear || currentData.compMetadata?.saleYear || ''}
                               onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, saleYear: parseInt(e.target.value) || undefined } })}
                               placeholder="2023"
+                              className="bg-white dark:bg-slate-900"
                               data-testid="input-saleYear"
                             />
                           ) : (
@@ -664,6 +680,7 @@ export function PendingPropertyDetailDialog({
                             value={(editedData.compMetadata as any)?.daysOnMarket || currentData.compMetadata?.daysOnMarket || ''}
                             onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, daysOnMarket: parseInt(e.target.value) || undefined } })}
                             placeholder="120"
+                            className="bg-white dark:bg-slate-900"
                             data-testid="input-daysOnMarket"
                           />
                         ) : (
@@ -687,6 +704,7 @@ export function PendingPropertyDetailDialog({
                             value={(editedData.compMetadata as any)?.saleCondition || currentData.compMetadata?.saleCondition || ''}
                             onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, saleCondition: e.target.value } })}
                             placeholder="As-is"
+                            className="bg-white dark:bg-slate-900"
                             data-testid="input-saleCondition"
                           />
                         ) : (
@@ -702,6 +720,7 @@ export function PendingPropertyDetailDialog({
                             value={(editedData.compMetadata as any)?.broker || currentData.compMetadata?.broker || ''}
                             onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, broker: e.target.value } })}
                             placeholder="ABC Realty"
+                            className="bg-white dark:bg-slate-900"
                             data-testid="input-broker"
                           />
                         ) : (
@@ -717,6 +736,7 @@ export function PendingPropertyDetailDialog({
                             value={(editedData.compMetadata as any)?.seller || currentData.compMetadata?.seller || ''}
                             onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, seller: e.target.value } })}
                             placeholder="John Doe"
+                            className="bg-white dark:bg-slate-900"
                             data-testid="input-seller"
                           />
                         ) : (
@@ -732,6 +752,7 @@ export function PendingPropertyDetailDialog({
                             value={(editedData.compMetadata as any)?.buyer || currentData.compMetadata?.buyer || ''}
                             onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, buyer: e.target.value } })}
                             placeholder="XYZ Corp"
+                            className="bg-white dark:bg-slate-900"
                             data-testid="input-buyer"
                           />
                         ) : (

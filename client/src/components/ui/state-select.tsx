@@ -64,6 +64,7 @@ interface StateSelectProps {
   onValueChange: (value: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  className?: string;
 }
 
 export function StateSelect({
@@ -71,10 +72,11 @@ export function StateSelect({
   onValueChange,
   placeholder = "Select state",
   disabled = false,
+  className,
 }: StateSelectProps) {
   return (
     <Select value={value} onValueChange={onValueChange} disabled={disabled}>
-      <SelectTrigger data-testid="select-state">
+      <SelectTrigger data-testid="select-state" className={className}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>

@@ -444,7 +444,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   placeholder="Jane"
-                  className={classNames(touched && errors.firstName && "border-destructive focus-visible:ring-destructive")}
+                  className={classNames("bg-white dark:bg-slate-900", touched && errors.firstName && "border-destructive focus-visible:ring-destructive")}
                   data-testid="input-first-name"
                 />
                 {touched && errors.firstName && (
@@ -458,7 +458,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                   value={lastName} 
                   onChange={(e) => setLastName(e.target.value)} 
                   placeholder="Doe" 
-                  className={classNames(touched && errors.lastName && "border-destructive focus-visible:ring-destructive")}
+                  className={classNames("bg-white dark:bg-slate-900", touched && errors.lastName && "border-destructive focus-visible:ring-destructive")}
                   data-testid="input-last-name"
                 />
                 {touched && errors.lastName && (
@@ -500,7 +500,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                   value={email} 
                   onChange={(e) => setEmail(e.target.value)} 
                   placeholder="jane.doe@example.com"
-                  className={classNames(touched && errors.email && "border-destructive focus-visible:ring-destructive")}
+                  className={classNames("bg-white dark:bg-slate-900", touched && errors.email && "border-destructive focus-visible:ring-destructive")}
                   data-testid="input-email"
                 />
                 {touched && errors.email && (
@@ -531,7 +531,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                         value={phone.type} 
                         onValueChange={(value) => updatePhone(index, 'type', value)}
                       >
-                        <SelectTrigger className="w-28" data-testid={`select-phone-type-${index}`}>
+                        <SelectTrigger className="w-28 bg-white dark:bg-slate-900" data-testid={`select-phone-type-${index}`}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -545,7 +545,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                         value={phone.number}
                         onChange={(e) => updatePhone(index, 'number', formatPhone(e.target.value))}
                         placeholder="(555) 555-1234"
-                        className="flex-1"
+                        className="flex-1 bg-white dark:bg-slate-900"
                         data-testid={`input-phone-${index}`}
                       />
                       {phones.length > 1 && (
@@ -590,7 +590,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                           if (company.length >= 2) setCompanyPopoverOpen(true);
                         }}
                         placeholder="Search or enter company name..." 
-                        className={classNames(touched && errors.company && "border-destructive focus-visible:ring-destructive")}
+                        className={classNames("bg-white dark:bg-slate-900", touched && errors.company && "border-destructive focus-visible:ring-destructive")}
                         data-testid="input-company"
                         autoComplete="off"
                       />
@@ -671,7 +671,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                   value={role} 
                   onChange={(e) => setRole(e.target.value)} 
                   placeholder="VP of Acquisitions" 
-                  className={classNames(touched && errors.role && "border-destructive focus-visible:ring-destructive")}
+                  className={classNames("bg-white dark:bg-slate-900", touched && errors.role && "border-destructive focus-visible:ring-destructive")}
                   data-testid="input-role"
                 />
                 {touched && errors.role && (
@@ -683,7 +683,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                 <Select value={contactTag} onValueChange={setContactTag}>
                   <SelectTrigger 
                     data-testid="select-contact-tag"
-                    className={classNames(touched && errors.contactTag && "border-destructive focus-visible:ring-destructive")}
+                    className={classNames("bg-white dark:bg-slate-900", touched && errors.contactTag && "border-destructive focus-visible:ring-destructive")}
                   >
                     <SelectValue placeholder="Select contact tag" />
                   </SelectTrigger>
@@ -714,7 +714,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                   <Select value={leadStatus} onValueChange={setLeadStatus}>
                     <SelectTrigger 
                       data-testid="select-lead-status"
-                      className={classNames(touched && errors.leadStatus && "border-destructive focus-visible:ring-destructive")}
+                      className={classNames("bg-white dark:bg-slate-900", touched && errors.leadStatus && "border-destructive focus-visible:ring-destructive")}
                     >
                       <SelectValue placeholder="Select lead status" />
                     </SelectTrigger>
@@ -773,6 +773,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                     value={unit} 
                     onChange={(e) => setUnit(e.target.value)} 
                     placeholder="Unit 5A" 
+                    className="bg-white dark:bg-slate-900"
                     data-testid="input-unit"
                   />
                 </div>
@@ -784,7 +785,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                       value={city} 
                       onChange={(e) => setCity(e.target.value)} 
                       placeholder="Key West"
-                      className={classNames(touched && errors.city && "border-destructive focus-visible:ring-destructive")}
+                      className={classNames("bg-white dark:bg-slate-900", touched && errors.city && "border-destructive focus-visible:ring-destructive")}
                       data-testid="input-city"
                     />
                     {touched && errors.city && (
@@ -797,6 +798,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                       value={state}
                       onValueChange={setState}
                       placeholder="Select state"
+                      className="bg-white dark:bg-slate-900"
                     />
                     {touched && errors.state && (
                       <p className="text-xs text-destructive">{errors.state}</p>
@@ -810,7 +812,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                     value={zipCode} 
                     onChange={(e) => setZipCode(e.target.value)} 
                     placeholder="33040"
-                    className={classNames(touched && errors.zipCode && "border-destructive focus-visible:ring-destructive")}
+                    className={classNames("bg-white dark:bg-slate-900", touched && errors.zipCode && "border-destructive focus-visible:ring-destructive")}
                     data-testid="input-zip-code"
                   />
                   {touched && errors.zipCode && (
@@ -846,7 +848,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                 <div className="space-y-2">
                   <Label className="text-sm">Assign to Deal</Label>
                   <Select value={dealAssignment} onValueChange={setDealAssignment}>
-                    <SelectTrigger data-testid="select-deal-assignment">
+                    <SelectTrigger className="bg-white dark:bg-slate-900" data-testid="select-deal-assignment">
                       <SelectValue placeholder="Select a deal to assign" />
                     </SelectTrigger>
                     <SelectContent>
@@ -865,7 +867,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                 <div className="space-y-2">
                   <Label className="text-sm">Contact Type</Label>
                   <Select value={contactType} onValueChange={setContactType}>
-                    <SelectTrigger data-testid="select-contact-type">
+                    <SelectTrigger className="bg-white dark:bg-slate-900" data-testid="select-contact-type">
                       <SelectValue placeholder="Select contact type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -919,7 +921,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                   onChange={(e) => setDealTeamNotes(e.target.value)} 
                   placeholder="Notes about this person's role on the deal team, responsibilities, coverage, etc." 
                   data-testid="textarea-deal-team-notes"
-                  className="resize-none"
+                  className="resize-none bg-white dark:bg-slate-900"
                 />
               </div>
             </CardContent>

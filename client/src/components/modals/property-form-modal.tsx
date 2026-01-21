@@ -538,7 +538,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                 <FormItem>
                   <FormLabel>Property Name *</FormLabel>
                   <FormControl>
-                    <Input placeholder="Property Name" {...field} data-testid="input-property-title" />
+                    <Input placeholder="Property Name" className="bg-white dark:bg-slate-900" {...field} data-testid="input-property-title" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -554,7 +554,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                     <FormLabel>Property Type</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger data-testid="select-property-type">
+                        <SelectTrigger className="bg-white dark:bg-slate-900" data-testid="select-property-type">
                           <SelectValue placeholder="Select type" />
                         </SelectTrigger>
                       </FormControl>
@@ -579,7 +579,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                     <FormLabel>Status</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger data-testid="select-property-status">
+                        <SelectTrigger className="bg-white dark:bg-slate-900" data-testid="select-property-status">
                           <SelectValue placeholder="Select status" />
                         </SelectTrigger>
                       </FormControl>
@@ -630,6 +630,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                     value={unit}
                     onChange={(e) => setUnit(e.target.value)}
                     placeholder="Dock A, Slip 12, etc."
+                    className="bg-white dark:bg-slate-900"
                     data-testid="input-unit"
                   />
                 </div>
@@ -641,6 +642,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
                       placeholder="Marina City"
+                      className="bg-white dark:bg-slate-900"
                       data-testid="input-city"
                     />
                   </div>
@@ -650,6 +652,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                       value={state}
                       onValueChange={setState}
                       placeholder="Select state"
+                      className="bg-white dark:bg-slate-900"
                     />
                   </div>
                   <div className="space-y-2">
@@ -659,6 +662,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                       value={zipCode}
                       onChange={(e) => setZipCode(e.target.value)}
                       placeholder="33000"
+                      className="bg-white dark:bg-slate-900"
                       data-testid="input-zip-code"
                     />
                   </div>
@@ -676,6 +680,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                     <Textarea 
                       placeholder="Detailed property description..." 
                       rows={3}
+                      className="bg-white dark:bg-slate-900"
                       {...field} 
                       data-testid="textarea-property-description"
                     />
@@ -697,6 +702,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                     placeholder="Number of wet slips"
                     value={wetSlips}
                     onChange={(e) => setWetSlips(e.target.value)}
+                    className="bg-white dark:bg-slate-900"
                     data-testid="input-wet-slips"
                   />
                 </div>
@@ -707,6 +713,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                     placeholder="Number of dry racks"
                     value={drySlips}
                     onChange={(e) => setDrySlips(e.target.value)}
+                    className="bg-white dark:bg-slate-900"
                     data-testid="input-dry-slips"
                   />
                 </div>
@@ -717,6 +724,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                     placeholder="Number of moorings"
                     value={moorings}
                     onChange={(e) => setMoorings(e.target.value)}
+                    className="bg-white dark:bg-slate-900"
                     data-testid="input-moorings"
                   />
                 </div>
@@ -727,6 +735,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                     placeholder="Total capacity"
                     value={totalCapacity}
                     onChange={(e) => setTotalCapacity(e.target.value)}
+                    className="bg-white dark:bg-slate-900"
                     data-testid="input-total-capacity"
                   />
                 </div>
@@ -738,6 +747,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                     placeholder="Total acreage"
                     value={totalAcres}
                     onChange={(e) => setTotalAcres(e.target.value)}
+                    className="bg-white dark:bg-slate-900"
                     data-testid="input-total-acres"
                   />
                 </div>
@@ -749,6 +759,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                     placeholder="Average water depth"
                     value={waterDepth}
                     onChange={(e) => setWaterDepth(e.target.value)}
+                    className="bg-white dark:bg-slate-900"
                     data-testid="input-water-depth"
                   />
                 </div>
@@ -759,6 +770,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                     placeholder="Linear feet of dockage"
                     value={linearFeet}
                     onChange={(e) => setLinearFeet(e.target.value)}
+                    className="bg-white dark:bg-slate-900"
                     data-testid="input-linear-feet"
                   />
                 </div>
@@ -769,6 +781,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                     placeholder="Year built"
                     value={yearBuilt}
                     onChange={(e) => setYearBuilt(e.target.value)}
+                    className="bg-white dark:bg-slate-900"
                     data-testid="input-year-built"
                   />
                 </div>
@@ -782,7 +795,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                 <FormLabel className="text-base font-medium">Storage Types</FormLabel>
                 <div className="flex gap-2 items-center">
                   <Select onValueChange={(value) => addStorageEntry(value)}>
-                    <SelectTrigger className="w-[180px]" data-testid="select-storage-type">
+                    <SelectTrigger className="w-[180px] bg-white dark:bg-slate-900" data-testid="select-storage-type">
                       <SelectValue placeholder="Add storage type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -808,7 +821,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                       addStorageEntry(customStorageType);
                     }
                   }}
-                  className="flex-1"
+                  className="flex-1 bg-white dark:bg-slate-900"
                   data-testid="input-custom-storage-type"
                 />
                 <Button 
@@ -846,7 +859,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                               placeholder="0"
                               value={entry.capacity}
                               onChange={(e) => updateStorageEntry(index, 'capacity', e.target.value)}
-                              className="h-8 w-20"
+                              className="h-8 w-20 bg-white dark:bg-slate-900"
                             />
                           </td>
                           <td className="px-3 py-1">
@@ -855,7 +868,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                               placeholder="0"
                               value={entry.occupied}
                               onChange={(e) => updateStorageEntry(index, 'occupied', e.target.value)}
-                              className="h-8 w-20"
+                              className="h-8 w-20 bg-white dark:bg-slate-900"
                             />
                           </td>
                           <td className="px-3 py-1">
@@ -865,7 +878,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                               placeholder="0.00"
                               value={entry.rate}
                               onChange={(e) => updateStorageEntry(index, 'rate', e.target.value)}
-                              className="h-8 w-24"
+                              className="h-8 w-24 bg-white dark:bg-slate-900"
                             />
                           </td>
                           <td className="px-3 py-1">
@@ -873,7 +886,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                               value={entry.rateType} 
                               onValueChange={(val) => updateStorageEntry(index, 'rateType', val)}
                             >
-                              <SelectTrigger className="h-8 w-24">
+                              <SelectTrigger className="h-8 w-24 bg-white dark:bg-slate-900">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -915,7 +928,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                 <div className="space-y-2">
                   <FormLabel className="text-sm">Last Sale Month</FormLabel>
                   <Select value={lastSaleMonth} onValueChange={setLastSaleMonth}>
-                    <SelectTrigger data-testid="select-last-sale-month">
+                    <SelectTrigger className="bg-white dark:bg-slate-900" data-testid="select-last-sale-month">
                       <SelectValue placeholder="Month" />
                     </SelectTrigger>
                     <SelectContent>
@@ -941,6 +954,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                     placeholder="e.g. 2023"
                     value={lastSaleYear}
                     onChange={(e) => setLastSaleYear(e.target.value)}
+                    className="bg-white dark:bg-slate-900"
                     data-testid="input-last-sale-year"
                   />
                 </div>
@@ -951,6 +965,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                     placeholder="e.g. 5000000"
                     value={lastSalePrice}
                     onChange={(e) => setLastSalePrice(e.target.value)}
+                    className="bg-white dark:bg-slate-900"
                     data-testid="input-last-sale-price"
                   />
                 </div>
@@ -995,12 +1010,12 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                               placeholder="Search contacts..."
                               value={contactSearch}
                               onChange={(e) => setContactSearch(e.target.value)}
-                              className="pl-8"
+                              className="pl-8 bg-white dark:bg-slate-900"
                               data-testid="input-search-contacts"
                             />
                           </div>
                           <Select value={selectedContactRelationship} onValueChange={setSelectedContactRelationship}>
-                            <SelectTrigger className="w-[130px]" data-testid="select-contact-relationship">
+                            <SelectTrigger className="w-[130px] bg-white dark:bg-slate-900" data-testid="select-contact-relationship">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -1080,12 +1095,12 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                               placeholder="Search companies..."
                               value={companySearch}
                               onChange={(e) => setCompanySearch(e.target.value)}
-                              className="pl-8"
+                              className="pl-8 bg-white dark:bg-slate-900"
                               data-testid="input-search-companies"
                             />
                           </div>
                           <Select value={selectedCompanyRelationship} onValueChange={setSelectedCompanyRelationship}>
-                            <SelectTrigger className="w-[130px]" data-testid="select-company-relationship">
+                            <SelectTrigger className="w-[130px] bg-white dark:bg-slate-900" data-testid="select-company-relationship">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>

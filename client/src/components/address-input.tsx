@@ -395,7 +395,7 @@ export function AddressInput({
           placeholder={placeholder}
           disabled={disabled}
           required={required}
-          className="pl-10"
+          className="pl-10 bg-white dark:bg-slate-900"
           data-testid={testId}
           autoComplete="off"
         />
