@@ -1,0 +1,72 @@
+import { Button } from '@/components/ui/button';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+
+const WORKFLOW_STEPS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'inputs', label: 'Inputs' },
+  { id: 'uploads', label: 'Uploads' },
+  { id: 'historical', label: 'Historical' },
+  { id: 'assumptions', label: 'Assumptions' },
+  { id: 'proforma', label: 'Pro Forma' },
+  { id: 'pricing', label: 'Pricing' },
+  { id: 'capital', label: 'Capital' },
+  { id: 'debt', label: 'Debt' },
+  { id: 'exit', label: 'Exit' },
+  { id: 'dcf', label: 'DCF' },
+  { id: 'summary', label: 'Summary' },
+];
+
+interface WorkflowNavigationProps {
+  currentTab: string;
+  onNavigate: (tab: string) => void;
+}
+
+export function WorkflowNavigation({ currentTab, onNavigate }: WorkflowNavigationProps) {
+  const currentIndex = WORKFLOW_STEPS.findIndex(step => step.id === currentTab);
+  
+  if (currentIndex === -1) return null;
+  
+  const previousStep = currentIndex > 0 ? WORKFLOW_STEPS[currentIndex - 1] : null;
+  const nextStep = currentIndex < WORKFLOW_STEPS.length - 1 ? WORKFLOW_STEPS[currentIndex + 1] : null;
+  const stepNumber = currentIndex + 1;
+  const totalSteps = WORKFLOW_STEPS.length;
+
+  return (
+    <div className="flex items-center justify-between pt-8 mt-8 border-t">
+      <div>
+        {previousStep ? (
+          <Button
+            variant="outline"
+            onClick={() => onNavigate(previousStep.id)}
+            className="gap-2"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Previous: {previousStep.label}
+          </Button>
+        ) : (
+          <div />
+        )}
+      </div>
+      
+      <div className="text-sm text-muted-foreground">
+        Step {stepNumber} of {totalSteps}
+      </div>
+      
+      <div>
+        {nextStep ? (
+          <Button
+            onClick={() => onNavigate(nextStep.id)}
+            className="gap-2"
+          >
+            Next: {nextStep.label}
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        ) : (
+          <div />
+        )}
+      </div>
+    </div>
+  );
+}
+
+export { WORKFLOW_STEPS };

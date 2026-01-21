@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import type { ModelingProject } from '@shared/schema';
 import { LiveDataStatusPanel } from '@/components/modeling/LiveDataStatusPanel';
+import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 
 interface WorkspaceOverviewProps {
   project: ModelingProject;
@@ -310,6 +311,8 @@ export default function WorkspaceOverview({ project, onTabChange }: WorkspaceOve
         projectId={project.id} 
         dealSource={(project as any).dealSource} 
       />
+
+      <WorkflowNavigation currentTab="overview" onNavigate={onTabChange} />
     </div>
   );
 }

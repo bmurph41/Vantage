@@ -50,9 +50,11 @@ import {
   BarChart3
 } from 'lucide-react';
 import ICMemoExport from './ic-memo-export';
+import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 
 interface WorkspaceExecutiveSummaryProps {
   projectId: string;
+  onTabChange?: (tab: string) => void;
 }
 
 type ScenarioType = 'base' | 'aggressive' | 'conservative';
@@ -89,7 +91,7 @@ const defaultScenarios: Record<ScenarioType, ScenarioConfig> = {
   },
 };
 
-export default function WorkspaceExecutiveSummary({ projectId }: WorkspaceExecutiveSummaryProps) {
+export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: WorkspaceExecutiveSummaryProps) {
   const { toast } = useToast();
   const [activeScenario, setActiveScenario] = useState<ScenarioType>('base');
   const [showScenarioConfig, setShowScenarioConfig] = useState(false);
@@ -507,6 +509,10 @@ export default function WorkspaceExecutiveSummary({ projectId }: WorkspaceExecut
           </Table>
         </CardContent>
       </Card>
+
+      {onTabChange && (
+        <WorkflowNavigation currentTab="summary" onNavigate={onTabChange} />
+      )}
     </div>
   );
 }

@@ -33,6 +33,7 @@ import {
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { cn } from '@/lib/utils';
 import debounce from 'lodash.debounce';
+import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 
 interface DCFScenario {
   id: string;
@@ -84,7 +85,11 @@ interface DCFAnalysis {
   };
 }
 
-export default function DCFCalculatorPage() {
+interface DCFCalculatorPageProps {
+  onTabChange?: (tab: string) => void;
+}
+
+export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProps = {}) {
   const { projectId } = useParams<{ projectId: string }>();
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedScenario, setSelectedScenario] = useState<string | null>(null);
@@ -718,6 +723,10 @@ export default function DCFCalculatorPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {onTabChange && (
+        <WorkflowNavigation currentTab="dcf" onNavigate={onTabChange} />
+      )}
     </div>
   );
 }

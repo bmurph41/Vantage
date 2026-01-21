@@ -3,6 +3,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AutosaveIndicator } from '@/components/ui/autosave-indicator';
+import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import type { AutoSaveStatus } from '@/hooks/use-local-autosave';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -139,6 +140,7 @@ function PercentInput({
 
 interface WorkspaceAssumptionsProps {
   projectId: string;
+  onTabChange?: (tab: string) => void;
 }
 
 type ScenarioType = 'base' | 'aggressive' | 'conservative' | 'custom';
@@ -301,7 +303,7 @@ const statusConfig: Record<ScenarioStatus, { label: string; variant: 'default' |
   rejected: { label: 'Rejected', variant: 'destructive', icon: XCircle },
 };
 
-export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptionsProps) {
+export default function WorkspaceAssumptions({ projectId, onTabChange }: WorkspaceAssumptionsProps) {
   const { toast } = useToast();
   const [activeScenarioType, setActiveScenarioType] = useState<ScenarioType>('base');
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
@@ -1298,6 +1300,10 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {onTabChange && (
+        <WorkflowNavigation currentTab="assumptions" onNavigate={onTabChange} />
+      )}
     </div>
   );
 }

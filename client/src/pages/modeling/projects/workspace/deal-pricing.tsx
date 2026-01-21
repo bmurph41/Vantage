@@ -39,9 +39,11 @@ import {
 import type { ModelingProject, ModelingFinancialPeriod } from '@shared/schema';
 import debounce from 'lodash.debounce';
 import YearSelector from '@/components/modeling/YearSelector';
+import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 
 interface DealPricingProps {
   projectId: string;
+  onTabChange?: (tab: string) => void;
 }
 
 interface PricingResult {
@@ -108,7 +110,7 @@ const parsePercentInput = (value: string): number => {
   return parseFloat(num) || 0;
 };
 
-export default function DealPricing({ projectId }: DealPricingProps) {
+export default function DealPricing({ projectId, onTabChange }: DealPricingProps) {
   const { toast } = useToast();
   
   const [manualPurchasePrice, setManualPurchasePrice] = useState<string>('');
@@ -765,6 +767,10 @@ export default function DealPricing({ projectId }: DealPricingProps) {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {onTabChange && (
+        <WorkflowNavigation currentTab="pricing" onNavigate={onTabChange} />
       )}
     </div>
   );

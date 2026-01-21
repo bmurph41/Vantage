@@ -29,14 +29,16 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 
 interface WorkspaceProFormaProps {
   projectId: string;
+  onTabChange?: (tab: string) => void;
 }
 
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-export default function WorkspaceProForma({ projectId }: WorkspaceProFormaProps) {
+export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceProFormaProps) {
   const [viewMode, setViewMode] = useState<'monthly' | 'annual'>('annual');
   const [selectedYear, setSelectedYear] = useState('2026');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['revenue']));
@@ -435,6 +437,10 @@ export default function WorkspaceProForma({ projectId }: WorkspaceProFormaProps)
           </div>
         </CardContent>
       </Card>
+
+      {onTabChange && (
+        <WorkflowNavigation currentTab="proforma" onNavigate={onTabChange} />
+      )}
     </div>
   );
 }

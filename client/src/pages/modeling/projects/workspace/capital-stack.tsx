@@ -49,9 +49,11 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { CapitalStack, DebtTranche, EquityLayer, CapitalStackProjection, Fund, FundDealAllocation, FundCapitalStackTemplate } from '@shared/schema';
+import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 
 interface CapitalStackWorkspaceProps {
   projectId: string;
+  onTabChange?: (tab: string) => void;
 }
 
 const DEBT_TRANCHE_TYPES = [
@@ -150,7 +152,7 @@ const equityLayerFormSchema = z.object({
 type DebtTrancheFormData = z.infer<typeof debtTrancheFormSchema>;
 type EquityLayerFormData = z.infer<typeof equityLayerFormSchema>;
 
-export default function CapitalStackWorkspace({ projectId }: CapitalStackWorkspaceProps) {
+export default function CapitalStackWorkspace({ projectId, onTabChange }: CapitalStackWorkspaceProps) {
   const { toast } = useToast();
   const [selectedStackId, setSelectedStackId] = useState<string | null>(null);
   const [showCreateStack, setShowCreateStack] = useState(false);
@@ -1786,6 +1788,10 @@ export default function CapitalStackWorkspace({ projectId }: CapitalStackWorkspa
             )}
           </div>
         </div>
+      )}
+
+      {onTabChange && (
+        <WorkflowNavigation currentTab="capital" onNavigate={onTabChange} />
       )}
     </div>
   );

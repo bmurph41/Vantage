@@ -27,9 +27,11 @@ import {
   Info
 } from "lucide-react";
 import type { ModelingProject, ExitScenario } from "@shared/schema";
+import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 
 interface WorkspaceExitStrategyProps {
   projectId: string;
+  onTabChange?: (tab: string) => void;
 }
 
 type ScenarioType = 'base' | 'aggressive' | 'conservative';
@@ -304,7 +306,7 @@ const exitTools = [
   },
 ];
 
-export default function WorkspaceExitStrategy({ projectId }: WorkspaceExitStrategyProps) {
+export default function WorkspaceExitStrategy({ projectId, onTabChange }: WorkspaceExitStrategyProps) {
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState("tax");
   const [activeScenario, setActiveScenario] = useState<ScenarioType>('base');
@@ -574,6 +576,10 @@ export default function WorkspaceExitStrategy({ projectId }: WorkspaceExitStrate
           />
         </TabsContent>
       </Tabs>
+
+      {onTabChange && (
+        <WorkflowNavigation currentTab="exit" onNavigate={onTabChange} />
+      )}
     </div>
   );
 }

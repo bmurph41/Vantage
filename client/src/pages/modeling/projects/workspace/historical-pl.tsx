@@ -52,9 +52,11 @@ import {
   Clock,
   Info
 } from 'lucide-react';
+import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 
 interface WorkspaceHistoricalPLProps {
   projectId: string;
+  onTabChange?: (tab: string) => void;
 }
 
 type PLLineItem = {
@@ -96,7 +98,7 @@ const dataSourceLabels: Record<string, string> = {
   doc_intel: 'Document Intelligence'
 };
 
-export default function WorkspaceHistoricalPL({ projectId }: WorkspaceHistoricalPLProps) {
+export default function WorkspaceHistoricalPL({ projectId, onTabChange }: WorkspaceHistoricalPLProps) {
   const { toast } = useToast();
   const [selectedYear, setSelectedYear] = useState('2024');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['Revenue', 'COGS', 'Expenses']));
@@ -654,6 +656,10 @@ export default function WorkspaceHistoricalPL({ projectId }: WorkspaceHistorical
           </div>
         </CardContent>
       </Card>
+
+      {onTabChange && (
+        <WorkflowNavigation currentTab="historical" onNavigate={onTabChange} />
+      )}
     </div>
   );
 }

@@ -34,9 +34,11 @@ import {
 import { Link } from 'wouter';
 import { UploadDropzone } from '@/pages/modeling/doc-intel/UploadDropzone';
 import type { DocIntelUpload } from '@shared/schema';
+import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 
 interface WorkspaceUploadsProps {
   projectId: string;
+  onTabChange?: (tab: string) => void;
 }
 
 interface UploadWithStats extends DocIntelUpload {
@@ -51,7 +53,7 @@ interface UploadWithStats extends DocIntelUpload {
   };
 }
 
-export default function WorkspaceUploads({ projectId }: WorkspaceUploadsProps) {
+export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUploadsProps) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -299,6 +301,10 @@ export default function WorkspaceUploads({ projectId }: WorkspaceUploadsProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {onTabChange && (
+        <WorkflowNavigation currentTab="uploads" onNavigate={onTabChange} />
+      )}
     </div>
   );
 }

@@ -317,7 +317,7 @@ export default function ProjectWorkspace() {
         </TabsContent>
 
         <TabsContent value="inputs" className="space-y-6" data-tour="valuator-inputs">
-          <WorkspaceInputs projectId={projectId!} />
+          <WorkspaceInputs projectId={projectId!} onTabChange={setActiveTab} />
         </TabsContent>
 
         <TabsContent value="cases" className="space-y-6" data-tour="valuator-scenarios">
@@ -325,15 +325,15 @@ export default function ProjectWorkspace() {
         </TabsContent>
 
         <TabsContent value="uploads" className="space-y-6">
-          <WorkspaceUploads projectId={projectId!} />
+          <WorkspaceUploads projectId={projectId!} onTabChange={setActiveTab} />
         </TabsContent>
 
         <TabsContent value="assumptions" className="space-y-6">
-          <WorkspaceAssumptions projectId={projectId!} />
+          <WorkspaceAssumptions projectId={projectId!} onTabChange={setActiveTab} />
         </TabsContent>
 
         <TabsContent value="historical" className="space-y-6">
-          <WorkspaceHistoricalPL projectId={projectId!} />
+          <WorkspaceHistoricalPL projectId={projectId!} onTabChange={setActiveTab} />
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6" data-tour="valuator-analysis">
@@ -341,27 +341,27 @@ export default function ProjectWorkspace() {
         </TabsContent>
 
         <TabsContent value="proforma" className="space-y-6">
-          <WorkspaceProForma projectId={projectId!} />
+          <WorkspaceProForma projectId={projectId!} onTabChange={setActiveTab} />
         </TabsContent>
 
         <TabsContent value="pricing" className="space-y-6">
-          <DealPricing projectId={projectId!} />
+          <DealPricing projectId={projectId!} onTabChange={setActiveTab} />
         </TabsContent>
 
         <TabsContent value="summary" className="space-y-6" data-tour="valuator-export">
-          <WorkspaceExecutiveSummary projectId={projectId!} />
+          <WorkspaceExecutiveSummary projectId={projectId!} onTabChange={setActiveTab} />
         </TabsContent>
 
         <TabsContent value="debt" className="space-y-6">
-          <WorkspaceDebtScenarios projectId={projectId!} />
+          <WorkspaceDebtScenarios projectId={projectId!} onTabChange={setActiveTab} />
         </TabsContent>
 
         <TabsContent value="capital" className="space-y-6">
-          <CapitalStackWorkspace projectId={projectId!} />
+          <CapitalStackWorkspace projectId={projectId!} onTabChange={setActiveTab} />
         </TabsContent>
 
         <TabsContent value="exit" className="space-y-6" data-tour="valuator-exit">
-          <WorkspaceExitStrategy projectId={projectId!} />
+          <WorkspaceExitStrategy projectId={projectId!} onTabChange={setActiveTab} />
         </TabsContent>
 
         <TabsContent value="compare" className="space-y-6">
@@ -392,7 +392,7 @@ export default function ProjectWorkspace() {
         </TabsContent>
 
         <TabsContent value="dcf" className="space-y-6">
-          <DCFCalculatorPage />
+          <DCFCalculatorPage onTabChange={setActiveTab} />
         </TabsContent>
 
         <TabsContent value="monte-carlo" className="space-y-6">

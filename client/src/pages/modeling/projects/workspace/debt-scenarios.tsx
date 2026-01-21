@@ -23,9 +23,11 @@ import { format, subYears } from "date-fns";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { DebtScenario, ModelingProject } from "@shared/schema";
+import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 
 interface WorkspaceDebtScenariosProps {
   projectId: string;
+  onTabChange?: (tab: string) => void;
 }
 
 const BASE_RATE_OPTIONS = [
@@ -74,7 +76,7 @@ const parseFormattedNumber = (value: string): number => {
   return parseFloat(value.replace(/,/g, '')) || 0;
 };
 
-export default function WorkspaceDebtScenarios({ projectId }: WorkspaceDebtScenariosProps) {
+export default function WorkspaceDebtScenarios({ projectId, onTabChange }: WorkspaceDebtScenariosProps) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState("overview");
@@ -872,6 +874,10 @@ export default function WorkspaceDebtScenarios({ projectId }: WorkspaceDebtScena
           )}
         </TabsContent>
       </Tabs>
+
+      {onTabChange && (
+        <WorkflowNavigation currentTab="debt" onNavigate={onTabChange} />
+      )}
     </div>
   );
 }

@@ -40,9 +40,11 @@ import {
   Container,
   Sailboat
 } from 'lucide-react';
+import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 
 interface WorkspaceInputsProps {
   projectId: string;
+  onTabChange?: (tab: string) => void;
 }
 
 type StorageTypeConfig = {
@@ -97,7 +99,7 @@ const months = [
   { value: 12, label: 'December', short: 'Dec' },
 ];
 
-export default function WorkspaceInputs({ projectId }: WorkspaceInputsProps) {
+export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInputsProps) {
   const { data: config, isLoading } = useQuery<any>({
     queryKey: ['/api/modeling/projects', projectId, 'config'],
   });
@@ -459,6 +461,10 @@ export default function WorkspaceInputs({ projectId }: WorkspaceInputsProps) {
           </div>
         </CardContent>
       </Card>
+
+      {onTabChange && (
+        <WorkflowNavigation currentTab="inputs" onNavigate={onTabChange} />
+      )}
     </div>
   );
 }
