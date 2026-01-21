@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { queryClient, apiRequest } from '@/lib/queryClient';
+import { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +14,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useToast } from '@/hooks/use-toast';
+import { useLocalAutosave } from '@/hooks/use-local-autosave';
+import { AutosaveIndicator } from '@/components/ui/autosave-indicator';
 import {
   Calendar,
   Save,
@@ -73,8 +73,6 @@ const months = [
 ];
 
 export default function WorkspaceInputs({ projectId }: WorkspaceInputsProps) {
-  const { toast } = useToast();
-
   const { data: config, isLoading } = useQuery<any>({
     queryKey: ['/api/modeling/projects', projectId, 'config'],
   });
@@ -84,6 +82,29 @@ export default function WorkspaceInputs({ projectId }: WorkspaceInputsProps) {
   const [cashFlowGranularity, setCashFlowGranularity] = useState<string>('annual');
   const [seasonMonths, setSeasonMonths] = useState<number[]>([4, 5, 6, 7, 8, 9, 10]);
   const [departments, setDepartments] = useState<DepartmentConfig[]>(defaultDepartments);
+
+  const { status, triggerAutosave, forceSave } = useLocalAutosave({
+    entityId: projectId,
+    endpoint: '/api/modeling/projects/{id}/config',
+    method: 'POST',
+    enabled: true,
+    debounceMs: 2000,
+    invalidateQueries: [['/api/modeling/projects', projectId, 'config']],
+  });
+
+  const getCurrentData = () => {
+    const departmentSettings: Record<string, { isYearRound: boolean; isEnabled: boolean }> = {};
+    departments.forEach(dept => {
+      departmentSettings[dept.id] = { isYearRound: dept.isYearRound, isEnabled: dept.isEnabled };
+    });
+    return {
+      holdPeriod,
+      startDate,
+      cashFlowGranularity,
+      seasonMonths,
+      departments: departmentSettings,
+    };
+  };
 
   useEffect(() => {
     if (config) {
@@ -101,16 +122,11 @@ export default function WorkspaceInputs({ projectId }: WorkspaceInputsProps) {
     }
   }, [config]);
 
-  const saveMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('POST', `/api/modeling/projects/${projectId}/config`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'config'] });
-      toast({ title: 'Saved', description: 'Project configuration has been saved.' });
-    },
-    onError: () => {
-      toast({ title: 'Error', description: 'Failed to save configuration.', variant: 'destructive' });
-    },
-  });
+  useEffect(() => {
+    if (config) {
+      triggerAutosave(getCurrentData());
+    }
+  }, [holdPeriod, startDate, cashFlowGranularity, seasonMonths, departments]);
 
   const toggleSeasonMonth = (month: number) => {
     setSeasonMonths(prev => 
@@ -133,18 +149,7 @@ export default function WorkspaceInputs({ projectId }: WorkspaceInputsProps) {
   };
 
   const handleSave = () => {
-    const departmentSettings: Record<string, { isYearRound: boolean; isEnabled: boolean }> = {};
-    departments.forEach(dept => {
-      departmentSettings[dept.id] = { isYearRound: dept.isYearRound, isEnabled: dept.isEnabled };
-    });
-
-    saveMutation.mutate({
-      holdPeriod,
-      startDate,
-      cashFlowGranularity,
-      seasonMonths,
-      departments: departmentSettings,
-    });
+    forceSave(getCurrentData());
   };
 
   const getSeasonLabel = () => {
@@ -165,14 +170,19 @@ export default function WorkspaceInputs({ projectId }: WorkspaceInputsProps) {
             Configure seasonality, hold period, and department settings
           </p>
         </div>
-        <Button 
-          onClick={handleSave} 
-          disabled={saveMutation.isPending}
-          data-testid="button-save-inputs"
-        >
-          <Save className="h-4 w-4 mr-2" />
-          {saveMutation.isPending ? 'Saving...' : 'Save Changes'}
-        </Button>
+        <div className="flex items-center gap-3">
+          <AutosaveIndicator status={status} showText size="sm" />
+          <Button 
+            onClick={handleSave} 
+            disabled={status === 'saving'}
+            variant="outline"
+            size="sm"
+            data-testid="button-save-inputs"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            Save Now
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">

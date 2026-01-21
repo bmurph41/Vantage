@@ -1,7 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { AutosaveIndicator } from '@/components/ui/autosave-indicator';
+import type { AutoSaveStatus } from '@/hooks/use-local-autosave';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -249,6 +251,8 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
   const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve');
   const [approvalNotes, setApprovalNotes] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
+  const [autosaveStatus, setAutosaveStatus] = useState<AutoSaveStatus>('idle');
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: project } = useQuery<ModelingProject>({
     queryKey: ['/api/modeling/projects', projectId],
@@ -400,7 +404,10 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
   }
 
   const saveMutation = useMutation({
-    mutationFn: ({ createNewVersion }: { createNewVersion: boolean }) => {
+    mutationFn: ({ createNewVersion, isAutosave }: { createNewVersion: boolean; isAutosave?: boolean }) => {
+      if (isAutosave) {
+        setAutosaveStatus('saving');
+      }
       if (!activeScenario) {
         return apiRequest('POST', `/api/modeling/projects/${projectId}/scenarios`, {
           scenarioType: activeScenarioType,
@@ -415,20 +422,52 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
         createNewVersion,
       });
     },
-    onSuccess: (_, { createNewVersion }) => {
+    onSuccess: (_, { createNewVersion, isAutosave }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'scenarios'] });
       setHasChanges(false);
-      toast({ 
-        title: createNewVersion ? 'New Version Created' : 'Saved', 
-        description: createNewVersion 
-          ? `Version ${(activeScenario?.version || 0) + 1} has been created.`
-          : 'Assumptions have been saved.' 
-      });
+      if (isAutosave) {
+        setAutosaveStatus('saved');
+        setTimeout(() => setAutosaveStatus('idle'), 3000);
+      } else {
+        toast({ 
+          title: createNewVersion ? 'New Version Created' : 'Saved', 
+          description: createNewVersion 
+            ? `Version ${(activeScenario?.version || 0) + 1} has been created.`
+            : 'Assumptions have been saved.' 
+        });
+      }
     },
-    onError: () => {
-      toast({ title: 'Error', description: 'Failed to save assumptions.', variant: 'destructive' });
+    onError: (_, { isAutosave }) => {
+      if (isAutosave) {
+        setAutosaveStatus('error');
+        setTimeout(() => setAutosaveStatus('idle'), 5000);
+      } else {
+        toast({ title: 'Error', description: 'Failed to save assumptions.', variant: 'destructive' });
+      }
     },
   });
+
+  const triggerAutosave = useCallback(() => {
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+    autosaveTimerRef.current = setTimeout(() => {
+      if (hasChanges && activeScenario) {
+        saveMutation.mutate({ createNewVersion: false, isAutosave: true });
+      }
+    }, 2000);
+  }, [hasChanges, activeScenario, saveMutation]);
+
+  useEffect(() => {
+    if (hasChanges) {
+      triggerAutosave();
+    }
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+      }
+    };
+  }, [hasChanges, growthRates, expenseGrowth, occupancy, margins, storageGrowth]);
 
   const submitMutation = useMutation({
     mutationFn: () => apiRequest('POST', `/api/modeling/projects/${projectId}/scenarios/${activeScenario?.id}/submit`),
@@ -629,7 +668,9 @@ export default function WorkspaceAssumptions({ projectId }: WorkspaceAssumptions
               </Tabs>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              <AutosaveIndicator status={autosaveStatus} showText size="sm" />
+              
               <Button
                 variant="outline"
                 size="sm"
