@@ -541,6 +541,13 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
   };
 
   const handleEquitySubmit = (data: EquityLayerFormData) => {
+    const ownershipValue = parseFloat(data.ownershipPct) || 0;
+    const normalizedOwnership = ownershipValue > 1 ? ownershipValue / 100 : ownershipValue;
+    const prefReturnValue = parseFloat(data.preferredReturn || '0');
+    const normalizedPrefReturn = prefReturnValue > 1 ? prefReturnValue / 100 : prefReturnValue;
+    const catchUpValue = parseFloat(data.catchUpPct || '0');
+    const normalizedCatchUp = catchUpValue > 1 ? catchUpValue / 100 : catchUpValue;
+    
     const payload = {
       name: data.name,
       layerType: data.layerType,
@@ -548,11 +555,11 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
       investorType: data.investorType || null,
       commitmentAmount: data.commitmentAmount,
       fundedAmount: data.fundedAmount || '0',
-      ownershipPct: data.ownershipPct,
-      preferredReturn: data.preferredReturn || null,
+      ownershipPct: String(normalizedOwnership),
+      preferredReturn: data.preferredReturn ? String(normalizedPrefReturn) : null,
       preferredReturnType: data.preferredReturnType || null,
       isParticipating: data.isParticipating ?? true,
-      catchUpPct: data.catchUpPct || null,
+      catchUpPct: data.catchUpPct ? String(normalizedCatchUp) : null,
       promoteTiers: data.layerType === 'promote' ? promoteTiers : null,
       waterfallPriority: (stackDetails?.equityLayers.length || 0) + 1,
     };
@@ -1367,215 +1374,372 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                             Add Layer
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                          <DialogHeader>
-                            <DialogTitle>{editingEquity ? 'Edit' : 'Add'} Equity Layer</DialogTitle>
-                            <DialogDescription>Configure equity contribution, returns, and promote structure</DialogDescription>
+                        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                          <DialogHeader className="pb-4 border-b">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-green-100 rounded-lg">
+                                <Layers className="h-5 w-5 text-green-600" />
+                              </div>
+                              <div>
+                                <DialogTitle className="text-lg">{editingEquity ? 'Edit' : 'Add'} Equity Layer</DialogTitle>
+                                <DialogDescription>Configure investor details, capital commitment, return structure, and promote tiers</DialogDescription>
+                              </div>
+                            </div>
                           </DialogHeader>
                           <Form {...equityForm}>
-                            <form onSubmit={equityForm.handleSubmit(handleEquitySubmit)} className="space-y-6">
-                              <div className="grid grid-cols-2 gap-4">
-                                <FormField control={equityForm.control} name="name" render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Layer Name *</FormLabel>
-                                    <FormControl><Input {...field} placeholder="LP Equity" /></FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )} />
-                                <FormField control={equityForm.control} name="layerType" render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Type *</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value}>
-                                      <FormControl>
-                                        <SelectTrigger><SelectValue /></SelectTrigger>
-                                      </FormControl>
-                                      <SelectContent>
-                                        {EQUITY_LAYER_TYPES.map((t) => (
-                                          <SelectItem key={t.value} value={t.value}>
-                                            <div>
-                                              <div>{t.label}</div>
-                                              <div className="text-xs text-muted-foreground">{t.description}</div>
+                            <form onSubmit={equityForm.handleSubmit(handleEquitySubmit)} className="space-y-0">
+                              <Tabs defaultValue="investor" className="w-full">
+                                <TabsList className="grid w-full grid-cols-4 mb-4">
+                                  <TabsTrigger value="investor" className="text-xs gap-1">
+                                    <Briefcase className="h-3.5 w-3.5" />
+                                    Investor
+                                  </TabsTrigger>
+                                  <TabsTrigger value="contribution" className="text-xs gap-1">
+                                    <DollarSign className="h-3.5 w-3.5" />
+                                    Contribution
+                                  </TabsTrigger>
+                                  <TabsTrigger value="returns" className="text-xs gap-1">
+                                    <TrendingUp className="h-3.5 w-3.5" />
+                                    Returns
+                                  </TabsTrigger>
+                                  <TabsTrigger value="promote" className="text-xs gap-1">
+                                    <PieChart className="h-3.5 w-3.5" />
+                                    Promote
+                                  </TabsTrigger>
+                                </TabsList>
+
+                                <TabsContent value="investor" className="space-y-4 mt-0">
+                                  <Card className="p-4 bg-slate-50/50">
+                                    <h4 className="font-medium text-sm mb-4 flex items-center gap-2">
+                                      <Briefcase className="h-4 w-4 text-slate-600" />
+                                      Investor Information
+                                    </h4>
+                                    <div className="grid grid-cols-2 gap-4">
+                                      <FormField control={equityForm.control} name="name" render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Layer Name *</FormLabel>
+                                          <FormControl>
+                                            <Input {...field} placeholder="e.g., LP Class A Equity" className="bg-white" />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )} />
+                                      <FormField control={equityForm.control} name="layerType" render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Equity Type *</FormLabel>
+                                          <Select onValueChange={field.onChange} value={field.value}>
+                                            <FormControl>
+                                              <SelectTrigger className="bg-white"><SelectValue placeholder="Select type..." /></SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                              {EQUITY_LAYER_TYPES.map((t) => (
+                                                <SelectItem key={t.value} value={t.value}>
+                                                  <div className="flex flex-col">
+                                                    <span className="font-medium">{t.label}</span>
+                                                    <span className="text-xs text-muted-foreground">{t.description}</span>
+                                                  </div>
+                                                </SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )} />
+                                    </div>
+
+                                    <Separator className="my-4" />
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                      <FormField control={equityForm.control} name="investorName" render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Investor / Entity Name</FormLabel>
+                                          <FormControl>
+                                            <Input {...field} placeholder="e.g., ABC Capital Partners, LP" className="bg-white" />
+                                          </FormControl>
+                                          <FormDescription>Legal name of the investing entity</FormDescription>
+                                        </FormItem>
+                                      )} />
+                                      <FormField control={equityForm.control} name="investorType" render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Investor Classification</FormLabel>
+                                          <Select onValueChange={field.onChange} value={field.value}>
+                                            <FormControl>
+                                              <SelectTrigger className="bg-white"><SelectValue placeholder="Select classification..." /></SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                              {INVESTOR_TYPES.map((t) => (
+                                                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                          <FormDescription>Type of investor for reporting</FormDescription>
+                                        </FormItem>
+                                      )} />
+                                    </div>
+                                  </Card>
+                                </TabsContent>
+
+                                <TabsContent value="contribution" className="space-y-4 mt-0">
+                                  <Card className="p-4 bg-blue-50/50">
+                                    <h4 className="font-medium text-sm mb-4 flex items-center gap-2">
+                                      <DollarSign className="h-4 w-4 text-blue-600" />
+                                      Capital Contribution Details
+                                    </h4>
+                                    <div className="grid grid-cols-3 gap-4">
+                                      <FormField control={equityForm.control} name="commitmentAmount" render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Capital Commitment *</FormLabel>
+                                          <FormControl>
+                                            <div className="relative">
+                                              <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                              <Input {...field} type="number" placeholder="5,000,000" className="pl-9 bg-white" />
                                             </div>
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                  </FormItem>
-                                )} />
-                              </div>
-
-                              <div className="grid grid-cols-2 gap-4">
-                                <FormField control={equityForm.control} name="investorName" render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Investor Name</FormLabel>
-                                    <FormControl><Input {...field} placeholder="ABC Capital Partners" /></FormControl>
-                                  </FormItem>
-                                )} />
-                                <FormField control={equityForm.control} name="investorType" render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Investor Type</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value}>
-                                      <FormControl>
-                                        <SelectTrigger><SelectValue /></SelectTrigger>
-                                      </FormControl>
-                                      <SelectContent>
-                                        {INVESTOR_TYPES.map((t) => (
-                                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </FormItem>
-                                )} />
-                              </div>
-
-                              <Separator />
-                              <h4 className="font-medium text-sm">Contribution</h4>
-
-                              <div className="grid grid-cols-3 gap-4">
-                                <FormField control={equityForm.control} name="commitmentAmount" render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Commitment Amount *</FormLabel>
-                                    <FormControl><Input {...field} type="number" placeholder="5000000" /></FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )} />
-                                <FormField control={equityForm.control} name="fundedAmount" render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Funded Amount</FormLabel>
-                                    <FormControl><Input {...field} type="number" placeholder="5000000" /></FormControl>
-                                    <FormDescription>Initial funding</FormDescription>
-                                  </FormItem>
-                                )} />
-                                <FormField control={equityForm.control} name="ownershipPct" render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Ownership % *</FormLabel>
-                                    <FormControl><Input {...field} type="number" step="0.0001" placeholder="0.90" /></FormControl>
-                                    <FormDescription>As decimal (90% = 0.90)</FormDescription>
-                                    <FormMessage />
-                                  </FormItem>
-                                )} />
-                              </div>
-
-                              <Separator />
-                              <h4 className="font-medium text-sm">Return Structure</h4>
-
-                              <div className="grid grid-cols-3 gap-4">
-                                <FormField control={equityForm.control} name="preferredReturn" render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Preferred Return</FormLabel>
-                                    <FormControl><Input {...field} type="number" step="0.01" placeholder="0.08" /></FormControl>
-                                    <FormDescription>Annual pref rate (8% = 0.08)</FormDescription>
-                                  </FormItem>
-                                )} />
-                                <FormField control={equityForm.control} name="preferredReturnType" render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Pref Type</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value}>
-                                      <FormControl>
-                                        <SelectTrigger><SelectValue /></SelectTrigger>
-                                      </FormControl>
-                                      <SelectContent>
-                                        {PREFERRED_RETURN_TYPES.map((t) => (
-                                          <SelectItem key={t.value} value={t.value}>
-                                            <div>
-                                              <div>{t.label}</div>
-                                              <div className="text-xs text-muted-foreground">{t.description}</div>
+                                          </FormControl>
+                                          <FormDescription>Total committed capital</FormDescription>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )} />
+                                      <FormField control={equityForm.control} name="fundedAmount" render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Funded to Date</FormLabel>
+                                          <FormControl>
+                                            <div className="relative">
+                                              <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                              <Input {...field} type="number" placeholder="5,000,000" className="pl-9 bg-white" />
                                             </div>
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </FormItem>
-                                )} />
-                                <FormField control={equityForm.control} name="catchUpPct" render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>GP Catch-Up %</FormLabel>
-                                    <FormControl><Input {...field} type="number" step="0.01" placeholder="0.50" /></FormControl>
-                                    <FormDescription>After LP pref is met</FormDescription>
-                                  </FormItem>
-                                )} />
-                              </div>
-
-                              <FormField control={equityForm.control} name="isParticipating" render={({ field }) => (
-                                <FormItem className="flex items-center gap-3">
-                                  <FormControl>
-                                    <Switch checked={field.value} onCheckedChange={field.onChange} />
-                                  </FormControl>
-                                  <div>
-                                    <FormLabel>Participating Equity</FormLabel>
-                                    <FormDescription>Participates in distributions after preferred return</FormDescription>
-                                  </div>
-                                </FormItem>
-                              )} />
-
-                              {layerType === 'promote' && (
-                                <>
-                                  <Separator />
-                                  <div className="flex justify-between items-center">
-                                    <h4 className="font-medium text-sm">Promote Tiers (Waterfall)</h4>
-                                    <Button type="button" variant="outline" size="sm" onClick={addPromoteTier}>
-                                      <Plus className="h-4 w-4 mr-1" /> Add Tier
-                                    </Button>
-                                  </div>
-
-                                  <div className="space-y-3">
-                                    {promoteTiers.map((tier, index) => (
-                                      <Card key={index} className="p-3">
-                                        <div className="flex items-center gap-4">
-                                          <Badge variant="outline">Tier {index + 1}</Badge>
-                                          <div className="flex-1 grid grid-cols-3 gap-3">
-                                            <div>
-                                              <Label className="text-xs">IRR Hurdle</Label>
-                                              <Input
-                                                type="number"
-                                                step="0.01"
-                                                value={tier.irrHurdle}
-                                                onChange={(e) => updatePromoteTier(index, 'irrHurdle', parseFloat(e.target.value))}
-                                                placeholder="0.08"
-                                              />
+                                          </FormControl>
+                                          <FormDescription>Capital already called</FormDescription>
+                                        </FormItem>
+                                      )} />
+                                      <FormField control={equityForm.control} name="ownershipPct" render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Ownership Percentage *</FormLabel>
+                                          <FormControl>
+                                            <div className="relative">
+                                              <Percent className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                              <Input {...field} type="number" step="0.01" placeholder="90" className="pl-9 bg-white" />
                                             </div>
-                                            <div>
-                                              <Label className="text-xs">GP Split</Label>
-                                              <Input
-                                                type="number"
-                                                step="0.01"
-                                                value={tier.gpSplit}
-                                                onChange={(e) => updatePromoteTier(index, 'gpSplit', parseFloat(e.target.value))}
-                                                placeholder="0.20"
-                                              />
+                                          </FormControl>
+                                          <FormDescription>Enter as % (e.g., 90 for 90%)</FormDescription>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )} />
+                                    </div>
+
+                                    {/* Funding Progress */}
+                                    <div className="mt-4 p-3 bg-white rounded-lg border">
+                                      <div className="flex justify-between text-sm mb-2">
+                                        <span className="text-muted-foreground">Funding Progress</span>
+                                        <span className="font-medium">
+                                          {equityForm.watch('fundedAmount') && equityForm.watch('commitmentAmount') 
+                                            ? `${((parseFloat(equityForm.watch('fundedAmount') || '0') / parseFloat(equityForm.watch('commitmentAmount') || '1')) * 100).toFixed(0)}%`
+                                            : '0%'}
+                                        </span>
+                                      </div>
+                                      <Progress 
+                                        value={
+                                          equityForm.watch('fundedAmount') && equityForm.watch('commitmentAmount')
+                                            ? (parseFloat(equityForm.watch('fundedAmount') || '0') / parseFloat(equityForm.watch('commitmentAmount') || '1')) * 100
+                                            : 0
+                                        } 
+                                        className="h-2"
+                                      />
+                                    </div>
+                                  </Card>
+                                </TabsContent>
+
+                                <TabsContent value="returns" className="space-y-4 mt-0">
+                                  <Card className="p-4 bg-green-50/50">
+                                    <h4 className="font-medium text-sm mb-4 flex items-center gap-2">
+                                      <TrendingUp className="h-4 w-4 text-green-600" />
+                                      Return Structure
+                                    </h4>
+                                    <div className="grid grid-cols-3 gap-4">
+                                      <FormField control={equityForm.control} name="preferredReturn" render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Preferred Return Rate</FormLabel>
+                                          <FormControl>
+                                            <div className="relative">
+                                              <Percent className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                              <Input {...field} type="number" step="0.1" placeholder="8" className="pl-9 bg-white" />
                                             </div>
-                                            <div>
-                                              <Label className="text-xs">LP Split</Label>
-                                              <Input
-                                                type="number"
-                                                step="0.01"
-                                                value={tier.lpSplit}
-                                                onChange={(e) => updatePromoteTier(index, 'lpSplit', parseFloat(e.target.value))}
-                                                placeholder="0.80"
-                                              />
+                                          </FormControl>
+                                          <FormDescription>Annual pref rate (e.g., 8 for 8%)</FormDescription>
+                                        </FormItem>
+                                      )} />
+                                      <FormField control={equityForm.control} name="preferredReturnType" render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Accrual Method</FormLabel>
+                                          <Select onValueChange={field.onChange} value={field.value}>
+                                            <FormControl>
+                                              <SelectTrigger className="bg-white"><SelectValue placeholder="Select method..." /></SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                              {PREFERRED_RETURN_TYPES.map((t) => (
+                                                <SelectItem key={t.value} value={t.value}>
+                                                  <div className="flex flex-col">
+                                                    <span>{t.label}</span>
+                                                    <span className="text-xs text-muted-foreground">{t.description}</span>
+                                                  </div>
+                                                </SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                        </FormItem>
+                                      )} />
+                                      <FormField control={equityForm.control} name="catchUpPct" render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>GP Catch-Up</FormLabel>
+                                          <FormControl>
+                                            <div className="relative">
+                                              <Percent className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                              <Input {...field} type="number" step="1" placeholder="100" className="pl-9 bg-white" />
                                             </div>
+                                          </FormControl>
+                                          <FormDescription>% of profit to GP until caught up</FormDescription>
+                                        </FormItem>
+                                      )} />
+                                    </div>
+
+                                    <Separator className="my-4" />
+
+                                    <FormField control={equityForm.control} name="isParticipating" render={({ field }) => (
+                                      <FormItem className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                                        <div className="space-y-0.5">
+                                          <FormLabel className="text-base">Participating Equity</FormLabel>
+                                          <FormDescription>
+                                            Investor participates in distributions beyond the preferred return
+                                          </FormDescription>
+                                        </div>
+                                        <FormControl>
+                                          <Switch checked={field.value} onCheckedChange={field.onChange} />
+                                        </FormControl>
+                                      </FormItem>
+                                    )} />
+                                  </Card>
+                                </TabsContent>
+
+                                <TabsContent value="promote" className="space-y-4 mt-0">
+                                  <Card className="p-4 bg-purple-50/50">
+                                    <div className="flex justify-between items-center mb-4">
+                                      <h4 className="font-medium text-sm flex items-center gap-2">
+                                        <PieChart className="h-4 w-4 text-purple-600" />
+                                        Promote / Carried Interest Tiers
+                                      </h4>
+                                      <Button type="button" variant="outline" size="sm" onClick={addPromoteTier} className="bg-white">
+                                        <Plus className="h-4 w-4 mr-1" /> Add Tier
+                                      </Button>
+                                    </div>
+
+                                    <p className="text-xs text-muted-foreground mb-4">
+                                      Define tiered promote structure based on IRR hurdles. Each tier specifies how profits are split between GP and LP above that return threshold.
+                                    </p>
+
+                                    <div className="space-y-3">
+                                      {promoteTiers.map((tier, index) => (
+                                        <Card key={index} className="p-4 bg-white border-purple-200">
+                                          <div className="flex items-start gap-4">
+                                            <div className="flex flex-col items-center">
+                                              <Badge className="bg-purple-600 text-white">Tier {index + 1}</Badge>
+                                              {index > 0 && (
+                                                <div className="text-xs text-muted-foreground mt-1">Above Tier {index}</div>
+                                              )}
+                                            </div>
+                                            <div className="flex-1 grid grid-cols-3 gap-4">
+                                              <div>
+                                                <Label className="text-xs font-medium">IRR Hurdle</Label>
+                                                <div className="relative mt-1">
+                                                  <Percent className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                                                  <Input
+                                                    type="number"
+                                                    step="1"
+                                                    value={(tier.irrHurdle * 100).toFixed(0)}
+                                                    onChange={(e) => updatePromoteTier(index, 'irrHurdle', parseFloat(e.target.value) / 100)}
+                                                    placeholder="8"
+                                                    className="pl-8 h-9"
+                                                  />
+                                                </div>
+                                              </div>
+                                              <div>
+                                                <Label className="text-xs font-medium text-green-700">GP Split</Label>
+                                                <div className="relative mt-1">
+                                                  <Percent className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-green-600" />
+                                                  <Input
+                                                    type="number"
+                                                    step="1"
+                                                    value={(tier.gpSplit * 100).toFixed(0)}
+                                                    onChange={(e) => updatePromoteTier(index, 'gpSplit', parseFloat(e.target.value) / 100)}
+                                                    placeholder="20"
+                                                    className="pl-8 h-9 border-green-200 focus:border-green-400"
+                                                  />
+                                                </div>
+                                              </div>
+                                              <div>
+                                                <Label className="text-xs font-medium text-blue-700">LP Split</Label>
+                                                <div className="relative mt-1">
+                                                  <Percent className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-blue-600" />
+                                                  <Input
+                                                    type="number"
+                                                    step="1"
+                                                    value={(tier.lpSplit * 100).toFixed(0)}
+                                                    onChange={(e) => updatePromoteTier(index, 'lpSplit', parseFloat(e.target.value) / 100)}
+                                                    placeholder="80"
+                                                    className="pl-8 h-9 border-blue-200 focus:border-blue-400"
+                                                  />
+                                                </div>
+                                              </div>
+                                            </div>
+                                            {promoteTiers.length > 1 && (
+                                              <Button type="button" variant="ghost" size="sm" className="text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => removePromoteTier(index)}>
+                                                <Trash2 className="h-4 w-4" />
+                                              </Button>
+                                            )}
                                           </div>
-                                          {promoteTiers.length > 1 && (
-                                            <Button type="button" variant="ghost" size="sm" onClick={() => removePromoteTier(index)}>
-                                              <X className="h-4 w-4" />
-                                            </Button>
-                                          )}
-                                        </div>
-                                        <div className="text-xs text-muted-foreground mt-2">
-                                          Above {formatPercent(tier.irrHurdle * 100)} IRR: GP receives {formatPercent(tier.gpSplit * 100)}, LP receives {formatPercent(tier.lpSplit * 100)}
-                                        </div>
-                                      </Card>
-                                    ))}
-                                  </div>
-                                </>
-                              )}
+                                          <div className="mt-3 p-2 bg-purple-50 rounded text-xs text-purple-700 flex items-center gap-2">
+                                            <Info className="h-3.5 w-3.5" />
+                                            Above {(tier.irrHurdle * 100).toFixed(0)}% IRR: GP receives {(tier.gpSplit * 100).toFixed(0)}%, LP receives {(tier.lpSplit * 100).toFixed(0)}%
+                                          </div>
+                                        </Card>
+                                      ))}
+                                    </div>
 
-                              <DialogFooter>
+                                    {/* Waterfall Preview */}
+                                    <div className="mt-4 p-3 bg-white rounded-lg border">
+                                      <h5 className="text-xs font-medium mb-2 text-muted-foreground">Waterfall Preview</h5>
+                                      <div className="space-y-1">
+                                        <div className="flex justify-between text-xs">
+                                          <span>1. Return of Capital</span>
+                                          <span className="text-muted-foreground">100% to Investors</span>
+                                        </div>
+                                        <div className="flex justify-between text-xs">
+                                          <span>2. Preferred Return</span>
+                                          <span className="text-muted-foreground">
+                                            {equityForm.watch('preferredReturn') ? `${equityForm.watch('preferredReturn')}% to LP` : 'Not set'}
+                                          </span>
+                                        </div>
+                                        {equityForm.watch('catchUpPct') && (
+                                          <div className="flex justify-between text-xs">
+                                            <span>3. GP Catch-Up</span>
+                                            <span className="text-muted-foreground">{equityForm.watch('catchUpPct')}% to GP</span>
+                                          </div>
+                                        )}
+                                        {promoteTiers.map((tier, i) => (
+                                          <div key={i} className="flex justify-between text-xs">
+                                            <span>{i + 3 + (equityForm.watch('catchUpPct') ? 1 : 0)}. Above {(tier.irrHurdle * 100).toFixed(0)}% IRR</span>
+                                            <span className="text-muted-foreground">{(tier.gpSplit * 100).toFixed(0)}% GP / {(tier.lpSplit * 100).toFixed(0)}% LP</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </Card>
+                                </TabsContent>
+                              </Tabs>
+
+                              <DialogFooter className="pt-4 mt-4 border-t">
                                 <Button type="button" variant="outline" onClick={() => { setShowAddEquity(false); setEditingEquity(null); }}>Cancel</Button>
-                                <Button type="submit" disabled={createEquityMutation.isPending || updateEquityMutation.isPending}>
+                                <Button type="submit" disabled={createEquityMutation.isPending || updateEquityMutation.isPending} className="bg-green-600 hover:bg-green-700">
                                   <Save className="h-4 w-4 mr-2" />
-                                  {editingEquity ? 'Update' : 'Add'} Layer
+                                  {editingEquity ? 'Update' : 'Add'} Equity Layer
                                 </Button>
                               </DialogFooter>
                             </form>
