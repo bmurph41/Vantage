@@ -38,8 +38,18 @@ import {
   Wrench,
   MapPin,
   Container,
-  Sailboat
+  Sailboat,
+  Plus,
+  CircleDot
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 
 interface WorkspaceInputsProps {
@@ -110,6 +120,9 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
   const [seasonMonths, setSeasonMonths] = useState<number[]>([4, 5, 6, 7, 8, 9, 10]);
   const [storageTypes, setStorageTypes] = useState<StorageTypeConfig[]>(defaultStorageTypes);
   const [designatedSpaces, setDesignatedSpaces] = useState<StorageTypeConfig[]>(defaultDesignatedSpaces);
+  const [showAddProfitCenterDialog, setShowAddProfitCenterDialog] = useState(false);
+  const [newProfitCenterName, setNewProfitCenterName] = useState('');
+  const [newProfitCenterSection, setNewProfitCenterSection] = useState<'storage' | 'designated'>('designated');
 
   const { status, triggerAutosave, forceSave } = useLocalAutosave({
     entityId: projectId,
@@ -198,6 +211,36 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
 
   const handleSave = () => {
     forceSave(getCurrentData());
+  };
+
+  const handleAddProfitCenter = () => {
+    if (!newProfitCenterName.trim()) return;
+    
+    const id = newProfitCenterName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+    
+    const allItems = [...storageTypes, ...designatedSpaces];
+    if (allItems.some(item => item.id === id || item.name.toLowerCase() === newProfitCenterName.toLowerCase())) {
+      return;
+    }
+    
+    const newItem: StorageTypeConfig = {
+      id,
+      name: newProfitCenterName.trim(),
+      section: newProfitCenterSection,
+      isYearRound: false,
+      isEnabled: true,
+      icon: <CircleDot className="h-4 w-4" />,
+    };
+    
+    if (newProfitCenterSection === 'storage') {
+      setStorageTypes(prev => [...prev, newItem]);
+    } else {
+      setDesignatedSpaces(prev => [...prev, newItem]);
+    }
+    
+    setNewProfitCenterName('');
+    setShowAddProfitCenterDialog(false);
+    triggerAutosave(getCurrentData());
   };
 
   const getSeasonLabel = () => {
@@ -347,13 +390,26 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Warehouse className="h-5 w-5" />
-            Storage Configuration
-          </CardTitle>
-          <CardDescription>
-            Enable storage types that apply to this property. Only enabled items will appear in Growth Rates and Pro Forma.
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Warehouse className="h-5 w-5" />
+                Storage Configuration
+              </CardTitle>
+              <CardDescription>
+                Enable storage types that apply to this property. Only enabled items will appear in Growth Rates and Pro Forma.
+              </CardDescription>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setShowAddProfitCenterDialog(true)}
+              data-testid="button-add-profit-center"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Profit Center
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
           <div>
@@ -465,6 +521,59 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
       {onTabChange && (
         <WorkflowNavigation currentTab="inputs" onNavigate={onTabChange} />
       )}
+
+      <Dialog open={showAddProfitCenterDialog} onOpenChange={setShowAddProfitCenterDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Profit Center</DialogTitle>
+            <DialogDescription>
+              Add a custom profit center to track revenue and expenses for this project.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="profit-center-name">Name</Label>
+              <Input
+                id="profit-center-name"
+                value={newProfitCenterName}
+                onChange={(e) => setNewProfitCenterName(e.target.value)}
+                placeholder="e.g., Charter Services, Boat Wash, Fishing Licenses"
+                data-testid="input-profit-center-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="profit-center-section">Category</Label>
+              <Select 
+                value={newProfitCenterSection} 
+                onValueChange={(v) => setNewProfitCenterSection(v as 'storage' | 'designated')}
+              >
+                <SelectTrigger id="profit-center-section" data-testid="select-profit-center-section">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="storage">Storage Type</SelectItem>
+                  <SelectItem value="designated">Designated Space</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Storage Types are for boat storage options. Designated Spaces are for ancillary services and amenities.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddProfitCenterDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleAddProfitCenter}
+              disabled={!newProfitCenterName.trim()}
+              data-testid="button-confirm-add-profit-center"
+            >
+              Add Profit Center
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
