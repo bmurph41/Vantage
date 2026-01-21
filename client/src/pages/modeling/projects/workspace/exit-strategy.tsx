@@ -24,8 +24,16 @@ import {
   HandCoins,
   Award,
   Link2,
-  Info
+  Link2Off,
+  Info,
+  AlertCircle,
+  Plus,
+  Trash2,
+  Users,
+  PieChart
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { ModelingProject, ExitScenario } from "@shared/schema";
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 
@@ -548,7 +556,7 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
         </TabsContent>
 
         <TabsContent value="waterfall" className="mt-6">
-          <WaterfallPanel salePrice={calculatedSalePrice.toString()} />
+          <WaterfallPanel salePrice={calculatedSalePrice.toString()} projectId={projectId} />
         </TabsContent>
 
         <TabsContent value="irr" className="mt-6">
@@ -1267,6 +1275,7 @@ function EarnoutPanel({ salePrice: initialSalePrice }: EarnoutPanelProps) {
 
 interface WaterfallPanelProps {
   salePrice: string;
+  projectId: string;
 }
 
 interface Investor {
@@ -1276,31 +1285,105 @@ interface Investor {
   isGP: boolean;
 }
 
-function WaterfallPanel({ salePrice: initialSalePrice }: WaterfallPanelProps) {
+interface EquityLayer {
+  id: string;
+  layerType: string;
+  investorName?: string;
+  commitmentAmount: string | number;
+  preferredReturn?: string | number;
+}
+
+interface CapitalStack {
+  id: number;
+  name: string;
+  isPrimary?: boolean;
+}
+
+interface CapitalStackDetails {
+  stack: CapitalStack;
+  debtTranches: unknown[];
+  equityLayers: EquityLayer[];
+}
+
+function WaterfallPanel({ salePrice: initialSalePrice, projectId }: WaterfallPanelProps) {
   const [distributionLinked, setDistributionLinked] = useState(true);
+  const [capitalStackLinked, setCapitalStackLinked] = useState(true);
   const [totalDistribution, setTotalDistribution] = useState<string>(initialSalePrice);
-  const [lpCapital, setLpCapital] = useState<string>((parseFloat(initialSalePrice) * 0.8).toString());
+  const [lpCapital, setLpCapital] = useState<string>("0");
+  const [gpCapitalState, setGpCapitalState] = useState<string>("0");
   const [preferredReturn, setPreferredReturn] = useState<string>("8");
   const [carriedInterest, setCarriedInterest] = useState<string>("20");
   const [gpCatchUp, setGpCatchUp] = useState<string>("100");
   const [holdPeriod, setHoldPeriod] = useState<string>("5");
   const [waterfallTab, setWaterfallTab] = useState<string>("structure");
-  const [investors, setInvestors] = useState<Investor[]>([
-    { id: '1', name: 'GP Fund Manager', contribution: parseFloat(initialSalePrice) * 0.2, isGP: true },
-    { id: '2', name: 'Institutional LP', contribution: parseFloat(initialSalePrice) * 0.5, isGP: false },
-    { id: '3', name: 'Family Office LP', contribution: parseFloat(initialSalePrice) * 0.3, isGP: false },
-  ]);
+  const [investors, setInvestors] = useState<Investor[]>([]);
+
+  const { data: capitalStacks, isLoading: stacksLoading } = useQuery<CapitalStack[]>({
+    queryKey: ['/api/modeling/projects', projectId, 'capital-stacks'],
+    enabled: !!projectId,
+  });
+
+  const selectedStackId = capitalStacks?.find(s => s.isPrimary)?.id || capitalStacks?.[0]?.id;
+
+  const { data: stackDetails, isLoading: detailsLoading } = useQuery<CapitalStackDetails>({
+    queryKey: ['/api/modeling/capital-stacks', selectedStackId],
+    enabled: !!selectedStackId && capitalStackLinked,
+  });
+
+  const capitalStackData = stackDetails;
+
+  useEffect(() => {
+    if (capitalStackLinked && capitalStackData?.equityLayers) {
+      const equityLayers = capitalStackData.equityLayers;
+      const gpLayers = equityLayers.filter(l => l.layerType === 'promote' || l.layerType === 'co_invest');
+      const lpLayers = equityLayers.filter(l => l.layerType === 'common' || l.layerType === 'preferred');
+      
+      const gpTotal = gpLayers.reduce((sum, l) => sum + (parseFloat(String(l.commitmentAmount)) || 0), 0);
+      const lpTotal = lpLayers.reduce((sum, l) => sum + (parseFloat(String(l.commitmentAmount)) || 0), 0);
+      
+      setGpCapitalState(gpTotal.toString());
+      setLpCapital(lpTotal.toString());
+      
+      const newInvestors: Investor[] = equityLayers.map((layer, idx) => ({
+        id: layer.id || String(idx + 1),
+        name: layer.investorName || (layer.layerType === 'promote' ? 'GP Promote' : layer.layerType === 'co_invest' ? 'GP Co-Invest' : `LP - ${layer.layerType}`),
+        contribution: parseFloat(String(layer.commitmentAmount)) || 0,
+        isGP: layer.layerType === 'promote' || layer.layerType === 'co_invest',
+      }));
+      
+      if (newInvestors.length > 0) {
+        setInvestors(newInvestors);
+      }
+      
+      const avgPref = lpLayers.reduce((sum, l) => sum + (parseFloat(String(l.preferredReturn)) || 0), 0) / (lpLayers.length || 1);
+      if (avgPref > 0) {
+        setPreferredReturn(avgPref.toFixed(1));
+      }
+    }
+  }, [capitalStackData, capitalStackLinked]);
 
   useEffect(() => {
     if (distributionLinked) {
       setTotalDistribution(initialSalePrice);
-      setLpCapital((parseFloat(initialSalePrice) * 0.8).toString());
     }
   }, [initialSalePrice, distributionLinked]);
 
+  useEffect(() => {
+    if (!capitalStackLinked && investors.length === 0) {
+      const defaultPrice = parseFloat(initialSalePrice) || 10000000;
+      setInvestors([
+        { id: '1', name: 'GP Fund Manager', contribution: defaultPrice * 0.2, isGP: true },
+        { id: '2', name: 'Institutional LP', contribution: defaultPrice * 0.5, isGP: false },
+        { id: '3', name: 'Family Office LP', contribution: defaultPrice * 0.3, isGP: false },
+      ]);
+      setLpCapital((defaultPrice * 0.8).toString());
+      setGpCapitalState((defaultPrice * 0.2).toString());
+    }
+  }, [capitalStackLinked, investors.length, initialSalePrice]);
+
   const totalProceeds = parseFloat(totalDistribution) || 0;
   const lpCap = parseFloat(lpCapital) || 0;
-  const gpCapital = totalProceeds * 0.2;
+  const gpCapital = parseFloat(gpCapitalState) || 0;
   const totalCapital = lpCap + gpCapital;
   const prefRate = parseFloat(preferredReturn) / 100 || 0;
   const carryRate = parseFloat(carriedInterest) / 100 || 0;
@@ -1367,9 +1450,54 @@ function WaterfallPanel({ salePrice: initialSalePrice }: WaterfallPanelProps) {
                   <BarChart3 className="h-5 w-5 text-cyan-500" />
                   Waterfall Structure
                 </CardTitle>
-                <CardDescription>Configure fund distribution terms</CardDescription>
+                <CardDescription className="flex items-center justify-between">
+                  <span>Configure fund distribution terms</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Capital Stack Link</span>
+                    <Switch
+                      checked={capitalStackLinked}
+                      onCheckedChange={setCapitalStackLinked}
+                      className="scale-75"
+                    />
+                    {capitalStackLinked ? (
+                      <Badge variant="outline" className="gap-1 text-xs bg-blue-50 text-blue-700 border-blue-200">
+                        <Link2 className="h-3 w-3" />
+                        Linked
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="gap-1 text-xs">
+                        <Link2Off className="h-3 w-3" />
+                        Manual
+                      </Badge>
+                    )}
+                  </div>
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                {capitalStackLinked && !stacksLoading && !detailsLoading && !selectedStackId && (
+                  <Alert className="bg-amber-50 border-amber-200">
+                    <AlertCircle className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="text-xs text-amber-800">
+                      No Capital Stack found. Create one in the Capital Stack tab first.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {capitalStackLinked && !detailsLoading && selectedStackId && (capitalStackData?.equityLayers?.length ?? 0) === 0 && (
+                  <Alert className="bg-amber-50 border-amber-200">
+                    <AlertCircle className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="text-xs text-amber-800">
+                      No equity layers found in Capital Stack. Add equity in the Capital Stack tab to auto-populate the waterfall.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {capitalStackLinked && (stacksLoading || detailsLoading) && (
+                  <Alert className="bg-blue-50 border-blue-200">
+                    <AlertCircle className="h-4 w-4 text-blue-600 animate-pulse" />
+                    <AlertDescription className="text-xs text-blue-800">
+                      Loading Capital Stack data...
+                    </AlertDescription>
+                  </Alert>
+                )}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="flex items-center gap-1 text-sm">
@@ -1384,8 +1512,28 @@ function WaterfallPanel({ salePrice: initialSalePrice }: WaterfallPanelProps) {
                     />
                   </div>
                   <div>
-                    <Label className="text-sm">LP Capital</Label>
-                    <CurrencyInput value={lpCapital} onChange={setLpCapital} />
+                    <Label className="flex items-center gap-1 text-sm">
+                      LP Capital
+                      {capitalStackLinked && <Link2 className="h-3 w-3 text-blue-500" />}
+                    </Label>
+                    <CurrencyInput 
+                      value={lpCapital} 
+                      onChange={(v) => { setLpCapital(v); setCapitalStackLinked(false); }}
+                      linked={capitalStackLinked}
+                      onUnlink={() => setCapitalStackLinked(false)}
+                    />
+                  </div>
+                  <div>
+                    <Label className="flex items-center gap-1 text-sm">
+                      GP Capital
+                      {capitalStackLinked && <Link2 className="h-3 w-3 text-blue-500" />}
+                    </Label>
+                    <CurrencyInput 
+                      value={gpCapitalState} 
+                      onChange={(v) => { setGpCapitalState(v); setCapitalStackLinked(false); }}
+                      linked={capitalStackLinked}
+                      onUnlink={() => setCapitalStackLinked(false)}
+                    />
                   </div>
                   <div>
                     <Label className="text-sm">Preferred Return</Label>
