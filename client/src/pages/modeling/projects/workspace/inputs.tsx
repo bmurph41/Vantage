@@ -94,6 +94,29 @@ const defaultDesignatedSpaces: StorageTypeConfig[] = [
   { id: 'ship_store', name: 'Ship Store', section: 'designated', isYearRound: false, isEnabled: true, icon: <ShoppingCart className="h-4 w-4" /> },
 ];
 
+type ProfitCenterConfig = {
+  id: string;
+  name: string;
+  isEnabled: boolean;
+  icon: React.ReactNode;
+};
+
+const defaultProfitCenters: ProfitCenterConfig[] = [
+  { id: 'pc_fuel_dock', name: 'Fuel Dock', isEnabled: true, icon: <Fuel className="h-4 w-4" /> },
+  { id: 'pc_marina_amenities', name: 'Marina & Amenities', isEnabled: true, icon: <Anchor className="h-4 w-4" /> },
+  { id: 'pc_ships_store', name: "Ship's Store", isEnabled: true, icon: <ShoppingCart className="h-4 w-4" /> },
+  { id: 'pc_service', name: 'Service', isEnabled: false, icon: <Wrench className="h-4 w-4" /> },
+  { id: 'pc_parts', name: 'Parts', isEnabled: false, icon: <Container className="h-4 w-4" /> },
+  { id: 'pc_boat_club', name: 'Boat Club', isEnabled: false, icon: <Users className="h-4 w-4" /> },
+  { id: 'pc_rental_boats', name: 'Rental Boats', isEnabled: false, icon: <Ship className="h-4 w-4" /> },
+  { id: 'pc_boat_sales', name: 'Boat Sales', isEnabled: false, icon: <Store className="h-4 w-4" /> },
+  { id: 'pc_boat_finance', name: 'Boat Finance', isEnabled: false, icon: <FileText className="h-4 w-4" /> },
+  { id: 'pc_boat_brokerage', name: 'Boat Brokerage', isEnabled: false, icon: <Sailboat className="h-4 w-4" /> },
+  { id: 'pc_fb', name: 'F&B', isEnabled: false, icon: <Utensils className="h-4 w-4" /> },
+  { id: 'pc_rv_park', name: 'RV Park', isEnabled: false, icon: <Car className="h-4 w-4" /> },
+  { id: 'pc_hospitality', name: 'Hospitality', isEnabled: false, icon: <Home className="h-4 w-4" /> },
+];
+
 const months = [
   { value: 1, label: 'January', short: 'Jan' },
   { value: 2, label: 'February', short: 'Feb' },
@@ -120,6 +143,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
   const [seasonMonths, setSeasonMonths] = useState<number[]>([4, 5, 6, 7, 8, 9, 10]);
   const [storageTypes, setStorageTypes] = useState<StorageTypeConfig[]>(defaultStorageTypes);
   const [designatedSpaces, setDesignatedSpaces] = useState<StorageTypeConfig[]>(defaultDesignatedSpaces);
+  const [profitCenters, setProfitCenters] = useState<ProfitCenterConfig[]>(defaultProfitCenters);
   const [showAddProfitCenterDialog, setShowAddProfitCenterDialog] = useState(false);
   const [newProfitCenterName, setNewProfitCenterName] = useState('');
   const [newProfitCenterSection, setNewProfitCenterSection] = useState<'storage' | 'designated'>('designated');
@@ -207,6 +231,12 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
         item.id === itemId ? { ...item, isEnabled: !item.isEnabled } : item
       ));
     }
+  };
+
+  const toggleProfitCenterEnabled = (itemId: string) => {
+    setProfitCenters(prev => prev.map(item => 
+      item.id === itemId ? { ...item, isEnabled: !item.isEnabled } : item
+    ));
   };
 
   const handleSave = () => {
@@ -514,6 +544,55 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                 </div>
               ))}
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Store className="h-5 w-5" />
+                Profit Center Configuration
+              </CardTitle>
+              <CardDescription>
+                Enable profit centers that apply to this property. Only enabled items will appear in Pro Forma revenue categories.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {profitCenters.map((item) => (
+              <div
+                key={item.id}
+                className={`flex items-center justify-between p-3 rounded-lg border ${
+                  item.isEnabled 
+                    ? 'bg-muted/30 border-border' 
+                    : 'bg-muted/10 border-dashed opacity-60'
+                }`}
+                data-testid={`profit-center-${item.id}`}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <input
+                    type="checkbox"
+                    checked={item.isEnabled}
+                    onChange={() => toggleProfitCenterEnabled(item.id)}
+                    className="h-4 w-4 rounded border-muted-foreground/50 text-primary focus:ring-primary cursor-pointer"
+                    data-testid={`checkbox-${item.id}-enabled`}
+                  />
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    item.isEnabled ? 'bg-background' : 'bg-muted/30'
+                  }`}>
+                    {item.icon}
+                  </div>
+                  <span className={`font-medium text-sm truncate ${!item.isEnabled && 'text-muted-foreground'}`}>
+                    {item.name}
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
