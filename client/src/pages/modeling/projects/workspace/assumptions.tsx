@@ -401,6 +401,71 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
     locationRates: {},
   });
   const [expandedStorageTypes, setExpandedStorageTypes] = useState<Record<string, boolean>>({});
+  const [expandedOccupancyTypes, setExpandedOccupancyTypes] = useState<Record<string, boolean>>({});
+  const [occupancyViewMode, setOccupancyViewMode] = useState<'annualized' | 'monthly'>('annualized');
+
+  const enabledStorageTypes = useMemo(() => {
+    if (!config?.departments) return [];
+    return storageTypesConfig.filter(st => 
+      config.departments[st.id]?.isEnabled === true
+    ).map(st => ({
+      ...st,
+      totalUnits: config.departments[st.id]?.totalUnits || 50,
+      locations: st.locations.map(loc => ({
+        ...loc,
+        units: Math.floor((config.departments[st.id]?.totalUnits || 50) / st.locations.length),
+      })),
+    }));
+  }, [config]);
+
+  const toggleOccupancyTypeExpanded = (typeId: string) => {
+    setExpandedOccupancyTypes(prev => ({ ...prev, [typeId]: !prev[typeId] }));
+  };
+
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  const getLocationOccupancy = (locationId: string, year: number, month?: number) => {
+    if (month !== undefined) {
+      return occupancy[`${locationId}_${year}_${month}`] ?? occupancy[locationId]?.[year] ?? 85;
+    }
+    return occupancy[locationId]?.[year] ?? 85;
+  };
+
+  const updateLocationOccupancy = (locationId: string, year: number, value: string, month?: number) => {
+    const numValue = parseFloat(value) || 0;
+    setOccupancy(prev => {
+      if (month !== undefined) {
+        return { ...prev, [`${locationId}_${year}_${month}`]: numValue };
+      }
+      return {
+        ...prev,
+        [locationId]: { ...(prev[locationId] || {}), [year]: numValue },
+      };
+    });
+    setHasChanges(true);
+    triggerAutosave();
+  };
+
+  const getStorageTypeAvgOccupancy = (storageType: typeof enabledStorageTypes[0], year: number) => {
+    if (storageType.locations.length === 0) return 85;
+    const sum = storageType.locations.reduce((acc, loc) => acc + getLocationOccupancy(loc.id, year), 0);
+    return sum / storageType.locations.length;
+  };
+
+  const getYoYChange = (locationId: string, year: number) => {
+    if (year === years[0]) return null;
+    const currentOcc = getLocationOccupancy(locationId, year);
+    const prevOcc = getLocationOccupancy(locationId, year - 1);
+    return currentOcc - prevOcc;
+  };
+
+  const getNetAdds = (locationId: string, year: number, totalUnits: number) => {
+    const currentOcc = getLocationOccupancy(locationId, year);
+    const prevOcc = year === years[0] ? 85 : getLocationOccupancy(locationId, year - 1);
+    const currentOccupied = Math.round((currentOcc / 100) * totalUnits);
+    const prevOccupied = Math.round((prevOcc / 100) * totalUnits);
+    return currentOccupied - prevOccupied;
+  };
 
   useEffect(() => {
     if (activeScenario?.assumptions) {
@@ -1054,46 +1119,201 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
         <TabsContent value="occupancy" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Occupancy Projections by Storage Type</CardTitle>
-              <CardDescription>
-                Set occupancy rates for each storage option across the hold period. 
-                This drives storage revenue projections.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-48">Storage Type</TableHead>
-                      <TableHead className="w-24 text-right">Units</TableHead>
-                      {years.map(year => (
-                        <TableHead key={year} className="text-center w-24">{year}</TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {storageOptions.map((storage) => (
-                      <TableRow key={storage.id}>
-                        <TableCell className="font-medium">{storage.name}</TableCell>
-                        <TableCell className="text-right text-muted-foreground">
-                          {storage.totalUnits}
-                        </TableCell>
-                        {years.map(year => (
-                          <TableCell key={year} className="p-1">
-                            <PercentInput
-                              value={occupancy[storage.id]?.[year] ?? 85}
-                              onChange={(val) => updateOccupancy(storage.id, year, val)}
-                              className="w-full"
-                              data-testid={`input-occupancy-${storage.id}-${year}`}
-                            />
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Percent className="h-5 w-5" />
+                    Occupancy Projections
+                  </CardTitle>
+                  <CardDescription>
+                    Set occupancy rates by storage type and location across the hold period
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select value={occupancyViewMode} onValueChange={(v) => setOccupancyViewMode(v as 'annualized' | 'monthly')}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="annualized">Annualized</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {enabledStorageTypes.length === 0 && (
+                <p className="text-sm text-muted-foreground py-4">
+                  No storage types enabled. Enable them in Department Configuration.
+                </p>
+              )}
+              {enabledStorageTypes.map((storageType) => (
+                <div key={storageType.id} className="border rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => toggleOccupancyTypeExpanded(storageType.id)}
+                    className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      {storageType.icon}
+                      <span className="font-medium">{storageType.name}</span>
+                      <Badge variant="secondary" className="ml-2">
+                        {storageType.totalUnits} units
+                      </Badge>
+                      <Badge variant="outline" className="ml-1">
+                        {storageType.locations.length} location{storageType.locations.length !== 1 ? 's' : ''}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      {years.slice(0, 3).map(year => (
+                        <div key={year} className="text-center">
+                          <span className="text-xs text-muted-foreground">{year}</span>
+                          <div className="font-medium text-sm">
+                            {getStorageTypeAvgOccupancy(storageType, year).toFixed(1)}%
+                          </div>
+                        </div>
+                      ))}
+                      {expandedOccupancyTypes[storageType.id] ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
+                    </div>
+                  </button>
+
+                  {expandedOccupancyTypes[storageType.id] && (
+                    <div className="border-t">
+                      {occupancyViewMode === 'annualized' ? (
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="bg-muted/30">
+                                <TableHead className="w-48">Location</TableHead>
+                                <TableHead className="w-16 text-right">Units</TableHead>
+                                {years.map(year => (
+                                  <TableHead key={year} className="text-center w-28">
+                                    <div>{year}</div>
+                                    <div className="text-[10px] text-muted-foreground font-normal">Occ% / YoY / Net</div>
+                                  </TableHead>
+                                ))}
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {storageType.locations.map((location) => (
+                                <TableRow key={location.id}>
+                                  <TableCell className="font-medium">
+                                    <div className="flex items-center gap-2">
+                                      <MapPin className="h-3 w-3 text-muted-foreground" />
+                                      {location.name}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-right text-muted-foreground text-sm">
+                                    {location.units}
+                                  </TableCell>
+                                  {years.map(year => {
+                                    const yoyChange = getYoYChange(location.id, year);
+                                    const netAdds = getNetAdds(location.id, year, location.units);
+                                    return (
+                                      <TableCell key={year} className="p-1">
+                                        <div className="flex flex-col items-center gap-0.5">
+                                          <PercentInput
+                                            value={getLocationOccupancy(location.id, year)}
+                                            onChange={(val) => updateLocationOccupancy(location.id, year, val)}
+                                            className="h-7 w-16 text-xs"
+                                          />
+                                          <div className="flex items-center gap-1 text-[10px]">
+                                            {yoyChange !== null && (
+                                              <span className={yoyChange >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                {yoyChange >= 0 ? '+' : ''}{yoyChange.toFixed(1)}%
+                                              </span>
+                                            )}
+                                            {yoyChange !== null && <span className="text-muted-foreground">|</span>}
+                                            <span className={netAdds >= 0 ? 'text-blue-600' : 'text-orange-600'}>
+                                              {netAdds >= 0 ? '+' : ''}{netAdds}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </TableCell>
+                                    );
+                                  })}
+                                </TableRow>
+                              ))}
+                              <TableRow className="bg-muted/30 font-medium">
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    {storageType.icon}
+                                    {storageType.name} Average
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right">{storageType.totalUnits}</TableCell>
+                                {years.map(year => {
+                                  const avgOcc = getStorageTypeAvgOccupancy(storageType, year);
+                                  const prevAvgOcc = year === years[0] ? 85 : getStorageTypeAvgOccupancy(storageType, year - 1);
+                                  const yoyChange = year === years[0] ? null : avgOcc - prevAvgOcc;
+                                  const totalNetAdds = storageType.locations.reduce((sum, loc) => sum + getNetAdds(loc.id, year, loc.units), 0);
+                                  return (
+                                    <TableCell key={year} className="text-center">
+                                      <div className="flex flex-col items-center gap-0.5">
+                                        <span className="font-semibold">{avgOcc.toFixed(1)}%</span>
+                                        <div className="flex items-center gap-1 text-[10px]">
+                                          {yoyChange !== null && (
+                                            <span className={yoyChange >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                              {yoyChange >= 0 ? '+' : ''}{yoyChange.toFixed(1)}%
+                                            </span>
+                                          )}
+                                          {yoyChange !== null && <span className="text-muted-foreground">|</span>}
+                                          <span className={totalNetAdds >= 0 ? 'text-blue-600' : 'text-orange-600'}>
+                                            {totalNetAdds >= 0 ? '+' : ''}{totalNetAdds}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </TableCell>
+                                  );
+                                })}
+                              </TableRow>
+                            </TableBody>
+                          </Table>
+                        </div>
+                      ) : (
+                        <div className="p-4 space-y-4">
+                          {storageType.locations.map((location) => (
+                            <div key={location.id} className="space-y-2">
+                              <div className="flex items-center gap-2 mb-2">
+                                <MapPin className="h-3 w-3 text-muted-foreground" />
+                                <span className="font-medium text-sm">{location.name}</span>
+                                <Badge variant="secondary" className="text-xs">{location.units} units</Badge>
+                              </div>
+                              {years.map(year => (
+                                <div key={year} className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium w-12">{year}</span>
+                                    <div className="text-xs text-muted-foreground">
+                                      Annual: {getLocationOccupancy(location.id, year).toFixed(1)}%
+                                    </div>
+                                  </div>
+                                  <div className="grid grid-cols-12 gap-1">
+                                    {months.map((month, idx) => (
+                                      <div key={month} className="text-center">
+                                        <span className="text-[10px] text-muted-foreground">{month}</span>
+                                        <PercentInput
+                                          value={getLocationOccupancy(location.id, year, idx)}
+                                          onChange={(val) => updateLocationOccupancy(location.id, year, val, idx)}
+                                          className="h-6 w-full text-[10px] px-1"
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
             </CardContent>
           </Card>
         </TabsContent>
