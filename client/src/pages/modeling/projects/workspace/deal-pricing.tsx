@@ -229,36 +229,48 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   const pricingData = calculateMutation.data as PricingResponse | undefined;
 
   // Bidirectional update: when exit cap changes and is driving, derive purchase price
-  // When pricing data changes and exit cap is driving, update the purchase price display
+  // Exit Cap Rate -> Price: Price = Exit Year NOI / Exit Cap Rate (discounted back)
   useEffect(() => {
-    if (isLinked && pricingDriver === 'exitCap' && pricingData?.fromGoingInCapRate) {
-      // Use the going-in cap rate calculation as a proxy for exit cap driven pricing
-      // Exit Cap Rate drives price = Exit Year NOI / Exit Cap Rate (simplified)
-      const exitCap = parsePercentInput(exitCapRate) / 100;
-      const holdYears = parseInt(holdPeriod) || 5;
-      const revenueGrowth = parsePercentInput(revenueGrowthRate) / 100;
-      const expenseGrowth = parsePercentInput(expenseGrowthRate) / 100;
+    if (!isLinked || pricingDriver !== 'exitCap') return;
+    
+    const exitCap = parsePercentInput(exitCapRate) / 100;
+    const holdYears = parseInt(holdPeriod) || 5;
+    const revenueGrowth = parsePercentInput(revenueGrowthRate) / 100;
+    const expenseGrowth = parsePercentInput(expenseGrowthRate) / 100;
+    
+    // Use year1NOI from pricing data, or estimate from project
+    const year1NOI = pricingData?.projectFinancials?.year1NOI || 500000; // Default NOI if not available
+    
+    if (exitCap > 0 && year1NOI > 0) {
+      // Project NOI to exit year using net growth rate
+      const netGrowth = revenueGrowth - expenseGrowth;
+      const projectedExitNOI = year1NOI * Math.pow(1 + netGrowth, holdYears);
       
-      if (exitCap > 0 && pricingData.projectFinancials?.year1NOI) {
-        const year1NOI = pricingData.projectFinancials.year1NOI;
-        // Project NOI to exit year using growth rates
-        const projectedExitNOI = year1NOI * Math.pow(1 + (revenueGrowth - expenseGrowth), holdYears);
-        // Exit Value = Exit NOI / Exit Cap Rate
-        const exitValue = projectedExitNOI / exitCap;
-        // Simple approximation: Purchase Price for target returns
-        // Using a simplified discount factor for demonstration
-        const targetReturn = 0.15; // 15% IRR approximation
-        const discountFactor = Math.pow(1 + targetReturn, holdYears);
-        const derivedPrice = exitValue / discountFactor + (year1NOI * holdYears * 0.8); // Add cash flows
-        
-        // Only update if meaningfully different to avoid loops
-        const currentPrice = parseCurrencyInput(manualPurchasePrice);
-        if (Math.abs(derivedPrice - currentPrice) > 10000 && derivedPrice > 0) {
-          setManualPurchasePrice(Math.round(derivedPrice).toLocaleString());
-        }
+      // Exit Value = Exit NOI / Exit Cap Rate
+      const exitValue = projectedExitNOI / exitCap;
+      
+      // Calculate cumulative cash flows (sum of annual NOIs)
+      let cumulativeCashFlows = 0;
+      for (let i = 1; i <= holdYears; i++) {
+        cumulativeCashFlows += year1NOI * Math.pow(1 + netGrowth, i - 1);
+      }
+      
+      // For a target IRR, derive max purchase price using simple approximation:
+      // IRR formula: 0 = -Price + sum(CF_t/(1+IRR)^t) + ExitValue/(1+IRR)^n
+      // Simplified: Price ≈ (ExitValue + CumulativeCF * 0.85) / (1 + targetIRR)^(holdYears/2)
+      const targetReturn = parsePercentInput(targetIRR) / 100 || 0.15;
+      const discountFactor = Math.pow(1 + targetReturn, holdYears * 0.6);
+      const derivedPrice = (exitValue + cumulativeCashFlows * 0.85) / discountFactor;
+      
+      // Only update if meaningfully different to avoid infinite loops
+      const currentPrice = parseCurrencyInput(manualPurchasePrice);
+      const priceDiff = Math.abs(derivedPrice - currentPrice);
+      
+      if (priceDiff > 50000 && derivedPrice > 0) {
+        setManualPurchasePrice(Math.round(derivedPrice).toLocaleString());
       }
     }
-  }, [exitCapRate, pricingDriver, isLinked, pricingData?.projectFinancials?.year1NOI]);
+  }, [exitCapRate, pricingDriver, isLinked, holdPeriod, revenueGrowthRate, expenseGrowthRate, targetIRR, pricingData?.projectFinancials?.year1NOI]);
 
   const handleSavePurchasePrice = (price: number, capRate?: number) => {
     saveMutation.mutate({ 
