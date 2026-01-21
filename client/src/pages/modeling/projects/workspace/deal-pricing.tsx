@@ -584,7 +584,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-4">
         <Card className={`border ${pricingDriver === 'price' && isLinked ? 'border-primary ring-2 ring-primary/30' : ''}`}>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
