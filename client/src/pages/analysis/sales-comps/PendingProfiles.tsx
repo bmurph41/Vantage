@@ -49,6 +49,13 @@ type SalesComp = {
   seller?: string;
 };
 
+type SalesCompsResponse = {
+  comps: SalesComp[];
+  total: number;
+  page?: number;
+  pageSize?: number;
+};
+
 type Property = {
   id: string;
   name: string;
@@ -70,7 +77,7 @@ export default function PendingProfiles() {
     refetchInterval: 2 * 60 * 1000,
   });
 
-  const { data: salesCompsData } = useQuery<SalesComp[]>({
+  const { data: salesCompsResponse } = useQuery<SalesCompsResponse>({
     queryKey: ['/api/sales-comps'],
     staleTime: 60 * 1000,
   });
@@ -82,7 +89,7 @@ export default function PendingProfiles() {
 
   // Ensure arrays are always valid even if API returns null/undefined
   const pendingProfiles = Array.isArray(pendingProfilesData) ? pendingProfilesData : [];
-  const salesComps = Array.isArray(salesCompsData) ? salesCompsData : [];
+  const salesComps = salesCompsResponse?.comps ?? [];
   const properties = Array.isArray(propertiesData) ? propertiesData : [];
 
   const createPropertyMutation = useMutation({
