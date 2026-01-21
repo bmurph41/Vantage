@@ -741,7 +741,7 @@ export default function ExecutiveDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
           <div className="mb-4">
             <h1 className="text-3xl font-semibold text-foreground" data-testid="heading-executive-dashboard">
-              Marina Analytics
+              Rent Roll
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
               Key performance metrics and trends

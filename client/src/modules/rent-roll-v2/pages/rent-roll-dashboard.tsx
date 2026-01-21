@@ -361,9 +361,9 @@ export default function RentRollDashboard() {
                   </>
                 ) : (
                   <>
-                    <h1 className="text-3xl font-semibold text-foreground">Marina Analytics</h1>
+                    <h1 className="text-3xl font-semibold text-foreground">Rent Roll</h1>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Comprehensive lease management and financial tracking
+                      Key performance metrics and trends
                     </p>
                   </>
                 )}

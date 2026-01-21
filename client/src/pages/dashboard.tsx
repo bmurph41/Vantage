@@ -1211,7 +1211,7 @@ export default function Dashboard() {
     },
     {
       id: 'marina-analytics',
-      title: 'Marina Analytics',
+      title: 'Rent Roll',
       icon: Activity,
       link: '/rent-roll',
       data: marinaAnalyticsData,

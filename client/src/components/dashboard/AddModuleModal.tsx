@@ -112,7 +112,7 @@ const allModules: ModuleDefinition[] = [
   // Analytics Modules
   {
     id: 'marina-analytics',
-    title: 'Marina Analytics',
+    title: 'Rent Roll',
     description: 'Track marina KPIs: occupancy, ADR, RevPALF, NOI margin, and DSCR',
     icon: Activity,
     category: 'analytics',
