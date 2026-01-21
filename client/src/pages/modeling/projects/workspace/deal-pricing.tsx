@@ -32,9 +32,12 @@ import {
   RefreshCw,
   Info,
   ArrowRight,
+  ArrowLeftRight,
   CheckCircle2,
   SlidersHorizontal,
   AlertTriangle,
+  Link2,
+  Unlink,
 } from 'lucide-react';
 import type { ModelingProject, ModelingFinancialPeriod } from '@shared/schema';
 import debounce from 'lodash.debounce';
@@ -125,6 +128,10 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
   const [selectedPeriodData, setSelectedPeriodData] = useState<ModelingFinancialPeriod | null>(null);
   const [useNormalizedData, setUseNormalizedData] = useState<boolean>(true);
+  
+  // Two-way linking: tracks which field was last edited to drive calculation direction
+  const [pricingDriver, setPricingDriver] = useState<'price' | 'exitCap'>('price');
+  const [isLinked, setIsLinked] = useState<boolean>(true);
 
   const { data: project } = useQuery<ModelingProject>({
     queryKey: ['/api/modeling/projects', projectId],
@@ -176,6 +183,17 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
     },
   });
 
+  // Handlers for bidirectional updates
+  const handlePurchasePriceChange = (value: string) => {
+    setManualPurchasePrice(value);
+    if (isLinked) setPricingDriver('price');
+  };
+
+  const handleExitCapRateChange = (value: string) => {
+    setExitCapRate(value);
+    if (isLinked) setPricingDriver('exitCap');
+  };
+
   const debouncedCalculate = useCallback(
     debounce(() => {
       const periodOverrides = selectedPeriodData ? {
@@ -196,10 +214,11 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
         revenueGrowthRate: parsePercentInput(revenueGrowthRate),
         expenseGrowthRate: parsePercentInput(expenseGrowthRate),
         useNormalizedData,
+        pricingDriver: isLinked ? pricingDriver : undefined,
         ...periodOverrides,
       });
     }, 500),
-    [manualPurchasePrice, targetIRR, goingInCapRate, targetYearCapRate, targetYear, holdPeriod, exitCapRate, revenueGrowthRate, expenseGrowthRate, selectedPeriod, selectedPeriodData, useNormalizedData]
+    [manualPurchasePrice, targetIRR, goingInCapRate, targetYearCapRate, targetYear, holdPeriod, exitCapRate, revenueGrowthRate, expenseGrowthRate, selectedPeriod, selectedPeriodData, useNormalizedData, pricingDriver, isLinked]
   );
 
   useEffect(() => {
@@ -208,6 +227,38 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   }, [debouncedCalculate]);
 
   const pricingData = calculateMutation.data as PricingResponse | undefined;
+
+  // Bidirectional update: when exit cap changes and is driving, derive purchase price
+  // When pricing data changes and exit cap is driving, update the purchase price display
+  useEffect(() => {
+    if (isLinked && pricingDriver === 'exitCap' && pricingData?.fromGoingInCapRate) {
+      // Use the going-in cap rate calculation as a proxy for exit cap driven pricing
+      // Exit Cap Rate drives price = Exit Year NOI / Exit Cap Rate (simplified)
+      const exitCap = parsePercentInput(exitCapRate) / 100;
+      const holdYears = parseInt(holdPeriod) || 5;
+      const revenueGrowth = parsePercentInput(revenueGrowthRate) / 100;
+      const expenseGrowth = parsePercentInput(expenseGrowthRate) / 100;
+      
+      if (exitCap > 0 && pricingData.projectFinancials?.year1NOI) {
+        const year1NOI = pricingData.projectFinancials.year1NOI;
+        // Project NOI to exit year using growth rates
+        const projectedExitNOI = year1NOI * Math.pow(1 + (revenueGrowth - expenseGrowth), holdYears);
+        // Exit Value = Exit NOI / Exit Cap Rate
+        const exitValue = projectedExitNOI / exitCap;
+        // Simple approximation: Purchase Price for target returns
+        // Using a simplified discount factor for demonstration
+        const targetReturn = 0.15; // 15% IRR approximation
+        const discountFactor = Math.pow(1 + targetReturn, holdYears);
+        const derivedPrice = exitValue / discountFactor + (year1NOI * holdYears * 0.8); // Add cash flows
+        
+        // Only update if meaningfully different to avoid loops
+        const currentPrice = parseCurrencyInput(manualPurchasePrice);
+        if (Math.abs(derivedPrice - currentPrice) > 10000 && derivedPrice > 0) {
+          setManualPurchasePrice(Math.round(derivedPrice).toLocaleString());
+        }
+      }
+    }
+  }, [exitCapRate, pricingDriver, isLinked, pricingData?.projectFinancials?.year1NOI]);
 
   const handleSavePurchasePrice = (price: number, capRate?: number) => {
     saveMutation.mutate({ 
@@ -379,15 +430,22 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
             </Select>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={pricingDriver === 'exitCap' && isLinked ? 'ring-2 ring-primary/50' : ''}>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Exit Cap Rate</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium">Exit Cap Rate</CardTitle>
+              {pricingDriver === 'exitCap' && isLinked && (
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                  Driving
+                </Badge>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="relative">
               <Input
                 value={exitCapRate}
-                onChange={(e) => setExitCapRate(e.target.value)}
+                onChange={(e) => handleExitCapRateChange(e.target.value)}
                 className="pr-8"
                 data-testid="input-exit-cap-rate"
               />
@@ -431,25 +489,85 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
 
       <Separator />
 
+      {isLinked && (
+        <div className="flex items-center justify-center gap-3 py-2">
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+            pricingDriver === 'exitCap' 
+              ? 'bg-primary/10 text-primary' 
+              : 'bg-muted text-muted-foreground'
+          }`}>
+            <Percent className="h-3.5 w-3.5" />
+            Exit Cap Rate
+          </div>
+          <div className="flex items-center">
+            <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+            pricingDriver === 'price' 
+              ? 'bg-primary/10 text-primary' 
+              : 'bg-muted text-muted-foreground'
+          }`}>
+            <DollarSign className="h-3.5 w-3.5" />
+            Purchase Price
+          </div>
+          <span className="text-xs text-muted-foreground ml-2">
+            {pricingDriver === 'price' 
+              ? '→ Yields update when price changes' 
+              : '→ Price updates when cap rate changes'}
+          </span>
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="border-2 border-primary/20">
+        <Card className={`border-2 ${pricingDriver === 'price' && isLinked ? 'border-primary ring-2 ring-primary/30' : 'border-primary/20'}`}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-primary" />
-              From Purchase Price
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-primary" />
+                From Purchase Price
+              </CardTitle>
+              {pricingDriver === 'price' && isLinked && (
+                <Badge className="bg-primary text-primary-foreground text-[10px] px-1.5">
+                  Driving
+                </Badge>
+              )}
+            </div>
             <CardDescription>
               Enter a purchase price to see resulting returns
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label>Purchase Price</Label>
-              <div className="relative mt-1">
+              <div className="flex items-center justify-between mb-1">
+                <Label>Purchase Price</Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={isLinked ? "default" : "outline"}
+                        size="sm"
+                        className="h-6 px-2 text-[10px] gap-1"
+                        onClick={() => setIsLinked(!isLinked)}
+                      >
+                        <Link2 className={`h-3 w-3 ${!isLinked ? 'opacity-50' : ''}`} />
+                        {isLinked ? 'Linked' : 'Unlinked'}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[200px]">
+                      <p className="text-xs">
+                        {isLinked 
+                          ? 'Price & Exit Cap are linked. Editing one updates the other.' 
+                          : 'Price & Exit Cap are independent. Click to link.'}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   value={manualPurchasePrice}
-                  onChange={(e) => setManualPurchasePrice(e.target.value)}
+                  onChange={(e) => handlePurchasePriceChange(e.target.value)}
                   placeholder="10,000,000"
                   className="pl-8"
                   data-testid="input-purchase-price"
