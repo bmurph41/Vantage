@@ -17,6 +17,7 @@ import {
   startScheduler,
   stopScheduler
 } from "../../marinamatch/services/listing-scheduler";
+import { runApifyCrexiScraper, ensureApifyCrexiSource, getApifyRunStatus } from "../../marinamatch/services/apify-crexi-scraper";
 
 export const curatedDataRouter = Router();
 
@@ -792,6 +793,62 @@ curatedDataRouter.get("/scrape-sources/available", async (req, res) => {
   } catch (error) {
     console.error("Error getting available sources:", error);
     res.status(500).json({ error: "Failed to get available sources" });
+  }
+});
+
+// =====================================================
+// APIFY CREXI SCRAPER
+// =====================================================
+
+curatedDataRouter.post("/apify/crexi/run", async (req, res) => {
+  try {
+    const hasToken = !!process.env.APIFY_API_TOKEN;
+    if (!hasToken) {
+      return res.status(400).json({ 
+        error: "APIFY_API_TOKEN not configured",
+        message: "Please add your Apify API token to secrets" 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      message: "Apify Crexi scrape initiated - this may take several minutes",
+    });
+
+    await ensureApifyCrexiSource();
+
+    runApifyCrexiScraper().then(result => {
+      console.log("[Admin] Apify Crexi scrape completed:", result);
+    }).catch(err => {
+      console.error("[Admin] Apify Crexi scrape failed:", err);
+    });
+  } catch (error) {
+    console.error("Error triggering Apify Crexi scrape:", error);
+    res.status(500).json({ error: "Failed to trigger Apify Crexi scrape" });
+  }
+});
+
+curatedDataRouter.get("/apify/status", async (req, res) => {
+  try {
+    const hasToken = !!process.env.APIFY_API_TOKEN;
+    const actorId = process.env.APIFY_CREXI_ACTOR_ID || "crawlerbros~crexi-real-estate-scraper";
+    
+    const crexiListings = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(marinaListings)
+      .where(eq(marinaListings.sourcePlatform, "Crexi"));
+
+    const runStatus = getApifyRunStatus();
+
+    res.json({
+      apifyConfigured: hasToken,
+      actorId,
+      crexiListingsCount: Number(crexiListings[0]?.count || 0),
+      lastRun: runStatus,
+    });
+  } catch (error) {
+    console.error("Error getting Apify status:", error);
+    res.status(500).json({ error: "Failed to get Apify status" });
   }
 });
 
