@@ -130,7 +130,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   const [useNormalizedData, setUseNormalizedData] = useState<boolean>(true);
   
   // Two-way linking: tracks which field was last edited to drive calculation direction
-  const [pricingDriver, setPricingDriver] = useState<'price' | 'exitCap'>('price');
+  const [pricingDriver, setPricingDriver] = useState<'price' | 'exitCap' | 'targetIRR' | 'goingInCap'>('price');
   const [isLinked, setIsLinked] = useState<boolean>(true);
 
   const { data: project } = useQuery<ModelingProject>({
@@ -194,6 +194,16 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
     if (isLinked) setPricingDriver('exitCap');
   };
 
+  const handleTargetIRRChange = (value: string) => {
+    setTargetIRR(value);
+    if (isLinked) setPricingDriver('targetIRR');
+  };
+
+  const handleGoingInCapRateChange = (value: string) => {
+    setGoingInCapRate(value);
+    if (isLinked) setPricingDriver('goingInCap');
+  };
+
   const debouncedCalculate = useCallback(
     debounce(() => {
       const periodOverrides = selectedPeriodData ? {
@@ -228,49 +238,75 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
 
   const pricingData = calculateMutation.data as PricingResponse | undefined;
 
-  // Bidirectional update: when exit cap changes and is driving, derive purchase price
-  // Exit Cap Rate -> Price: Price = Exit Year NOI / Exit Cap Rate (discounted back)
+  // Bidirectional updates based on which field is driving
   useEffect(() => {
-    if (!isLinked || pricingDriver !== 'exitCap') return;
+    if (!isLinked) return;
     
-    const exitCap = parsePercentInput(exitCapRate) / 100;
     const holdYears = parseInt(holdPeriod) || 5;
     const revenueGrowth = parsePercentInput(revenueGrowthRate) / 100;
     const expenseGrowth = parsePercentInput(expenseGrowthRate) / 100;
+    const netGrowth = revenueGrowth - expenseGrowth;
+    const year1NOI = pricingData?.projectFinancials?.year1NOI || 500000;
     
-    // Use year1NOI from pricing data, or estimate from project
-    const year1NOI = pricingData?.projectFinancials?.year1NOI || 500000; // Default NOI if not available
+    if (year1NOI <= 0) return;
     
-    if (exitCap > 0 && year1NOI > 0) {
-      // Project NOI to exit year using net growth rate
-      const netGrowth = revenueGrowth - expenseGrowth;
-      const projectedExitNOI = year1NOI * Math.pow(1 + netGrowth, holdYears);
-      
-      // Exit Value = Exit NOI / Exit Cap Rate
-      const exitValue = projectedExitNOI / exitCap;
-      
-      // Calculate cumulative cash flows (sum of annual NOIs)
-      let cumulativeCashFlows = 0;
-      for (let i = 1; i <= holdYears; i++) {
-        cumulativeCashFlows += year1NOI * Math.pow(1 + netGrowth, i - 1);
+    // Calculate cumulative cash flows and exit NOI
+    let cumulativeCashFlows = 0;
+    for (let i = 1; i <= holdYears; i++) {
+      cumulativeCashFlows += year1NOI * Math.pow(1 + netGrowth, i - 1);
+    }
+    const projectedExitNOI = year1NOI * Math.pow(1 + netGrowth, holdYears);
+    
+    if (pricingDriver === 'exitCap') {
+      // Exit Cap Rate drives Price
+      const exitCap = parsePercentInput(exitCapRate) / 100;
+      if (exitCap > 0) {
+        const exitValue = projectedExitNOI / exitCap;
+        const targetReturn = parsePercentInput(targetIRR) / 100 || 0.15;
+        const discountFactor = Math.pow(1 + targetReturn, holdYears * 0.6);
+        const derivedPrice = (exitValue + cumulativeCashFlows * 0.85) / discountFactor;
+        
+        const currentPrice = parseCurrencyInput(manualPurchasePrice);
+        if (Math.abs(derivedPrice - currentPrice) > 50000 && derivedPrice > 0) {
+          setManualPurchasePrice(Math.round(derivedPrice).toLocaleString());
+        }
       }
+    } else if (pricingDriver === 'targetIRR') {
+      // Target IRR drives Price: Higher IRR = Lower Price
+      const targetReturn = parsePercentInput(targetIRR) / 100;
+      const exitCap = parsePercentInput(exitCapRate) / 100 || 0.075;
       
-      // For a target IRR, derive max purchase price using simple approximation:
-      // IRR formula: 0 = -Price + sum(CF_t/(1+IRR)^t) + ExitValue/(1+IRR)^n
-      // Simplified: Price ≈ (ExitValue + CumulativeCF * 0.85) / (1 + targetIRR)^(holdYears/2)
-      const targetReturn = parsePercentInput(targetIRR) / 100 || 0.15;
-      const discountFactor = Math.pow(1 + targetReturn, holdYears * 0.6);
-      const derivedPrice = (exitValue + cumulativeCashFlows * 0.85) / discountFactor;
-      
-      // Only update if meaningfully different to avoid infinite loops
-      const currentPrice = parseCurrencyInput(manualPurchasePrice);
-      const priceDiff = Math.abs(derivedPrice - currentPrice);
-      
-      if (priceDiff > 50000 && derivedPrice > 0) {
-        setManualPurchasePrice(Math.round(derivedPrice).toLocaleString());
+      if (targetReturn > 0 && exitCap > 0) {
+        const exitValue = projectedExitNOI / exitCap;
+        
+        // More accurate IRR-based price calculation
+        // PV = CF1/(1+r) + CF2/(1+r)^2 + ... + (CFn + ExitValue)/(1+r)^n
+        let pvCashFlows = 0;
+        for (let i = 1; i <= holdYears; i++) {
+          const yearCF = year1NOI * Math.pow(1 + netGrowth, i - 1);
+          pvCashFlows += yearCF / Math.pow(1 + targetReturn, i);
+        }
+        const pvExitValue = exitValue / Math.pow(1 + targetReturn, holdYears);
+        const derivedPrice = pvCashFlows + pvExitValue;
+        
+        const currentPrice = parseCurrencyInput(manualPurchasePrice);
+        if (Math.abs(derivedPrice - currentPrice) > 50000 && derivedPrice > 0) {
+          setManualPurchasePrice(Math.round(derivedPrice).toLocaleString());
+        }
+      }
+    } else if (pricingDriver === 'goingInCap') {
+      // Going-In Cap Rate drives Price: Price = Year 1 NOI / Cap Rate
+      const goingInCap = parsePercentInput(goingInCapRate) / 100;
+      if (goingInCap > 0) {
+        const derivedPrice = year1NOI / goingInCap;
+        
+        const currentPrice = parseCurrencyInput(manualPurchasePrice);
+        if (Math.abs(derivedPrice - currentPrice) > 50000 && derivedPrice > 0) {
+          setManualPurchasePrice(Math.round(derivedPrice).toLocaleString());
+        }
       }
     }
-  }, [exitCapRate, pricingDriver, isLinked, holdPeriod, revenueGrowthRate, expenseGrowthRate, targetIRR, pricingData?.projectFinancials?.year1NOI]);
+  }, [exitCapRate, targetIRR, goingInCapRate, pricingDriver, isLinked, holdPeriod, revenueGrowthRate, expenseGrowthRate, pricingData?.projectFinancials?.year1NOI]);
 
   const handleSavePurchasePrice = (price: number, capRate?: number) => {
     saveMutation.mutate({ 
@@ -502,30 +538,39 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
       <Separator />
 
       {isLinked && (
-        <div className="flex items-center justify-center gap-3 py-2">
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-            pricingDriver === 'exitCap' 
-              ? 'bg-primary/10 text-primary' 
-              : 'bg-muted text-muted-foreground'
+        <div className="flex items-center justify-center gap-2 py-2 flex-wrap">
+          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+            pricingDriver === 'price' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
           }`}>
-            <Percent className="h-3.5 w-3.5" />
-            Exit Cap Rate
+            <DollarSign className="h-3 w-3" />
+            Price
           </div>
-          <div className="flex items-center">
-            <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
-          </div>
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-            pricingDriver === 'price' 
-              ? 'bg-primary/10 text-primary' 
-              : 'bg-muted text-muted-foreground'
+          <ArrowLeftRight className="h-3.5 w-3.5 text-muted-foreground" />
+          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+            pricingDriver === 'targetIRR' ? 'bg-green-600 text-white' : 'bg-muted text-muted-foreground'
           }`}>
-            <DollarSign className="h-3.5 w-3.5" />
-            Purchase Price
+            <Target className="h-3 w-3" />
+            IRR
+          </div>
+          <ArrowLeftRight className="h-3.5 w-3.5 text-muted-foreground" />
+          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+            pricingDriver === 'goingInCap' ? 'bg-blue-600 text-white' : 'bg-muted text-muted-foreground'
+          }`}>
+            <Percent className="h-3 w-3" />
+            Cap Rate
+          </div>
+          <ArrowLeftRight className="h-3.5 w-3.5 text-muted-foreground" />
+          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+            pricingDriver === 'exitCap' ? 'bg-purple-600 text-white' : 'bg-muted text-muted-foreground'
+          }`}>
+            <TrendingUp className="h-3 w-3" />
+            Exit Cap
           </div>
           <span className="text-xs text-muted-foreground ml-2">
-            {pricingDriver === 'price' 
-              ? '→ Yields update when price changes' 
-              : '→ Price updates when cap rate changes'}
+            {pricingDriver === 'price' && '→ Editing price updates yield metrics'}
+            {pricingDriver === 'targetIRR' && '→ Editing IRR updates purchase price'}
+            {pricingDriver === 'goingInCap' && '→ Editing cap rate updates purchase price'}
+            {pricingDriver === 'exitCap' && '→ Editing exit cap updates purchase price'}
           </span>
         </div>
       )}
@@ -649,12 +694,19 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-green-500/20">
+        <Card className={`border-2 ${pricingDriver === 'targetIRR' && isLinked ? 'border-green-500 ring-2 ring-green-500/30' : 'border-green-500/20'}`}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-green-600" />
-              From Target IRR
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-green-600" />
+                From Target IRR
+              </CardTitle>
+              {pricingDriver === 'targetIRR' && isLinked && (
+                <Badge className="bg-green-600 text-white text-[10px] px-1.5">
+                  Driving
+                </Badge>
+              )}
+            </div>
             <CardDescription>
               Enter your target IRR to find the max purchase price
             </CardDescription>
@@ -665,7 +717,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
               <div className="relative mt-1">
                 <Input
                   value={targetIRR}
-                  onChange={(e) => setTargetIRR(e.target.value)}
+                  onChange={(e) => handleTargetIRRChange(e.target.value)}
                   placeholder="15"
                   className="pr-8"
                   data-testid="input-target-irr"
@@ -720,12 +772,19 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-blue-500/20">
+        <Card className={`border-2 ${pricingDriver === 'goingInCap' && isLinked ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-blue-500/20'}`}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Percent className="h-5 w-5 text-blue-600" />
-              From Going-In Cap Rate
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Percent className="h-5 w-5 text-blue-600" />
+                From Going-In Cap Rate
+              </CardTitle>
+              {pricingDriver === 'goingInCap' && isLinked && (
+                <Badge className="bg-blue-600 text-white text-[10px] px-1.5">
+                  Driving
+                </Badge>
+              )}
+            </div>
             <CardDescription>
               Enter a Year 1 cap rate to calculate price from NOI
             </CardDescription>
@@ -736,7 +795,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
               <div className="relative mt-1">
                 <Input
                   value={goingInCapRate}
-                  onChange={(e) => setGoingInCapRate(e.target.value)}
+                  onChange={(e) => handleGoingInCapRateChange(e.target.value)}
                   placeholder="7.5"
                   className="pr-8"
                   data-testid="input-going-in-cap"
