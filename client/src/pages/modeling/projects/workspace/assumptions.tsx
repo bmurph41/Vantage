@@ -1320,69 +1320,68 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
 
         <TabsContent value="margins" className="space-y-6">
           <Card>
-            <CardHeader>
-              <CardTitle>COGS Margins</CardTitle>
-              <CardDescription>
-                Set gross profit margins for departments with cost of goods sold. 
-                COGS is calculated as (1 - Margin%) x Revenue.
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">COGS Margins</CardTitle>
+              <CardDescription className="text-xs">
+                Gross profit margins for departments with cost of goods sold. COGS = (1 - Margin%) x Revenue.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {['fuel_dock', 'ship_store'].map((categoryId) => {
-                  const category = revenueCategories.find(c => c.id === categoryId);
-                  const margin = margins[categoryId] || { historical: 0, projected: 0 };
-                  
+            <CardContent className="pt-0">
+              {(() => {
+                const cogsCategories = ['fuel_dock', 'ship_store', 'restaurant', 'service', 'rental_boats', 'parts'];
+                const enabledCogsCategories = cogsCategories.filter(id => 
+                  config?.departments?.[id]?.isEnabled === true
+                );
+                
+                if (enabledCogsCategories.length === 0) {
                   return (
-                    <div key={categoryId} className="p-4 rounded-lg border space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          {category?.icon}
-                          <span className="font-medium">{category?.name}</span>
-                        </div>
-                      </div>
-                      
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label className="flex items-center gap-2">
-                            <Info className="h-3 w-3 text-muted-foreground" />
-                            Historical Average
-                          </Label>
-                          <PercentInput
-                            value={margin.historical}
-                            onChange={(val) => updateMargin(categoryId, 'historical', val)}
-                            className="w-32"
-                            data-testid={`input-margin-historical-${categoryId}`}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Based on actual P&L data
-                          </p>
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label>Projected Margin</Label>
-                          <PercentInput
-                            value={margin.projected}
-                            onChange={(val) => updateMargin(categoryId, 'projected', val)}
-                            className="w-32"
-                            data-testid={`input-margin-projected-${categoryId}`}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Applied to Pro Forma projections
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 p-2 rounded bg-muted/50">
-                        <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">
-                          COGS = Revenue x (1 - {margin.projected || 0}%) = Revenue x {((100 - (margin.projected || 0)) / 100).toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
+                    <p className="text-sm text-muted-foreground py-4">
+                      No profit centers with COGS enabled. Enable Fuel Dock, Ship Store, Restaurant, Service, Rental Boats, or Parts in Department Configuration.
+                    </p>
                   );
-                })}
-              </div>
+                }
+                
+                return (
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {enabledCogsCategories.map((categoryId) => {
+                      const category = revenueCategories.find(c => c.id === categoryId);
+                      const margin = margins[categoryId] || { historical: 0, projected: 0 };
+                      
+                      return (
+                        <div key={categoryId} className="p-3 rounded-lg border space-y-2">
+                          <div className="flex items-center gap-2">
+                            {category?.icon}
+                            <span className="font-medium text-sm">{category?.name}</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <Label className="text-xs text-muted-foreground">Historical</Label>
+                              <PercentInput
+                                value={margin.historical}
+                                onChange={(val) => updateMargin(categoryId, 'historical', val)}
+                                className="h-8 w-full"
+                                data-testid={`input-margin-historical-${categoryId}`}
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs text-muted-foreground">Projected</Label>
+                              <PercentInput
+                                value={margin.projected}
+                                onChange={(val) => updateMargin(categoryId, 'projected', val)}
+                                className="h-8 w-full"
+                                data-testid={`input-margin-projected-${categoryId}`}
+                              />
+                            </div>
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">
+                            COGS multiplier: {((100 - (margin.projected || 0)) / 100).toFixed(2)}x
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         </TabsContent>
