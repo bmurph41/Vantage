@@ -567,21 +567,25 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="structure" data-testid="tab-structure">
-              <BarChart3 className="h-4 w-4 mr-2" />
+          <TabsList className="flex-wrap h-auto gap-1">
+            <TabsTrigger value="structure" data-testid="tab-structure" className="gap-1.5 text-xs">
+              <BarChart3 className="h-3.5 w-3.5" />
               Structure
             </TabsTrigger>
-            <TabsTrigger value="investors" data-testid="tab-investors">
-              <DollarSign className="h-4 w-4 mr-2" />
-              Investors
+            <TabsTrigger value="partners" data-testid="tab-partners" className="gap-1.5 text-xs">
+              <DollarSign className="h-3.5 w-3.5" />
+              Partners
             </TabsTrigger>
-            <TabsTrigger value="distribution" data-testid="tab-distribution">
-              <Layers className="h-4 w-4 mr-2" />
+            <TabsTrigger value="returns" data-testid="tab-returns" className="gap-1.5 text-xs">
+              <TrendingUp className="h-3.5 w-3.5" />
+              Returns
+            </TabsTrigger>
+            <TabsTrigger value="distribution" data-testid="tab-distribution" className="gap-1.5 text-xs">
+              <Layers className="h-3.5 w-3.5" />
               Distribution
             </TabsTrigger>
-            <TabsTrigger value="sensitivity" data-testid="tab-sensitivity">
-              <RefreshCw className="h-4 w-4 mr-2" />
+            <TabsTrigger value="sensitivity" data-testid="tab-sensitivity" className="gap-1.5 text-xs">
+              <RefreshCw className="h-3.5 w-3.5" />
               Sensitivity
             </TabsTrigger>
           </TabsList>
@@ -1011,6 +1015,290 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
                     <p className="text-xl font-bold text-purple-600">{formatCurrency(gpContribution)}</p>
                     <p className="text-xs text-muted-foreground">{((gpContribution / totalContributed) * 100).toFixed(1)}% of total</p>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* PARTNERS TAB - GP/LP Management with Commitments */}
+          <TabsContent value="partners" className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-lg">Partners & Commitments</h3>
+              <Button size="sm" onClick={addInvestor}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Partner
+              </Button>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card className="border-2 border-primary/30">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Badge className="bg-primary">GP</Badge>
+                    General Partner
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Co-Investment</span>
+                    <span className="font-medium">{formatCurrency(gpContribution)} ({((gpContribution / totalContributed) * 100).toFixed(1)}%)</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Promote (at Pref)</span>
+                    <span className="font-medium">{tiers[0]?.gpSplit || 20}% of profits</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Catch-Up</span>
+                    <span className="font-medium">{inputs.gpCatchUpPercentage}%</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between text-sm font-medium">
+                    <span>Projected Returns</span>
+                    <span className="text-green-600">{formatCurrency(calculateWaterfall.gpTotal)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Badge variant="secondary">LP</Badge>
+                    Limited Partners ({investors.filter(i => !i.isGP).length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Total LP Capital</span>
+                    <span className="font-medium">{formatCurrency(lpContribution)} ({((lpContribution / totalContributed) * 100).toFixed(1)}%)</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Preferred Return</span>
+                    <span className="font-medium">{inputs.preferredReturn}% IRR</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Profit Split</span>
+                    <span className="font-medium">{tiers[0]?.lpSplit || 80}%</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between text-sm font-medium">
+                    <span>Projected Returns</span>
+                    <span className="text-green-600">{formatCurrency(calculateWaterfall.lpTotal)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Investor Detail</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-3 px-4 font-medium text-muted-foreground">Investor</th>
+                        <th className="text-center py-3 px-4 font-medium text-muted-foreground">Type</th>
+                        <th className="text-right py-3 px-4 font-medium text-muted-foreground">Commitment</th>
+                        <th className="text-right py-3 px-4 font-medium text-muted-foreground">Ownership %</th>
+                        <th className="text-right py-3 px-4 font-medium text-muted-foreground">Pref Return</th>
+                        <th className="text-right py-3 px-4 font-medium text-muted-foreground">Proj. MOIC</th>
+                        <th className="text-center py-3 px-4 font-medium text-muted-foreground">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {investors.map((investor) => {
+                        const ownership = (investor.contribution / totalContributed) * 100;
+                        const projMoic = investor.isGP ? gpMOIC : lpMOIC;
+                        return (
+                          <tr key={investor.id} className="border-b hover:bg-muted/50">
+                            <td className="py-3 px-4 font-medium">{investor.name}</td>
+                            <td className="text-center py-3 px-4">
+                              <Badge className={investor.isGP ? "bg-primary text-xs" : ""} variant={investor.isGP ? "default" : "secondary"}>
+                                {investor.isGP ? 'GP' : 'LP'}
+                              </Badge>
+                            </td>
+                            <td className="text-right py-3 px-4">{formatCurrency(investor.contribution)}</td>
+                            <td className="text-right py-3 px-4">{ownership.toFixed(1)}%</td>
+                            <td className="text-right py-3 px-4">{investor.isGP ? '—' : `${inputs.preferredReturn}%`}</td>
+                            <td className="text-right py-3 px-4">
+                              <span className="text-green-600 font-medium">{projMoic.toFixed(2)}x</span>
+                            </td>
+                            <td className="text-center py-3 px-4">
+                              <Button variant="ghost" size="sm" onClick={() => removeInvestor(investor.id)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* RETURNS TAB - Investor Returns Analysis */}
+          <TabsContent value="returns" className="space-y-6">
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5" />
+                      Investor Returns Analysis
+                    </CardTitle>
+                    <CardDescription>Waterfall distribution based on exit scenario</CardDescription>
+                  </div>
+                  <Badge variant="outline">
+                    {inputs.waterfallType === 'european' ? 'European' : 'American'} Waterfall
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-4 mb-6">
+                  <Card className="bg-blue-500/10 border-blue-500/20">
+                    <CardContent className="pt-4 text-center">
+                      <div className="text-2xl font-bold text-blue-600">{formatCurrency(inputs.totalDistribution)}</div>
+                      <div className="text-xs text-muted-foreground">Total Proceeds</div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-green-500/10 border-green-500/20">
+                    <CardContent className="pt-4 text-center">
+                      <div className="text-2xl font-bold text-green-600">{formatCurrency(inputs.totalDistribution - totalContributed)}</div>
+                      <div className="text-xs text-muted-foreground">Total Profit</div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-purple-500/10 border-purple-500/20">
+                    <CardContent className="pt-4 text-center">
+                      <div className="text-2xl font-bold text-purple-600">{(((inputs.totalDistribution / totalContributed) - 1) * 100 / inputs.holdingPeriodYears).toFixed(1)}%</div>
+                      <div className="text-xs text-muted-foreground">Fund IRR</div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-orange-500/10 border-orange-500/20">
+                    <CardContent className="pt-4 text-center">
+                      <div className="text-2xl font-bold text-orange-600">{(inputs.totalDistribution / totalContributed).toFixed(2)}x</div>
+                      <div className="text-xs text-muted-foreground">Equity Multiple</div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="space-y-3">
+                  <h4 className="font-medium">Waterfall Distribution</h4>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">Tier</th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">Description</th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground">Amount</th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground">LP Share</th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground">GP Share</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="bg-blue-500/5">
+                          <td className="py-3 px-4"><Badge variant="outline">Tier 1</Badge></td>
+                          <td className="py-3 px-4">Return of Capital</td>
+                          <td className="py-3 px-4 text-right font-medium">{formatCurrency(calculateWaterfall.returnOfCapital)}</td>
+                          <td className="py-3 px-4 text-right">{formatCurrency(calculateWaterfall.returnOfCapital * (lpContribution / totalContributed))}</td>
+                          <td className="py-3 px-4 text-right">{formatCurrency(calculateWaterfall.returnOfCapital * (gpContribution / totalContributed))}</td>
+                        </tr>
+                        <tr className="bg-green-500/5">
+                          <td className="py-3 px-4"><Badge variant="outline">Tier 2</Badge></td>
+                          <td className="py-3 px-4">Preferred Return ({inputs.preferredReturn}% IRR)</td>
+                          <td className="py-3 px-4 text-right font-medium">{formatCurrency(calculateWaterfall.preferredReturn)}</td>
+                          <td className="py-3 px-4 text-right">{formatCurrency(calculateWaterfall.preferredReturn * (lpContribution / totalContributed))}</td>
+                          <td className="py-3 px-4 text-right">{formatCurrency(calculateWaterfall.preferredReturn * (gpContribution / totalContributed))}</td>
+                        </tr>
+                        <tr className="bg-orange-500/5">
+                          <td className="py-3 px-4"><Badge variant="outline">Tier 3</Badge></td>
+                          <td className="py-3 px-4">GP Catch-Up ({inputs.gpCatchUpPercentage}%)</td>
+                          <td className="py-3 px-4 text-right font-medium">{formatCurrency(calculateWaterfall.gpCatchUp)}</td>
+                          <td className="py-3 px-4 text-right">$0</td>
+                          <td className="py-3 px-4 text-right">{formatCurrency(calculateWaterfall.gpCatchUp)}</td>
+                        </tr>
+                        {calculateWaterfall.tierDistributions.map((tierDist, idx) => (
+                          <tr key={idx} className="bg-purple-500/5">
+                            <td className="py-3 px-4"><Badge variant="outline">Tier {4 + idx}</Badge></td>
+                            <td className="py-3 px-4">{tierDist.tier.name} ({tierDist.tier.lpSplit}/{tierDist.tier.gpSplit})</td>
+                            <td className="py-3 px-4 text-right font-medium">{formatCurrency(tierDist.lpAmount + tierDist.gpAmount)}</td>
+                            <td className="py-3 px-4 text-right">{formatCurrency(tierDist.lpAmount)}</td>
+                            <td className="py-3 px-4 text-right">{formatCurrency(tierDist.gpAmount)}</td>
+                          </tr>
+                        ))}
+                        <tr className="font-bold border-t-2">
+                          <td className="py-3 px-4"></td>
+                          <td className="py-3 px-4">Total Distributions</td>
+                          <td className="py-3 px-4 text-right">{formatCurrency(calculateWaterfall.lpTotal + calculateWaterfall.gpTotal)}</td>
+                          <td className="py-3 px-4 text-right text-blue-600">{formatCurrency(calculateWaterfall.lpTotal)}</td>
+                          <td className="py-3 px-4 text-right text-green-600">{formatCurrency(calculateWaterfall.gpTotal)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <Separator className="my-6" />
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm">LP Returns Summary</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Capital Invested</span>
+                        <span>{formatCurrency(lpContribution)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Total Distributions</span>
+                        <span>{formatCurrency(calculateWaterfall.lpTotal)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Net Profit</span>
+                        <span className="text-green-600">{formatCurrency(calculateWaterfall.lpTotal - lpContribution)}</span>
+                      </div>
+                      <Separator />
+                      <div className="flex justify-between font-medium">
+                        <span>LP IRR</span>
+                        <span className="text-green-600">{((lpMOIC - 1) * 100 / inputs.holdingPeriodYears).toFixed(1)}%</span>
+                      </div>
+                      <div className="flex justify-between font-medium">
+                        <span>LP Multiple</span>
+                        <span className="text-green-600">{lpMOIC.toFixed(2)}x</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm">GP Returns Summary</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Capital Invested</span>
+                        <span>{formatCurrency(gpContribution)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Co-Invest Return</span>
+                        <span>{formatCurrency(calculateWaterfall.returnOfCapital * (gpContribution / totalContributed))}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Promote (Carry)</span>
+                        <span className="text-green-600">{formatCurrency(calculateWaterfall.gpCatchUp + calculateWaterfall.tierDistributions.reduce((sum, t) => sum + t.gpAmount, 0))}</span>
+                      </div>
+                      <Separator />
+                      <div className="flex justify-between font-medium">
+                        <span>GP IRR</span>
+                        <span className="text-green-600">{((gpMOIC - 1) * 100 / inputs.holdingPeriodYears).toFixed(1)}%</span>
+                      </div>
+                      <div className="flex justify-between font-medium">
+                        <span>GP Multiple</span>
+                        <span className="text-green-600">{gpMOIC.toFixed(2)}x</span>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
               </CardContent>
             </Card>
