@@ -686,32 +686,9 @@ export class CompService {
             results.insertedCount++;
             results.successCount++;
 
-            // Create pending property for user confirmation
-            if (needsPropertyProfile && createdComp) {
-              try {
-                const propertyData = {
-                  marinaName: transformedData.marina,
-                  city: transformedData.city,
-                  state: transformedData.state,
-                  address: transformedData.address,
-                };
-                
-                // Find potential duplicates to suggest to user
-                const propertyDuplicates = await DuplicateDetectionService.findPropertyDuplicates(propertyData, orgId);
-                const suggestedDuplicates = propertyDuplicates.matches.map(m => m.existingEntity.id);
-                
-                // Always create pending property for user review/confirmation
-                await this.storage.createPendingPropertyProfile({
-                  compId: createdComp.id,
-                  orgId,
-                  status: 'pending',
-                  suggestedDuplicates,
-                });
-                results.pendingPropertiesCreated++;
-              } catch (error) {
-                console.error('Error processing property duplicate detection:', error);
-              }
-            }
+            // NOTE: Pending property profiles are NOT created during sales comp import.
+            // Sales comps are the source of truth for transaction data.
+            // Pending sales comps are only created when users add transaction data to CRM Properties.
 
             // Create pending buyer company for user confirmation
             if (createdComp && transformedData.company && transformedData.company.trim()) {

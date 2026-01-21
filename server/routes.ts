@@ -11895,18 +11895,9 @@ Current context: Project ${req.params.projectId}`;
         }
       }
 
-      // Auto-create pending property profile if propertyId is not provided
-      if (!compData.propertyId) {
-        try {
-          await storage.createPendingPropertyProfile({
-            compId: comp.id,
-            orgId,
-            status: 'pending',
-          });
-        } catch (pendingError) {
-          console.error('Error auto-creating pending property profile:', pendingError);
-        }
-      }
+      // NOTE: Pending property profiles are NOT auto-created from sales comps.
+      // Sales comps are the source of truth for transaction data.
+      // Pending sales comps are only created when users add transaction data to CRM Properties.
 
       res.status(201).json(comp);
     } catch (error: any) {
