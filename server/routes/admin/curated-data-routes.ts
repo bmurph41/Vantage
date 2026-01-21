@@ -852,4 +852,148 @@ curatedDataRouter.get("/apify/status", async (req, res) => {
   }
 });
 
+const SOLD_STATUS_PATTERNS = [
+  /\bproperty\s+sold\b/i,
+  /\bmarina\s+sold\b/i,
+  /\blisting\s+sold\b/i,
+  /\brecently\s+sold\b/i,
+  /\bjust\s+sold\b/i,
+  /\bnow\s+sold\b/i,
+  /\bhas\s+been\s+sold\b/i,
+  /\bproperty\s+closed\b/i,
+  /\brecently\s+closed\b/i,
+  /\bdeal\s+closed\b/i,
+  /\bunder\s+contract\b/i,
+  /\bpending\s+sale\b/i,
+  /\bsale\s+pending\b/i,
+  /\bcontract\s+pending\b/i,
+  /\boff\s+market\b/i,
+  /\bno\s+longer\s+available\b/i,
+  /\bin\s+escrow\b/i,
+  /\baccepted\s+offer\b/i,
+  /\bstatus:\s*sold\b/i,
+  /\bstatus:\s*closed\b/i,
+  /\bstatus:\s*pending\b/i,
+];
+
+const TITLE_SOLD_KEYWORDS = [
+  "sold",
+  "closed",
+  "pending",
+  "under contract",
+  "off market",
+];
+
+function isSoldListingCheck(listing: { title?: string | null; propertyName?: string | null; originalDescription?: string | null; dealType?: string | null; }): { isSold: boolean; matchedKeyword?: string } {
+  const title = (listing.title || "").toLowerCase();
+  const propertyName = (listing.propertyName || "").toLowerCase();
+  const dealType = (listing.dealType || "").toLowerCase();
+  
+  for (const keyword of TITLE_SOLD_KEYWORDS) {
+    if (title.includes(keyword) || propertyName.includes(keyword)) {
+      return { isSold: true, matchedKeyword: `title/name: ${keyword}` };
+    }
+  }
+  
+  if (dealType === "sold" || dealType === "closed" || dealType === "pending") {
+    return { isSold: true, matchedKeyword: `dealType: ${dealType}` };
+  }
+  
+  const fullText = `${listing.title || ""} ${listing.propertyName || ""} ${listing.originalDescription || ""}`;
+  
+  for (const pattern of SOLD_STATUS_PATTERNS) {
+    const match = fullText.match(pattern);
+    if (match) {
+      return { isSold: true, matchedKeyword: match[0] };
+    }
+  }
+  
+  return { isSold: false };
+}
+
+curatedDataRouter.post("/listings/scan-sold", async (req, res) => {
+  try {
+    const { dryRun = true } = req.body;
+    
+    const allListings = await db
+      .select({
+        id: marinaListings.id,
+        propertyName: marinaListings.propertyName,
+        title: marinaListings.title,
+        originalDescription: marinaListings.originalDescription,
+        dealType: marinaListings.dealType,
+        status: marinaListings.status,
+      })
+      .from(marinaListings)
+      .where(eq(marinaListings.scope, "global"));
+
+    const soldListings: Array<{ id: string; name: string; matchedKeyword: string }> = [];
+    
+    for (const listing of allListings) {
+      const soldCheck = isSoldListingCheck(listing);
+      if (soldCheck.isSold) {
+        soldListings.push({
+          id: listing.id,
+          name: listing.propertyName || listing.title || "Unknown",
+          matchedKeyword: soldCheck.matchedKeyword || "unknown",
+        });
+      }
+    }
+
+    if (!dryRun && soldListings.length > 0) {
+      const soldIds = soldListings.map(l => l.id);
+      await db
+        .delete(marinaListings)
+        .where(sql`${marinaListings.id} = ANY(${soldIds})`);
+    }
+
+    res.json({
+      dryRun,
+      totalScanned: allListings.length,
+      soldListingsFound: soldListings.length,
+      removed: dryRun ? 0 : soldListings.length,
+      soldListings: soldListings.slice(0, 50),
+    });
+  } catch (error) {
+    console.error("Error scanning for sold listings:", error);
+    res.status(500).json({ error: "Failed to scan for sold listings" });
+  }
+});
+
+curatedDataRouter.post("/listings/deduplicate", async (req, res) => {
+  try {
+    const { dryRun = true } = req.body;
+    
+    const duplicates = await db.execute(sql`
+      WITH duplicates AS (
+        SELECT id, dedupe_hash, property_name,
+          ROW_NUMBER() OVER (PARTITION BY dedupe_hash ORDER BY created_at ASC) as rn
+        FROM marina_listings
+        WHERE scope = 'global' AND dedupe_hash IS NOT NULL
+      )
+      SELECT id, dedupe_hash, property_name
+      FROM duplicates
+      WHERE rn > 1
+    `);
+
+    const duplicateIds = (duplicates.rows as any[]).map(r => r.id);
+    
+    if (!dryRun && duplicateIds.length > 0) {
+      await db
+        .delete(marinaListings)
+        .where(sql`${marinaListings.id} = ANY(${duplicateIds})`);
+    }
+
+    res.json({
+      dryRun,
+      duplicatesFound: duplicateIds.length,
+      removed: dryRun ? 0 : duplicateIds.length,
+      duplicates: (duplicates.rows as any[]).slice(0, 50),
+    });
+  } catch (error) {
+    console.error("Error deduplicating listings:", error);
+    res.status(500).json({ error: "Failed to deduplicate listings" });
+  }
+});
+
 export default curatedDataRouter;

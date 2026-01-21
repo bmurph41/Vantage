@@ -101,6 +101,64 @@ function parseNumber(value: number | string | undefined): number | undefined {
   return isNaN(parsed) ? undefined : parsed;
 }
 
+const SOLD_STATUS_PATTERNS = [
+  /\bproperty\s+sold\b/i,
+  /\bmarina\s+sold\b/i,
+  /\blisting\s+sold\b/i,
+  /\brecently\s+sold\b/i,
+  /\bjust\s+sold\b/i,
+  /\bnow\s+sold\b/i,
+  /\bhas\s+been\s+sold\b/i,
+  /\bproperty\s+closed\b/i,
+  /\brecently\s+closed\b/i,
+  /\bdeal\s+closed\b/i,
+  /\bunder\s+contract\b/i,
+  /\bpending\s+sale\b/i,
+  /\bsale\s+pending\b/i,
+  /\bcontract\s+pending\b/i,
+  /\boff\s+market\b/i,
+  /\bno\s+longer\s+available\b/i,
+  /\bin\s+escrow\b/i,
+  /\baccepted\s+offer\b/i,
+  /\bstatus:\s*sold\b/i,
+  /\bstatus:\s*closed\b/i,
+  /\bstatus:\s*pending\b/i,
+];
+
+const TITLE_SOLD_KEYWORDS = [
+  "sold",
+  "closed",
+  "pending",
+  "under contract",
+  "off market",
+];
+
+function isSoldListing(raw: CrexiListing): { isSold: boolean; matchedKeyword?: string } {
+  const status = (raw.status || "").toLowerCase();
+  const title = (raw.title || raw.name || "").toLowerCase();
+  
+  if (status === "sold" || status === "closed" || status === "pending" || status === "off market") {
+    return { isSold: true, matchedKeyword: `status: ${status}` };
+  }
+  
+  for (const keyword of TITLE_SOLD_KEYWORDS) {
+    if (title.includes(keyword)) {
+      return { isSold: true, matchedKeyword: `title: ${keyword}` };
+    }
+  }
+  
+  const fullText = `${raw.title || ""} ${raw.name || ""} ${raw.description || ""}`;
+  
+  for (const pattern of SOLD_STATUS_PATTERNS) {
+    const match = fullText.match(pattern);
+    if (match) {
+      return { isSold: true, matchedKeyword: match[0] };
+    }
+  }
+  
+  return { isSold: false };
+}
+
 function parseCrexiListing(raw: CrexiListing): ListingData | null {
   const title = raw.title || raw.name || raw.propertyName || "";
   if (!title) return null;
@@ -249,9 +307,20 @@ export async function runApifyCrexiScraper(): Promise<{
     console.log(`[Apify Crexi] Retrieved ${rawListings.length} raw listings`);
 
     result.listingsFound = rawListings.length;
+    
+    let skippedSold = 0;
+    let skippedDuplicate = 0;
 
     for (const raw of rawListings) {
       try {
+        // Filter out sold/closed listings
+        const soldCheck = isSoldListing(raw);
+        if (soldCheck.isSold) {
+          console.log(`[Apify Crexi] Skipping sold listing: "${raw.title || raw.name}" (matched: "${soldCheck.matchedKeyword}")`);
+          skippedSold++;
+          continue;
+        }
+        
         const listing = parseCrexiListing(raw);
         if (!listing) continue;
 
@@ -264,6 +333,7 @@ export async function runApifyCrexiScraper(): Promise<{
           .limit(1);
 
         if (existing.length > 0) {
+          // Update existing listing with latest data
           await db
             .update(marinaListings)
             .set({
@@ -272,6 +342,7 @@ export async function runApifyCrexiScraper(): Promise<{
               updatedAt: new Date(),
             })
             .where(eq(marinaListings.id, existing[0].id));
+          skippedDuplicate++;
           continue;
         }
 
@@ -330,7 +401,7 @@ export async function runApifyCrexiScraper(): Promise<{
     }
 
     result.success = true;
-    console.log(`[Apify Crexi] Completed: ${result.newListings} new listings imported`);
+    console.log(`[Apify Crexi] Completed: ${result.listingsFound} found, ${skippedSold} sold/closed skipped, ${skippedDuplicate} duplicates updated, ${result.newListings} new listings imported`);
     
     lastRunStatus = {
       ...lastRunStatus,

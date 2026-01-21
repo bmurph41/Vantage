@@ -4,6 +4,69 @@ import { marinaScrapeources, marinaScrapeRuns, marinaListings } from "@shared/sc
 import { scrapeSourceWithMultiPage, ListingData, generateDedupeHash } from "./cre-scraper";
 import { matchScoringService } from "./match-scoring-service";
 
+const SOLD_STATUS_PATTERNS = [
+  /\bproperty\s+sold\b/i,
+  /\bmarina\s+sold\b/i,
+  /\blisting\s+sold\b/i,
+  /\brecently\s+sold\b/i,
+  /\bjust\s+sold\b/i,
+  /\bnow\s+sold\b/i,
+  /\bhas\s+been\s+sold\b/i,
+  /\bproperty\s+closed\b/i,
+  /\brecently\s+closed\b/i,
+  /\bdeal\s+closed\b/i,
+  /\bunder\s+contract\b/i,
+  /\bpending\s+sale\b/i,
+  /\bsale\s+pending\b/i,
+  /\bcontract\s+pending\b/i,
+  /\boff\s+market\b/i,
+  /\bno\s+longer\s+available\b/i,
+  /\bin\s+escrow\b/i,
+  /\baccepted\s+offer\b/i,
+  /\bstatus:\s*sold\b/i,
+  /\bstatus:\s*closed\b/i,
+  /\bstatus:\s*pending\b/i,
+];
+
+const TITLE_SOLD_KEYWORDS = [
+  "sold",
+  "closed",
+  "pending",
+  "under contract",
+  "off market",
+];
+
+function isSoldListing(listing: ListingData): { isSold: boolean; matchedKeyword?: string } {
+  const title = (listing.title || "").toLowerCase();
+  const propertyName = (listing.propertyName || "").toLowerCase();
+  const dealType = (listing.dealType || "").toLowerCase();
+  
+  for (const keyword of TITLE_SOLD_KEYWORDS) {
+    if (title.includes(keyword) || propertyName.includes(keyword)) {
+      return { isSold: true, matchedKeyword: `title/name: ${keyword}` };
+    }
+  }
+  
+  if (dealType === "sold" || dealType === "closed" || dealType === "pending") {
+    return { isSold: true, matchedKeyword: `dealType: ${dealType}` };
+  }
+  
+  const fullText = [
+    listing.title || "",
+    listing.propertyName || "",
+    listing.originalDescription || "",
+  ].join(" ");
+  
+  for (const pattern of SOLD_STATUS_PATTERNS) {
+    const match = fullText.match(pattern);
+    if (match) {
+      return { isSold: true, matchedKeyword: match[0] };
+    }
+  }
+  
+  return { isSold: false };
+}
+
 const SCRAPE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const MIN_SCRAPE_INTERVAL_MS = 60 * 60 * 1000;
 
@@ -292,11 +355,21 @@ async function saveGlobalListings(
   const result = {
     newListings: 0,
     totalListings: listings.length,
+    skippedSold: 0,
+    skippedDuplicate: 0,
     errors: [] as string[],
   };
 
   for (const listing of listings) {
     try {
+      // Filter out sold/closed listings as safety check
+      const soldCheck = isSoldListing(listing);
+      if (soldCheck.isSold) {
+        console.log(`[Scheduler] Skipping sold listing: "${listing.propertyName || listing.title}" (matched: "${soldCheck.matchedKeyword}")`);
+        result.skippedSold++;
+        continue;
+      }
+      
       const dedupeHash = generateDedupeHash(listing, platform);
       
       const [existing] = await db
@@ -313,6 +386,7 @@ async function saveGlobalListings(
             updatedAt: new Date(),
           })
           .where(eq(marinaListings.id, existing.id));
+        result.skippedDuplicate++;
         continue;
       }
 
@@ -379,6 +453,6 @@ async function saveGlobalListings(
     }
   }
 
-  console.log(`[Scheduler] Saved ${result.newListings} new listings from ${platform} (${listings.length} total)`);
+  console.log(`[Scheduler] ${platform}: ${listings.length} found, ${result.skippedSold} sold skipped, ${result.skippedDuplicate} duplicates updated, ${result.newListings} new saved`);
   return result;
 }
