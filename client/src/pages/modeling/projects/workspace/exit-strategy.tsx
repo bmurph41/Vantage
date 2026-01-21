@@ -1269,12 +1269,27 @@ interface WaterfallPanelProps {
   salePrice: string;
 }
 
+interface Investor {
+  id: string;
+  name: string;
+  contribution: number;
+  isGP: boolean;
+}
+
 function WaterfallPanel({ salePrice: initialSalePrice }: WaterfallPanelProps) {
   const [distributionLinked, setDistributionLinked] = useState(true);
   const [totalDistribution, setTotalDistribution] = useState<string>(initialSalePrice);
   const [lpCapital, setLpCapital] = useState<string>((parseFloat(initialSalePrice) * 0.8).toString());
   const [preferredReturn, setPreferredReturn] = useState<string>("8");
   const [carriedInterest, setCarriedInterest] = useState<string>("20");
+  const [gpCatchUp, setGpCatchUp] = useState<string>("100");
+  const [holdPeriod, setHoldPeriod] = useState<string>("5");
+  const [waterfallTab, setWaterfallTab] = useState<string>("structure");
+  const [investors, setInvestors] = useState<Investor[]>([
+    { id: '1', name: 'GP Fund Manager', contribution: parseFloat(initialSalePrice) * 0.2, isGP: true },
+    { id: '2', name: 'Institutional LP', contribution: parseFloat(initialSalePrice) * 0.5, isGP: false },
+    { id: '3', name: 'Family Office LP', contribution: parseFloat(initialSalePrice) * 0.3, isGP: false },
+  ]);
 
   useEffect(() => {
     if (distributionLinked) {
@@ -1283,78 +1298,421 @@ function WaterfallPanel({ salePrice: initialSalePrice }: WaterfallPanelProps) {
     }
   }, [initialSalePrice, distributionLinked]);
 
-  const prefAmount = (parseFloat(lpCapital) || 0) * (parseFloat(preferredReturn) / 100 || 0);
-  const remaining = (parseFloat(totalDistribution) || 0) - prefAmount - (parseFloat(lpCapital) || 0);
-  const gpCarry = remaining > 0 ? remaining * (parseFloat(carriedInterest) / 100 || 0) : 0;
-  const lpShare = remaining - gpCarry;
+  const totalProceeds = parseFloat(totalDistribution) || 0;
+  const lpCap = parseFloat(lpCapital) || 0;
+  const gpCapital = totalProceeds * 0.2;
+  const totalCapital = lpCap + gpCapital;
+  const prefRate = parseFloat(preferredReturn) / 100 || 0;
+  const carryRate = parseFloat(carriedInterest) / 100 || 0;
+  const catchUpRate = parseFloat(gpCatchUp) / 100 || 0;
+  const holdYears = parseFloat(holdPeriod) || 5;
+
+  const returnOfCapital = Math.min(totalProceeds, totalCapital);
+  const afterCapitalReturn = Math.max(0, totalProceeds - totalCapital);
+  const lpPreferred = lpCap * prefRate * holdYears;
+  const prefPayment = Math.min(afterCapitalReturn, lpPreferred);
+  const afterPref = Math.max(0, afterCapitalReturn - prefPayment);
+  const gpCatchUpAmount = afterPref > 0 ? Math.min(afterPref * catchUpRate, afterPref) : 0;
+  const afterCatchUp = Math.max(0, afterPref - gpCatchUpAmount);
+  const gpCarry = afterCatchUp * carryRate;
+  const lpProfitShare = afterCatchUp * (1 - carryRate);
+  
+  const totalLP = (returnOfCapital * (lpCap / totalCapital)) + prefPayment + lpProfitShare;
+  const totalGP = (returnOfCapital * (gpCapital / totalCapital)) + gpCatchUpAmount + gpCarry;
+  const lpMOIC = totalLP / lpCap;
+  const gpMOIC = totalGP / gpCapital;
+  const fundMOIC = totalProceeds / totalCapital;
+  const fundIRR = (Math.pow(fundMOIC, 1 / holdYears) - 1) * 100;
+  const lpIRR = (Math.pow(lpMOIC, 1 / holdYears) - 1) * 100;
+  const gpIRR = (Math.pow(gpMOIC, 1 / holdYears) - 1) * 100;
+
+  const addInvestor = () => {
+    const newId = (investors.length + 1).toString();
+    setInvestors([...investors, { id: newId, name: `New LP ${newId}`, contribution: 1000000, isGP: false }]);
+  };
+
+  const removeInvestor = (id: string) => {
+    if (investors.length > 1) {
+      setInvestors(investors.filter(inv => inv.id !== id));
+    }
+  };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-cyan-500" />
-            Waterfall Analysis
-          </CardTitle>
-          <CardDescription>
-            Fund distribution modeling
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label className="flex items-center gap-1">
-                Total Distribution
-                {distributionLinked && <Link2 className="h-3 w-3 text-blue-500" />}
-              </Label>
-              <CurrencyInput 
-                value={totalDistribution} 
-                onChange={(v) => { setTotalDistribution(v); setDistributionLinked(false); }}
-                linked={distributionLinked}
-                onUnlink={() => setDistributionLinked(false)}
-              />
-            </div>
-            <div>
-              <Label>LP Capital</Label>
-              <CurrencyInput value={lpCapital} onChange={setLpCapital} />
-            </div>
-            <div>
-              <Label>Preferred Return</Label>
-              <PercentInput value={preferredReturn} onChange={setPreferredReturn} />
-            </div>
-            <div>
-              <Label>Carried Interest</Label>
-              <PercentInput value={carriedInterest} onChange={setCarriedInterest} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="space-y-4">
+      <Tabs value={waterfallTab} onValueChange={setWaterfallTab}>
+        <TabsList className="flex flex-wrap h-auto gap-1 mb-4">
+          <TabsTrigger value="structure" className="text-xs gap-1">
+            <BarChart3 className="h-3.5 w-3.5" />
+            Structure
+          </TabsTrigger>
+          <TabsTrigger value="partners" className="text-xs gap-1">
+            <DollarSign className="h-3.5 w-3.5" />
+            Partners
+          </TabsTrigger>
+          <TabsTrigger value="returns" className="text-xs gap-1">
+            <TrendingUp className="h-3.5 w-3.5" />
+            Returns
+          </TabsTrigger>
+          <TabsTrigger value="distribution" className="text-xs gap-1">
+            <Calculator className="h-3.5 w-3.5" />
+            Distribution
+          </TabsTrigger>
+        </TabsList>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Distribution Summary</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3">
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">LP Preferred Return</span>
-              <span className="font-semibold">{formatCurrency(prefAmount)}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">LP Capital Return</span>
-              <span className="font-semibold">{formatCurrency(lpCapital)}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">GP Carried Interest</span>
-              <span className="font-semibold">{formatCurrency(gpCarry)}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">LP Profit Share</span>
-              <span className="font-semibold text-green-600">{formatCurrency(lpShare)}</span>
-            </div>
+        <TabsContent value="structure" className="mt-0">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <BarChart3 className="h-5 w-5 text-cyan-500" />
+                  Waterfall Structure
+                </CardTitle>
+                <CardDescription>Configure fund distribution terms</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="flex items-center gap-1 text-sm">
+                      Total Proceeds
+                      {distributionLinked && <Link2 className="h-3 w-3 text-blue-500" />}
+                    </Label>
+                    <CurrencyInput 
+                      value={totalDistribution} 
+                      onChange={(v) => { setTotalDistribution(v); setDistributionLinked(false); }}
+                      linked={distributionLinked}
+                      onUnlink={() => setDistributionLinked(false)}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm">LP Capital</Label>
+                    <CurrencyInput value={lpCapital} onChange={setLpCapital} />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Preferred Return</Label>
+                    <PercentInput value={preferredReturn} onChange={setPreferredReturn} />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Carried Interest</Label>
+                    <PercentInput value={carriedInterest} onChange={setCarriedInterest} />
+                  </div>
+                  <div>
+                    <Label className="text-sm">GP Catch-Up %</Label>
+                    <PercentInput value={gpCatchUp} onChange={setGpCatchUp} />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Hold Period (Years)</Label>
+                    <Input 
+                      type="number" 
+                      value={holdPeriod} 
+                      onChange={(e) => setHoldPeriod(e.target.value)}
+                      min={1}
+                      max={20}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Quick Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between py-2 border-b text-sm">
+                  <span className="text-muted-foreground">Total Capital</span>
+                  <span className="font-semibold">{formatCurrency(totalCapital)}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b text-sm">
+                  <span className="text-muted-foreground">Total Proceeds</span>
+                  <span className="font-semibold">{formatCurrency(totalProceeds)}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b text-sm">
+                  <span className="text-muted-foreground">Total Profit</span>
+                  <span className="font-semibold text-green-600">{formatCurrency(totalProceeds - totalCapital)}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b text-sm">
+                  <span className="text-muted-foreground">Fund MOIC</span>
+                  <span className="font-semibold">{fundMOIC.toFixed(2)}x</span>
+                </div>
+                <div className="flex justify-between py-2 text-sm">
+                  <span className="text-muted-foreground">Fund IRR</span>
+                  <span className="font-semibold text-green-600">{fundIRR.toFixed(1)}%</span>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+        </TabsContent>
+
+        <TabsContent value="partners" className="mt-0">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">Partners & Commitments</h3>
+              <Button size="sm" variant="outline" onClick={addInvestor}>
+                Add Partner
+              </Button>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card className="border-2 border-primary/30">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Badge className="bg-primary text-xs">GP</Badge>
+                    General Partner
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Co-Investment</span>
+                    <span className="font-medium">{formatCurrency(gpCapital)} ({((gpCapital / totalCapital) * 100).toFixed(1)}%)</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Promote Rate</span>
+                    <span className="font-medium">{carriedInterest}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Catch-Up</span>
+                    <span className="font-medium">{gpCatchUp}%</span>
+                  </div>
+                  <div className="flex justify-between font-medium pt-2 border-t">
+                    <span>Projected Returns</span>
+                    <span className="text-green-600">{formatCurrency(totalGP)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Badge variant="secondary" className="text-xs">LP</Badge>
+                    Limited Partners ({investors.filter(i => !i.isGP).length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Total LP Capital</span>
+                    <span className="font-medium">{formatCurrency(lpCap)} ({((lpCap / totalCapital) * 100).toFixed(1)}%)</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Preferred Return</span>
+                    <span className="font-medium">{preferredReturn}% IRR</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Profit Split</span>
+                    <span className="font-medium">{100 - parseFloat(carriedInterest)}%</span>
+                  </div>
+                  <div className="flex justify-between font-medium pt-2 border-t">
+                    <span>Projected Returns</span>
+                    <span className="text-green-600">{formatCurrency(totalLP)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Investor Detail</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2 px-3 font-medium text-muted-foreground">Investor</th>
+                        <th className="text-center py-2 px-3 font-medium text-muted-foreground">Type</th>
+                        <th className="text-right py-2 px-3 font-medium text-muted-foreground">Commitment</th>
+                        <th className="text-right py-2 px-3 font-medium text-muted-foreground">Ownership %</th>
+                        <th className="text-right py-2 px-3 font-medium text-muted-foreground">Proj. MOIC</th>
+                        <th className="text-center py-2 px-3 font-medium text-muted-foreground">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {investors.map((investor) => {
+                        const ownership = (investor.contribution / totalCapital) * 100;
+                        const projMoic = investor.isGP ? gpMOIC : lpMOIC;
+                        return (
+                          <tr key={investor.id} className="border-b hover:bg-muted/50">
+                            <td className="py-2 px-3 font-medium">{investor.name}</td>
+                            <td className="text-center py-2 px-3">
+                              <Badge className={investor.isGP ? "bg-primary text-xs" : ""} variant={investor.isGP ? "default" : "secondary"}>
+                                {investor.isGP ? 'GP' : 'LP'}
+                              </Badge>
+                            </td>
+                            <td className="text-right py-2 px-3">{formatCurrency(investor.contribution)}</td>
+                            <td className="text-right py-2 px-3">{ownership.toFixed(1)}%</td>
+                            <td className="text-right py-2 px-3">
+                              <span className="text-green-600 font-medium">{projMoic.toFixed(2)}x</span>
+                            </td>
+                            <td className="text-center py-2 px-3">
+                              <Button variant="ghost" size="sm" onClick={() => removeInvestor(investor.id)}>
+                                ×
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="returns" className="mt-0">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <TrendingUp className="h-5 w-5" />
+                Investor Returns Analysis
+              </CardTitle>
+              <CardDescription>Waterfall distribution based on exit scenario</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-4 mb-6">
+                <Card className="bg-blue-500/10 border-blue-500/20">
+                  <CardContent className="pt-4 text-center">
+                    <div className="text-xl font-bold text-blue-600">{formatCurrency(totalProceeds)}</div>
+                    <div className="text-xs text-muted-foreground">Total Proceeds</div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-green-500/10 border-green-500/20">
+                  <CardContent className="pt-4 text-center">
+                    <div className="text-xl font-bold text-green-600">{formatCurrency(totalProceeds - totalCapital)}</div>
+                    <div className="text-xs text-muted-foreground">Total Profit</div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-purple-500/10 border-purple-500/20">
+                  <CardContent className="pt-4 text-center">
+                    <div className="text-xl font-bold text-purple-600">{fundIRR.toFixed(1)}%</div>
+                    <div className="text-xs text-muted-foreground">Fund IRR</div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-orange-500/10 border-orange-500/20">
+                  <CardContent className="pt-4 text-center">
+                    <div className="text-xl font-bold text-orange-600">{fundMOIC.toFixed(2)}x</div>
+                    <div className="text-xs text-muted-foreground">Equity Multiple</div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2 mt-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">LP Returns Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Capital Invested</span>
+                      <span>{formatCurrency(lpCap)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Total Distributions</span>
+                      <span>{formatCurrency(totalLP)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Net Profit</span>
+                      <span className="text-green-600">{formatCurrency(totalLP - lpCap)}</span>
+                    </div>
+                    <div className="flex justify-between font-medium pt-2 border-t">
+                      <span>LP IRR</span>
+                      <span className="text-green-600">{lpIRR.toFixed(1)}%</span>
+                    </div>
+                    <div className="flex justify-between font-medium">
+                      <span>LP Multiple</span>
+                      <span className="text-green-600">{lpMOIC.toFixed(2)}x</span>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">GP Returns Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Capital Invested</span>
+                      <span>{formatCurrency(gpCapital)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Co-Invest Return</span>
+                      <span>{formatCurrency(returnOfCapital * (gpCapital / totalCapital))}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Promote (Carry)</span>
+                      <span className="text-green-600">{formatCurrency(gpCatchUpAmount + gpCarry)}</span>
+                    </div>
+                    <div className="flex justify-between font-medium pt-2 border-t">
+                      <span>GP IRR</span>
+                      <span className="text-green-600">{gpIRR.toFixed(1)}%</span>
+                    </div>
+                    <div className="flex justify-between font-medium">
+                      <span>GP Multiple</span>
+                      <span className="text-green-600">{gpMOIC.toFixed(2)}x</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="distribution" className="mt-0">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Waterfall Distribution</CardTitle>
+              <CardDescription>Step-by-step distribution breakdown</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Tier</th>
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Description</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">Amount</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">LP Share</th>
+                      <th className="text-right py-2 px-3 font-medium text-muted-foreground">GP Share</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="bg-blue-500/5">
+                      <td className="py-2 px-3"><Badge variant="outline" className="text-xs">Tier 1</Badge></td>
+                      <td className="py-2 px-3">Return of Capital</td>
+                      <td className="py-2 px-3 text-right font-medium">{formatCurrency(returnOfCapital)}</td>
+                      <td className="py-2 px-3 text-right">{formatCurrency(returnOfCapital * (lpCap / totalCapital))}</td>
+                      <td className="py-2 px-3 text-right">{formatCurrency(returnOfCapital * (gpCapital / totalCapital))}</td>
+                    </tr>
+                    <tr className="bg-green-500/5">
+                      <td className="py-2 px-3"><Badge variant="outline" className="text-xs">Tier 2</Badge></td>
+                      <td className="py-2 px-3">Preferred Return ({preferredReturn}% IRR)</td>
+                      <td className="py-2 px-3 text-right font-medium">{formatCurrency(prefPayment)}</td>
+                      <td className="py-2 px-3 text-right">{formatCurrency(prefPayment)}</td>
+                      <td className="py-2 px-3 text-right">$0</td>
+                    </tr>
+                    <tr className="bg-orange-500/5">
+                      <td className="py-2 px-3"><Badge variant="outline" className="text-xs">Tier 3</Badge></td>
+                      <td className="py-2 px-3">GP Catch-Up ({gpCatchUp}%)</td>
+                      <td className="py-2 px-3 text-right font-medium">{formatCurrency(gpCatchUpAmount)}</td>
+                      <td className="py-2 px-3 text-right">$0</td>
+                      <td className="py-2 px-3 text-right">{formatCurrency(gpCatchUpAmount)}</td>
+                    </tr>
+                    <tr className="bg-purple-500/5">
+                      <td className="py-2 px-3"><Badge variant="outline" className="text-xs">Tier 4</Badge></td>
+                      <td className="py-2 px-3">Carried Interest ({carriedInterest}%/{100 - parseFloat(carriedInterest)}%)</td>
+                      <td className="py-2 px-3 text-right font-medium">{formatCurrency(gpCarry + lpProfitShare)}</td>
+                      <td className="py-2 px-3 text-right">{formatCurrency(lpProfitShare)}</td>
+                      <td className="py-2 px-3 text-right">{formatCurrency(gpCarry)}</td>
+                    </tr>
+                    <tr className="font-bold border-t-2">
+                      <td className="py-2 px-3"></td>
+                      <td className="py-2 px-3">Total Distributions</td>
+                      <td className="py-2 px-3 text-right">{formatCurrency(totalProceeds)}</td>
+                      <td className="py-2 px-3 text-right text-blue-600">{formatCurrency(totalLP)}</td>
+                      <td className="py-2 px-3 text-right text-green-600">{formatCurrency(totalGP)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
