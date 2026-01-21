@@ -129,10 +129,27 @@ router.get("/listings", async (req: Request, res: Response) => {
 
     const { status, state, city, source, minScore, sortBy, limit = "100", offset = "0", includeGlobal = "true" } = req.query;
 
+    // Get user's active packs for filtering global listings
+    const userPacks = (req as any).user?.activePacks || (req as any).user?.packs || [];
+    const hasIntelPack = userPacks.includes("intel") || userPacks.includes("marinamatch_intel");
+    const hasAnalysisPack = userPacks.includes("analysis") || userPacks.includes("analytics_pro");
+    
     // Include both org-specific listings AND global listings (if user has pack access)
-    // Global listings are curated by the MarinaMatch team and available to all subscribers
+    // Global listings are curated by the MarinaMatch team and available to subscribers
+    // For global listings, filter by requiredPack - show only listings user has access to
     const scopeCondition = includeGlobal === "true"
-      ? or(eq(marinaListings.orgId, orgId), eq(marinaListings.scope, "global"))
+      ? or(
+          eq(marinaListings.orgId, orgId),
+          and(
+            eq(marinaListings.scope, "global"),
+            // Pack-gated access: show global listings that don't require a pack OR user has required pack
+            or(
+              isNull(marinaListings.requiredPack),
+              ...(hasIntelPack ? [eq(marinaListings.requiredPack, "intel")] : []),
+              ...(hasAnalysisPack ? [eq(marinaListings.requiredPack, "analysis")] : [])
+            )
+          )
+        )
       : eq(marinaListings.orgId, orgId);
     
     const conditions: any[] = [scopeCondition];
@@ -187,12 +204,35 @@ router.get("/listings/:id", async (req: Request, res: Response) => {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
 
+    // First try to find by org-scoped or global listing
     const [listing] = await db
       .select()
       .from(marinaListings)
-      .where(and(eq(marinaListings.id, req.params.id), eq(marinaListings.orgId, orgId)));
+      .where(and(
+        eq(marinaListings.id, req.params.id),
+        or(
+          eq(marinaListings.orgId, orgId),
+          eq(marinaListings.scope, "global")
+        )
+      ));
 
     if (!listing) return res.status(404).json({ error: "Listing not found" });
+
+    // Pack-gated access for global listings
+    if (listing.scope === "global" && listing.requiredPack) {
+      const userPacks = (req as any).user?.activePacks || (req as any).user?.packs || [];
+      const hasIntelPack = userPacks.includes("intel") || userPacks.includes("marinamatch_intel");
+      const hasAnalysisPack = userPacks.includes("analysis") || userPacks.includes("analytics_pro");
+      
+      const packRequired = listing.requiredPack;
+      const hasAccess = 
+        (packRequired === "intel" && hasIntelPack) ||
+        (packRequired === "analysis" && hasAnalysisPack);
+      
+      if (!hasAccess) {
+        return res.status(403).json({ error: "Pack subscription required", requiredPack: packRequired });
+      }
+    }
 
     const matches = await db
       .select()

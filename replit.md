@@ -51,8 +51,18 @@ The platform implements a dual-sourced data model separating "Universal/Global" 
 - `salesComps`: Has scope, requiredPack, isCurated, curatedByUserId, curatedAt columns
 - `rateComps`: Has scope, requiredPack, isCurated, curatedByUserId, curatedAt columns
 - `industryStandards`: Global benchmarks with category, region, metrics, and pack-gated access
+- `marinaListings`: Global listings with scope, requiredPack, isCurated, curatedByUserId, curatedAt columns
+- `marinaScrapeources`: Global scrape sources with scope and isGlobalSource columns
 
 **Admin Routes** (`/api/admin/curated/*`): Manage global curated data (owner/admin role required)
+- `/api/admin/curated/listings` - CRUD for global marina listings
+- `/api/admin/curated/listings/:id/promote` - Promote org listing to global
+- `/api/admin/curated/listings/:id/demote` - Demote global listing to org-scoped
+- `/api/admin/curated/scrape-sources` - CRUD for global scrape sources
+- `/api/admin/curated/scrape-sources/:id/scrape` - Trigger scrape for a global source
+- `/api/admin/curated/stats` - Dashboard stats for all curated data types
+
+**Admin Dashboard** (`/admin/curated-data`): UI for managing global curated data with tabs for Overview, Listings, Sources, Sales Comps, Rate Comps, and Industry Standards
 
 **Pack Access Control**: Users see global data only if they have the required pack subscription
 

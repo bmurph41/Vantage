@@ -65,6 +65,9 @@ interface MarinaListing {
   brokerCompany?: string;
   brokerPhone?: string;
   brokerEmail?: string;
+  scope?: string;
+  isCurated?: boolean;
+  requiredPack?: string;
 }
 
 interface IntelAnalytics {
@@ -1695,6 +1698,12 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
                               <h3 className="font-semibold text-base">{listing.propertyName || listing.title}</h3>
+                              {listing.scope === 'global' && (
+                                <Badge variant="default" className="text-xs bg-blue-500 hover:bg-blue-600">
+                                  <Globe className="h-3 w-3 mr-1" />
+                                  Global
+                                </Badge>
+                              )}
                               <Badge variant="outline" className={`text-xs ${getSourceBadgeStyle(listing.sourcePlatform)}`}>
                                 {listing.sourcePlatform}
                               </Badge>
