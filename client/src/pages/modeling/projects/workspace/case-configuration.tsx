@@ -83,11 +83,6 @@ const CASE_COLORS = [
   { name: 'Teal', value: 'teal', bg: 'bg-teal-500', text: 'text-teal-600', bgLight: 'bg-teal-50', border: 'border-teal-500' },
 ];
 
-const DEFAULT_CASE_TEMPLATES = [
-  { name: 'Base Case', color: 'blue', revenueGrowthRate: '0.03', expenseGrowthRate: '0.025', exitCapRate: '0.07', occupancyRate: '0.90' },
-  { name: 'Conservative', color: 'orange', revenueGrowthRate: '0.015', expenseGrowthRate: '0.03', exitCapRate: '0.075', occupancyRate: '0.85' },
-  { name: 'Aggressive', color: 'green', revenueGrowthRate: '0.05', expenseGrowthRate: '0.02', exitCapRate: '0.065', occupancyRate: '0.95' },
-];
 
 function getCaseColorClass(color: string | null): { bg: string; text: string; bgLight: string; border: string } {
   const found = CASE_COLORS.find(c => c.value === color);
@@ -319,18 +314,6 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
     setLeaseUpSchedule(leaseUpSchedule.filter((_, i) => i !== index));
   };
 
-  const handleCreateFromTemplate = (template: typeof DEFAULT_CASE_TEMPLATES[0]) => {
-    createCaseMutation.mutate({
-      name: template.name,
-      color: template.color,
-      description: '',
-      revenueGrowthRate: template.revenueGrowthRate,
-      expenseGrowthRate: template.expenseGrowthRate,
-      exitCapRate: template.exitCapRate,
-      occupancyRate: template.occupancyRate,
-    });
-  };
-
   const activeCase = cases.find(c => c.id === activeCaseId);
   const colorClasses = getCaseColorClass(activeCase?.color || 'blue');
 
@@ -408,24 +391,6 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
                     data-testid="input-new-case-description"
                   />
                 </div>
-                <Separator />
-                <div className="space-y-2">
-                  <Label className="text-muted-foreground">Quick Templates</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {DEFAULT_CASE_TEMPLATES.map((template) => (
-                      <Button
-                        key={template.name}
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleCreateFromTemplate(template)}
-                        disabled={createCaseMutation.isPending}
-                        data-testid={`button-template-${template.name.toLowerCase().replace(/\s+/g, '-')}`}
-                      >
-                        {template.name}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setShowAddDialog(false)}>
@@ -434,9 +399,9 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
                 <Button
                   onClick={() => createCaseMutation.mutate({ name: newCaseName, color: newCaseColor, description: newCaseDescription })}
                   disabled={!newCaseName.trim() || createCaseMutation.isPending}
-                  data-testid="button-create-case"
+                  data-testid="button-create-scenario"
                 >
-                  {createCaseMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Case'}
+                  {createCaseMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Scenario'}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -448,23 +413,17 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Settings2 className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No Cases Yet</h3>
+            <h3 className="text-lg font-semibold mb-2">No Scenarios Yet</h3>
             <p className="text-muted-foreground text-center mb-4">
-              Create your first modeling case to start building scenarios.
+              Create your first modeling scenario to start building projections.
             </p>
-            <div className="flex flex-wrap gap-2">
-              {DEFAULT_CASE_TEMPLATES.map((template) => (
-                <Button
-                  key={template.name}
-                  variant="outline"
-                  onClick={() => handleCreateFromTemplate(template)}
-                  disabled={createCaseMutation.isPending}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  {template.name}
-                </Button>
-              ))}
-            </div>
+            <Button
+              onClick={() => setShowAddDialog(true)}
+              disabled={createCaseMutation.isPending}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Scenario
+            </Button>
           </CardContent>
         </Card>
       ) : (
@@ -473,10 +432,10 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
                 <Tag className="h-4 w-4" />
-                Cases ({cases.length})
+                Scenarios ({cases.length})
               </CardTitle>
               <CardDescription>
-                Select a case to configure
+                Select a scenario to configure
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
@@ -916,7 +875,7 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Case</AlertDialogTitle>
+            <AlertDialogTitle>Delete Scenario</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete "{caseToDelete?.name}"? This action cannot be undone.
             </AlertDialogDescription>
