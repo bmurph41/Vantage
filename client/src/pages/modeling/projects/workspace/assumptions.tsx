@@ -362,6 +362,19 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
     );
   }, [config]);
 
+  const enabledProfitCenters = useMemo(() => {
+    if (!config?.departments) return [];
+    return Object.entries(config.departments)
+      .filter(([_, dept]: [string, any]) => dept?.isEnabled === true)
+      .map(([id, dept]: [string, any]) => ({
+        id,
+        name: dept.name || id.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+        icon: storageTypesConfig.find(s => s.id === id)?.icon || 
+              designatedSpaceCategories.find(d => d.id === id)?.icon || 
+              <Warehouse className="h-4 w-4" />,
+      }));
+  }, [config]);
+
   const [growthRates, setGrowthRates] = useState<GrowthRates>({});
   const [expenseGrowth, setExpenseGrowth] = useState<GrowthRates>({});
   const [occupancy, setOccupancy] = useState<OccupancyData>({});
@@ -891,13 +904,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                       <SelectItem value="per_type">
                         <div className="flex items-center gap-2">
                           <Layers className="h-4 w-4" />
-                          Per Storage Type
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="granular">
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4" />
-                          Granular (Dock/Location)
+                          Per Profit Center
                         </div>
                       </SelectItem>
                     </SelectContent>
@@ -926,95 +933,30 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
               )}
 
               {storageGrowth.mode === 'per_type' && (
-                <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {storageTypesConfig.map((storageType) => (
-                    <div key={storageType.id} className="space-y-1">
-                      <Label htmlFor={`storage-type-${storageType.id}`} className="flex items-center gap-1.5 text-sm">
-                        {storageType.icon}
-                        {storageType.name}
-                      </Label>
+                <div className="grid gap-x-6 gap-y-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  {enabledProfitCenters.map((profitCenter) => (
+                    <div key={profitCenter.id} className="flex items-center gap-3">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        {profitCenter.icon}
+                        <span className="text-sm font-medium truncate">{profitCenter.name}</span>
+                      </div>
                       <PercentInput
-                        id={`storage-type-${storageType.id}`}
-                        value={storageGrowth.typeRates[storageType.id] ?? 3}
-                        onChange={(val) => updateStorageTypeRate(storageType.id, val)}
-                        className="h-9 w-24"
-                        data-testid={`input-storage-type-${storageType.id}`}
+                        id={`storage-type-${profitCenter.id}`}
+                        value={storageGrowth.typeRates[profitCenter.id] ?? 3}
+                        onChange={(val) => updateStorageTypeRate(profitCenter.id, val)}
+                        className="h-8 w-20"
+                        data-testid={`input-storage-type-${profitCenter.id}`}
                       />
-                      <p className="text-xs text-muted-foreground">
-                        {storageType.locations.length} location{storageType.locations.length !== 1 ? 's' : ''}
-                      </p>
                     </div>
                   ))}
+                  {enabledProfitCenters.length === 0 && (
+                    <p className="text-sm text-muted-foreground col-span-full">
+                      No profit centers enabled. Enable them in Department Configuration.
+                    </p>
+                  )}
                 </div>
               )}
 
-              {storageGrowth.mode === 'granular' && (
-                <div className="space-y-4">
-                  {storageTypesConfig.map((storageType) => (
-                    <div key={storageType.id} className="border rounded-lg">
-                      <button
-                        type="button"
-                        onClick={() => toggleStorageTypeExpanded(storageType.id)}
-                        className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
-                        data-testid={`button-expand-${storageType.id}`}
-                      >
-                        <div className="flex items-center gap-2">
-                          {storageType.icon}
-                          <span className="font-medium">{storageType.name}</span>
-                          <Badge variant="secondary" className="ml-2">
-                            {storageType.locations.length} locations
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm text-muted-foreground">
-                            Avg: {(
-                              storageType.locations.reduce(
-                                (sum, loc) => sum + (storageGrowth.locationRates[loc.id] ?? 3),
-                                0
-                              ) / storageType.locations.length
-                            ).toFixed(1)}%
-                          </span>
-                          {expandedStorageTypes[storageType.id] ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                        </div>
-                      </button>
-                      
-                      {expandedStorageTypes[storageType.id] && (
-                        <div className="border-t p-4 bg-muted/20">
-                          <div className="flex items-center gap-4 mb-4 pb-3 border-b">
-                            <Label className="text-sm font-medium">Set all locations:</Label>
-                            <PercentInput
-                              value={storageGrowth.typeRates[storageType.id] ?? 3}
-                              onChange={(val) => updateStorageTypeRate(storageType.id, val)}
-                              className="h-8 w-20"
-                              data-testid={`input-set-all-${storageType.id}`}
-                            />
-                          </div>
-                          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            {storageType.locations.map((location) => (
-                              <div key={location.id} className="flex items-center gap-3">
-                                <div className="flex items-center gap-2 flex-1 min-w-0">
-                                  <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />
-                                  <span className="text-sm truncate">{location.name}</span>
-                                </div>
-                                <PercentInput
-                                  value={storageGrowth.locationRates[location.id] ?? 3}
-                                  onChange={(val) => updateStorageLocationRate(location.id, val)}
-                                  className="h-8 w-20"
-                                  data-testid={`input-location-${location.id}`}
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
             </CardContent>
           </Card>
 
