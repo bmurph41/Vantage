@@ -270,8 +270,23 @@ const expenseCategories = [
   { id: 'professional_fees', name: 'Professional Fees' },
   { id: 'property_taxes', name: 'Property Taxes' },
   { id: 'management_fees', name: 'Management Fees' },
+  { id: 'g_and_a', name: 'G&A' },
+  { id: 'licenses_permits', name: 'Licenses & Permits' },
+  { id: 'contract_services', name: 'Contract Services' },
+  { id: 'bank_cc_fees', name: 'Bank/CC Fees' },
+  { id: 'leases', name: 'Leases' },
   { id: 'other_expenses', name: 'Other Expenses' },
 ];
+
+const segmentExpenseCategories = [
+  { id: 'f_and_b', name: 'F&B', segment: true },
+  { id: 'service', name: 'Service', segment: true },
+  { id: 'parts', name: 'Parts', segment: true },
+  { id: 'rv_park', name: 'RV Park', segment: true },
+  { id: 'hospitality', name: 'Hospitality', segment: true },
+];
+
+const allExpenseCategories = [...expenseCategories, ...segmentExpenseCategories];
 
 const storageOptions = [
   { id: 'wet_slips', name: 'Wet Slips', totalUnits: 150 },
@@ -995,7 +1010,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                 Annual percentage increase for operating expenses
               </CardDescription>
             </CardHeader>
-            <CardContent className="pt-0">
+            <CardContent className="pt-0 space-y-4">
               <div className="grid gap-x-3 gap-y-2 grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {expenseCategories.map((category) => (
                   <div key={category.id} className="flex items-center gap-2">
@@ -1011,6 +1026,26 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                     />
                   </div>
                 ))}
+              </div>
+              <Separator />
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Segment Expenses (for departmental NOI)</p>
+                <div className="grid gap-x-3 gap-y-2 grid-cols-3 lg:grid-cols-5">
+                  {segmentExpenseCategories.map((category) => (
+                    <div key={category.id} className="flex items-center gap-2">
+                      <Label htmlFor={`expense-${category.id}`} className="text-xs whitespace-nowrap min-w-0 flex-1 truncate">
+                        {category.name}
+                      </Label>
+                      <PercentInput
+                        id={`expense-${category.id}`}
+                        value={expenseGrowth[category.id] ?? 2}
+                        onChange={(val) => updateExpenseGrowth(category.id, val)}
+                        className="h-7 text-xs w-16 px-2"
+                        data-testid={`input-expense-${category.id}`}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
             </CardContent>
           </Card>
