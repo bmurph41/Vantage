@@ -2398,135 +2398,293 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                     </Card>
                   </TabsContent>
 
-                  {/* PARTNERS TAB - LP/GP Management */}
+                  {/* PARTNERS TAB - LP/GP Management with Yields & Returns */}
                   <TabsContent value="partners" className="space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="font-semibold">Partners & Commitments</h3>
-                      <Button size="sm">
+                      <Button size="sm" onClick={() => {
+                        setEditingEquity(null);
+                        equityForm.reset();
+                        setShowAddEquity(true);
+                      }}>
                         <Plus className="h-4 w-4 mr-2" />
                         Add Partner
                       </Button>
                     </div>
 
-                    <div className="grid gap-4 md:grid-cols-2">
-                      {/* GP Card */}
-                      <Card className="border-2 border-primary/30">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm flex items-center gap-2">
-                            <Badge className="bg-primary">GP</Badge>
-                            General Partner
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Co-Investment</span>
-                            <span className="font-medium">$500,000 (5%)</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Promote (at 20% IRR)</span>
-                            <span className="font-medium">20% of profits</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Management Fee</span>
-                            <span className="font-medium">2.0% annually</span>
-                          </div>
-                          <Separator />
-                          <div className="flex justify-between text-sm font-medium">
-                            <span>Projected Returns</span>
-                            <span className="text-green-600">$1,250,000</span>
-                          </div>
-                        </CardContent>
-                      </Card>
+                    {(() => {
+                      const gpPartners = equityLayers.filter(l => l.investorType === 'gp' || l.investorType === 'sponsor');
+                      const lpPartners = equityLayers.filter(l => l.investorType === 'lp' || l.investorType === 'institutional' || l.investorType === 'family_office' || l.investorType === 'hnwi');
+                      const gpTotal = gpPartners.reduce((sum, p) => sum + parseNumber(p.commitmentAmount), 0);
+                      const lpTotal = lpPartners.reduce((sum, p) => sum + parseNumber(p.commitmentAmount), 0);
+                      const grandTotal = gpTotal + lpTotal;
+                      
+                      const holdPeriod = stack?.holdPeriodYears || 5;
+                      const exitCapRate = Math.max(parseNumber(stack?.exitCapRate) || 0.07, 0.01);
+                      const noiGrowthRate = parseNumber(stack?.noiGrowthRate) || 0.02;
+                      const currentNoi = parseNumber(noi);
+                      const terminalNoi = currentNoi * Math.pow(1 + noiGrowthRate, holdPeriod);
+                      const exitValue = exitCapRate > 0 ? terminalNoi / exitCapRate : 0;
+                      const grossProceeds = Math.max(0, exitValue - totalDebt);
+                      const totalProfit = Math.max(0, grossProceeds - grandTotal);
+                      
+                      const totalPrefAccrued = equityLayers.reduce((sum, p) => {
+                        const commitment = parseNumber(p.commitmentAmount);
+                        const pref = parseNumber(p.preferredReturn) || 0.08;
+                        return sum + (commitment * pref * holdPeriod);
+                      }, 0);
+                      const profitAfterPref = Math.max(0, totalProfit - totalPrefAccrued);
+                      
+                      const gpPromotePercent = gpPartners.length > 0 ? (parseNumber(gpPartners[0].promoteSplit) || 0.20) : 0.20;
+                      const lpProfitPercent = 1 - gpPromotePercent;
+                      
+                      const calcPartnerReturns = (commitment: number, ownershipPct: number, prefReturn: number, isGp: boolean) => {
+                        if (commitment <= 0 || grandTotal <= 0) {
+                          return { irr: 0, multiple: 0, totalDistribution: 0, cashOnCash: 0 };
+                        }
+                        const effectiveOwnership = ownershipPct > 0 ? ownershipPct : commitment / grandTotal;
+                        const lpOwnershipShare = lpTotal > 0 ? commitment / lpTotal : 0;
+                        
+                        const capitalReturn = commitment;
+                        const prefAccrued = commitment * prefReturn * holdPeriod;
+                        
+                        let promoteShare = 0;
+                        if (isGp) {
+                          promoteShare = profitAfterPref * gpPromotePercent * (gpTotal > 0 ? commitment / gpTotal : 1);
+                        } else {
+                          promoteShare = profitAfterPref * lpProfitPercent * lpOwnershipShare;
+                        }
+                        
+                        const totalDistribution = capitalReturn + prefAccrued + promoteShare;
+                        const multiple = totalDistribution / commitment;
+                        const irr = holdPeriod > 0 ? Math.pow(Math.max(multiple, 0), 1 / holdPeriod) - 1 : 0;
+                        const cashOnCash = prefReturn;
+                        
+                        return {
+                          irr: Math.min(Math.max(irr, -1), 2),
+                          multiple: Math.max(multiple, 0),
+                          totalDistribution: Math.max(totalDistribution, 0),
+                          cashOnCash,
+                        };
+                      };
+                      
+                      const gpWeightedIRR = gpTotal > 0 
+                        ? gpPartners.reduce((sum, p) => {
+                            const commitment = parseNumber(p.commitmentAmount);
+                            const returns = calcPartnerReturns(commitment, parseNumber(p.ownershipPct), parseNumber(p.preferredReturn) || 0.08, true);
+                            return sum + (returns.irr * commitment);
+                          }, 0) / gpTotal
+                        : 0;
+                        
+                      const lpWeightedIRR = lpTotal > 0
+                        ? lpPartners.reduce((sum, p) => {
+                            const commitment = parseNumber(p.commitmentAmount);
+                            const returns = calcPartnerReturns(commitment, parseNumber(p.ownershipPct), parseNumber(p.preferredReturn) || 0.08, false);
+                            return sum + (returns.irr * commitment);
+                          }, 0) / lpTotal
+                        : 0;
+                        
+                      const lpWeightedPref = lpTotal > 0
+                        ? lpPartners.reduce((sum, p) => {
+                            const commitment = parseNumber(p.commitmentAmount);
+                            const pref = parseNumber(p.preferredReturn) || 0.08;
+                            return sum + (pref * commitment);
+                          }, 0) / lpTotal
+                        : 0.08;
 
-                      {/* LP Cards */}
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm flex items-center gap-2">
-                            <Badge variant="secondary">LP</Badge>
-                            Limited Partners (3)
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Total LP Capital</span>
-                            <span className="font-medium">$9,500,000 (95%)</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Preferred Return</span>
-                            <span className="font-medium">8.0% IRR</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Capital Called</span>
-                            <span className="font-medium">$7,125,000 (75%)</span>
-                          </div>
-                          <Separator />
-                          <div className="flex justify-between text-sm font-medium">
-                            <span>Projected Returns</span>
-                            <span className="text-green-600">$14,250,000</span>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
+                      return (
+                        <>
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <Card className="border-2 border-amber-500/30 bg-amber-50/30">
+                              <CardHeader className="pb-2">
+                                <CardTitle className="text-sm flex items-center gap-2">
+                                  <Badge className="bg-amber-600">GP</Badge>
+                                  General Partners ({gpPartners.length})
+                                </CardTitle>
+                              </CardHeader>
+                              <CardContent className="space-y-3">
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">Total GP Capital</span>
+                                  <span className="font-medium">{formatCurrency(gpTotal)} ({grandTotal > 0 ? ((gpTotal / grandTotal) * 100).toFixed(1) : 0}%)</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">Promote Structure</span>
+                                  <span className="font-medium">{formatPercent(gpPromotePercent * 100)} above pref</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">Wtd. Proj. IRR</span>
+                                  <span className={`font-medium ${gpWeightedIRR >= 0.15 ? 'text-green-600' : gpWeightedIRR >= 0.08 ? 'text-amber-600' : 'text-red-600'}`}>
+                                    {gpPartners.length > 0 ? formatPercent(gpWeightedIRR * 100) : '—'}
+                                  </span>
+                                </div>
+                                <Separator />
+                                <div className="flex justify-between text-sm font-medium">
+                                  <span>Projected Returns</span>
+                                  <span className="text-green-600">
+                                    {formatCurrency(gpPartners.reduce((sum, p) => {
+                                      const commitment = parseNumber(p.commitmentAmount);
+                                      const returns = calcPartnerReturns(commitment, parseNumber(p.ownershipPct), parseNumber(p.preferredReturn) || 0.08, true);
+                                      return sum + returns.totalDistribution;
+                                    }, 0))}
+                                  </span>
+                                </div>
+                              </CardContent>
+                            </Card>
 
-                    {/* Partner List Table */}
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm">Investor Detail</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Investor</TableHead>
-                              <TableHead>Type</TableHead>
-                              <TableHead>Commitment</TableHead>
-                              <TableHead>Called</TableHead>
-                              <TableHead>Ownership %</TableHead>
-                              <TableHead>Pref Return</TableHead>
-                              <TableHead>Proj. IRR</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            <TableRow>
-                              <TableCell className="font-medium">Marina Capital GP LLC</TableCell>
-                              <TableCell><Badge className="bg-primary text-xs">GP</Badge></TableCell>
-                              <TableCell>$500,000</TableCell>
-                              <TableCell>$500,000</TableCell>
-                              <TableCell>5.0%</TableCell>
-                              <TableCell>—</TableCell>
-                              <TableCell className="text-green-600 font-medium">42.5%</TableCell>
-                            </TableRow>
-                            <TableRow>
-                              <TableCell className="font-medium">Harbor Investments LLC</TableCell>
-                              <TableCell><Badge variant="secondary" className="text-xs">LP</Badge></TableCell>
-                              <TableCell>$5,000,000</TableCell>
-                              <TableCell>$3,750,000</TableCell>
-                              <TableCell>50.0%</TableCell>
-                              <TableCell>8.0%</TableCell>
-                              <TableCell className="text-green-600 font-medium">18.2%</TableCell>
-                            </TableRow>
-                            <TableRow>
-                              <TableCell className="font-medium">Coastal Family Office</TableCell>
-                              <TableCell><Badge variant="secondary" className="text-xs">LP</Badge></TableCell>
-                              <TableCell>$3,000,000</TableCell>
-                              <TableCell>$2,250,000</TableCell>
-                              <TableCell>30.0%</TableCell>
-                              <TableCell>8.0%</TableCell>
-                              <TableCell className="text-green-600 font-medium">18.2%</TableCell>
-                            </TableRow>
-                            <TableRow>
-                              <TableCell className="font-medium">Anchor Capital Partners</TableCell>
-                              <TableCell><Badge variant="secondary" className="text-xs">LP</Badge></TableCell>
-                              <TableCell>$1,500,000</TableCell>
-                              <TableCell>$1,125,000</TableCell>
-                              <TableCell>15.0%</TableCell>
-                              <TableCell>8.0%</TableCell>
-                              <TableCell className="text-green-600 font-medium">18.2%</TableCell>
-                            </TableRow>
-                          </TableBody>
-                        </Table>
-                      </CardContent>
-                    </Card>
+                            <Card className="border-2 border-green-500/30 bg-green-50/30">
+                              <CardHeader className="pb-2">
+                                <CardTitle className="text-sm flex items-center gap-2">
+                                  <Badge className="bg-green-600 text-white">LP</Badge>
+                                  Limited Partners ({lpPartners.length})
+                                </CardTitle>
+                              </CardHeader>
+                              <CardContent className="space-y-3">
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">Total LP Capital</span>
+                                  <span className="font-medium">{formatCurrency(lpTotal)} ({grandTotal > 0 ? ((lpTotal / grandTotal) * 100).toFixed(1) : 0}%)</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">Wtd. Preferred Return</span>
+                                  <span className="font-medium">{formatPercent(lpWeightedPref * 100)}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">Wtd. Proj. IRR</span>
+                                  <span className={`font-medium ${lpWeightedIRR >= 0.15 ? 'text-green-600' : lpWeightedIRR >= 0.08 ? 'text-amber-600' : 'text-red-600'}`}>
+                                    {lpPartners.length > 0 ? formatPercent(lpWeightedIRR * 100) : '—'}
+                                  </span>
+                                </div>
+                                <Separator />
+                                <div className="flex justify-between text-sm font-medium">
+                                  <span>Projected Returns</span>
+                                  <span className="text-green-600">
+                                    {formatCurrency(lpPartners.reduce((sum, p) => {
+                                      const commitment = parseNumber(p.commitmentAmount);
+                                      const returns = calcPartnerReturns(commitment, parseNumber(p.ownershipPct), parseNumber(p.preferredReturn) || 0.08, false);
+                                      return sum + returns.totalDistribution;
+                                    }, 0))}
+                                  </span>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </div>
+
+                          <Card>
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm flex items-center gap-2">
+                                <PieChart className="h-4 w-4" />
+                                Partner-Level Returns Analysis
+                              </CardTitle>
+                              <CardDescription>
+                                Based on {holdPeriod}-year hold, {formatPercent(exitCapRate * 100)} exit cap, {formatPercent(noiGrowthRate * 100)} NOI growth
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                              {equityLayers.length === 0 ? (
+                                <div className="text-center py-8 text-muted-foreground">
+                                  <Building2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                  <p>No partners added yet. Add equity layers to see partner returns.</p>
+                                </div>
+                              ) : (
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Partner</TableHead>
+                                      <TableHead>Type</TableHead>
+                                      <TableHead className="text-right">Commitment</TableHead>
+                                      <TableHead className="text-right">Ownership</TableHead>
+                                      <TableHead className="text-right">Pref Return</TableHead>
+                                      <TableHead className="text-right">Cash-on-Cash</TableHead>
+                                      <TableHead className="text-right">Equity Multiple</TableHead>
+                                      <TableHead className="text-right">Proj. IRR</TableHead>
+                                      <TableHead className="text-right">Total Distribution</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {equityLayers.map((layer) => {
+                                      const commitment = parseNumber(layer.commitmentAmount);
+                                      const ownership = parseNumber(layer.ownershipPct);
+                                      const prefReturn = parseNumber(layer.preferredReturn) || 0.08;
+                                      const isGp = layer.investorType === 'gp' || layer.investorType === 'sponsor';
+                                      const returns = calcPartnerReturns(commitment, ownership, prefReturn, isGp);
+                                      
+                                      return (
+                                        <TableRow key={layer.id}>
+                                          <TableCell className="font-medium">{layer.name}</TableCell>
+                                          <TableCell>
+                                            <Badge className={isGp ? 'bg-amber-600' : 'bg-green-600 text-white'}>
+                                              {isGp ? 'GP' : 'LP'}
+                                            </Badge>
+                                          </TableCell>
+                                          <TableCell className="text-right">{formatCurrency(commitment)}</TableCell>
+                                          <TableCell className="text-right">
+                                            {ownership > 0 ? formatPercent(ownership * 100) : formatPercent((grandTotal > 0 ? commitment / grandTotal : 0) * 100)}
+                                          </TableCell>
+                                          <TableCell className="text-right">{formatPercent(prefReturn * 100)}</TableCell>
+                                          <TableCell className="text-right">{formatPercent(returns.cashOnCash * 100)}</TableCell>
+                                          <TableCell className="text-right font-medium">{returns.multiple.toFixed(2)}x</TableCell>
+                                          <TableCell className="text-right">
+                                            <span className={`font-medium ${returns.irr >= 0.15 ? 'text-green-600' : returns.irr >= 0.08 ? 'text-amber-600' : 'text-red-600'}`}>
+                                              {formatPercent(returns.irr * 100)}
+                                            </span>
+                                          </TableCell>
+                                          <TableCell className="text-right font-medium text-green-600">
+                                            {formatCurrency(returns.totalDistribution)}
+                                          </TableCell>
+                                        </TableRow>
+                                      );
+                                    })}
+                                  </TableBody>
+                                  <tfoot>
+                                    <TableRow className="bg-muted/50 font-medium">
+                                      <TableCell>Total</TableCell>
+                                      <TableCell>{equityLayers.length} Partners</TableCell>
+                                      <TableCell className="text-right">{formatCurrency(grandTotal)}</TableCell>
+                                      <TableCell className="text-right">100.0%</TableCell>
+                                      <TableCell className="text-right">—</TableCell>
+                                      <TableCell className="text-right">—</TableCell>
+                                      <TableCell className="text-right">
+                                        {grandTotal > 0 ? (grossProceeds / grandTotal).toFixed(2) : '0.00'}x
+                                      </TableCell>
+                                      <TableCell className="text-right">—</TableCell>
+                                      <TableCell className="text-right text-green-600">{formatCurrency(grossProceeds)}</TableCell>
+                                    </TableRow>
+                                  </tfoot>
+                                </Table>
+                              )}
+                            </CardContent>
+                          </Card>
+
+                          <Card className="bg-slate-50">
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm flex items-center gap-2">
+                                <Calculator className="h-4 w-4" />
+                                Waterfall Assumptions
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="grid grid-cols-4 gap-4 text-sm">
+                                <div>
+                                  <span className="text-muted-foreground block">Exit Value</span>
+                                  <span className="font-semibold">{formatCurrency(exitValue)}</span>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground block">Less: Debt Payoff</span>
+                                  <span className="font-semibold text-red-600">({formatCurrency(totalDebt)})</span>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground block">Gross Proceeds</span>
+                                  <span className="font-semibold text-green-600">{formatCurrency(grossProceeds)}</span>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground block">Total Profit</span>
+                                  <span className="font-semibold text-green-600">{formatCurrency(totalProfit)}</span>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </>
+                      );
+                    })()}
                   </TabsContent>
 
                   {/* RETURNS TAB - Investor Returns Analysis */}
