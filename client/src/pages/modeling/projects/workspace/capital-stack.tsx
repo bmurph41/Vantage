@@ -168,6 +168,73 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
   const [showFundInheritance, setShowFundInheritance] = useState(false);
   const [selectedFundId, setSelectedFundId] = useState<string | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  
+  const [stackPartners, setStackPartners] = useState<{
+    id: string;
+    name: string;
+    type: 'gp' | 'lp';
+    commitmentAmount: string;
+    ownershipPct: string;
+    preferredReturn: string;
+  }[]>([
+    { id: crypto.randomUUID(), name: 'GP Sponsor', type: 'gp', commitmentAmount: '500000', ownershipPct: '10', preferredReturn: '8' },
+    { id: crypto.randomUUID(), name: 'LP Investor 1', type: 'lp', commitmentAmount: '2000000', ownershipPct: '40', preferredReturn: '8' },
+  ]);
+  const [stackPromoteTiers, setStackPromoteTiers] = useState<{
+    id: string;
+    irrHurdle: string;
+    gpSplit: string;
+    lpSplit: string;
+  }[]>([
+    { id: crypto.randomUUID(), irrHurdle: '8', gpSplit: '20', lpSplit: '80' },
+    { id: crypto.randomUUID(), irrHurdle: '12', gpSplit: '30', lpSplit: '70' },
+    { id: crypto.randomUUID(), irrHurdle: '15', gpSplit: '40', lpSplit: '60' },
+  ]);
+  
+  const addStackPartner = () => {
+    setStackPartners([...stackPartners, {
+      id: crypto.randomUUID(),
+      name: `LP Investor ${stackPartners.filter(p => p.type === 'lp').length + 1}`,
+      type: 'lp',
+      commitmentAmount: '',
+      ownershipPct: '',
+      preferredReturn: '8',
+    }]);
+  };
+  
+  const removeStackPartner = (id: string) => {
+    if (stackPartners.length > 1) {
+      setStackPartners(stackPartners.filter(p => p.id !== id));
+    }
+  };
+  
+  const updateStackPartner = (id: string, field: string, value: string) => {
+    setStackPartners(stackPartners.map(p => p.id === id ? { ...p, [field]: value } : p));
+  };
+  
+  const addStackPromoteTier = () => {
+    const lastTier = stackPromoteTiers[stackPromoteTiers.length - 1];
+    const nextHurdle = lastTier ? parseFloat(lastTier.irrHurdle) + 5 : 8;
+    setStackPromoteTiers([...stackPromoteTiers, {
+      id: crypto.randomUUID(),
+      irrHurdle: String(nextHurdle),
+      gpSplit: '30',
+      lpSplit: '70',
+    }]);
+  };
+  
+  const removeStackPromoteTier = (id: string) => {
+    if (stackPromoteTiers.length > 1) {
+      setStackPromoteTiers(stackPromoteTiers.filter(t => t.id !== id));
+    }
+  };
+  
+  const updateStackPromoteTier = (id: string, field: string, value: string) => {
+    setStackPromoteTiers(stackPromoteTiers.map(t => t.id === id ? { ...t, [field]: value } : t));
+  };
+  
+  const totalPartnerCommitment = stackPartners.reduce((sum, p) => sum + (parseFloat(p.commitmentAmount) || 0), 0);
+  const totalOwnership = stackPartners.reduce((sum, p) => sum + (parseFloat(p.ownershipPct) || 0), 0);
 
   const { data: stacks, isLoading: stacksLoading } = useQuery<CapitalStack[]>({
     queryKey: ['/api/modeling/projects', projectId, 'capital-stacks'],
@@ -634,86 +701,340 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
               New Capital Stack
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden">
             <DialogHeader>
               <DialogTitle>Create Capital Stack</DialogTitle>
-              <DialogDescription>Define the capital structure for this deal</DialogDescription>
+              <DialogDescription>Define the capital structure, partners, and waterfall for this deal</DialogDescription>
             </DialogHeader>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const formData = new FormData(e.target as HTMLFormElement);
-              const purchasePrice = parseFloat(formData.get('purchasePrice') as string) || 0;
-              const closingCosts = parseFloat(formData.get('closingCosts') as string) || 0;
-              const capexReserves = parseFloat(formData.get('capexReserves') as string) || 0;
-              const workingCapital = parseFloat(formData.get('workingCapital') as string) || 0;
-              createStackMutation.mutate({
-                name: formData.get('name'),
-                description: formData.get('description'),
-                purchasePrice: purchasePrice,
-                closingCosts: closingCosts,
-                capexReserves: capexReserves,
-                workingCapital: workingCapital,
-                totalCapitalization: purchasePrice + closingCosts + capexReserves + workingCapital,
-                holdPeriodYears: parseInt(formData.get('holdPeriodYears') as string) || 5,
-                exitCapRate: formData.get('exitCapRate') || '0.07',
-                noiGrowthRate: formData.get('noiGrowthRate') || '0.02',
-              });
-            }}>
-              <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
-                <div>
-                  <Label htmlFor="name">Stack Name *</Label>
-                  <Input id="name" name="name" placeholder="Base Case" required />
+            <Tabs defaultValue="basics" className="w-full">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="basics">Basics</TabsTrigger>
+                <TabsTrigger value="partners">Partners</TabsTrigger>
+                <TabsTrigger value="promote">Promote</TabsTrigger>
+                <TabsTrigger value="exit">Exit</TabsTrigger>
+              </TabsList>
+              
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target as HTMLFormElement);
+                const purchasePrice = parseFloat(formData.get('purchasePrice') as string) || 0;
+                const closingCosts = parseFloat(formData.get('closingCosts') as string) || 0;
+                const capexReserves = parseFloat(formData.get('capexReserves') as string) || 0;
+                const workingCapital = parseFloat(formData.get('workingCapital') as string) || 0;
+                createStackMutation.mutate({
+                  name: formData.get('name'),
+                  description: formData.get('description'),
+                  purchasePrice: purchasePrice,
+                  closingCosts: closingCosts,
+                  capexReserves: capexReserves,
+                  workingCapital: workingCapital,
+                  totalCapitalization: purchasePrice + closingCosts + capexReserves + workingCapital,
+                  holdPeriodYears: parseInt(formData.get('holdPeriodYears') as string) || 5,
+                  exitCapRate: formData.get('exitCapRate') || '0.07',
+                  noiGrowthRate: formData.get('noiGrowthRate') || '0.02',
+                  partners: stackPartners.map(p => ({
+                    name: p.name,
+                    type: p.type,
+                    commitmentAmount: parseFloat(p.commitmentAmount) || 0,
+                    ownershipPct: (parseFloat(p.ownershipPct) || 0) / 100,
+                    preferredReturn: (parseFloat(p.preferredReturn) || 0) / 100,
+                  })),
+                  promoteTiers: stackPromoteTiers.map(t => ({
+                    irrHurdle: (parseFloat(t.irrHurdle) || 0) / 100,
+                    gpSplit: (parseFloat(t.gpSplit) || 0) / 100,
+                    lpSplit: (parseFloat(t.lpSplit) || 0) / 100,
+                  })),
+                });
+              }}>
+                <div className="max-h-[55vh] overflow-y-auto py-4">
+                  <TabsContent value="basics" className="space-y-4 mt-0">
+                    <Card className="p-4 bg-slate-50/50">
+                      <h4 className="font-medium text-sm flex items-center gap-2 mb-3">
+                        <Settings2 className="h-4 w-4 text-slate-600" />
+                        Stack Details
+                      </h4>
+                      <div className="space-y-3">
+                        <div>
+                          <Label htmlFor="name">Stack Name *</Label>
+                          <Input id="name" name="name" placeholder="Base Case" required />
+                        </div>
+                        <div>
+                          <Label htmlFor="description">Description</Label>
+                          <Textarea id="description" name="description" placeholder="Deal assumptions and notes..." rows={2} />
+                        </div>
+                      </div>
+                    </Card>
+                    
+                    <Card className="p-4 bg-blue-50/50">
+                      <h4 className="font-medium text-sm flex items-center gap-2 mb-3">
+                        <DollarSign className="h-4 w-4 text-blue-600" />
+                        Uses of Funds
+                      </h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="purchasePrice">Purchase Price *</Label>
+                          <div className="relative">
+                            <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input id="purchasePrice" name="purchasePrice" type="number" placeholder="10,000,000" className="pl-8" required />
+                          </div>
+                        </div>
+                        <div>
+                          <Label htmlFor="closingCosts">Closing Costs</Label>
+                          <div className="relative">
+                            <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input id="closingCosts" name="closingCosts" type="number" placeholder="150,000" className="pl-8" />
+                          </div>
+                        </div>
+                        <div>
+                          <Label htmlFor="capexReserves">CapEx Reserves</Label>
+                          <div className="relative">
+                            <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input id="capexReserves" name="capexReserves" type="number" placeholder="200,000" className="pl-8" />
+                          </div>
+                        </div>
+                        <div>
+                          <Label htmlFor="workingCapital">Working Capital</Label>
+                          <div className="relative">
+                            <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input id="workingCapital" name="workingCapital" type="number" placeholder="50,000" className="pl-8" />
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  </TabsContent>
+                  
+                  <TabsContent value="partners" className="space-y-4 mt-0">
+                    <Card className="p-4 bg-green-50/50">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium text-sm flex items-center gap-2">
+                          <Building2 className="h-4 w-4 text-green-600" />
+                          Capital Partners
+                        </h4>
+                        <Button type="button" variant="outline" size="sm" onClick={addStackPartner} className="bg-white">
+                          <Plus className="h-4 w-4 mr-1" /> Add Partner
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-4">
+                        Add GP and LP partners with their capital contributions and ownership percentages.
+                      </p>
+                      
+                      <div className="space-y-3">
+                        {stackPartners.map((partner, index) => (
+                          <Card key={partner.id} className={`p-3 ${partner.type === 'gp' ? 'bg-amber-50 border-amber-200' : 'bg-white border-green-200'}`}>
+                            <div className="flex items-center gap-3">
+                              <Badge variant={partner.type === 'gp' ? 'default' : 'secondary'} className={partner.type === 'gp' ? 'bg-amber-600' : 'bg-green-600 text-white'}>
+                                {partner.type === 'gp' ? 'GP' : 'LP'}
+                              </Badge>
+                              <div className="flex-1 grid grid-cols-4 gap-3">
+                                <div>
+                                  <Label className="text-xs">Partner Name</Label>
+                                  <Input
+                                    value={partner.name}
+                                    onChange={(e) => updateStackPartner(partner.id, 'name', e.target.value)}
+                                    placeholder="Partner name"
+                                    className="h-8 text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs">Commitment ($)</Label>
+                                  <Input
+                                    type="number"
+                                    value={partner.commitmentAmount}
+                                    onChange={(e) => updateStackPartner(partner.id, 'commitmentAmount', e.target.value)}
+                                    placeholder="1,000,000"
+                                    className="h-8 text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs">Ownership %</Label>
+                                  <Input
+                                    type="number"
+                                    value={partner.ownershipPct}
+                                    onChange={(e) => updateStackPartner(partner.id, 'ownershipPct', e.target.value)}
+                                    placeholder="25"
+                                    className="h-8 text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs">Pref Return %</Label>
+                                  <Input
+                                    type="number"
+                                    value={partner.preferredReturn}
+                                    onChange={(e) => updateStackPartner(partner.id, 'preferredReturn', e.target.value)}
+                                    placeholder="8"
+                                    className="h-8 text-sm"
+                                  />
+                                </div>
+                              </div>
+                              <Select value={partner.type} onValueChange={(v) => updateStackPartner(partner.id, 'type', v)}>
+                                <SelectTrigger className="w-20 h-8">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="gp">GP</SelectItem>
+                                  <SelectItem value="lp">LP</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              {stackPartners.length > 1 && (
+                                <Button type="button" variant="ghost" size="sm" className="text-red-500 hover:text-red-700 h-8 w-8 p-0" onClick={() => removeStackPartner(partner.id)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                      
+                      <div className="mt-4 p-3 bg-white rounded-lg border">
+                        <div className="flex justify-between text-sm">
+                          <span>Total Commitment:</span>
+                          <span className="font-semibold">{formatCurrency(totalPartnerCommitment)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm mt-1">
+                          <span>Total Ownership:</span>
+                          <span className={`font-semibold ${totalOwnership === 100 ? 'text-green-600' : totalOwnership > 100 ? 'text-red-600' : 'text-amber-600'}`}>
+                            {totalOwnership.toFixed(1)}%
+                            {totalOwnership !== 100 && <span className="text-xs ml-1">({totalOwnership < 100 ? `${(100 - totalOwnership).toFixed(1)}% remaining` : 'exceeds 100%'})</span>}
+                          </span>
+                        </div>
+                      </div>
+                    </Card>
+                  </TabsContent>
+                  
+                  <TabsContent value="promote" className="space-y-4 mt-0">
+                    <Card className="p-4 bg-purple-50/50">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium text-sm flex items-center gap-2">
+                          <PieChart className="h-4 w-4 text-purple-600" />
+                          Promote / Waterfall Tiers
+                        </h4>
+                        <Button type="button" variant="outline" size="sm" onClick={addStackPromoteTier} className="bg-white">
+                          <Plus className="h-4 w-4 mr-1" /> Add Tier
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-4">
+                        Define tiered promote structure based on IRR hurdles. GP receive increasing share of profits above each threshold.
+                      </p>
+                      
+                      <div className="space-y-3">
+                        {stackPromoteTiers.map((tier, index) => (
+                          <Card key={tier.id} className="p-3 bg-white border-purple-200">
+                            <div className="flex items-center gap-3">
+                              <Badge className="bg-purple-600 text-white">Tier {index + 1}</Badge>
+                              <div className="flex-1 grid grid-cols-3 gap-3">
+                                <div>
+                                  <Label className="text-xs">IRR Hurdle (%)</Label>
+                                  <div className="relative">
+                                    <Percent className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                                    <Input
+                                      type="number"
+                                      value={tier.irrHurdle}
+                                      onChange={(e) => updateStackPromoteTier(tier.id, 'irrHurdle', e.target.value)}
+                                      placeholder="8"
+                                      className="h-8 text-sm pl-7"
+                                    />
+                                  </div>
+                                </div>
+                                <div>
+                                  <Label className="text-xs text-green-700">GP Split (%)</Label>
+                                  <div className="relative">
+                                    <Percent className="absolute left-2 top-2 h-3.5 w-3.5 text-green-600" />
+                                    <Input
+                                      type="number"
+                                      value={tier.gpSplit}
+                                      onChange={(e) => updateStackPromoteTier(tier.id, 'gpSplit', e.target.value)}
+                                      placeholder="20"
+                                      className="h-8 text-sm pl-7 border-green-200"
+                                    />
+                                  </div>
+                                </div>
+                                <div>
+                                  <Label className="text-xs text-blue-700">LP Split (%)</Label>
+                                  <div className="relative">
+                                    <Percent className="absolute left-2 top-2 h-3.5 w-3.5 text-blue-600" />
+                                    <Input
+                                      type="number"
+                                      value={tier.lpSplit}
+                                      onChange={(e) => updateStackPromoteTier(tier.id, 'lpSplit', e.target.value)}
+                                      placeholder="80"
+                                      className="h-8 text-sm pl-7 border-blue-200"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                              {stackPromoteTiers.length > 1 && (
+                                <Button type="button" variant="ghost" size="sm" className="text-red-500 hover:text-red-700 h-8 w-8 p-0" onClick={() => removeStackPromoteTier(tier.id)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                            <div className="mt-2 p-2 bg-purple-50 rounded text-xs text-purple-700">
+                              Above {tier.irrHurdle}% IRR: GP receives {tier.gpSplit}%, LP receives {tier.lpSplit}%
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                      
+                      <div className="mt-4 p-3 bg-white rounded-lg border">
+                        <h5 className="text-xs font-medium mb-2 text-muted-foreground">Waterfall Summary</h5>
+                        <div className="space-y-1 text-xs">
+                          <div className="flex justify-between">
+                            <span>1. Return of Capital</span>
+                            <span className="text-muted-foreground">100% to Investors</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>2. Preferred Return</span>
+                            <span className="text-muted-foreground">100% to LPs (until pref met)</span>
+                          </div>
+                          {stackPromoteTiers.map((tier, i) => (
+                            <div key={tier.id} className="flex justify-between">
+                              <span>{i + 3}. Above {tier.irrHurdle}% IRR</span>
+                              <span className="text-muted-foreground">GP {tier.gpSplit}% / LP {tier.lpSplit}%</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </Card>
+                  </TabsContent>
+                  
+                  <TabsContent value="exit" className="space-y-4 mt-0">
+                    <Card className="p-4 bg-orange-50/50">
+                      <h4 className="font-medium text-sm flex items-center gap-2 mb-3">
+                        <TrendingUp className="h-4 w-4 text-orange-600" />
+                        Exit Assumptions
+                      </h4>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <Label htmlFor="holdPeriodYears">Hold Period (Years)</Label>
+                          <Input id="holdPeriodYears" name="holdPeriodYears" type="number" placeholder="5" defaultValue="5" />
+                        </div>
+                        <div>
+                          <Label htmlFor="exitCapRate">Exit Cap Rate</Label>
+                          <div className="relative">
+                            <Percent className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input id="exitCapRate" name="exitCapRate" type="number" step="0.1" placeholder="7" defaultValue="7" className="pl-8" />
+                          </div>
+                        </div>
+                        <div>
+                          <Label htmlFor="noiGrowthRate">NOI Growth Rate</Label>
+                          <div className="relative">
+                            <Percent className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input id="noiGrowthRate" name="noiGrowthRate" type="number" step="0.1" placeholder="2" defaultValue="2" className="pl-8" />
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  </TabsContent>
                 </div>
-                <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea id="description" name="description" placeholder="Deal assumptions and notes..." rows={2} />
-                </div>
-                <Separator />
-                <h4 className="font-medium text-sm">Uses of Funds</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="purchasePrice">Purchase Price *</Label>
-                    <Input id="purchasePrice" name="purchasePrice" type="number" placeholder="10000000" required />
-                  </div>
-                  <div>
-                    <Label htmlFor="closingCosts">Closing Costs</Label>
-                    <Input id="closingCosts" name="closingCosts" type="number" placeholder="150000" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="capexReserves">CapEx Reserves</Label>
-                    <Input id="capexReserves" name="capexReserves" type="number" placeholder="200000" />
-                  </div>
-                  <div>
-                    <Label htmlFor="workingCapital">Working Capital</Label>
-                    <Input id="workingCapital" name="workingCapital" type="number" placeholder="50000" />
-                  </div>
-                </div>
-                <Separator />
-                <h4 className="font-medium text-sm">Exit Assumptions</h4>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="holdPeriodYears">Hold Period (Years)</Label>
-                    <Input id="holdPeriodYears" name="holdPeriodYears" type="number" placeholder="5" defaultValue="5" />
-                  </div>
-                  <div>
-                    <Label htmlFor="exitCapRate">Exit Cap Rate</Label>
-                    <Input id="exitCapRate" name="exitCapRate" type="number" step="0.001" placeholder="0.07" defaultValue="0.07" />
-                  </div>
-                  <div>
-                    <Label htmlFor="noiGrowthRate">NOI Growth Rate</Label>
-                    <Input id="noiGrowthRate" name="noiGrowthRate" type="number" step="0.001" placeholder="0.02" defaultValue="0.02" />
-                  </div>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setShowCreateStack(false)}>Cancel</Button>
-                <Button type="submit" disabled={createStackMutation.isPending}>
-                  {createStackMutation.isPending ? 'Creating...' : 'Create Stack'}
-                </Button>
-              </DialogFooter>
-            </form>
+                
+                <DialogFooter className="border-t pt-4">
+                  <Button type="button" variant="outline" onClick={() => setShowCreateStack(false)}>Cancel</Button>
+                  <Button type="submit" disabled={createStackMutation.isPending}>
+                    {createStackMutation.isPending ? 'Creating...' : 'Create Stack'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Tabs>
           </DialogContent>
         </Dialog>
       </div>
