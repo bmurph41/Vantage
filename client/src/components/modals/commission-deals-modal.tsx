@@ -87,6 +87,7 @@ export default function CommissionDealsModal({
       description={modalSubtitle}
       icon={DollarSign}
       size="lg"
+      showProgressBar={true}
       secondaryAction={{
         label: "Close",
         onClick: () => onOpenChange(false),

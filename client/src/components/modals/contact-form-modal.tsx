@@ -390,15 +390,16 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
       description="Business-ready contact card. Only the essentials."
       icon={User}
       size="lg"
+      showProgressBar={true}
       className="max-w-5xl max-h-[92vh] p-0 overflow-hidden"
       primaryAction={{
-        label: isEdit ? "Save Changes" : "Add Contact",
+        label: isEdit ? "Save" : "Create",
         onClick: handleSave,
         disabled: isLoading,
         loading: isLoading,
       }}
       secondaryAction={{
-        label: "Cancel",
+        label: "Back",
         onClick: onClose,
         disabled: isLoading,
       }}

@@ -119,19 +119,19 @@ export default function ConvertToProjectModal({ isOpen, onClose, deal }: Convert
       description="Create a new Due Diligence project from this deal. Data will be mapped automatically."
       icon={FolderOpen}
       size="md"
+      showProgressBar={true}
       footer={createdProjectId ? successFooter : undefined}
       primaryAction={!createdProjectId ? {
-        label: "Convert to DD Project",
+        label: "Convert",
         onClick: form.handleSubmit(handleSubmit),
         disabled: convertMutation.isPending,
         loading: convertMutation.isPending,
       } : undefined}
       secondaryAction={!createdProjectId ? {
-        label: "Cancel",
+        label: "Back",
         onClick: handleClose,
         disabled: convertMutation.isPending,
       } : undefined}
-      className="max-h-[90vh] overflow-y-auto"
     >
       <div data-testid="modal-convert-to-project">
         {createdProjectId ? (

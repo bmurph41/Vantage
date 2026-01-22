@@ -63,6 +63,7 @@ export default function AddNewModal({ isOpen, onClose }: AddNewModalProps) {
         title="Add New"
         icon={PlusCircle}
         size="sm"
+        showProgressBar={true}
       >
         <div className="grid grid-cols-2 gap-4" data-testid="add-new-modal">
           {options.map((option) => (

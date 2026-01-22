@@ -111,14 +111,15 @@ export default function KpiSettingsModal({
       description="Customize your dashboard KPI cards"
       icon={BarChart3}
       size="lg"
+      showProgressBar={true}
       primaryAction={{
-        label: "Save Changes",
+        label: "Save",
         onClick: handleSave,
         disabled: savePreferencesMutation.isPending,
         loading: savePreferencesMutation.isPending,
       }}
       secondaryAction={{
-        label: "Cancel",
+        label: "Back",
         onClick: onClose,
       }}
     >

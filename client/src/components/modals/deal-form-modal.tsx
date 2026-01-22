@@ -843,15 +843,15 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
       title={deal ? 'Edit Deal' : 'Create Deal'}
       icon={Anchor}
       size="xl"
-      className="max-h-[90vh] overflow-y-auto"
+      showProgressBar={true}
       primaryAction={{
-        label: deal ? 'Update Deal' : 'Create Deal',
+        label: deal ? 'Update' : 'Create',
         onClick: form.handleSubmit(onSubmit),
         disabled: isLoading,
         loading: isLoading,
       }}
       secondaryAction={{
-        label: 'Cancel',
+        label: 'Back',
         onClick: onClose,
         disabled: isLoading,
       }}

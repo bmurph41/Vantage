@@ -305,14 +305,15 @@ export default function LeadFormModal({ isOpen, onClose, lead, onCompanyCreated,
       title={lead ? "Edit Lead" : "Create Lead"}
       icon={UserPlus}
       size="lg"
+      showProgressBar={true}
       primaryAction={activeTab === "manual" ? {
-        label: lead ? "Update Lead" : "Create Lead",
+        label: lead ? "Update" : "Create",
         onClick: handlePrimaryAction,
         disabled: isLoading,
         loading: isLoading,
       } : undefined}
       secondaryAction={activeTab === "manual" ? {
-        label: "Cancel",
+        label: "Back",
         onClick: onClose,
         disabled: isLoading,
       } : undefined}

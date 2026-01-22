@@ -316,7 +316,7 @@ export default function EntityConversionModal({
       description={`From ${sourceType}: ${getEntityDisplayName()}`}
       icon={ArrowRightLeft}
       size="xl"
-      className="max-h-[90vh] overflow-y-auto"
+      showProgressBar={true}
       footer={
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-2 text-sm text-gray-600">

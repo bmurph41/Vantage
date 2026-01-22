@@ -218,6 +218,7 @@ export default function DashboardCustomizationModal({
       description="Select widgets to display on your dashboard and configure their layout"
       icon={LayoutGrid}
       size="lg"
+      showProgressBar={true}
       footer={
         <>
           <Button
@@ -229,7 +230,7 @@ export default function DashboardCustomizationModal({
             Reset to Default
           </Button>
           <Button variant="outline" onClick={onClose}>
-            Cancel
+            Back
           </Button>
           <Button 
             onClick={handleSave}
@@ -237,7 +238,7 @@ export default function DashboardCustomizationModal({
             className="bg-[#1E4FAB] hover:bg-[#1a4294]"
           >
             <Save className="h-4 w-4 mr-2" />
-            {saveLayoutMutation.isPending ? 'Saving...' : 'Save Layout'}
+            {saveLayoutMutation.isPending ? 'Saving...' : 'Save'}
           </Button>
         </>
       }

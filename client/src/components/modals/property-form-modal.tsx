@@ -516,15 +516,15 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
       title={property ? 'Edit Property' : 'Add New Property'}
       icon={MapPin}
       size="lg"
-      className="max-h-[90vh] overflow-y-auto"
+      showProgressBar={true}
       primaryAction={{
-        label: property ? "Update Property" : "Create Property",
+        label: property ? "Update" : "Create",
         onClick: handlePrimaryClick,
         disabled: isLoading,
         loading: isLoading,
       }}
       secondaryAction={{
-        label: "Cancel",
+        label: "Back",
         onClick: onClose,
         disabled: isLoading,
       }}

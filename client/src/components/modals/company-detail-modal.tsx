@@ -565,6 +565,7 @@ export default function CompanyDetailModal({
       title={company?.name || "Company Details"}
       icon={Building2}
       size="lg"
+      showProgressBar={true}
       className="sm:max-w-[1100px] max-h-[95vh] overflow-hidden flex flex-col p-0"
     >
       <div data-testid="modal-company-detail" className="-mx-4 -mt-4">

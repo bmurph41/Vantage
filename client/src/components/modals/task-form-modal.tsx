@@ -203,14 +203,15 @@ export default function TaskFormModal({ isOpen, onClose, task }: TaskFormModalPr
       title={task ? 'Edit Task' : 'Add New Task'}
       icon={ClipboardList}
       size="md"
+      showProgressBar={true}
       primaryAction={{
-        label: task ? 'Update Task' : 'Create Task',
+        label: task ? 'Update' : 'Create',
         onClick: form.handleSubmit(onSubmit),
         disabled: isLoading,
         loading: isLoading,
       }}
       secondaryAction={{
-        label: 'Cancel',
+        label: 'Back',
         onClick: onClose,
         disabled: isLoading,
       }}

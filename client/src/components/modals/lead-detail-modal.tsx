@@ -304,6 +304,7 @@ export default function LeadDetailModal({ isOpen, onClose, lead }: LeadDetailMod
       title={modalTitle}
       icon={Users}
       size="lg"
+      showProgressBar={true}
       footer={footerContent}
       className="max-h-[90vh] overflow-hidden flex flex-col"
     >

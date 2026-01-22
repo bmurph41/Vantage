@@ -114,14 +114,15 @@ export function ActivityComposerModal({
       title="Create Activity"
       icon={Activity}
       size="lg"
+      showProgressBar={true}
       primaryAction={{
-        label: "Create Activity",
+        label: "Create",
         onClick: handlePrimaryAction,
         disabled: createMutation.isPending,
         loading: createMutation.isPending,
       }}
       secondaryAction={{
-        label: "Cancel",
+        label: "Back",
         onClick: () => onOpenChange(false),
       }}
     >

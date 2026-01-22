@@ -382,6 +382,7 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
       title={contactName || "Contact Details"}
       icon={User}
       size="lg"
+      showProgressBar={true}
       className="sm:max-w-[1100px] max-h-[95vh] overflow-hidden flex flex-col p-0"
     >
       <div data-testid="modal-contact-detail" className="-mt-4">

@@ -178,11 +178,11 @@ export default function PipelineSettingsModal({
       description="Manage stages for this pipeline. Drag to reorder, click to edit."
       icon={Settings}
       size="lg"
+      showProgressBar={true}
       secondaryAction={{
         label: "Close",
         onClick: () => onOpenChange(false),
       }}
-      className="max-h-[80vh] overflow-hidden flex flex-col"
     >
       <div className="flex-1 overflow-y-auto">
         <div className="space-y-3">

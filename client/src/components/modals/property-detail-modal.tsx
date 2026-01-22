@@ -348,6 +348,7 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
       title={property?.title || "Property Details"}
       icon={MapPin}
       size="lg"
+      showProgressBar={true}
       className="max-h-[90vh] overflow-hidden flex flex-col"
     >
       <div className="flex flex-col h-full" data-testid="modal-property-detail">
