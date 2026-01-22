@@ -19243,6 +19243,7 @@ export const modelingCases = pgTable("modeling_cases", {
   
   name: text("name").notNull(), // e.g., "Base Case", "Aggressive", "Conservative"
   description: text("description"),
+  color: text("color"), // Color identifier for UI display (e.g., "blue", "green", "orange")
   sortOrder: integer("sort_order").notNull().default(0),
   isDefault: boolean("is_default").notNull().default(false), // One case per project is the default
   isEnabled: boolean("is_enabled").notNull().default(true),

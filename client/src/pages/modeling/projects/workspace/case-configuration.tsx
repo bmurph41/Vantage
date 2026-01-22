@@ -452,21 +452,22 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
         </div>
       </div>
 
+      {/* Scenario Comparison Section - Shown First */}
+      {cases.length >= 2 && (
+        <>
+          <ScenarioComparison projectId={projectId} />
+          <Separator className="my-6" />
+        </>
+      )}
+
       {cases.length === 0 ? (
         <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Settings2 className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No Scenarios Yet</h3>
-            <p className="text-muted-foreground text-center mb-4">
-              Create your first modeling scenario to start building projections.
+          <CardContent className="flex flex-col items-center justify-center py-8">
+            <Settings2 className="h-10 w-10 text-muted-foreground mb-3" />
+            <h3 className="text-base font-semibold mb-1">No Scenarios Yet</h3>
+            <p className="text-muted-foreground text-center text-sm">
+              Use the "Add Scenario" button above to create your first modeling scenario.
             </p>
-            <Button
-              onClick={() => setShowAddDialog(true)}
-              disabled={createCaseMutation.isPending}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Create Scenario
-            </Button>
           </CardContent>
         </Card>
       ) : (
@@ -978,10 +979,6 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
           )}
         </div>
       )}
-
-      {/* Scenario Comparison Section */}
-      <Separator className="my-8" />
-      <ScenarioComparison projectId={projectId} />
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
