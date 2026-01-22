@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, date, boolean, jsonb, pgEnum, primaryKey, unique, index, customType, decimal, numeric, real, time } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, date, boolean, jsonb, pgEnum, primaryKey, unique, uniqueIndex, index, customType, decimal, numeric, real, time } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -18189,6 +18189,7 @@ export const marinaListings = pgTable("marina_listings", {
   sourceIdx: index("marina_listings_source_idx").on(table.sourcePlatform),
   statusIdx: index("marina_listings_status_idx").on(table.status),
   stateIdx: index("marina_listings_state_idx").on(table.state),
+  dedupeHashIdx: uniqueIndex("marina_listings_dedupe_hash_idx").on(table.dedupeHash),
 }));
 
 export const investmentCriteriaProfiles = pgTable("investment_criteria_profiles", {

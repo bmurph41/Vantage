@@ -54,14 +54,24 @@ function getUserId(req: Request): string | null {
   return (req as any).user?.id || (req as any).session?.user?.id || null;
 }
 
+function normalizePropertyName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[-–—|,].*$/, "")
+    .replace(/\d+\s*(wet\s*)?slips?/gi, "")
+    .replace(/\s*(marina|boat|yacht|harbor|club|inc|llc|corp|confidential)\s*/gi, " marina ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function generateListingDedupeHash(listing: Partial<MarinaListing>): string {
   const normalizedAddress = (listing.propertyAddress || "").toLowerCase().replace(/\s+/g, " ").trim();
-  const normalizedName = (listing.propertyName || listing.title || "").toLowerCase().replace(/\s+/g, " ").trim();
+  const normalizedName = normalizePropertyName(listing.propertyName || listing.title || "");
   const city = (listing.city || "").toLowerCase().trim();
   const state = (listing.state || "").toLowerCase().trim();
-  const source = (listing.sourcePlatform || "").toLowerCase().trim();
   
-  const input = `${source}|${normalizedName}|${normalizedAddress}|${city}|${state}`;
+  const input = `${normalizedName}|${normalizedAddress}|${city}|${state}`;
   return crypto.createHash("md5").update(input).digest("hex");
 }
 
