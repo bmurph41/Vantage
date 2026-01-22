@@ -154,6 +154,10 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
   const [newCaseName, setNewCaseName] = useState('');
   const [newCaseColor, setNewCaseColor] = useState('blue');
   const [newCaseDescription, setNewCaseDescription] = useState('');
+  const [newRevenueGrowth, setNewRevenueGrowth] = useState('3.0');
+  const [newExpenseGrowth, setNewExpenseGrowth] = useState('2.5');
+  const [newExitCapRate, setNewExitCapRate] = useState('7.0');
+  const [newOccupancyRate, setNewOccupancyRate] = useState('85');
   const [editedCase, setEditedCase] = useState<Partial<ModelingCase> | null>(null);
   const [leaseUpSchedule, setLeaseUpSchedule] = useState<LeaseUpEntry[]>([]);
   const [showLeaseUp, setShowLeaseUp] = useState(false);
@@ -220,6 +224,10 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
       setNewCaseName('');
       setNewCaseColor('blue');
       setNewCaseDescription('');
+      setNewRevenueGrowth('3.0');
+      setNewExpenseGrowth('2.5');
+      setNewExitCapRate('7.0');
+      setNewOccupancyRate('85');
       setActiveCaseId(newCase.id);
       toast({ title: 'Scenario Created', description: `"${newCase.name}" has been created.` });
     },
@@ -432,7 +440,68 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
                     onChange={(e) => setNewCaseDescription(e.target.value)}
                     placeholder="Describe the assumptions for this scenario..."
                     data-testid="input-new-case-description"
+                    rows={2}
                   />
+                </div>
+                
+                <Separator className="my-2" />
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    Key Assumptions
+                  </Label>
+                  <p className="text-xs text-muted-foreground">These values differentiate this scenario from others</p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="new-revenue-growth" className="text-sm">Revenue Growth (%)</Label>
+                    <Input
+                      id="new-revenue-growth"
+                      type="number"
+                      step="0.1"
+                      value={newRevenueGrowth}
+                      onChange={(e) => setNewRevenueGrowth(e.target.value)}
+                      placeholder="3.0"
+                      className="bg-white dark:bg-slate-900"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-expense-growth" className="text-sm">Expense Growth (%)</Label>
+                    <Input
+                      id="new-expense-growth"
+                      type="number"
+                      step="0.1"
+                      value={newExpenseGrowth}
+                      onChange={(e) => setNewExpenseGrowth(e.target.value)}
+                      placeholder="2.5"
+                      className="bg-white dark:bg-slate-900"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-exit-cap-rate" className="text-sm">Exit Cap Rate (%)</Label>
+                    <Input
+                      id="new-exit-cap-rate"
+                      type="number"
+                      step="0.1"
+                      value={newExitCapRate}
+                      onChange={(e) => setNewExitCapRate(e.target.value)}
+                      placeholder="7.0"
+                      className="bg-white dark:bg-slate-900"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-occupancy-rate" className="text-sm">Occupancy Rate (%)</Label>
+                    <Input
+                      id="new-occupancy-rate"
+                      type="number"
+                      step="1"
+                      value={newOccupancyRate}
+                      onChange={(e) => setNewOccupancyRate(e.target.value)}
+                      placeholder="85"
+                      className="bg-white dark:bg-slate-900"
+                    />
+                  </div>
                 </div>
               </div>
               <DialogFooter>
@@ -440,7 +509,15 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
                   Cancel
                 </Button>
                 <Button
-                  onClick={() => createCaseMutation.mutate({ name: newCaseName, color: newCaseColor, description: newCaseDescription })}
+                  onClick={() => createCaseMutation.mutate({ 
+                    name: newCaseName, 
+                    color: newCaseColor, 
+                    description: newCaseDescription,
+                    revenueGrowthRate: newRevenueGrowth ? (parseFloat(newRevenueGrowth) / 100).toString() : undefined,
+                    expenseGrowthRate: newExpenseGrowth ? (parseFloat(newExpenseGrowth) / 100).toString() : undefined,
+                    exitCapRate: newExitCapRate ? (parseFloat(newExitCapRate) / 100).toString() : undefined,
+                    occupancyRate: newOccupancyRate ? (parseFloat(newOccupancyRate) / 100).toString() : undefined,
+                  })}
                   disabled={!newCaseName.trim() || createCaseMutation.isPending}
                   data-testid="button-create-scenario"
                 >
@@ -500,9 +577,9 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
                         }`}
                         data-testid={`button-select-case-${modelCase.id}`}
                       >
-                        <div className="flex items-center gap-3">
-                          <div className={`w-3 h-3 rounded-full ${caseColor.bg}`} />
-                          <div className="text-left">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className={`w-3 h-3 rounded-full ${caseColor.bg} flex-shrink-0`} />
+                          <div className="text-left min-w-0 flex-1">
                             <div className="font-medium flex items-center gap-2">
                               {modelCase.name}
                               {modelCase.isDefault && (
@@ -510,14 +587,24 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
                               )}
                             </div>
                             {modelCase.description && (
-                              <div className="text-xs text-muted-foreground truncate max-w-[120px]">
+                              <div className="text-xs text-muted-foreground truncate max-w-[150px]">
                                 {modelCase.description}
+                              </div>
+                            )}
+                            {(modelCase.exitCapRate || modelCase.revenueGrowthRate) && (
+                              <div className="text-xs text-muted-foreground flex gap-2 mt-0.5">
+                                {modelCase.exitCapRate && (
+                                  <span className="font-medium">Cap: {(parseFloat(modelCase.exitCapRate) * 100).toFixed(1)}%</span>
+                                )}
+                                {modelCase.revenueGrowthRate && (
+                                  <span className="font-medium">Rev: +{(parseFloat(modelCase.revenueGrowthRate) * 100).toFixed(1)}%</span>
+                                )}
                               </div>
                             )}
                           </div>
                         </div>
                         {!modelCase.isEnabled && (
-                          <Badge variant="outline" className="text-xs">Disabled</Badge>
+                          <Badge variant="outline" className="text-xs flex-shrink-0">Disabled</Badge>
                         )}
                       </button>
                     );

@@ -15734,7 +15734,7 @@ Current context: Project ${req.params.projectId}`;
       const cases = await db.select()
         .from(modelingCases)
         .where(and(eq(modelingCases.projectId, projectId), eq(modelingCases.orgId, orgId)))
-        .orderBy(asc(modelingCases.displayOrder));
+        .orderBy(asc(modelingCases.sortOrder));
       res.json(cases);
     } catch (error: any) {
       console.error('Failed to fetch modeling cases:', error);
