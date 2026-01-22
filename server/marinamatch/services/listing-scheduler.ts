@@ -372,6 +372,7 @@ async function saveGlobalListings(
       
       const dedupeHash = generateDedupeHash(listing, platform);
       
+      // Check by dedupe_hash first (normalized property identity)
       const [existing] = await db
         .select({ id: marinaListings.id })
         .from(marinaListings)
@@ -388,6 +389,28 @@ async function saveGlobalListings(
           .where(eq(marinaListings.id, existing.id));
         result.skippedDuplicate++;
         continue;
+      }
+      
+      // Also check by source URL (same page scraped multiple times)
+      if (listing.sourceUrl) {
+        const normalizedUrl = listing.sourceUrl.split('?')[0].replace(/\/+$/, '').toLowerCase();
+        const [existingByUrl] = await db
+          .select({ id: marinaListings.id })
+          .from(marinaListings)
+          .where(sql`lower(regexp_replace(split_part(source_url, '?', 1), '/+$', '')) = ${normalizedUrl}`)
+          .limit(1);
+        
+        if (existingByUrl) {
+          await db
+            .update(marinaListings)
+            .set({
+              lastScrapedAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(eq(marinaListings.id, existingByUrl.id));
+          result.skippedDuplicate++;
+          continue;
+        }
       }
 
       const [newListing] = await db.insert(marinaListings).values({
