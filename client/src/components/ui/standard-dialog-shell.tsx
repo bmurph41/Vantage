@@ -1,4 +1,5 @@
 import { type ReactNode, type LucideIcon } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +33,7 @@ interface StandardDialogShellProps {
   };
   size?: "sm" | "md" | "lg" | "xl";
   className?: string;
+  showProgressBar?: boolean;
 }
 
 const sizeClasses = {
@@ -53,13 +55,18 @@ export function StandardDialogShell({
   secondaryAction,
   size = "md",
   className,
+  showProgressBar = false,
 }: StandardDialogShellProps) {
   const showFooter = footer || primaryAction || secondaryAction;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn(sizeClasses[size], className)}>
-        <DialogHeader>
+      <DialogContent className={cn(
+        sizeClasses[size], 
+        "flex flex-col max-h-[90vh]",
+        className
+      )}>
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             {Icon && (
               <div className="p-1.5 rounded-lg bg-[#1E4FAB]/10">
@@ -68,41 +75,52 @@ export function StandardDialogShell({
             )}
             {title}
           </DialogTitle>
+          {showProgressBar && (
+            <div className="w-24 h-1 bg-[#1E4FAB] rounded-full mt-2" />
+          )}
           {description && (
-            <DialogDescription>{description}</DialogDescription>
+            <DialogDescription className="pt-1">{description}</DialogDescription>
           )}
         </DialogHeader>
 
-        <div className="py-4">{children}</div>
+        <div className="flex-1 overflow-y-auto py-4 min-h-0">{children}</div>
 
         {showFooter && (
-          <div className="flex justify-end gap-2 pt-4 border-t">
+          <div className="flex-shrink-0 flex justify-between items-center gap-2 pt-4 border-t">
             {footer || (
               <>
-                {secondaryAction && (
-                  <Button
-                    variant="outline"
-                    onClick={secondaryAction.onClick}
-                    disabled={secondaryAction.disabled}
-                  >
-                    {secondaryAction.label}
-                  </Button>
-                )}
-                {primaryAction && (
-                  <Button
-                    onClick={primaryAction.onClick}
-                    disabled={primaryAction.disabled || primaryAction.loading}
-                    className={cn(
-                      primaryAction.variant !== "destructive" &&
-                        "bg-[#1E4FAB] hover:bg-[#1a4294]"
-                    )}
-                    variant={primaryAction.variant}
-                  >
-                    {primaryAction.loading
-                      ? (primaryAction.loadingLabel || `${primaryAction.label}...`)
-                      : primaryAction.label}
-                  </Button>
-                )}
+                <div>
+                  {secondaryAction && (
+                    <Button
+                      variant="ghost"
+                      onClick={secondaryAction.onClick}
+                      disabled={secondaryAction.disabled}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-1" />
+                      {secondaryAction.label}
+                    </Button>
+                  )}
+                </div>
+                <div>
+                  {primaryAction && (
+                    <Button
+                      onClick={primaryAction.onClick}
+                      disabled={primaryAction.disabled || primaryAction.loading}
+                      className={cn(
+                        "gap-1",
+                        primaryAction.variant !== "destructive" &&
+                          "bg-[#1E4FAB] hover:bg-[#1a4294]"
+                      )}
+                      variant={primaryAction.variant}
+                    >
+                      {primaryAction.loading
+                        ? (primaryAction.loadingLabel || `${primaryAction.label}...`)
+                        : primaryAction.label}
+                      {!primaryAction.loading && <ChevronRight className="h-4 w-4" />}
+                    </Button>
+                  )}
+                </div>
               </>
             )}
           </div>

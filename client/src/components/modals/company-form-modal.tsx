@@ -642,16 +642,18 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
       open={isOpen}
       onOpenChange={onClose}
       title={company ? 'Edit Company' : 'Create Company'}
+      description={pendingCompanyId ? 'Review and edit company details before adding to CRM' : undefined}
       icon={Building}
       size="lg"
+      showProgressBar={true}
       primaryAction={{
-        label: isLoading ? 'Saving...' : ((company?.id || pendingCompanyId) ? 'Update Company' : 'Create Company'),
+        label: isLoading ? 'Saving...' : ((company?.id || pendingCompanyId) ? 'Update' : 'Create'),
         onClick: form.handleSubmit(onSubmit),
         disabled: isLoading,
         loading: isLoading,
       }}
       secondaryAction={{
-        label: 'Cancel',
+        label: 'Back',
         onClick: onClose,
         disabled: isLoading,
       }}
