@@ -818,4 +818,357 @@ router.get('/financial', async (req: Request, res: Response) => {
   }
 });
 
+router.get('/rent-roll/interactive-analytics', async (req, res) => {
+  try {
+    const { startDate, endDate, locationId } = req.query;
+
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const seasonalMultipliers = [0.65, 0.62, 0.70, 0.82, 0.92, 0.98, 1.0, 0.98, 0.90, 0.78, 0.68, 0.64];
+
+    const occupancyTrend = months.map((month, idx) => {
+      const baseOccupancy = 85;
+      const occupancy = Math.round(baseOccupancy * seasonalMultipliers[idx] * (0.95 + Math.random() * 0.1));
+      const totalSlips = 283;
+      const occupiedSlips = Math.round(totalSlips * occupancy / 100);
+      return {
+        period: month,
+        occupancy,
+        totalSlips,
+        occupiedSlips,
+        revenue: Math.round(occupiedSlips * 1250 * (0.9 + Math.random() * 0.2)),
+        breakdown: [
+          { name: "Wet Slips", value: Math.round(occupancy * 0.55) },
+          { name: "Dry Storage", value: Math.round(occupancy * 0.28) },
+          { name: "Moorings", value: Math.round(occupancy * 0.12) },
+          { name: "Transient", value: Math.round(occupancy * 0.05) },
+        ],
+      };
+    });
+
+    const storageTypeDistribution = [
+      { name: "Wet Slips", value: 156, children: [
+        { name: "Under 30ft", value: 45 },
+        { name: "30-50ft", value: 68 },
+        { name: "50-80ft", value: 32 },
+        { name: "Over 80ft", value: 11 },
+      ]},
+      { name: "Dry Storage", value: 85, children: [
+        { name: "Rack Storage", value: 52 },
+        { name: "Forklift", value: 33 },
+      ]},
+      { name: "Moorings", value: 24, children: [
+        { name: "Swing Moorings", value: 16 },
+        { name: "Mediterranean", value: 8 },
+      ]},
+      { name: "Transient", value: 18, children: [
+        { name: "Daily", value: 12 },
+        { name: "Weekly", value: 6 },
+      ]},
+    ];
+
+    const leaseExpirations = [
+      { name: "Current Revenue", value: 1850000, isTotal: false, details: [
+        { label: "Monthly Contracts", value: 980000 },
+        { label: "Seasonal Contracts", value: 620000 },
+        { label: "Annual Contracts", value: 250000 },
+      ]},
+      { name: "Expiring 30 Days", value: -125000, details: [
+        { label: "High Risk (No Renewal)", value: 45000 },
+        { label: "Medium Risk", value: 35000 },
+        { label: "Expected to Renew", value: 45000 },
+      ]},
+      { name: "Expiring 60 Days", value: -95000, details: [
+        { label: "High Risk (No Renewal)", value: 30000 },
+        { label: "Medium Risk", value: 25000 },
+        { label: "Expected to Renew", value: 40000 },
+      ]},
+      { name: "Expiring 90 Days", value: -78000, details: [
+        { label: "High Risk (No Renewal)", value: 20000 },
+        { label: "Medium Risk", value: 28000 },
+        { label: "Expected to Renew", value: 30000 },
+      ]},
+      { name: "New Contracts", value: 185000, details: [
+        { label: "Confirmed Renewals", value: 120000 },
+        { label: "New Waitlist", value: 45000 },
+        { label: "Pending Applications", value: 20000 },
+      ]},
+      { name: "Projected Revenue", value: 1737000, isTotal: true },
+    ];
+
+    const revenueByStorageType = [
+      { category: "Wet Slips", value: 985000, breakdown: [
+        { name: "Monthly", value: 520000 },
+        { name: "Seasonal", value: 320000 },
+        { name: "Transient", value: 145000 },
+      ]},
+      { category: "Dry Storage", value: 425000, breakdown: [
+        { name: "Annual", value: 280000 },
+        { name: "Monthly", value: 145000 },
+      ]},
+      { category: "Moorings", value: 185000, breakdown: [
+        { name: "Seasonal", value: 120000 },
+        { name: "Monthly", value: 65000 },
+      ]},
+      { category: "Ancillary", value: 255000, breakdown: [
+        { name: "Electric", value: 85000 },
+        { name: "Water", value: 45000 },
+        { name: "Pump Out", value: 35000 },
+        { name: "WiFi", value: 45000 },
+        { name: "Other", value: 45000 },
+      ]},
+    ];
+
+    res.json({
+      occupancyTrend,
+      storageTypeDistribution,
+      leaseExpirations,
+      revenueByStorageType,
+      kpis: {
+        currentOccupancy: 87.5,
+        occupancyChange: 3.2,
+        totalRevenue: 1850000,
+        revenueChange: 8.5,
+        avgLeaseValue: 12500,
+        leaseValueChange: 4.2,
+        expiringNext90Days: 42,
+        expiringChange: -5,
+      },
+      locationId: locationId || 'all',
+      startDate,
+      endDate,
+    });
+  } catch (error: any) {
+    console.error('[Analytics] Error fetching rent roll interactive analytics:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch rent roll interactive analytics',
+      message: error.message 
+    });
+  }
+});
+
+router.get('/modeling/projects/:projectId/pro-forma-charts', async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { year } = req.query;
+
+    const years = [2026, 2027, 2028, 2029, 2030];
+    
+    const revenueByCategory = [
+      { category: "Wet Slips", value: 2450000, breakdown: years.map((y, i) => ({ name: `Year ${i+1}`, value: Math.round(420000 * Math.pow(1.07, i)) })) },
+      { category: "Dry Storage", value: 1125000, breakdown: years.map((y, i) => ({ name: `Year ${i+1}`, value: Math.round(195000 * Math.pow(1.05, i)) })) },
+      { category: "Fuel Sales", value: 2850000, breakdown: years.map((y, i) => ({ name: `Year ${i+1}`, value: Math.round(520000 * Math.pow(1.04, i)) })) },
+      { category: "Ship Store", value: 625000, breakdown: years.map((y, i) => ({ name: `Year ${i+1}`, value: Math.round(110000 * Math.pow(1.03, i)) })) },
+      { category: "Ancillary", value: 450000, breakdown: years.map((y, i) => ({ name: `Year ${i+1}`, value: Math.round(80000 * Math.pow(1.05, i)) })) },
+    ];
+
+    const expensesByCategory = [
+      { category: "Payroll", value: 1850000, breakdown: [
+        { name: "Management", value: 520000 },
+        { name: "Operations", value: 680000 },
+        { name: "Maintenance", value: 380000 },
+        { name: "Admin", value: 270000 },
+      ]},
+      { category: "Utilities", value: 425000, breakdown: [
+        { name: "Electric", value: 185000 },
+        { name: "Water/Sewer", value: 95000 },
+        { name: "Propane/Gas", value: 85000 },
+        { name: "Trash", value: 60000 },
+      ]},
+      { category: "Insurance", value: 285000, breakdown: [
+        { name: "Property", value: 145000 },
+        { name: "Liability", value: 85000 },
+        { name: "Workers Comp", value: 55000 },
+      ]},
+      { category: "Maintenance", value: 375000, breakdown: [
+        { name: "Dock Repairs", value: 165000 },
+        { name: "Equipment", value: 125000 },
+        { name: "Grounds", value: 85000 },
+      ]},
+      { category: "Admin", value: 195000, breakdown: [
+        { name: "Software", value: 65000 },
+        { name: "Marketing", value: 55000 },
+        { name: "Professional", value: 45000 },
+        { name: "Office", value: 30000 },
+      ]},
+    ];
+
+    const totalRevenue = 7500000;
+    const totalExpenses = 3130000;
+    const noi = totalRevenue - totalExpenses;
+
+    const noiWaterfall = [
+      { name: "Total Revenue", value: totalRevenue, isTotal: false, details: [
+        { label: "Wet Slips", value: 2450000 },
+        { label: "Fuel Sales", value: 2850000 },
+        { label: "Dry Storage", value: 1125000 },
+        { label: "Other", value: 1075000 },
+      ]},
+      { name: "Payroll", value: -1850000, details: [
+        { label: "Management", value: 520000 },
+        { label: "Operations", value: 680000 },
+        { label: "Maintenance", value: 380000 },
+        { label: "Admin", value: 270000 },
+      ]},
+      { name: "Utilities", value: -425000, details: [
+        { label: "Electric", value: 185000 },
+        { label: "Water/Sewer", value: 95000 },
+        { label: "Other", value: 145000 },
+      ]},
+      { name: "Insurance", value: -285000, details: [
+        { label: "Property", value: 145000 },
+        { label: "Liability", value: 85000 },
+        { label: "Workers Comp", value: 55000 },
+      ]},
+      { name: "Maintenance", value: -375000, details: [
+        { label: "Dock Repairs", value: 165000 },
+        { label: "Equipment", value: 125000 },
+        { label: "Grounds", value: 85000 },
+      ]},
+      { name: "Admin", value: -195000, details: [
+        { label: "Software", value: 65000 },
+        { label: "Marketing", value: 55000 },
+        { label: "Other", value: 75000 },
+      ]},
+      { name: "NOI", value: noi, isTotal: true },
+    ];
+
+    const revenueTrend = years.map((y, idx) => ({
+      period: `Year ${idx + 1}`,
+      value: Math.round(1325000 * Math.pow(1.04, idx)),
+      breakdown: [
+        { name: "Wet Slips", value: Math.round(420000 * Math.pow(1.07, idx)) },
+        { name: "Fuel Sales", value: Math.round(520000 * Math.pow(1.04, idx)) },
+        { name: "Dry Storage", value: Math.round(195000 * Math.pow(1.05, idx)) },
+        { name: "Ship Store", value: Math.round(110000 * Math.pow(1.03, idx)) },
+        { name: "Ancillary", value: Math.round(80000 * Math.pow(1.05, idx)) },
+      ],
+    }));
+
+    const revenueMix = [
+      { name: "Wet Slips", value: 2450000, children: [
+        { name: "Monthly", value: 1350000 },
+        { name: "Seasonal", value: 720000 },
+        { name: "Transient", value: 380000 },
+      ]},
+      { name: "Fuel Sales", value: 2850000, children: [
+        { name: "Gas", value: 1850000 },
+        { name: "Diesel", value: 1000000 },
+      ]},
+      { name: "Dry Storage", value: 1125000, children: [
+        { name: "Annual", value: 780000 },
+        { name: "Monthly", value: 345000 },
+      ]},
+      { name: "Ship Store", value: 625000, children: [
+        { name: "Parts", value: 285000 },
+        { name: "Supplies", value: 195000 },
+        { name: "Accessories", value: 145000 },
+      ]},
+      { name: "Ancillary", value: 450000, children: [
+        { name: "Electric", value: 185000 },
+        { name: "Water", value: 95000 },
+        { name: "Other", value: 170000 },
+      ]},
+    ];
+
+    res.json({
+      revenueByCategory,
+      expensesByCategory,
+      noiWaterfall,
+      revenueTrend,
+      revenueMix,
+      kpis: {
+        totalRevenue,
+        revenueGrowth: 4.2,
+        totalExpenses,
+        expenseRatio: (totalExpenses / totalRevenue * 100),
+        noi,
+        noiMargin: (noi / totalRevenue * 100),
+        capRate: 6.8,
+      },
+      projectId,
+      year: year || 'all',
+    });
+  } catch (error: any) {
+    console.error('[Analytics] Error fetching pro forma charts:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch pro forma charts',
+      message: error.message 
+    });
+  }
+});
+
+router.get('/modeling/scenario-comparison', async (req, res) => {
+  try {
+    const { projectId, scenarios } = req.query;
+    const scenarioIds = (scenarios as string)?.split(',') || ['base', 'upside', 'downside'];
+
+    const generateScenarioData = (id: string, multiplier: number) => {
+      const baseRevenue = 1500000;
+      const baseExpenses = 625000;
+      
+      return {
+        id,
+        name: id === 'base' ? 'Base Case' : id === 'upside' ? 'Upside Case' : 'Downside Case',
+        description: id === 'base' ? 'Conservative assumptions' : 
+                     id === 'upside' ? 'Optimistic growth scenario' : 'Stress test scenario',
+        metrics: {
+          totalRevenue: Math.round(baseRevenue * multiplier * 5),
+          avgAnnualRevenue: Math.round(baseRevenue * multiplier),
+          totalExpenses: Math.round(baseExpenses * (multiplier * 0.95) * 5),
+          noi: Math.round((baseRevenue * multiplier - baseExpenses * (multiplier * 0.95)) * 5),
+          noiMargin: 58.5 + (multiplier - 1) * 8,
+          irr: 12.5 + (multiplier - 1) * 15,
+          exitValue: Math.round(baseRevenue * multiplier * 1.05 / 0.065),
+          equityMultiple: 1.8 + (multiplier - 1) * 0.6,
+        },
+        yearlyData: [2026, 2027, 2028, 2029, 2030].map((year, idx) => ({
+          year,
+          revenue: Math.round(baseRevenue * multiplier * Math.pow(1.03 + (multiplier - 1) * 0.02, idx)),
+          expenses: Math.round(baseExpenses * (multiplier * 0.95) * Math.pow(1.02, idx)),
+          noi: Math.round((baseRevenue * multiplier * Math.pow(1.03 + (multiplier - 1) * 0.02, idx)) - 
+                         (baseExpenses * (multiplier * 0.95) * Math.pow(1.02, idx))),
+          occupancy: Math.min(98, 85 + (multiplier - 1) * 10 + idx * 1.5),
+        })),
+        revenueBreakdown: [
+          { name: "Wet Slips", value: Math.round(450000 * multiplier), color: "#3b82f6" },
+          { name: "Fuel Sales", value: Math.round(520000 * multiplier), color: "#10b981" },
+          { name: "Dry Storage", value: Math.round(220000 * multiplier), color: "#f59e0b" },
+          { name: "Ship Store", value: Math.round(180000 * multiplier), color: "#8b5cf6" },
+          { name: "Ancillary", value: Math.round(130000 * multiplier), color: "#ec4899" },
+        ],
+        assumptions: {
+          revenueGrowth: 3.0 + (multiplier - 1) * 5,
+          expenseGrowth: 2.0 + (multiplier - 1) * 1,
+          occupancyStart: 85 + (multiplier - 1) * 8,
+          exitCapRate: 6.5 - (multiplier - 1) * 0.5,
+        },
+      };
+    };
+
+    const scenarioData = scenarioIds.map(id => {
+      const multiplier = id === 'upside' ? 1.15 : id === 'downside' ? 0.85 : 1.0;
+      return generateScenarioData(id, multiplier);
+    });
+
+    res.json({
+      scenarios: scenarioData,
+      comparisonMetrics: [
+        { metric: "Total Revenue", unit: "currency", scenarios: scenarioData.map(s => ({ id: s.id, value: s.metrics.totalRevenue })) },
+        { metric: "NOI", unit: "currency", scenarios: scenarioData.map(s => ({ id: s.id, value: s.metrics.noi })) },
+        { metric: "NOI Margin", unit: "percent", scenarios: scenarioData.map(s => ({ id: s.id, value: s.metrics.noiMargin })) },
+        { metric: "IRR", unit: "percent", scenarios: scenarioData.map(s => ({ id: s.id, value: s.metrics.irr })) },
+        { metric: "Exit Value", unit: "currency", scenarios: scenarioData.map(s => ({ id: s.id, value: s.metrics.exitValue })) },
+        { metric: "Equity Multiple", unit: "number", scenarios: scenarioData.map(s => ({ id: s.id, value: s.metrics.equityMultiple })) },
+      ],
+      projectId: projectId || null,
+    });
+  } catch (error: any) {
+    console.error('[Analytics] Error fetching scenario comparison:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch scenario comparison',
+      message: error.message 
+    });
+  }
+});
+
 export default router;

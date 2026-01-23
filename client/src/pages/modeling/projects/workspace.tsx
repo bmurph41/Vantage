@@ -61,6 +61,8 @@ import DCFCalculatorPage from './workspace/dcf-calculator';
 import MonteCarloPage from './workspace/monte-carlo';
 import RentRollDataTab from './workspace/rent-roll-data';
 import ModelingProjectIntegrationPanel from '@/components/modeling/ModelingProjectIntegrationPanel';
+import WorkspaceProFormaCharts from './workspace/pro-forma-charts';
+import ScenarioComparisonCharts from './workspace/scenario-comparison-charts';
 
 export default function ProjectWorkspace() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -303,6 +305,14 @@ export default function ProjectWorkspace() {
               <Activity className="h-4 w-4" />
               <span className="hidden sm:inline">Monte Carlo</span>
             </TabsTrigger>
+            <TabsTrigger value="proforma-charts" className="gap-2" data-testid="tab-proforma-charts">
+              <BarChart3 className="h-4 w-4" />
+              <span className="hidden sm:inline">Charts</span>
+            </TabsTrigger>
+            <TabsTrigger value="scenario-compare" className="gap-2" data-testid="tab-scenario-compare">
+              <Layers className="h-4 w-4" />
+              <span className="hidden sm:inline">Compare</span>
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -388,6 +398,14 @@ export default function ProjectWorkspace() {
 
         <TabsContent value="monte-carlo" className="space-y-6">
           <MonteCarloPage />
+        </TabsContent>
+
+        <TabsContent value="proforma-charts" className="space-y-6">
+          <WorkspaceProFormaCharts projectId={projectId!} onTabChange={setActiveTab} />
+        </TabsContent>
+
+        <TabsContent value="scenario-compare" className="space-y-6">
+          <ScenarioComparisonCharts projectId={projectId!} onTabChange={setActiveTab} />
         </TabsContent>
       </Tabs>
     </div>

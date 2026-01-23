@@ -170,6 +170,7 @@ const RentRollV2Snapshots = lazy(() => import("@/modules/rent-roll-v2/pages/snap
 // Rent Roll V2 - Data Quality pages
 const RentRollV2DataQuality = lazy(() => import("@/modules/rent-roll-v2/pages/data-quality"));
 const RentRollV2PortfolioDataQuality = lazy(() => import("@/modules/rent-roll-v2/pages/portfolio-data-quality"));
+const RentRollV2InteractiveAnalytics = lazy(() => import("@/modules/rent-roll-v2/pages/interactive-analytics"));
 
 // Operations - Tabbed Module Pages
 const FuelSalesTabbed = lazy(() => import("@/pages/operations/FuelSalesTabbed"));
@@ -896,6 +897,17 @@ function Router() {
             <UnifiedLayout>
               <Suspense fallback={<PageLoader />}>
                 <RentRollV2Snapshots />
+              </Suspense>
+            </UnifiedLayout>
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/rent-roll/interactive-analytics">
+        {() => (
+          <AuthGuard>
+            <UnifiedLayout>
+              <Suspense fallback={<PageLoader />}>
+                <RentRollV2InteractiveAnalytics />
               </Suspense>
             </UnifiedLayout>
           </AuthGuard>
