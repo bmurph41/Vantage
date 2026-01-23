@@ -1,9 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw, Check, AlertCircle, Clock, Database, ArrowDownToLine, ArrowUpFromLine, ArrowRightLeft } from "lucide-react";
+import { RefreshCw, Check, AlertCircle, Clock, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -45,12 +44,6 @@ const MODULE_LABELS: Record<string, string> = {
   service: "Service",
   bookkeeping: "Bookkeeping",
   documents: "Documents",
-};
-
-const SYNC_DIRECTION_ICON: Record<string, typeof ArrowDownToLine> = {
-  read: ArrowDownToLine,
-  write: ArrowUpFromLine,
-  bidirectional: ArrowRightLeft,
 };
 
 export function SyncStatusPanel({ showModuleCoverage = true, onSyncComplete }: SyncStatusPanelProps) {

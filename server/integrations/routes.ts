@@ -381,8 +381,16 @@ integrationsRouter.post('/api/integrations/:key/sync', async (req: Request, res:
   const { targetModule, targetEntity, fullSync = false } = req.body;
 
   try {
+    const whereConditions = [
+      eq(userIntegrations.userId, userId),
+      eq(userIntegrations.integrationKey, key),
+    ];
+    if (userIntegrations.orgId) {
+      whereConditions.push(eq(userIntegrations.orgId, orgId));
+    }
+
     const [userIntegration] = await db.select().from(userIntegrations)
-      .where(and(eq(userIntegrations.userId, userId), eq(userIntegrations.integrationKey, key)))
+      .where(and(...whereConditions))
       .limit(1);
 
     if (!userIntegration?.isConnected) {
@@ -403,9 +411,11 @@ integrationsRouter.post('/api/integrations/:key/sync', async (req: Request, res:
       return res.status(400).json({ error: 'No data mappings available for this sync request' });
     }
 
+    const syncId = crypto.randomBytes(16).toString('hex');
     const syncResult = {
-      syncId: crypto.randomBytes(16).toString('hex'),
+      syncId,
       integrationKey: key,
+      orgId,
       status: 'queued',
       mappingsQueued: mappingsToSync.map(m => ({
         targetModule: m.targetModule,
@@ -423,7 +433,7 @@ integrationsRouter.post('/api/integrations/:key/sync', async (req: Request, res:
         lastSyncAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(and(eq(userIntegrations.userId, userId), eq(userIntegrations.integrationKey, key)));
+      .where(and(...whereConditions));
 
     res.json(syncResult);
   } catch (error) {
@@ -435,12 +445,21 @@ integrationsRouter.post('/api/integrations/:key/sync', async (req: Request, res:
 integrationsRouter.get('/api/integrations/:key/sync/status', async (req: Request, res: Response) => {
   const userId = requireUser(req, res);
   if (!userId) return;
+  const orgId = getOrgId(req);
 
   const { key } = req.params;
 
   try {
+    const whereConditions = [
+      eq(userIntegrations.userId, userId),
+      eq(userIntegrations.integrationKey, key),
+    ];
+    if (orgId && userIntegrations.orgId) {
+      whereConditions.push(eq(userIntegrations.orgId, orgId));
+    }
+
     const [userIntegration] = await db.select().from(userIntegrations)
-      .where(and(eq(userIntegrations.userId, userId), eq(userIntegrations.integrationKey, key)))
+      .where(and(...whereConditions))
       .limit(1);
 
     if (!userIntegration) {
@@ -514,7 +533,12 @@ integrationsRouter.get('/api/integrations/sync/overview', async (req: Request, r
   const orgId = getOrgId(req);
 
   try {
-    const userItems = await db.select().from(userIntegrations).where(eq(userIntegrations.userId, userId));
+    const whereConditions = [eq(userIntegrations.userId, userId)];
+    if (orgId && userIntegrations.orgId) {
+      whereConditions.push(eq(userIntegrations.orgId, orgId));
+    }
+
+    const userItems = await db.select().from(userIntegrations).where(and(...whereConditions));
     const connectedIntegrations = userItems.filter(u => u.isConnected);
 
     const overview = connectedIntegrations.map(item => {
