@@ -42,4 +42,5 @@ export function isGoogleMapsAvailable(): boolean {
 export function resetGoogleMapsLoader(): void {
   loaderPromise = null;
   loadError = null;
+  isConfigError = false;
 }

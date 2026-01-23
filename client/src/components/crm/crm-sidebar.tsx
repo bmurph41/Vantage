@@ -6,6 +6,7 @@ import {
   LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight, ArrowLeft, Archive
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
 
 const coreNav = [
   { name: "Sales Pipeline", href: "/crm/pipeline", icon: Layers },
@@ -43,10 +44,15 @@ const reportingNav = [
 
 export default function Sidebar() {
   const [location] = useLocation();
+  const { user } = useAuth();
   const [crmExpanded, setCrmExpanded] = useState(true);
   const [toolsExpanded, setToolsExpanded] = useState(false);
   const [automationExpanded, setAutomationExpanded] = useState(false);
   const [reportsExpanded, setReportsExpanded] = useState(false);
+
+  const userName = user?.name || user?.email?.split('@')[0] || 'User';
+  const userInitials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
+  const userRole = user?.role || 'Team Member';
 
   const NavLink = ({ item }: { item: { name: string; href: string; icon: any; badge?: string } }) => {
     const isActive = location === item.href;
@@ -168,11 +174,11 @@ export default function Sidebar() {
       <div className="p-4 border-t border-gray-200 bg-white flex-shrink-0" data-testid="user-profile">
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-sm font-medium" data-testid="user-initials">JD</span>
+            <span className="text-white text-sm font-medium" data-testid="user-initials">{userInitials}</span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate" data-testid="user-name">John Doe</p>
-            <p className="text-xs text-gray-500 truncate" data-testid="user-role">Sales Manager</p>
+            <p className="text-sm font-medium text-gray-900 truncate" data-testid="user-name">{userName}</p>
+            <p className="text-xs text-gray-500 truncate" data-testid="user-role">{userRole}</p>
           </div>
           <button className="text-gray-400 hover:text-gray-600 flex-shrink-0" data-testid="button-user-settings">
             <Settings className="w-4 h-4" />

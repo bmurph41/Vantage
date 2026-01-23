@@ -480,11 +480,7 @@ export default function DockitLaunches() {
                               </SelectItem>
                             ))}
                             {employees.length === 0 && (
-                              <>
-                                <SelectItem value="John Smith">John Smith</SelectItem>
-                                <SelectItem value="Mike Johnson">Mike Johnson</SelectItem>
-                                <SelectItem value="Sarah Williams">Sarah Williams</SelectItem>
-                              </>
+                              <SelectItem value="__no_employees__" disabled>No employees configured</SelectItem>
                             )}
                           </SelectContent>
                         </Select>

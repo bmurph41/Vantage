@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Phone, Mail, Calendar, FileText, Search, Filter,
-  ArrowUpRight, ArrowDownRight, Clock, User, Building, Home, Handshake
+  ArrowUpRight, ArrowDownRight, Clock, User, Building, Home, Handshake, Loader2
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -25,69 +25,6 @@ type Activity = {
   deal?: { id: string; name: string };
 };
 
-const mockActivities: Activity[] = [
-  { 
-    id: '1', 
-    type: 'call', 
-    direction: 'outbound', 
-    subject: 'Follow-up call with owner', 
-    description: 'Discussed potential sale timeline. Owner interested but needs 3 months.',
-    date: '2025-01-27T14:30:00', 
-    user: 'John Smith',
-    contact: { id: 'c1', name: 'Robert Wilson' },
-    property: { id: 'p1', name: 'Sunset Marina' }
-  },
-  { 
-    id: '2', 
-    type: 'email', 
-    direction: 'outbound', 
-    subject: 'Initial outreach - Tampa Bay Marina', 
-    date: '2025-01-27T11:15:00', 
-    user: 'John Smith',
-    contact: { id: 'c2', name: 'Sarah Johnson' },
-    company: { id: 'co1', name: 'Bay Properties LLC' }
-  },
-  { 
-    id: '3', 
-    type: 'meeting', 
-    direction: 'internal', 
-    subject: 'Deal review - Clearwater acquisition',
-    description: 'IC meeting to review LOI terms and due diligence progress.',
-    date: '2025-01-27T09:00:00', 
-    user: 'Jane Doe',
-    deal: { id: 'd1', name: 'Clearwater Marina Acquisition' }
-  },
-  { 
-    id: '4', 
-    type: 'note', 
-    direction: 'internal', 
-    subject: 'Site visit notes',
-    description: 'Completed site inspection. 45 slips, good condition. Fuel dock needs upgrade.',
-    date: '2025-01-26T16:45:00', 
-    user: 'Mike Brown',
-    property: { id: 'p2', name: 'Harbor Point Marina' }
-  },
-  { 
-    id: '5', 
-    type: 'call', 
-    direction: 'inbound', 
-    subject: 'Broker inquiry',
-    description: 'Broker calling about off-market opportunity in Sarasota.',
-    date: '2025-01-26T13:20:00', 
-    user: 'John Smith',
-    contact: { id: 'c3', name: 'David Miller' },
-    company: { id: 'co2', name: 'Coastal Realty' }
-  },
-  { 
-    id: '6', 
-    type: 'email', 
-    direction: 'inbound', 
-    subject: 'RE: Partnership proposal',
-    date: '2025-01-26T10:05:00', 
-    user: 'Jane Doe',
-    contact: { id: 'c4', name: 'Jennifer Lee' }
-  },
-];
 
 export default function ActivityLog() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -98,7 +35,7 @@ export default function ActivityLog() {
     queryKey: ['/api/activities'],
   });
 
-  const displayActivities = (activities as Activity[]) || mockActivities;
+  const displayActivities = (activities as Activity[]) || [];
 
   const filteredActivities = displayActivities.filter(activity => {
     const matchesSearch = activity.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -192,7 +129,13 @@ export default function ActivityLog() {
         </Card>
 
         <div className="space-y-4">
-          {filteredActivities.map((activity) => (
+          {isLoading && (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <span className="ml-2 text-gray-500">Loading activities...</span>
+            </div>
+          )}
+          {!isLoading && filteredActivities.map((activity) => (
             <Card key={activity.id} className="bg-white" data-testid={`activity-card-${activity.id}`}>
               <CardContent className="p-4">
                 <div className="flex items-start space-x-4">
@@ -259,7 +202,7 @@ export default function ActivityLog() {
           ))}
         </div>
 
-        {filteredActivities.length === 0 && (
+        {!isLoading && filteredActivities.length === 0 && (
           <div className="text-center py-12">
             <Clock className="w-12 h-12 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900">No activities found</h3>
