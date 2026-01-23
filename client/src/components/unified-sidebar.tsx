@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { 
   BarChart3, Users, Building, Handshake, Calendar, 
-  Bot, Bell, Mail, PieChart, TrendingUp, Settings,
+  Bot, Bell, Mail, PieChart, TrendingUp, Settings, Activity,
   LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight, ChevronLeft,
   Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock, Receipt, RefreshCcw, Percent, Search, Wrench, Ship, ShoppingCart, PanelLeftClose, PanelLeft, Plug, BookOpen
 } from "lucide-react";
@@ -106,6 +106,7 @@ const dockTalkNav = [
 const marinalyticsNav = [
   { name: "Sales Comps", href: "/analysis/sales-comps", icon: BarChart3 },
   { name: "Rate Comps", href: "/analysis/rate-comps", icon: TrendingUp },
+  { name: "Financial Analysis", href: "/analysis/financial-analysis", icon: Activity },
   { name: "Demographics", href: "/analysis/demographics", icon: Users },
   { name: "Capital Markets", href: "/analysis/benchmarks", icon: Target },
   { name: "Portfolio Analytics", href: "/analysis/marinalytics", icon: BarChart3 },

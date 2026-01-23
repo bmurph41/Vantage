@@ -135,6 +135,7 @@ const OwnedMarinas = lazy(() => import("@/pages/operations/OwnedMarinas"));
 const CommercialTenants = lazy(() => import("@/pages/operations/commercial-tenants"));
 const Portfolio = lazy(() => import("@/pages/Portfolio"));
 const MarinalyticsPage = lazy(() => import("@/pages/marinalytics"));
+const FinancialAnalysis = lazy(() => import("@/pages/analysis/financial-analysis"));
 const MarinaDetail = lazy(() => import("@/pages/portfolio/MarinaDetail"));
 // Rent Roll V2 - Layouts (lazy with preloading)
 const RentRollV2ProjectLayout = lazy(() => import("@/modules/rent-roll-v2/layouts/ProjectLayout"));
@@ -1694,6 +1695,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <MarinalyticsPage />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/financial-analysis">
+        {() => (
+          <UnifiedLayout>
+            <FinancialAnalysis />
           </UnifiedLayout>
         )}
       </Route>

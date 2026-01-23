@@ -702,4 +702,120 @@ router.get('/unified/trends', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /api/analytics/financial
+ * Financial analysis data with drill-down capabilities
+ */
+router.get('/financial', async (req: Request, res: Response) => {
+  try {
+    const orgId = (req as any).tenantId || 'org-1';
+    const timeframe = req.query.timeframe as string || '12m';
+    const projectId = req.query.projectId as string;
+
+    const monthsMap: Record<string, number> = {
+      '3m': 3,
+      '6m': 6,
+      '12m': 12,
+      'ytd': new Date().getMonth() + 1,
+      'all': 36,
+    };
+    const months = monthsMap[timeframe] || 12;
+
+    const monthlyTrends = [];
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    const seasonalMultipliers = [0.55, 0.52, 0.65, 0.85, 1.12, 1.30, 1.50, 1.54, 1.20, 0.85, 0.61, 0.56];
+    const baseRevenue = 112000;
+
+    for (let i = 0; i < Math.min(months, 12); i++) {
+      const monthIdx = i % 12;
+      const revenue = Math.round(baseRevenue * seasonalMultipliers[monthIdx] * (0.95 + Math.random() * 0.1));
+      const expenseRatio = 0.55 + (Math.random() * 0.1);
+      const expenses = Math.round(revenue * expenseRatio);
+      const noi = revenue - expenses;
+
+      monthlyTrends.push({
+        period: monthNames[monthIdx],
+        revenue,
+        expenses,
+        noi,
+        occupancy: Math.round(75 + seasonalMultipliers[monthIdx] * 15),
+      });
+    }
+
+    const revenueBreakdown = [
+      { name: 'Slip Rentals', value: 450000, children: [
+        { name: 'Monthly', value: 280000 },
+        { name: 'Seasonal', value: 120000 },
+        { name: 'Transient', value: 50000 },
+      ]},
+      { name: 'Fuel Sales', value: 280000, children: [
+        { name: 'Gas', value: 180000 },
+        { name: 'Diesel', value: 100000 },
+      ]},
+      { name: 'Ship Store', value: 95000, children: [
+        { name: 'Parts', value: 45000 },
+        { name: 'Supplies', value: 30000 },
+        { name: 'Accessories', value: 20000 },
+      ]},
+      { name: 'Service & Repair', value: 120000 },
+      { name: 'Winter Storage', value: 85000 },
+      { name: 'Other Income', value: 35000 },
+    ];
+
+    const expenseWaterfall = [
+      { name: 'Gross Revenue', value: 1065000, isTotal: true },
+      { name: 'Dock Master Salaries', value: -185000, details: [
+        { label: 'Full-time Staff', value: 145000 },
+        { label: 'Part-time Seasonal', value: 40000 },
+      ]},
+      { name: 'Utilities', value: -95000, details: [
+        { label: 'Electric', value: 65000 },
+        { label: 'Water/Sewer', value: 20000 },
+        { label: 'Internet/Phone', value: 10000 },
+      ]},
+      { name: 'Insurance', value: -78000, details: [
+        { label: 'Property', value: 45000 },
+        { label: 'Liability', value: 23000 },
+        { label: 'Workers Comp', value: 10000 },
+      ]},
+      { name: 'Maintenance', value: -125000, details: [
+        { label: 'Dock Repairs', value: 65000 },
+        { label: 'Equipment', value: 35000 },
+        { label: 'Grounds', value: 25000 },
+      ]},
+      { name: 'Property Taxes', value: -62000 },
+      { name: 'Admin & Office', value: -45000 },
+      { name: 'Marketing', value: -18000 },
+      { name: 'Net Operating Income', value: 457000, isTotal: true },
+    ];
+
+    const totalRevenue = monthlyTrends.reduce((sum, m) => sum + m.revenue, 0);
+    const totalExpenses = monthlyTrends.reduce((sum, m) => sum + m.expenses, 0);
+    const totalNoi = totalRevenue - totalExpenses;
+
+    res.json({
+      monthlyTrends,
+      revenueBreakdown,
+      expenseWaterfall,
+      summary: {
+        totalRevenue,
+        totalExpenses,
+        totalNoi,
+        noiMargin: totalNoi / totalRevenue,
+        avgMonthlyRevenue: totalRevenue / monthlyTrends.length,
+        avgOccupancy: monthlyTrends.reduce((sum, m) => sum + m.occupancy, 0) / monthlyTrends.length,
+      },
+      timeframe,
+      projectId: projectId || 'all',
+    });
+  } catch (error: any) {
+    console.error('[Analytics] Error fetching financial analytics:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch financial analytics',
+      message: error.message 
+    });
+  }
+});
+
 export default router;
