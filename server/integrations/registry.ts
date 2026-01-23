@@ -271,7 +271,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
     category: "Marina PMS",
     contexts: ["rentRoll", "financials", "crm"],
     uiPlacements: ["rentRoll.integrations.panel", "financials.integrations.panel"],
-    authType: "oauth",
+    authType: "apiKey",
     websiteUrl: "https://www.storable.com/marine/",
     iconUrl: "/assets/integrations/storable.svg",
     logoColor: "#FF6B00",
@@ -283,6 +283,8 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
     },
     settingsSchema: {
       fields: [
+        { key: "apiKey", label: "API Key", type: "secret", required: true, helpText: "Your Storable Marine API key from the Developer settings." },
+        { key: "apiSecret", label: "API Secret", type: "secret", required: true, helpText: "Your Storable Marine API secret. Stored encrypted." },
         { key: "facilityId", label: "Facility ID", type: "string", required: true, helpText: "Your Storable Marine facility identifier." },
         { key: "syncFrequency", label: "Sync Frequency", type: "select", required: true, options: [
           { label: "Hourly", value: "hourly" },
@@ -291,19 +293,20 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect Storable Marine via OAuth for secure, automatic data sync. Your credentials are never stored—only a secure token.",
+      overview: "Connect Storable Marine using your API credentials for secure, automatic data sync.",
       prerequisites: [
         "Storable Marine account with admin access",
+        "API credentials from Developer settings",
         "Facility ID from your account dashboard"
       ],
       steps: [
-        { title: "Click Connect", description: "Click the 'Connect with Storable' button below." },
-        { title: "Authorize Access", description: "You'll be redirected to Storable to log in and authorize MarinaMatch." },
-        { title: "Grant Permissions", description: "Review the requested permissions and click 'Authorize'." },
-        { title: "Automatic Setup", description: "You'll be redirected back here. The connection is now active." }
+        { title: "Access Developer Settings", description: "Log into Storable Marine and navigate to Settings > Developer > API Access." },
+        { title: "Generate API Credentials", description: "Click 'Create API Key' and copy both the API Key and Secret." },
+        { title: "Find Facility ID", description: "Your Facility ID is shown on the main dashboard or in Account Settings." },
+        { title: "Enter Credentials", description: "Paste your API Key, Secret, and Facility ID into the fields above." }
       ],
       supportUrl: "https://support.storable.com/",
-      estimatedTime: "2-3 minutes"
+      estimatedTime: "5-10 minutes"
     },
     dataMappings: [
       { sourceEntity: "tenants", targetModule: "rentRoll", targetEntity: "tenants", fields: [
@@ -431,7 +434,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
     category: "Marina PMS",
     contexts: ["rentRoll", "analytics"],
     uiPlacements: ["rentRoll.integrations.panel", "analytics.integrations.panel"],
-    authType: "oauth",
+    authType: "apiKey",
     websiteUrl: "https://boatcloud.io/",
     iconUrl: "/assets/integrations/boatcloud.svg",
     logoColor: "#4A90D9",
@@ -443,24 +446,27 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
     },
     settingsSchema: {
       fields: [
-        { key: "locationId", label: "Location ID", type: "string", required: true },
+        { key: "apiKey", label: "API Key", type: "secret", required: true, helpText: "Your BoatCloud API key from Developer settings." },
+        { key: "apiSecret", label: "API Secret", type: "secret", required: true, helpText: "Your BoatCloud API secret. Stored encrypted." },
+        { key: "locationId", label: "Location ID", type: "string", required: true, helpText: "Your marina's Location ID from the dashboard." },
         { key: "includeSensorData", label: "Include IoT Sensor Data", type: "boolean" },
       ],
     },
     connectionGuide: {
-      overview: "Connect BoatCloud via OAuth for seamless integration of IoT data and occupancy analytics.",
+      overview: "Connect BoatCloud using your API credentials for seamless integration of IoT data and occupancy analytics.",
       prerequisites: [
         "BoatCloud account with API tier",
+        "API credentials from Developer settings",
         "Location ID from dashboard"
       ],
       steps: [
-        { title: "Initiate OAuth", description: "Click 'Connect with BoatCloud' to begin secure authorization." },
-        { title: "Log In", description: "Sign in to your BoatCloud account when prompted." },
-        { title: "Authorize", description: "Grant MarinaMatch access to your marina data." },
-        { title: "Configure", description: "Select which data sources to sync." }
+        { title: "Access Developer Settings", description: "Log into BoatCloud and go to Settings > Developer > API Keys." },
+        { title: "Generate API Credentials", description: "Create a new API key and copy both the Key and Secret." },
+        { title: "Find Location ID", description: "Your Location ID is on the main dashboard or in Account Settings." },
+        { title: "Enter Credentials", description: "Paste your API Key, Secret, and Location ID into the fields above." }
       ],
       supportUrl: "https://support.boatcloud.io/",
-      estimatedTime: "3-5 minutes"
+      estimatedTime: "5-10 minutes"
     },
     dataMappings: [
       { sourceEntity: "occupancy", targetModule: "analytics", targetEntity: "metrics", fields: [
@@ -552,7 +558,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
     category: "Reservations & Booking",
     contexts: ["boatRentals", "rentRoll", "crm"],
     uiPlacements: ["boatRentals.integrations.panel", "rentRoll.integrations.panel"],
-    authType: "oauth",
+    authType: "apiKey",
     websiteUrl: "https://dockwa.com/",
     iconUrl: "/assets/integrations/dockwa.svg",
     logoColor: "#0077B5",
@@ -564,27 +570,30 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
     },
     settingsSchema: {
       fields: [
+        { key: "apiKey", label: "API Key", type: "secret", required: true, helpText: "Your Dockwa API key from the Developer portal." },
+        { key: "apiSecret", label: "API Secret", type: "secret", required: true, helpText: "Your Dockwa API secret. Stored encrypted." },
         { key: "marinaId", label: "Marina ID", type: "string", required: true, helpText: "Found in Dockwa Pro dashboard." },
         { key: "syncTransients", label: "Sync Transient Bookings", type: "boolean", helpText: "Include transient/visitor reservations." },
         { key: "syncAvailability", label: "Push Availability", type: "boolean", helpText: "Update Dockwa availability from MarinaMatch." },
       ],
     },
     connectionGuide: {
-      overview: "Connect Dockwa via secure OAuth to sync your transient reservations and boater data bidirectionally.",
+      overview: "Connect Dockwa using your API credentials to sync transient reservations and boater data bidirectionally.",
       prerequisites: [
         "Dockwa Pro subscription",
-        "Marina administrator access"
+        "Marina administrator access",
+        "API credentials from Developer portal"
       ],
       steps: [
-        { title: "Click Connect", description: "Click the 'Connect with Dockwa' button below." },
-        { title: "Sign In to Dockwa", description: "Log in to your Dockwa Pro account." },
-        { title: "Authorize MarinaMatch", description: "Review permissions and click 'Authorize'." },
-        { title: "Select Marina", description: "Choose which marina(s) to sync if you manage multiple." },
+        { title: "Access Developer Portal", description: "Log into Dockwa Pro and navigate to Settings > Developer > API Access." },
+        { title: "Generate API Credentials", description: "Create a new API key and copy both the Key and Secret." },
+        { title: "Find Marina ID", description: "Your Marina ID is shown in your dashboard header or Account Settings." },
+        { title: "Enter Credentials", description: "Paste your API Key, Secret, and Marina ID into the fields above." },
         { title: "Configure Options", description: "Enable transient sync and availability push as needed." }
       ],
       supportUrl: "https://help.dockwa.com/",
       apiDocsUrl: "https://developer.dockwa.com/",
-      estimatedTime: "3-5 minutes"
+      estimatedTime: "5-10 minutes"
     },
     dataMappings: [
       { sourceEntity: "reservations", targetModule: "boatRentals", targetEntity: "reservations", fields: [
@@ -882,7 +891,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
     category: "Communications",
     contexts: ["rentRoll", "crm"],
     uiPlacements: ["rentRoll.integrations.panel"],
-    authType: "oauth",
+    authType: "apiKey",
     websiteUrl: "https://molo.io/",
     iconUrl: "/assets/integrations/molo.svg",
     logoColor: "#00BCD4",
@@ -894,24 +903,28 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
     },
     settingsSchema: {
       fields: [
-        { key: "propertyId", label: "Property ID", type: "string", required: true },
+        { key: "apiKey", label: "API Key", type: "secret", required: true, helpText: "Your Molo API key from Admin settings." },
+        { key: "apiSecret", label: "API Secret", type: "secret", required: true, helpText: "Your Molo API secret. Stored encrypted." },
+        { key: "propertyId", label: "Property ID", type: "string", required: true, helpText: "Your property ID from the Molo dashboard." },
         { key: "syncAccessLogs", label: "Sync Access Logs", type: "boolean", helpText: "Import gate access history." },
       ],
     },
     connectionGuide: {
-      overview: "Connect Molo via OAuth to manage digital access and sync gate entry logs.",
+      overview: "Connect Molo using your API credentials to manage digital access and sync gate entry logs.",
       prerequisites: [
         "Molo Pro subscription",
-        "Property administrator access"
+        "Property administrator access",
+        "API credentials from Admin settings"
       ],
       steps: [
-        { title: "Click Connect", description: "Click 'Connect with Molo' to start OAuth flow." },
-        { title: "Authorize", description: "Log in and authorize MarinaMatch to access your property data." },
-        { title: "Select Property", description: "Choose which property to connect." },
+        { title: "Access Admin Settings", description: "Log into Molo and go to Admin > Integrations > API Keys." },
+        { title: "Generate API Credentials", description: "Click 'Create API Key' and copy both the Key and Secret." },
+        { title: "Find Property ID", description: "Your Property ID is shown in the dashboard header or Account Settings." },
+        { title: "Enter Credentials", description: "Paste your API Key, Secret, and Property ID into the fields above." },
         { title: "Configure Sync", description: "Enable access log sync for security tracking." }
       ],
       supportUrl: "https://help.molo.io/",
-      estimatedTime: "3-5 minutes"
+      estimatedTime: "5-10 minutes"
     },
     dataMappings: [
       { sourceEntity: "access_logs", targetModule: "rentRoll", targetEntity: "accessLogs", fields: [
@@ -937,7 +950,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
     category: "Accounting",
     contexts: ["financials", "bookkeeping"],
     uiPlacements: ["financials.integrations.panel", "financials.toolbar.importButton", "bookkeeping.integrations.panel"],
-    authType: "oauth",
+    authType: "apiKey",
     websiteUrl: "https://quickbooks.intuit.com/",
     iconUrl: "/assets/integrations/quickbooks.svg",
     logoColor: "#2CA01C",
@@ -949,7 +962,9 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
     },
     settingsSchema: {
       fields: [
-        { key: "companyId", label: "Company ID", type: "string", helpText: "Auto-populated after OAuth connection." },
+        { key: "clientId", label: "Client ID", type: "secret", required: true, helpText: "Your QuickBooks app Client ID from the Intuit Developer Portal." },
+        { key: "clientSecret", label: "Client Secret", type: "secret", required: true, helpText: "Your QuickBooks app Client Secret. Stored encrypted." },
+        { key: "realmId", label: "Realm ID (Company ID)", type: "string", required: true, helpText: "Your QuickBooks company's Realm ID. Found in your QuickBooks URL." },
         { key: "syncFrequency", label: "Sync Frequency", type: "select", required: true, options: [
           { label: "Daily", value: "daily" },
           { label: "Weekly", value: "weekly" },
@@ -960,23 +975,23 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect QuickBooks Online via secure OAuth to sync your complete financial data—P&L statements, Chart of Accounts, invoices, and payments.",
+      overview: "Connect QuickBooks Online using your API credentials to sync your complete financial data—P&L statements, Chart of Accounts, invoices, and payments.",
       prerequisites: [
         "QuickBooks Online subscription (Plus, Advanced, or Accountant)",
-        "Admin access to your QuickBooks company",
-        "Pop-ups enabled in your browser for OAuth"
+        "Intuit Developer account with a registered app",
+        "Client ID, Client Secret, and Realm ID from your QuickBooks app"
       ],
       steps: [
-        { title: "Click Connect with QuickBooks", description: "Click the button below to initiate the secure OAuth connection." },
-        { title: "Sign In to QuickBooks", description: "Enter your Intuit/QuickBooks credentials when prompted." },
-        { title: "Select Company", description: "If you have multiple companies, choose the one to connect." },
-        { title: "Authorize Access", description: "Review the permissions and click 'Connect' to authorize MarinaMatch." },
+        { title: "Create a QuickBooks App", description: "Go to developer.intuit.com and create a new app. Select 'Accounting' as the scope." },
+        { title: "Get Your Client ID & Secret", description: "In your app's Keys & OAuth section, copy the Client ID and Client Secret." },
+        { title: "Find Your Realm ID", description: "Log into QuickBooks Online. The Realm ID is in the URL after /app/ (e.g., qbo.intuit.com/app/123456789)." },
+        { title: "Enter Credentials", description: "Paste your Client ID, Client Secret, and Realm ID into the fields above." },
         { title: "Configure Sync Options", description: "Choose how often to sync and which data types to include." },
-        { title: "Initial Import", description: "MarinaMatch will perform an initial import of your financial data." }
+        { title: "Test Connection", description: "Click Connect to verify your credentials and start the initial data import." }
       ],
       supportUrl: "https://quickbooks.intuit.com/learn-support/",
       apiDocsUrl: "https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/account",
-      estimatedTime: "5-10 minutes"
+      estimatedTime: "10-15 minutes"
     },
     dataMappings: [
       { sourceEntity: "ProfitAndLoss", targetModule: "financials", targetEntity: "pnl", fields: [

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, ExternalLink, HelpCircle, CheckCircle2, ArrowLeft, Loader2, Info } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -92,6 +93,11 @@ export function IntegrationSetupWizard({
                   Connect with {integration.name}
                 </DialogTitle>
               </div>
+              <VisuallyHidden>
+                <DialogDescription>
+                  Step-by-step wizard to connect {integration.name} to MarinaMatch
+                </DialogDescription>
+              </VisuallyHidden>
             </DialogHeader>
 
             <div className="mb-6">
