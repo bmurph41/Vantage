@@ -5,9 +5,8 @@ import { Plug, Search, Grid, List, Anchor, Calendar, Wrench, MessageSquare, Calc
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { IntegrationCard } from "@/components/integrations/IntegrationCard";
+import { IntegrationSetupWizard } from "@/components/integrations/IntegrationSetupWizard";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   fetchIntegrations,
@@ -56,7 +55,7 @@ export default function IntegrationsMarketplace() {
   });
 
   const connectMut = useMutation({
-    mutationFn: ({ key, payload }: { key: string; payload?: { apiKey?: string } }) =>
+    mutationFn: ({ key, payload }: { key: string; payload?: { apiKey?: string; settings?: Record<string, any> } }) =>
       connectIntegration(key, payload),
     onSuccess: async (resp, vars) => {
       if (resp?.authorizeUrl) {
@@ -79,12 +78,20 @@ export default function IntegrationsMarketplace() {
   });
 
   function handleConnect(item: IntegrationItem) {
-    if (item.authType === "apiKey") {
+    if (item.authType === "apiKey" || item.settingsSchema?.fields?.length > 0) {
       setSelectedIntegration(item);
       setApiKeyDialogOpen(true);
       return;
     }
     connectMut.mutate({ key: item.key });
+  }
+
+  function handleWizardConnect(credentials: Record<string, string>) {
+    if (!selectedIntegration) return;
+    connectMut.mutate({ 
+      key: selectedIntegration.key, 
+      payload: { apiKey: credentials.apiKey, settings: credentials } 
+    });
   }
 
   function handleApiKeySubmit() {
@@ -280,60 +287,19 @@ export default function IntegrationsMarketplace() {
         )}
       </Tabs>
 
-      <Dialog open={apiKeyDialogOpen} onOpenChange={setApiKeyDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Connect {selectedIntegration?.name}</DialogTitle>
-            <DialogDescription>
-              Enter your API key to connect this integration. Your key will be stored securely with encryption.
-            </DialogDescription>
-          </DialogHeader>
-          
-          {selectedIntegration?.connectionGuide && (
-            <div className="bg-muted/50 rounded-lg p-4 space-y-3">
-              <h4 className="font-medium text-sm">Quick Setup Guide</h4>
-              <ol className="space-y-2">
-                {selectedIntegration.connectionGuide.steps.slice(0, 3).map((step, idx) => (
-                  <li key={idx} className="flex gap-2 text-sm">
-                    <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[#1E4FAB] text-white text-xs flex items-center justify-center">
-                      {idx + 1}
-                    </span>
-                    <span className="text-muted-foreground">{step.description}</span>
-                  </li>
-                ))}
-              </ol>
-              <Link href={`/settings/integrations/${selectedIntegration.key}`} className="text-sm text-[#1E4FAB] hover:underline flex items-center gap-1">
-                View full setup guide <ChevronRight className="w-3 h-3" />
-              </Link>
-            </div>
-          )}
-          
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="apiKey">API Key</Label>
-              <Input
-                id="apiKey"
-                type="password"
-                placeholder="Enter your API key"
-                value={apiKeyValue}
-                onChange={(e) => setApiKeyValue(e.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setApiKeyDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleApiKeySubmit}
-              disabled={!apiKeyValue.trim() || connectMut.isPending}
-              className="bg-[#1E4FAB] hover:bg-[#1a4294]"
-            >
-              {connectMut.isPending ? "Connecting..." : "Connect"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <IntegrationSetupWizard
+        integration={selectedIntegration}
+        open={apiKeyDialogOpen}
+        onOpenChange={(open) => {
+          setApiKeyDialogOpen(open);
+          if (!open) {
+            setSelectedIntegration(null);
+            setApiKeyValue("");
+          }
+        }}
+        onConnect={handleWizardConnect}
+        isConnecting={connectMut.isPending}
+      />
     </div>
   );
 }
