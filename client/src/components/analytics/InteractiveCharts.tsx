@@ -537,19 +537,24 @@ export function WaterfallChart({
   const [showDetails, setShowDetails] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
 
-  const processedData = data.map((item, index) => {
-    if (item.isTotal) {
-      return { ...item, start: 0, end: item.value, fill: '#3b82f6' };
-    }
-    const prevEnd = index === 0 ? 0 : (processedData[index - 1] as any)?.end || 0;
-    const fill = item.value >= 0 ? '#10b981' : '#ef4444';
-    return {
-      ...item,
-      start: prevEnd,
-      end: prevEnd + item.value,
-      fill,
-    };
-  });
+  const processedData = useMemo(() => {
+    const result: any[] = [];
+    data.forEach((item, index) => {
+      if (item.isTotal) {
+        result.push({ ...item, start: 0, end: item.value, fill: '#3b82f6' });
+      } else {
+        const prevEnd = index === 0 ? 0 : result[index - 1]?.end || 0;
+        const fill = item.value >= 0 ? '#10b981' : '#ef4444';
+        result.push({
+          ...item,
+          start: prevEnd,
+          end: prevEnd + item.value,
+          fill,
+        });
+      }
+    });
+    return result;
+  }, [data]);
 
   const handleClick = (item: any) => {
     if (item.details) {
