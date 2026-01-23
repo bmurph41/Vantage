@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IntegrationCard } from "@/components/integrations/IntegrationCard";
 import { IntegrationSetupWizard } from "@/components/integrations/IntegrationSetupWizard";
+import { SyncStatusPanel } from "@/components/integrations/SyncStatusPanel";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   fetchIntegrations,
@@ -144,6 +145,12 @@ export default function IntegrationsMarketplace() {
           </Button>
         </div>
       </div>
+
+      {connectedItems.length > 0 && (
+        <div className="mb-6">
+          <SyncStatusPanel showModuleCoverage={false} />
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">

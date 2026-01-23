@@ -70,6 +70,7 @@ import BulkLeaseImportDialog from "./BulkLeaseImportDialog";
 import ColumnSettingsDialog from "./ColumnSettingsDialog";
 import CashFlowDrawer from "./CashFlowDrawer";
 import { useRentRollColumns } from "../../hooks/useRentRollColumns";
+import { ImportedDataBadge } from "@/components/integrations/ImportedDataBadge";
 import type { RentRollColumnConfig, LeaseWithTenant } from "@shared/schema";
 
 // Rolling/MTM contract term types that have no fixed expiration
@@ -750,6 +751,11 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
         return (
           <div className="flex items-center gap-2">
             <span className="font-medium">{tenant.name || "N/A"}</span>
+            <ImportedDataBadge
+              integrationSource={(lease as any).integrationSource || (tenant as any).integrationSource}
+              externalId={(lease as any).externalId || (tenant as any).externalId}
+              lastSyncedAt={(lease as any).lastSyncedAt || (tenant as any).lastSyncedAt}
+            />
             {isIncompleteLease && (
               <Tooltip>
                 <TooltipTrigger asChild>

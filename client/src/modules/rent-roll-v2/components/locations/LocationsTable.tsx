@@ -24,6 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Edit, Trash2, MapPin } from "lucide-react";
+import { ImportedDataBadge } from "@/components/integrations/ImportedDataBadge";
 
 interface LocationsTableProps {
   projectId: string;
@@ -159,7 +160,14 @@ export default function LocationsTable({ projectId, onEditLocation }: LocationsT
             {locations.map((location) => (
               <TableRow key={location.id} data-testid={`row-location-${location.id}`}>
                 <TableCell className="font-medium" data-testid={`text-location-name-${location.id}`}>
-                  {location.name}
+                  <div className="flex items-center gap-2">
+                    {location.name}
+                    <ImportedDataBadge
+                      integrationSource={(location as any).integrationSource}
+                      externalId={(location as any).externalId}
+                      lastSyncedAt={(location as any).lastSyncedAt}
+                    />
+                  </div>
                 </TableCell>
                 <TableCell data-testid={`text-location-code-${location.id}`}>
                   {location.code || "-"}

@@ -12,6 +12,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import ContactFormModal from "@/components/modals/contact-form-modal";
 import { FileUpload } from "@/components/file-upload";
+import { ImportedDataBadge } from "@/components/integrations/ImportedDataBadge";
 import type { Contact, Company } from "@shared/schema";
 
 interface ContactsTableProps {
@@ -261,8 +262,15 @@ export default function ContactsTable({ showFullView = false }: ContactsTablePro
                           </span>
                         </div>
                         <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900" data-testid={`contact-name-${contact.id}`}>
-                            {contact.firstName} {contact.lastName}
+                          <div className="flex items-center gap-2">
+                            <div className="text-sm font-medium text-gray-900" data-testid={`contact-name-${contact.id}`}>
+                              {contact.firstName} {contact.lastName}
+                            </div>
+                            <ImportedDataBadge
+                              integrationSource={(contact as any).integrationSource}
+                              externalId={(contact as any).externalId}
+                              lastSyncedAt={(contact as any).lastSyncedAt}
+                            />
                           </div>
                           <div className="text-sm text-gray-500" data-testid={`contact-email-${contact.id}`}>
                             {contact.email}
