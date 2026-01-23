@@ -11,6 +11,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
 import { useToast } from "@/hooks/use-toast";
 import { rateCompsApi } from "@/lib/ratecomps/api";
 import { formatCurrency, formatPercent, formatNumber } from "@/lib/ratecomps/format";
+import { generateRateCompsComparisonPDF, downloadPDF } from "@/components/ratecomps/analytics/RateCompsComparisonPDF";
 import type { RateComp } from "@shared/schema";
 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
@@ -46,32 +47,56 @@ export default function Compare() {
   const statistics = useMemo(() => {
     if (!compsData || compsData.length === 0) return null;
 
-    const prices = compsData.filter(c => c.salePrice).map(c => c.salePrice!);
-    const capRates = compsData.filter(c => c.capRate).map(c => c.capRate!);
-    const wetSlips = compsData.filter(c => c.wetSlips).map(c => c.wetSlips!);
-    const dryRacks = compsData.filter(c => c.dryRacks).map(c => c.dryRacks!);
+    const wetRates = compsData.filter(c => c.avgWetRate).map(c => c.avgWetRate!);
+    const dryRates = compsData.filter(c => c.avgDryRate).map(c => c.avgDryRate!);
+    const occupancies = compsData.filter(c => c.occupancy).map(c => c.occupancy!);
+    const capacities = compsData.filter(c => c.totalSlips).map(c => c.totalSlips!);
     
     const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
     const min = (arr: number[]) => arr.length ? Math.min(...arr) : 0;
     const max = (arr: number[]) => arr.length ? Math.max(...arr) : 0;
 
     return {
-      avgPrice: avg(prices),
-      minPrice: min(prices),
-      maxPrice: max(prices),
-      avgCapRate: avg(capRates),
-      minCapRate: min(capRates),
-      maxCapRate: max(capRates),
-      avgWetSlips: avg(wetSlips),
-      avgDryRacks: avg(dryRacks),
+      avgWetRate: avg(wetRates),
+      minWetRate: min(wetRates),
+      maxWetRate: max(wetRates),
+      avgDryRate: avg(dryRates),
+      minDryRate: min(dryRates),
+      maxDryRate: max(dryRates),
+      avgOccupancy: avg(occupancies),
+      avgCapacity: avg(capacities),
     };
   }, [compsData]);
 
   const handleExportPDF = async () => {
-    toast({
-      title: "Export PDF",
-      description: "PDF export functionality coming soon",
-    });
+    if (!compsData || !statistics) {
+      toast({
+        title: "Cannot Export",
+        description: "Please wait for data to load before exporting",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsExportingPdf(true);
+    try {
+      const blob = await generateRateCompsComparisonPDF(compsData, statistics);
+      const filename = `marina-rate-comps-comparison-${new Date().toISOString().split('T')[0]}.pdf`;
+      downloadPDF(blob, filename);
+      toast({
+        title: "PDF Exported",
+        description: `Rate comparison analysis saved as ${filename}`,
+      });
+    } catch (error) {
+      console.error('PDF export error:', error);
+      toast({
+        title: "Export Failed",
+        description: "There was an error generating the PDF. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExportingPdf(false);
+    }
   };
 
   if (selectedIds.length === 0) {

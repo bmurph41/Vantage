@@ -5,6 +5,8 @@ import { eq, and, inArray } from 'drizzle-orm';
 import { INTEGRATION_REGISTRY, getIntegrationByKey, getIntegrationsByContext } from './registry';
 import { encrypt, decrypt } from './crypto';
 import crypto from 'crypto';
+import { ConnectorFactory } from './connectors';
+import type { ConnectorConfig } from './connectors';
 
 export const integrationsRouter = Router();
 
@@ -369,6 +371,104 @@ integrationsRouter.get('/api/integrations/:key/oauth/callback', async (req: Requ
   });
 });
 
+integrationsRouter.post('/api/integrations/:key/test-connection', async (req: Request, res: Response) => {
+  const userId = requireUser(req, res);
+  if (!userId) return;
+  const orgId = getOrgId(req);
+  if (!orgId) {
+    return res.status(400).json({ error: 'Organization required' });
+  }
+
+  const { key } = req.params;
+
+  try {
+    const whereConditions = [
+      eq(userIntegrations.userId, userId),
+      eq(userIntegrations.integrationKey, key),
+    ];
+    if (userIntegrations.orgId) {
+      whereConditions.push(eq(userIntegrations.orgId, orgId));
+    }
+
+    const [userIntegration] = await db.select().from(userIntegrations)
+      .where(and(...whereConditions))
+      .limit(1);
+
+    if (!userIntegration) {
+      return res.status(404).json({ error: 'Integration not found' });
+    }
+
+    if (!ConnectorFactory.isRegistered(key)) {
+      return res.json({
+        connected: false,
+        message: `Connector for ${key} is not yet implemented. Connection status is based on saved credentials.`,
+        connectorAvailable: false,
+      });
+    }
+
+    const credentials = userIntegration.encryptedCredentials 
+      ? JSON.parse(decrypt(userIntegration.encryptedCredentials))
+      : {};
+
+    if (!credentials || Object.keys(credentials).length === 0) {
+      return res.json({
+        connected: false,
+        message: 'No credentials configured. Please complete the integration setup.',
+        connectorAvailable: true,
+        missingCredentials: true,
+      });
+    }
+
+    const connectorConfig: ConnectorConfig = {
+      integrationKey: key,
+      credentials,
+      settings: (userIntegration.settings as Record<string, any>) || {},
+      userId,
+      orgId,
+    };
+
+    try {
+      const connector = ConnectorFactory.create(connectorConfig);
+      const result = await connector.testConnection();
+
+      await db.update(userIntegrations)
+        .set({
+          isConnected: result.connected,
+          errorMessage: result.connected ? null : result.message,
+          updatedAt: new Date(),
+        })
+        .where(and(...whereConditions));
+
+      res.json({
+        ...result,
+        connectorAvailable: true,
+      });
+    } catch (connectorError) {
+      const errorMessage = connectorError instanceof Error ? connectorError.message : 'Connection test failed';
+      
+      await db.update(userIntegrations)
+        .set({
+          isConnected: false,
+          errorMessage: errorMessage,
+          updatedAt: new Date(),
+        })
+        .where(and(...whereConditions));
+
+      res.json({
+        connected: false,
+        message: errorMessage,
+        connectorAvailable: true,
+      });
+    }
+  } catch (error) {
+    console.error('Error testing connection:', error);
+    res.status(500).json({ 
+      connected: false, 
+      message: error instanceof Error ? error.message : 'Connection test failed' 
+    });
+  }
+});
+
 integrationsRouter.post('/api/integrations/:key/sync', async (req: Request, res: Response) => {
   const userId = requireUser(req, res);
   if (!userId) return;
@@ -378,7 +478,7 @@ integrationsRouter.post('/api/integrations/:key/sync', async (req: Request, res:
   }
 
   const { key } = req.params;
-  const { targetModule, targetEntity, fullSync = false } = req.body;
+  const { targetModule, targetEntity, fullSync = false, executeNow = false } = req.body;
 
   try {
     const whereConditions = [
@@ -412,11 +512,104 @@ integrationsRouter.post('/api/integrations/:key/sync', async (req: Request, res:
     }
 
     const syncId = crypto.randomBytes(16).toString('hex');
+
+    if (executeNow && ConnectorFactory.isRegistered(key)) {
+      const credentials = userIntegration.encryptedCredentials 
+        ? JSON.parse(decrypt(userIntegration.encryptedCredentials))
+        : {};
+
+      if (!credentials || Object.keys(credentials).length === 0) {
+        return res.status(400).json({ 
+          error: 'No credentials configured. Please complete the integration setup before syncing.' 
+        });
+      }
+
+      const connectorConfig: ConnectorConfig = {
+        integrationKey: key,
+        credentials,
+        settings: (userIntegration.settings as Record<string, any>) || {},
+        userId,
+        orgId,
+      };
+
+      try {
+        const connector = ConnectorFactory.create(connectorConfig);
+        const syncResults = await connector.syncAll();
+
+        const results: Record<string, any> = {};
+        let totalProcessed = 0;
+        let totalCreated = 0;
+        let totalUpdated = 0;
+        let totalErrors = 0;
+
+        syncResults.forEach((result, entityKey) => {
+          results[entityKey] = {
+            success: result.success,
+            recordsProcessed: result.recordsProcessed,
+            recordsCreated: result.recordsCreated,
+            recordsUpdated: result.recordsUpdated,
+            recordsSkipped: result.recordsSkipped,
+            errorCount: result.errors.length,
+            duration: result.duration,
+          };
+          totalProcessed += result.recordsProcessed;
+          totalCreated += result.recordsCreated;
+          totalUpdated += result.recordsUpdated;
+          totalErrors += result.errors.length;
+        });
+
+        await db.update(userIntegrations)
+          .set({
+            lastSyncAt: new Date(),
+            errorMessage: totalErrors > 0 ? `${totalErrors} errors during sync` : null,
+            updatedAt: new Date(),
+          })
+          .where(and(...whereConditions));
+
+        return res.json({
+          syncId,
+          integrationKey: key,
+          orgId,
+          status: 'completed',
+          executed: true,
+          summary: {
+            totalProcessed,
+            totalCreated,
+            totalUpdated,
+            totalErrors,
+          },
+          entityResults: results,
+          completedAt: new Date().toISOString(),
+        });
+      } catch (syncError) {
+        const errorMessage = syncError instanceof Error ? syncError.message : 'Sync execution failed';
+        
+        await db.update(userIntegrations)
+          .set({
+            lastSyncAt: new Date(),
+            errorMessage: errorMessage,
+            updatedAt: new Date(),
+          })
+          .where(and(...whereConditions));
+
+        return res.status(500).json({
+          syncId,
+          integrationKey: key,
+          orgId,
+          status: 'failed',
+          executed: true,
+          error: errorMessage,
+          failedAt: new Date().toISOString(),
+        });
+      }
+    }
+
     const syncResult = {
       syncId,
       integrationKey: key,
       orgId,
       status: 'queued',
+      executed: false,
       mappingsQueued: mappingsToSync.map(m => ({
         targetModule: m.targetModule,
         targetEntity: m.targetEntity,
@@ -425,7 +618,9 @@ integrationsRouter.post('/api/integrations/:key/sync', async (req: Request, res:
       })),
       fullSync,
       queuedAt: new Date().toISOString(),
-      message: `Sync queued for ${mappingsToSync.length} data mapping(s). The sync will process in the background.`,
+      message: ConnectorFactory.isRegistered(key)
+        ? `Sync queued for ${mappingsToSync.length} data mapping(s). Use executeNow: true for immediate sync.`
+        : `Sync queued for ${mappingsToSync.length} data mapping(s). Connector not yet implemented - sync will be simulated.`,
     };
 
     await db.update(userIntegrations)

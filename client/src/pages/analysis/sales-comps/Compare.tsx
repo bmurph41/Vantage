@@ -11,6 +11,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
 import { useToast } from "@/hooks/use-toast";
 import { salesCompsApi } from "@/lib/salescomps/api";
 import { formatCurrency, formatPercent, formatNumber } from "@/lib/salescomps/format";
+import { generateCompsComparisonPDF, downloadPDF } from "@/components/salescomps/analytics/CompsComparisonPDF";
 import type { SalesComp } from "@shared/schema";
 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
@@ -68,10 +69,34 @@ export default function Compare() {
   }, [compsData]);
 
   const handleExportPDF = async () => {
-    toast({
-      title: "Export PDF",
-      description: "PDF export functionality coming soon",
-    });
+    if (!compsData || !statistics) {
+      toast({
+        title: "Cannot Export",
+        description: "Please wait for data to load before exporting",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsExportingPdf(true);
+    try {
+      const blob = await generateCompsComparisonPDF(compsData, statistics);
+      const filename = `marina-comps-comparison-${new Date().toISOString().split('T')[0]}.pdf`;
+      downloadPDF(blob, filename);
+      toast({
+        title: "PDF Exported",
+        description: `Comparative analysis saved as ${filename}`,
+      });
+    } catch (error) {
+      console.error('PDF export error:', error);
+      toast({
+        title: "Export Failed",
+        description: "There was an error generating the PDF. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExportingPdf(false);
+    }
   };
 
   if (selectedIds.length === 0) {
