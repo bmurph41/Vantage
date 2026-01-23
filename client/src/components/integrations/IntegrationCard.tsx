@@ -70,12 +70,11 @@ export function IntegrationCard({
           {isConnected ? (
             <>
               <Button
-                variant="outline"
                 size="sm"
-                onClick={() => onDisconnect(integration)}
-                disabled={isDisconnecting}
+                className="bg-green-600 hover:bg-green-700 text-white cursor-default"
+                disabled
               >
-                {isDisconnecting ? "Disconnecting..." : "Disconnect"}
+                Connected
               </Button>
               {onSettings && (
                 <Button
@@ -87,6 +86,14 @@ export function IntegrationCard({
                   Settings
                 </Button>
               )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onDisconnect(integration)}
+                disabled={isDisconnecting}
+              >
+                {isDisconnecting ? "..." : "Disconnect"}
+              </Button>
             </>
           ) : (
             <Button
@@ -95,13 +102,7 @@ export function IntegrationCard({
               disabled={isConnecting}
               className="bg-[#1E4FAB] hover:bg-[#1a4294]"
             >
-              {isConnecting
-                ? "Connecting..."
-                : integration.authType === "oauth"
-                ? "Connect"
-                : integration.authType === "apiKey"
-                ? "Add API Key"
-                : "Enable"}
+              {isConnecting ? "Connecting..." : "Connect"}
             </Button>
           )}
         </div>
