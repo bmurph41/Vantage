@@ -2204,10 +2204,16 @@ export const crmContacts = pgTable("crm_contacts", {
   birthday: date("birthday"),
   anniversary: date("anniversary"),
   
+  // Integration sync fields
+  externalId: text("external_id"),
+  integrationSource: text("integration_source"),
+  lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("crm_contacts_org_idx").on(table.orgId),
+  externalIdx: index("crm_contacts_external_idx").on(table.externalId, table.integrationSource),
 }));
 
 // Junction table for many-to-many relationship between contacts and companies
@@ -8933,6 +8939,10 @@ export const fuelSales = pgTable('fuel_sales', {
   paymentMethod: paymentMethodEnum('payment_method'),
   processedBy: varchar('processed_by').references(() => users.id),
   notes: text('notes'),
+  pumpId: text('pump_id'),
+  externalId: text('external_id'),
+  integrationSource: text('integration_source'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -8940,8 +8950,8 @@ export const fuelSales = pgTable('fuel_sales', {
   dateIdx: index('fuel_sales_date_idx').on(table.transactionDate),
   fuelTypeIdx: index('fuel_sales_fuel_type_idx').on(table.fuelType),
   processedByIdx: index('fuel_sales_processed_by_idx').on(table.processedBy),
-  // Composite index for dashboard revenue queries
   orgDateIdx: index('fuel_sales_org_date_idx').on(table.orgId, table.transactionDate),
+  externalIdx: index('fuel_sales_external_idx').on(table.externalId, table.integrationSource),
 }));
 
 // Fuel Types Configuration - for managing different fuel products
@@ -9064,6 +9074,113 @@ export const fuelImportLogs = pgTable('fuel_import_logs', {
 }));
 
 // ================================================================================
+// INTEGRATION SYNC SYSTEM - Universal sync tracking for all integrations
+// ================================================================================
+
+export const integrationSyncStatusEnum = pgEnum("integration_sync_status", ["pending", "in_progress", "completed", "failed", "partial"]);
+export const integrationSyncDirectionEnum = pgEnum("integration_sync_direction", ["import", "export", "bidirectional"]);
+
+export const integrationConnections = pgTable('integration_connections', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  integrationKey: text('integration_key').notNull(),
+  displayName: text('display_name'),
+  isEnabled: boolean('is_enabled').notNull().default(false),
+  credentials: jsonb('credentials').default(sql`'{}'`),
+  settings: jsonb('settings').default(sql`'{}'`),
+  lastSyncAt: timestamp('last_sync_at', { withTimezone: true }),
+  lastSyncStatus: integrationSyncStatusEnum('last_sync_status'),
+  lastSyncMessage: text('last_sync_message'),
+  syncFrequencyMinutes: integer('sync_frequency_minutes').default(60),
+  autoSyncEnabled: boolean('auto_sync_enabled').default(false),
+  recordsSyncedTotal: integer('records_synced_total').default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('integration_connections_org_idx').on(table.orgId),
+  keyIdx: index('integration_connections_key_idx').on(table.integrationKey),
+  enabledIdx: index('integration_connections_enabled_idx').on(table.isEnabled),
+  orgKeyUnique: unique('integration_connections_org_key').on(table.orgId, table.integrationKey),
+}));
+
+export const integrationSyncLogs = pgTable('integration_sync_logs', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  connectionId: varchar('connection_id').references(() => integrationConnections.id, { onDelete: 'cascade' }),
+  integrationKey: text('integration_key').notNull(),
+  syncType: text('sync_type').notNull(),
+  syncDirection: integrationSyncDirectionEnum('sync_direction').notNull().default('import'),
+  status: integrationSyncStatusEnum('status').notNull().default('pending'),
+  targetModule: text('target_module'),
+  targetEntity: text('target_entity'),
+  recordsProcessed: integer('records_processed').default(0),
+  recordsCreated: integer('records_created').default(0),
+  recordsUpdated: integer('records_updated').default(0),
+  recordsSkipped: integer('records_skipped').default(0),
+  recordsFailed: integer('records_failed').default(0),
+  errorLog: jsonb('error_log').default(sql`'[]'`),
+  syncDetails: jsonb('sync_details').default(sql`'{}'`),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  durationMs: integer('duration_ms'),
+  triggeredBy: varchar('triggered_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('integration_sync_logs_org_idx').on(table.orgId),
+  connectionIdx: index('integration_sync_logs_connection_idx').on(table.connectionId),
+  keyIdx: index('integration_sync_logs_key_idx').on(table.integrationKey),
+  statusIdx: index('integration_sync_logs_status_idx').on(table.status),
+  dateIdx: index('integration_sync_logs_date_idx').on(table.startedAt),
+  moduleIdx: index('integration_sync_logs_module_idx').on(table.targetModule),
+}));
+
+export const integrationSyncedRecords = pgTable('integration_synced_records', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  connectionId: varchar('connection_id').references(() => integrationConnections.id, { onDelete: 'cascade' }),
+  integrationKey: text('integration_key').notNull(),
+  externalId: text('external_id').notNull(),
+  internalId: varchar('internal_id').notNull(),
+  internalTable: text('internal_table').notNull(),
+  externalData: jsonb('external_data').default(sql`'{}'`),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }).notNull().defaultNow(),
+  syncLogId: varchar('sync_log_id').references(() => integrationSyncLogs.id),
+  checksum: text('checksum'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('integration_synced_records_org_idx').on(table.orgId),
+  connectionIdx: index('integration_synced_records_connection_idx').on(table.connectionId),
+  keyIdx: index('integration_synced_records_key_idx').on(table.integrationKey),
+  externalIdx: index('integration_synced_records_external_idx').on(table.externalId),
+  internalIdx: index('integration_synced_records_internal_idx').on(table.internalId),
+  tableIdx: index('integration_synced_records_table_idx').on(table.internalTable),
+  orgKeyExternalUnique: unique('integration_synced_records_org_key_external').on(table.orgId, table.integrationKey, table.externalId),
+}));
+
+export const insertIntegrationConnectionSchema = createInsertSchema(integrationConnections).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const insertIntegrationSyncLogSchema = createInsertSchema(integrationSyncLogs).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertIntegrationSyncedRecordSchema = createInsertSchema(integrationSyncedRecords).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type IntegrationConnection = typeof integrationConnections.$inferSelect;
+export type InsertIntegrationConnection = z.infer<typeof insertIntegrationConnectionSchema>;
+export type IntegrationSyncLog = typeof integrationSyncLogs.$inferSelect;
+export type InsertIntegrationSyncLog = z.infer<typeof insertIntegrationSyncLogSchema>;
+export type IntegrationSyncedRecord = typeof integrationSyncedRecords.$inferSelect;
+export type InsertIntegrationSyncedRecord = z.infer<typeof insertIntegrationSyncedRecordSchema>;
+
+// ================================================================================
 // SERVICE DEPARTMENT - Work Orders, Parts, Technicians, Labor
 // ================================================================================
 
@@ -9148,6 +9265,9 @@ export const serviceWorkOrders = pgTable('service_work_orders', {
   customerNotes: text('customer_notes'),
   glAccount: text('gl_account'),
   invoiceId: varchar('invoice_id'),
+  externalId: text('external_id'),
+  integrationSource: text('integration_source'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -9158,6 +9278,7 @@ export const serviceWorkOrders = pgTable('service_work_orders', {
   customerIdx: index('service_work_orders_customer_idx').on(table.customerId),
   technicianIdx: index('service_work_orders_technician_idx').on(table.assignedTechnicianId),
   scheduledDateIdx: index('service_work_orders_scheduled_date_idx').on(table.scheduledDate),
+  externalIdx: index('service_work_orders_external_idx').on(table.externalId, table.integrationSource),
   uniqueWorkOrderNumber: unique('service_work_orders_org_number').on(table.orgId, table.workOrderNumber),
 }));
 
@@ -9630,7 +9751,7 @@ export const slipAssignments = pgTable('slip_assignments', {
   renewalDateIdx: index('slip_assignments_renewal_date_idx').on(table.renewalDate),
 }));
 
-// Boat Registry - Customer boats
+// Boat Registry - Customer boats (enhanced for integration sync)
 export const boatRegistry = pgTable('boat_registry', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
@@ -9639,11 +9760,27 @@ export const boatRegistry = pgTable('boat_registry', {
   make: text('make'),
   model: text('model'),
   year: integer('year'),
-  length: decimal('length', { precision: 5, scale: 2 }), // feet
+  length: decimal('length', { precision: 5, scale: 2 }),
+  beam: decimal('beam', { precision: 5, scale: 2 }),
+  draft: decimal('draft', { precision: 5, scale: 2 }),
+  hin: varchar('hin', { length: 14 }),
   registration: text('registration'),
+  registrationState: varchar('registration_state', { length: 2 }),
+  registrationExpiry: date('registration_expiry'),
+  insuranceCarrier: text('insurance_carrier'),
+  insurancePolicy: text('insurance_policy'),
   insuranceExpiry: date('insurance_expiry'),
+  hullColor: text('hull_color'),
+  hullMaterial: text('hull_material'),
+  engineType: text('engine_type'),
+  engineCount: integer('engine_count'),
+  fuelCapacity: decimal('fuel_capacity', { precision: 8, scale: 2 }),
+  homePort: text('home_port'),
   isActive: boolean('is_active').default(true).notNull(),
   notes: text('notes'),
+  externalId: text('external_id'),
+  integrationSource: text('integration_source'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -9651,6 +9788,8 @@ export const boatRegistry = pgTable('boat_registry', {
   customerIdx: index('boat_registry_customer_idx').on(table.customerId),
   activeIdx: index('boat_registry_active_idx').on(table.isActive),
   registrationIdx: index('boat_registry_registration_idx').on(table.registration),
+  hinIdx: index('boat_registry_hin_idx').on(table.hin),
+  externalIdx: index('boat_registry_external_idx').on(table.externalId, table.integrationSource),
   uniqueRegistration: unique('boat_registry_org_registration').on(table.orgId, table.registration),
 }));
 
@@ -9817,6 +9956,9 @@ export const storageLocations = pgTable('storage_locations', {
   ratePerFoot: decimal('rate_per_foot', { precision: 8, scale: 2 }),
   isAvailable: boolean('is_available').default(true),
   notes: text('notes'),
+  externalId: text('external_id'),
+  integrationSource: text('integration_source'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -9826,6 +9968,7 @@ export const storageLocations = pgTable('storage_locations', {
   typeIdx: index('storage_locations_type_idx').on(table.locationType),
   availableIdx: index('storage_locations_available_idx').on(table.isAvailable),
   dockIdx: index('storage_locations_dock_idx').on(table.dock),
+  externalIdx: index('storage_locations_external_idx').on(table.externalId, table.integrationSource),
 }));
 
 // Marina Tenants - Boat owners/renters
@@ -9854,6 +9997,9 @@ export const marinaTenants = pgTable('marina_tenants', {
   linkedCrmContactId: varchar('linked_crm_contact_id').references(() => contacts.id),
   isActive: boolean('is_active').default(true),
   notes: text('notes'),
+  externalId: text('external_id'),
+  integrationSource: text('integration_source'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -9864,6 +10010,7 @@ export const marinaTenants = pgTable('marina_tenants', {
   activeIdx: index('marina_tenants_active_idx').on(table.isActive),
   stateIdx: index('marina_tenants_state_idx').on(table.state),
   cityIdx: index('marina_tenants_city_idx').on(table.city),
+  externalIdx: index('marina_tenants_external_idx').on(table.externalId, table.integrationSource),
 }));
 
 // Marina Leases - Rental agreements
@@ -9892,6 +10039,9 @@ export const marinaLeases = pgTable('marina_leases', {
   escalationRate: decimal('escalation_rate', { precision: 5, scale: 2 }), // Annual escalation %
   previousLeaseId: varchar('previous_lease_id').references((): any => marinaLeases.id),
   notes: text('notes'),
+  externalId: text('external_id'),
+  integrationSource: text('integration_source'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -9903,6 +10053,7 @@ export const marinaLeases = pgTable('marina_leases', {
   termGroupIdx: index('marina_leases_term_group_idx').on(table.contractTermGroup),
   datesIdx: index('marina_leases_dates_idx').on(table.startDate, table.endDate),
   leaseNumIdx: index('marina_leases_num_idx').on(table.leaseNumber),
+  externalIdx: index('marina_leases_external_idx').on(table.externalId, table.integrationSource),
 }));
 
 // Lease Line Items - Individual charges/fees per lease

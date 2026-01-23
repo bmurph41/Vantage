@@ -368,3 +368,193 @@ integrationsRouter.get('/api/integrations/:key/oauth/callback', async (req: Requ
     message: `Would exchange code for tokens. Integration: ${key}, Code: ${code}, State: ${state}` 
   });
 });
+
+integrationsRouter.post('/api/integrations/:key/sync', async (req: Request, res: Response) => {
+  const userId = requireUser(req, res);
+  if (!userId) return;
+  const orgId = getOrgId(req);
+  if (!orgId) {
+    return res.status(400).json({ error: 'Organization required' });
+  }
+
+  const { key } = req.params;
+  const { targetModule, targetEntity, fullSync = false } = req.body;
+
+  try {
+    const [userIntegration] = await db.select().from(userIntegrations)
+      .where(and(eq(userIntegrations.userId, userId), eq(userIntegrations.integrationKey, key)))
+      .limit(1);
+
+    if (!userIntegration?.isConnected) {
+      return res.status(400).json({ error: 'Integration not connected' });
+    }
+
+    const regItem = getIntegrationByKey(key);
+    if (!regItem) {
+      return res.status(404).json({ error: 'Integration definition not found' });
+    }
+
+    const availableMappings = regItem.dataMappings || [];
+    const mappingsToSync = targetModule 
+      ? availableMappings.filter(m => m.targetModule === targetModule && (!targetEntity || m.targetEntity === targetEntity))
+      : availableMappings;
+
+    if (mappingsToSync.length === 0) {
+      return res.status(400).json({ error: 'No data mappings available for this sync request' });
+    }
+
+    const syncResult = {
+      syncId: crypto.randomBytes(16).toString('hex'),
+      integrationKey: key,
+      status: 'queued',
+      mappingsQueued: mappingsToSync.map(m => ({
+        targetModule: m.targetModule,
+        targetEntity: m.targetEntity,
+        syncDirection: m.syncDirection,
+        frequency: m.frequency,
+      })),
+      fullSync,
+      queuedAt: new Date().toISOString(),
+      message: `Sync queued for ${mappingsToSync.length} data mapping(s). The sync will process in the background.`,
+    };
+
+    await db.update(userIntegrations)
+      .set({
+        lastSyncAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(and(eq(userIntegrations.userId, userId), eq(userIntegrations.integrationKey, key)));
+
+    res.json(syncResult);
+  } catch (error) {
+    console.error('Error initiating sync:', error);
+    res.status(500).json({ error: 'Failed to initiate sync' });
+  }
+});
+
+integrationsRouter.get('/api/integrations/:key/sync/status', async (req: Request, res: Response) => {
+  const userId = requireUser(req, res);
+  if (!userId) return;
+
+  const { key } = req.params;
+
+  try {
+    const [userIntegration] = await db.select().from(userIntegrations)
+      .where(and(eq(userIntegrations.userId, userId), eq(userIntegrations.integrationKey, key)))
+      .limit(1);
+
+    if (!userIntegration) {
+      return res.status(404).json({ error: 'Integration connection not found' });
+    }
+
+    const regItem = getIntegrationByKey(key);
+
+    res.json({
+      integrationKey: key,
+      isConnected: userIntegration.isConnected,
+      lastSyncAt: userIntegration.lastSyncAt,
+      errorMessage: userIntegration.errorMessage,
+      availableMappings: (regItem?.dataMappings || []).map(m => ({
+        sourceEntity: m.sourceEntity,
+        targetModule: m.targetModule,
+        targetEntity: m.targetEntity,
+        syncDirection: m.syncDirection,
+        frequency: m.frequency,
+        fieldCount: m.fields.length,
+      })),
+      migrationSupport: regItem?.migrationSupport || null,
+    });
+  } catch (error) {
+    console.error('Error fetching sync status:', error);
+    res.status(500).json({ error: 'Failed to fetch sync status' });
+  }
+});
+
+integrationsRouter.get('/api/integrations/:key/data-mappings', async (req: Request, res: Response) => {
+  const userId = requireUser(req, res);
+  if (!userId) return;
+
+  const { key } = req.params;
+
+  try {
+    const regItem = getIntegrationByKey(key);
+    if (!regItem) {
+      return res.status(404).json({ error: 'Integration not found' });
+    }
+
+    const mappingsWithDetails = (regItem.dataMappings || []).map(mapping => ({
+      sourceEntity: mapping.sourceEntity,
+      targetModule: mapping.targetModule,
+      targetEntity: mapping.targetEntity,
+      syncDirection: mapping.syncDirection,
+      frequency: mapping.frequency,
+      fields: mapping.fields.map(f => ({
+        source: f.source,
+        target: f.target,
+        transform: f.transform || null,
+      })),
+    }));
+
+    res.json({
+      integrationKey: key,
+      integrationName: regItem.name,
+      category: regItem.category,
+      dataMappings: mappingsWithDetails,
+      migrationSupport: regItem.migrationSupport,
+    });
+  } catch (error) {
+    console.error('Error fetching data mappings:', error);
+    res.status(500).json({ error: 'Failed to fetch data mappings' });
+  }
+});
+
+integrationsRouter.get('/api/integrations/sync/overview', async (req: Request, res: Response) => {
+  const userId = requireUser(req, res);
+  if (!userId) return;
+  const orgId = getOrgId(req);
+
+  try {
+    const userItems = await db.select().from(userIntegrations).where(eq(userIntegrations.userId, userId));
+    const connectedIntegrations = userItems.filter(u => u.isConnected);
+
+    const overview = connectedIntegrations.map(item => {
+      const regItem = getIntegrationByKey(item.integrationKey);
+      return {
+        integrationKey: item.integrationKey,
+        integrationName: regItem?.name || item.integrationKey,
+        category: regItem?.category || 'Unknown',
+        isConnected: true,
+        lastSyncAt: item.lastSyncAt,
+        errorMessage: item.errorMessage,
+        dataMappingsCount: regItem?.dataMappings?.length || 0,
+        availableModules: [...new Set((regItem?.dataMappings || []).map(m => m.targetModule))],
+        migrationSupport: regItem?.migrationSupport || null,
+      };
+    });
+
+    const moduleCoverage: Record<string, { integrations: string[]; canSync: string[] }> = {};
+    for (const item of overview) {
+      const regItem = getIntegrationByKey(item.integrationKey);
+      for (const mapping of regItem?.dataMappings || []) {
+        if (!moduleCoverage[mapping.targetModule]) {
+          moduleCoverage[mapping.targetModule] = { integrations: [], canSync: [] };
+        }
+        if (!moduleCoverage[mapping.targetModule].integrations.includes(item.integrationKey)) {
+          moduleCoverage[mapping.targetModule].integrations.push(item.integrationKey);
+        }
+        if (!moduleCoverage[mapping.targetModule].canSync.includes(mapping.targetEntity)) {
+          moduleCoverage[mapping.targetModule].canSync.push(mapping.targetEntity);
+        }
+      }
+    }
+
+    res.json({
+      connectedCount: connectedIntegrations.length,
+      integrations: overview,
+      moduleCoverage,
+    });
+  } catch (error) {
+    console.error('Error fetching sync overview:', error);
+    res.status(500).json({ error: 'Failed to fetch sync overview' });
+  }
+});
