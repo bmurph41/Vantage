@@ -1174,4 +1174,641 @@ router.post('/seed', async (req: Request, res: Response) => {
   }
 });
 
+// ============================================================================
+// VALUATOR OPERATIONS - Project-scoped operations data for standalone modeling
+// These routes support the dual-context architecture where Operations modules
+// exist both in the sidebar (marina-centric) and in Valuator (project-centric)
+// ============================================================================
+
+// GET project fuel transactions (Valuator context)
+router.get('/projects/:projectId/ops/fuel', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId } = req.params;
+    const { startDate, endDate } = req.query;
+    
+    await requireProjectInOrg(projectId, orgId);
+    
+    let conditions: SQL<unknown>[] = [
+      eq(opsFuelTransactions.modelingProjectId, projectId),
+      eq(opsFuelTransactions.orgId, orgId),
+    ];
+    
+    if (startDate && endDate) {
+      conditions.push(
+        gte(opsFuelTransactions.txnDate, startDate as string),
+        lte(opsFuelTransactions.txnDate, endDate as string)
+      );
+    }
+    
+    const transactions = await db
+      .select()
+      .from(opsFuelTransactions)
+      .where(and(...conditions))
+      .orderBy(desc(opsFuelTransactions.txnDate));
+    
+    res.json({ success: true, data: transactions });
+  } catch (error) {
+    console.error('Error fetching project fuel transactions:', error);
+    res.status(500).json({ error: 'Failed to fetch fuel transactions' });
+  }
+});
+
+// POST create fuel transaction for project (Valuator context)
+router.post('/projects/:projectId/ops/fuel', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const userId = getUserId(req);
+    const { projectId } = req.params;
+    
+    await requireProjectInOrg(projectId, orgId);
+    
+    const validated = fuelTransactionSchema.parse(req.body);
+    
+    const [transaction] = await db.insert(opsFuelTransactions).values({
+      id: randomUUID(),
+      orgId,
+      modelingProjectId: projectId,
+      marinaId: null,
+      txnDate: validated.txnDate,
+      fuelType: validated.fuelType,
+      gallons: validated.gallons,
+      grossSales: validated.grossSales,
+      cogs: validated.cogs || "0",
+      source: validated.source,
+      notes: validated.notes,
+      createdBy: userId,
+    }).returning();
+    
+    res.json({ success: true, data: transaction });
+  } catch (error) {
+    console.error('Error creating project fuel transaction:', error);
+    res.status(500).json({ error: 'Failed to create fuel transaction' });
+  }
+});
+
+// PUT update fuel transaction for project (Valuator context)
+router.put('/projects/:projectId/ops/fuel/:txnId', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId, txnId } = req.params;
+    
+    await requireProjectInOrg(projectId, orgId);
+    
+    const validated = fuelTransactionSchema.partial().parse(req.body);
+    
+    const [updated] = await db
+      .update(opsFuelTransactions)
+      .set({
+        ...validated,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(opsFuelTransactions.id, txnId),
+        eq(opsFuelTransactions.modelingProjectId, projectId),
+        eq(opsFuelTransactions.orgId, orgId)
+      ))
+      .returning();
+    
+    if (!updated) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    console.error('Error updating project fuel transaction:', error);
+    res.status(500).json({ error: 'Failed to update fuel transaction' });
+  }
+});
+
+// DELETE fuel transaction for project (Valuator context)
+router.delete('/projects/:projectId/ops/fuel/:txnId', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId, txnId } = req.params;
+    
+    await requireProjectInOrg(projectId, orgId);
+    
+    const [deleted] = await db
+      .delete(opsFuelTransactions)
+      .where(and(
+        eq(opsFuelTransactions.id, txnId),
+        eq(opsFuelTransactions.modelingProjectId, projectId),
+        eq(opsFuelTransactions.orgId, orgId)
+      ))
+      .returning();
+    
+    if (!deleted) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    
+    res.json({ success: true, data: deleted });
+  } catch (error) {
+    console.error('Error deleting project fuel transaction:', error);
+    res.status(500).json({ error: 'Failed to delete fuel transaction' });
+  }
+});
+
+// GET project fuel summary (Valuator context)
+router.get('/projects/:projectId/ops/fuel/summary', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId } = req.params;
+    const { startDate, endDate } = req.query;
+    
+    await requireProjectInOrg(projectId, orgId);
+    
+    let conditions: SQL<unknown>[] = [
+      eq(opsFuelTransactions.modelingProjectId, projectId),
+      eq(opsFuelTransactions.orgId, orgId),
+    ];
+    
+    if (startDate && endDate) {
+      conditions.push(
+        gte(opsFuelTransactions.txnDate, startDate as string),
+        lte(opsFuelTransactions.txnDate, endDate as string)
+      );
+    }
+    
+    const result = await db
+      .select({
+        fuelType: opsFuelTransactions.fuelType,
+        totalGallons: sql<string>`sum(${opsFuelTransactions.gallons})`,
+        totalRevenue: sql<string>`sum(${opsFuelTransactions.grossSales})`,
+        totalCogs: sql<string>`sum(${opsFuelTransactions.cogs})`,
+        transactionCount: sql<number>`count(*)`,
+      })
+      .from(opsFuelTransactions)
+      .where(and(...conditions))
+      .groupBy(opsFuelTransactions.fuelType);
+    
+    const totals = result.reduce((acc, row) => ({
+      totalGallons: acc.totalGallons + parseFloat(row.totalGallons || '0'),
+      totalRevenue: acc.totalRevenue + parseFloat(row.totalRevenue || '0'),
+      totalCogs: acc.totalCogs + parseFloat(row.totalCogs || '0'),
+      transactionCount: acc.transactionCount + (row.transactionCount || 0),
+    }), { totalGallons: 0, totalRevenue: 0, totalCogs: 0, transactionCount: 0 });
+    
+    res.json({
+      success: true,
+      data: {
+        byFuelType: result,
+        totals: {
+          ...totals,
+          grossMargin: totals.totalRevenue - totals.totalCogs,
+          marginPercent: totals.totalRevenue > 0 
+            ? ((totals.totalRevenue - totals.totalCogs) / totals.totalRevenue * 100).toFixed(2) 
+            : 0,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching project fuel summary:', error);
+    res.status(500).json({ error: 'Failed to fetch fuel summary' });
+  }
+});
+
+// GET project ship store sales (Valuator context)
+router.get('/projects/:projectId/ops/ship-store', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId } = req.params;
+    const { startDate, endDate } = req.query;
+    
+    await requireProjectInOrg(projectId, orgId);
+    
+    let conditions: SQL<unknown>[] = [
+      eq(opsShipStoreSales.modelingProjectId, projectId),
+      eq(opsShipStoreSales.orgId, orgId),
+    ];
+    
+    if (startDate && endDate) {
+      conditions.push(
+        gte(opsShipStoreSales.txnDate, startDate as string),
+        lte(opsShipStoreSales.txnDate, endDate as string)
+      );
+    }
+    
+    const sales = await db
+      .select()
+      .from(opsShipStoreSales)
+      .where(and(...conditions))
+      .orderBy(desc(opsShipStoreSales.txnDate));
+    
+    res.json({ success: true, data: sales });
+  } catch (error) {
+    console.error('Error fetching project ship store sales:', error);
+    res.status(500).json({ error: 'Failed to fetch ship store sales' });
+  }
+});
+
+// POST create ship store sale for project (Valuator context)
+router.post('/projects/:projectId/ops/ship-store', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const userId = getUserId(req);
+    const { projectId } = req.params;
+    
+    await requireProjectInOrg(projectId, orgId);
+    
+    const validated = shipStoreSaleSchema.parse(req.body);
+    
+    const [sale] = await db.insert(opsShipStoreSales).values({
+      id: randomUUID(),
+      orgId,
+      modelingProjectId: projectId,
+      marinaId: null,
+      txnDate: validated.txnDate,
+      category: validated.category || "GENERAL",
+      grossSales: validated.grossSales,
+      cogs: validated.cogs || "0",
+      txnCount: validated.qty,
+      source: validated.source,
+      notes: validated.notes,
+      createdBy: userId,
+    }).returning();
+    
+    res.json({ success: true, data: sale });
+  } catch (error) {
+    console.error('Error creating project ship store sale:', error);
+    res.status(500).json({ error: 'Failed to create ship store sale' });
+  }
+});
+
+// PUT update ship store sale for project (Valuator context)
+router.put('/projects/:projectId/ops/ship-store/:saleId', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId, saleId } = req.params;
+    
+    await requireProjectInOrg(projectId, orgId);
+    
+    const validated = shipStoreSaleSchema.partial().parse(req.body);
+    
+    const [updated] = await db
+      .update(opsShipStoreSales)
+      .set({
+        ...validated,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(opsShipStoreSales.id, saleId),
+        eq(opsShipStoreSales.modelingProjectId, projectId),
+        eq(opsShipStoreSales.orgId, orgId)
+      ))
+      .returning();
+    
+    if (!updated) {
+      return res.status(404).json({ error: 'Sale not found' });
+    }
+    
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    console.error('Error updating project ship store sale:', error);
+    res.status(500).json({ error: 'Failed to update ship store sale' });
+  }
+});
+
+// DELETE ship store sale for project (Valuator context)
+router.delete('/projects/:projectId/ops/ship-store/:saleId', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId, saleId } = req.params;
+    
+    await requireProjectInOrg(projectId, orgId);
+    
+    const [deleted] = await db
+      .delete(opsShipStoreSales)
+      .where(and(
+        eq(opsShipStoreSales.id, saleId),
+        eq(opsShipStoreSales.modelingProjectId, projectId),
+        eq(opsShipStoreSales.orgId, orgId)
+      ))
+      .returning();
+    
+    if (!deleted) {
+      return res.status(404).json({ error: 'Sale not found' });
+    }
+    
+    res.json({ success: true, data: deleted });
+  } catch (error) {
+    console.error('Error deleting project ship store sale:', error);
+    res.status(500).json({ error: 'Failed to delete ship store sale' });
+  }
+});
+
+// GET project ship store summary (Valuator context)
+router.get('/projects/:projectId/ops/ship-store/summary', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId } = req.params;
+    const { startDate, endDate } = req.query;
+    
+    await requireProjectInOrg(projectId, orgId);
+    
+    let conditions: SQL<unknown>[] = [
+      eq(opsShipStoreSales.modelingProjectId, projectId),
+      eq(opsShipStoreSales.orgId, orgId),
+    ];
+    
+    if (startDate && endDate) {
+      conditions.push(
+        gte(opsShipStoreSales.txnDate, startDate as string),
+        lte(opsShipStoreSales.txnDate, endDate as string)
+      );
+    }
+    
+    const result = await db
+      .select({
+        category: opsShipStoreSales.category,
+        totalRevenue: sql<string>`sum(${opsShipStoreSales.grossSales})`,
+        totalCogs: sql<string>`sum(${opsShipStoreSales.cogs})`,
+        transactionCount: sql<number>`count(*)`,
+      })
+      .from(opsShipStoreSales)
+      .where(and(...conditions))
+      .groupBy(opsShipStoreSales.category);
+    
+    const totals = result.reduce((acc, row) => ({
+      totalRevenue: acc.totalRevenue + parseFloat(row.totalRevenue || '0'),
+      totalCogs: acc.totalCogs + parseFloat(row.totalCogs || '0'),
+      transactionCount: acc.transactionCount + (row.transactionCount || 0),
+    }), { totalRevenue: 0, totalCogs: 0, transactionCount: 0 });
+    
+    res.json({
+      success: true,
+      data: {
+        byCategory: result,
+        totals: {
+          ...totals,
+          grossMargin: totals.totalRevenue - totals.totalCogs,
+          marginPercent: totals.totalRevenue > 0 
+            ? ((totals.totalRevenue - totals.totalCogs) / totals.totalRevenue * 100).toFixed(2) 
+            : 0,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching project ship store summary:', error);
+    res.status(500).json({ error: 'Failed to fetch ship store summary' });
+  }
+});
+
+// GET combined operations summary for project (Valuator context)
+router.get('/projects/:projectId/ops/summary', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId } = req.params;
+    const { startDate, endDate } = req.query;
+    
+    await requireProjectInOrg(projectId, orgId);
+    
+    let fuelConditions: SQL<unknown>[] = [
+      eq(opsFuelTransactions.modelingProjectId, projectId),
+      eq(opsFuelTransactions.orgId, orgId),
+    ];
+    
+    if (startDate && endDate) {
+      fuelConditions.push(
+        gte(opsFuelTransactions.txnDate, startDate as string),
+        lte(opsFuelTransactions.txnDate, endDate as string)
+      );
+    }
+    
+    const fuelResult = await db
+      .select({
+        totalGallons: sql<string>`sum(${opsFuelTransactions.gallons})`,
+        totalRevenue: sql<string>`sum(${opsFuelTransactions.grossSales})`,
+        totalCogs: sql<string>`sum(${opsFuelTransactions.cogs})`,
+        transactionCount: sql<number>`count(*)`,
+      })
+      .from(opsFuelTransactions)
+      .where(and(...fuelConditions));
+    
+    let storeConditions: SQL<unknown>[] = [
+      eq(opsShipStoreSales.modelingProjectId, projectId),
+      eq(opsShipStoreSales.orgId, orgId),
+    ];
+    
+    if (startDate && endDate) {
+      storeConditions.push(
+        gte(opsShipStoreSales.txnDate, startDate as string),
+        lte(opsShipStoreSales.txnDate, endDate as string)
+      );
+    }
+    
+    const storeResult = await db
+      .select({
+        totalRevenue: sql<string>`sum(${opsShipStoreSales.grossSales})`,
+        totalCogs: sql<string>`sum(${opsShipStoreSales.cogs})`,
+        transactionCount: sql<number>`count(*)`,
+      })
+      .from(opsShipStoreSales)
+      .where(and(...storeConditions));
+    
+    const fuelData = fuelResult[0] || { totalGallons: '0', totalRevenue: '0', totalCogs: '0', transactionCount: 0 };
+    const storeData = storeResult[0] || { totalRevenue: '0', totalCogs: '0', transactionCount: 0 };
+    
+    const fuelRevenue = parseFloat(fuelData.totalRevenue || '0');
+    const fuelCogs = parseFloat(fuelData.totalCogs || '0');
+    const storeRevenue = parseFloat(storeData.totalRevenue || '0');
+    const storeCogs = parseFloat(storeData.totalCogs || '0');
+    
+    const totalRevenue = fuelRevenue + storeRevenue;
+    const totalCogs = fuelCogs + storeCogs;
+    
+    res.json({
+      success: true,
+      data: {
+        fuel: {
+          totalGallons: parseFloat(fuelData.totalGallons || '0'),
+          totalRevenue: fuelRevenue,
+          totalCogs: fuelCogs,
+          grossMargin: fuelRevenue - fuelCogs,
+          transactionCount: fuelData.transactionCount || 0,
+        },
+        shipStore: {
+          totalRevenue: storeRevenue,
+          totalCogs: storeCogs,
+          grossMargin: storeRevenue - storeCogs,
+          transactionCount: storeData.transactionCount || 0,
+        },
+        combined: {
+          totalRevenue,
+          totalCogs,
+          grossMargin: totalRevenue - totalCogs,
+          marginPercent: totalRevenue > 0 
+            ? ((totalRevenue - totalCogs) / totalRevenue * 100).toFixed(2) 
+            : 0,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching project operations summary:', error);
+    res.status(500).json({ error: 'Failed to fetch operations summary' });
+  }
+});
+
+// ============================================================================
+// IMPORT FROM ACTUALS - Copy operations data from owned marinas to project
+// ============================================================================
+
+// GET available marinas with operations data for import
+router.get('/projects/:projectId/ops/import/available', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId } = req.params;
+    
+    await requireProjectInOrg(projectId, orgId);
+    
+    const marinas = await db
+      .select({
+        id: opsMarinas.id,
+        name: opsMarinas.name,
+        location: opsMarinas.location,
+      })
+      .from(opsMarinas)
+      .where(eq(opsMarinas.orgId, orgId));
+    
+    const marinasWithData = await Promise.all(marinas.map(async (marina) => {
+      const [fuelCount] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(opsFuelTransactions)
+        .where(and(
+          eq(opsFuelTransactions.marinaId, marina.id),
+          eq(opsFuelTransactions.orgId, orgId)
+        ));
+      
+      const [storeCount] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(opsShipStoreSales)
+        .where(and(
+          eq(opsShipStoreSales.marinaId, marina.id),
+          eq(opsShipStoreSales.orgId, orgId)
+        ));
+      
+      return {
+        ...marina,
+        fuelTransactionCount: fuelCount?.count || 0,
+        shipStoreSaleCount: storeCount?.count || 0,
+        hasData: (fuelCount?.count || 0) > 0 || (storeCount?.count || 0) > 0,
+      };
+    }));
+    
+    res.json({
+      success: true,
+      data: marinasWithData.filter(m => m.hasData),
+    });
+  } catch (error) {
+    console.error('Error fetching available marinas:', error);
+    res.status(500).json({ error: 'Failed to fetch available marinas' });
+  }
+});
+
+// POST import operations data from marina to project
+router.post('/projects/:projectId/ops/import', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const userId = getUserId(req);
+    const { projectId } = req.params;
+    const { marinaId, dataTypes, startDate, endDate } = req.body;
+    
+    if (!marinaId || !dataTypes || !Array.isArray(dataTypes)) {
+      return res.status(400).json({ error: 'marinaId and dataTypes[] required' });
+    }
+    
+    await requireProjectInOrg(projectId, orgId);
+    
+    let importedFuel = 0;
+    let importedStore = 0;
+    
+    if (dataTypes.includes('fuel')) {
+      let conditions: SQL<unknown>[] = [
+        eq(opsFuelTransactions.marinaId, marinaId),
+        eq(opsFuelTransactions.orgId, orgId),
+      ];
+      
+      if (startDate && endDate) {
+        conditions.push(
+          gte(opsFuelTransactions.txnDate, startDate),
+          lte(opsFuelTransactions.txnDate, endDate)
+        );
+      }
+      
+      const marinaFuel = await db
+        .select()
+        .from(opsFuelTransactions)
+        .where(and(...conditions));
+      
+      for (const txn of marinaFuel) {
+        await db.insert(opsFuelTransactions).values({
+          id: randomUUID(),
+          orgId,
+          modelingProjectId: projectId,
+          marinaId: null,
+          txnDate: txn.txnDate,
+          fuelType: txn.fuelType,
+          gallons: txn.gallons,
+          grossSales: txn.grossSales,
+          cogs: txn.cogs,
+          source: 'CSV_IMPORT',
+          notes: `Imported from marina on ${new Date().toISOString().split('T')[0]}`,
+          createdBy: userId,
+        });
+        importedFuel++;
+      }
+    }
+    
+    if (dataTypes.includes('ship-store')) {
+      let conditions: SQL<unknown>[] = [
+        eq(opsShipStoreSales.marinaId, marinaId),
+        eq(opsShipStoreSales.orgId, orgId),
+      ];
+      
+      if (startDate && endDate) {
+        conditions.push(
+          gte(opsShipStoreSales.txnDate, startDate),
+          lte(opsShipStoreSales.txnDate, endDate)
+        );
+      }
+      
+      const marinaSales = await db
+        .select()
+        .from(opsShipStoreSales)
+        .where(and(...conditions));
+      
+      for (const sale of marinaSales) {
+        await db.insert(opsShipStoreSales).values({
+          id: randomUUID(),
+          orgId,
+          modelingProjectId: projectId,
+          marinaId: null,
+          txnDate: sale.txnDate,
+          category: sale.category,
+          grossSales: sale.grossSales,
+          cogs: sale.cogs,
+          txnCount: sale.txnCount,
+          source: 'CSV_IMPORT',
+          notes: `Imported from marina on ${new Date().toISOString().split('T')[0]}`,
+          createdBy: userId,
+        });
+        importedStore++;
+      }
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        imported: {
+          fuelTransactions: importedFuel,
+          shipStoreSales: importedStore,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Error importing operations data:', error);
+    res.status(500).json({ error: 'Failed to import operations data' });
+  }
+});
+
 export default router;

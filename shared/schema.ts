@@ -21944,12 +21944,13 @@ export const opsMarinas = pgTable("ops_marinas", {
 }));
 
 // ============================================================================
-// OPS_FUEL_TRANSACTIONS - Daily fuel sales actuals
+// OPS_FUEL_TRANSACTIONS - Supports dual context: Operations (marinaId) and Valuator (modelingProjectId)
 // ============================================================================
 export const opsFuelTransactions = pgTable("ops_fuel_transactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  marinaId: varchar("marina_id").notNull().references(() => opsMarinas.id, { onDelete: "cascade" }),
+  marinaId: varchar("marina_id").references(() => opsMarinas.id, { onDelete: "cascade" }),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
+  modelingProjectId: varchar("modeling_project_id").references(() => modelingProjects.id, { onDelete: "cascade" }),
   txnDate: date("txn_date").notNull(),
   fuelType: varchar("fuel_type", { length: 50 }).notNull(), // diesel, ethanol, rec90, etc.
   gallons: decimal("gallons", { precision: 12, scale: 4 }).notNull(),
@@ -21964,15 +21965,17 @@ export const opsFuelTransactions = pgTable("ops_fuel_transactions", {
 }, (table) => ({
   marinaDateIdx: index("ops_fuel_marina_date_idx").on(table.marinaId, table.txnDate),
   orgIdx: index("ops_fuel_org_idx").on(table.orgId),
+  modelingProjectIdx: index("ops_fuel_modeling_project_idx").on(table.modelingProjectId),
 }));
 
 // ============================================================================
-// OPS_SHIP_STORE_SALES - Daily ship store sales actuals
+// OPS_SHIP_STORE_SALES - Supports dual context: Operations (marinaId) and Valuator (modelingProjectId)
 // ============================================================================
 export const opsShipStoreSales = pgTable("ops_ship_store_sales", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  marinaId: varchar("marina_id").notNull().references(() => opsMarinas.id, { onDelete: "cascade" }),
+  marinaId: varchar("marina_id").references(() => opsMarinas.id, { onDelete: "cascade" }),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
+  modelingProjectId: varchar("modeling_project_id").references(() => modelingProjects.id, { onDelete: "cascade" }),
   txnDate: date("txn_date").notNull(),
   category: varchar("category", { length: 100 }).notNull(), // parts, accessories, apparel, etc.
   grossSales: decimal("gross_sales", { precision: 14, scale: 2 }).notNull(),
@@ -21986,6 +21989,7 @@ export const opsShipStoreSales = pgTable("ops_ship_store_sales", {
 }, (table) => ({
   marinaDateIdx: index("ops_ship_store_marina_date_idx").on(table.marinaId, table.txnDate),
   orgIdx: index("ops_ship_store_org_idx").on(table.orgId),
+  modelingProjectIdx: index("ops_ship_store_modeling_project_idx").on(table.modelingProjectId),
 }));
 
 // ============================================================================
