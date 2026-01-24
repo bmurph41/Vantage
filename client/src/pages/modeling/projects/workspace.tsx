@@ -42,6 +42,7 @@ import { useTrackRecent } from '@/hooks/use-track-recent';
 import { formatCurrency } from '@/lib/formatUtils';
 import { apiRequest } from '@/lib/queryClient';
 import { toast } from '@/hooks/use-toast';
+import ProjectTypeBadge from '@/components/modeling/ProjectTypeBadge';
 
 import WorkspaceOverview from './workspace/overview';
 import WorkspaceInputs from './workspace/inputs';
@@ -170,6 +171,7 @@ export default function ProjectWorkspace() {
             <h1 className="text-2xl font-bold tracking-tight flex items-center gap-3" data-testid="text-project-name">
               <Building2 className="h-6 w-6 text-muted-foreground" />
               {project.marinaName}
+              <ProjectTypeBadge project={project} />
             </h1>
             <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
               {(project.city || project.state) && (
