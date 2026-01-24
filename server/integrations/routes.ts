@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
-import { integrations, userIntegrations, users } from '@shared/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { integrations, userIntegrations, users, integrationSyncHistory, integrationSyncMetrics } from '@shared/schema';
+import { eq, and, inArray, desc, sql } from 'drizzle-orm';
 import { INTEGRATION_REGISTRY, getIntegrationByKey, getIntegrationsByContext } from './registry';
 import { encrypt, decrypt } from './crypto';
 import crypto from 'crypto';
@@ -777,3 +777,230 @@ integrationsRouter.get('/api/integrations/sync/overview', async (req: Request, r
     res.status(500).json({ error: 'Failed to fetch sync overview' });
   }
 });
+
+// Integration Sync Status - comprehensive sync status for SyncMonitor dashboard
+integrationsRouter.get('/api/integrations/sync-status', async (req: Request, res: Response) => {
+  const userId = requireUser(req, res);
+  if (!userId) return;
+  const orgId = getOrgId(req);
+
+  try {
+    const whereConditions = [eq(userIntegrations.userId, userId)];
+    if (orgId && userIntegrations.orgId) {
+      whereConditions.push(eq(userIntegrations.orgId, orgId));
+    }
+
+    const userItems = await db.select().from(userIntegrations).where(and(...whereConditions));
+    
+    // Get metrics for each integration
+    const metricsConditions = [eq(integrationSyncMetrics.userId, userId)];
+    if (orgId) {
+      metricsConditions.push(eq(integrationSyncMetrics.orgId, orgId));
+    }
+    const metricsData = await db.select().from(integrationSyncMetrics).where(and(...metricsConditions));
+    const metricsMap = new Map(metricsData.map(m => [m.integrationKey, m]));
+
+    // Get latest running sync for each integration
+    const runningConditions = [
+      eq(integrationSyncHistory.userId, userId),
+      eq(integrationSyncHistory.status, 'running')
+    ];
+    if (orgId) {
+      runningConditions.push(eq(integrationSyncHistory.orgId, orgId));
+    }
+    const runningSyncs = await db.select().from(integrationSyncHistory).where(and(...runningConditions));
+    const runningMap = new Map(runningSyncs.map(s => [s.integrationKey, true]));
+
+    const integrationStatuses = await Promise.all(userItems.map(async (item) => {
+      const regItem = getIntegrationByKey(item.integrationKey);
+      const metrics = metricsMap.get(item.integrationKey);
+      const isRunning = runningMap.has(item.integrationKey);
+      
+      // Determine status
+      let status: 'connected' | 'syncing' | 'error' | 'disconnected' | 'pending' = 'disconnected';
+      if (!item.isConnected) {
+        status = 'pending';
+      } else if (isRunning) {
+        status = 'syncing';
+      } else if (item.errorMessage) {
+        status = 'error';
+      } else {
+        status = 'connected';
+      }
+
+      // Calculate next sync (hourly by default)
+      let nextSync: Date | null = null;
+      if (item.isConnected && item.lastSyncAt) {
+        nextSync = new Date(item.lastSyncAt.getTime() + 3600000);
+      }
+
+      return {
+        id: item.id,
+        name: regItem?.name || item.integrationKey,
+        type: regItem?.category?.toLowerCase().replace(/\s+/g, '_') || 'data',
+        provider: regItem?.providerName || regItem?.name || item.integrationKey,
+        status,
+        lastSync: item.lastSyncAt,
+        nextSync,
+        recordsImported: metrics?.totalRecordsImported || 0,
+        recordsExported: metrics?.totalRecordsExported || 0,
+        errorCount: metrics?.failedSyncs || 0,
+        healthScore: metrics?.healthScore || (item.isConnected ? 100 : 0),
+        errorMessage: item.errorMessage,
+      };
+    }));
+
+    res.json(integrationStatuses);
+  } catch (error) {
+    console.error('Error fetching sync status:', error);
+    res.status(500).json({ error: 'Failed to fetch sync status' });
+  }
+});
+
+// Integration Sync History - detailed sync operation history
+integrationsRouter.get('/api/integrations/sync-history', async (req: Request, res: Response) => {
+  const userId = requireUser(req, res);
+  if (!userId) return;
+  const orgId = getOrgId(req);
+
+  try {
+    const limit = parseInt(req.query.limit as string) || 50;
+    const integrationKey = req.query.integrationKey as string;
+
+    const whereConditions = [eq(integrationSyncHistory.userId, userId)];
+    if (orgId) {
+      whereConditions.push(eq(integrationSyncHistory.orgId, orgId));
+    }
+    if (integrationKey) {
+      whereConditions.push(eq(integrationSyncHistory.integrationKey, integrationKey));
+    }
+
+    const history = await db
+      .select()
+      .from(integrationSyncHistory)
+      .where(and(...whereConditions))
+      .orderBy(desc(integrationSyncHistory.startedAt))
+      .limit(limit);
+
+    const formattedHistory = await Promise.all(history.map(async (item) => {
+      const regItem = getIntegrationByKey(item.integrationKey);
+      return {
+        id: item.id,
+        integrationId: item.integrationKey,
+        integrationName: regItem?.name || item.integrationKey,
+        type: item.syncType,
+        status: item.status === 'success' ? 'success' : item.status === 'partial' ? 'partial' : 'failed',
+        startTime: item.startedAt,
+        endTime: item.completedAt,
+        recordsProcessed: item.recordsProcessed,
+        errors: item.errorCount,
+        message: item.errors && item.errors.length > 0 
+          ? item.errors[0].message 
+          : item.status === 'success' 
+            ? 'Sync completed successfully'
+            : 'Sync completed with issues',
+      };
+    }));
+
+    res.json(formattedHistory);
+  } catch (error) {
+    console.error('Error fetching sync history:', error);
+    res.status(500).json({ error: 'Failed to fetch sync history' });
+  }
+});
+
+// Record a sync operation (called by integration services)
+integrationsRouter.post('/api/integrations/sync-history', async (req: Request, res: Response) => {
+  const userId = requireUser(req, res);
+  if (!userId) return;
+  const orgId = getOrgId(req);
+
+  try {
+    const { integrationKey, syncType, status, recordsProcessed, recordsCreated, recordsUpdated, recordsDeleted, recordsFailed, errors, metadata, triggeredBy } = req.body;
+
+    const [syncRecord] = await db.insert(integrationSyncHistory).values({
+      userId,
+      orgId,
+      integrationKey,
+      syncType: syncType || 'full_sync',
+      status: status || 'success',
+      completedAt: new Date(),
+      recordsProcessed: recordsProcessed || 0,
+      recordsCreated: recordsCreated || 0,
+      recordsUpdated: recordsUpdated || 0,
+      recordsDeleted: recordsDeleted || 0,
+      recordsFailed: recordsFailed || 0,
+      errorCount: errors?.length || 0,
+      errors: errors || [],
+      metadata: metadata || {},
+      triggeredBy: triggeredBy || 'manual',
+    }).returning();
+
+    // Update metrics
+    await updateSyncMetrics(userId, orgId, integrationKey, {
+      recordsImported: recordsCreated + recordsUpdated,
+      recordsExported: 0,
+      success: status === 'success',
+      durationMs: 0,
+    });
+
+    res.json(syncRecord);
+  } catch (error) {
+    console.error('Error recording sync history:', error);
+    res.status(500).json({ error: 'Failed to record sync history' });
+  }
+});
+
+// Helper to update sync metrics
+async function updateSyncMetrics(
+  userId: string, 
+  orgId: string | null, 
+  integrationKey: string, 
+  data: { recordsImported: number; recordsExported: number; success: boolean; durationMs: number }
+) {
+  const existing = await db
+    .select()
+    .from(integrationSyncMetrics)
+    .where(and(
+      eq(integrationSyncMetrics.userId, userId),
+      eq(integrationSyncMetrics.integrationKey, integrationKey),
+      orgId ? eq(integrationSyncMetrics.orgId, orgId) : sql`true`
+    ))
+    .limit(1);
+
+  if (existing.length > 0) {
+    const current = existing[0];
+    const newTotalSyncs = current.totalSyncs + 1;
+    const newSuccessful = data.success ? current.successfulSyncs + 1 : current.successfulSyncs;
+    const newFailed = data.success ? current.failedSyncs : current.failedSyncs + 1;
+    const healthScore = Math.round((newSuccessful / newTotalSyncs) * 100);
+
+    await db.update(integrationSyncMetrics)
+      .set({
+        totalRecordsImported: current.totalRecordsImported + data.recordsImported,
+        totalRecordsExported: current.totalRecordsExported + data.recordsExported,
+        totalSyncs: newTotalSyncs,
+        successfulSyncs: newSuccessful,
+        failedSyncs: newFailed,
+        lastSyncAt: new Date(),
+        lastSuccessfulSyncAt: data.success ? new Date() : current.lastSuccessfulSyncAt,
+        healthScore,
+        updatedAt: new Date(),
+      })
+      .where(eq(integrationSyncMetrics.id, current.id));
+  } else {
+    await db.insert(integrationSyncMetrics).values({
+      userId,
+      orgId,
+      integrationKey,
+      totalRecordsImported: data.recordsImported,
+      totalRecordsExported: data.recordsExported,
+      totalSyncs: 1,
+      successfulSyncs: data.success ? 1 : 0,
+      failedSyncs: data.success ? 0 : 1,
+      lastSyncAt: new Date(),
+      lastSuccessfulSyncAt: data.success ? new Date() : null,
+      healthScore: data.success ? 100 : 0,
+    });
+  }
+}

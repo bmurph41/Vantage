@@ -21154,6 +21154,75 @@ export const insertUserIntegrationSchema = createInsertSchema(userIntegrations).
   updatedAt: true,
 });
 
+// Integration Sync History - tracks detailed sync operations
+export const integrationSyncTypeEnum = pgEnum("integration_sync_type", ["import", "export", "full_sync", "incremental", "migration"]);
+
+export const integrationSyncHistory = pgTable("integration_sync_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").references(() => organizations.id),
+  integrationKey: varchar("integration_key").notNull().references(() => integrations.key),
+  syncType: integrationSyncTypeEnum("sync_type").default("full_sync").notNull(),
+  status: integrationSyncStatusEnum("status").default("pending").notNull(),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+  recordsProcessed: integer("records_processed").default(0).notNull(),
+  recordsCreated: integer("records_created").default(0).notNull(),
+  recordsUpdated: integer("records_updated").default(0).notNull(),
+  recordsDeleted: integer("records_deleted").default(0).notNull(),
+  recordsFailed: integer("records_failed").default(0).notNull(),
+  errorCount: integer("error_count").default(0).notNull(),
+  errors: jsonb("errors").$type<Array<{code: string; message: string; entity?: string; timestamp: string}>>().default([]),
+  metadata: jsonb("metadata").$type<Record<string, any>>().default({}),
+  triggeredBy: varchar("triggered_by").default("manual").notNull(),
+}, (table) => ({
+  userIdx: index("sync_history_user_idx").on(table.userId),
+  orgIdx: index("sync_history_org_idx").on(table.orgId),
+  integrationKeyIdx: index("sync_history_integration_key_idx").on(table.integrationKey),
+  startedAtIdx: index("sync_history_started_at_idx").on(table.startedAt),
+  statusIdx: index("sync_history_status_idx").on(table.status),
+}));
+
+export type IntegrationSyncHistory = typeof integrationSyncHistory.$inferSelect;
+export type InsertIntegrationSyncHistory = typeof integrationSyncHistory.$inferInsert;
+export const insertIntegrationSyncHistorySchema = createInsertSchema(integrationSyncHistory).omit({
+  id: true,
+  startedAt: true,
+});
+
+// Integration Sync Metrics - aggregated sync statistics
+export const integrationSyncMetrics = pgTable("integration_sync_metrics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").references(() => organizations.id),
+  integrationKey: varchar("integration_key").notNull().references(() => integrations.key),
+  totalRecordsImported: integer("total_records_imported").default(0).notNull(),
+  totalRecordsExported: integer("total_records_exported").default(0).notNull(),
+  totalSyncs: integer("total_syncs").default(0).notNull(),
+  successfulSyncs: integer("successful_syncs").default(0).notNull(),
+  failedSyncs: integer("failed_syncs").default(0).notNull(),
+  lastSyncAt: timestamp("last_sync_at"),
+  lastSuccessfulSyncAt: timestamp("last_successful_sync_at"),
+  nextScheduledSync: timestamp("next_scheduled_sync"),
+  healthScore: integer("health_score").default(100).notNull(),
+  averageSyncDurationMs: integer("average_sync_duration_ms").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  userIntegrationUnique: unique("sync_metrics_unique").on(table.userId, table.integrationKey, table.orgId),
+  userIdx: index("sync_metrics_user_idx").on(table.userId),
+  orgIdx: index("sync_metrics_org_idx").on(table.orgId),
+  integrationKeyIdx: index("sync_metrics_key_idx").on(table.integrationKey),
+}));
+
+export type IntegrationSyncMetrics = typeof integrationSyncMetrics.$inferSelect;
+export type InsertIntegrationSyncMetrics = typeof integrationSyncMetrics.$inferInsert;
+export const insertIntegrationSyncMetricsSchema = createInsertSchema(integrationSyncMetrics).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Industry Standards Types
 export type IndustryStandard = typeof industryStandards.$inferSelect;
 export type InsertIndustryStandard = typeof industryStandards.$inferInsert;

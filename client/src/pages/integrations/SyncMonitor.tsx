@@ -241,24 +241,17 @@ export default function SyncMonitor() {
 
   const { data: integrations, isLoading } = useQuery<IntegrationSync[]>({
     queryKey: ['/api/integrations/sync-status'],
-    queryFn: async () => {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return SAMPLE_INTEGRATIONS;
-    },
   });
 
   const { data: history } = useQuery<SyncHistoryItem[]>({
     queryKey: ['/api/integrations/sync-history'],
-    queryFn: async () => {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return SAMPLE_HISTORY;
-    },
   });
 
   const syncMutation = useMutation({
     mutationFn: async (integrationId: string) => {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      return { success: true };
+      const res = await fetch(`/api/integrations/${integrationId}/sync`, { method: 'POST' });
+      if (!res.ok) throw new Error('Sync failed');
+      return res.json();
     },
     onSuccess: () => {
       toast({ title: "Sync Started", description: "Integration sync has been initiated." });
@@ -271,7 +264,10 @@ export default function SyncMonitor() {
 
   const syncAllMutation = useMutation({
     mutationFn: async () => {
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      const connected = integrations?.filter(i => i.status === 'connected') || [];
+      await Promise.all(connected.map(i => 
+        fetch(`/api/integrations/${i.id}/sync`, { method: 'POST' })
+      ));
       return { success: true };
     },
     onSuccess: () => {

@@ -242,11 +242,11 @@ export default function VDRActivityDashboard() {
   const [filterUserType, setFilterUserType] = useState('all');
 
   const { data: activities, isLoading } = useQuery<ActivityItem[]>({
-    queryKey: ['/api/vdr/activity', timeRange],
-    queryFn: async () => {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return SAMPLE_ACTIVITIES;
-    },
+    queryKey: ['/api/vdr/activity', timeRange, filterUserType],
+  });
+
+  const { data: metrics } = useQuery<{views: number; downloads: number; externalAccess: number; securityEvents: number}>({
+    queryKey: ['/api/vdr/activity/metrics', timeRange],
   });
 
   const filteredActivities = activities?.filter(a => {
@@ -255,10 +255,10 @@ export default function VDRActivityDashboard() {
     return true;
   });
 
-  const viewCount = activities?.filter(a => a.action === 'view').length || 0;
-  const downloadCount = activities?.filter(a => a.action === 'download').length || 0;
-  const externalAccessCount = activities?.filter(a => a.userType === 'external').length || 0;
-  const securityEventCount = activities?.filter(a => ['permission_change', 'user_added', 'share'].includes(a.action)).length || 0;
+  const viewCount = metrics?.views || activities?.filter(a => a.action === 'view').length || 0;
+  const downloadCount = metrics?.downloads || activities?.filter(a => a.action === 'download').length || 0;
+  const externalAccessCount = metrics?.externalAccess || activities?.filter(a => a.userType === 'external').length || 0;
+  const securityEventCount = metrics?.securityEvents || activities?.filter(a => ['permission_change', 'user_added', 'share'].includes(a.action)).length || 0;
 
   if (isLoading) {
     return (
