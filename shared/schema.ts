@@ -21872,4 +21872,670 @@ export type AnalyticsReportSchedule = typeof analyticsReportSchedules.$inferSele
 export type InsertAnalyticsReportSchedule = z.infer<typeof insertAnalyticsReportScheduleSchema>;
 
 // Replit Auth models
+
+// ============================================================================
+// OPERATIONS + VALUATOR DUAL-CONTEXT ARCHITECTURE
+// Portfolios, Marinas, Actuals (ops_*), Assumptions (asmp_*), Import Events
+// ============================================================================
+
+// Ownership Status Enum - Determines data context
+export const ownershipStatusEnum = pgEnum("ownership_status", ["OWNED", "DEAL"]);
+
+// Import Scope Enum - For import operations
+export const importScopeEnum = pgEnum("import_scope", [
+  "ALL", "FUEL", "SHIP_STORE", "SERVICE", "TENANTS", "RENTALS", "CLUB", "BOAT_SALES", "BOOKKEEPING"
+]);
+
+// Data Source Enum - Track where data came from
+export const opsDataSourceEnum = pgEnum("ops_data_source", ["MANUAL", "CSV_IMPORT", "INTEGRATION", "QBO"]);
+
+// Valuator Project Type Enum
+export const valuatorProjectTypeEnum = pgEnum("valuator_project_type", ["OWNED", "ACQUISITION", "BROKER_LISTING"]);
+
+// ============================================================================
+// Portfolios - Grouping for owned marinas
+// ============================================================================
+export const opsPortfolios = pgTable("ops_portfolios", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  currency: varchar("currency", { length: 3 }).default("USD"),
+  timezone: varchar("timezone", { length: 50 }).default("America/New_York"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userIdx: index("ops_portfolios_user_idx").on(table.userId),
+  orgIdx: index("ops_portfolios_org_idx").on(table.orgId),
+}));
+
+// ============================================================================
+// Marinas - Properties within portfolios
+// ============================================================================
+export const opsMarinas = pgTable("ops_marinas", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  portfolioId: varchar("portfolio_id").notNull().references(() => opsPortfolios.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  address: text("address"),
+  city: varchar("city", { length: 100 }),
+  state: varchar("state", { length: 50 }),
+  zip: varchar("zip", { length: 20 }),
+  country: varchar("country", { length: 50 }).default("USA"),
+  ownershipStatus: ownershipStatusEnum("ownership_status").notNull().default("OWNED"),
+  // Operational info
+  totalSlips: integer("total_slips").default(0),
+  totalDryStorage: integer("total_dry_storage").default(0),
+  totalSqft: integer("total_sqft").default(0),
+  seasonStartMonth: integer("season_start_month").default(4), // April
+  seasonEndMonth: integer("season_end_month").default(10), // October
+  // Integration hooks
+  integrationId: varchar("integration_id"), // Link to marina integration
+  lastSyncAt: timestamp("last_sync_at"),
+  isActive: boolean("is_active").default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  portfolioIdx: index("ops_marinas_portfolio_idx").on(table.portfolioId),
+  orgIdx: index("ops_marinas_org_idx").on(table.orgId),
+  ownershipIdx: index("ops_marinas_ownership_idx").on(table.ownershipStatus),
+}));
+
+// ============================================================================
+// OPS_FUEL_TRANSACTIONS - Daily fuel sales actuals
+// ============================================================================
+export const opsFuelTransactions = pgTable("ops_fuel_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  marinaId: varchar("marina_id").notNull().references(() => opsMarinas.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  txnDate: date("txn_date").notNull(),
+  fuelType: varchar("fuel_type", { length: 50 }).notNull(), // diesel, ethanol, rec90, etc.
+  gallons: decimal("gallons", { precision: 12, scale: 4 }).notNull(),
+  grossSales: decimal("gross_sales", { precision: 14, scale: 2 }).notNull(),
+  cogs: decimal("cogs", { precision: 14, scale: 2 }).notNull(),
+  vendor: varchar("vendor", { length: 100 }),
+  source: opsDataSourceEnum("source").default("MANUAL"),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  marinaDateIdx: index("ops_fuel_marina_date_idx").on(table.marinaId, table.txnDate),
+  orgIdx: index("ops_fuel_org_idx").on(table.orgId),
+}));
+
+// ============================================================================
+// OPS_SHIP_STORE_SALES - Daily ship store sales actuals
+// ============================================================================
+export const opsShipStoreSales = pgTable("ops_ship_store_sales", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  marinaId: varchar("marina_id").notNull().references(() => opsMarinas.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  txnDate: date("txn_date").notNull(),
+  category: varchar("category", { length: 100 }).notNull(), // parts, accessories, apparel, etc.
+  grossSales: decimal("gross_sales", { precision: 14, scale: 2 }).notNull(),
+  cogs: decimal("cogs", { precision: 14, scale: 2 }).notNull(),
+  txnCount: integer("txn_count").default(1),
+  source: opsDataSourceEnum("source").default("MANUAL"),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  marinaDateIdx: index("ops_ship_store_marina_date_idx").on(table.marinaId, table.txnDate),
+  orgIdx: index("ops_ship_store_org_idx").on(table.orgId),
+}));
+
+// ============================================================================
+// OPS_SERVICE_WORK_ORDERS - Service department actuals
+// ============================================================================
+export const opsServiceWorkOrders = pgTable("ops_service_work_orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  marinaId: varchar("marina_id").notNull().references(() => opsMarinas.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  openDate: date("open_date").notNull(),
+  closeDate: date("close_date"),
+  laborRevenue: decimal("labor_revenue", { precision: 14, scale: 2 }).default("0"),
+  partsRevenue: decimal("parts_revenue", { precision: 14, scale: 2 }).default("0"),
+  cogs: decimal("cogs", { precision: 14, scale: 2 }).default("0"),
+  status: varchar("status", { length: 20 }).default("open"), // open, in_progress, closed
+  source: opsDataSourceEnum("source").default("MANUAL"),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  marinaOpenIdx: index("ops_service_marina_open_idx").on(table.marinaId, table.openDate),
+  orgIdx: index("ops_service_org_idx").on(table.orgId),
+}));
+
+// ============================================================================
+// OPS_BOAT_RENTALS - Boat rental actuals
+// ============================================================================
+export const opsBoatRentals = pgTable("ops_boat_rentals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  marinaId: varchar("marina_id").notNull().references(() => opsMarinas.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  rentalDate: date("rental_date").notNull(),
+  hours: decimal("hours", { precision: 8, scale: 2 }).notNull(),
+  grossSales: decimal("gross_sales", { precision: 14, scale: 2 }).notNull(),
+  channel: varchar("channel", { length: 50 }), // walk-in, online, phone
+  boatType: varchar("boat_type", { length: 100 }),
+  source: opsDataSourceEnum("source").default("MANUAL"),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  marinaDateIdx: index("ops_boat_rentals_marina_date_idx").on(table.marinaId, table.rentalDate),
+  orgIdx: index("ops_boat_rentals_org_idx").on(table.orgId),
+}));
+
+// ============================================================================
+// OPS_BOAT_CLUB_MEMBERSHIPS - Boat club membership actuals
+// ============================================================================
+export const opsBoatClubMemberships = pgTable("ops_boat_club_memberships", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  marinaId: varchar("marina_id").notNull().references(() => opsMarinas.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  memberId: varchar("member_id", { length: 100 }).notNull(),
+  memberName: text("member_name"),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date"),
+  tier: varchar("tier", { length: 50 }), // standard, premium, vip
+  monthlyDues: decimal("monthly_dues", { precision: 10, scale: 2 }).notNull(),
+  status: varchar("status", { length: 20 }).default("active"), // active, paused, cancelled
+  source: opsDataSourceEnum("source").default("MANUAL"),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  marinaIdx: index("ops_boat_club_marina_idx").on(table.marinaId),
+  orgIdx: index("ops_boat_club_org_idx").on(table.orgId),
+}));
+
+// ============================================================================
+// OPS_BOAT_SALES - Boat sales actuals
+// ============================================================================
+export const opsBoatSales = pgTable("ops_boat_sales", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  marinaId: varchar("marina_id").notNull().references(() => opsMarinas.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  saleDate: date("sale_date").notNull(),
+  makeModel: varchar("make_model", { length: 200 }).notNull(),
+  grossSales: decimal("gross_sales", { precision: 14, scale: 2 }).notNull(),
+  cogs: decimal("cogs", { precision: 14, scale: 2 }).default("0"),
+  source: opsDataSourceEnum("source").default("MANUAL"),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  marinaDateIdx: index("ops_boat_sales_marina_date_idx").on(table.marinaId, table.saleDate),
+  orgIdx: index("ops_boat_sales_org_idx").on(table.orgId),
+}));
+
+// ============================================================================
+// OPS_COMMERCIAL_LEASES - Commercial tenant lease actuals
+// ============================================================================
+export const opsCommercialLeases = pgTable("ops_commercial_leases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  marinaId: varchar("marina_id").notNull().references(() => opsMarinas.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  tenantName: text("tenant_name").notNull(),
+  unit: varchar("unit", { length: 50 }),
+  sqft: integer("sqft").default(0),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date"),
+  baseRent: decimal("base_rent", { precision: 12, scale: 2 }).notNull(),
+  cam: decimal("cam", { precision: 10, scale: 2 }).default("0"),
+  percentRent: decimal("percent_rent", { precision: 10, scale: 2 }).default("0"),
+  status: varchar("status", { length: 20 }).default("active"), // active, expired, terminated
+  source: opsDataSourceEnum("source").default("MANUAL"),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  marinaIdx: index("ops_commercial_leases_marina_idx").on(table.marinaId),
+  orgIdx: index("ops_commercial_leases_org_idx").on(table.orgId),
+}));
+
+// ============================================================================
+// OPS_BOOKKEEPING_GL - General ledger actuals
+// ============================================================================
+export const opsBookkeepingGl = pgTable("ops_bookkeeping_gl", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  marinaId: varchar("marina_id").notNull().references(() => opsMarinas.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  periodStart: date("period_start").notNull(),
+  periodEnd: date("period_end").notNull(),
+  accountName: text("account_name").notNull(),
+  accountType: varchar("account_type", { length: 50 }).notNull(), // revenue, expense, asset, liability
+  amount: decimal("amount", { precision: 14, scale: 2 }).notNull(),
+  source: opsDataSourceEnum("source").default("MANUAL"),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  marinaPeriodIdx: index("ops_bookkeeping_marina_period_idx").on(table.marinaId, table.periodStart),
+  orgIdx: index("ops_bookkeeping_org_idx").on(table.orgId),
+}));
+
+// ============================================================================
+// ASMP_FUEL - Fuel assumptions per valuator project
+// ============================================================================
+export const asmpFuel = pgTable("asmp_fuel", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => modelingProjects.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  periodMonth: date("period_month").notNull(), // YYYY-MM-01
+  gallons: decimal("gallons", { precision: 12, scale: 4 }),
+  avgRetailPrice: decimal("avg_retail_price", { precision: 8, scale: 4 }),
+  avgCostPrice: decimal("avg_cost_price", { precision: 8, scale: 4 }),
+  marginPct: decimal("margin_pct", { precision: 6, scale: 4 }),
+  growthPct: decimal("growth_pct", { precision: 6, scale: 4 }),
+  seasonalIndex: decimal("seasonal_index", { precision: 6, scale: 4 }).default("1.0"),
+  // Computed outputs (denormalized for efficiency)
+  revenue: decimal("revenue", { precision: 14, scale: 2 }),
+  cogs: decimal("cogs", { precision: 14, scale: 2 }),
+  grossProfit: decimal("gross_profit", { precision: 14, scale: 2 }),
+  // Audit
+  importedAt: timestamp("imported_at"),
+  importSource: varchar("import_source", { length: 20 }), // ACTUALS, TEMPLATE, MANUAL
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  projectMonthIdx: index("asmp_fuel_project_month_idx").on(table.projectId, table.periodMonth),
+  projectMonthUnique: unique().on(table.projectId, table.periodMonth),
+}));
+
+// ============================================================================
+// ASMP_SHIP_STORE - Ship store assumptions per valuator project
+// ============================================================================
+export const asmpShipStore = pgTable("asmp_ship_store", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => modelingProjects.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  periodMonth: date("period_month").notNull(),
+  revenue: decimal("revenue", { precision: 14, scale: 2 }),
+  cogsPct: decimal("cogs_pct", { precision: 6, scale: 4 }),
+  growthPct: decimal("growth_pct", { precision: 6, scale: 4 }),
+  seasonalIndex: decimal("seasonal_index", { precision: 6, scale: 4 }).default("1.0"),
+  txnCount: integer("txn_count"),
+  avgTicket: decimal("avg_ticket", { precision: 10, scale: 2 }),
+  // Computed
+  cogs: decimal("cogs", { precision: 14, scale: 2 }),
+  grossProfit: decimal("gross_profit", { precision: 14, scale: 2 }),
+  importedAt: timestamp("imported_at"),
+  importSource: varchar("import_source", { length: 20 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  projectMonthIdx: index("asmp_ship_store_project_month_idx").on(table.projectId, table.periodMonth),
+  projectMonthUnique: unique().on(table.projectId, table.periodMonth),
+}));
+
+// ============================================================================
+// ASMP_SERVICE - Service department assumptions
+// ============================================================================
+export const asmpService = pgTable("asmp_service", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => modelingProjects.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  periodMonth: date("period_month").notNull(),
+  laborRevenue: decimal("labor_revenue", { precision: 14, scale: 2 }),
+  partsRevenue: decimal("parts_revenue", { precision: 14, scale: 2 }),
+  cogsPct: decimal("cogs_pct", { precision: 6, scale: 4 }),
+  growthPct: decimal("growth_pct", { precision: 6, scale: 4 }),
+  workOrderCount: integer("work_order_count"),
+  // Computed
+  totalRevenue: decimal("total_revenue", { precision: 14, scale: 2 }),
+  cogs: decimal("cogs", { precision: 14, scale: 2 }),
+  grossProfit: decimal("gross_profit", { precision: 14, scale: 2 }),
+  importedAt: timestamp("imported_at"),
+  importSource: varchar("import_source", { length: 20 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  projectMonthIdx: index("asmp_service_project_month_idx").on(table.projectId, table.periodMonth),
+  projectMonthUnique: unique().on(table.projectId, table.periodMonth),
+}));
+
+// ============================================================================
+// ASMP_COMMERCIAL_TENANTS - Commercial tenant assumptions
+// ============================================================================
+export const asmpCommercialTenants = pgTable("asmp_commercial_tenants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => modelingProjects.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  periodMonth: date("period_month").notNull(),
+  tenantCount: integer("tenant_count"),
+  totalSqft: integer("total_sqft"),
+  occupiedSqft: integer("occupied_sqft"),
+  avgRentPerSqft: decimal("avg_rent_per_sqft", { precision: 8, scale: 2 }),
+  occupancyPct: decimal("occupancy_pct", { precision: 6, scale: 4 }),
+  otherIncome: decimal("other_income", { precision: 12, scale: 2 }),
+  growthPct: decimal("growth_pct", { precision: 6, scale: 4 }),
+  // Computed
+  baseRentRevenue: decimal("base_rent_revenue", { precision: 14, scale: 2 }),
+  camRevenue: decimal("cam_revenue", { precision: 14, scale: 2 }),
+  totalRevenue: decimal("total_revenue", { precision: 14, scale: 2 }),
+  importedAt: timestamp("imported_at"),
+  importSource: varchar("import_source", { length: 20 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  projectMonthIdx: index("asmp_tenants_project_month_idx").on(table.projectId, table.periodMonth),
+  projectMonthUnique: unique().on(table.projectId, table.periodMonth),
+}));
+
+// ============================================================================
+// ASMP_BOAT_RENTALS - Boat rental assumptions
+// ============================================================================
+export const asmpBoatRentals = pgTable("asmp_boat_rentals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => modelingProjects.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  periodMonth: date("period_month").notNull(),
+  hours: decimal("hours", { precision: 10, scale: 2 }),
+  avgRatePerHour: decimal("avg_rate_per_hour", { precision: 10, scale: 2 }),
+  utilizationPct: decimal("utilization_pct", { precision: 6, scale: 4 }),
+  growthPct: decimal("growth_pct", { precision: 6, scale: 4 }),
+  // Computed
+  revenue: decimal("revenue", { precision: 14, scale: 2 }),
+  importedAt: timestamp("imported_at"),
+  importSource: varchar("import_source", { length: 20 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  projectMonthIdx: index("asmp_boat_rentals_project_month_idx").on(table.projectId, table.periodMonth),
+  projectMonthUnique: unique().on(table.projectId, table.periodMonth),
+}));
+
+// ============================================================================
+// ASMP_BOAT_CLUB - Boat club assumptions
+// ============================================================================
+export const asmpBoatClub = pgTable("asmp_boat_club", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => modelingProjects.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  periodMonth: date("period_month").notNull(),
+  memberCount: integer("member_count"),
+  avgMonthlyDues: decimal("avg_monthly_dues", { precision: 10, scale: 2 }),
+  churnPct: decimal("churn_pct", { precision: 6, scale: 4 }),
+  growthPct: decimal("growth_pct", { precision: 6, scale: 4 }),
+  // Computed
+  monthlyRecurringRevenue: decimal("mrr", { precision: 14, scale: 2 }),
+  importedAt: timestamp("imported_at"),
+  importSource: varchar("import_source", { length: 20 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  projectMonthIdx: index("asmp_boat_club_project_month_idx").on(table.projectId, table.periodMonth),
+  projectMonthUnique: unique().on(table.projectId, table.periodMonth),
+}));
+
+// ============================================================================
+// ASMP_BOAT_SALES - Boat sales assumptions
+// ============================================================================
+export const asmpBoatSales = pgTable("asmp_boat_sales", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => modelingProjects.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  periodMonth: date("period_month").notNull(),
+  units: integer("units"),
+  avgSalePrice: decimal("avg_sale_price", { precision: 14, scale: 2 }),
+  marginPct: decimal("margin_pct", { precision: 6, scale: 4 }),
+  growthPct: decimal("growth_pct", { precision: 6, scale: 4 }),
+  // Computed
+  revenue: decimal("revenue", { precision: 14, scale: 2 }),
+  cogs: decimal("cogs", { precision: 14, scale: 2 }),
+  grossProfit: decimal("gross_profit", { precision: 14, scale: 2 }),
+  importedAt: timestamp("imported_at"),
+  importSource: varchar("import_source", { length: 20 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  projectMonthIdx: index("asmp_boat_sales_project_month_idx").on(table.projectId, table.periodMonth),
+  projectMonthUnique: unique().on(table.projectId, table.periodMonth),
+}));
+
+// ============================================================================
+// ASMP_BOOKKEEPING - Bookkeeping assumptions (simplified bridge)
+// ============================================================================
+export const asmpBookkeeping = pgTable("asmp_bookkeeping", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => modelingProjects.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  periodMonth: date("period_month").notNull(),
+  revenueTotalOverride: decimal("revenue_total_override", { precision: 14, scale: 2 }),
+  expenseTotalOverride: decimal("expense_total_override", { precision: 14, scale: 2 }),
+  noiOverride: decimal("noi_override", { precision: 14, scale: 2 }),
+  importedAt: timestamp("imported_at"),
+  importSource: varchar("import_source", { length: 20 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  projectMonthIdx: index("asmp_bookkeeping_project_month_idx").on(table.projectId, table.periodMonth),
+  projectMonthUnique: unique().on(table.projectId, table.periodMonth),
+}));
+
+// ============================================================================
+// OPS_IMPORT_EVENTS - Track imports from actuals to assumptions
+// ============================================================================
+export const opsImportEvents = pgTable("ops_import_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => modelingProjects.id, { onDelete: "cascade" }),
+  marinaId: varchar("marina_id").notNull().references(() => opsMarinas.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  scope: importScopeEnum("scope").notNull(),
+  rangeStart: date("range_start").notNull(),
+  rangeEnd: date("range_end").notNull(),
+  overwrite: boolean("overwrite").default(false),
+  rowsWritten: integer("rows_written").default(0),
+  monthsAffected: integer("months_affected").default(0),
+  durationMs: integer("duration_ms"),
+  status: varchar("status", { length: 20 }).default("completed"), // pending, completed, failed
+  errorMessage: text("error_message"),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  projectIdx: index("ops_import_events_project_idx").on(table.projectId),
+  projectCreatedIdx: index("ops_import_events_project_created_idx").on(table.projectId, table.createdAt),
+}));
+
+// ============================================================================
+// VALUATOR PROJECT EXTENSION - Add project type and marina link
+// Note: This is added as a new table to avoid modifying existing modelingProjects
+// ============================================================================
+export const valuatorProjectContext = pgTable("valuator_project_context", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => modelingProjects.id, { onDelete: "cascade" }).unique(),
+  marinaId: varchar("marina_id").references(() => opsMarinas.id),
+  projectType: valuatorProjectTypeEnum("project_type").notNull().default("ACQUISITION"),
+  defaultDataSource: varchar("default_data_source", { length: 20 }).default("ASSUMPTIONS"), // ACTUALS or ASSUMPTIONS
+  lastImportAt: timestamp("last_import_at"),
+  assumptionsCoverageMonths: integer("assumptions_coverage_months").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  projectIdx: index("valuator_context_project_idx").on(table.projectId),
+  marinaIdx: index("valuator_context_marina_idx").on(table.marinaId),
+}));
+
+// ============================================================================
+// Insert Schemas and Types
+// ============================================================================
+export const insertOpsPortfolioSchema = createInsertSchema(opsPortfolios).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type OpsPortfolio = typeof opsPortfolios.$inferSelect;
+export type InsertOpsPortfolio = z.infer<typeof insertOpsPortfolioSchema>;
+
+export const insertOpsMarinaSchema = createInsertSchema(opsMarinas).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type OpsMarina = typeof opsMarinas.$inferSelect;
+export type InsertOpsMarina = z.infer<typeof insertOpsMarinaSchema>;
+
+export const insertOpsFuelTransactionSchema = createInsertSchema(opsFuelTransactions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type OpsFuelTransaction = typeof opsFuelTransactions.$inferSelect;
+export type InsertOpsFuelTransaction = z.infer<typeof insertOpsFuelTransactionSchema>;
+
+export const insertOpsShipStoreSaleSchema = createInsertSchema(opsShipStoreSales).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type OpsShipStoreSale = typeof opsShipStoreSales.$inferSelect;
+export type InsertOpsShipStoreSale = z.infer<typeof insertOpsShipStoreSaleSchema>;
+
+export const insertOpsServiceWorkOrderSchema = createInsertSchema(opsServiceWorkOrders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type OpsServiceWorkOrder = typeof opsServiceWorkOrders.$inferSelect;
+export type InsertOpsServiceWorkOrder = z.infer<typeof insertOpsServiceWorkOrderSchema>;
+
+export const insertOpsBoatRentalSchema = createInsertSchema(opsBoatRentals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type OpsBoatRental = typeof opsBoatRentals.$inferSelect;
+export type InsertOpsBoatRental = z.infer<typeof insertOpsBoatRentalSchema>;
+
+export const insertOpsBoatClubMembershipSchema = createInsertSchema(opsBoatClubMemberships).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type OpsBoatClubMembership = typeof opsBoatClubMemberships.$inferSelect;
+export type InsertOpsBoatClubMembership = z.infer<typeof insertOpsBoatClubMembershipSchema>;
+
+export const insertOpsBoatSaleSchema = createInsertSchema(opsBoatSales).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type OpsBoatSale = typeof opsBoatSales.$inferSelect;
+export type InsertOpsBoatSale = z.infer<typeof insertOpsBoatSaleSchema>;
+
+export const insertOpsCommercialLeaseSchema = createInsertSchema(opsCommercialLeases).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type OpsCommercialLease = typeof opsCommercialLeases.$inferSelect;
+export type InsertOpsCommercialLease = z.infer<typeof insertOpsCommercialLeaseSchema>;
+
+export const insertOpsBookkeepingGlSchema = createInsertSchema(opsBookkeepingGl).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type OpsBookkeepingGl = typeof opsBookkeepingGl.$inferSelect;
+export type InsertOpsBookkeepingGl = z.infer<typeof insertOpsBookkeepingGlSchema>;
+
+export const insertAsmpFuelSchema = createInsertSchema(asmpFuel).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type AsmpFuel = typeof asmpFuel.$inferSelect;
+export type InsertAsmpFuel = z.infer<typeof insertAsmpFuelSchema>;
+
+export const insertAsmpShipStoreSchema = createInsertSchema(asmpShipStore).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type AsmpShipStore = typeof asmpShipStore.$inferSelect;
+export type InsertAsmpShipStore = z.infer<typeof insertAsmpShipStoreSchema>;
+
+export const insertAsmpServiceSchema = createInsertSchema(asmpService).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type AsmpService = typeof asmpService.$inferSelect;
+export type InsertAsmpService = z.infer<typeof insertAsmpServiceSchema>;
+
+export const insertAsmpCommercialTenantsSchema = createInsertSchema(asmpCommercialTenants).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type AsmpCommercialTenants = typeof asmpCommercialTenants.$inferSelect;
+export type InsertAsmpCommercialTenants = z.infer<typeof insertAsmpCommercialTenantsSchema>;
+
+export const insertAsmpBoatRentalsSchema = createInsertSchema(asmpBoatRentals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type AsmpBoatRentals = typeof asmpBoatRentals.$inferSelect;
+export type InsertAsmpBoatRentals = z.infer<typeof insertAsmpBoatRentalsSchema>;
+
+export const insertAsmpBoatClubSchema = createInsertSchema(asmpBoatClub).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type AsmpBoatClub = typeof asmpBoatClub.$inferSelect;
+export type InsertAsmpBoatClub = z.infer<typeof insertAsmpBoatClubSchema>;
+
+export const insertAsmpBoatSalesSchema = createInsertSchema(asmpBoatSales).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type AsmpBoatSales = typeof asmpBoatSales.$inferSelect;
+export type InsertAsmpBoatSales = z.infer<typeof insertAsmpBoatSalesSchema>;
+
+export const insertAsmpBookkeepingSchema = createInsertSchema(asmpBookkeeping).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type AsmpBookkeeping = typeof asmpBookkeeping.$inferSelect;
+export type InsertAsmpBookkeeping = z.infer<typeof insertAsmpBookkeepingSchema>;
+
+export const insertOpsImportEventSchema = createInsertSchema(opsImportEvents).omit({
+  id: true,
+  createdAt: true,
+});
+export type OpsImportEvent = typeof opsImportEvents.$inferSelect;
+export type InsertOpsImportEvent = z.infer<typeof insertOpsImportEventSchema>;
+
+export const insertValuatorProjectContextSchema = createInsertSchema(valuatorProjectContext).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type ValuatorProjectContext = typeof valuatorProjectContext.$inferSelect;
+export type InsertValuatorProjectContext = z.infer<typeof insertValuatorProjectContextSchema>;
+
 export * from "./models/auth";

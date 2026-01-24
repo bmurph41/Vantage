@@ -64,6 +64,7 @@ import tourProgressRoutes from "./routes/tour-progress-routes";
 import operationsSyncRoutes from "./routes/operations-sync-routes";
 import ddAutomationRoutes from "./routes/dd-automation-routes";
 import modelingValidationRoutes from "./routes/modeling-validation-routes";
+import operationsContextRoutes from "./routes/operations-context-routes";
 import { userSessions, insertProspectingEntrySchema, users, salesComps, rateComps, industryStandards } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { rentRollService } from "./services/rent-roll-service";
@@ -433,6 +434,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/boat-club", authenticateUser, boatClubRouter);
   app.use("/api/boat-sales", authenticateUser, boatSalesRouter);
   app.use("/api/operations", authenticateUser, enforceTenant, operationsSyncRoutes);
+  app.use("/api/operations-context", authenticateUser, enforceTenant, operationsContextRoutes);
   app.use("/api/opssos", authenticateUser, enforceTenant, opssosRouter);
   app.use("/api/admin", authenticateUser, enforceTenant, adminRouter);
   app.use("/api/integration", authenticateUser, integrationRouter);
