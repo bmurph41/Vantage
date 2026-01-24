@@ -13,6 +13,9 @@ import {
   type OmDocument
 } from "@shared/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
+import { pdfGeneratorService, type PDFTemplateType, type PDFGeneratorOptions } from "./pdf-generator-service";
+import * as fs from 'fs';
+import * as path from 'path';
 
 export interface PropertyOverview {
   name: string;
@@ -293,7 +296,7 @@ class OMBuilderService {
     return updated;
   }
 
-  async exportToPDF(documentId: string): Promise<string> {
+  async exportToPDF(documentId: string, options?: { templateType?: PDFTemplateType; companyName?: string }): Promise<string> {
     const [document] = await db
       .select()
       .from(omDocuments)
@@ -304,17 +307,100 @@ class OMBuilderService {
       throw new Error('Document not found');
     }
 
+    const omData = await this.aggregateOMData(document.dealId);
+    if (!omData) {
+      throw new Error('Failed to aggregate deal data for PDF generation');
+    }
+
+    const templateType = options?.templateType || this.getTemplateTypeFromId(document.templateId);
+    
+    const pdfOptions: Partial<PDFGeneratorOptions> = {
+      templateType,
+      companyName: options?.companyName || 'MarinaMatch',
+    };
+
+    const pdfBytes = await pdfGeneratorService.generatePDF(omData, pdfOptions);
+
+    const uploadsDir = path.join(process.cwd(), 'server', 'uploads', 'om-pdfs');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    const fileName = `om_${documentId}_${Date.now()}.pdf`;
+    const filePath = path.join(uploadsDir, fileName);
+    fs.writeFileSync(filePath, pdfBytes);
+
     const pdfUrl = `/api/om-builder/documents/${documentId}/pdf`;
     
     await db
       .update(omDocuments)
       .set({ 
         pdfUrl,
+        metadata: {
+          ...(document.metadata as object || {}),
+          pdfFileName: fileName,
+          pdfGeneratedAt: new Date().toISOString(),
+          templateType,
+        },
         updatedAt: new Date(),
       })
       .where(eq(omDocuments.id, documentId));
 
     return pdfUrl;
+  }
+
+  private getTemplateTypeFromId(templateId: string | null): PDFTemplateType {
+    if (!templateId) return 'standard';
+    
+    const lowerTemplateId = templateId.toLowerCase();
+    if (lowerTemplateId.includes('executive')) return 'executive';
+    if (lowerTemplateId.includes('premium')) return 'premium';
+    return 'standard';
+  }
+
+  async generatePDFBytes(documentId: string, templateType?: PDFTemplateType): Promise<Uint8Array> {
+    const [document] = await db
+      .select()
+      .from(omDocuments)
+      .where(eq(omDocuments.id, documentId))
+      .limit(1);
+
+    if (!document) {
+      throw new Error('Document not found');
+    }
+
+    const omData = await this.aggregateOMData(document.dealId);
+    if (!omData) {
+      throw new Error('Failed to aggregate deal data');
+    }
+
+    const type = templateType || this.getTemplateTypeFromId(document.templateId);
+    
+    return pdfGeneratorService.generatePDF(omData, { templateType: type });
+  }
+
+  async getPDFFilePath(documentId: string): Promise<string | null> {
+    const [document] = await db
+      .select()
+      .from(omDocuments)
+      .where(eq(omDocuments.id, documentId))
+      .limit(1);
+
+    if (!document || !document.metadata) {
+      return null;
+    }
+
+    const metadata = document.metadata as { pdfFileName?: string };
+    if (!metadata.pdfFileName) {
+      return null;
+    }
+
+    const filePath = path.join(process.cwd(), 'server', 'uploads', 'om-pdfs', metadata.pdfFileName);
+    if (fs.existsSync(filePath)) {
+      return filePath;
+    }
+
+    return null;
   }
 
   async getDocumentsByDeal(dealId: string): Promise<OmDocument[]> {

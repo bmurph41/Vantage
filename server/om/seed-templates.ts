@@ -5,9 +5,95 @@ import { eq, and } from "drizzle-orm";
 interface SystemTemplate {
   name: string;
   scope: 'system' | 'organization' | 'user';
-  category: 'om' | 'ic_memo' | 'executive_summary' | 'page' | 'block';
+  category: 'om' | 'ic_memo' | 'executive_summary' | 'page' | 'block' | 'pdf';
   content: any;
 }
+
+const PDF_TEMPLATES: SystemTemplate[] = [
+  {
+    name: "Standard PDF Template",
+    scope: "system",
+    category: "pdf",
+    content: {
+      templateType: "standard",
+      description: "Basic marina overview, 2-3 pages with essential property and financial information",
+      pageCount: { min: 2, max: 3 },
+      sections: [
+        { name: "Cover Page", included: true },
+        { name: "Property Overview", included: true },
+        { name: "Financial Summary", included: true },
+        { name: "Rent Roll Summary", included: true },
+        { name: "Investment Highlights", included: true },
+        { name: "Disclaimer", included: true },
+      ],
+      settings: {
+        headerLogo: true,
+        footerPageNumbers: true,
+        confidentialMark: true,
+        colorScheme: "professional",
+      }
+    }
+  },
+  {
+    name: "Premium PDF Template",
+    scope: "system",
+    category: "pdf",
+    content: {
+      templateType: "premium",
+      description: "Detailed financials with charts and projections, 5-7 pages",
+      pageCount: { min: 5, max: 7 },
+      sections: [
+        { name: "Cover Page", included: true },
+        { name: "Executive Summary", included: true },
+        { name: "Property Overview", included: true },
+        { name: "Financial Summary", included: true },
+        { name: "Revenue Projections", included: true },
+        { name: "Rent Roll Summary", included: true },
+        { name: "Operations Overview", included: true },
+        { name: "Investment Highlights", included: true },
+        { name: "Disclaimer", included: true },
+      ],
+      settings: {
+        headerLogo: true,
+        footerPageNumbers: true,
+        confidentialMark: true,
+        includeCharts: true,
+        colorScheme: "premium",
+      }
+    }
+  },
+  {
+    name: "Executive PDF Template",
+    scope: "system",
+    category: "pdf",
+    content: {
+      templateType: "executive",
+      description: "Full comprehensive report with all details, 8-12 pages",
+      pageCount: { min: 8, max: 12 },
+      sections: [
+        { name: "Cover Page", included: true },
+        { name: "Table of Contents", included: true },
+        { name: "Executive Summary", included: true },
+        { name: "Property Overview", included: true },
+        { name: "Financial Summary", included: true },
+        { name: "Revenue Projections & Analysis", included: true },
+        { name: "Rent Roll Analysis", included: true },
+        { name: "Operations Overview", included: true },
+        { name: "Investment Highlights & Value Proposition", included: true },
+        { name: "Terms & Disclaimer", included: true },
+      ],
+      settings: {
+        headerLogo: true,
+        footerPageNumbers: true,
+        confidentialMark: true,
+        includeCharts: true,
+        includeTableOfContents: true,
+        detailedAnalysis: true,
+        colorScheme: "executive",
+      }
+    }
+  },
+];
 
 const SYSTEM_TEMPLATES: SystemTemplate[] = [
   {
@@ -259,7 +345,42 @@ export async function seedSystemTemplates(): Promise<{ created: number; skipped:
   let created = 0;
   let skipped = 0;
 
-  for (const template of SYSTEM_TEMPLATES) {
+  const allTemplates = [...PDF_TEMPLATES, ...SYSTEM_TEMPLATES];
+
+  for (const template of allTemplates) {
+    const existing = await db
+      .select()
+      .from(omTemplates)
+      .where(
+        and(
+          eq(omTemplates.name, template.name),
+          eq(omTemplates.scope, template.scope)
+        )
+      );
+
+    if (existing.length > 0) {
+      skipped++;
+      continue;
+    }
+
+    await db.insert(omTemplates).values({
+      name: template.name,
+      scope: template.scope,
+      category: template.category,
+      content: template.content,
+      userId: 'system',
+    });
+    created++;
+  }
+
+  return { created, skipped };
+}
+
+export async function seedPDFTemplates(): Promise<{ created: number; skipped: number }> {
+  let created = 0;
+  let skipped = 0;
+
+  for (const template of PDF_TEMPLATES) {
     const existing = await db
       .select()
       .from(omTemplates)
