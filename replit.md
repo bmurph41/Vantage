@@ -38,6 +38,10 @@ The platform uses React 18 with TypeScript and Wouter for routing. The UI is bui
 - **Content Aggregation**: DockTalk 2.0 for industry intelligence with an institutional-grade scraper (feature-flagged) and Listing Ingestion V2 for robust listing aggregation (feature-flagged).
 - **OM Builder**: Professional offering memorandum creation with data binding and PDF export.
 - **Cross-Module Architecture**: Comprehensive system for connecting CRM, Due Diligence, Modeling, and DockTalk via database schema consolidation, a query key factory for cache invalidation, a Deal Orchestrator Service, Entity Linking API, and a Cross-Module Event System.
+- **Marina Integration Adapters**: Abstract adapter framework for connecting to 10+ marina management systems (DockMaster, Dockwa, Storable Marine, Marina Office) with OAuth handling, rate limiting, retry logic, and automatic sync recording.
+- **Operations Data Sync**: Pipeline connecting Fuel Sales, Rent Roll V2, and Ship Store modules to marina integrations with real-time sync capabilities.
+- **Unified Analytics Dashboard**: Cross-module analytics aggregating metrics from CRM, DD, Modeling, and Operations with time period filtering and trend visualization.
+- **OM Builder**: Professional offering memorandum generation with template system, multi-module data aggregation, and PDF export.
 
 ### Dual-Sourced Data Architecture
 The platform implements a dual-sourced data model separating "Universal/Global" curated data from user-specific data:
