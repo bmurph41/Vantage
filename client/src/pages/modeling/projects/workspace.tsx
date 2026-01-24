@@ -63,6 +63,7 @@ import RentRollDataTab from './workspace/rent-roll-data';
 import ModelingProjectIntegrationPanel from '@/components/modeling/ModelingProjectIntegrationPanel';
 import WorkspaceProFormaCharts from './workspace/pro-forma-charts';
 import ScenarioComparisonCharts from './workspace/scenario-comparison-charts';
+import ExportModel from './workspace/export-model';
 
 export default function ProjectWorkspace() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -313,6 +314,10 @@ export default function ProjectWorkspace() {
               <Layers className="h-4 w-4" />
               <span className="hidden sm:inline">Compare</span>
             </TabsTrigger>
+            <TabsTrigger value="export" className="gap-2" data-testid="tab-export">
+              <FileSpreadsheet className="h-4 w-4" />
+              <span className="hidden sm:inline">Export</span>
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -406,6 +411,10 @@ export default function ProjectWorkspace() {
 
         <TabsContent value="scenario-compare" className="space-y-6">
           <ScenarioComparisonCharts projectId={projectId!} onTabChange={setActiveTab} />
+        </TabsContent>
+
+        <TabsContent value="export" className="space-y-6">
+          <ExportModel projectId={projectId!} projectName={project.marinaName} onTabChange={setActiveTab} />
         </TabsContent>
       </Tabs>
     </div>

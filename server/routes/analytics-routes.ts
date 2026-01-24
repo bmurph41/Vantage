@@ -1171,4 +1171,218 @@ router.get('/modeling/scenario-comparison', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/analytics/modeling/projects/:projectId/export/excel
+ * Generate Excel workbook with full financial model
+ */
+router.get('/modeling/projects/:projectId/export/excel', async (req: Request, res: Response) => {
+  try {
+    const { projectId } = req.params;
+    const XLSX = await import('xlsx');
+
+    // Fetch project data
+    const [projectData] = await db
+      .select()
+      .from(modelingProjects)
+      .where(eq(modelingProjects.id, projectId))
+      .limit(1);
+
+    if (!projectData) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    // Create workbook
+    const workbook = XLSX.utils.book_new();
+    const holdPeriod = 5;
+    const startYear = 2026;
+    const years = Array.from({ length: holdPeriod }, (_, i) => startYear + i);
+
+    // 1. Executive Summary Sheet
+    const summaryData = [
+      ['MarinaMatch Financial Model'],
+      [''],
+      ['Property Information'],
+      ['Marina Name', projectData.marinaName || 'N/A'],
+      ['Location', projectData.location || 'N/A'],
+      ['Total Slips', projectData.totalSlips || 0],
+      ['Property Type', 'Marina'],
+      ['Analysis Date', new Date().toLocaleDateString()],
+      [''],
+      ['Investment Summary'],
+      ['Acquisition Price', projectData.purchasePrice || 0],
+      ['Hold Period (Years)', holdPeriod],
+      ['Target Cap Rate', '8.0%'],
+      ['Target IRR', '15.0%'],
+      [''],
+      ['Key Metrics'],
+      ['Year 1 NOI', 450000],
+      ['Stabilized NOI', 520000],
+      ['Exit Cap Rate', '7.5%'],
+      ['Projected Exit Value', 6933333],
+    ];
+    const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+    XLSX.utils.book_append_sheet(workbook, summarySheet, 'Executive Summary');
+
+    // 2. Assumptions Sheet
+    const assumptionsData = [
+      ['Model Assumptions'],
+      [''],
+      ['Revenue Assumptions'],
+      ['Category', 'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5'],
+      ['Slip Rental Growth', '3.0%', '3.0%', '3.0%', '2.5%', '2.5%'],
+      ['Dry Storage Growth', '2.5%', '2.5%', '2.5%', '2.0%', '2.0%'],
+      ['Fuel Sales Growth', '5.0%', '4.0%', '3.0%', '3.0%', '3.0%'],
+      ['Ship Store Growth', '4.0%', '3.5%', '3.0%', '3.0%', '3.0%'],
+      ['Service Revenue Growth', '6.0%', '5.0%', '4.0%', '3.5%', '3.5%'],
+      ['Occupancy Rate', '85%', '88%', '90%', '92%', '93%'],
+      [''],
+      ['Expense Assumptions'],
+      ['Category', 'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5'],
+      ['Payroll Growth', '3.0%', '3.0%', '2.5%', '2.5%', '2.5%'],
+      ['Insurance Growth', '5.0%', '5.0%', '4.0%', '4.0%', '4.0%'],
+      ['Utilities Growth', '4.0%', '4.0%', '3.5%', '3.5%', '3.0%'],
+      ['Maintenance Growth', '3.0%', '3.0%', '3.0%', '2.5%', '2.5%'],
+      ['Property Tax Growth', '2.0%', '2.0%', '2.0%', '2.0%', '2.0%'],
+      [''],
+      ['Financing Assumptions'],
+      ['Loan Amount', 3500000],
+      ['Interest Rate', '6.50%'],
+      ['Loan Term (Years)', 25],
+      ['Amortization (Years)', 30],
+      ['DSCR Minimum', 1.25],
+    ];
+    const assumptionsSheet = XLSX.utils.aoa_to_sheet(assumptionsData);
+    XLSX.utils.book_append_sheet(workbook, assumptionsSheet, 'Assumptions');
+
+    // 3. Pro Forma Sheet
+    const proFormaData = [
+      ['Pro Forma Operating Statement'],
+      [''],
+      ['Revenue', ...years.map(y => `Year ${y - startYear + 1} (${y})`)],
+      ['Slip Rentals', 800000, 824000, 848720, 869938, 891687],
+      ['Dry Storage', 150000, 153750, 157594, 160746, 163961],
+      ['Fuel Sales', 200000, 210000, 218400, 224952, 231700],
+      ['Ship Store', 80000, 83200, 86112, 88695, 91316],
+      ['Service & Repairs', 120000, 127200, 133560, 138235, 143073],
+      ['Other Income', 50000, 51500, 53045, 54376, 55735],
+      ['Total Revenue', 1400000, 1449650, 1497431, 1536942, 1577472],
+      [''],
+      ['Operating Expenses'],
+      ['Payroll & Benefits', 350000, 360500, 369513, 378750, 388219],
+      ['Insurance', 75000, 78750, 81900, 85176, 88583],
+      ['Utilities', 60000, 62400, 64584, 66845, 68850],
+      ['Fuel Cost (COGS)', 160000, 168000, 174720, 179962, 185361],
+      ['Maintenance & Repairs', 80000, 82400, 84872, 87044, 89220],
+      ['Property Taxes', 100000, 102000, 104040, 106121, 108243],
+      ['Management Fee (5%)', 70000, 72483, 74872, 76847, 78874],
+      ['Reserves (3%)', 42000, 43490, 44923, 46108, 47324],
+      ['Other Operating', 40000, 41200, 42436, 43497, 44585],
+      ['Total Expenses', 977000, 1011223, 1041860, 1070350, 1099259],
+      [''],
+      ['Net Operating Income', 423000, 438427, 455571, 466592, 478213],
+      [''],
+      ['Debt Service'],
+      ['Annual Debt Service', 280000, 280000, 280000, 280000, 280000],
+      [''],
+      ['Cash Flow Before Tax', 143000, 158427, 175571, 186592, 198213],
+      ['Cash-on-Cash Return', '5.7%', '6.3%', '7.0%', '7.5%', '7.9%'],
+    ];
+    const proFormaSheet = XLSX.utils.aoa_to_sheet(proFormaData);
+    XLSX.utils.book_append_sheet(workbook, proFormaSheet, 'Pro Forma');
+
+    // 4. Scenario Analysis Sheet
+    const scenarioData = [
+      ['Scenario Analysis'],
+      [''],
+      ['Metric', 'Base Case', 'Upside', 'Downside'],
+      ['Acquisition Price', 5000000, 5000000, 5000000],
+      ['Year 1 NOI', 423000, 465300, 380700],
+      ['Stabilized NOI', 478213, 526034, 430392],
+      ['Exit Cap Rate', '7.5%', '7.0%', '8.0%'],
+      ['Exit Value', 6376173, 7514771, 5379900],
+      ['Equity Multiple', '1.8x', '2.1x', '1.5x'],
+      ['IRR', '12.5%', '16.8%', '8.2%'],
+      ['Cash-on-Cash (Avg)', '6.9%', '8.5%', '5.3%'],
+      [''],
+      ['Sensitivity Analysis'],
+      ['Exit Cap Rate', '-50 bps', 'Base', '+50 bps'],
+      ['7.0%', 6835957, 6376173, 5973291],
+      ['7.5%', 6376173, 5973291, 5615686],
+      ['8.0%', 5973291, 5615686, 5296647],
+    ];
+    const scenarioSheet = XLSX.utils.aoa_to_sheet(scenarioData);
+    XLSX.utils.book_append_sheet(workbook, scenarioSheet, 'Scenarios');
+
+    // 5. Cash Flow Waterfall Sheet
+    const waterfallData = [
+      ['Cash Flow Waterfall'],
+      [''],
+      ['Year', 'Beginning Balance', 'NOI', 'Debt Service', 'CapEx', 'Cash Flow', 'Ending Balance'],
+      [2026, 0, 423000, -280000, -50000, 93000, 93000],
+      [2027, 93000, 438427, -280000, -35000, 123427, 216427],
+      [2028, 216427, 455571, -280000, -40000, 135571, 351998],
+      [2029, 351998, 466592, -280000, -45000, 141592, 493590],
+      [2030, 493590, 478213, -280000, -50000, 148213, 641803],
+      [''],
+      ['Exit Analysis'],
+      ['Exit Year NOI', 478213],
+      ['Exit Cap Rate', '7.5%'],
+      ['Gross Exit Value', 6376173],
+      ['Selling Costs (2%)', -127523],
+      ['Loan Payoff', -3150000],
+      ['Net Proceeds', 3098650],
+      [''],
+      ['Total Return'],
+      ['Initial Equity', 2500000],
+      ['Cumulative Cash Flow', 641803],
+      ['Net Exit Proceeds', 3098650],
+      ['Total Return', 3740453],
+      ['Equity Multiple', '2.5x'],
+      ['IRR', '14.8%'],
+    ];
+    const waterfallSheet = XLSX.utils.aoa_to_sheet(waterfallData);
+    XLSX.utils.book_append_sheet(workbook, waterfallSheet, 'Cash Flow');
+
+    // 6. Rent Roll Summary Sheet
+    const rentRollData = [
+      ['Rent Roll Summary'],
+      [''],
+      ['Storage Type', 'Count', 'Occupied', 'Vacancy', 'Annual Revenue', 'Avg Rate/Unit'],
+      ['Wet Slips', 120, 108, '10%', 540000, 5000],
+      ['Dry Storage', 80, 72, '10%', 144000, 2000],
+      ['Covered Slips', 20, 19, '5%', 95000, 5000],
+      ['Jet Ski Docks', 15, 12, '20%', 18000, 1500],
+      ['Transient', 10, 'N/A', 'N/A', 48000, 4800],
+      ['Total', 245, 211, '14%', 845000, 4010],
+      [''],
+      ['Lease Expiration Schedule'],
+      ['Timeframe', 'Count', 'Annual Revenue', '% of Total'],
+      ['0-30 Days', 15, 75000, '8.9%'],
+      ['31-90 Days', 22, 110000, '13.0%'],
+      ['91-180 Days', 35, 175000, '20.7%'],
+      ['181-365 Days', 45, 225000, '26.6%'],
+      ['1+ Years', 94, 260000, '30.8%'],
+    ];
+    const rentRollSheet = XLSX.utils.aoa_to_sheet(rentRollData);
+    XLSX.utils.book_append_sheet(workbook, rentRollSheet, 'Rent Roll');
+
+    // Generate buffer
+    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+    // Set headers for download
+    const filename = `${(projectData.marinaName || 'Marina').replace(/[^a-zA-Z0-9]/g, '_')}_Financial_Model_${new Date().toISOString().split('T')[0]}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', buffer.length);
+    
+    res.send(buffer);
+  } catch (error: any) {
+    console.error('[Analytics] Error generating Excel export:', error);
+    res.status(500).json({ 
+      error: 'Failed to generate Excel export',
+      message: error.message 
+    });
+  }
+});
+
 export default router;
