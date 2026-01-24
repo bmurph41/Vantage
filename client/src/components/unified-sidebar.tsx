@@ -196,7 +196,10 @@ export default function UnifiedSidebar() {
 
   // Helper function to check if user has access to Rent Roll (requires owner, investor, broker, operations, or modeling_tools pack)
   // Operations pack and Underwriting Tools (modeling_tools) pack include Rent Roll as a bundled feature
+  // In development mode, always show Rent Roll for testing
   const hasRentRollAccess = (): boolean => {
+    const isDev = import.meta.env.DEV || import.meta.env.MODE === 'development';
+    if (isDev) return true;
     return hasPack('owner') || hasPack('investor') || hasPack('broker') || hasPack('operations') || hasPack('modeling_tools');
   };
 
