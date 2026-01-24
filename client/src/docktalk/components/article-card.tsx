@@ -1,13 +1,19 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { updateBookmarkStatus, toggleArticleLike, recordArticleView } from "../lib/api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createBookmark, deleteBookmark, checkBookmarkStatus, addToReadingList, removeFromReadingList, checkReadingListStatus, toggleArticleLike, recordArticleView } from "../lib/api";
 import { Article } from "../types/article";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
-import { Bookmark, Share2, ExternalLink, Heart, Clock, Building2 } from "lucide-react";
+import { Bookmark, Share2, ExternalLink, Heart, Clock, Building2, BookOpen, ListPlus } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ArticleCardProps {
   article: Article;
@@ -54,6 +60,21 @@ export default function ArticleCard({ article, featured = false }: ArticleCardPr
   const primaryCategory = (article.categories && article.categories[0]) || article.category || "General";
   const primaryCategoryStyle = CATEGORY_COLORS[primaryCategory] || CATEGORY_COLORS["General"];
 
+  const { data: bookmarkStatus } = useQuery({
+    queryKey: ['/api/docktalk/bookmarks', article.id, 'status'],
+    queryFn: () => checkBookmarkStatus(article.id),
+    staleTime: 30000,
+  });
+
+  const { data: readingListStatus } = useQuery({
+    queryKey: ['/api/docktalk/reading-list', article.id, 'status'],
+    queryFn: () => checkReadingListStatus(article.id),
+    staleTime: 30000,
+  });
+
+  const isBookmarked = bookmarkStatus?.isBookmarked || false;
+  const inReadingList = readingListStatus?.inReadingList || false;
+
   const likeMutation = useMutation({
     mutationFn: () => toggleArticleLike(article.id),
     onMutate: async () => {
@@ -74,15 +95,21 @@ export default function ArticleCard({ article, featured = false }: ArticleCardPr
   });
 
   const bookmarkMutation = useMutation({
-    mutationFn: ({ id, isBookmarked }: { id: number; isBookmarked: boolean }) =>
-      updateBookmarkStatus(id, isBookmarked),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/articles'] });
+    mutationFn: async (action: 'add' | 'remove') => {
+      if (action === 'add') {
+        return createBookmark(article.id);
+      } else {
+        return deleteBookmark(article.id);
+      }
+    },
+    onSuccess: (_, action) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/bookmarks'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/bookmarks', article.id, 'status'] });
       toast({
-        title: article.isBookmarked ? "Bookmark removed" : "Article bookmarked",
-        description: article.isBookmarked 
-          ? "Article removed from your saved items"
-          : "Article saved to your bookmarks",
+        title: action === 'add' ? "Article bookmarked" : "Bookmark removed",
+        description: action === 'add' 
+          ? "Article saved to your bookmarks"
+          : "Article removed from your saved items",
       });
     },
     onError: (error) => {
@@ -94,12 +121,46 @@ export default function ArticleCard({ article, featured = false }: ArticleCardPr
     },
   });
 
+  const readingListMutation = useMutation({
+    mutationFn: async ({ action, priority }: { action: 'add' | 'remove'; priority?: 'low' | 'medium' | 'high' }) => {
+      if (action === 'add') {
+        return addToReadingList(article.id, priority);
+      } else {
+        return removeFromReadingList(article.id);
+      }
+    },
+    onSuccess: (_, { action }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/reading-list'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/docktalk/reading-list', article.id, 'status'] });
+      toast({
+        title: action === 'add' ? "Added to reading list" : "Removed from reading list",
+        description: action === 'add' 
+          ? "Article added to your reading list"
+          : "Article removed from your reading list",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update reading list",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleBookmark = (e: React.MouseEvent) => {
     e.stopPropagation();
-    bookmarkMutation.mutate({
-      id: article.id,
-      isBookmarked: !article.isBookmarked
-    });
+    bookmarkMutation.mutate(isBookmarked ? 'remove' : 'add');
+  };
+
+  const handleAddToReadingList = (e: React.MouseEvent, priority: 'low' | 'medium' | 'high') => {
+    e.stopPropagation();
+    readingListMutation.mutate({ action: 'add', priority });
+  };
+
+  const handleRemoveFromReadingList = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    readingListMutation.mutate({ action: 'remove' });
   };
 
   const handleShare = (e: React.MouseEvent) => {
@@ -238,12 +299,54 @@ export default function ArticleCard({ article, featured = false }: ArticleCardPr
                   disabled={bookmarkMutation.isPending}
                   className={cn(
                     "h-7 w-7",
-                    article.isBookmarked ? "text-amber-500 hover:text-amber-600" : "text-gray-400 hover:text-gray-600"
+                    isBookmarked ? "text-amber-500 hover:text-amber-600" : "text-gray-400 hover:text-gray-600"
                   )}
                   data-testid={`button-bookmark-${article.id}`}
+                  title={isBookmarked ? "Remove bookmark" : "Bookmark article"}
                 >
-                  <Bookmark className={cn("h-3.5 w-3.5", article.isBookmarked && "fill-current")} />
+                  <Bookmark className={cn("h-3.5 w-3.5", isBookmarked && "fill-current")} />
                 </Button>
+
+                {inReadingList ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleRemoveFromReadingList}
+                    disabled={readingListMutation.isPending}
+                    className="h-7 w-7 text-blue-500 hover:text-blue-600"
+                    title="Remove from reading list"
+                    data-testid={`button-reading-list-${article.id}`}
+                  >
+                    <BookOpen className="h-3.5 w-3.5 fill-current" />
+                  </Button>
+                ) : (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        disabled={readingListMutation.isPending}
+                        className="h-7 w-7 text-gray-400 hover:text-gray-600"
+                        onClick={(e) => e.stopPropagation()}
+                        title="Add to reading list"
+                        data-testid={`button-reading-list-${article.id}`}
+                      >
+                        <ListPlus className="h-3.5 w-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenuItem onClick={(e) => handleAddToReadingList(e as any, 'high')}>
+                        High Priority
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => handleAddToReadingList(e as any, 'medium')}>
+                        Medium Priority
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => handleAddToReadingList(e as any, 'low')}>
+                        Low Priority
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
                 
                 <Button
                   variant="ghost"

@@ -477,3 +477,360 @@ export async function fetchUserLikedArticles(): Promise<number[]> {
   
   return response.json();
 }
+
+// ============================================================================
+// USER BOOKMARKS API
+// ============================================================================
+
+export interface UserBookmark {
+  id: number;
+  userId: string;
+  orgId: string;
+  articleId: number;
+  notes: string | null;
+  createdAt: string;
+  article: Article;
+}
+
+export async function fetchUserBookmarks(): Promise<UserBookmark[]> {
+  const response = await fetch(`${API_BASE}/bookmarks`, {
+    credentials: "include",
+  });
+  
+  if (!response.ok) {
+    throw new Error("Failed to fetch bookmarks");
+  }
+  
+  return response.json();
+}
+
+export async function createBookmark(articleId: number, notes?: string): Promise<UserBookmark> {
+  const response = await fetch(`${API_BASE}/bookmarks/${articleId}`, {
+    method: "POST",
+    credentials: "include",
+    headers: getHeaders(),
+    body: JSON.stringify({ notes }),
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(errorData.error || "Failed to create bookmark");
+  }
+  
+  return response.json();
+}
+
+export async function deleteBookmark(articleId: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/bookmarks/${articleId}`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: getHeaders(false),
+  });
+  
+  if (!response.ok) {
+    throw new Error("Failed to delete bookmark");
+  }
+}
+
+export async function checkBookmarkStatus(articleId: number): Promise<{ isBookmarked: boolean }> {
+  const response = await fetch(`${API_BASE}/bookmarks/${articleId}/status`, {
+    credentials: "include",
+  });
+  
+  if (!response.ok) {
+    throw new Error("Failed to check bookmark status");
+  }
+  
+  return response.json();
+}
+
+// ============================================================================
+// USER READING LIST API
+// ============================================================================
+
+export interface ReadingListItem {
+  id: number;
+  userId: string;
+  orgId: string;
+  articleId: number;
+  priority: "low" | "medium" | "high";
+  status: "unread" | "reading" | "completed";
+  notes: string | null;
+  addedAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  article: Article;
+}
+
+export async function fetchReadingList(status?: string): Promise<ReadingListItem[]> {
+  const params = new URLSearchParams();
+  if (status) {
+    params.append("status", status);
+  }
+  
+  const response = await fetch(`${API_BASE}/reading-list?${params}`, {
+    credentials: "include",
+  });
+  
+  if (!response.ok) {
+    throw new Error("Failed to fetch reading list");
+  }
+  
+  return response.json();
+}
+
+export async function addToReadingList(articleId: number, priority?: "low" | "medium" | "high", notes?: string): Promise<ReadingListItem> {
+  const response = await fetch(`${API_BASE}/reading-list/${articleId}`, {
+    method: "POST",
+    credentials: "include",
+    headers: getHeaders(),
+    body: JSON.stringify({ priority, notes }),
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(errorData.error || "Failed to add to reading list");
+  }
+  
+  return response.json();
+}
+
+export async function updateReadingListItem(articleId: number, updates: {
+  priority?: "low" | "medium" | "high";
+  status?: "unread" | "reading" | "completed";
+  notes?: string;
+}): Promise<ReadingListItem> {
+  const response = await fetch(`${API_BASE}/reading-list/${articleId}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: getHeaders(),
+    body: JSON.stringify(updates),
+  });
+  
+  if (!response.ok) {
+    throw new Error("Failed to update reading list item");
+  }
+  
+  return response.json();
+}
+
+export async function removeFromReadingList(articleId: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/reading-list/${articleId}`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: getHeaders(false),
+  });
+  
+  if (!response.ok) {
+    throw new Error("Failed to remove from reading list");
+  }
+}
+
+export async function checkReadingListStatus(articleId: number): Promise<{ inReadingList: boolean; item: ReadingListItem | null }> {
+  const response = await fetch(`${API_BASE}/reading-list/${articleId}/status`, {
+    credentials: "include",
+  });
+  
+  if (!response.ok) {
+    throw new Error("Failed to check reading list status");
+  }
+  
+  return response.json();
+}
+
+// ============================================================================
+// M&A ALERTS API
+// ============================================================================
+
+export interface MaAlert {
+  id: string;
+  userId: string;
+  orgId: string;
+  name: string;
+  keywords: string[];
+  dealTypes: string[] | null;
+  regions: string[] | null;
+  emailEnabled: boolean;
+  pushEnabled: boolean;
+  frequency: "immediate" | "daily" | "weekly";
+  isActive: boolean;
+  lastTriggeredAt: string | null;
+  matchCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function fetchMaAlerts(): Promise<MaAlert[]> {
+  const response = await fetch(`${API_BASE}/alerts`, {
+    credentials: "include",
+  });
+  
+  if (!response.ok) {
+    throw new Error("Failed to fetch M&A alerts");
+  }
+  
+  return response.json();
+}
+
+export async function createMaAlert(data: {
+  name: string;
+  keywords: string[];
+  dealTypes?: string[];
+  regions?: string[];
+  emailEnabled?: boolean;
+  pushEnabled?: boolean;
+  frequency?: "immediate" | "daily" | "weekly";
+}): Promise<MaAlert> {
+  const response = await fetch(`${API_BASE}/alerts`, {
+    method: "POST",
+    credentials: "include",
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(errorData.error || "Failed to create M&A alert");
+  }
+  
+  return response.json();
+}
+
+export async function updateMaAlert(alertId: string, updates: Partial<{
+  name: string;
+  keywords: string[];
+  dealTypes: string[];
+  regions: string[];
+  emailEnabled: boolean;
+  pushEnabled: boolean;
+  frequency: "immediate" | "daily" | "weekly";
+  isActive: boolean;
+}>): Promise<MaAlert> {
+  const response = await fetch(`${API_BASE}/alerts/${alertId}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: getHeaders(),
+    body: JSON.stringify(updates),
+  });
+  
+  if (!response.ok) {
+    throw new Error("Failed to update M&A alert");
+  }
+  
+  return response.json();
+}
+
+export async function deleteMaAlert(alertId: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/alerts/${alertId}`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: getHeaders(false),
+  });
+  
+  if (!response.ok) {
+    throw new Error("Failed to delete M&A alert");
+  }
+}
+
+// ============================================================================
+// DIGEST PREFERENCES API
+// ============================================================================
+
+export interface DigestPreferences {
+  id: string;
+  userId: string;
+  orgId: string;
+  emailAddress: string;
+  frequency: "daily" | "weekly";
+  dayOfWeek: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" | null;
+  timeOfDay: string;
+  timezone: string;
+  categories: string[] | null;
+  includeDeals: boolean;
+  includeSummaries: boolean;
+  includeTrending: boolean;
+  maxArticles: number;
+  enabled: boolean;
+  lastSentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function fetchDigestPreferences(): Promise<DigestPreferences | null> {
+  const response = await fetch(`${API_BASE}/digest`, {
+    credentials: "include",
+  });
+  
+  if (!response.ok) {
+    throw new Error("Failed to fetch digest preferences");
+  }
+  
+  return response.json();
+}
+
+export async function saveDigestPreferences(data: {
+  emailAddress: string;
+  frequency?: "daily" | "weekly";
+  dayOfWeek?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday";
+  timeOfDay?: string;
+  timezone?: string;
+  categories?: string[];
+  includeDeals?: boolean;
+  includeSummaries?: boolean;
+  includeTrending?: boolean;
+  maxArticles?: number;
+  enabled?: boolean;
+}): Promise<DigestPreferences> {
+  const response = await fetch(`${API_BASE}/digest`, {
+    method: "POST",
+    credentials: "include",
+    headers: getHeaders(),
+    body: JSON.stringify(data),
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(errorData.error || "Failed to save digest preferences");
+  }
+  
+  return response.json();
+}
+
+export async function updateDigestPreferences(updates: Partial<{
+  emailAddress: string;
+  frequency: "daily" | "weekly";
+  dayOfWeek: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday";
+  timeOfDay: string;
+  timezone: string;
+  categories: string[];
+  includeDeals: boolean;
+  includeSummaries: boolean;
+  includeTrending: boolean;
+  maxArticles: number;
+  enabled: boolean;
+}>): Promise<DigestPreferences> {
+  const response = await fetch(`${API_BASE}/digest`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: getHeaders(),
+    body: JSON.stringify(updates),
+  });
+  
+  if (!response.ok) {
+    throw new Error("Failed to update digest preferences");
+  }
+  
+  return response.json();
+}
+
+export async function deleteDigestPreferences(): Promise<void> {
+  const response = await fetch(`${API_BASE}/digest`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: getHeaders(false),
+  });
+  
+  if (!response.ok) {
+    throw new Error("Failed to delete digest preferences");
+  }
+}

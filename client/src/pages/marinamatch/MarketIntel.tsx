@@ -23,11 +23,17 @@ import {
   ExternalLink, Star, Clock, Filter, Fuel, Store,
   Wrench, ArrowUpDown, Building, Info, Globe, Loader2,
   Settings, ChevronDown, ChevronUp, Plus, Check, X, Radar, Pencil, Mail, AlertTriangle, Flag, MessageSquareWarning, Trash2,
-  ShoppingBag, FolderKanban, Rss, Crown
+  ShoppingBag, FolderKanban, Rss, Crown, ShieldCheck, ShieldAlert, Copy
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { format, formatDistanceToNow } from "date-fns";
+import { 
+  ConfidenceBadge, 
+  VerificationBadge, 
+  getConfidenceTier, 
+  type VerificationStatus 
+} from "@/components/marketplace/ConfidenceBadge";
 
 interface MarinaListing {
   id: string;
@@ -49,6 +55,10 @@ interface MarinaListing {
   sourceUrl: string;
   bestMatchScore?: number;
   extractionConfidence?: number;
+  identityConfidence?: number;
+  verificationStatus?: VerificationStatus;
+  potentialDuplicates?: number;
+  isVerified?: boolean;
   hasFuel?: boolean;
   hasShipStore?: boolean;
   hasRestaurant?: boolean;
@@ -873,7 +883,7 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
                     <div className="flex-1 p-4">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <h3 className="font-semibold text-base">{listing.propertyName || listing.title}</h3>
                             {listing.scope === 'global' && (
                               <Badge variant="default" className="text-xs bg-blue-500 hover:bg-blue-600">
@@ -884,6 +894,27 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
                             <Badge variant="outline" className={`text-xs ${getSourceBadgeStyle(listing.sourcePlatform)}`}>
                               {listing.sourcePlatform}
                             </Badge>
+                            {listing.verificationStatus && (
+                              <VerificationBadge 
+                                status={listing.verificationStatus} 
+                                size="sm" 
+                              />
+                            )}
+                            {listing.identityConfidence !== undefined && listing.identityConfidence > 0 && (
+                              <ConfidenceBadge 
+                                confidence={listing.identityConfidence} 
+                                size="sm"
+                              />
+                            )}
+                            {listing.potentialDuplicates !== undefined && listing.potentialDuplicates > 0 && (
+                              <Badge 
+                                variant="outline" 
+                                className="text-xs bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900 dark:text-orange-200"
+                              >
+                                <Copy className="h-3 w-3 mr-1" />
+                                {listing.potentialDuplicates} {listing.potentialDuplicates === 1 ? 'match' : 'matches'}
+                              </Badge>
+                            )}
                             {listing.askingPrice && (
                               <span className="flex items-center gap-1 font-semibold text-green-600 dark:text-green-400 ml-auto text-sm">
                                 <DollarSign className="h-4 w-4" />
@@ -914,6 +945,12 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
                             {listing.brokerCompany && (
                               <span className="text-xs">
                                 via {listing.brokerCompany}
+                              </span>
+                            )}
+                            {listing.isVerified && (
+                              <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                                <ShieldCheck className="h-3 w-3" />
+                                Verified
                               </span>
                             )}
                           </div>

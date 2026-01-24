@@ -951,3 +951,174 @@ export type AiTrainingSession = typeof aiTrainingSessions.$inferSelect;
 export type InsertAiTrainingSession = z.infer<typeof insertAiTrainingSessionSchema>;
 export type AiTrainingAnalytics = typeof aiTrainingAnalytics.$inferSelect;
 export type InsertAiTrainingAnalytics = z.infer<typeof insertAiTrainingAnalyticsSchema>;
+
+// ============================================================================
+// USER BOOKMARKS & READING LIST
+// ============================================================================
+
+// User Bookmarks - per-user article bookmarking with optional notes
+export const userBookmarks = pgTable("docktalk_user_bookmarks", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull(),
+  articleId: integer("article_id").notNull().references(() => articles.id, { onDelete: "cascade" }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  byUser: index("idx_docktalk_bookmarks_user").on(table.userId),
+  byOrg: index("idx_docktalk_bookmarks_org").on(table.orgId),
+  byArticle: index("idx_docktalk_bookmarks_article").on(table.articleId),
+  uniqueUserArticle: uniqueIndex("idx_docktalk_bookmarks_unique").on(table.userId, table.articleId),
+}));
+
+// Reading List Status enum
+export const readingListStatusEnum = pgEnum("docktalk_reading_list_status", ["unread", "reading", "completed"]);
+export const readingListPriorityEnum = pgEnum("docktalk_reading_list_priority", ["low", "medium", "high"]);
+
+// User Reading List - articles to read later with priority and status tracking
+export const userReadingList = pgTable("docktalk_user_reading_list", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull(),
+  articleId: integer("article_id").notNull().references(() => articles.id, { onDelete: "cascade" }),
+  priority: readingListPriorityEnum("priority").notNull().default("medium"),
+  status: readingListStatusEnum("status").notNull().default("unread"),
+  notes: text("notes"),
+  addedAt: timestamp("added_at").defaultNow(),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+}, (table) => ({
+  byUser: index("idx_docktalk_reading_list_user").on(table.userId),
+  byOrg: index("idx_docktalk_reading_list_org").on(table.orgId),
+  byArticle: index("idx_docktalk_reading_list_article").on(table.articleId),
+  byStatus: index("idx_docktalk_reading_list_status").on(table.status),
+  byPriority: index("idx_docktalk_reading_list_priority").on(table.priority),
+  uniqueUserArticle: uniqueIndex("idx_docktalk_reading_list_unique").on(table.userId, table.articleId),
+}));
+
+// ============================================================================
+// M&A DEAL ALERTS
+// ============================================================================
+
+// M&A Alert frequency enum
+export const maAlertFrequencyEnum = pgEnum("docktalk_ma_alert_frequency", ["immediate", "daily", "weekly"]);
+
+// M&A Alerts - keyword-based deal notification subscriptions
+export const maAlerts = pgTable("docktalk_ma_alerts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull(),
+  name: text("name").notNull(),
+  keywords: text("keywords").array().notNull(),
+  dealTypes: text("deal_types").array(), // acquisition, merger, sale, investment, partnership
+  regions: text("regions").array(),
+  emailEnabled: boolean("email_enabled").notNull().default(true),
+  pushEnabled: boolean("push_enabled").notNull().default(false),
+  frequency: maAlertFrequencyEnum("frequency").notNull().default("daily"),
+  isActive: boolean("is_active").notNull().default(true),
+  lastTriggeredAt: timestamp("last_triggered_at"),
+  matchCount: integer("match_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  byUser: index("idx_docktalk_ma_alerts_user").on(table.userId),
+  byOrg: index("idx_docktalk_ma_alerts_org").on(table.orgId),
+  byActive: index("idx_docktalk_ma_alerts_active").on(table.isActive),
+}));
+
+// M&A Alert Matches - tracks which articles matched which alerts
+export const maAlertMatches = pgTable("docktalk_ma_alert_matches", {
+  id: serial("id").primaryKey(),
+  alertId: varchar("alert_id").notNull().references(() => maAlerts.id, { onDelete: "cascade" }),
+  articleId: integer("article_id").notNull().references(() => articles.id, { onDelete: "cascade" }),
+  matchedKeywords: text("matched_keywords").array().notNull(),
+  matchScore: integer("match_score").notNull().default(0),
+  notified: boolean("notified").notNull().default(false),
+  notifiedAt: timestamp("notified_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  byAlert: index("idx_docktalk_ma_matches_alert").on(table.alertId),
+  byArticle: index("idx_docktalk_ma_matches_article").on(table.articleId),
+  byNotified: index("idx_docktalk_ma_matches_notified").on(table.notified),
+  uniqueAlertArticle: uniqueIndex("idx_docktalk_ma_matches_unique").on(table.alertId, table.articleId),
+}));
+
+// ============================================================================
+// DIGEST EMAIL PREFERENCES
+// ============================================================================
+
+// Digest frequency enum
+export const digestFrequencyEnum = pgEnum("docktalk_digest_frequency", ["daily", "weekly"]);
+export const digestDayOfWeekEnum = pgEnum("docktalk_digest_day", ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]);
+
+// Digest Preferences - user preferences for scheduled digest emails
+export const digestPreferences = pgTable("docktalk_digest_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull(),
+  emailAddress: text("email_address").notNull(),
+  frequency: digestFrequencyEnum("frequency").notNull().default("daily"),
+  dayOfWeek: digestDayOfWeekEnum("day_of_week").default("monday"),
+  timeOfDay: text("time_of_day").notNull().default("09:00"),
+  timezone: text("timezone").notNull().default("America/New_York"),
+  categories: text("categories").array(),
+  includeDeals: boolean("include_deals").notNull().default(true),
+  includeSummaries: boolean("include_summaries").notNull().default(true),
+  includeTrending: boolean("include_trending").notNull().default(true),
+  maxArticles: integer("max_articles").notNull().default(10),
+  enabled: boolean("enabled").notNull().default(true),
+  lastSentAt: timestamp("last_sent_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  byUser: index("idx_docktalk_digest_prefs_user").on(table.userId),
+  byOrg: index("idx_docktalk_digest_prefs_org").on(table.orgId),
+  byEnabled: index("idx_docktalk_digest_prefs_enabled").on(table.enabled),
+  byFrequency: index("idx_docktalk_digest_prefs_frequency").on(table.frequency),
+}));
+
+// Insert schemas for new tables
+export const insertUserBookmarkSchema = createInsertSchema(userBookmarks).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertUserReadingListSchema = createInsertSchema(userReadingList).omit({
+  id: true,
+  addedAt: true,
+  startedAt: true,
+  completedAt: true,
+});
+
+export const insertMaAlertSchema = createInsertSchema(maAlerts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastTriggeredAt: true,
+  matchCount: true,
+});
+
+export const insertMaAlertMatchSchema = createInsertSchema(maAlertMatches).omit({
+  id: true,
+  createdAt: true,
+  notifiedAt: true,
+});
+
+export const insertDigestPreferencesSchema = createInsertSchema(digestPreferences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastSentAt: true,
+});
+
+// Types for new tables
+export type UserBookmark = typeof userBookmarks.$inferSelect;
+export type InsertUserBookmark = z.infer<typeof insertUserBookmarkSchema>;
+export type UserReadingListItem = typeof userReadingList.$inferSelect;
+export type InsertUserReadingListItem = z.infer<typeof insertUserReadingListSchema>;
+export type MaAlert = typeof maAlerts.$inferSelect;
+export type InsertMaAlert = z.infer<typeof insertMaAlertSchema>;
+export type MaAlertMatch = typeof maAlertMatches.$inferSelect;
+export type InsertMaAlertMatch = z.infer<typeof insertMaAlertMatchSchema>;
+export type DigestPreferences = typeof digestPreferences.$inferSelect;
+export type InsertDigestPreferences = z.infer<typeof insertDigestPreferencesSchema>;

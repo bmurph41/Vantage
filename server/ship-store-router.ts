@@ -371,6 +371,174 @@ router.post('/transactions', async (req: Request, res: Response) => {
 
 // ===== DASHBOARD METRICS =====
 
+router.get('/inventory/low-stock', async (req: Request, res: Response) => {
+  try {
+    const result = await db.select({
+      id: shipStoreProducts.id,
+      name: shipStoreProducts.name,
+      currentStock: shipStoreProducts.stock,
+      reorderPoint: shipStoreProducts.lowStockThreshold,
+      category: shipStoreCategories.name,
+    })
+    .from(shipStoreProducts)
+    .leftJoin(shipStoreCategories, eq(shipStoreProducts.categoryId, shipStoreCategories.id))
+    .where(
+      and(
+        eq(shipStoreProducts.isActive, true),
+        sql`${shipStoreProducts.stock} <= ${shipStoreProducts.lowStockThreshold}`
+      )
+    )
+    .orderBy(shipStoreProducts.stock);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching low stock items' });
+  }
+});
+
+router.get('/products/top-selling', async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const orgId = user?.organizationId || user?.orgId;
+    const days = parseInt(req.query.days as string) || 30;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const topProducts = await db.execute(sql`
+      SELECT 
+        item->>'productId' as id,
+        item->>'name' as name,
+        c.name as category,
+        SUM((item->>'quantity')::numeric) as "unitsSold",
+        SUM((item->>'price')::numeric * (item->>'quantity')::numeric) as revenue
+      FROM ship_store_transactions t,
+      jsonb_array_elements(t.items) as item
+      LEFT JOIN ship_store_products p ON p.id = (item->>'productId')
+      LEFT JOIN ship_store_categories c ON c.id = p.category_id
+      WHERE t.created_at >= ${startDate.toISOString()}
+        AND (${orgId}::text IS NULL OR t.org_id = ${orgId})
+      GROUP BY item->>'productId', item->>'name', c.name
+      ORDER BY revenue DESC
+      LIMIT 10
+    `);
+
+    res.json(topProducts.rows);
+  } catch (error) {
+    console.error('Error fetching top selling products:', error);
+    res.status(500).json({ message: 'Error fetching top selling products' });
+  }
+});
+
+router.get('/sales/by-category', async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const orgId = user?.organizationId || user?.orgId;
+    const days = parseInt(req.query.days as string) || 30;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const categoryRevenue = await db.execute(sql`
+      SELECT 
+        COALESCE(c.name, 'Other') as category,
+        SUM((item->>'price')::numeric * (item->>'quantity')::numeric) as revenue
+      FROM ship_store_transactions t,
+      jsonb_array_elements(t.items) as item
+      LEFT JOIN ship_store_products p ON p.id = (item->>'productId')
+      LEFT JOIN ship_store_categories c ON c.id = p.category_id
+      WHERE t.created_at >= ${startDate.toISOString()}
+        AND (${orgId}::text IS NULL OR t.org_id = ${orgId})
+      GROUP BY COALESCE(c.name, 'Other')
+      ORDER BY revenue DESC
+    `);
+
+    res.json(categoryRevenue.rows);
+  } catch (error) {
+    console.error('Error fetching sales by category:', error);
+    res.status(500).json({ message: 'Error fetching sales by category' });
+  }
+});
+
+router.get('/sales/trend', async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const orgId = user?.organizationId || user?.orgId;
+    const days = parseInt(req.query.days as string) || 30;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    const endDate = new Date();
+
+    const salesTrend = await db.execute(sql`
+      SELECT 
+        TO_CHAR(d::date, 'Mon DD') as date,
+        COALESCE(SUM(CAST(t.total AS DECIMAL)), 0)::numeric as revenue,
+        COALESCE(COUNT(t.id), 0)::int as transactions
+      FROM generate_series(
+        ${startDate.toISOString().split('T')[0]}::date,
+        ${endDate.toISOString().split('T')[0]}::date,
+        '1 day'::interval
+      ) d
+      LEFT JOIN ship_store_transactions t ON DATE(t.created_at) = d::date
+        AND (${orgId}::text IS NULL OR t.org_id = ${orgId})
+      GROUP BY d
+      ORDER BY d
+    `);
+
+    res.json(salesTrend.rows);
+  } catch (error) {
+    console.error('Error fetching sales trend:', error);
+    res.status(500).json({ message: 'Error fetching sales trend' });
+  }
+});
+
+router.get('/inventory/turnover', async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const orgId = user?.organizationId || user?.orgId;
+    
+    const [inventoryStats] = await db.select({
+      totalValue: sql<number>`COALESCE(SUM(${shipStoreProducts.stock} * ${shipStoreProducts.cost}), 0)`,
+      totalProducts: sql<number>`COUNT(*)`,
+      lowStockCount: sql<number>`SUM(CASE WHEN ${shipStoreProducts.stock} <= ${shipStoreProducts.lowStockThreshold} THEN 1 ELSE 0 END)`,
+      deadStockCount: sql<number>`SUM(CASE WHEN ${shipStoreProducts.stock} = 0 THEN 1 ELSE 0 END)`,
+    })
+    .from(shipStoreProducts)
+    .where(eq(shipStoreProducts.isActive, true));
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const [salesStats] = await db.select({
+      totalSales: sql<number>`COALESCE(SUM(${shipStoreTransactions.total}), 0)`,
+    })
+    .from(shipStoreTransactions)
+    .where(
+      and(
+        orgId ? eq(shipStoreTransactions.orgId, orgId) : undefined,
+        gte(shipStoreTransactions.createdAt, thirtyDaysAgo)
+      )
+    );
+
+    const avgInventory = (inventoryStats?.totalValue || 0);
+    const monthlySales = salesStats?.totalSales || 0;
+    const annualizedSales = monthlySales * 12;
+    const turnoverRate = avgInventory > 0 ? annualizedSales / avgInventory : 0;
+    const daysOfInventory = monthlySales > 0 ? Math.round((avgInventory / monthlySales) * 30) : 0;
+    const sellThroughRate = Math.min(100, Math.round((monthlySales / (avgInventory || 1)) * 100));
+    const stockCoverage = monthlySales > 0 ? Math.round((avgInventory / (monthlySales / 4))) : 0;
+
+    res.json({
+      turnoverRate: Math.round(turnoverRate * 10) / 10,
+      daysOfInventory,
+      sellThroughRate,
+      stockCoverage,
+      deadStockCount: inventoryStats?.deadStockCount || 0,
+      lowStockCount: inventoryStats?.lowStockCount || 0,
+    });
+  } catch (error) {
+    console.error('Error fetching inventory turnover:', error);
+    res.status(500).json({ message: 'Error fetching inventory turnover' });
+  }
+});
+
 router.get('/dashboard/metrics', async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;

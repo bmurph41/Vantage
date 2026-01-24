@@ -5,6 +5,7 @@ import { liv2Repo } from '../listings/ingestion_v2/storage/repo';
 import { runListingScrape } from '../listings/ingestion_v2/runner/runScrape';
 import { checkMarketplaceScrapeUrl, getAllowedMarinaDomains } from '../listings/ingestion_v2/fetch/ssrfGuard';
 import { findDuplicatesInBatch, findDuplicatesForListing } from '../listings/ingestion_v2/identity/duplicateDetector';
+import { BROKER_SOURCES, getActiveBrokerSources, getBrokerSourcesByType, getBrokerSourcesByFrequency } from '../listings/ingestion_v2/brokerSources';
 
 const router = Router();
 
@@ -224,6 +225,154 @@ router.get('/status', (req, res) => {
     },
     allowedDomains: getAllowedMarinaDomains(),
   });
+});
+
+router.get('/broker-sources', (req, res) => {
+  const { type, frequency, activeOnly } = req.query;
+  
+  let sources = BROKER_SOURCES;
+  
+  if (type && typeof type === 'string') {
+    sources = getBrokerSourcesByType(type as any);
+  }
+  
+  if (frequency && typeof frequency === 'string') {
+    sources = sources.filter(s => s.frequency === frequency);
+  }
+  
+  if (activeOnly === 'true') {
+    sources = sources.filter(s => s.isActive);
+  }
+  
+  res.json({
+    sources: sources.map(s => ({
+      name: s.name,
+      domain: s.domain,
+      type: s.type,
+      sourceType: s.sourceType,
+      frequency: s.frequency,
+      isActive: s.isActive,
+      description: s.description,
+      rules: {
+        urlPatterns: s.rules.urlPatterns,
+        rateLimit: s.rules.rateLimit,
+      },
+    })),
+    totalCount: sources.length,
+    activeCount: sources.filter(s => s.isActive).length,
+    bySourceType: {
+      broker: sources.filter(s => s.sourceType === 'broker').length,
+      listing_site: sources.filter(s => s.sourceType === 'listing_site').length,
+      mls: sources.filter(s => s.sourceType === 'mls').length,
+    },
+    byFrequency: {
+      weekly: sources.filter(s => s.frequency === 'weekly').length,
+      'bi-weekly': sources.filter(s => s.frequency === 'bi-weekly').length,
+      daily: sources.filter(s => s.frequency === 'daily').length,
+      monthly: sources.filter(s => s.frequency === 'monthly').length,
+    },
+  });
+});
+
+router.post('/broker-sources/seed', checkLiv2Enabled, async (req, res) => {
+  try {
+    const activeSources = getActiveBrokerSources();
+    const results: Array<{ domain: string; status: 'created' | 'exists' | 'error'; id?: string; error?: string }> = [];
+    
+    for (const source of activeSources) {
+      try {
+        const existing = await liv2Repo.getSourceByDomain(source.domain);
+        
+        if (existing) {
+          results.push({ domain: source.domain, status: 'exists', id: existing.id });
+          continue;
+        }
+        
+        const created = await liv2Repo.createSource({
+          name: source.name,
+          domain: source.domain,
+          type: source.type,
+          rules: source.rules,
+          isActive: source.isActive,
+        });
+        
+        results.push({ domain: source.domain, status: 'created', id: created.id });
+      } catch (error) {
+        results.push({ domain: source.domain, status: 'error', error: (error as Error).message });
+      }
+    }
+    
+    res.json({
+      success: true,
+      summary: {
+        total: activeSources.length,
+        created: results.filter(r => r.status === 'created').length,
+        existing: results.filter(r => r.status === 'exists').length,
+        errors: results.filter(r => r.status === 'error').length,
+      },
+      results,
+    });
+  } catch (error) {
+    console.error('[Marketplace] Seed broker sources error:', error);
+    res.status(500).json({ error: 'Failed to seed broker sources', message: (error as Error).message });
+  }
+});
+
+router.get('/identity-resolution/:listingId', checkLiv2Enabled, async (req, res) => {
+  try {
+    const { listingId } = req.params;
+    const listing = await liv2Repo.getCurrentListingById(listingId);
+    
+    if (!listing) {
+      return res.status(404).json({ error: 'Listing not found' });
+    }
+    
+    const allListings = await liv2Repo.getCurrentListings({ limit: 500 });
+    const duplicates = findDuplicatesForListing(listing, allListings, 50);
+    
+    const getVerificationStatus = (confidence: number): 'verified' | 'unverified' | 'potential_duplicate' => {
+      if (confidence >= 90) return 'potential_duplicate';
+      if (confidence >= 70) return 'unverified';
+      return 'verified';
+    };
+    
+    const getConfidenceTier = (confidence: number): 'high' | 'medium' | 'low' => {
+      if (confidence >= 90) return 'high';
+      if (confidence >= 70) return 'medium';
+      return 'low';
+    };
+    
+    res.json({
+      listing: {
+        id: listing.id,
+        canonicalListingId: listing.canonicalListingId,
+        title: listing.title,
+        city: listing.city,
+        state: listing.state,
+        domain: listing.domain,
+      },
+      identityResolution: {
+        isVerified: duplicates.length === 0,
+        verificationStatus: duplicates.length > 0 
+          ? getVerificationStatus(duplicates[0].confidence) 
+          : 'verified',
+        potentialDuplicates: duplicates.length,
+        matches: duplicates.map(d => ({
+          matchedListingId: d.listing2.canonicalListingId,
+          matchedTitle: d.listing2.title,
+          matchedDomain: d.listing2.domain,
+          confidence: d.confidence,
+          confidencePercent: `${d.confidence}%`,
+          confidenceTier: getConfidenceTier(d.confidence),
+          matchReasons: d.matchReasons,
+          scores: d.scores,
+        })),
+      },
+    });
+  } catch (error) {
+    console.error('[Marketplace] Identity resolution error:', error);
+    res.status(500).json({ error: 'Failed to get identity resolution data' });
+  }
 });
 
 export default router;

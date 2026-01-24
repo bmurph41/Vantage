@@ -1,4 +1,4 @@
-import { users, articles, rssSources, systemStats, savedFilters, savedSearches, userArticleAnnotations, portfolioCompanies, notifications, articleFingerprints, articleDuplicates, userNotificationPreferences, articleRemovalPatterns, userFilterPreferences, entities, articleEntities, watchlists, watchlistEntities, organizationFeatures, userTagLibrary, articleTagAssignments, articleFeedback, articleViews, articleLikes, type User, type InsertUser, type Article, type InsertArticle, type RssSource, type InsertRssSource, type SystemStats, type SavedFilter, type InsertSavedFilter, type SavedSearch, type InsertSavedSearch, type UserArticleAnnotation, type InsertUserArticleAnnotation, type PortfolioCompany, type InsertPortfolioCompany, type Notification, type InsertNotification, type UserNotificationPreferences, type InsertUserNotificationPreferences, type ArticleRemovalPattern, type InsertArticleRemovalPattern, type UserFilterPreferences, type InsertUserFilterPreferences, type Entity, type InsertEntity, type ArticleEntity, type InsertArticleEntity, type Watchlist, type InsertWatchlist, type WatchlistEntity, type InsertWatchlistEntity, type UserTag, type InsertUserTag, type ArticleTagAssignment, type InsertArticleTagAssignment, type ArticleFeedback, type InsertArticleFeedback, type ArticleView, type InsertArticleView, type ArticleLike, type InsertArticleLike } from "@shared/docktalk-schema";
+import { users, articles, rssSources, systemStats, savedFilters, savedSearches, userArticleAnnotations, portfolioCompanies, notifications, articleFingerprints, articleDuplicates, userNotificationPreferences, articleRemovalPatterns, userFilterPreferences, entities, articleEntities, watchlists, watchlistEntities, organizationFeatures, userTagLibrary, articleTagAssignments, articleFeedback, articleViews, articleLikes, userBookmarks, userReadingList, maAlerts, maAlertMatches, digestPreferences, type User, type InsertUser, type Article, type InsertArticle, type RssSource, type InsertRssSource, type SystemStats, type SavedFilter, type InsertSavedFilter, type SavedSearch, type InsertSavedSearch, type UserArticleAnnotation, type InsertUserArticleAnnotation, type PortfolioCompany, type InsertPortfolioCompany, type Notification, type InsertNotification, type UserNotificationPreferences, type InsertUserNotificationPreferences, type ArticleRemovalPattern, type InsertArticleRemovalPattern, type UserFilterPreferences, type InsertUserFilterPreferences, type Entity, type InsertEntity, type ArticleEntity, type InsertArticleEntity, type Watchlist, type InsertWatchlist, type WatchlistEntity, type InsertWatchlistEntity, type UserTag, type InsertUserTag, type ArticleTagAssignment, type InsertArticleTagAssignment, type ArticleFeedback, type InsertArticleFeedback, type ArticleView, type InsertArticleView, type ArticleLike, type InsertArticleLike, type UserBookmark, type InsertUserBookmark, type UserReadingListItem, type InsertUserReadingListItem, type MaAlert, type InsertMaAlert, type MaAlertMatch, type InsertMaAlertMatch, type DigestPreferences, type InsertDigestPreferences } from "@shared/docktalk-schema";
 import { docktalkDeals, crmCompanies, type DocktalkDeal, type InsertDocktalkDeal, type CrmCompany } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, ilike, and, or, gte, lte, sql, count, inArray } from "drizzle-orm";
@@ -239,6 +239,41 @@ export interface IStorage {
   getUnprocessedFeedback(limit?: number): Promise<ArticleFeedback[]>;
   markFeedbackProcessed(id: number): Promise<void>;
   getFeedbackStats(userId: string, orgId: string): Promise<{ totalFeedback: number; helpfulCount: number; irrelevantCount: number; duplicateCount: number; lowQualityCount: number; byType: Array<{ type: string; count: number }> }>;
+
+  // User Bookmark methods
+  getUserBookmarks(userId: string, orgId: string): Promise<(UserBookmark & { article: Article })[]>;
+  createBookmark(bookmark: InsertUserBookmark): Promise<UserBookmark>;
+  getBookmark(userId: string, articleId: number): Promise<UserBookmark | undefined>;
+  updateBookmarkNotes(userId: string, articleId: number, notes: string): Promise<UserBookmark | undefined>;
+  deleteBookmark(userId: string, articleId: number): Promise<boolean>;
+  isArticleBookmarked(userId: string, articleId: number): Promise<boolean>;
+
+  // User Reading List methods
+  getUserReadingList(userId: string, orgId: string, status?: string): Promise<(UserReadingListItem & { article: Article })[]>;
+  addToReadingList(item: InsertUserReadingListItem): Promise<UserReadingListItem>;
+  getReadingListItem(userId: string, articleId: number): Promise<UserReadingListItem | undefined>;
+  updateReadingListItem(userId: string, articleId: number, updates: Partial<InsertUserReadingListItem>): Promise<UserReadingListItem | undefined>;
+  removeFromReadingList(userId: string, articleId: number): Promise<boolean>;
+  isArticleInReadingList(userId: string, articleId: number): Promise<boolean>;
+
+  // M&A Alert methods
+  getMaAlerts(userId: string, orgId: string): Promise<MaAlert[]>;
+  createMaAlert(alert: InsertMaAlert): Promise<MaAlert>;
+  getMaAlertById(id: string, userId: string, orgId: string): Promise<MaAlert | undefined>;
+  updateMaAlert(id: string, userId: string, orgId: string, updates: Partial<InsertMaAlert>): Promise<MaAlert | undefined>;
+  deleteMaAlert(id: string, userId: string, orgId: string): Promise<boolean>;
+  getActiveMaAlertsForMatching(): Promise<MaAlert[]>;
+  createMaAlertMatch(match: InsertMaAlertMatch): Promise<MaAlertMatch>;
+  getUnnotifiedAlertMatches(alertId: string): Promise<(MaAlertMatch & { article: Article })[]>;
+  markAlertMatchesNotified(alertId: string): Promise<void>;
+
+  // Digest Preferences methods
+  getDigestPreferences(userId: string, orgId: string): Promise<DigestPreferences | undefined>;
+  createDigestPreferences(prefs: InsertDigestPreferences): Promise<DigestPreferences>;
+  updateDigestPreferences(userId: string, orgId: string, updates: Partial<InsertDigestPreferences>): Promise<DigestPreferences | undefined>;
+  deleteDigestPreferences(userId: string, orgId: string): Promise<boolean>;
+  getActiveDigestPreferencesForFrequency(frequency: string): Promise<DigestPreferences[]>;
+  updateDigestLastSent(userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2376,6 +2411,339 @@ export class DatabaseStorage implements IStorage {
       lowQualityCount: byType['low_quality'] || 0,
       byType: Object.entries(byType).map(([type, count]) => ({ type, count }))
     };
+  }
+
+  // User Bookmark methods
+  async getUserBookmarks(userId: string, orgId: string): Promise<(UserBookmark & { article: Article })[]> {
+    const bookmarks = await db
+      .select()
+      .from(userBookmarks)
+      .where(and(
+        eq(userBookmarks.userId, userId),
+        eq(userBookmarks.orgId, orgId)
+      ))
+      .orderBy(desc(userBookmarks.createdAt));
+    
+    const result: (UserBookmark & { article: Article })[] = [];
+    for (const bookmark of bookmarks) {
+      const [article] = await db
+        .select()
+        .from(articles)
+        .where(eq(articles.id, bookmark.articleId));
+      if (article) {
+        result.push({ ...bookmark, article });
+      }
+    }
+    return result;
+  }
+
+  async createBookmark(bookmark: InsertUserBookmark): Promise<UserBookmark> {
+    const [created] = await db
+      .insert(userBookmarks)
+      .values(bookmark)
+      .returning();
+    return created;
+  }
+
+  async getBookmark(userId: string, articleId: number): Promise<UserBookmark | undefined> {
+    const [bookmark] = await db
+      .select()
+      .from(userBookmarks)
+      .where(and(
+        eq(userBookmarks.userId, userId),
+        eq(userBookmarks.articleId, articleId)
+      ));
+    return bookmark || undefined;
+  }
+
+  async updateBookmarkNotes(userId: string, articleId: number, notes: string): Promise<UserBookmark | undefined> {
+    const [updated] = await db
+      .update(userBookmarks)
+      .set({ notes })
+      .where(and(
+        eq(userBookmarks.userId, userId),
+        eq(userBookmarks.articleId, articleId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteBookmark(userId: string, articleId: number): Promise<boolean> {
+    const result = await db
+      .delete(userBookmarks)
+      .where(and(
+        eq(userBookmarks.userId, userId),
+        eq(userBookmarks.articleId, articleId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  async isArticleBookmarked(userId: string, articleId: number): Promise<boolean> {
+    const bookmark = await this.getBookmark(userId, articleId);
+    return !!bookmark;
+  }
+
+  // User Reading List methods
+  async getUserReadingList(userId: string, orgId: string, status?: string): Promise<(UserReadingListItem & { article: Article })[]> {
+    const conditions = [
+      eq(userReadingList.userId, userId),
+      eq(userReadingList.orgId, orgId)
+    ];
+    
+    if (status) {
+      conditions.push(eq(userReadingList.status, status as any));
+    }
+    
+    const items = await db
+      .select()
+      .from(userReadingList)
+      .where(and(...conditions))
+      .orderBy(desc(userReadingList.priority), desc(userReadingList.addedAt));
+    
+    const result: (UserReadingListItem & { article: Article })[] = [];
+    for (const item of items) {
+      const [article] = await db
+        .select()
+        .from(articles)
+        .where(eq(articles.id, item.articleId));
+      if (article) {
+        result.push({ ...item, article });
+      }
+    }
+    return result;
+  }
+
+  async addToReadingList(item: InsertUserReadingListItem): Promise<UserReadingListItem> {
+    const [created] = await db
+      .insert(userReadingList)
+      .values(item)
+      .returning();
+    return created;
+  }
+
+  async getReadingListItem(userId: string, articleId: number): Promise<UserReadingListItem | undefined> {
+    const [item] = await db
+      .select()
+      .from(userReadingList)
+      .where(and(
+        eq(userReadingList.userId, userId),
+        eq(userReadingList.articleId, articleId)
+      ));
+    return item || undefined;
+  }
+
+  async updateReadingListItem(userId: string, articleId: number, updates: Partial<InsertUserReadingListItem>): Promise<UserReadingListItem | undefined> {
+    const updateData: any = { ...updates };
+    
+    if (updates.status === 'reading' && !updateData.startedAt) {
+      updateData.startedAt = new Date();
+    }
+    if (updates.status === 'completed' && !updateData.completedAt) {
+      updateData.completedAt = new Date();
+    }
+    
+    const [updated] = await db
+      .update(userReadingList)
+      .set(updateData)
+      .where(and(
+        eq(userReadingList.userId, userId),
+        eq(userReadingList.articleId, articleId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async removeFromReadingList(userId: string, articleId: number): Promise<boolean> {
+    const result = await db
+      .delete(userReadingList)
+      .where(and(
+        eq(userReadingList.userId, userId),
+        eq(userReadingList.articleId, articleId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  async isArticleInReadingList(userId: string, articleId: number): Promise<boolean> {
+    const item = await this.getReadingListItem(userId, articleId);
+    return !!item;
+  }
+
+  // M&A Alert methods
+  async getMaAlerts(userId: string, orgId: string): Promise<MaAlert[]> {
+    return await db
+      .select()
+      .from(maAlerts)
+      .where(and(
+        eq(maAlerts.userId, userId),
+        eq(maAlerts.orgId, orgId)
+      ))
+      .orderBy(desc(maAlerts.createdAt));
+  }
+
+  async createMaAlert(alert: InsertMaAlert): Promise<MaAlert> {
+    const [created] = await db
+      .insert(maAlerts)
+      .values(alert)
+      .returning();
+    return created;
+  }
+
+  async getMaAlertById(id: string, userId: string, orgId: string): Promise<MaAlert | undefined> {
+    const [alert] = await db
+      .select()
+      .from(maAlerts)
+      .where(and(
+        eq(maAlerts.id, id),
+        eq(maAlerts.userId, userId),
+        eq(maAlerts.orgId, orgId)
+      ));
+    return alert || undefined;
+  }
+
+  async updateMaAlert(id: string, userId: string, orgId: string, updates: Partial<InsertMaAlert>): Promise<MaAlert | undefined> {
+    const [updated] = await db
+      .update(maAlerts)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(
+        eq(maAlerts.id, id),
+        eq(maAlerts.userId, userId),
+        eq(maAlerts.orgId, orgId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteMaAlert(id: string, userId: string, orgId: string): Promise<boolean> {
+    const result = await db
+      .delete(maAlerts)
+      .where(and(
+        eq(maAlerts.id, id),
+        eq(maAlerts.userId, userId),
+        eq(maAlerts.orgId, orgId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  async getActiveMaAlertsForMatching(): Promise<MaAlert[]> {
+    return await db
+      .select()
+      .from(maAlerts)
+      .where(eq(maAlerts.isActive, true));
+  }
+
+  async createMaAlertMatch(match: InsertMaAlertMatch): Promise<MaAlertMatch> {
+    const [created] = await db
+      .insert(maAlertMatches)
+      .values(match)
+      .returning();
+    
+    await db
+      .update(maAlerts)
+      .set({ matchCount: sql`${maAlerts.matchCount} + 1` })
+      .where(eq(maAlerts.id, match.alertId));
+    
+    return created;
+  }
+
+  async getUnnotifiedAlertMatches(alertId: string): Promise<(MaAlertMatch & { article: Article })[]> {
+    const matches = await db
+      .select()
+      .from(maAlertMatches)
+      .where(and(
+        eq(maAlertMatches.alertId, alertId),
+        eq(maAlertMatches.notified, false)
+      ))
+      .orderBy(desc(maAlertMatches.createdAt));
+    
+    const result: (MaAlertMatch & { article: Article })[] = [];
+    for (const match of matches) {
+      const [article] = await db
+        .select()
+        .from(articles)
+        .where(eq(articles.id, match.articleId));
+      if (article) {
+        result.push({ ...match, article });
+      }
+    }
+    return result;
+  }
+
+  async markAlertMatchesNotified(alertId: string): Promise<void> {
+    await db
+      .update(maAlertMatches)
+      .set({ notified: true, notifiedAt: new Date() })
+      .where(and(
+        eq(maAlertMatches.alertId, alertId),
+        eq(maAlertMatches.notified, false)
+      ));
+    
+    await db
+      .update(maAlerts)
+      .set({ lastTriggeredAt: new Date() })
+      .where(eq(maAlerts.id, alertId));
+  }
+
+  // Digest Preferences methods
+  async getDigestPreferences(userId: string, orgId: string): Promise<DigestPreferences | undefined> {
+    const [prefs] = await db
+      .select()
+      .from(digestPreferences)
+      .where(and(
+        eq(digestPreferences.userId, userId),
+        eq(digestPreferences.orgId, orgId)
+      ));
+    return prefs || undefined;
+  }
+
+  async createDigestPreferences(prefs: InsertDigestPreferences): Promise<DigestPreferences> {
+    const [created] = await db
+      .insert(digestPreferences)
+      .values(prefs)
+      .returning();
+    return created;
+  }
+
+  async updateDigestPreferences(userId: string, orgId: string, updates: Partial<InsertDigestPreferences>): Promise<DigestPreferences | undefined> {
+    const [updated] = await db
+      .update(digestPreferences)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(
+        eq(digestPreferences.userId, userId),
+        eq(digestPreferences.orgId, orgId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteDigestPreferences(userId: string, orgId: string): Promise<boolean> {
+    const result = await db
+      .delete(digestPreferences)
+      .where(and(
+        eq(digestPreferences.userId, userId),
+        eq(digestPreferences.orgId, orgId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  async getActiveDigestPreferencesForFrequency(frequency: string): Promise<DigestPreferences[]> {
+    return await db
+      .select()
+      .from(digestPreferences)
+      .where(and(
+        eq(digestPreferences.enabled, true),
+        eq(digestPreferences.frequency, frequency as any)
+      ));
+  }
+
+  async updateDigestLastSent(userId: string): Promise<void> {
+    await db
+      .update(digestPreferences)
+      .set({ lastSentAt: new Date() })
+      .where(eq(digestPreferences.userId, userId));
   }
 }
 

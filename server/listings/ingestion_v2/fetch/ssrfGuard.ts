@@ -30,6 +30,17 @@ const ALLOWED_MARINA_DOMAINS = [
   'boatline.com',
   'sailboatlistings.com',
   'marinalife.com',
+  'marinabrokers.com',
+  'merrittsmith.com',
+  'waterfrontventures.com',
+  'marineassetpartners.com',
+  'marinaproperties.com',
+  'coastalmarinainvestments.com',
+  'firstboatmarinas.com',
+  'marinamaxpartners.com',
+  'sunbeltnetwork.com',
+  'bizbuysell.com',
+  'businessbroker.net',
 ];
 
 const PRIVATE_IP_RANGES = [

@@ -3810,5 +3810,467 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
+  // ============================================================================
+  // USER BOOKMARKS ENDPOINTS
+  // ============================================================================
+
+  // Get user's bookmarked articles
+  app.get("/api/docktalk/bookmarks", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const bookmarks = await dockTalkStorage.getUserBookmarks(
+        req.dockTalkUser!.id,
+        req.dockTalkUser!.orgId
+      );
+      res.json(bookmarks);
+    } catch (error) {
+      console.error("Error fetching bookmarks:", error);
+      res.status(500).json({ error: "Failed to fetch bookmarks" });
+    }
+  });
+
+  // Bookmark an article
+  app.post("/api/docktalk/bookmarks/:articleId", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const articleId = parseInt(req.params.articleId);
+      const NotesSchema = z.object({
+        notes: z.string().optional(),
+      });
+      const { notes } = NotesSchema.parse(req.body || {});
+
+      const existing = await dockTalkStorage.getBookmark(req.dockTalkUser!.id, articleId);
+      if (existing) {
+        return res.status(400).json({ error: "Article already bookmarked" });
+      }
+
+      const bookmark = await dockTalkStorage.createBookmark({
+        userId: req.dockTalkUser!.id,
+        orgId: req.dockTalkUser!.orgId,
+        articleId,
+        notes: notes || null,
+      });
+      res.status(201).json(bookmark);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      console.error("Error creating bookmark:", error);
+      res.status(500).json({ error: "Failed to create bookmark" });
+    }
+  });
+
+  // Update bookmark notes
+  app.patch("/api/docktalk/bookmarks/:articleId", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const articleId = parseInt(req.params.articleId);
+      const NotesSchema = z.object({
+        notes: z.string(),
+      });
+      const { notes } = NotesSchema.parse(req.body);
+
+      const updated = await dockTalkStorage.updateBookmarkNotes(req.dockTalkUser!.id, articleId, notes);
+      if (!updated) {
+        return res.status(404).json({ error: "Bookmark not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      console.error("Error updating bookmark:", error);
+      res.status(500).json({ error: "Failed to update bookmark" });
+    }
+  });
+
+  // Remove bookmark
+  app.delete("/api/docktalk/bookmarks/:articleId", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const articleId = parseInt(req.params.articleId);
+      const deleted = await dockTalkStorage.deleteBookmark(req.dockTalkUser!.id, articleId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Bookmark not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting bookmark:", error);
+      res.status(500).json({ error: "Failed to delete bookmark" });
+    }
+  });
+
+  // Check if article is bookmarked
+  app.get("/api/docktalk/bookmarks/:articleId/status", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const articleId = parseInt(req.params.articleId);
+      const isBookmarked = await dockTalkStorage.isArticleBookmarked(req.dockTalkUser!.id, articleId);
+      res.json({ isBookmarked });
+    } catch (error) {
+      console.error("Error checking bookmark status:", error);
+      res.status(500).json({ error: "Failed to check bookmark status" });
+    }
+  });
+
+  // ============================================================================
+  // USER READING LIST ENDPOINTS
+  // ============================================================================
+
+  // Get user's reading list
+  app.get("/api/docktalk/reading-list", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const status = req.query.status as string | undefined;
+      const readingList = await dockTalkStorage.getUserReadingList(
+        req.dockTalkUser!.id,
+        req.dockTalkUser!.orgId,
+        status
+      );
+      res.json(readingList);
+    } catch (error) {
+      console.error("Error fetching reading list:", error);
+      res.status(500).json({ error: "Failed to fetch reading list" });
+    }
+  });
+
+  // Add article to reading list
+  app.post("/api/docktalk/reading-list/:articleId", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const articleId = parseInt(req.params.articleId);
+      const AddSchema = z.object({
+        priority: z.enum(["low", "medium", "high"]).optional().default("medium"),
+        notes: z.string().optional(),
+      });
+      const { priority, notes } = AddSchema.parse(req.body || {});
+
+      const existing = await dockTalkStorage.getReadingListItem(req.dockTalkUser!.id, articleId);
+      if (existing) {
+        return res.status(400).json({ error: "Article already in reading list" });
+      }
+
+      const item = await dockTalkStorage.addToReadingList({
+        userId: req.dockTalkUser!.id,
+        orgId: req.dockTalkUser!.orgId,
+        articleId,
+        priority,
+        status: "unread",
+        notes: notes || null,
+      });
+      res.status(201).json(item);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      console.error("Error adding to reading list:", error);
+      res.status(500).json({ error: "Failed to add to reading list" });
+    }
+  });
+
+  // Update reading list item
+  app.patch("/api/docktalk/reading-list/:articleId", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const articleId = parseInt(req.params.articleId);
+      const UpdateSchema = z.object({
+        priority: z.enum(["low", "medium", "high"]).optional(),
+        status: z.enum(["unread", "reading", "completed"]).optional(),
+        notes: z.string().optional(),
+      });
+      const updates = UpdateSchema.parse(req.body);
+
+      const updated = await dockTalkStorage.updateReadingListItem(req.dockTalkUser!.id, articleId, updates);
+      if (!updated) {
+        return res.status(404).json({ error: "Reading list item not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      console.error("Error updating reading list item:", error);
+      res.status(500).json({ error: "Failed to update reading list item" });
+    }
+  });
+
+  // Remove from reading list
+  app.delete("/api/docktalk/reading-list/:articleId", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const articleId = parseInt(req.params.articleId);
+      const deleted = await dockTalkStorage.removeFromReadingList(req.dockTalkUser!.id, articleId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Reading list item not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error removing from reading list:", error);
+      res.status(500).json({ error: "Failed to remove from reading list" });
+    }
+  });
+
+  // Check if article is in reading list
+  app.get("/api/docktalk/reading-list/:articleId/status", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const articleId = parseInt(req.params.articleId);
+      const item = await dockTalkStorage.getReadingListItem(req.dockTalkUser!.id, articleId);
+      res.json({ 
+        inReadingList: !!item,
+        item: item || null
+      });
+    } catch (error) {
+      console.error("Error checking reading list status:", error);
+      res.status(500).json({ error: "Failed to check reading list status" });
+    }
+  });
+
+  // ============================================================================
+  // M&A ALERTS ENDPOINTS
+  // ============================================================================
+
+  // Get user's M&A alerts
+  app.get("/api/docktalk/alerts", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const alerts = await dockTalkStorage.getMaAlerts(
+        req.dockTalkUser!.id,
+        req.dockTalkUser!.orgId
+      );
+      res.json(alerts);
+    } catch (error) {
+      console.error("Error fetching M&A alerts:", error);
+      res.status(500).json({ error: "Failed to fetch M&A alerts" });
+    }
+  });
+
+  // Create M&A alert
+  app.post("/api/docktalk/alerts", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const AlertSchema = z.object({
+        name: z.string().min(1).max(100),
+        keywords: z.array(z.string()).min(1),
+        dealTypes: z.array(z.string()).optional(),
+        regions: z.array(z.string()).optional(),
+        emailEnabled: z.boolean().optional().default(true),
+        pushEnabled: z.boolean().optional().default(false),
+        frequency: z.enum(["immediate", "daily", "weekly"]).optional().default("daily"),
+      });
+      const data = AlertSchema.parse(req.body);
+
+      const alert = await dockTalkStorage.createMaAlert({
+        ...data,
+        userId: req.dockTalkUser!.id,
+        orgId: req.dockTalkUser!.orgId,
+        isActive: true,
+      });
+      res.status(201).json(alert);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      console.error("Error creating M&A alert:", error);
+      res.status(500).json({ error: "Failed to create M&A alert" });
+    }
+  });
+
+  // Get single M&A alert
+  app.get("/api/docktalk/alerts/:alertId", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const alert = await dockTalkStorage.getMaAlertById(
+        req.params.alertId,
+        req.dockTalkUser!.id,
+        req.dockTalkUser!.orgId
+      );
+      if (!alert) {
+        return res.status(404).json({ error: "Alert not found" });
+      }
+      res.json(alert);
+    } catch (error) {
+      console.error("Error fetching M&A alert:", error);
+      res.status(500).json({ error: "Failed to fetch M&A alert" });
+    }
+  });
+
+  // Update M&A alert
+  app.patch("/api/docktalk/alerts/:alertId", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const UpdateSchema = z.object({
+        name: z.string().min(1).max(100).optional(),
+        keywords: z.array(z.string()).min(1).optional(),
+        dealTypes: z.array(z.string()).optional(),
+        regions: z.array(z.string()).optional(),
+        emailEnabled: z.boolean().optional(),
+        pushEnabled: z.boolean().optional(),
+        frequency: z.enum(["immediate", "daily", "weekly"]).optional(),
+        isActive: z.boolean().optional(),
+      });
+      const updates = UpdateSchema.parse(req.body);
+
+      const updated = await dockTalkStorage.updateMaAlert(
+        req.params.alertId,
+        req.dockTalkUser!.id,
+        req.dockTalkUser!.orgId,
+        updates
+      );
+      if (!updated) {
+        return res.status(404).json({ error: "Alert not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      console.error("Error updating M&A alert:", error);
+      res.status(500).json({ error: "Failed to update M&A alert" });
+    }
+  });
+
+  // Delete M&A alert
+  app.delete("/api/docktalk/alerts/:alertId", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const deleted = await dockTalkStorage.deleteMaAlert(
+        req.params.alertId,
+        req.dockTalkUser!.id,
+        req.dockTalkUser!.orgId
+      );
+      if (!deleted) {
+        return res.status(404).json({ error: "Alert not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting M&A alert:", error);
+      res.status(500).json({ error: "Failed to delete M&A alert" });
+    }
+  });
+
+  // Get unnotified matches for an alert
+  app.get("/api/docktalk/alerts/:alertId/matches", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const alert = await dockTalkStorage.getMaAlertById(
+        req.params.alertId,
+        req.dockTalkUser!.id,
+        req.dockTalkUser!.orgId
+      );
+      if (!alert) {
+        return res.status(404).json({ error: "Alert not found" });
+      }
+
+      const matches = await dockTalkStorage.getUnnotifiedAlertMatches(req.params.alertId);
+      res.json(matches);
+    } catch (error) {
+      console.error("Error fetching alert matches:", error);
+      res.status(500).json({ error: "Failed to fetch alert matches" });
+    }
+  });
+
+  // ============================================================================
+  // DIGEST PREFERENCES ENDPOINTS
+  // ============================================================================
+
+  // Get user's digest preferences
+  app.get("/api/docktalk/digest", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const prefs = await dockTalkStorage.getDigestPreferences(
+        req.dockTalkUser!.id,
+        req.dockTalkUser!.orgId
+      );
+      res.json(prefs || null);
+    } catch (error) {
+      console.error("Error fetching digest preferences:", error);
+      res.status(500).json({ error: "Failed to fetch digest preferences" });
+    }
+  });
+
+  // Create or update digest preferences
+  app.post("/api/docktalk/digest", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const DigestSchema = z.object({
+        emailAddress: z.string().email(),
+        frequency: z.enum(["daily", "weekly"]).optional().default("daily"),
+        dayOfWeek: z.enum(["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]).optional(),
+        timeOfDay: z.string().regex(/^\d{2}:\d{2}$/).optional().default("09:00"),
+        timezone: z.string().optional().default("America/New_York"),
+        categories: z.array(z.string()).optional(),
+        includeDeals: z.boolean().optional().default(true),
+        includeSummaries: z.boolean().optional().default(true),
+        includeTrending: z.boolean().optional().default(true),
+        maxArticles: z.number().int().min(1).max(50).optional().default(10),
+        enabled: z.boolean().optional().default(true),
+      });
+      const data = DigestSchema.parse(req.body);
+
+      const existing = await dockTalkStorage.getDigestPreferences(
+        req.dockTalkUser!.id,
+        req.dockTalkUser!.orgId
+      );
+
+      let result;
+      if (existing) {
+        result = await dockTalkStorage.updateDigestPreferences(
+          req.dockTalkUser!.id,
+          req.dockTalkUser!.orgId,
+          data
+        );
+      } else {
+        result = await dockTalkStorage.createDigestPreferences({
+          ...data,
+          userId: req.dockTalkUser!.id,
+          orgId: req.dockTalkUser!.orgId,
+        });
+      }
+      res.status(existing ? 200 : 201).json(result);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      console.error("Error saving digest preferences:", error);
+      res.status(500).json({ error: "Failed to save digest preferences" });
+    }
+  });
+
+  // Update digest preferences
+  app.patch("/api/docktalk/digest", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const UpdateSchema = z.object({
+        emailAddress: z.string().email().optional(),
+        frequency: z.enum(["daily", "weekly"]).optional(),
+        dayOfWeek: z.enum(["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]).optional(),
+        timeOfDay: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+        timezone: z.string().optional(),
+        categories: z.array(z.string()).optional(),
+        includeDeals: z.boolean().optional(),
+        includeSummaries: z.boolean().optional(),
+        includeTrending: z.boolean().optional(),
+        maxArticles: z.number().int().min(1).max(50).optional(),
+        enabled: z.boolean().optional(),
+      });
+      const updates = UpdateSchema.parse(req.body);
+
+      const updated = await dockTalkStorage.updateDigestPreferences(
+        req.dockTalkUser!.id,
+        req.dockTalkUser!.orgId,
+        updates
+      );
+      if (!updated) {
+        return res.status(404).json({ error: "Digest preferences not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      console.error("Error updating digest preferences:", error);
+      res.status(500).json({ error: "Failed to update digest preferences" });
+    }
+  });
+
+  // Delete digest preferences
+  app.delete("/api/docktalk/digest", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const deleted = await dockTalkStorage.deleteDigestPreferences(
+        req.dockTalkUser!.id,
+        req.dockTalkUser!.orgId
+      );
+      if (!deleted) {
+        return res.status(404).json({ error: "Digest preferences not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting digest preferences:", error);
+      res.status(500).json({ error: "Failed to delete digest preferences" });
+    }
+  });
+
   // DockTalk routes registered successfully
 }
