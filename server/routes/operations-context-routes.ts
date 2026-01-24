@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { randomUUID } from 'crypto';
 import { db } from '../db';
 import { 
   opsPortfolios, opsMarinas, opsFuelTransactions, opsShipStoreSales,
@@ -1038,6 +1039,138 @@ router.get('/projects/:projectId/module-outputs', async (req: Request, res: Resp
   } catch (error) {
     console.error('Error fetching module outputs:', error);
     res.status(500).json({ error: 'Failed to fetch module outputs' });
+  }
+});
+
+// ============================================================================
+// SEED DATA (Development Only)
+// ============================================================================
+
+router.post('/seed', async (req: Request, res: Response) => {
+  try {
+    if (process.env.NODE_ENV !== 'development') {
+      return res.status(403).json({ error: 'Seed only available in development' });
+    }
+    
+    const orgId = getOrgId(req);
+    const userId = getUserId(req);
+    
+    const portfolioId = randomUUID();
+    await db.insert(opsPortfolios).values({
+      id: portfolioId,
+      orgId,
+      userId,
+      name: "Coastal Holdings Portfolio",
+      description: "Primary portfolio of owned marina properties",
+    });
+    
+    const marina1Id = randomUUID();
+    const marina2Id = randomUUID();
+    
+    await db.insert(opsMarinas).values([
+      {
+        id: marina1Id,
+        orgId,
+        portfolioId,
+        name: "Sunset Bay Marina",
+        address: "123 Harbor Drive",
+        city: "Miami",
+        state: "FL",
+        slipCount: 120,
+        wetSlips: 100,
+        dryStorage: 20,
+        ownershipStatus: "OWNED",
+      },
+      {
+        id: marina2Id,
+        orgId,
+        portfolioId,
+        name: "Crystal Cove Marina",
+        address: "456 Ocean Boulevard",
+        city: "Fort Lauderdale",
+        state: "FL",
+        slipCount: 85,
+        wetSlips: 75,
+        dryStorage: 10,
+        ownershipStatus: "OWNED",
+      },
+    ]);
+    
+    const today = new Date();
+    const fuelTransactions = [];
+    
+    for (let i = 0; i < 60; i++) {
+      const txDate = new Date(today);
+      txDate.setDate(txDate.getDate() - i);
+      
+      const numTxToday = Math.floor(Math.random() * 5) + 1;
+      for (let j = 0; j < numTxToday; j++) {
+        const gallons = Math.floor(Math.random() * 150) + 20;
+        const pricePerGallon = 4.25 + (Math.random() * 0.5);
+        const cogs = gallons * (pricePerGallon * 0.75);
+        
+        fuelTransactions.push({
+          id: randomUUID(),
+          orgId,
+          marinaId: i % 2 === 0 ? marina1Id : marina2Id,
+          txnDate: txDate,
+          fuelType: ["DIESEL", "GAS_87", "GAS_93"][Math.floor(Math.random() * 3)] as "DIESEL" | "GAS_87" | "GAS_93",
+          gallons: gallons.toString(),
+          pricePerGallon: pricePerGallon.toFixed(2),
+          grossSales: (gallons * pricePerGallon).toFixed(2),
+          cogs: cogs.toFixed(2),
+        });
+      }
+    }
+    
+    await db.insert(opsFuelTransactions).values(fuelTransactions);
+    
+    const shipStoreSales = [];
+    
+    for (let i = 0; i < 45; i++) {
+      const txDate = new Date(today);
+      txDate.setDate(txDate.getDate() - i);
+      
+      const numSalesToday = Math.floor(Math.random() * 3) + 1;
+      for (let j = 0; j < numSalesToday; j++) {
+        const items = Math.floor(Math.random() * 5) + 1;
+        const subtotal = Math.floor(Math.random() * 200) + 20;
+        const taxRate = 0.07;
+        const tax = subtotal * taxRate;
+        const cogs = subtotal * 0.55;
+        
+        shipStoreSales.push({
+          id: randomUUID(),
+          orgId,
+          marinaId: i % 2 === 0 ? marina1Id : marina2Id,
+          txnDate: txDate,
+          itemCount: items,
+          subtotal: subtotal.toFixed(2),
+          tax: tax.toFixed(2),
+          total: (subtotal + tax).toFixed(2),
+          cogs: cogs.toFixed(2),
+          category: "SUPPLIES",
+        });
+      }
+    }
+    
+    await db.insert(opsShipStoreSales).values(shipStoreSales);
+    
+    res.json({
+      success: true,
+      data: {
+        portfolioId,
+        marinas: [
+          { id: marina1Id, name: "Sunset Bay Marina" },
+          { id: marina2Id, name: "Crystal Cove Marina" },
+        ],
+        fuelTransactions: fuelTransactions.length,
+        shipStoreSales: shipStoreSales.length,
+      }
+    });
+  } catch (error) {
+    console.error('Error seeding operations data:', error);
+    res.status(500).json({ error: 'Failed to seed operations data' });
   }
 });
 

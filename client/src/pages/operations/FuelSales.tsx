@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import {
   Fuel, Plus, Download, Trash2, Edit, Calendar, DollarSign,
-  Droplet, TrendingUp, Filter, X
+  Droplet, TrendingUp, Filter, X, Calculator
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +28,9 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import type { FuelSale } from "@shared/schema";
 import FuelSaleDialog from "@/components/operations/FuelSaleDialog";
+import { GlobalControlsBar } from "@/components/operations/GlobalControlsBar";
+import { KpiRow } from "@/components/operations/KpiRow";
+import { UseInValuatorModal } from "@/components/operations/UseInValuatorModal";
 
 type FuelSaleWithUser = FuelSale & {
   processedByUser?: {
@@ -67,10 +70,23 @@ export default function FuelSales() {
   const [dateRange, setDateRange] = useState({ start: "", end: "" });
   const [fuelTypeFilter, setFuelTypeFilter] = useState<string>("");
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>("");
+  
+  const [selectedMarinaId, setSelectedMarinaId] = useState<string | null>(null);
+  const [selectedTimeframe, setSelectedTimeframe] = useState("ttm");
+  const [showUseInValuator, setShowUseInValuator] = useState(false);
 
-  // Fetch all fuel sales
+  // Fetch all fuel sales with optional marina filter
   const { data: sales = [], isLoading } = useQuery<FuelSaleWithUser[]>({
-    queryKey: ["/api/operations/fuel-sales"],
+    queryKey: ["/api/operations/fuel-sales", selectedMarinaId],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (selectedMarinaId) params.set("marinaId", selectedMarinaId);
+      const res = await fetch(`/api/operations/fuel-sales?${params.toString()}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch fuel sales");
+      return res.json();
+    },
   });
 
   // Fetch stats
@@ -176,8 +192,40 @@ export default function FuelSales() {
       : 0,
   };
 
+  // KPI metrics for the KpiRow component
+  const kpiMetrics = [
+    {
+      label: "Total Sales",
+      value: quickStats.totalSales,
+      format: "number" as const,
+    },
+    {
+      label: "Total Revenue",
+      value: quickStats.totalRevenue,
+      format: "currency" as const,
+    },
+    {
+      label: "Total Gallons",
+      value: quickStats.totalGallons,
+      format: "gallons" as const,
+    },
+    {
+      label: "Avg Price/Gal",
+      value: quickStats.avgPricePerGallon,
+      format: "currency" as const,
+    },
+  ];
+
   return (
     <div className="p-6 space-y-6">
+      {/* Global Controls Bar */}
+      <GlobalControlsBar
+        selectedMarinaId={selectedMarinaId}
+        onMarinaChange={(id) => setSelectedMarinaId(id === "all" ? null : id)}
+        timeframe={selectedTimeframe}
+        onTimeframeChange={setSelectedTimeframe}
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -188,6 +236,16 @@ export default function FuelSales() {
           <p className="text-gray-500 mt-1">Track and manage fuel sales transactions</p>
         </div>
         <div className="flex gap-2">
+          {selectedMarinaId && (
+            <Button 
+              variant="outline" 
+              onClick={() => setShowUseInValuator(true)}
+              data-testid="button-use-in-valuator"
+            >
+              <Calculator className="mr-2 h-4 w-4" />
+              Use in Valuator
+            </Button>
+          )}
           <Button onClick={handleExportCSV} variant="outline" data-testid="button-export-csv">
             <Download className="mr-2 h-4 w-4" />
             Export CSV
@@ -199,60 +257,8 @@ export default function FuelSales() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" data-testid="stat-total-sales">
-              {quickStats.totalSales}
-            </div>
-            <p className="text-xs text-muted-foreground">transactions</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" data-testid="stat-total-revenue">
-              ${quickStats.totalRevenue.toFixed(2)}
-            </div>
-            <p className="text-xs text-muted-foreground">total earnings</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Gallons</CardTitle>
-            <Droplet className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" data-testid="stat-total-gallons">
-              {quickStats.totalGallons.toFixed(2)}
-            </div>
-            <p className="text-xs text-muted-foreground">gallons sold</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Price/Gal</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" data-testid="stat-avg-price">
-              ${quickStats.avgPricePerGallon.toFixed(2)}
-            </div>
-            <p className="text-xs text-muted-foreground">average price</p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Stats KPI Row */}
+      <KpiRow kpis={kpiMetrics} />
 
       {/* Filters */}
       <Card>
@@ -420,6 +426,16 @@ export default function FuelSales() {
         onOpenChange={setShowDialog}
         fuelSale={selectedSale}
       />
+
+      {/* Use in Valuator Modal */}
+      {selectedMarinaId && (
+        <UseInValuatorModal
+          open={showUseInValuator}
+          onOpenChange={setShowUseInValuator}
+          marinaId={selectedMarinaId}
+          module="FUEL"
+        />
+      )}
     </div>
   );
 }

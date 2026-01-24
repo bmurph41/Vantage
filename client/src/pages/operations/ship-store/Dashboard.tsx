@@ -21,13 +21,16 @@ import {
   ArrowDownRight,
   RefreshCw,
   Star,
-  RotateCcw
+  RotateCcw,
+  Calculator
 } from "lucide-react";
 import { AssetSelector } from "@/components/AssetSelector";
 import { ContextIntegrationsPanel } from "@/components/integrations/ContextIntegrationsPanel";
 import { PageTour } from "@/components/onboarding/PageTour";
 import { TOUR_IDS, shipStoreTourSteps } from "@/lib/tour-configs";
 import { SyncStatusBanner } from "@/components/operations/SyncStatusBanner";
+import { GlobalControlsBar } from "@/components/operations/GlobalControlsBar";
+import { UseInValuatorModal } from "@/components/operations/UseInValuatorModal";
 import { 
   BarChart, 
   Bar, 
@@ -48,6 +51,9 @@ const COLORS = ['hsl(var(--primary))', 'hsl(var(--accent))', 'hsl(39, 85%, 59%)'
 
 export default function ShipStoreDashboard() {
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [selectedMarinaId, setSelectedMarinaId] = useState<string | null>(null);
+  const [selectedTimeframe, setSelectedTimeframe] = useState("ttm");
+  const [showUseInValuator, setShowUseInValuator] = useState(false);
 
   const queryKey = selectedAssetId 
     ? ['/api/ship-store/dashboard/metrics', selectedAssetId]
@@ -152,6 +158,14 @@ export default function ShipStoreDashboard() {
       </div>
 
       <div className="p-8 max-w-7xl mx-auto space-y-8">
+        {/* Global Controls Bar */}
+        <GlobalControlsBar
+          selectedMarinaId={selectedMarinaId}
+          onMarinaChange={(id) => setSelectedMarinaId(id === "all" ? null : id)}
+          timeframe={selectedTimeframe}
+          onTimeframeChange={setSelectedTimeframe}
+        />
+
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-2">
             <h1 className="text-3xl font-bold text-gray-900" data-testid="page-title">
@@ -161,11 +175,23 @@ export default function ShipStoreDashboard() {
               Manage your marina ship store inventory, sales, and analytics
             </p>
           </div>
-          <AssetSelector 
-            value={selectedAssetId} 
-            onChange={setSelectedAssetId}
-            className="w-[280px]"
-          />
+          <div className="flex items-center gap-2">
+            {selectedMarinaId && (
+              <Button 
+                variant="outline" 
+                onClick={() => setShowUseInValuator(true)}
+                data-testid="button-use-in-valuator"
+              >
+                <Calculator className="mr-2 h-4 w-4" />
+                Use in Valuator
+              </Button>
+            )}
+            <AssetSelector 
+              value={selectedAssetId} 
+              onChange={setSelectedAssetId}
+              className="w-[280px]"
+            />
+          </div>
         </div>
 
         {/* Key Metrics */}
@@ -509,6 +535,16 @@ export default function ShipStoreDashboard() {
           description="Connect POS and inventory systems to sync data with MarinaMatch."
         />
       </div>
+
+      {/* Use in Valuator Modal */}
+      {selectedMarinaId && (
+        <UseInValuatorModal
+          open={showUseInValuator}
+          onOpenChange={setShowUseInValuator}
+          marinaId={selectedMarinaId}
+          module="SHIP_STORE"
+        />
+      )}
     </div>
   );
 }
