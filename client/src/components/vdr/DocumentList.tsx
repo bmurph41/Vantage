@@ -33,7 +33,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { FileText, Upload, Download, Trash2, MoreVertical, FolderOpen, History, Search, X, Eye } from "lucide-react";
+import { FileText, Upload, Download, Trash2, MoreVertical, FolderOpen, History, Search, X, Eye, Archive, FolderDown } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { VersionHistoryDrawer } from "./VersionHistoryDrawer";
@@ -86,6 +86,7 @@ export function DocumentList({
   const [documentToView, setDocumentToView] = useState<{ id: string; filename: string } | null>(null);
   const [documentUrl, setDocumentUrl] = useState<string | null>(null);
   const [isLoadingDocument, setIsLoadingDocument] = useState(false);
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
 
   const { data: documents = [], isLoading } = useQuery<VdrDocument[]>({
     queryKey: ['/api/vdr/folders', folderId, 'documents'],
@@ -287,6 +288,61 @@ export function DocumentList({
     setHistoryDrawerOpen(true);
   };
 
+  const handleDownloadAll = async () => {
+    if (!folderId) return;
+    
+    setIsDownloadingAll(true);
+    try {
+      const response = await fetch(`/api/vdr/folders/${folderId}/download-zip`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          includeSubfolders: true,
+          applyWatermarks: false,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Download failed');
+      }
+
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = `${folderName || 'documents'}.zip`;
+      
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (match) {
+          filename = match[1];
+        }
+      }
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: 'Download started',
+        description: `Downloading ${filename}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Download failed',
+        description: error.message || 'Could not download folder contents',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDownloadingAll(false);
+    }
+  };
+
   const confirmDelete = () => {
     if (documentToDelete) {
       onDelete(documentToDelete);
@@ -344,6 +400,17 @@ export function DocumentList({
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold text-gray-900">{folderName || "Documents"}</h2>
           <div className="flex items-center gap-2">
+            {displayDocuments.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={handleDownloadAll}
+                disabled={isDownloadingAll}
+                data-testid="button-download-all"
+              >
+                <FolderDown className="h-4 w-4 mr-2" />
+                {isDownloadingAll ? "Preparing..." : "Download All"}
+              </Button>
+            )}
             <Input
               type="file"
               id="file-upload"

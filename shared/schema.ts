@@ -102,6 +102,12 @@ export const requestCategoryEnum = pgEnum("request_category", ["financial", "leg
 export const dataRequestItemStatusEnum = pgEnum("data_request_item_status", ["outstanding", "in_progress", "received", "n_a"]);
 export const dataRequestPriorityEnum = pgEnum("data_request_priority", ["low", "medium", "high", "urgent"]);
 
+// DD Automation and Notification enums
+export const ddAutomationTriggerEnum = pgEnum("dd_automation_trigger", ["project_created", "milestone_reached", "task_completed", "date_based", "status_changed", "deadline_approaching"]);
+export const ddAutomationActionEnum = pgEnum("dd_automation_action", ["assign_tasks", "send_notification", "update_status", "create_task"]);
+export const ddNotificationTypeEnum = pgEnum("dd_notification_type", ["milestone_started", "milestone_completed", "task_assigned", "deadline_approaching", "status_changed", "automation_triggered"]);
+export const ddTemplateTypeEnum = pgEnum("dd_template_type", ["environmental", "infrastructure", "permits", "financial", "operations", "custom"]);
+
 // Persona and Dashboard enums
 export const personaTypeEnum = pgEnum("persona_type", ["pe_investor", "broker", "operator", "advisor"]);
 export const widgetCategoryEnum = pgEnum("widget_category", ["analytics", "pipeline", "operations", "finance", "tasks", "market_intel"]);
@@ -1111,6 +1117,76 @@ export const notificationsLog = pgTable("notifications_log", {
   };
 });
 
+// DD Automation Rules - Rules for automatic task assignments and notifications
+export const ddAutomationRules = pgTable("dd_automation_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").references(() => projects.id, { onDelete: "cascade" }), // Null for org-wide rules
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  triggerType: ddAutomationTriggerEnum("trigger_type").notNull(),
+  triggerCondition: jsonb("trigger_condition").notNull().default(sql`'{}'`), // e.g., { milestoneId: 'env', taskId: 'xyz' }
+  actionType: ddAutomationActionEnum("action_type").notNull(),
+  actionConfig: jsonb("action_config").notNull().default(sql`'{}'`), // e.g., { assigneeId: 'user-id', taskIds: [] }
+  assigneeId: varchar("assignee_id").references(() => users.id), // Default assignee for assign_tasks action
+  templateType: ddTemplateTypeEnum("template_type"), // Links to template category
+  isActive: boolean("is_active").notNull().default(true),
+  priority: integer("priority").notNull().default(0), // Order of execution
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  projectIdx: index("dd_automation_rules_project").on(table.projectId),
+  orgIdx: index("dd_automation_rules_org").on(table.orgId),
+  triggerIdx: index("dd_automation_rules_trigger").on(table.triggerType),
+  activeIdx: index("dd_automation_rules_active").on(table.isActive),
+}));
+
+// DD Milestone Notifications - User notifications for milestone events
+export const ddMilestoneNotifications = pgTable("dd_milestone_notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  milestoneId: varchar("milestone_id"), // Could reference a task with isMilestone=true
+  taskId: varchar("task_id").references(() => tasks.id, { onDelete: "cascade" }), // Optional task reference
+  notificationType: ddNotificationTypeEnum("notification_type").notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  metadata: jsonb("metadata").default(sql`'{}'`), // Additional context
+  isRead: boolean("is_read").notNull().default(false),
+  readAt: timestamp("read_at"),
+  emailSent: boolean("email_sent").notNull().default(false),
+  emailSentAt: timestamp("email_sent_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdx: index("dd_milestone_notifications_user").on(table.userId),
+  projectIdx: index("dd_milestone_notifications_project").on(table.projectId),
+  isReadIdx: index("dd_milestone_notifications_read").on(table.isRead),
+  createdAtIdx: index("dd_milestone_notifications_created").on(table.createdAt),
+}));
+
+// DD Checklist Templates - Pre-defined marina-specific checklist templates
+export const ddChecklistTemplates = pgTable("dd_checklist_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").references(() => organizations.id), // Null for global templates
+  name: text("name").notNull(),
+  description: text("description"),
+  templateType: ddTemplateTypeEnum("template_type").notNull(),
+  category: ddCategoryEnum("category"), // Maps to existing DD categories
+  tasks: jsonb("tasks").notNull().default(sql`'[]'`), // Array of task blueprints
+  isSystem: boolean("is_system").notNull().default(false), // System-provided templates
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("dd_checklist_templates_org").on(table.orgId),
+  typeIdx: index("dd_checklist_templates_type").on(table.templateType),
+  systemIdx: index("dd_checklist_templates_system").on(table.isSystem),
+}));
+
 // Calendar Events
 export const calendarEvents = pgTable("calendar_events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1903,6 +1979,27 @@ export const insertNotificationLogSchema = createInsertSchema(notificationsLog).
   createdAt: true,
 });
 
+export const insertDDAutomationRuleSchema = createInsertSchema(ddAutomationRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateDDAutomationRuleSchema = insertDDAutomationRuleSchema.partial();
+
+export const insertDDMilestoneNotificationSchema = createInsertSchema(ddMilestoneNotifications).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertDDChecklistTemplateSchema = createInsertSchema(ddChecklistTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateDDChecklistTemplateSchema = insertDDChecklistTemplateSchema.partial();
+
 export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit({
   id: true,
   createdAt: true,
@@ -2011,6 +2108,17 @@ export type InsertNotificationSubscription = z.infer<typeof insertNotificationSu
 
 export type NotificationLog = typeof notificationsLog.$inferSelect;
 export type InsertNotificationLog = z.infer<typeof insertNotificationLogSchema>;
+
+export type DDAutomationRule = typeof ddAutomationRules.$inferSelect;
+export type InsertDDAutomationRule = z.infer<typeof insertDDAutomationRuleSchema>;
+export type UpdateDDAutomationRule = z.infer<typeof updateDDAutomationRuleSchema>;
+
+export type DDMilestoneNotification = typeof ddMilestoneNotifications.$inferSelect;
+export type InsertDDMilestoneNotification = z.infer<typeof insertDDMilestoneNotificationSchema>;
+
+export type DDChecklistTemplate = typeof ddChecklistTemplates.$inferSelect;
+export type InsertDDChecklistTemplate = z.infer<typeof insertDDChecklistTemplateSchema>;
+export type UpdateDDChecklistTemplate = z.infer<typeof updateDDChecklistTemplateSchema>;
 
 export type CalendarEvent = typeof calendarEvents.$inferSelect;
 export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;
@@ -2902,6 +3010,40 @@ export const rraLeases = pgTable("rra_leases", {
   locationIdx: index("rra_leases_location_idx").on(table.locationId),
   orgIdx: index("rra_leases_org_idx").on(table.orgId),
 }));
+
+// Renewal Reminder Status Enum
+export const renewalReminderStatusEnum = pgEnum("renewal_reminder_status", ["pending", "sent", "dismissed", "converted"]);
+
+// Lease Renewal Reminders - Automated renewal tracking
+export const rraRenewalReminders = pgTable("rra_renewal_reminders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  leaseId: varchar("lease_id").notNull().references(() => rraLeases.id, { onDelete: "cascade" }),
+  reminderDate: date("reminder_date").notNull(),
+  daysBeforeExpiration: integer("days_before_expiration").notNull().default(30),
+  status: renewalReminderStatusEnum("status").notNull().default("pending"),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  notificationMethod: text("notification_method").default("email"),
+  recipientEmail: text("recipient_email"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdBy: varchar("created_by").references(() => users.id),
+}, (table) => ({
+  orgIdx: index("rra_renewal_reminders_org_idx").on(table.orgId),
+  leaseIdx: index("rra_renewal_reminders_lease_idx").on(table.leaseId),
+  dateIdx: index("rra_renewal_reminders_date_idx").on(table.reminderDate),
+  statusIdx: index("rra_renewal_reminders_status_idx").on(table.status),
+}));
+
+export const insertRraRenewalReminderSchema = createInsertSchema(rraRenewalReminders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateRraRenewalReminderSchema = insertRraRenewalReminderSchema.partial().omit({ orgId: true, leaseId: true });
+export type RraRenewalReminder = typeof rraRenewalReminders.$inferSelect;
+export type InsertRraRenewalReminder = typeof rraRenewalReminders.$inferInsert;
 
 // 5. RRA Lease Line Items
 export const rraLeaseLineItems = pgTable("rra_lease_line_items", {

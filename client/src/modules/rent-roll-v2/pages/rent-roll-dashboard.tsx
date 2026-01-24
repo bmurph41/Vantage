@@ -45,6 +45,10 @@ import FileImportDrawer from "../components/rent-roll/FileImportDrawer";
 import ProjectOverview from "../components/rent-roll/ProjectOverview";
 import { ProjectDetailsTab } from "../components/rent-roll/ProjectDetailsTab";
 import UploadedFilesTab from "../components/rent-roll/UploadedFilesTab";
+import { OccupancyTrendCharts } from "../components/rent-roll/OccupancyTrendCharts";
+import { SeasonalRateComparison } from "../components/rent-roll/SeasonalRateComparison";
+import { LeaseExpirationCalendar } from "../components/rent-roll/LeaseExpirationCalendar";
+import { RenewalRemindersPanel } from "../components/rent-roll/RenewalRemindersPanel";
 import { type TimePeriodFilter, type TimePeriodType, getAvailableMonths, getAvailableQuarters } from "@shared/timePeriodUtils";
 import { deleteLocation } from "../lib/locationApi";
 
@@ -412,11 +416,13 @@ export default function RentRollDashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <TabsList className="bg-muted p-1 justify-start" data-testid="tabs-navigation">
+            <TabsList className="bg-muted p-1 justify-start flex-wrap" data-testid="tabs-navigation">
               <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
               {locationId && <TabsTrigger value="details" data-testid="tab-details">Project Setup</TabsTrigger>}
               <TabsTrigger value="cash-flows" data-testid="tab-cash-flows">Cash Flows</TabsTrigger>
               <TabsTrigger value="leases" data-testid="tab-leases">Leases</TabsTrigger>
+              <TabsTrigger value="analytics" data-testid="tab-analytics">Analytics</TabsTrigger>
+              <TabsTrigger value="lease-management" data-testid="tab-lease-management">Lease Management</TabsTrigger>
               <TabsTrigger value="heat-map" data-testid="tab-heat-map">Heat Map</TabsTrigger>
               {locationId && <TabsTrigger value="files" data-testid="tab-files">Uploaded Files</TabsTrigger>}
             </TabsList>
@@ -554,6 +560,22 @@ export default function RentRollDashboard() {
           {/* Leases Tab */}
           <TabsContent value="leases" className="space-y-6">
             <LeasesTable onEditLease={handleEditLease} locationId={locationId} />
+          </TabsContent>
+
+          {/* Analytics Tab */}
+          <TabsContent value="analytics" className="space-y-6">
+            <div className="grid gap-6">
+              <OccupancyTrendCharts locationId={locationId} />
+              <SeasonalRateComparison locationId={locationId} />
+            </div>
+          </TabsContent>
+
+          {/* Lease Management Tab */}
+          <TabsContent value="lease-management" className="space-y-6">
+            <div className="grid gap-6 lg:grid-cols-2">
+              <LeaseExpirationCalendar locationId={locationId} />
+              <RenewalRemindersPanel locationId={locationId} />
+            </div>
           </TabsContent>
 
           {/* Heat Map Tab */}

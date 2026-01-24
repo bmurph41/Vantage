@@ -662,7 +662,26 @@ router.get('/documents/:documentId/versions', requireAuth, requireVdrAccess('vie
     const currentVersion = await storage.vdr.documents.getDocument(rootDocumentId, orgId);
     const allVersions = currentVersion ? [currentVersion, ...versions] : versions;
 
-    res.json(allVersions);
+    const userIds = [...new Set(allVersions.map(v => v.uploadedBy).filter(Boolean))];
+    const uploaderMap: Record<string, { name: string; email: string }> = {};
+    
+    if (userIds.length > 0) {
+      const uploaders = await db.select({ id: users.id, name: users.name, email: users.email })
+        .from(users)
+        .where(inArray(users.id, userIds as string[]));
+      
+      for (const u of uploaders) {
+        uploaderMap[u.id] = { name: u.name || u.email, email: u.email };
+      }
+    }
+
+    const versionsWithUploaderInfo = allVersions.map(v => ({
+      ...v,
+      uploaderName: v.uploadedBy ? (uploaderMap[v.uploadedBy]?.name || 'Unknown User') : 'Unknown User',
+      uploaderEmail: v.uploadedBy ? (uploaderMap[v.uploadedBy]?.email || '') : '',
+    }));
+
+    res.json(versionsWithUploaderInfo);
   } catch (error: any) {
     console.error('Error fetching document versions:', error);
     res.status(500).json({ error: 'Failed to fetch document versions' });
@@ -1215,6 +1234,257 @@ router.post('/documents/bulk-download', requireAuth, async (req: Request, res: R
     await archive.finalize();
   } catch (error: any) {
     console.error('Error creating bulk download:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to create download archive' });
+    }
+  }
+});
+
+router.post('/folders/:folderId/download-zip', requireAuth, requireVdrAccess('download'), async (req: Request, res: Response) => {
+  const { folderId } = req.params;
+  const orgId = (req.user as any).orgId;
+  const userId = (req.user as any).id;
+  const { includeSubfolders = true } = req.body;
+
+  try {
+    const folder = await storage.vdr.folders.getFolder(folderId, orgId);
+    if (!folder) {
+      return res.status(404).json({ error: 'Folder not found' });
+    }
+
+    const allFolders = await storage.vdr.folders.getFoldersForProject(folder.projectId, orgId);
+    
+    const folderMap = new Map<string, { name: string; path: string; parentId: string | null }>();
+    for (const f of allFolders) {
+      folderMap.set(f.id, { name: f.name, path: f.path, parentId: f.parentFolderId });
+    }
+    
+    const getFolderIdsRecursive = (parentId: string): string[] => {
+      const result: string[] = [parentId];
+      for (const f of allFolders) {
+        if (f.parentFolderId === parentId) {
+          result.push(...getFolderIdsRecursive(f.id));
+        }
+      }
+      return result;
+    };
+    
+    const folderIdsToInclude = includeSubfolders 
+      ? getFolderIdsRecursive(folderId)
+      : [folderId];
+    
+    const buildRelativePath = (docFolderId: string): string => {
+      const pathParts: string[] = [];
+      let currentId: string | null = docFolderId;
+      
+      while (currentId && currentId !== folderId) {
+        const folderInfo = folderMap.get(currentId);
+        if (folderInfo) {
+          pathParts.unshift(folderInfo.name);
+          currentId = folderInfo.parentId;
+        } else {
+          break;
+        }
+      }
+      
+      return pathParts.join('/');
+    };
+    
+    let allDocuments: any[] = [];
+    for (const fid of folderIdsToInclude) {
+      const docs = await storage.vdr.documents.getDocumentsForFolder(fid, orgId);
+      allDocuments.push(...docs.map(d => ({ ...d, relativePath: buildRelativePath(d.folderId) })));
+    }
+    
+    if (allDocuments.length === 0) {
+      return res.status(404).json({ error: 'No documents found in folder' });
+    }
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    
+    archive.on('error', (err) => {
+      throw err;
+    });
+
+    const safeFileName = folder.name.replace(/[^a-zA-Z0-9-_]/g, '_');
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}_${Date.now()}.zip"`);
+
+    archive.pipe(res);
+
+    for (const doc of allDocuments) {
+      try {
+        const stream = await defaultStorageProvider.download(doc.storagePath);
+        const entryPath = doc.relativePath 
+          ? `${doc.relativePath}/${doc.filename}` 
+          : doc.filename;
+        
+        archive.append(stream, { name: entryPath });
+
+        await storage.vdr.audit.logAction({
+          projectId: doc.projectId,
+          orgId,
+          userId,
+          action: 'document_downloaded',
+          resourceType: 'document',
+          resourceId: doc.id,
+          metadata: { documentName: doc.filename, bulkDownload: true, folderId }
+        });
+      } catch (error) {
+        console.error(`Error adding ${doc.filename} to archive:`, error);
+      }
+    }
+
+    await archive.finalize();
+  } catch (error: any) {
+    console.error('Error creating folder download archive:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to create download archive' });
+    }
+  }
+});
+
+router.post('/folders/:folderId/download-zip-watermarked', async (req: Request, res: Response) => {
+  const { folderId } = req.params;
+  const { accessToken, includeSubfolders = true } = req.body;
+
+  if (!accessToken) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  try {
+    const [access] = await db.select()
+      .from(externalUserProjectAccess)
+      .where(eq(externalUserProjectAccess.accessToken, accessToken))
+      .limit(1);
+    
+    if (!access) {
+      return res.status(401).json({ error: 'Invalid access token' });
+    }
+    
+    const now = new Date();
+    if (access.expiresAt && access.expiresAt < now) {
+      return res.status(403).json({ error: 'Access has expired' });
+    }
+    if (access.tokenExpiresAt && access.tokenExpiresAt < now) {
+      return res.status(403).json({ error: 'Access token has expired' });
+    }
+    if (access.status !== 'active') {
+      return res.status(403).json({ error: 'Access has been revoked' });
+    }
+
+    const folder = await storage.vdr.folders.getFolder(folderId, access.orgId);
+    if (!folder || folder.projectId !== access.projectId) {
+      return res.status(404).json({ error: 'Folder not found or not accessible' });
+    }
+
+    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() 
+      || req.socket?.remoteAddress 
+      || 'unknown';
+
+    const allFolders = await storage.vdr.folders.getFoldersForProject(folder.projectId, access.orgId);
+    
+    const folderMap = new Map<string, { name: string; path: string; parentId: string | null }>();
+    for (const f of allFolders) {
+      folderMap.set(f.id, { name: f.name, path: f.path, parentId: f.parentFolderId });
+    }
+    
+    const getFolderIdsRecursive = (parentId: string): string[] => {
+      const result: string[] = [parentId];
+      for (const f of allFolders) {
+        if (f.parentFolderId === parentId) {
+          result.push(...getFolderIdsRecursive(f.id));
+        }
+      }
+      return result;
+    };
+    
+    const folderIdsToInclude = includeSubfolders 
+      ? getFolderIdsRecursive(folderId)
+      : [folderId];
+    
+    const buildRelativePath = (docFolderId: string): string => {
+      const pathParts: string[] = [];
+      let currentId: string | null = docFolderId;
+      
+      while (currentId && currentId !== folderId) {
+        const folderInfo = folderMap.get(currentId);
+        if (folderInfo) {
+          pathParts.unshift(folderInfo.name);
+          currentId = folderInfo.parentId;
+        } else {
+          break;
+        }
+      }
+      
+      return pathParts.join('/');
+    };
+    
+    let allDocuments: any[] = [];
+    for (const fid of folderIdsToInclude) {
+      const docs = await storage.vdr.documents.getDocumentsForFolder(fid, access.orgId);
+      allDocuments.push(...docs.map(d => ({ ...d, relativePath: buildRelativePath(d.folderId) })));
+    }
+    
+    if (allDocuments.length === 0) {
+      return res.status(404).json({ error: 'No documents found in folder' });
+    }
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    
+    archive.on('error', (err) => {
+      throw err;
+    });
+
+    const safeFileName = folder.name.replace(/[^a-zA-Z0-9-_]/g, '_');
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}_${Date.now()}.zip"`);
+
+    archive.pipe(res);
+
+    for (const doc of allDocuments) {
+      try {
+        const stream = await defaultStorageProvider.download(doc.storagePath);
+        
+        const watermarkResult = await vdrWatermarkService.applyWatermarkToDownload(
+          doc.id,
+          null,
+          access.externalUserId,
+          access.orgId,
+          stream,
+          doc.mimeType,
+          clientIp
+        );
+        
+        const entryPath = doc.relativePath 
+          ? `${doc.relativePath}/${doc.filename}` 
+          : doc.filename;
+        
+        archive.append(watermarkResult.stream, { name: entryPath });
+
+        await vdrAuditService.logEvent({
+          projectId: doc.projectId,
+          orgId: access.orgId,
+          externalUserId: access.externalUserId,
+          documentId: doc.id,
+          eventType: 'download',
+          metadata: { 
+            documentName: doc.filename, 
+            bulkDownload: true, 
+            folderId,
+            watermarkApplied: watermarkResult.watermarkApplied,
+            downloadType: 'external_bulk_watermarked',
+          },
+          req,
+        });
+      } catch (error) {
+        console.error(`Error adding ${doc.filename} to archive:`, error);
+      }
+    }
+
+    await archive.finalize();
+  } catch (error: any) {
+    console.error('Error creating watermarked folder download archive:', error);
     if (!res.headersSent) {
       res.status(500).json({ error: 'Failed to create download archive' });
     }
@@ -2709,6 +2979,270 @@ router.get('/external-access', requireAuth, async (req: Request, res: Response) 
   } catch (error: any) {
     console.error('Error fetching external access list:', error);
     res.status(500).json({ error: 'Failed to fetch external access list' });
+  }
+});
+
+router.post('/folders/:folderId/download-zip', requireAuth, requireVdrAccess('download'), async (req: Request, res: Response) => {
+  const { folderId } = req.params;
+  const orgId = (req.user as any).orgId;
+  const userId = (req.user as any).id;
+  const { documentIds, includeSubfolders = true, applyWatermarks = false } = req.body;
+
+  try {
+    const folder = await storage.vdr.folders.getFolder(folderId, orgId);
+    if (!folder) {
+      return res.status(404).json({ error: 'Folder not found' });
+    }
+
+    const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() 
+      || req.socket?.remoteAddress 
+      || 'unknown';
+
+    const documentsToDownload: any[] = [];
+
+    if (documentIds && Array.isArray(documentIds) && documentIds.length > 0) {
+      for (const docId of documentIds) {
+        const doc = await storage.vdr.documents.getDocument(docId, orgId);
+        if (doc) {
+          documentsToDownload.push({ document: doc, folderPath: '' });
+        }
+      }
+    } else {
+      const allFolders = await storage.vdr.folders.getFoldersForProject(folder.projectId, orgId);
+      
+      const getFolderPath = (targetFolderId: string): string => {
+        const paths: string[] = [];
+        let currentId: string | null = targetFolderId;
+        
+        while (currentId && currentId !== folderId) {
+          const f = allFolders.find(x => x.id === currentId);
+          if (f) {
+            paths.unshift(f.name);
+            currentId = f.parentFolderId;
+          } else {
+            break;
+          }
+        }
+        
+        return paths.join('/');
+      };
+
+      const getDocumentsRecursively = async (currentFolderId: string) => {
+        const docs = await storage.vdr.documents.getDocumentsForFolder(currentFolderId, orgId);
+        const folderPath = getFolderPath(currentFolderId);
+        
+        for (const doc of docs) {
+          documentsToDownload.push({ document: doc, folderPath });
+        }
+
+        if (includeSubfolders) {
+          const subfolders = allFolders.filter(f => f.parentFolderId === currentFolderId);
+          for (const subfolder of subfolders) {
+            await getDocumentsRecursively(subfolder.id);
+          }
+        }
+      };
+
+      await getDocumentsRecursively(folderId);
+    }
+
+    if (documentsToDownload.length === 0) {
+      return res.status(400).json({ error: 'No documents to download' });
+    }
+
+    const zipFilename = `${folder.name.replace(/[^a-zA-Z0-9]/g, '_')}_documents.zip`;
+    
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`);
+
+    const archive = archiver('zip', { zlib: { level: 6 } });
+    
+    archive.on('error', (err) => {
+      console.error('Archive error:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Failed to create zip archive' });
+      }
+    });
+
+    archive.pipe(res);
+
+    for (const { document: doc, folderPath } of documentsToDownload) {
+      try {
+        const stream = await defaultStorageProvider.download(doc.storagePath);
+        
+        let fileContent: Buffer;
+        const chunks: Buffer[] = [];
+        for await (const chunk of stream) {
+          chunks.push(Buffer.from(chunk));
+        }
+        fileContent = Buffer.concat(chunks);
+
+        if (applyWatermarks && doc.mimeType === 'application/pdf') {
+          const watermarkResult = await vdrWatermarkService.applyWatermarkToBuffer(
+            fileContent,
+            userId,
+            null,
+            orgId,
+            doc.id,
+            ipAddress
+          );
+          fileContent = watermarkResult.buffer;
+        }
+
+        const filePath = folderPath ? `${folderPath}/${doc.filename}` : doc.filename;
+        archive.append(fileContent, { name: filePath });
+
+      } catch (docError) {
+        console.error(`Error processing document ${doc.id}:`, docError);
+      }
+    }
+
+    await archive.finalize();
+
+    await vdrAuditService.logEvent({
+      projectId: folder.projectId,
+      orgId,
+      userId,
+      eventType: 'download',
+      metadata: { 
+        action: 'bulk_download',
+        folderId,
+        folderName: folder.name,
+        documentCount: documentsToDownload.length,
+        watermarksApplied: applyWatermarks,
+      },
+      req,
+    });
+
+  } catch (error: any) {
+    console.error('Error creating bulk download zip:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to create zip archive' });
+    }
+  }
+});
+
+router.post('/projects/:projectId/download-zip', requireAuth, requireVdrAccess('download'), async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  const orgId = (req.user as any).orgId;
+  const userId = (req.user as any).id;
+  const { applyWatermarks = false } = req.body;
+
+  try {
+    const [project] = await db.select()
+      .from(projects)
+      .where(and(eq(projects.id, projectId), eq(projects.orgId, orgId)))
+      .limit(1);
+    
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() 
+      || req.socket?.remoteAddress 
+      || 'unknown';
+
+    const allFolders = await storage.vdr.folders.getFoldersForProject(projectId, orgId);
+    const documentsToDownload: { document: any; folderPath: string }[] = [];
+
+    const getFolderPath = (targetFolderId: string): string => {
+      const paths: string[] = [];
+      let currentId: string | null = targetFolderId;
+      
+      while (currentId) {
+        const f = allFolders.find(x => x.id === currentId);
+        if (f) {
+          paths.unshift(f.name);
+          currentId = f.parentFolderId;
+        } else {
+          break;
+        }
+      }
+      
+      return paths.join('/');
+    };
+
+    for (const folder of allFolders) {
+      const docs = await storage.vdr.documents.getDocumentsForFolder(folder.id, orgId);
+      const folderPath = getFolderPath(folder.id);
+      
+      for (const doc of docs) {
+        documentsToDownload.push({ document: doc, folderPath });
+      }
+    }
+
+    if (documentsToDownload.length === 0) {
+      return res.status(400).json({ error: 'No documents to download' });
+    }
+
+    const zipFilename = `${project.name.replace(/[^a-zA-Z0-9]/g, '_')}_vdr.zip`;
+    
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`);
+
+    const archive = archiver('zip', { zlib: { level: 6 } });
+    
+    archive.on('error', (err) => {
+      console.error('Archive error:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Failed to create zip archive' });
+      }
+    });
+
+    archive.pipe(res);
+
+    for (const { document: doc, folderPath } of documentsToDownload) {
+      try {
+        const stream = await defaultStorageProvider.download(doc.storagePath);
+        
+        let fileContent: Buffer;
+        const chunks: Buffer[] = [];
+        for await (const chunk of stream) {
+          chunks.push(Buffer.from(chunk));
+        }
+        fileContent = Buffer.concat(chunks);
+
+        if (applyWatermarks && doc.mimeType === 'application/pdf') {
+          const watermarkResult = await vdrWatermarkService.applyWatermarkToBuffer(
+            fileContent,
+            userId,
+            null,
+            orgId,
+            doc.id,
+            ipAddress
+          );
+          fileContent = watermarkResult.buffer;
+        }
+
+        const filePath = folderPath ? `${folderPath}/${doc.filename}` : doc.filename;
+        archive.append(fileContent, { name: filePath });
+
+      } catch (docError) {
+        console.error(`Error processing document ${doc.id}:`, docError);
+      }
+    }
+
+    await archive.finalize();
+
+    await vdrAuditService.logEvent({
+      projectId,
+      orgId,
+      userId,
+      eventType: 'download',
+      metadata: { 
+        action: 'bulk_download',
+        projectName: project.name,
+        documentCount: documentsToDownload.length,
+        watermarksApplied: applyWatermarks,
+      },
+      req,
+    });
+
+  } catch (error: any) {
+    console.error('Error creating bulk download zip:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to create zip archive' });
+    }
   }
 });
 

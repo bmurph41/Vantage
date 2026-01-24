@@ -10,6 +10,10 @@ import {
   rraMarinaLocations as marinaLocations,
   rraStorageLocations as storageLocations,
   rraProjectDetailsConfig as projectDetailsConfig,
+  rraRenewalReminders,
+  rraTenants,
+  rraLeases,
+  rraStorageLocations,
   type RraTenant as Tenant,
   type RraLease as Lease,
   type RraLeaseLineItem as LeaseLineItem,
@@ -7368,4 +7372,460 @@ export async function getExecutiveAvgBoatSize(
     } : null,
     byProject,
   };
+}
+
+// ============================================
+// RENEWAL REMINDERS SERVICE FUNCTIONS
+// ============================================
+
+export async function getRenewalReminders(
+  orgId: string,
+  options: { locationId?: string; status?: string }
+): Promise<any[]> {
+  try {
+    const conditions: any[] = [eq(rraRenewalReminders.orgId, orgId)];
+    
+    if (options.status) {
+      conditions.push(eq(rraRenewalReminders.status, options.status as any));
+    }
+    
+    const reminders = await db
+      .select({
+        id: rraRenewalReminders.id,
+        leaseId: rraRenewalReminders.leaseId,
+        reminderDate: rraRenewalReminders.reminderDate,
+        daysBeforeExpiration: rraRenewalReminders.daysBeforeExpiration,
+        status: rraRenewalReminders.status,
+        sentAt: rraRenewalReminders.sentAt,
+        notificationMethod: rraRenewalReminders.notificationMethod,
+        recipientEmail: rraRenewalReminders.recipientEmail,
+        notes: rraRenewalReminders.notes,
+        createdAt: rraRenewalReminders.createdAt,
+      })
+      .from(rraRenewalReminders)
+      .where(and(...conditions))
+      .orderBy(asc(rraRenewalReminders.reminderDate));
+    
+    // Fetch lease details for each reminder
+    const enrichedReminders = await Promise.all(
+      reminders.map(async (reminder) => {
+        const lease = await db
+          .select({
+            id: rraLeases.id,
+            leaseExpiration: rraLeases.leaseExpiration,
+            leaseAmount: rraLeases.leaseAmount,
+            locationId: rraLeases.locationId,
+          })
+          .from(rraLeases)
+          .where(eq(rraLeases.id, reminder.leaseId))
+          .limit(1);
+        
+        const leaseData = lease[0];
+        if (!leaseData) return { ...reminder, lease: null };
+        
+        // Filter by locationId if provided
+        if (options.locationId && leaseData.locationId !== options.locationId) {
+          return null;
+        }
+        
+        const tenant = await db
+          .select({ firstName: rraTenants.firstName, lastName: rraTenants.lastName })
+          .from(rraTenants)
+          .innerJoin(rraLeases, eq(rraLeases.tenantId, rraTenants.id))
+          .where(eq(rraLeases.id, reminder.leaseId))
+          .limit(1);
+        
+        const storage = leaseData.locationId ? await db
+          .select({ name: rraStorageLocations.name })
+          .from(rraStorageLocations)
+          .innerJoin(rraLeases, eq(rraLeases.storageLocationId, rraStorageLocations.id))
+          .where(eq(rraLeases.id, reminder.leaseId))
+          .limit(1) : [];
+        
+        return {
+          ...reminder,
+          lease: {
+            id: leaseData.id,
+            tenantName: tenant[0] ? `${tenant[0].firstName || ''} ${tenant[0].lastName || ''}`.trim() || 'Unknown' : 'Unknown',
+            slipLabel: storage[0]?.name || leaseData.locationId || 'Unknown',
+            leaseExpiration: leaseData.leaseExpiration,
+            monthlyRent: parseFloat(leaseData.leaseAmount || '0'),
+          },
+        };
+      })
+    );
+    
+    return enrichedReminders.filter(Boolean);
+  } catch (error) {
+    console.error('[getRenewalReminders] Error:', error);
+    return [];
+  }
+}
+
+export async function createRenewalReminder(
+  orgId: string,
+  data: {
+    leaseId: string;
+    daysBeforeExpiration: number;
+    recipientEmail?: string;
+    notes?: string;
+    createdBy?: string;
+  }
+): Promise<any> {
+  // Get lease expiration date
+  const lease = await db
+    .select({ leaseExpiration: rraLeases.leaseExpiration })
+    .from(rraLeases)
+    .where(and(eq(rraLeases.id, data.leaseId), eq(rraLeases.orgId, orgId)))
+    .limit(1);
+  
+  if (!lease[0]?.leaseExpiration) {
+    throw new Error('Lease not found or has no expiration date');
+  }
+  
+  const expirationDate = new Date(lease[0].leaseExpiration);
+  const reminderDate = new Date(expirationDate);
+  reminderDate.setDate(reminderDate.getDate() - data.daysBeforeExpiration);
+  
+  const [reminder] = await db
+    .insert(rraRenewalReminders)
+    .values({
+      orgId,
+      leaseId: data.leaseId,
+      reminderDate: reminderDate.toISOString().split('T')[0],
+      daysBeforeExpiration: data.daysBeforeExpiration,
+      recipientEmail: data.recipientEmail,
+      notes: data.notes,
+      createdBy: data.createdBy,
+      status: 'pending',
+    })
+    .returning();
+  
+  return reminder;
+}
+
+export async function updateRenewalReminder(
+  orgId: string,
+  id: string,
+  data: { status?: string; notes?: string; recipientEmail?: string }
+): Promise<any> {
+  const updateData: any = { updatedAt: new Date() };
+  
+  if (data.status) {
+    updateData.status = data.status;
+    if (data.status === 'sent') {
+      updateData.sentAt = new Date();
+    }
+  }
+  if (data.notes !== undefined) updateData.notes = data.notes;
+  if (data.recipientEmail !== undefined) updateData.recipientEmail = data.recipientEmail;
+  
+  const [reminder] = await db
+    .update(rraRenewalReminders)
+    .set(updateData)
+    .where(and(eq(rraRenewalReminders.id, id), eq(rraRenewalReminders.orgId, orgId)))
+    .returning();
+  
+  return reminder;
+}
+
+export async function deleteRenewalReminder(orgId: string, id: string): Promise<void> {
+  await db
+    .delete(rraRenewalReminders)
+    .where(and(eq(rraRenewalReminders.id, id), eq(rraRenewalReminders.orgId, orgId)));
+}
+
+export async function getExpiringLeases(
+  orgId: string,
+  options: { locationId?: string; daysAhead?: number }
+): Promise<any[]> {
+  const daysAhead = options.daysAhead || 180;
+  const today = new Date();
+  const futureDate = new Date();
+  futureDate.setDate(today.getDate() + daysAhead);
+  
+  const conditions: any[] = [
+    eq(rraLeases.orgId, orgId),
+    eq(rraLeases.isActive, true),
+    gte(rraLeases.leaseExpiration, today.toISOString().split('T')[0]),
+    lte(rraLeases.leaseExpiration, futureDate.toISOString().split('T')[0]),
+  ];
+  
+  if (options.locationId) {
+    conditions.push(eq(rraLeases.locationId, options.locationId));
+  }
+  
+  const leases = await db
+    .select({
+      id: rraLeases.id,
+      leaseExpiration: rraLeases.leaseExpiration,
+      leaseAmount: rraLeases.leaseAmount,
+      storageType: rraLeases.storageType,
+      unitNumber: rraLeases.unitNumber,
+      slipLength: rraLeases.slipLength,
+      tenantId: rraLeases.tenantId,
+      storageLocationId: rraLeases.storageLocationId,
+    })
+    .from(rraLeases)
+    .where(and(...conditions))
+    .orderBy(asc(rraLeases.leaseExpiration));
+  
+  return Promise.all(
+    leases.map(async (lease) => {
+      const tenant = await db
+        .select({ firstName: rraTenants.firstName, lastName: rraTenants.lastName, email: rraTenants.email })
+        .from(rraTenants)
+        .where(eq(rraTenants.id, lease.tenantId))
+        .limit(1);
+      
+      const storage = lease.storageLocationId ? await db
+        .select({ name: rraStorageLocations.name })
+        .from(rraStorageLocations)
+        .where(eq(rraStorageLocations.id, lease.storageLocationId))
+        .limit(1) : [];
+      
+      const daysUntilExpiration = Math.ceil(
+        (new Date(lease.leaseExpiration!).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      
+      return {
+        id: lease.id,
+        tenantName: tenant[0] ? `${tenant[0].firstName || ''} ${tenant[0].lastName || ''}`.trim() || 'Unknown' : 'Unknown',
+        slipId: lease.unitNumber || 'N/A',
+        slipLabel: storage[0]?.name || lease.unitNumber || 'Unknown',
+        monthlyRent: parseFloat(lease.leaseAmount || '0'),
+        expirationDate: lease.leaseExpiration,
+        daysUntilExpiration,
+        contactEmail: tenant[0]?.email,
+        storageType: lease.storageType,
+        loa: lease.slipLength ? parseFloat(lease.slipLength) : null,
+      };
+    })
+  );
+}
+
+export async function getOccupancyTrends(
+  orgId: string,
+  options: { locationId?: string; months?: number }
+): Promise<any[]> {
+  const months = options.months || 12;
+  const trends: any[] = [];
+  
+  for (let i = months - 1; i >= 0; i--) {
+    const date = new Date();
+    date.setMonth(date.getMonth() - i);
+    const monthName = date.toLocaleString('default', { month: 'short' });
+    const year = date.getFullYear();
+    
+    // Get active leases for this month
+    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+    const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    
+    const conditions: any[] = [
+      eq(rraLeases.orgId, orgId),
+      lte(rraLeases.leaseCommencement, endOfMonth.toISOString().split('T')[0]),
+      or(
+        gte(rraLeases.leaseExpiration, startOfMonth.toISOString().split('T')[0]),
+        eq(rraLeases.isActive, true)
+      ),
+    ];
+    
+    if (options.locationId) {
+      conditions.push(eq(rraLeases.locationId, options.locationId));
+    }
+    
+    const activeLeases = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(rraLeases)
+      .where(and(...conditions));
+    
+    const occupiedUnits = activeLeases[0]?.count || 0;
+    
+    // Get total storage locations
+    const locationConditions: any[] = [eq(rraStorageLocations.orgId, orgId)];
+    if (options.locationId) {
+      locationConditions.push(eq(rraStorageLocations.locationId, options.locationId));
+    }
+    
+    const totalUnitsResult = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(rraStorageLocations)
+      .where(and(...locationConditions));
+    
+    const totalUnits = Math.max(totalUnitsResult[0]?.count || 100, occupiedUnits);
+    const vacantUnits = Math.max(0, totalUnits - occupiedUnits);
+    const occupancyRate = totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 0;
+    
+    trends.push({
+      month: `${monthName} ${year}`,
+      occupancyRate,
+      occupiedUnits,
+      vacantUnits,
+      totalUnits,
+    });
+  }
+  
+  return trends;
+}
+
+export async function getSeasonalRates(
+  orgId: string,
+  options: { locationId?: string }
+): Promise<any[]> {
+  const conditions: any[] = [eq(rraLeases.orgId, orgId), eq(rraLeases.isActive, true)];
+  
+  if (options.locationId) {
+    conditions.push(eq(rraLeases.locationId, options.locationId));
+  }
+  
+  const leases = await db
+    .select({
+      contractTerm: rraLeases.contractTerm,
+      leaseAmount: rraLeases.leaseAmount,
+      slipLength: rraLeases.slipLength,
+    })
+    .from(rraLeases)
+    .where(and(...conditions));
+  
+  const seasonalData: Record<string, { totalRate: number; totalRent: number; count: number; totalLength: number }> = {
+    'Annual': { totalRate: 0, totalRent: 0, count: 0, totalLength: 0 },
+    'Seasonal': { totalRate: 0, totalRent: 0, count: 0, totalLength: 0 },
+    'Winter': { totalRate: 0, totalRent: 0, count: 0, totalLength: 0 },
+    'Short-term': { totalRate: 0, totalRent: 0, count: 0, totalLength: 0 },
+  };
+  
+  for (const lease of leases) {
+    const term = lease.contractTerm?.toLowerCase() || 'annual';
+    let season = 'Annual';
+    
+    if (term.includes('season')) season = 'Seasonal';
+    else if (term.includes('winter')) season = 'Winter';
+    else if (term.includes('short') || term.includes('transient') || term.includes('daily') || term.includes('weekly')) season = 'Short-term';
+    
+    const monthlyRent = parseFloat(lease.leaseAmount || '0');
+    const length = parseFloat(lease.slipLength || '30');
+    const ratePerFoot = length > 0 ? monthlyRent / length : 0;
+    
+    seasonalData[season].totalRate += ratePerFoot;
+    seasonalData[season].totalRent += monthlyRent;
+    seasonalData[season].count += 1;
+    seasonalData[season].totalLength += length;
+  }
+  
+  return Object.entries(seasonalData)
+    .filter(([_, data]) => data.count > 0)
+    .map(([season, data]) => ({
+      season,
+      avgRatePerFoot: data.count > 0 ? Math.round((data.totalRate / data.count) * 100) / 100 : 0,
+      avgMonthlyRate: data.count > 0 ? Math.round(data.totalRent / data.count) : 0,
+      count: data.count,
+      totalRevenue: Math.round(data.totalRent * 12),
+      avgLoa: data.count > 0 ? Math.round(data.totalLength / data.count) : 30,
+    }));
+}
+
+export async function getOccupancyByStorageType(
+  orgId: string,
+  options: { locationId?: string }
+): Promise<any[]> {
+  const conditions: any[] = [eq(rraLeases.orgId, orgId), eq(rraLeases.isActive, true)];
+  
+  if (options.locationId) {
+    conditions.push(eq(rraLeases.locationId, options.locationId));
+  }
+  
+  const leases = await db
+    .select({
+      storageType: rraLeases.storageType,
+    })
+    .from(rraLeases)
+    .where(and(...conditions));
+  
+  // Count leases by storage type
+  const typeCounts: Record<string, { occupied: number }> = {};
+  
+  for (const lease of leases) {
+    const type = lease.storageType || 'Other';
+    if (!typeCounts[type]) {
+      typeCounts[type] = { occupied: 0 };
+    }
+    typeCounts[type].occupied += 1;
+  }
+  
+  // Get total capacity by storage type
+  const locationConditions: any[] = [eq(storageLocations.orgId, orgId)];
+  if (options.locationId) {
+    locationConditions.push(eq(storageLocations.locationId, options.locationId));
+  }
+  
+  const allLocations = await db
+    .select({
+      storageType: storageLocations.storageType,
+    })
+    .from(storageLocations)
+    .where(and(...locationConditions));
+  
+  // Count total capacity by type
+  const capacityByType: Record<string, number> = {};
+  for (const loc of allLocations) {
+    const type = loc.storageType || 'Other';
+    capacityByType[type] = (capacityByType[type] || 0) + 1;
+  }
+  
+  // Combine data
+  const allTypes = new Set([...Object.keys(typeCounts), ...Object.keys(capacityByType)]);
+  return Array.from(allTypes).map(type => {
+    const occupied = typeCounts[type]?.occupied || 0;
+    const total = Math.max(capacityByType[type] || occupied, occupied);
+    const vacant = Math.max(0, total - occupied);
+    const occupancyRate = total > 0 ? Math.round((occupied / total) * 100) : 0;
+    
+    return {
+      storageType: type,
+      occupied,
+      vacant,
+      total,
+      occupancyRate,
+    };
+  }).filter(t => t.total > 0);
+}
+
+export async function processPendingReminders(orgId: string): Promise<{ processed: number; sent: number; errors: number }> {
+  const today = new Date().toISOString().split('T')[0];
+  
+  const pendingReminders = await db
+    .select()
+    .from(rraRenewalReminders)
+    .where(
+      and(
+        eq(rraRenewalReminders.orgId, orgId),
+        eq(rraRenewalReminders.status, 'pending'),
+        lte(rraRenewalReminders.reminderDate, today)
+      )
+    );
+  
+  let processed = 0;
+  let sent = 0;
+  let errors = 0;
+  
+  for (const reminder of pendingReminders) {
+    processed++;
+    try {
+      // Mark as sent (in a real implementation, this would send an email)
+      await db
+        .update(rraRenewalReminders)
+        .set({
+          status: 'sent',
+          sentAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(rraRenewalReminders.id, reminder.id));
+      sent++;
+    } catch (error) {
+      console.error(`[processPendingReminders] Error processing reminder ${reminder.id}:`, error);
+      errors++;
+    }
+  }
+  
+  return { processed, sent, errors };
 }

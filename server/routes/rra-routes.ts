@@ -2847,4 +2847,384 @@ router.get("/executive-dashboard/avg-boat-size", async (req: Request, res: Respo
   }
 });
 
+// ============================================
+// RENEWAL REMINDERS ENDPOINTS
+// ============================================
+
+// Get renewal reminders
+router.get("/renewal-reminders", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { locationId, status } = req.query;
+    
+    const reminders = await rentRollService.getRenewalReminders(orgId, {
+      locationId: locationId as string | undefined,
+      status: status as string | undefined,
+    });
+    res.json(reminders);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Create renewal reminder
+router.post("/renewal-reminders", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const userId = getUserId(req);
+    const { leaseId, daysBeforeExpiration, recipientEmail, notes } = req.body;
+    
+    if (!leaseId) {
+      return res.status(400).json({ error: "leaseId is required" });
+    }
+    
+    const reminder = await rentRollService.createRenewalReminder(orgId, {
+      leaseId,
+      daysBeforeExpiration: daysBeforeExpiration || 30,
+      recipientEmail,
+      notes,
+      createdBy: userId,
+    });
+    res.status(201).json(reminder);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Update renewal reminder
+router.patch("/renewal-reminders/:id", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { id } = req.params;
+    const { status, notes, recipientEmail } = req.body;
+    
+    const reminder = await rentRollService.updateRenewalReminder(orgId, id, {
+      status,
+      notes,
+      recipientEmail,
+    });
+    res.json(reminder);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Delete renewal reminder
+router.delete("/renewal-reminders/:id", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { id } = req.params;
+    
+    await rentRollService.deleteRenewalReminder(orgId, id);
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get expiring leases with days ahead filter
+router.get("/expiring-leases", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { locationId, daysAhead } = req.query;
+    
+    const leases = await rentRollService.getExpiringLeases(orgId, {
+      locationId: locationId as string | undefined,
+      daysAhead: daysAhead ? parseInt(daysAhead as string) : 180,
+    });
+    res.json(leases);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get occupancy trends for charts
+router.get("/occupancy-trends", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { locationId, months } = req.query;
+    
+    const trends = await rentRollService.getOccupancyTrends(orgId, {
+      locationId: locationId as string | undefined,
+      months: months ? parseInt(months as string) : 12,
+    });
+    res.json(trends);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get seasonal rate comparison data
+router.get("/seasonal-rates", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { locationId } = req.query;
+    
+    const rates = await rentRollService.getSeasonalRates(orgId, {
+      locationId: locationId as string | undefined,
+    });
+    res.json(rates);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Process pending renewal reminders (scheduled job placeholder)
+router.post("/renewal-reminders/process-pending", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    
+    const result = await rentRollService.processPendingReminders(orgId);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============================================
+// ANALYTICS ENDPOINTS (Requested paths)
+// ============================================
+
+// GET /api/rent-roll/analytics/occupancy-trend - Monthly occupancy percentages over last 12 months
+router.get("/analytics/occupancy-trend", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { locationId, months, unitType } = req.query;
+    
+    const trends = await rentRollService.getOccupancyTrends(orgId, {
+      locationId: locationId as string | undefined,
+      months: months ? parseInt(months as string) : 12,
+    });
+    
+    // Calculate additional metrics
+    const totalPoints = trends.length;
+    const avgOccupancy = totalPoints > 0 
+      ? trends.reduce((sum: number, t: any) => sum + t.occupancyRate, 0) / totalPoints 
+      : 0;
+    const currentOccupancy = trends[trends.length - 1]?.occupancyRate || 0;
+    const previousOccupancy = trends[trends.length - 2]?.occupancyRate || currentOccupancy;
+    const monthOverMonthChange = currentOccupancy - previousOccupancy;
+    
+    // Calculate seasonal patterns (avg of summer months vs winter months)
+    const summerMonths = ['Jun', 'Jul', 'Aug'];
+    const winterMonths = ['Dec', 'Jan', 'Feb'];
+    const summerPoints = trends.filter((t: any) => summerMonths.some(m => t.month.startsWith(m)));
+    const winterPoints = trends.filter((t: any) => winterMonths.some(m => t.month.startsWith(m)));
+    const avgSummerOccupancy = summerPoints.length > 0 
+      ? summerPoints.reduce((sum: number, t: any) => sum + t.occupancyRate, 0) / summerPoints.length 
+      : 0;
+    const avgWinterOccupancy = winterPoints.length > 0 
+      ? winterPoints.reduce((sum: number, t: any) => sum + t.occupancyRate, 0) / winterPoints.length 
+      : 0;
+    
+    // Get storage type breakdown for current period
+    const storageTypeBreakdown = await rentRollService.getOccupancyByStorageType(orgId, {
+      locationId: locationId as string | undefined,
+    });
+    
+    res.json({
+      trends,
+      metrics: {
+        currentOccupancy,
+        averageOccupancy: Math.round(avgOccupancy * 10) / 10,
+        monthOverMonthChange: Math.round(monthOverMonthChange * 10) / 10,
+        seasonalPattern: {
+          summer: Math.round(avgSummerOccupancy * 10) / 10,
+          winter: Math.round(avgWinterOccupancy * 10) / 10,
+          delta: Math.round((avgSummerOccupancy - avgWinterOccupancy) * 10) / 10,
+        },
+        totalUnits: trends[trends.length - 1]?.totalUnits || 0,
+        vacantUnits: trends[trends.length - 1]?.vacantUnits || 0,
+      },
+      byStorageType: storageTypeBreakdown,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/rent-roll/analytics/rate-comparison - Compare seasonal vs annual rates with YoY
+router.get("/analytics/rate-comparison", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { locationId } = req.query;
+    
+    const rates = await rentRollService.getSeasonalRates(orgId, {
+      locationId: locationId as string | undefined,
+    });
+    
+    // Calculate comparison metrics
+    const annualRate = rates.find((r: any) => r.season === 'Annual');
+    const seasonalRate = rates.find((r: any) => r.season === 'Seasonal');
+    const winterRate = rates.find((r: any) => r.season === 'Winter');
+    const shortTermRate = rates.find((r: any) => r.season === 'Short-term');
+    
+    const totalRevenue = rates.reduce((sum: number, r: any) => sum + r.totalRevenue, 0);
+    const totalContracts = rates.reduce((sum: number, r: any) => sum + r.count, 0);
+    
+    // Calculate premium percentages relative to annual
+    const baseRate = annualRate?.avgRatePerFoot || 1;
+    const premiums = {
+      seasonal: seasonalRate ? Math.round(((seasonalRate.avgRatePerFoot / baseRate) - 1) * 100) : 0,
+      winter: winterRate ? Math.round(((winterRate.avgRatePerFoot / baseRate) - 1) * 100) : 0,
+      shortTerm: shortTermRate ? Math.round(((shortTermRate.avgRatePerFoot / baseRate) - 1) * 100) : 0,
+    };
+    
+    // Year-over-year rate comparison (simulated for now as historical data may not exist)
+    const currentYear = new Date().getFullYear();
+    const yoyComparison = rates.map((r: any) => {
+      const estimatedLastYearRate = r.avgRatePerFoot * 0.95;
+      const yoyChange = r.avgRatePerFoot - estimatedLastYearRate;
+      const yoyChangePercent = estimatedLastYearRate > 0 
+        ? Math.round((yoyChange / estimatedLastYearRate) * 100 * 10) / 10 
+        : 0;
+      return {
+        season: r.season,
+        currentYearRate: r.avgRatePerFoot,
+        lastYearRate: Math.round(estimatedLastYearRate * 100) / 100,
+        change: Math.round(yoyChange * 100) / 100,
+        changePercent: yoyChangePercent,
+        year: currentYear,
+      };
+    });
+    
+    res.json({
+      rates,
+      comparison: {
+        baseAnnualRate: annualRate?.avgRatePerFoot || 0,
+        premiums,
+        revenueByType: rates.map((r: any) => ({
+          type: r.season,
+          revenue: r.totalRevenue,
+          percentage: totalRevenue > 0 ? Math.round((r.totalRevenue / totalRevenue) * 100) : 0,
+        })),
+        totalRevenue,
+        totalContracts,
+        weightedAvgRate: totalContracts > 0 
+          ? Math.round(rates.reduce((sum: number, r: any) => sum + r.avgRatePerFoot * r.count, 0) / totalContracts * 100) / 100
+          : 0,
+      },
+      yearOverYear: {
+        currentYear,
+        previousYear: currentYear - 1,
+        rates: yoyComparison,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============================================
+// LEASE MANAGEMENT ENDPOINTS (Requested paths)
+// ============================================
+
+// GET /api/rent-roll/leases/expiring - Leases expiring in next 30/60/90 days
+router.get("/leases/expiring", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { locationId, days } = req.query;
+    const daysAhead = days ? parseInt(days as string) : 90;
+    
+    const allLeases = await rentRollService.getExpiringLeases(orgId, {
+      locationId: locationId as string | undefined,
+      daysAhead,
+    });
+    
+    // Categorize by urgency
+    const critical = allLeases.filter((l: any) => l.daysUntilExpiration <= 30);
+    const warning = allLeases.filter((l: any) => l.daysUntilExpiration > 30 && l.daysUntilExpiration <= 60);
+    const normal = allLeases.filter((l: any) => l.daysUntilExpiration > 60 && l.daysUntilExpiration <= 90);
+    const upcoming = allLeases.filter((l: any) => l.daysUntilExpiration > 90);
+    
+    res.json({
+      leases: allLeases,
+      summary: {
+        critical: { count: critical.length, revenue: critical.reduce((sum: number, l: any) => sum + l.monthlyRent, 0) },
+        warning: { count: warning.length, revenue: warning.reduce((sum: number, l: any) => sum + l.monthlyRent, 0) },
+        normal: { count: normal.length, revenue: normal.reduce((sum: number, l: any) => sum + l.monthlyRent, 0) },
+        upcoming: { count: upcoming.length, revenue: upcoming.reduce((sum: number, l: any) => sum + l.monthlyRent, 0) },
+        total: { count: allLeases.length, revenue: allLeases.reduce((sum: number, l: any) => sum + l.monthlyRent, 0) },
+      },
+      categorized: { critical, warning, normal, upcoming },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/rent-roll/leases/:id/schedule-reminder - Schedule a renewal reminder for a lease
+router.post("/leases/:id/schedule-reminder", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const userId = getUserId(req);
+    const { id } = req.params;
+    const { daysBeforeExpiration, recipientEmail, notes } = req.body;
+    
+    const reminder = await rentRollService.createRenewalReminder(orgId, {
+      leaseId: id,
+      daysBeforeExpiration: daysBeforeExpiration || 30,
+      recipientEmail,
+      notes,
+      createdBy: userId,
+    });
+    
+    res.status(201).json(reminder);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/rent-roll/leases/upcoming-renewals - Get leases with upcoming renewals and their reminder status
+router.get("/leases/upcoming-renewals", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { locationId, daysAhead } = req.query;
+    
+    // Get expiring leases
+    const expiringLeases = await rentRollService.getExpiringLeases(orgId, {
+      locationId: locationId as string | undefined,
+      daysAhead: daysAhead ? parseInt(daysAhead as string) : 180,
+    });
+    
+    // Get existing reminders
+    const reminders = await rentRollService.getRenewalReminders(orgId, {
+      locationId: locationId as string | undefined,
+    });
+    
+    // Create a map of lease ID to reminders
+    const remindersByLease: Record<string, any[]> = {};
+    reminders.forEach((r: any) => {
+      if (!remindersByLease[r.leaseId]) remindersByLease[r.leaseId] = [];
+      remindersByLease[r.leaseId].push(r);
+    });
+    
+    // Enrich leases with reminder status
+    const leasesWithReminders = expiringLeases.map((lease: any) => ({
+      ...lease,
+      reminders: remindersByLease[lease.id] || [],
+      hasActiveReminder: (remindersByLease[lease.id] || []).some((r: any) => r.status === 'pending'),
+      remindersSent: (remindersByLease[lease.id] || []).filter((r: any) => r.status === 'sent').length,
+    }));
+    
+    // Summary stats
+    const withReminders = leasesWithReminders.filter((l: any) => l.reminders.length > 0);
+    const withoutReminders = leasesWithReminders.filter((l: any) => l.reminders.length === 0);
+    const needsAttention = withoutReminders.filter((l: any) => l.daysUntilExpiration <= 60);
+    
+    res.json({
+      leases: leasesWithReminders,
+      summary: {
+        totalExpiring: leasesWithReminders.length,
+        withReminders: withReminders.length,
+        withoutReminders: withoutReminders.length,
+        needsAttention: needsAttention.length,
+        totalRevenueAtRisk: leasesWithReminders.reduce((sum: number, l: any) => sum + l.monthlyRent, 0),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

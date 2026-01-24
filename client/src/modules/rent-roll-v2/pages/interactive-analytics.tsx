@@ -17,8 +17,13 @@ import {
   Download,
   Users,
   DollarSign,
-  Activity
+  Activity,
+  Bell,
 } from "lucide-react";
+import { OccupancyTrendCharts } from "../components/rent-roll/OccupancyTrendCharts";
+import { SeasonalRateComparison } from "../components/rent-roll/SeasonalRateComparison";
+import { LeaseExpirationCalendar } from "../components/rent-roll/LeaseExpirationCalendar";
+import { RenewalRemindersPanel } from "../components/rent-roll/RenewalRemindersPanel";
 import {
   DrillDownBarChart,
   TimeSeriesDrillDown,
@@ -341,11 +346,15 @@ export default function RentRollInteractiveAnalytics() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4 max-w-lg">
+          <TabsList className="grid w-full grid-cols-5 max-w-2xl">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="occupancy">Occupancy</TabsTrigger>
             <TabsTrigger value="revenue">Revenue</TabsTrigger>
             <TabsTrigger value="expirations">Expirations</TabsTrigger>
+            <TabsTrigger value="automation" className="flex items-center gap-1">
+              <Bell className="h-3 w-3" />
+              Automation
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6 mt-6">
@@ -506,6 +515,41 @@ export default function RentRollInteractiveAnalytics() {
                 valueFormatter={(val) => `${val} leases`}
               />
             </div>
+          </TabsContent>
+
+          <TabsContent value="automation" className="space-y-6 mt-6">
+            <div className="grid gap-6 lg:grid-cols-2">
+              <OccupancyTrendCharts 
+                data={occupancyChartData.map(item => ({
+                  month: item.period,
+                  occupancyRate: item.value,
+                  occupiedUnits: Math.round(item.value * 1.5),
+                  vacantUnits: Math.round((100 - item.value) * 1.5),
+                  totalUnits: 150,
+                }))}
+                targetOccupancy={90}
+              />
+              <SeasonalRateComparison 
+                seasonalRates={[
+                  { season: 'Annual' as const, avgRatePerFoot: 18.50, avgMonthlyRate: 925, count: 85, totalRevenue: 943800, avgLoa: 50 },
+                  { season: 'Seasonal' as const, avgRatePerFoot: 22.75, avgMonthlyRate: 1024, count: 45, totalRevenue: 552960, avgLoa: 45 },
+                  { season: 'Winter' as const, avgRatePerFoot: 15.25, avgMonthlyRate: 762, count: 28, totalRevenue: 171264, avgLoa: 50 },
+                  { season: 'Short-term' as const, avgRatePerFoot: 32.50, avgMonthlyRate: 1137, count: 15, totalRevenue: 204660, avgLoa: 35 },
+                ]}
+              />
+            </div>
+            <LeaseExpirationCalendar 
+              expiringLeases={[
+                { id: '1', tenantName: 'John Smith', slipId: 'A-15', slipLabel: 'Slip A-15', monthlyRent: 1250, expirationDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(), daysUntilExpiration: 15 },
+                { id: '2', tenantName: 'Sarah Johnson', slipId: 'B-22', slipLabel: 'Slip B-22', monthlyRent: 1875, expirationDate: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(), daysUntilExpiration: 45 },
+                { id: '3', tenantName: 'Michael Brown', slipId: 'C-08', slipLabel: 'Slip C-08', monthlyRent: 2150, expirationDate: new Date(Date.now() + 75 * 24 * 60 * 60 * 1000).toISOString(), daysUntilExpiration: 75 },
+                { id: '4', tenantName: 'Emily Davis', slipId: 'D-33', slipLabel: 'Slip D-33', monthlyRent: 1425, expirationDate: new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString(), daysUntilExpiration: 120 },
+                { id: '5', tenantName: 'Robert Wilson', slipId: 'A-28', slipLabel: 'Slip A-28', monthlyRent: 1650, expirationDate: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000).toISOString(), daysUntilExpiration: 25 },
+              ]}
+            />
+            <RenewalRemindersPanel 
+              locationId={effectiveProject !== 'all' ? effectiveProject : undefined}
+            />
           </TabsContent>
         </Tabs>
       </div>

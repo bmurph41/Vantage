@@ -49,6 +49,8 @@ type VdrDocument = {
   uploadedBy: string;
   uploadedAt: string;
   description: string | null;
+  uploaderName?: string;
+  uploaderEmail?: string;
 };
 
 type VersionHistoryDrawerProps = {
@@ -260,6 +262,7 @@ export function VersionHistoryDrawer({
                     <TableHeader>
                       <TableRow>
                         <TableHead>Version</TableHead>
+                        <TableHead>Uploader</TableHead>
                         <TableHead>Uploaded</TableHead>
                         <TableHead>Size</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
@@ -275,6 +278,14 @@ export function VersionHistoryDrawer({
                                 <Badge variant="default" className="text-xs">
                                   Current
                                 </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm text-gray-600">
+                            <div className="flex flex-col">
+                              <span className="font-medium text-gray-700">{version.uploaderName || 'Unknown'}</span>
+                              {version.uploaderEmail && (
+                                <span className="text-xs text-gray-400">{version.uploaderEmail}</span>
                               )}
                             </div>
                           </TableCell>

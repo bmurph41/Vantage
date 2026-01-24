@@ -1,8 +1,9 @@
 import { db } from '../db';
 import { vdrWatermarks, vdrDocuments, vdrFolders, vdrAuditLogs, projects, users, externalUsers, organizations } from '@shared/schema';
 import { eq, and, isNotNull, or } from 'drizzle-orm';
-import { Readable } from 'stream';
+import { Readable, PassThrough } from 'stream';
 import { format } from 'date-fns';
+import { PDFDocument, rgb, degrees, StandardFonts } from 'pdf-lib';
 
 export interface WatermarkConfig {
   isDynamic: boolean;
@@ -168,22 +169,169 @@ class VdrWatermarkService {
     }
     
     const formattedDate = format(context.timestamp, "yyyy-MM-dd HH:mm:ss 'UTC'");
+    const shortDocId = context.documentId.substring(0, 8);
     
-    const lines = [
-      `Downloaded by: ${context.userName}`,
-      `Email: ${context.userEmail}`,
-      `Date: ${formattedDate}`,
-      `Document ID: ${context.documentId}`,
+    return `CONFIDENTIAL - ${context.userEmail} - ${formattedDate} - Doc: ${shortDocId}`;
+  }
+
+  generateWatermarkLines(context: WatermarkContext): string[] {
+    const formattedDate = format(context.timestamp, "yyyy-MM-dd HH:mm:ss 'UTC'");
+    const shortDocId = context.documentId.substring(0, 8);
+    
+    return [
+      'CONFIDENTIAL',
+      context.userEmail,
+      formattedDate,
+      `Document ID: ${shortDocId}`,
     ];
-    
-    if (context.ipAddress) {
-      lines.push(`IP: ${context.ipAddress}`);
+  }
+
+  async streamToBuffer(stream: Readable): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+      stream.on('end', () => resolve(Buffer.concat(chunks)));
+      stream.on('error', reject);
+    });
+  }
+
+  async applyPdfWatermark(
+    pdfBuffer: Buffer,
+    watermarkText: string,
+    config: WatermarkConfig,
+    context?: WatermarkContext
+  ): Promise<Buffer> {
+    try {
+      const pdfDoc = await PDFDocument.load(pdfBuffer);
+      const helveticaFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      const pages = pdfDoc.getPages();
+      
+      const opacity = (config.opacity || 30) / 100;
+      const watermarkColor = rgb(0.6, 0.6, 0.6);
+      
+      for (const page of pages) {
+        const { width, height } = page.getSize();
+        
+        if (config.position === 'diagonal' || !config.position) {
+          const diagonalAngle = 45;
+          const mainFontSize = 14;
+          const lineSpacing = 22;
+          
+          const watermarkLines = context 
+            ? this.generateWatermarkLines(context)
+            : [watermarkText];
+          
+          const positions = [
+            { x: width * 0.15, y: height * 0.85 },
+            { x: width * 0.5, y: height * 0.5 },
+            { x: width * 0.85, y: height * 0.15 },
+            { x: width * 0.3, y: height * 0.3 },
+            { x: width * 0.7, y: height * 0.7 },
+          ];
+          
+          for (const pos of positions) {
+            let yOffset = 0;
+            for (const line of watermarkLines) {
+              page.drawText(line, {
+                x: pos.x,
+                y: pos.y - yOffset,
+                size: mainFontSize,
+                font: helveticaFont,
+                color: watermarkColor,
+                opacity: opacity,
+                rotate: degrees(diagonalAngle),
+              });
+              yOffset += lineSpacing;
+            }
+          }
+          
+          const footerFontSize = 9;
+          const footerText = watermarkText;
+          const footerWidth = helveticaFont.widthOfTextAtSize(footerText, footerFontSize);
+          page.drawText(footerText, {
+            x: (width - footerWidth) / 2,
+            y: 15,
+            size: footerFontSize,
+            font: helveticaFont,
+            color: watermarkColor,
+            opacity: opacity * 1.5,
+          });
+          
+        } else if (config.position === 'tiled') {
+          const spacing = 180;
+          const tileFontSize = 10;
+          for (let x = 50; x < width; x += spacing) {
+            for (let y = 50; y < height; y += spacing) {
+              page.drawText(watermarkText, {
+                x: x,
+                y: y,
+                size: tileFontSize,
+                font: helveticaFont,
+                color: watermarkColor,
+                opacity: opacity * 0.7,
+                rotate: degrees(45),
+              });
+            }
+          }
+        } else if (config.position === 'center') {
+          const centerFontSize = 16;
+          const textWidth = helveticaFont.widthOfTextAtSize(watermarkText, centerFontSize);
+          page.drawText(watermarkText, {
+            x: (width - textWidth) / 2,
+            y: height / 2,
+            size: centerFontSize,
+            font: helveticaFont,
+            color: watermarkColor,
+            opacity: opacity,
+          });
+        } else if (config.position === 'corners') {
+          const margin = 30;
+          const cornerFontSize = 10;
+          
+          page.drawText(watermarkText, {
+            x: margin,
+            y: height - margin,
+            size: cornerFontSize,
+            font: helveticaFont,
+            color: watermarkColor,
+            opacity: opacity,
+          });
+          
+          page.drawText(watermarkText, {
+            x: margin,
+            y: margin,
+            size: cornerFontSize,
+            font: helveticaFont,
+            color: watermarkColor,
+            opacity: opacity,
+          });
+          
+          const textWidth = helveticaFont.widthOfTextAtSize(watermarkText, cornerFontSize);
+          page.drawText(watermarkText, {
+            x: width - margin - textWidth,
+            y: height - margin,
+            size: cornerFontSize,
+            font: helveticaFont,
+            color: watermarkColor,
+            opacity: opacity,
+          });
+          
+          page.drawText(watermarkText, {
+            x: width - margin - textWidth,
+            y: margin,
+            size: cornerFontSize,
+            font: helveticaFont,
+            color: watermarkColor,
+            opacity: opacity,
+          });
+        }
+      }
+      
+      return Buffer.from(await pdfDoc.save());
+    } catch (error) {
+      console.error('Error applying PDF watermark:', error);
+      return pdfBuffer;
     }
-    
-    lines.push(`Document: ${context.documentName}`);
-    lines.push(`Project: ${context.projectName}`);
-    
-    return lines.join('\n');
   }
 
   async applyTextWatermark(
@@ -202,8 +350,76 @@ class VdrWatermarkService {
       };
     }
     
+    try {
+      const pdfBuffer = await this.streamToBuffer(inputStream);
+      const watermarkedBuffer = await this.applyPdfWatermark(pdfBuffer, watermarkText, config, context);
+      const outputStream = new PassThrough();
+      outputStream.end(watermarkedBuffer);
+      
+      return {
+        stream: outputStream,
+        watermarkApplied: true,
+        watermarkText,
+      };
+    } catch (error) {
+      console.error('Error applying watermark:', error);
+      return {
+        stream: inputStream,
+        watermarkApplied: false,
+        watermarkText: undefined,
+      };
+    }
+  }
+
+  async applyWatermarkToBuffer(
+    pdfBuffer: Buffer,
+    userId: string | null,
+    externalUserId: string | null,
+    orgId: string,
+    documentId: string,
+    ipAddress?: string
+  ): Promise<{ buffer: Buffer; watermarkApplied: boolean; watermarkText?: string }> {
+    const document = await db.query.vdrDocuments.findFirst({
+      where: eq(vdrDocuments.id, documentId)
+    });
+    
+    if (!document) {
+      return { buffer: pdfBuffer, watermarkApplied: false };
+    }
+    
+    let config = await this.getWatermarkConfig(
+      orgId,
+      documentId,
+      document.folderId,
+      document.projectId
+    );
+    
+    if (!config && externalUserId) {
+      config = {
+        isDynamic: true,
+        opacity: 30,
+        position: 'diagonal',
+        includeQrCode: false,
+      };
+    }
+    
+    if (!config) {
+      return { buffer: pdfBuffer, watermarkApplied: false };
+    }
+    
+    const context = await this.getWatermarkContext(
+      userId,
+      externalUserId,
+      orgId,
+      documentId,
+      ipAddress
+    );
+    
+    const watermarkText = this.generateWatermarkText(config, context);
+    const watermarkedBuffer = await this.applyPdfWatermark(pdfBuffer, watermarkText, config, context);
+    
     return {
-      stream: inputStream,
+      buffer: watermarkedBuffer,
       watermarkApplied: true,
       watermarkText,
     };
@@ -229,12 +445,21 @@ class VdrWatermarkService {
       };
     }
     
-    const config = await this.getWatermarkConfig(
+    let config = await this.getWatermarkConfig(
       orgId,
       documentId,
       document.folderId,
       document.projectId
     );
+    
+    if (!config && externalUserId) {
+      config = {
+        isDynamic: true,
+        opacity: 30,
+        position: 'diagonal',
+        includeQrCode: false,
+      };
+    }
     
     if (!config) {
       return {
