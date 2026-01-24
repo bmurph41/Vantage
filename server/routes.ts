@@ -63,6 +63,7 @@ import commercialTenantsRoutes from "./routes/commercial-tenants-routes";
 import tourProgressRoutes from "./routes/tour-progress-routes";
 import operationsSyncRoutes from "./routes/operations-sync-routes";
 import ddAutomationRoutes from "./routes/dd-automation-routes";
+import modelingValidationRoutes from "./routes/modeling-validation-routes";
 import { userSessions, insertProspectingEntrySchema, users, salesComps, rateComps, industryStandards } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { rentRollService } from "./services/rent-roll-service";
@@ -383,6 +384,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/email-marketing", authenticateUser, emailMarketingRoutes);
   app.use("/api/archive", authenticateUser, archiveRoutes);
   app.use("/api/modeling/scenario-templates", authenticateUser, scenarioTemplateRoutes);
+  app.use("/api/modeling", authenticateUser, modelingValidationRoutes);
   app.use("/api/marinalytics", authenticateUser, marinalyticsRoutes);
   app.use("/api/commercial-tenants", authenticateUser, commercialTenantsRoutes);
   app.use(authenticateUser, tourProgressRoutes);

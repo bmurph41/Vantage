@@ -28,6 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format, formatDistanceToNow, differenceInDays } from "date-fns";
 import { AddressInput, type AddressComponents } from "@/components/address-input";
+import { ContactEngagementCard } from "@/components/crm/ContactEngagementCard";
 import type { Contact, Company, Deal, Property, Activity as ActivityType, Note, CrmTask, CrmFile } from "@shared/schema";
 
 interface ContactDetailModalProps {
@@ -867,6 +868,9 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
                       )}
                     </CardContent>
                   </Card>
+
+                  {/* Engagement Score Card */}
+                  <ContactEngagementCard contactId={contact.id} />
 
                   {/* Related Contacts */}
                   {relatedContacts.length > 1 && (

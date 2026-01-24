@@ -19,9 +19,11 @@ import {
   tasks,
   rentRolls,
   rentRollEntries,
+  analyticsReportSchedules,
+  insertAnalyticsReportScheduleSchema,
 } from '@shared/schema';
 import { articles } from '@shared/docktalk-schema';
-import { eq, sql, count, and, gte, lte, lt } from 'drizzle-orm';
+import { eq, sql, count, and, gte, lte, lt, desc, asc } from 'drizzle-orm';
 
 const router = Router();
 
@@ -1541,5 +1543,1098 @@ router.get('/modeling/projects/:projectId/export/excel', async (req: Request, re
     });
   }
 });
+
+// ============================================================================
+// Drill-down Endpoints for Analytics Dashboard
+// ============================================================================
+
+/**
+ * GET /api/analytics/drill-down
+ * Unified drill-down endpoint with metricType and filters
+ * Supports: deals, dd-projects, operations, contacts, companies
+ */
+router.get('/drill-down', async (req: Request, res: Response) => {
+  try {
+    const orgId = (req as any).tenantId || 'org-1';
+    const metricType = req.query.metricType as string;
+    const filter = req.query.filter as string;
+    const stage = req.query.stage as string;
+    const status = req.query.status as string;
+    const type = req.query.type as string;
+    const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    if (!metricType) {
+      return res.status(400).json({ error: 'metricType is required' });
+    }
+
+    let items: any[] = [];
+    let total = 0;
+
+    switch (metricType) {
+      case 'deals':
+      case 'wonDeals':
+      case 'lostDeals':
+      case 'pipelineValue': {
+        const whereConditions = [eq(crmDeals.ownerId, orgId)];
+        if (stage || filter) {
+          whereConditions.push(eq(crmDeals.stage, stage || filter));
+        }
+        if (metricType === 'wonDeals') {
+          whereConditions.push(sql`LOWER(${crmDeals.stage}) LIKE '%won%'`);
+        } else if (metricType === 'lostDeals') {
+          whereConditions.push(sql`LOWER(${crmDeals.stage}) LIKE '%lost%'`);
+        }
+        
+        const deals = await db.select({
+          id: crmDeals.id,
+          name: crmDeals.name,
+          stage: crmDeals.stage,
+          value: crmDeals.value,
+          probability: crmDeals.probability,
+          expectedCloseDate: crmDeals.expectedCloseDate,
+          createdAt: crmDeals.createdAt,
+        })
+          .from(crmDeals)
+          .where(and(...whereConditions))
+          .orderBy(desc(crmDeals.createdAt))
+          .limit(limit)
+          .offset(offset);
+        
+        const countResult = await db.select({ count: count() })
+          .from(crmDeals)
+          .where(and(...whereConditions));
+        
+        items = deals;
+        total = Number(countResult[0]?.count || 0);
+        break;
+      }
+
+      case 'dd-projects':
+      case 'activeProjects':
+      case 'completedProjects': {
+        const whereConditions = [eq(projects.orgId, orgId)];
+        if (status || filter) {
+          whereConditions.push(eq(projects.status, (status || filter) as any));
+        }
+        if (metricType === 'activeProjects') {
+          whereConditions.push(eq(projects.status, 'active'));
+        } else if (metricType === 'completedProjects') {
+          whereConditions.push(eq(projects.status, 'completed'));
+        }
+        
+        const ddProjects = await db.select({
+          id: projects.id,
+          name: projects.name,
+          status: projects.status,
+          ddExpirationDate: projects.ddExpirationDate,
+          psaDate: projects.psaDate,
+          createdAt: projects.createdAt,
+        })
+          .from(projects)
+          .where(and(...whereConditions))
+          .orderBy(desc(projects.createdAt))
+          .limit(limit)
+          .offset(offset);
+        
+        const countResult = await db.select({ count: count() })
+          .from(projects)
+          .where(and(...whereConditions));
+        
+        items = ddProjects;
+        total = Number(countResult[0]?.count || 0);
+        break;
+      }
+
+      case 'operations':
+      case 'occupiedUnits':
+      case 'totalUnits': {
+        const whereConditions = [eq(rentRollEntries.orgId, orgId)];
+        if (status || filter) {
+          whereConditions.push(eq(rentRollEntries.status, (status || filter) as any));
+        }
+        if (type) {
+          whereConditions.push(eq(rentRollEntries.entryType, type as any));
+        }
+        if (metricType === 'occupiedUnits') {
+          whereConditions.push(eq(rentRollEntries.status, 'active'));
+        }
+        
+        const entries = await db.select({
+          id: rentRollEntries.id,
+          unitId: rentRollEntries.unitId,
+          status: rentRollEntries.status,
+          entryType: rentRollEntries.entryType,
+          tenantName: rentRollEntries.tenantName,
+          monthlyRate: rentRollEntries.monthlyRate,
+          leaseStartDate: rentRollEntries.leaseStartDate,
+          leaseEndDate: rentRollEntries.leaseEndDate,
+          createdAt: rentRollEntries.createdAt,
+        })
+          .from(rentRollEntries)
+          .where(and(...whereConditions))
+          .orderBy(desc(rentRollEntries.createdAt))
+          .limit(limit)
+          .offset(offset);
+        
+        const countResult = await db.select({ count: count() })
+          .from(rentRollEntries)
+          .where(and(...whereConditions));
+        
+        items = entries.map(e => ({
+          ...e,
+          name: e.tenantName || e.unitId || 'Unknown',
+          value: e.monthlyRate ? parseFloat(e.monthlyRate) : 0,
+        }));
+        total = Number(countResult[0]?.count || 0);
+        break;
+      }
+
+      case 'contacts':
+      case 'totalContacts': {
+        const contacts = await db.select({
+          id: crmContacts.id,
+          firstName: crmContacts.firstName,
+          lastName: crmContacts.lastName,
+          email: crmContacts.email,
+          company: crmContacts.company,
+          title: crmContacts.title,
+          createdAt: crmContacts.createdAt,
+        })
+          .from(crmContacts)
+          .where(eq(crmContacts.orgId, orgId))
+          .orderBy(desc(crmContacts.createdAt))
+          .limit(limit)
+          .offset(offset);
+        
+        const countResult = await db.select({ count: count() })
+          .from(crmContacts)
+          .where(eq(crmContacts.orgId, orgId));
+        
+        items = contacts.map(c => ({
+          ...c,
+          name: `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Unknown',
+        }));
+        total = Number(countResult[0]?.count || 0);
+        break;
+      }
+
+      case 'companies':
+      case 'totalCompanies': {
+        const companies = await db.select({
+          id: crmCompanies.id,
+          name: crmCompanies.name,
+          industry: crmCompanies.industry,
+          website: crmCompanies.website,
+          createdAt: crmCompanies.createdAt,
+        })
+          .from(crmCompanies)
+          .where(eq(crmCompanies.orgId, orgId))
+          .orderBy(desc(crmCompanies.createdAt))
+          .limit(limit)
+          .offset(offset);
+        
+        const countResult = await db.select({ count: count() })
+          .from(crmCompanies)
+          .where(eq(crmCompanies.orgId, orgId));
+        
+        items = companies;
+        total = Number(countResult[0]?.count || 0);
+        break;
+      }
+
+      default:
+        return res.status(400).json({ error: `Unknown metricType: ${metricType}` });
+    }
+
+    res.json({
+      metricType,
+      filter: filter || stage || status || null,
+      items,
+      total,
+      limit,
+      offset,
+      hasMore: offset + items.length < total,
+    });
+  } catch (error: any) {
+    console.error('[Analytics] Error in unified drill-down:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch drill-down data',
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * GET /api/analytics/unified/drilldown/deals
+ * Get deals filtered by stage for drill-down view
+ */
+router.get('/unified/drilldown/deals', async (req: Request, res: Response) => {
+  try {
+    const orgId = (req as any).tenantId || 'org-1';
+    const stage = req.query.stage as string;
+    
+    const whereConditions = [eq(crmDeals.ownerId, orgId)];
+    if (stage) {
+      whereConditions.push(eq(crmDeals.stage, stage));
+    }
+    
+    const deals = await db.select({
+      id: crmDeals.id,
+      name: crmDeals.name,
+      stage: crmDeals.stage,
+      value: crmDeals.value,
+      probability: crmDeals.probability,
+      expectedCloseDate: crmDeals.expectedCloseDate,
+      createdAt: crmDeals.createdAt,
+    })
+      .from(crmDeals)
+      .where(and(...whereConditions))
+      .orderBy(desc(crmDeals.createdAt))
+      .limit(100);
+    
+    res.json({
+      items: deals,
+      total: deals.length,
+      stage: stage || 'all',
+    });
+  } catch (error: any) {
+    console.error('[Analytics] Error fetching deals drilldown:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch deals drilldown',
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * GET /api/analytics/unified/drilldown/dd-projects
+ * Get DD projects filtered by status for drill-down view
+ */
+router.get('/unified/drilldown/dd-projects', async (req: Request, res: Response) => {
+  try {
+    const orgId = (req as any).tenantId || 'org-1';
+    const status = req.query.status as string;
+    
+    const whereConditions = [eq(projects.orgId, orgId)];
+    if (status) {
+      whereConditions.push(eq(projects.status, status as any));
+    }
+    
+    const ddProjects = await db.select({
+      id: projects.id,
+      name: projects.name,
+      status: projects.status,
+      ddExpirationDate: projects.ddExpirationDate,
+      psaDate: projects.psaDate,
+      createdAt: projects.createdAt,
+    })
+      .from(projects)
+      .where(and(...whereConditions))
+      .orderBy(desc(projects.createdAt))
+      .limit(100);
+    
+    res.json({
+      items: ddProjects,
+      total: ddProjects.length,
+      status: status || 'all',
+    });
+  } catch (error: any) {
+    console.error('[Analytics] Error fetching DD projects drilldown:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch DD projects drilldown',
+      message: error.message 
+    });
+  }
+});
+
+// ============================================================================
+// Report Schedule CRUD Endpoints
+// ============================================================================
+
+const reportScheduleSchema = z.object({
+  reportType: z.string(),
+  name: z.string().min(1),
+  frequency: z.enum(['daily', 'weekly', 'monthly']),
+  dayOfWeek: z.number().min(0).max(6).optional(),
+  dayOfMonth: z.number().min(1).max(31).optional(),
+  timeOfDay: z.string().default('09:00:00'),
+  timezone: z.string().default('America/New_York'),
+  recipients: z.array(z.string().email()),
+  filters: z.record(z.any()).optional(),
+  includeCharts: z.boolean().default(true),
+  isActive: z.boolean().default(true),
+});
+
+function calculateNextRunAt(frequency: string, dayOfWeek?: number | null, dayOfMonth?: number | null, timeOfDay: string = '09:00:00'): Date {
+  const now = new Date();
+  const [hours, minutes] = timeOfDay.split(':').map(Number);
+  const nextRun = new Date();
+  nextRun.setHours(hours, minutes, 0, 0);
+  
+  if (nextRun <= now) {
+    nextRun.setDate(nextRun.getDate() + 1);
+  }
+  
+  if (frequency === 'weekly' && dayOfWeek !== undefined && dayOfWeek !== null) {
+    while (nextRun.getDay() !== dayOfWeek) {
+      nextRun.setDate(nextRun.getDate() + 1);
+    }
+  } else if (frequency === 'monthly' && dayOfMonth !== undefined && dayOfMonth !== null) {
+    nextRun.setDate(dayOfMonth);
+    if (nextRun <= now) {
+      nextRun.setMonth(nextRun.getMonth() + 1);
+    }
+  }
+  
+  return nextRun;
+}
+
+/**
+ * GET /api/analytics/report-schedules
+ * List all report schedules for the current user/org
+ */
+router.get('/report-schedules', async (req: Request, res: Response) => {
+  try {
+    const orgId = (req as any).tenantId || 'org-1';
+    
+    const schedules = await db.select()
+      .from(analyticsReportSchedules)
+      .where(eq(analyticsReportSchedules.orgId, orgId))
+      .orderBy(asc(analyticsReportSchedules.nextRunAt));
+    
+    res.json(schedules);
+  } catch (error: any) {
+    console.error('[Analytics] Error fetching report schedules:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch report schedules',
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * POST /api/analytics/report-schedules
+ * Create a new report schedule
+ */
+router.post('/report-schedules', async (req: Request, res: Response) => {
+  try {
+    const orgId = (req as any).tenantId || 'org-1';
+    const userId = (req as any).userId || 'user-1';
+    
+    const data = reportScheduleSchema.parse(req.body);
+    const nextRunAt = calculateNextRunAt(data.frequency, data.dayOfWeek, data.dayOfMonth, data.timeOfDay);
+    
+    const [schedule] = await db.insert(analyticsReportSchedules)
+      .values({
+        ...data,
+        orgId,
+        userId,
+        nextRunAt,
+      })
+      .returning();
+    
+    res.status(201).json(schedule);
+  } catch (error: any) {
+    console.error('[Analytics] Error creating report schedule:', error);
+    res.status(500).json({ 
+      error: 'Failed to create report schedule',
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * PUT /api/analytics/report-schedules/:id
+ * Update a report schedule
+ */
+router.put('/report-schedules/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const orgId = (req as any).tenantId || 'org-1';
+    
+    const data = reportScheduleSchema.partial().parse(req.body);
+    const updateData: any = { ...data, updatedAt: new Date() };
+    
+    if (data.frequency || data.dayOfWeek !== undefined || data.dayOfMonth !== undefined || data.timeOfDay) {
+      const existing = await db.select()
+        .from(analyticsReportSchedules)
+        .where(and(eq(analyticsReportSchedules.id, id), eq(analyticsReportSchedules.orgId, orgId)))
+        .limit(1);
+      
+      if (existing[0]) {
+        const freq = data.frequency || existing[0].frequency;
+        const dow = data.dayOfWeek !== undefined ? data.dayOfWeek : existing[0].dayOfWeek;
+        const dom = data.dayOfMonth !== undefined ? data.dayOfMonth : existing[0].dayOfMonth;
+        const tod = data.timeOfDay || existing[0].timeOfDay;
+        updateData.nextRunAt = calculateNextRunAt(freq, dow, dom, tod || '09:00:00');
+      }
+    }
+    
+    const [schedule] = await db.update(analyticsReportSchedules)
+      .set(updateData)
+      .where(and(eq(analyticsReportSchedules.id, id), eq(analyticsReportSchedules.orgId, orgId)))
+      .returning();
+    
+    if (!schedule) {
+      return res.status(404).json({ error: 'Report schedule not found' });
+    }
+    
+    res.json(schedule);
+  } catch (error: any) {
+    console.error('[Analytics] Error updating report schedule:', error);
+    res.status(500).json({ 
+      error: 'Failed to update report schedule',
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * DELETE /api/analytics/report-schedules/:id
+ * Delete a report schedule
+ */
+router.delete('/report-schedules/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const orgId = (req as any).tenantId || 'org-1';
+    
+    const [deleted] = await db.delete(analyticsReportSchedules)
+      .where(and(eq(analyticsReportSchedules.id, id), eq(analyticsReportSchedules.orgId, orgId)))
+      .returning();
+    
+    if (!deleted) {
+      return res.status(404).json({ error: 'Report schedule not found' });
+    }
+    
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('[Analytics] Error deleting report schedule:', error);
+    res.status(500).json({ 
+      error: 'Failed to delete report schedule',
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * GET /api/analytics/unified/drilldown/operations
+ * Get rent roll entries filtered by status for drill-down view
+ */
+router.get('/unified/drilldown/operations', async (req: Request, res: Response) => {
+  try {
+    const orgId = (req as any).tenantId || 'org-1';
+    const status = req.query.status as string;
+    const type = req.query.type as string;
+    
+    const whereConditions = [eq(rentRollEntries.orgId, orgId)];
+    if (status) {
+      whereConditions.push(eq(rentRollEntries.status, status as any));
+    }
+    if (type) {
+      whereConditions.push(eq(rentRollEntries.entryType, type as any));
+    }
+    
+    const entries = await db.select({
+      id: rentRollEntries.id,
+      name: rentRollEntries.unitId,
+      status: rentRollEntries.status,
+      entryType: rentRollEntries.entryType,
+      tenantName: rentRollEntries.tenantName,
+      monthlyRate: rentRollEntries.monthlyRate,
+      leaseStartDate: rentRollEntries.leaseStartDate,
+      leaseEndDate: rentRollEntries.leaseEndDate,
+      createdAt: rentRollEntries.createdAt,
+    })
+      .from(rentRollEntries)
+      .where(and(...whereConditions))
+      .orderBy(desc(rentRollEntries.createdAt))
+      .limit(100);
+    
+    res.json({
+      items: entries.map(e => ({
+        ...e,
+        name: e.tenantName || e.name || 'Unknown',
+        value: e.monthlyRate ? parseFloat(e.monthlyRate) : 0,
+      })),
+      total: entries.length,
+      status: status || 'all',
+      type: type || 'all',
+    });
+  } catch (error: any) {
+    console.error('[Analytics] Error fetching operations drilldown:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch operations drilldown',
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * POST /api/analytics/export-pdf
+ * Generate PDF export of analytics dashboard with actual PDF generation
+ * Saves to server and returns download URL
+ */
+router.post('/export-pdf', async (req: Request, res: Response) => {
+  try {
+    const orgId = (req as any).tenantId || 'org-1';
+    const { period = '30d', dashboardType = 'unified', filters = {}, analyticsData, returnUrl = false } = req.body;
+    
+    const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
+    const fs = await import('fs/promises');
+    const path = await import('path');
+    
+    const pdfDoc = await PDFDocument.create();
+    const timesRoman = await pdfDoc.embedFont(StandardFonts.TimesRoman);
+    const timesBold = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
+    
+    const page = pdfDoc.addPage([612, 792]);
+    const { width, height } = page.getSize();
+    let yOffset = height - 50;
+    
+    const dashboardTitles: Record<string, string> = {
+      unified: 'Cross-Module Analytics Report',
+      crm: 'CRM Analytics Report',
+      dd: 'Due Diligence Analytics Report',
+      modeling: 'Modeling Analytics Report',
+      operations: 'Operations Analytics Report',
+    };
+    
+    page.drawText(dashboardTitles[dashboardType] || 'Analytics Report', {
+      x: 50,
+      y: yOffset,
+      size: 24,
+      font: timesBold,
+      color: rgb(0.1, 0.1, 0.1),
+    });
+    yOffset -= 30;
+    
+    const periodLabels: Record<string, string> = {
+      '7d': 'Last 7 days',
+      '30d': 'Last 30 days',
+      '90d': 'Last 90 days',
+      'ytd': 'Year to Date'
+    };
+    
+    page.drawText(`Generated: ${new Date().toLocaleString()}`, {
+      x: 50,
+      y: yOffset,
+      size: 10,
+      font: timesRoman,
+      color: rgb(0.4, 0.4, 0.4),
+    });
+    yOffset -= 15;
+    
+    page.drawText(`Period: ${periodLabels[period] || period}`, {
+      x: 50,
+      y: yOffset,
+      size: 10,
+      font: timesRoman,
+      color: rgb(0.4, 0.4, 0.4),
+    });
+    yOffset -= 15;
+    
+    page.drawText(`Dashboard Type: ${dashboardType}`, {
+      x: 50,
+      y: yOffset,
+      size: 10,
+      font: timesRoman,
+      color: rgb(0.4, 0.4, 0.4),
+    });
+    yOffset -= 40;
+    
+    if (analyticsData) {
+      page.drawText('Key Performance Indicators', {
+        x: 50,
+        y: yOffset,
+        size: 16,
+        font: timesBold,
+        color: rgb(0.1, 0.1, 0.1),
+      });
+      yOffset -= 25;
+      
+      const formatCurrency = (value: number) => {
+        if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+        if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+        return `$${value.toFixed(0)}`;
+      };
+      
+      const formatPercent = (value: number) => `${value.toFixed(1)}%`;
+      
+      const kpis = [
+        { label: 'Total Pipeline Value', value: formatCurrency(analyticsData.crm?.pipelineValue || 0) },
+        { label: 'Win Rate', value: formatPercent(analyticsData.crm?.conversionRate || 0) },
+        { label: 'DD Completion Rate', value: formatPercent(analyticsData.dueDiligence?.completionRate || 0) },
+        { label: 'Overdue Tasks', value: String(analyticsData.dueDiligence?.overdueTasks || 0) },
+        { label: 'Total Contacts', value: String(analyticsData.crm?.totalContacts || 0) },
+        { label: 'Total Companies', value: String(analyticsData.crm?.totalCompanies || 0) },
+        { label: 'DD Projects', value: String(analyticsData.dueDiligence?.totalProjects || 0) },
+        { label: 'Modeling Projects', value: String(analyticsData.modeling?.totalProjects || 0) },
+        { label: 'Occupancy Rate', value: formatPercent(analyticsData.operations?.occupancyRate || 0) },
+        { label: 'Monthly Revenue', value: formatCurrency(analyticsData.operations?.totalMonthlyRevenue || 0) },
+      ];
+      
+      kpis.forEach((kpi, index) => {
+        const col = index % 2;
+        const row = Math.floor(index / 2);
+        const x = 50 + col * 270;
+        const y = yOffset - row * 25;
+        
+        page.drawText(`${kpi.label}: `, {
+          x,
+          y,
+          size: 11,
+          font: timesRoman,
+          color: rgb(0.3, 0.3, 0.3),
+        });
+        page.drawText(kpi.value, {
+          x: x + 150,
+          y,
+          size: 11,
+          font: timesBold,
+          color: rgb(0.1, 0.1, 0.1),
+        });
+      });
+      yOffset -= Math.ceil(kpis.length / 2) * 25 + 30;
+      
+      if (analyticsData.crm?.dealsByStage) {
+        page.drawText('Deals by Stage', {
+          x: 50,
+          y: yOffset,
+          size: 14,
+          font: timesBold,
+          color: rgb(0.1, 0.1, 0.1),
+        });
+        yOffset -= 20;
+        
+        Object.entries(analyticsData.crm.dealsByStage).forEach(([stage, count], index) => {
+          page.drawText(`${stage}: ${count} deals`, {
+            x: 60,
+            y: yOffset - index * 18,
+            size: 10,
+            font: timesRoman,
+            color: rgb(0.3, 0.3, 0.3),
+          });
+        });
+        yOffset -= Object.keys(analyticsData.crm.dealsByStage).length * 18 + 25;
+      }
+      
+      if (analyticsData.dueDiligence?.projectsByStatus) {
+        page.drawText('DD Projects by Status', {
+          x: 50,
+          y: yOffset,
+          size: 14,
+          font: timesBold,
+          color: rgb(0.1, 0.1, 0.1),
+        });
+        yOffset -= 20;
+        
+        Object.entries(analyticsData.dueDiligence.projectsByStatus).forEach(([status, count], index) => {
+          page.drawText(`${status}: ${count} projects`, {
+            x: 60,
+            y: yOffset - index * 18,
+            size: 10,
+            font: timesRoman,
+            color: rgb(0.3, 0.3, 0.3),
+          });
+        });
+        yOffset -= Object.keys(analyticsData.dueDiligence.projectsByStatus).length * 18 + 25;
+      }
+      
+      if (analyticsData.operations) {
+        page.drawText('Operations Summary', {
+          x: 50,
+          y: yOffset,
+          size: 14,
+          font: timesBold,
+          color: rgb(0.1, 0.1, 0.1),
+        });
+        yOffset -= 20;
+        
+        const opsItems = [
+          { label: 'Total Units', value: analyticsData.operations.totalUnits || 0 },
+          { label: 'Occupied Units', value: analyticsData.operations.occupiedUnits || 0 },
+          { label: 'Occupancy Rate', value: `${(analyticsData.operations.occupancyRate || 0).toFixed(1)}%` },
+          { label: 'Monthly Revenue', value: formatCurrency(analyticsData.operations.totalMonthlyRevenue || 0) },
+        ];
+        
+        opsItems.forEach((item, index) => {
+          page.drawText(`${item.label}: ${item.value}`, {
+            x: 60,
+            y: yOffset - index * 18,
+            size: 10,
+            font: timesRoman,
+            color: rgb(0.3, 0.3, 0.3),
+          });
+        });
+      }
+    }
+    
+    page.drawText('Note: Chart visualizations available in interactive dashboard', {
+      x: 50,
+      y: 50,
+      size: 8,
+      font: timesRoman,
+      color: rgb(0.5, 0.5, 0.5),
+    });
+    
+    const pdfBytes = await pdfDoc.save();
+    
+    if (returnUrl) {
+      const uploadsDir = path.default.join(process.cwd(), 'server', 'uploads', 'analytics-reports');
+      await fs.mkdir(uploadsDir, { recursive: true });
+      
+      const filename = `analytics-report-${dashboardType}-${Date.now()}.pdf`;
+      const filePath = path.default.join(uploadsDir, filename);
+      await fs.writeFile(filePath, Buffer.from(pdfBytes));
+      
+      const downloadUrl = `/api/analytics/reports/${filename}`;
+      
+      res.json({
+        success: true,
+        filename,
+        downloadUrl,
+        size: pdfBytes.length,
+        generatedAt: new Date().toISOString(),
+      });
+    } else {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="analytics-report-${dashboardType}-${new Date().toISOString().split('T')[0]}.pdf"`);
+      res.setHeader('Content-Length', pdfBytes.length);
+      res.send(Buffer.from(pdfBytes));
+    }
+  } catch (error: any) {
+    console.error('[Analytics] Error generating PDF export:', error);
+    res.status(500).json({ 
+      error: 'Failed to generate PDF export',
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * GET /api/analytics/reports/:filename
+ * Download a previously generated PDF report
+ */
+router.get('/reports/:filename', async (req: Request, res: Response) => {
+  try {
+    const { filename } = req.params;
+    const fs = await import('fs/promises');
+    const path = await import('path');
+    
+    if (!filename.endsWith('.pdf') || filename.includes('..')) {
+      return res.status(400).json({ error: 'Invalid filename' });
+    }
+    
+    const filePath = path.default.join(process.cwd(), 'server', 'uploads', 'analytics-reports', filename);
+    
+    try {
+      await fs.access(filePath);
+    } catch {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+    
+    const fileBuffer = await fs.readFile(filePath);
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', fileBuffer.length);
+    res.send(fileBuffer);
+  } catch (error: any) {
+    console.error('[Analytics] Error downloading PDF report:', error);
+    res.status(500).json({ 
+      error: 'Failed to download report',
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * POST /api/analytics/report-schedules/:id/preview
+ * Generate a preview of what the scheduled report will look like
+ */
+router.post('/report-schedules/:id/preview', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const orgId = (req as any).tenantId || 'org-1';
+    
+    const [schedule] = await db.select()
+      .from(analyticsReportSchedules)
+      .where(and(eq(analyticsReportSchedules.id, id), eq(analyticsReportSchedules.orgId, orgId)))
+      .limit(1);
+    
+    if (!schedule) {
+      return res.status(404).json({ error: 'Report schedule not found' });
+    }
+    
+    const period = (schedule.filters as any)?.period || '30d';
+    const periodDays: Record<string, number> = {
+      '7d': 7,
+      '30d': 30,
+      '90d': 90,
+      'ytd': Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 1).getTime()) / (1000 * 60 * 60 * 24)),
+    };
+    const days = periodDays[period] || 30;
+    const periodStart = new Date();
+    periodStart.setDate(periodStart.getDate() - days);
+    
+    const [contactsCount, dealsData, ddProjectsData] = await Promise.all([
+      db.select({ count: count() })
+        .from(crmContacts)
+        .where(eq(crmContacts.orgId, orgId))
+        .then(r => r[0]?.count || 0),
+      
+      db.select({
+        stage: crmDeals.stage,
+        count: count(),
+        totalValue: sql<number>`COALESCE(SUM(${crmDeals.value}), 0)`,
+      })
+        .from(crmDeals)
+        .where(eq(crmDeals.ownerId, orgId))
+        .groupBy(crmDeals.stage),
+      
+      db.select({
+        status: projects.status,
+        count: count(),
+      })
+        .from(projects)
+        .where(eq(projects.orgId, orgId))
+        .groupBy(projects.status),
+    ]);
+    
+    const dealsByStage: Record<string, number> = {};
+    let pipelineValue = 0;
+    dealsData.forEach(r => {
+      dealsByStage[r.stage || 'unknown'] = Number(r.count);
+      pipelineValue += Number(r.totalValue);
+    });
+    
+    const projectsByStatus: Record<string, number> = {};
+    ddProjectsData.forEach(r => {
+      projectsByStatus[r.status || 'unknown'] = Number(r.count);
+    });
+    
+    const previewHtml = `
+      <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+            h1 { color: #333; }
+            .header { border-bottom: 2px solid #007bff; padding-bottom: 10px; margin-bottom: 20px; }
+            .meta { color: #666; font-size: 12px; }
+            .section { margin-bottom: 30px; }
+            .section h2 { color: #007bff; font-size: 16px; margin-bottom: 10px; }
+            .kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+            .kpi { background: #f8f9fa; padding: 15px; border-radius: 8px; }
+            .kpi-label { color: #666; font-size: 12px; }
+            .kpi-value { font-size: 24px; font-weight: bold; color: #333; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+            th { background: #f8f9fa; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>${schedule.name}</h1>
+            <div class="meta">
+              <p>Report Type: ${schedule.reportType} | Frequency: ${schedule.frequency}</p>
+              <p>Generated: ${new Date().toLocaleString()}</p>
+              <p>Period: ${period === '7d' ? 'Last 7 days' : period === '30d' ? 'Last 30 days' : period === '90d' ? 'Last 90 days' : 'Year to Date'}</p>
+            </div>
+          </div>
+          
+          <div class="section">
+            <h2>Key Metrics</h2>
+            <div class="kpi-grid">
+              <div class="kpi">
+                <div class="kpi-label">Total Contacts</div>
+                <div class="kpi-value">${contactsCount}</div>
+              </div>
+              <div class="kpi">
+                <div class="kpi-label">Pipeline Value</div>
+                <div class="kpi-value">$${(pipelineValue / 1000000).toFixed(1)}M</div>
+              </div>
+              <div class="kpi">
+                <div class="kpi-label">Total Deals</div>
+                <div class="kpi-value">${Object.values(dealsByStage).reduce((a, b) => a + b, 0)}</div>
+              </div>
+              <div class="kpi">
+                <div class="kpi-label">DD Projects</div>
+                <div class="kpi-value">${Object.values(projectsByStatus).reduce((a, b) => a + b, 0)}</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="section">
+            <h2>Deals by Stage</h2>
+            <table>
+              <tr><th>Stage</th><th>Count</th></tr>
+              ${Object.entries(dealsByStage).map(([stage, cnt]) => `<tr><td>${stage}</td><td>${cnt}</td></tr>`).join('')}
+            </table>
+          </div>
+          
+          <div class="section">
+            <h2>DD Projects by Status</h2>
+            <table>
+              <tr><th>Status</th><th>Count</th></tr>
+              ${Object.entries(projectsByStatus).map(([status, cnt]) => `<tr><td>${status}</td><td>${cnt}</td></tr>`).join('')}
+            </table>
+          </div>
+          
+          <div class="meta" style="margin-top: 40px; text-align: center;">
+            <p>Recipients: ${schedule.recipients.join(', ')}</p>
+            <p>Next scheduled delivery: ${schedule.nextRunAt ? new Date(schedule.nextRunAt).toLocaleString() : 'Not scheduled'}</p>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    res.json({
+      schedule,
+      preview: {
+        html: previewHtml,
+        data: {
+          totalContacts: contactsCount,
+          pipelineValue,
+          dealsByStage,
+          projectsByStatus,
+        },
+      },
+    });
+  } catch (error: any) {
+    console.error('[Analytics] Error generating report preview:', error);
+    res.status(500).json({ 
+      error: 'Failed to generate report preview',
+      message: error.message 
+    });
+  }
+});
+
+// ============================================================================
+// Scheduled Report Execution (Placeholder for Background Job)
+// ============================================================================
+
+/**
+ * POST /api/analytics/report-schedules/:id/execute
+ * Manually trigger execution of a scheduled report
+ * In production, this would be called by a background job scheduler (e.g., cron, Bull, Agenda)
+ */
+router.post('/report-schedules/:id/execute', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const orgId = (req as any).tenantId || 'org-1';
+    
+    const [schedule] = await db.select()
+      .from(analyticsReportSchedules)
+      .where(and(eq(analyticsReportSchedules.id, id), eq(analyticsReportSchedules.orgId, orgId)))
+      .limit(1);
+    
+    if (!schedule) {
+      return res.status(404).json({ error: 'Report schedule not found' });
+    }
+    
+    if (!schedule.isActive) {
+      return res.status(400).json({ error: 'Schedule is not active' });
+    }
+    
+    console.log(`[Analytics] Executing scheduled report: ${schedule.name} (${schedule.id})`);
+    console.log(`[Analytics] Recipients: ${schedule.recipients.join(', ')}`);
+    console.log(`[Analytics] Report type: ${schedule.reportType}, Frequency: ${schedule.frequency}`);
+    
+    const nextRunAt = calculateNextRunAt(
+      schedule.frequency, 
+      schedule.dayOfWeek, 
+      schedule.dayOfMonth, 
+      schedule.timeOfDay || '09:00:00'
+    );
+    
+    await db.update(analyticsReportSchedules)
+      .set({
+        lastRunAt: new Date(),
+        nextRunAt,
+        updatedAt: new Date(),
+      })
+      .where(eq(analyticsReportSchedules.id, id));
+    
+    res.json({
+      success: true,
+      message: 'Report execution triggered (placeholder)',
+      schedule: {
+        id: schedule.id,
+        name: schedule.name,
+        recipients: schedule.recipients,
+        lastRunAt: new Date().toISOString(),
+        nextRunAt: nextRunAt.toISOString(),
+      },
+      note: 'In production, this would generate and send the report via email using SendGrid or similar service.',
+    });
+  } catch (error: any) {
+    console.error('[Analytics] Error executing scheduled report:', error);
+    res.status(500).json({ 
+      error: 'Failed to execute scheduled report',
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * GET /api/analytics/report-schedules/pending
+ * Get all pending scheduled reports that should be executed
+ * Used by background job scheduler to find reports due for execution
+ */
+router.get('/report-schedules/pending', async (req: Request, res: Response) => {
+  try {
+    const now = new Date();
+    
+    const pendingSchedules = await db.select()
+      .from(analyticsReportSchedules)
+      .where(and(
+        eq(analyticsReportSchedules.isActive, true),
+        lte(analyticsReportSchedules.nextRunAt, now)
+      ))
+      .orderBy(asc(analyticsReportSchedules.nextRunAt))
+      .limit(50);
+    
+    res.json({
+      pending: pendingSchedules,
+      count: pendingSchedules.length,
+      checkedAt: now.toISOString(),
+    });
+  } catch (error: any) {
+    console.error('[Analytics] Error fetching pending schedules:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch pending schedules',
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * Placeholder function for scheduled job execution
+ * In production, this would be called by a background job scheduler
+ * 
+ * Implementation notes for production:
+ * 1. Use a job scheduler like Bull, Agenda, or node-cron
+ * 2. Poll /api/analytics/report-schedules/pending periodically (e.g., every minute)
+ * 3. For each pending schedule:
+ *    a. Generate the report (PDF or HTML)
+ *    b. Send email via SendGrid integration
+ *    c. Update lastRunAt and calculate nextRunAt
+ *    d. Log the execution
+ * 
+ * Example cron job setup (for reference):
+ * ```
+ * import cron from 'node-cron';
+ * 
+ * cron.schedule('* * * * *', async () => {
+ *   const response = await fetch('/api/analytics/report-schedules/pending');
+ *   const { pending } = await response.json();
+ *   
+ *   for (const schedule of pending) {
+ *     await fetch(`/api/analytics/report-schedules/${schedule.id}/execute`, { method: 'POST' });
+ *   }
+ * });
+ * ```
+ */
 
 export default router;

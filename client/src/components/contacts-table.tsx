@@ -1,12 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   Users, Plus, Mail, Phone, MoreHorizontal, Search, 
-  Star, ArrowRight, Edit, Trash2, Upload 
+  Star, ArrowRight, Edit, Trash2, Upload, TrendingUp, MailOpen, MousePointerClick, Flame, ThermometerSun, Snowflake
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +15,15 @@ import ContactFormModal from "@/components/modals/contact-form-modal";
 import { FileUpload } from "@/components/file-upload";
 import { ImportedDataBadge } from "@/components/integrations/ImportedDataBadge";
 import type { Contact, Company } from "@shared/schema";
+
+interface ContactEngagementScore {
+  contactId: string;
+  engagementScore: number;
+  emailsOpened: number;
+  emailsClicked: number;
+  emailsSent: number;
+  lastInteraction: string | null;
+}
 
 interface ContactsTableProps {
   showFullView?: boolean;
@@ -37,6 +47,23 @@ export default function ContactsTable({ showFullView = false }: ContactsTablePro
     queryKey: ['/api/contacts/search', { q: searchQuery }],
     enabled: searchQuery.length > 2,
   });
+
+  const { data: engagementScores = [] } = useQuery<ContactEngagementScore[]>({
+    queryKey: ['/api/crm/contacts/engagement-scores'],
+    enabled: showFullView,
+  });
+
+  const engagementScoreMap = useMemo(() => {
+    const map = new Map<string, ContactEngagementScore>();
+    engagementScores.forEach(score => map.set(score.contactId, score));
+    return map;
+  }, [engagementScores]);
+
+  const getEngagementLevel = (score: number) => {
+    if (score >= 70) return { label: 'Hot', color: 'bg-red-100 text-red-800 border-red-300', icon: Flame };
+    if (score >= 40) return { label: 'Warm', color: 'bg-amber-100 text-amber-800 border-amber-300', icon: ThermometerSun };
+    return { label: 'Cold', color: 'bg-blue-100 text-blue-800 border-blue-300', icon: Snowflake };
+  };
 
   const deleteContactMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -236,6 +263,16 @@ export default function ContactsTable({ showFullView = false }: ContactsTablePro
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Company
                   </th>
+                  {showFullView && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Engagement
+                    </th>
+                  )}
+                  {showFullView && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Email Status
+                    </th>
+                  )}
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Lead Score
                   </th>
@@ -294,6 +331,84 @@ export default function ContactsTable({ showFullView = false }: ContactsTablePro
                         <span className="text-sm text-gray-400">No company</span>
                       )}
                     </td>
+                    {showFullView && (
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {(() => {
+                          const engScore = engagementScoreMap.get(contact.id);
+                          if (!engScore) return <span className="text-sm text-gray-400">—</span>;
+                          const level = getEngagementLevel(engScore.engagementScore);
+                          const IconComponent = level.icon;
+                          return (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <Badge 
+                                    className={`${level.color} inline-flex items-center gap-1 border`}
+                                    data-testid={`contact-engagement-${contact.id}`}
+                                  >
+                                    <IconComponent className="w-3 h-3" />
+                                    {level.label}
+                                    <span className="opacity-60">({engScore.engagementScore})</span>
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <div className="text-xs">
+                                    <p className="font-medium">{level.label} Lead - Score: {engScore.engagementScore}/100</p>
+                                    <p className="text-muted-foreground">
+                                      Last interaction: {engScore.lastInteraction 
+                                        ? new Date(engScore.lastInteraction).toLocaleDateString() 
+                                        : 'Never'}
+                                    </p>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          );
+                        })()}
+                      </td>
+                    )}
+                    {showFullView && (
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {(() => {
+                          const engScore = engagementScoreMap.get(contact.id);
+                          if (!engScore || engScore.emailsSent === 0) {
+                            return <span className="text-sm text-gray-400">No emails</span>;
+                          }
+                          const openRate = engScore.emailsSent > 0 
+                            ? Math.round((engScore.emailsOpened / engScore.emailsSent) * 100) 
+                            : 0;
+                          const clickRate = engScore.emailsSent > 0 
+                            ? Math.round((engScore.emailsClicked / engScore.emailsSent) * 100) 
+                            : 0;
+                          return (
+                            <div className="flex items-center gap-2 text-xs">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger className="flex items-center gap-1">
+                                    <MailOpen className="w-3 h-3 text-green-500" />
+                                    <span>{openRate}%</span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    {engScore.emailsOpened} of {engScore.emailsSent} opened
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger className="flex items-center gap-1">
+                                    <MousePointerClick className="w-3 h-3 text-purple-500" />
+                                    <span>{clickRate}%</span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    {engScore.emailsClicked} of {engScore.emailsSent} clicked
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                          );
+                        })()}
+                      </td>
+                    )}
                     <td className="px-6 py-4 whitespace-nowrap">
                       <Badge 
                         className={`${getLeadScoreColor(contact.leadScore || 0)} inline-flex items-center`}

@@ -1,8 +1,9 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { dealStageHistoryService } from "../services/deal-stage-history-service";
+import { contactEngagementService } from "../services/contact-engagement-service";
 import { db } from "../db";
-import { crmDeals, crmDealEngagementScores } from "@shared/schema";
-import { eq, desc, and, gte, lte } from "drizzle-orm";
+import { crmDeals, crmDealEngagementScores, crmContacts, crmActivities, users, crmDealStageHistory, crmContactEngagementScores } from "@shared/schema";
+import { eq, desc, and, gte, lte, sql, count, isNotNull } from "drizzle-orm";
 
 const router = Router();
 
@@ -163,6 +164,337 @@ router.get("/crm/analytics/win-probability-distribution", async (req: Request, r
       averageWinProbability: scores.length > 0 
         ? Math.round(scores.reduce((acc, s) => acc + (s.winProbability || 0), 0) / scores.length)
         : 0,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/crm/analytics/deal-velocity", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = (req as any).user?.orgId || "org-1";
+    const { startDate, endDate } = req.query;
+    
+    const start = startDate ? new Date(startDate as string) : undefined;
+    const end = endDate ? new Date(endDate as string) : undefined;
+    
+    const velocityMetrics = await dealStageHistoryService.getStageVelocityMetrics(orgId, start, end);
+    
+    const conditions = [isNotNull(crmDealStageHistory.exitedAt)];
+    if (start) {
+      conditions.push(gte(crmDealStageHistory.enteredAt, start));
+    }
+    if (end) {
+      conditions.push(lte(crmDealStageHistory.enteredAt, end));
+    }
+    
+    const monthlyVelocity = await db
+      .select({
+        month: sql<string>`TO_CHAR(${crmDealStageHistory.enteredAt}, 'YYYY-MM')`.as("month"),
+        avgDays: sql<number>`AVG(${crmDealStageHistory.durationBusinessDays})`.as("avg_days"),
+        dealCount: count().as("deal_count"),
+      })
+      .from(crmDealStageHistory)
+      .where(and(...conditions))
+      .groupBy(sql`TO_CHAR(${crmDealStageHistory.enteredAt}, 'YYYY-MM')`)
+      .orderBy(sql`TO_CHAR(${crmDealStageHistory.enteredAt}, 'YYYY-MM')`);
+    
+    res.json({
+      ...velocityMetrics,
+      velocityTrend: monthlyVelocity.map(m => ({
+        period: m.month,
+        avgDays: Math.round(m.avgDays || 0),
+        dealCount: m.dealCount,
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/crm/analytics/win-loss", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = (req as any).user?.orgId || "org-1";
+    const { startDate, endDate } = req.query;
+    
+    const conditions = [];
+    if (startDate) {
+      conditions.push(gte(crmDeals.createdAt, new Date(startDate as string)));
+    }
+    if (endDate) {
+      conditions.push(lte(crmDeals.createdAt, new Date(endDate as string)));
+    }
+    
+    const deals = await db
+      .select()
+      .from(crmDeals)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+    
+    const wonDeals = deals.filter(d => d.stage?.toLowerCase() === "won" || d.outcome === "won");
+    const lostDeals = deals.filter(d => d.stage?.toLowerCase() === "lost" || d.outcome === "lost");
+    const activeDeals = deals.filter(d => !["won", "lost"].includes(d.stage?.toLowerCase() || "") && !d.outcome);
+    
+    const totalClosed = wonDeals.length + lostDeals.length;
+    const overallWinRate = totalClosed > 0 ? (wonDeals.length / totalClosed) * 100 : 0;
+    
+    const bySource: Record<string, { won: number; lost: number; total: number; winRate: number; value: number }> = {};
+    deals.forEach(d => {
+      const source = d.source || "Unknown";
+      if (!bySource[source]) {
+        bySource[source] = { won: 0, lost: 0, total: 0, winRate: 0, value: 0 };
+      }
+      bySource[source].total++;
+      bySource[source].value += Number(d.value) || 0;
+      if (d.stage?.toLowerCase() === "won" || d.outcome === "won") {
+        bySource[source].won++;
+      } else if (d.stage?.toLowerCase() === "lost" || d.outcome === "lost") {
+        bySource[source].lost++;
+      }
+    });
+    Object.values(bySource).forEach(s => {
+      const closed = s.won + s.lost;
+      s.winRate = closed > 0 ? Math.round((s.won / closed) * 100) : 0;
+    });
+    
+    const sizeBuckets = [
+      { label: "< $100K", min: 0, max: 100000 },
+      { label: "$100K - $500K", min: 100000, max: 500000 },
+      { label: "$500K - $1M", min: 500000, max: 1000000 },
+      { label: "$1M - $5M", min: 1000000, max: 5000000 },
+      { label: "> $5M", min: 5000000, max: Infinity },
+    ];
+    
+    const bySize = sizeBuckets.map(bucket => {
+      const bucketDeals = deals.filter(d => {
+        const value = Number(d.value) || 0;
+        return value >= bucket.min && value < bucket.max;
+      });
+      const won = bucketDeals.filter(d => d.stage?.toLowerCase() === "won" || d.outcome === "won").length;
+      const lost = bucketDeals.filter(d => d.stage?.toLowerCase() === "lost" || d.outcome === "lost").length;
+      const closed = won + lost;
+      return {
+        label: bucket.label,
+        won,
+        lost,
+        total: bucketDeals.length,
+        winRate: closed > 0 ? Math.round((won / closed) * 100) : 0,
+        totalValue: bucketDeals.reduce((acc, d) => acc + (Number(d.value) || 0), 0),
+      };
+    });
+    
+    const userMap = await db.select().from(users);
+    const userLookup = new Map(userMap.map(u => [u.id, u.name || u.email || u.id]));
+    
+    const byUser: Record<string, { name: string; won: number; lost: number; total: number; winRate: number; value: number }> = {};
+    deals.forEach(d => {
+      const userId = d.ownerId || "unassigned";
+      if (!byUser[userId]) {
+        byUser[userId] = { name: userLookup.get(userId) || "Unassigned", won: 0, lost: 0, total: 0, winRate: 0, value: 0 };
+      }
+      byUser[userId].total++;
+      byUser[userId].value += Number(d.value) || 0;
+      if (d.stage?.toLowerCase() === "won" || d.outcome === "won") {
+        byUser[userId].won++;
+      } else if (d.stage?.toLowerCase() === "lost" || d.outcome === "lost") {
+        byUser[userId].lost++;
+      }
+    });
+    Object.values(byUser).forEach(u => {
+      const closed = u.won + u.lost;
+      u.winRate = closed > 0 ? Math.round((u.won / closed) * 100) : 0;
+    });
+    
+    const monthlyData: Record<string, { won: number; lost: number; total: number; winRate: number }> = {};
+    deals.forEach(d => {
+      const month = d.createdAt ? new Date(d.createdAt).toISOString().slice(0, 7) : "Unknown";
+      if (!monthlyData[month]) {
+        monthlyData[month] = { won: 0, lost: 0, total: 0, winRate: 0 };
+      }
+      monthlyData[month].total++;
+      if (d.stage?.toLowerCase() === "won" || d.outcome === "won") {
+        monthlyData[month].won++;
+      } else if (d.stage?.toLowerCase() === "lost" || d.outcome === "lost") {
+        monthlyData[month].lost++;
+      }
+    });
+    Object.values(monthlyData).forEach(m => {
+      const closed = m.won + m.lost;
+      m.winRate = closed > 0 ? Math.round((m.won / closed) * 100) : 0;
+    });
+    
+    const lostReasons: Record<string, number> = {};
+    lostDeals.forEach(d => {
+      const reason = d.lossReason || "Not specified";
+      lostReasons[reason] = (lostReasons[reason] || 0) + 1;
+    });
+    
+    res.json({
+      summary: {
+        totalDeals: deals.length,
+        wonDeals: wonDeals.length,
+        lostDeals: lostDeals.length,
+        activeDeals: activeDeals.length,
+        overallWinRate: Math.round(overallWinRate * 10) / 10,
+        wonValue: wonDeals.reduce((acc, d) => acc + (Number(d.value) || 0), 0),
+        lostValue: lostDeals.reduce((acc, d) => acc + (Number(d.value) || 0), 0),
+      },
+      bySource: Object.entries(bySource).map(([source, data]) => ({ source, ...data })),
+      bySize,
+      byUser: Object.entries(byUser).map(([userId, data]) => ({ userId, ...data })),
+      byPeriod: Object.entries(monthlyData)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([period, data]) => ({ period, ...data })),
+      lostReasons: Object.entries(lostReasons)
+        .sort(([, a], [, b]) => b - a)
+        .map(([reason, count]) => ({ reason, count })),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/crm/contacts/engagement-scores", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const scores = await db
+      .select({
+        contactId: crmContactEngagementScores.contactId,
+        engagementScore: crmContactEngagementScores.engagementScore,
+        emailsOpened: crmContactEngagementScores.emailsOpened,
+        emailsClicked: crmContactEngagementScores.emailsClicked,
+        emailsSent: crmContactEngagementScores.emailsSent,
+        lastInteraction: crmContactEngagementScores.lastInteraction,
+      })
+      .from(crmContactEngagementScores);
+    res.json(scores);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/crm/contacts/:contactId/engagement-score", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { contactId } = req.params;
+    const score = await contactEngagementService.getEngagementScore(contactId);
+    res.json(score);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/crm/contacts/:contactId/recalculate-engagement", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { contactId } = req.params;
+    const score = await contactEngagementService.recalculateEngagementScore(contactId);
+    res.json({ engagementScore: score });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/crm/contacts/:contactId/email-activity", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { contactId } = req.params;
+    const activity = await contactEngagementService.getEmailActivity(contactId);
+    res.json(activity);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/crm/emails/tracking-stats", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = (req as any).user?.orgId || "org-1";
+    const { startDate, endDate } = req.query;
+    
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    
+    const conditions = [
+      eq(crmActivities.type, "email"),
+      gte(crmActivities.createdAt, startDate ? new Date(startDate as string) : ninetyDaysAgo)
+    ];
+    
+    if (endDate) {
+      conditions.push(lte(crmActivities.createdAt, new Date(endDate as string)));
+    }
+    
+    const activities = await db
+      .select()
+      .from(crmActivities)
+      .where(and(...conditions))
+      .orderBy(desc(crmActivities.createdAt));
+    
+    const totalSent = activities.length;
+    const totalOpened = activities.filter(a => 
+      (a.metadata as any)?.opened === true || 
+      (a.metadata as any)?.status === "opened" ||
+      (a.metadata as any)?.status === "clicked"
+    ).length;
+    const totalClicked = activities.filter(a => 
+      (a.metadata as any)?.clicked === true || 
+      (a.metadata as any)?.status === "clicked"
+    ).length;
+    const totalBounced = activities.filter(a => 
+      (a.metadata as any)?.bounced === true || 
+      (a.metadata as any)?.status === "bounced"
+    ).length;
+    
+    const openRate = totalSent > 0 ? Math.round((totalOpened / totalSent) * 100) : 0;
+    const clickRate = totalSent > 0 ? Math.round((totalClicked / totalSent) * 100) : 0;
+    const bounceRate = totalSent > 0 ? Math.round((totalBounced / totalSent) * 100) : 0;
+    const clickToOpenRate = totalOpened > 0 ? Math.round((totalClicked / totalOpened) * 100) : 0;
+    
+    const byDay: Record<string, { sent: number; opened: number; clicked: number }> = {};
+    activities.forEach(a => {
+      const day = new Date(a.createdAt).toISOString().slice(0, 10);
+      if (!byDay[day]) {
+        byDay[day] = { sent: 0, opened: 0, clicked: 0 };
+      }
+      byDay[day].sent++;
+      if ((a.metadata as any)?.opened || (a.metadata as any)?.status === "opened" || (a.metadata as any)?.status === "clicked") {
+        byDay[day].opened++;
+      }
+      if ((a.metadata as any)?.clicked || (a.metadata as any)?.status === "clicked") {
+        byDay[day].clicked++;
+      }
+    });
+    
+    const uniqueContacts = new Set(activities.map(a => a.contactId).filter(Boolean));
+    const uniqueDeals = new Set(activities.filter(a => a.entityType === "deal").map(a => a.entityId));
+    
+    res.json({
+      summary: {
+        totalSent,
+        totalOpened,
+        totalClicked,
+        totalBounced,
+        openRate,
+        clickRate,
+        bounceRate,
+        clickToOpenRate,
+        uniqueContacts: uniqueContacts.size,
+        uniqueDeals: uniqueDeals.size,
+      },
+      trend: Object.entries(byDay)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, data]) => ({
+          date,
+          ...data,
+          openRate: data.sent > 0 ? Math.round((data.opened / data.sent) * 100) : 0,
+          clickRate: data.sent > 0 ? Math.round((data.clicked / data.sent) * 100) : 0,
+        })),
+      recentEmails: activities.slice(0, 20).map(a => ({
+        id: a.id,
+        subject: (a.metadata as any)?.subject || a.description || "Email",
+        contactId: a.contactId,
+        entityType: a.entityType,
+        entityId: a.entityId,
+        sentAt: a.createdAt,
+        opened: (a.metadata as any)?.opened || (a.metadata as any)?.status === "opened" || (a.metadata as any)?.status === "clicked",
+        clicked: (a.metadata as any)?.clicked || (a.metadata as any)?.status === "clicked",
+        openedAt: (a.metadata as any)?.openedAt || null,
+        clickedAt: (a.metadata as any)?.clickedAt || null,
+      })),
     });
   } catch (error) {
     next(error);

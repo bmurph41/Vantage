@@ -4100,6 +4100,37 @@ export const crmDealEngagementScores = pgTable("crm_deal_engagement_scores", {
   probabilityIdx: index("crm_deal_engagement_probability_idx").on(table.winProbability),
 }));
 
+// Contact Engagement Scores - Tracks engagement metrics for contacts
+export const crmContactEngagementScores = pgTable("crm_contact_engagement_scores", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contactId: varchar("contact_id").notNull().references(() => crmContacts.id, { onDelete: "cascade" }).unique(),
+  engagementScore: integer("engagement_score").default(0).notNull(), // 0-100 composite score
+  emailScore: integer("email_score").default(0), // Based on email opens and clicks
+  meetingScore: integer("meeting_score").default(0), // Based on meeting attendance
+  callScore: integer("call_score").default(0), // Based on call frequency
+  dealInvolvementScore: integer("deal_involvement_score").default(0), // Based on deals associated
+  recencyScore: integer("recency_score").default(0), // Based on last interaction recency
+  responseScore: integer("response_score").default(0), // Based on response rates
+  emailsOpened: integer("emails_opened").default(0),
+  emailsClicked: integer("emails_clicked").default(0),
+  emailsSent: integer("emails_sent").default(0),
+  totalMeetings: integer("total_meetings").default(0),
+  totalCalls: integer("total_calls").default(0),
+  dealsInvolved: integer("deals_involved").default(0),
+  lastEmailOpen: timestamp("last_email_open"),
+  lastEmailClick: timestamp("last_email_click"),
+  lastMeeting: timestamp("last_meeting"),
+  lastCall: timestamp("last_call"),
+  lastInteraction: timestamp("last_interaction"),
+  factors: jsonb("factors").default({}).notNull(), // Detailed breakdown of score factors
+  lastCalculatedAt: timestamp("last_calculated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  contactIdx: index("crm_contact_engagement_contact_idx").on(table.contactId),
+  scoreIdx: index("crm_contact_engagement_score_idx").on(table.engagementScore),
+}));
+
 // Products table - for revenue tracking
 
 export const crmProducts = pgTable("crm_products", {
@@ -5972,6 +6003,7 @@ export type CrmActivity = typeof crmActivities.$inferSelect;
 export type CrmDealStageHistory = typeof crmDealStageHistory.$inferSelect;
 export type CrmTimelineEvent = typeof crmTimelineEvents.$inferSelect;
 export type CrmDealEngagementScore = typeof crmDealEngagementScores.$inferSelect;
+export type CrmContactEngagementScore = typeof crmContactEngagementScores.$inferSelect;
 
 // CRM Insert Schemas
 export const insertCrmDealSchema = createInsertSchema(crmDeals).omit({
@@ -6270,6 +6302,14 @@ export const insertCrmDealEngagementScoreSchema = createInsertSchema(crmDealEnga
   lastCalculatedAt: true,
 });
 export type InsertCrmDealEngagementScore = z.infer<typeof insertCrmDealEngagementScoreSchema>;
+
+export const insertCrmContactEngagementScoreSchema = createInsertSchema(crmContactEngagementScores).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastCalculatedAt: true,
+});
+export type InsertCrmContactEngagementScore = z.infer<typeof insertCrmContactEngagementScoreSchema>;
 
 // CRM Workflow schema
 export const insertCrmWorkflowSchema = createInsertSchema(crmWorkflows).omit({
@@ -21789,6 +21829,47 @@ export const insertUserTourProgressSchema = createInsertSchema(userTourProgress)
 });
 export type UserTourProgress = typeof userTourProgress.$inferSelect;
 export type InsertUserTourProgress = z.infer<typeof insertUserTourProgressSchema>;
+
+// ============================================================================
+// Analytics Report Schedules - For scheduled email reports
+// ============================================================================
+
+export const reportFrequencyEnum = pgEnum("report_frequency", ["daily", "weekly", "monthly"]);
+
+export const analyticsReportSchedules = pgTable("analytics_report_schedules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  reportType: varchar("report_type", { length: 100 }).notNull(), // unified, crm, dd, modeling, operations
+  name: varchar("name", { length: 255 }).notNull(),
+  frequency: reportFrequencyEnum("frequency").notNull(),
+  dayOfWeek: integer("day_of_week"), // 0-6 for weekly (Sunday = 0)
+  dayOfMonth: integer("day_of_month"), // 1-31 for monthly
+  timeOfDay: time("time_of_day").notNull().default('09:00:00'),
+  timezone: varchar("timezone", { length: 100 }).notNull().default('America/New_York'),
+  recipients: text("recipients").array().notNull().default(sql`'{}'`), // Array of email addresses
+  filters: jsonb("filters").default(sql`'{}'`), // JSON object with filter settings
+  includeCharts: boolean("include_charts").notNull().default(true),
+  isActive: boolean("is_active").notNull().default(true),
+  lastRunAt: timestamp("last_run_at"),
+  nextRunAt: timestamp("next_run_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdx: index("analytics_report_schedules_user_idx").on(table.userId),
+  orgIdx: index("analytics_report_schedules_org_idx").on(table.orgId),
+  nextRunIdx: index("analytics_report_schedules_next_run_idx").on(table.nextRunAt),
+}));
+
+export const insertAnalyticsReportScheduleSchema = createInsertSchema(analyticsReportSchedules).omit({
+  id: true,
+  lastRunAt: true,
+  nextRunAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type AnalyticsReportSchedule = typeof analyticsReportSchedules.$inferSelect;
+export type InsertAnalyticsReportSchedule = z.infer<typeof insertAnalyticsReportScheduleSchema>;
 
 // Replit Auth models
 export * from "./models/auth";

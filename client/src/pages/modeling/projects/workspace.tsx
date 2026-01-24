@@ -32,7 +32,9 @@ import {
   FileText,
   Users,
   Anchor,
-  Activity
+  Activity,
+  Tornado,
+  AlertTriangle
 } from 'lucide-react';
 import type { ModelingProject } from '@shared/schema';
 import { FavoriteButton, PinButton } from '@/components/quick-access';
@@ -64,6 +66,8 @@ import ModelingProjectIntegrationPanel from '@/components/modeling/ModelingProje
 import WorkspaceProFormaCharts from './workspace/pro-forma-charts';
 import ScenarioComparisonCharts from './workspace/scenario-comparison-charts';
 import ExportModel from './workspace/export-model';
+import SensitivityTornado from './workspace/sensitivity-tornado';
+import ValidationWarnings from './workspace/validation-warnings';
 
 export default function ProjectWorkspace() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -314,6 +318,14 @@ export default function ProjectWorkspace() {
               <Layers className="h-4 w-4" />
               <span className="hidden sm:inline">Compare</span>
             </TabsTrigger>
+            <TabsTrigger value="sensitivity" className="gap-2" data-testid="tab-sensitivity">
+              <Tornado className="h-4 w-4" />
+              <span className="hidden sm:inline">Sensitivity</span>
+            </TabsTrigger>
+            <TabsTrigger value="validation" className="gap-2" data-testid="tab-validation">
+              <AlertTriangle className="h-4 w-4" />
+              <span className="hidden sm:inline">Validation</span>
+            </TabsTrigger>
             <TabsTrigger value="export" className="gap-2" data-testid="tab-export">
               <FileSpreadsheet className="h-4 w-4" />
               <span className="hidden sm:inline">Export</span>
@@ -411,6 +423,14 @@ export default function ProjectWorkspace() {
 
         <TabsContent value="scenario-compare" className="space-y-6">
           <ScenarioComparisonCharts projectId={projectId!} onTabChange={setActiveTab} />
+        </TabsContent>
+
+        <TabsContent value="sensitivity" className="space-y-6">
+          <SensitivityTornado projectId={projectId!} onTabChange={setActiveTab} />
+        </TabsContent>
+
+        <TabsContent value="validation" className="space-y-6">
+          <ValidationWarnings projectId={projectId!} onTabChange={setActiveTab} />
         </TabsContent>
 
         <TabsContent value="export" className="space-y-6">
