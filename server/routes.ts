@@ -31,6 +31,7 @@ import integrationRouter from "./integration-routes";
 import { integrationsRouter } from "./integrations";
 import marinamatchRouter from "./marinamatch/routes";
 import omRouter from "./om/routes";
+import omBuilderRouter from "./routes/om-builder-routes";
 import scraperV2Routes from "./docktalk/scraper_v2/routes";
 import { liv2Routes } from "./listings/ingestion_v2";
 import pnlRouter from "./services/pnl/routes";
@@ -430,6 +431,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(authenticateUser, enforceTenant, integrationsRouter);
   app.use("/api/marinamatch", authenticateUser, marinamatchRouter);
   app.use("/api/om", authenticateUser, omRouter);
+  app.use(authenticateUser, omBuilderRouter);
 
   // Entity Linking API (Phase 2B) - Cross-module relationship management
   registerEntityLinkingRoutes(app);

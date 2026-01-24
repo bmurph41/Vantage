@@ -1004,3 +1004,553 @@ async function updateSyncMetrics(
     });
   }
 }
+
+// QuickBooks Integration Endpoints
+import { quickBooksService } from '../services/quickbooks-service';
+import { quickbooksIntegrations, quickbooksSyncLogs, integrationSyncHistory } from '@shared/schema';
+
+integrationsRouter.post('/api/integrations/quickbooks/refresh-token', async (req: Request, res: Response) => {
+  const userId = requireUser(req, res);
+  if (!userId) return;
+  
+  const orgId = getOrgId(req);
+  if (!orgId) {
+    return res.status(400).json({ error: 'Organization ID required' });
+  }
+
+  try {
+    if (!quickBooksService.isQuickBooksConfigured()) {
+      return res.status(503).json({ 
+        error: 'QuickBooks integration not configured',
+        message: 'QUICKBOOKS_CLIENT_ID and QUICKBOOKS_CLIENT_SECRET environment variables are required'
+      });
+    }
+
+    const tokens = await quickBooksService.refreshTokens(orgId);
+    
+    if (!tokens) {
+      return res.status(401).json({ 
+        error: 'Token refresh failed',
+        message: 'Unable to refresh tokens. User may need to reconnect to QuickBooks.',
+        reconnectRequired: true
+      });
+    }
+
+    await db.insert(integrationSyncHistory).values({
+      userId,
+      orgId,
+      integrationKey: 'quickbooks',
+      syncType: 'token_refresh' as any,
+      status: 'completed',
+      completedAt: new Date(),
+      recordsProcessed: 0,
+      recordsCreated: 0,
+      recordsUpdated: 0,
+      recordsFailed: 0,
+      errorCount: 0,
+      triggeredBy: 'manual',
+    });
+
+    res.json({ 
+      success: true, 
+      message: 'Token refreshed successfully',
+      expiresAt: tokens.expiresAt,
+      tokenPersistenceEnabled: quickBooksService.isTokenPersistenceEnabled()
+    });
+  } catch (error: any) {
+    console.error('[QuickBooks] Token refresh error:', error);
+    res.status(500).json({ 
+      error: 'Token refresh failed',
+      message: error.message || 'An unexpected error occurred'
+    });
+  }
+});
+
+integrationsRouter.get('/api/integrations/quickbooks/reports/profit-loss', async (req: Request, res: Response) => {
+  const userId = requireUser(req, res);
+  if (!userId) return;
+  
+  const orgId = getOrgId(req);
+  if (!orgId) {
+    return res.status(400).json({ error: 'Organization ID required' });
+  }
+
+  const { startDate, endDate } = req.query;
+  
+  if (!startDate || !endDate) {
+    return res.status(400).json({ 
+      error: 'Missing required parameters',
+      message: 'startDate and endDate query parameters are required (format: YYYY-MM-DD)'
+    });
+  }
+
+  try {
+    const connectionStatus = await quickBooksService.getConnectionStatus(orgId);
+    
+    if (!connectionStatus.isConnected) {
+      return res.status(401).json({
+        error: 'Not connected to QuickBooks',
+        message: 'Please connect to QuickBooks first',
+        warnings: connectionStatus.warnings
+      });
+    }
+
+    const report = await quickBooksService.getProfitAndLoss(
+      orgId, 
+      startDate as string, 
+      endDate as string
+    );
+
+    const marinaMappedReport = {
+      ...report,
+      marinaCategorization: report.rows.map(row => {
+        const mapping = mapQuickBooksToMarinaCategory(row.account, row.type);
+        return {
+          ...row,
+          marinaCategory: mapping.category,
+          marinaSubcategory: mapping.subcategory
+        };
+      })
+    };
+
+    res.json({
+      success: true,
+      report: marinaMappedReport,
+      metadata: {
+        fetchedAt: new Date().toISOString(),
+        orgId,
+        warnings: connectionStatus.warnings
+      }
+    });
+  } catch (error: any) {
+    console.error('[QuickBooks] P&L fetch error:', error);
+    
+    if (error.message?.includes('Not connected')) {
+      return res.status(401).json({
+        error: 'QuickBooks connection expired',
+        message: 'Please reconnect to QuickBooks',
+        reconnectRequired: true
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Failed to fetch P&L report',
+      message: error.message || 'An unexpected error occurred'
+    });
+  }
+});
+
+integrationsRouter.get('/api/integrations/quickbooks/accounts', async (req: Request, res: Response) => {
+  const userId = requireUser(req, res);
+  if (!userId) return;
+  
+  const orgId = getOrgId(req);
+  if (!orgId) {
+    return res.status(400).json({ error: 'Organization ID required' });
+  }
+
+  try {
+    const connectionStatus = await quickBooksService.getConnectionStatus(orgId);
+    
+    if (!connectionStatus.isConnected) {
+      return res.status(401).json({
+        error: 'Not connected to QuickBooks',
+        message: 'Please connect to QuickBooks first',
+        warnings: connectionStatus.warnings
+      });
+    }
+
+    const accounts = await quickBooksService.getChartOfAccounts(orgId);
+
+    const [integration] = await db.select()
+      .from(quickbooksIntegrations)
+      .where(eq(quickbooksIntegrations.orgId, orgId))
+      .limit(1);
+
+    const existingMappings = (integration?.chartOfAccountsMapping as Record<string, any>) || {};
+
+    const mappedAccounts = accounts.map((account: any) => {
+      const defaultMapping = mapQuickBooksToMarinaCategory(account.Name, account.AccountType);
+      const customMapping = existingMappings[account.Id];
+      
+      return {
+        id: account.Id,
+        name: account.Name,
+        accountType: account.AccountType,
+        accountSubType: account.AccountSubType,
+        currentBalance: account.CurrentBalance,
+        isActive: account.Active,
+        marinaMapping: customMapping || {
+          category: defaultMapping.category,
+          subcategory: defaultMapping.subcategory,
+          isCustom: false
+        }
+      };
+    });
+
+    res.json({
+      success: true,
+      accounts: mappedAccounts,
+      totalAccounts: mappedAccounts.length,
+      metadata: {
+        fetchedAt: new Date().toISOString(),
+        orgId,
+        warnings: connectionStatus.warnings
+      }
+    });
+  } catch (error: any) {
+    console.error('[QuickBooks] Accounts fetch error:', error);
+    
+    if (error.message?.includes('Not connected')) {
+      return res.status(401).json({
+        error: 'QuickBooks connection expired',
+        message: 'Please reconnect to QuickBooks',
+        reconnectRequired: true
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Failed to fetch chart of accounts',
+      message: error.message || 'An unexpected error occurred'
+    });
+  }
+});
+
+integrationsRouter.post('/api/integrations/quickbooks/accounts/mapping', async (req: Request, res: Response) => {
+  const userId = requireUser(req, res);
+  if (!userId) return;
+  
+  const orgId = getOrgId(req);
+  if (!orgId) {
+    return res.status(400).json({ error: 'Organization ID required' });
+  }
+
+  const { mappings } = req.body;
+  
+  if (!mappings || typeof mappings !== 'object') {
+    return res.status(400).json({ 
+      error: 'Invalid request',
+      message: 'mappings object is required'
+    });
+  }
+
+  try {
+    await quickBooksService.updateAccountMapping(orgId, mappings);
+    
+    res.json({ 
+      success: true,
+      message: 'Account mappings updated successfully',
+      mappingsCount: Object.keys(mappings).length
+    });
+  } catch (error: any) {
+    console.error('[QuickBooks] Mapping update error:', error);
+    res.status(500).json({ 
+      error: 'Failed to update account mappings',
+      message: error.message || 'An unexpected error occurred'
+    });
+  }
+});
+
+integrationsRouter.post('/api/integrations/quickbooks/sync', async (req: Request, res: Response) => {
+  const userId = requireUser(req, res);
+  if (!userId) return;
+  
+  const orgId = getOrgId(req);
+  if (!orgId) {
+    return res.status(400).json({ error: 'Organization ID required' });
+  }
+
+  const { 
+    modelingProjectId,
+    startDate,
+    endDate,
+    syncType = 'full',
+    entityTypes = ['profit_loss', 'accounts', 'transactions']
+  } = req.body;
+
+  if (!startDate || !endDate) {
+    return res.status(400).json({ 
+      error: 'Missing required parameters',
+      message: 'startDate and endDate are required (format: YYYY-MM-DD)'
+    });
+  }
+
+  try {
+    const connectionStatus = await quickBooksService.getConnectionStatus(orgId);
+    
+    if (!connectionStatus.isConnected) {
+      return res.status(401).json({
+        error: 'Not connected to QuickBooks',
+        message: 'Please connect to QuickBooks first',
+        warnings: connectionStatus.warnings
+      });
+    }
+
+    const startTime = Date.now();
+    const syncResults: Record<string, any> = {};
+    let totalProcessed = 0;
+    let totalCreated = 0;
+    let totalUpdated = 0;
+    const errors: Array<{ entity: string; error: string }> = [];
+
+    if (entityTypes.includes('profit_loss')) {
+      try {
+        const plReport = await quickBooksService.getProfitAndLoss(orgId, startDate, endDate);
+        syncResults.profitAndLoss = {
+          success: true,
+          rowsProcessed: plReport.rows.length,
+          totalIncome: plReport.totalIncome,
+          totalExpenses: plReport.totalExpenses,
+          netIncome: plReport.netIncome
+        };
+        totalProcessed += plReport.rows.length;
+        totalCreated += plReport.rows.length;
+      } catch (err: any) {
+        errors.push({ entity: 'profit_loss', error: err.message });
+        syncResults.profitAndLoss = { success: false, error: err.message };
+      }
+    }
+
+    if (entityTypes.includes('accounts')) {
+      try {
+        const accounts = await quickBooksService.getChartOfAccounts(orgId);
+        syncResults.accounts = {
+          success: true,
+          accountsProcessed: accounts.length,
+          incomeAccounts: accounts.filter((a: any) => a.AccountType === 'Income').length,
+          expenseAccounts: accounts.filter((a: any) => a.AccountType === 'Expense').length,
+          otherAccounts: accounts.filter((a: any) => !['Income', 'Expense'].includes(a.AccountType)).length
+        };
+        totalProcessed += accounts.length;
+        totalUpdated += accounts.length;
+      } catch (err: any) {
+        errors.push({ entity: 'accounts', error: err.message });
+        syncResults.accounts = { success: false, error: err.message };
+      }
+    }
+
+    if (modelingProjectId && entityTypes.includes('actuals')) {
+      try {
+        const actualsResult = await quickBooksService.syncProfitAndLossToActuals(
+          orgId,
+          modelingProjectId,
+          startDate,
+          endDate
+        );
+        syncResults.actuals = {
+          success: actualsResult.success,
+          transactionsImported: actualsResult.syncLog?.transactionsImported || 0
+        };
+        totalCreated += actualsResult.syncLog?.transactionsImported || 0;
+      } catch (err: any) {
+        errors.push({ entity: 'actuals', error: err.message });
+        syncResults.actuals = { success: false, error: err.message };
+      }
+    }
+
+    const duration = Date.now() - startTime;
+    const success = errors.length === 0;
+
+    await db.insert(integrationSyncHistory).values({
+      userId,
+      orgId,
+      integrationKey: 'quickbooks',
+      syncType: syncType as any,
+      status: success ? 'completed' : 'partial',
+      completedAt: new Date(),
+      recordsProcessed: totalProcessed,
+      recordsCreated: totalCreated,
+      recordsUpdated: totalUpdated,
+      recordsFailed: errors.length,
+      errorCount: errors.length,
+      errors: errors.length > 0 ? errors : null,
+      metadata: { 
+        duration, 
+        entityTypes,
+        startDate,
+        endDate,
+        modelingProjectId
+      },
+      triggeredBy: 'manual',
+    });
+
+    await db.update(quickbooksIntegrations)
+      .set({
+        lastSyncAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(quickbooksIntegrations.orgId, orgId));
+
+    res.json({
+      success,
+      syncId: `qb_sync_${Date.now()}`,
+      results: syncResults,
+      summary: {
+        totalProcessed,
+        totalCreated,
+        totalUpdated,
+        errorCount: errors.length,
+        duration
+      },
+      errors: errors.length > 0 ? errors : undefined,
+      completedAt: new Date().toISOString()
+    });
+  } catch (error: any) {
+    console.error('[QuickBooks] Sync error:', error);
+    
+    await db.insert(integrationSyncHistory).values({
+      userId,
+      orgId,
+      integrationKey: 'quickbooks',
+      syncType: 'full_sync' as any,
+      status: 'failed',
+      completedAt: new Date(),
+      recordsProcessed: 0,
+      recordsCreated: 0,
+      recordsUpdated: 0,
+      recordsFailed: 1,
+      errorCount: 1,
+      errors: [{ error: error.message }],
+      triggeredBy: 'manual',
+    });
+    
+    res.status(500).json({ 
+      success: false,
+      error: 'Sync failed',
+      message: error.message || 'An unexpected error occurred'
+    });
+  }
+});
+
+integrationsRouter.get('/api/integrations/quickbooks/sync/history', async (req: Request, res: Response) => {
+  const userId = requireUser(req, res);
+  if (!userId) return;
+  
+  const orgId = getOrgId(req);
+  if (!orgId) {
+    return res.status(400).json({ error: 'Organization ID required' });
+  }
+
+  const limit = parseInt(req.query.limit as string) || 20;
+
+  try {
+    const history = await quickBooksService.getSyncHistory(orgId, limit);
+    
+    res.json({
+      success: true,
+      history,
+      count: history.length
+    });
+  } catch (error: any) {
+    console.error('[QuickBooks] Sync history fetch error:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch sync history',
+      message: error.message || 'An unexpected error occurred'
+    });
+  }
+});
+
+integrationsRouter.get('/api/integrations/quickbooks/status', async (req: Request, res: Response) => {
+  const userId = requireUser(req, res);
+  if (!userId) return;
+  
+  const orgId = getOrgId(req);
+  if (!orgId) {
+    return res.status(400).json({ error: 'Organization ID required' });
+  }
+
+  try {
+    const status = await quickBooksService.getConnectionStatus(orgId);
+    
+    let companyInfo = null;
+    if (status.isConnected) {
+      try {
+        companyInfo = await quickBooksService.getCompanyInfo(orgId);
+      } catch (err) {
+        console.warn('[QuickBooks] Could not fetch company info:', err);
+      }
+    }
+
+    res.json({
+      ...status,
+      companyInfo: companyInfo ? {
+        name: companyInfo.CompanyName,
+        legalName: companyInfo.LegalName,
+        country: companyInfo.Country,
+        email: companyInfo.Email?.Address
+      } : null,
+      configured: quickBooksService.isQuickBooksConfigured()
+    });
+  } catch (error: any) {
+    console.error('[QuickBooks] Status check error:', error);
+    res.status(500).json({ 
+      error: 'Failed to check connection status',
+      message: error.message || 'An unexpected error occurred'
+    });
+  }
+});
+
+function mapQuickBooksToMarinaCategory(accountName: string, accountType: string): { category: string; subcategory: string } {
+  const lowerName = accountName.toLowerCase();
+  const lowerType = accountType.toLowerCase();
+
+  if (lowerType.includes('income') || lowerType.includes('revenue')) {
+    if (lowerName.includes('fuel')) return { category: 'Revenue', subcategory: 'Fuel Sales' };
+    if (lowerName.includes('slip') || lowerName.includes('dock') || lowerName.includes('wet')) return { category: 'Revenue', subcategory: 'Wet Slips' };
+    if (lowerName.includes('dry') || lowerName.includes('storage') || lowerName.includes('rack')) return { category: 'Revenue', subcategory: 'Dry Storage' };
+    if (lowerName.includes('store') || lowerName.includes('retail') || lowerName.includes('ship store')) return { category: 'Revenue', subcategory: 'Ship Store' };
+    if (lowerName.includes('service') || lowerName.includes('repair') || lowerName.includes('labor')) return { category: 'Revenue', subcategory: 'Service & Repair' };
+    if (lowerName.includes('lease') || lowerName.includes('rent') || lowerName.includes('commercial')) return { category: 'Revenue', subcategory: 'Third-Party Leases' };
+    if (lowerName.includes('transient') || lowerName.includes('guest')) return { category: 'Revenue', subcategory: 'Transient Dockage' };
+    if (lowerName.includes('haul') || lowerName.includes('launch')) return { category: 'Revenue', subcategory: 'Haul & Launch' };
+    if (lowerName.includes('electric') || lowerName.includes('power')) return { category: 'Revenue', subcategory: 'Electric Revenue' };
+    if (lowerName.includes('water')) return { category: 'Revenue', subcategory: 'Water Revenue' };
+    if (lowerName.includes('wifi') || lowerName.includes('internet')) return { category: 'Revenue', subcategory: 'Amenity Revenue' };
+    return { category: 'Revenue', subcategory: 'Other Revenue' };
+  }
+
+  if (lowerType === 'cost of goods sold' || lowerType.includes('cogs')) {
+    if (lowerName.includes('fuel')) return { category: 'COGS', subcategory: 'Fuel Cost' };
+    if (lowerName.includes('store') || lowerName.includes('merchandise') || lowerName.includes('inventory')) return { category: 'COGS', subcategory: 'Ship Store Cost' };
+    if (lowerName.includes('parts')) return { category: 'COGS', subcategory: 'Parts Cost' };
+    return { category: 'COGS', subcategory: 'Other COGS' };
+  }
+
+  if (lowerType.includes('expense')) {
+    if (lowerName.includes('payroll') || lowerName.includes('wage') || lowerName.includes('salary') || lowerName.includes('benefits')) 
+      return { category: 'Expenses', subcategory: 'Payroll & Benefits' };
+    if (lowerName.includes('utilit') || lowerName.includes('electric') || lowerName.includes('water') || lowerName.includes('gas')) 
+      return { category: 'Expenses', subcategory: 'Utilities' };
+    if (lowerName.includes('insurance')) 
+      return { category: 'Expenses', subcategory: 'Insurance' };
+    if (lowerName.includes('repair') || lowerName.includes('maintenance') || lowerName.includes('upkeep')) 
+      return { category: 'Expenses', subcategory: 'Repairs & Maintenance' };
+    if (lowerName.includes('marketing') || lowerName.includes('advertising') || lowerName.includes('promotion')) 
+      return { category: 'Expenses', subcategory: 'Marketing' };
+    if (lowerName.includes('professional') || lowerName.includes('legal') || lowerName.includes('accounting') || lowerName.includes('consulting')) 
+      return { category: 'Expenses', subcategory: 'Professional Fees' };
+    if (lowerName.includes('tax') && (lowerName.includes('property') || lowerName.includes('real estate'))) 
+      return { category: 'Expenses', subcategory: 'Property Taxes' };
+    if (lowerName.includes('management') || lowerName.includes('admin')) 
+      return { category: 'Expenses', subcategory: 'Management Fees' };
+    if (lowerName.includes('depreciation') || lowerName.includes('amortization')) 
+      return { category: 'Expenses', subcategory: 'Depreciation' };
+    if (lowerName.includes('interest') || lowerName.includes('debt service')) 
+      return { category: 'Expenses', subcategory: 'Interest Expense' };
+    if (lowerName.includes('dredg')) 
+      return { category: 'Expenses', subcategory: 'Dredging' };
+    if (lowerName.includes('permit') || lowerName.includes('license') || lowerName.includes('regulatory')) 
+      return { category: 'Expenses', subcategory: 'Permits & Licenses' };
+    if (lowerName.includes('security')) 
+      return { category: 'Expenses', subcategory: 'Security' };
+    if (lowerName.includes('trash') || lowerName.includes('waste') || lowerName.includes('disposal')) 
+      return { category: 'Expenses', subcategory: 'Waste Disposal' };
+    return { category: 'Expenses', subcategory: 'Other Expenses' };
+  }
+
+  if (lowerType.includes('asset')) return { category: 'Balance Sheet', subcategory: 'Assets' };
+  if (lowerType.includes('liability')) return { category: 'Balance Sheet', subcategory: 'Liabilities' };
+  if (lowerType.includes('equity')) return { category: 'Balance Sheet', subcategory: 'Equity' };
+
+  return { category: 'Other', subcategory: 'Uncategorized' };
+}

@@ -19089,6 +19089,43 @@ export const omDocumentVersions = pgTable("om_document_versions", {
 }));
 
 // ============================================================================
+// OM Builder - Generated Documents (Deal-specific OM documents)
+// ============================================================================
+export const omDocumentStatusEnum = pgEnum("om_document_status", ["draft", "generating", "completed", "failed"]);
+
+export const omDocuments = pgTable("om_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  dealId: varchar("deal_id").notNull().references(() => crmDeals.id, { onDelete: 'cascade' }),
+  templateId: varchar("template_id").references(() => omTemplates.id, { onDelete: 'set null' }),
+  title: text("title").notNull(),
+  generatedAt: timestamp("generated_at").notNull().defaultNow(),
+  pdfUrl: text("pdf_url"),
+  status: omDocumentStatusEnum("status").notNull().default('draft'),
+  metadata: jsonb("metadata").$type<{
+    propertyOverview?: Record<string, any>;
+    financialSummary?: Record<string, any>;
+    rentRoll?: Record<string, any>;
+    operations?: Record<string, any>;
+    generationOptions?: Record<string, any>;
+  }>().default({}),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  dealIdx: index("om_documents_deal_idx").on(table.dealId),
+  templateIdx: index("om_documents_template_idx").on(table.templateId),
+  statusIdx: index("om_documents_status_idx").on(table.status),
+}));
+
+export const insertOmDocumentSchema = createInsertSchema(omDocuments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateOmDocumentSchema = insertOmDocumentSchema.partial();
+export type InsertOmDocument = z.infer<typeof insertOmDocumentSchema>;
+export type OmDocument = typeof omDocuments.$inferSelect;
+
+// ============================================================================
 // OM Builder - Assets
 // ============================================================================
 export const omAssets = pgTable("om_assets", {

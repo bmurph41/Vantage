@@ -269,6 +269,7 @@ const ProjectWorkspace = lazy(() => import("@/pages/modeling/projects/workspace"
 // OM Builder
 const ProjectOms = lazy(() => import("@/modules/om-builder/pages/project-oms"));
 const OMBuilder = lazy(() => import("@/modules/om-builder/pages/om-builder"));
+const DealOMBuilder = lazy(() => import("@/pages/om-builder/OMBuilder"));
 const OMExport = lazy(() => import("@/modules/om-builder/pages/om-export"));
 const OMTemplates = lazy(() => import("@/modules/om-builder/pages/om-templates"));
 const OMBrandKits = lazy(() => import("@/modules/om-builder/pages/om-brand-kits"));
@@ -1325,6 +1326,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <DealDetail />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/crm/deals/:dealId/om">
+        {(params: { dealId: string }) => (
+          <UnifiedLayout>
+            <DealOMBuilder dealId={params.dealId} />
           </UnifiedLayout>
         )}
       </Route>
