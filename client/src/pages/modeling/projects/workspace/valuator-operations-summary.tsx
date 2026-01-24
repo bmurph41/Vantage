@@ -45,13 +45,13 @@ export default function ValuatorOperationsSummary({ projectId, projectName }: Va
   };
 
   const { data: summary, isLoading } = useQuery<OperationsSummary>({
-    queryKey: ["/api/ops/projects", projectId, "ops/summary", dateRange],
+    queryKey: ["/api/operations-context/projects", projectId, "ops/summary", dateRange],
     queryFn: async () => {
       const params = new URLSearchParams({
         startDate: dateRange.startDate,
         endDate: dateRange.endDate,
       });
-      const res = await fetch(`/api/ops/projects/${projectId}/ops/summary?${params}`, {
+      const res = await fetch(`/api/operations-context/projects/${projectId}/ops/summary?${params}`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch summary");

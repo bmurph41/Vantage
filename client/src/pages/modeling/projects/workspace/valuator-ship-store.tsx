@@ -98,13 +98,13 @@ export default function ValuatorShipStoreTab({ projectId, projectName }: Valuato
   const dateRange = getDateRange();
 
   const { data: sales = [], isLoading } = useQuery<ShipStoreSale[]>({
-    queryKey: ["/api/ops/projects", projectId, "ops/ship-store", dateRange],
+    queryKey: ["/api/operations-context/projects", projectId, "ops/ship-store", dateRange],
     queryFn: async () => {
       const params = new URLSearchParams({
         startDate: dateRange.startDate,
         endDate: dateRange.endDate,
       });
-      const res = await fetch(`/api/ops/projects/${projectId}/ops/ship-store?${params}`, {
+      const res = await fetch(`/api/operations-context/projects/${projectId}/ops/ship-store?${params}`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch sales");
@@ -114,13 +114,13 @@ export default function ValuatorShipStoreTab({ projectId, projectName }: Valuato
   });
 
   const { data: summary } = useQuery<ShipStoreSummary>({
-    queryKey: ["/api/ops/projects", projectId, "ops/ship-store/summary", dateRange],
+    queryKey: ["/api/operations-context/projects", projectId, "ops/ship-store/summary", dateRange],
     queryFn: async () => {
       const params = new URLSearchParams({
         startDate: dateRange.startDate,
         endDate: dateRange.endDate,
       });
-      const res = await fetch(`/api/ops/projects/${projectId}/ops/ship-store/summary?${params}`, {
+      const res = await fetch(`/api/operations-context/projects/${projectId}/ops/ship-store/summary?${params}`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch summary");
@@ -131,13 +131,13 @@ export default function ValuatorShipStoreTab({ projectId, projectName }: Valuato
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<ShipStoreSale>) => {
-      return apiRequest(`/api/ops/projects/${projectId}/ops/ship-store`, {
+      return apiRequest(`/api/operations-context/projects/${projectId}/ops/ship-store`, {
         method: "POST",
         body: JSON.stringify(data),
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/ops/projects", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/operations-context/projects", projectId] });
       toast({ title: "Success", description: "Sale added" });
       setShowAddDialog(false);
     },
@@ -148,12 +148,12 @@ export default function ValuatorShipStoreTab({ projectId, projectName }: Valuato
 
   const deleteMutation = useMutation({
     mutationFn: async (saleId: string) => {
-      return apiRequest(`/api/ops/projects/${projectId}/ops/ship-store/${saleId}`, {
+      return apiRequest(`/api/operations-context/projects/${projectId}/ops/ship-store/${saleId}`, {
         method: "DELETE",
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/ops/projects", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/operations-context/projects", projectId] });
       toast({ title: "Success", description: "Sale deleted" });
     },
     onError: () => {

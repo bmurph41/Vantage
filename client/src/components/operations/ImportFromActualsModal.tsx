@@ -49,9 +49,9 @@ export default function ImportFromActualsModal({
   const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
 
   const { data: marinas = [], isLoading } = useQuery<Marina[]>({
-    queryKey: ["/api/ops/projects", projectId, "ops/import/available"],
+    queryKey: ["/api/operations-context/projects", projectId, "ops/import/available"],
     queryFn: async () => {
-      const res = await fetch(`/api/ops/projects/${projectId}/ops/import/available`, {
+      const res = await fetch(`/api/operations-context/projects/${projectId}/ops/import/available`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch marinas");
@@ -67,7 +67,7 @@ export default function ImportFromActualsModal({
       if (importFuel) dataTypes.push("fuel");
       if (importStore) dataTypes.push("ship-store");
       
-      return apiRequest(`/api/ops/projects/${projectId}/ops/import`, {
+      return apiRequest(`/api/operations-context/projects/${projectId}/ops/import`, {
         method: "POST",
         body: JSON.stringify({
           marinaId: selectedMarina,
@@ -78,7 +78,7 @@ export default function ImportFromActualsModal({
       });
     },
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/ops/projects", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/operations-context/projects", projectId] });
       const imported = data.data?.imported || {};
       toast({
         title: "Import Complete",

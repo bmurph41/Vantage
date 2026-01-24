@@ -100,13 +100,13 @@ export default function ValuatorFuelSalesTab({ projectId, projectName }: Valuato
   const dateRange = getDateRange();
 
   const { data: transactions = [], isLoading } = useQuery<FuelTransaction[]>({
-    queryKey: ["/api/ops/projects", projectId, "ops/fuel", dateRange],
+    queryKey: ["/api/operations-context/projects", projectId, "ops/fuel", dateRange],
     queryFn: async () => {
       const params = new URLSearchParams({
         startDate: dateRange.startDate,
         endDate: dateRange.endDate,
       });
-      const res = await fetch(`/api/ops/projects/${projectId}/ops/fuel?${params}`, {
+      const res = await fetch(`/api/operations-context/projects/${projectId}/ops/fuel?${params}`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch fuel transactions");
@@ -116,13 +116,13 @@ export default function ValuatorFuelSalesTab({ projectId, projectName }: Valuato
   });
 
   const { data: summary } = useQuery<FuelSummary>({
-    queryKey: ["/api/ops/projects", projectId, "ops/fuel/summary", dateRange],
+    queryKey: ["/api/operations-context/projects", projectId, "ops/fuel/summary", dateRange],
     queryFn: async () => {
       const params = new URLSearchParams({
         startDate: dateRange.startDate,
         endDate: dateRange.endDate,
       });
-      const res = await fetch(`/api/ops/projects/${projectId}/ops/fuel/summary?${params}`, {
+      const res = await fetch(`/api/operations-context/projects/${projectId}/ops/fuel/summary?${params}`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch summary");
@@ -133,13 +133,13 @@ export default function ValuatorFuelSalesTab({ projectId, projectName }: Valuato
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<FuelTransaction>) => {
-      return apiRequest(`/api/ops/projects/${projectId}/ops/fuel`, {
+      return apiRequest(`/api/operations-context/projects/${projectId}/ops/fuel`, {
         method: "POST",
         body: JSON.stringify(data),
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/ops/projects", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/operations-context/projects", projectId] });
       toast({ title: "Success", description: "Fuel transaction added" });
       setShowAddDialog(false);
     },
@@ -150,12 +150,12 @@ export default function ValuatorFuelSalesTab({ projectId, projectName }: Valuato
 
   const deleteMutation = useMutation({
     mutationFn: async (txnId: string) => {
-      return apiRequest(`/api/ops/projects/${projectId}/ops/fuel/${txnId}`, {
+      return apiRequest(`/api/operations-context/projects/${projectId}/ops/fuel/${txnId}`, {
         method: "DELETE",
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/ops/projects", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/operations-context/projects", projectId] });
       toast({ title: "Success", description: "Transaction deleted" });
     },
     onError: () => {
