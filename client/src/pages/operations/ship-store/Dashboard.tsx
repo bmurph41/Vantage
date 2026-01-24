@@ -7,6 +7,7 @@ import { AssetSelector } from "@/components/AssetSelector";
 import { ContextIntegrationsPanel } from "@/components/integrations/ContextIntegrationsPanel";
 import { PageTour } from "@/components/onboarding/PageTour";
 import { TOUR_IDS, shipStoreTourSteps } from "@/lib/tour-configs";
+import { SyncStatusBanner } from "@/components/operations/SyncStatusBanner";
 
 export default function ShipStoreDashboard() {
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
@@ -47,6 +48,9 @@ export default function ShipStoreDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       <PageTour tourId={TOUR_IDS.SHIP_STORE} steps={shipStoreTourSteps} />
+      <div className="px-8 pt-4">
+        <SyncStatusBanner moduleName="ship-store" />
+      </div>
       <div className="p-8 max-w-7xl mx-auto space-y-8">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-2">

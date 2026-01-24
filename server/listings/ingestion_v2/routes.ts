@@ -4,6 +4,8 @@ import { isLiv2Enabled, LIV2_CONFIG } from './config';
 import { liv2Repo } from './storage/repo';
 import { runListingScrape } from './runner/runScrape';
 import { insertLiv2SourceSchema } from './schema';
+import { checkMarketplaceScrapeUrl, getAllowedMarinaDomains } from './fetch/ssrfGuard';
+import { findDuplicatesInBatch, findDuplicatesForListing } from './identity/duplicateDetector';
 
 const router = Router();
 
@@ -221,6 +223,235 @@ router.get('/config', (req, res) => {
     confidenceThreshold: LIV2_CONFIG.identity.confidenceThreshold,
     maxCandidatesPerRun: LIV2_CONFIG.identity.maxCandidatesPerRun,
   });
+});
+
+const marketplaceScrapeSchema = z.object({
+  sourceId: z.string().uuid(),
+  urls: z.array(z.string().url()).min(1).max(100),
+  validateDomain: z.boolean().optional().default(true),
+});
+
+router.post('/marketplace/scrape', async (req, res) => {
+  try {
+    const { sourceId, urls, validateDomain } = marketplaceScrapeSchema.parse(req.body);
+    
+    const source = await liv2Repo.getSourceById(sourceId);
+    if (!source) {
+      return res.status(404).json({ error: 'Source not found' });
+    }
+    
+    const validatedUrls: string[] = [];
+    const blockedUrls: Array<{ url: string; reason: string }> = [];
+    
+    for (const url of urls) {
+      if (validateDomain) {
+        const ssrfCheck = checkMarketplaceScrapeUrl(url);
+        if (!ssrfCheck.allowed) {
+          blockedUrls.push({ url, reason: ssrfCheck.reason || 'Blocked by SSRF protection' });
+          continue;
+        }
+      }
+      validatedUrls.push(url);
+    }
+    
+    if (validatedUrls.length === 0) {
+      return res.status(400).json({
+        error: 'No valid URLs to scrape',
+        blockedUrls,
+        allowedDomains: getAllowedMarinaDomains(),
+      });
+    }
+    
+    const result = await runListingScrape(sourceId, validatedUrls);
+    
+    res.json({
+      runId: result.runId,
+      status: result.status,
+      metrics: result.metrics,
+      validatedUrls: validatedUrls.length,
+      blockedUrls,
+      errors: result.errors.slice(0, 10),
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation error', details: error.errors });
+    }
+    console.error('[LIV2] Marketplace scrape error:', error);
+    res.status(500).json({ error: 'Scrape failed', message: (error as Error).message });
+  }
+});
+
+router.get('/marketplace/allowed-domains', (req, res) => {
+  res.json({
+    domains: getAllowedMarinaDomains(),
+  });
+});
+
+const duplicatesQuerySchema = z.object({
+  minConfidence: z.string().optional().transform(val => val ? parseInt(val, 10) : 60),
+  limit: z.string().optional().transform(val => val ? parseInt(val, 10) : 100),
+  domain: z.string().optional(),
+  state: z.string().optional(),
+});
+
+router.get('/marketplace/duplicates', async (req, res) => {
+  try {
+    const { minConfidence, limit, domain, state } = duplicatesQuerySchema.parse(req.query);
+    
+    const listings = await liv2Repo.getCurrentListings({
+      domain,
+      state,
+      limit: Math.min(limit * 2, 500),
+    });
+    
+    if (listings.length === 0) {
+      return res.json({
+        duplicates: [],
+        totalListingsChecked: 0,
+        potentialDuplicateCount: 0,
+      });
+    }
+    
+    const result = findDuplicatesInBatch(listings, minConfidence);
+    
+    res.json({
+      duplicates: result.duplicates.slice(0, limit).map(d => ({
+        confidence: d.confidence,
+        matchReasons: d.matchReasons,
+        scores: d.scores,
+        listing1: {
+          id: d.listing1.id,
+          canonicalListingId: d.listing1.canonicalListingId,
+          title: d.listing1.title,
+          city: d.listing1.city,
+          state: d.listing1.state,
+          slips: d.listing1.slips,
+          askingPrice: d.listing1.askingPrice,
+          domain: d.listing1.domain,
+        },
+        listing2: {
+          id: d.listing2.id,
+          canonicalListingId: d.listing2.canonicalListingId,
+          title: d.listing2.title,
+          city: d.listing2.city,
+          state: d.listing2.state,
+          slips: d.listing2.slips,
+          askingPrice: d.listing2.askingPrice,
+          domain: d.listing2.domain,
+        },
+      })),
+      totalListingsChecked: result.totalListingsChecked,
+      potentialDuplicateCount: result.potentialDuplicateCount,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation error', details: error.errors });
+    }
+    console.error('[LIV2] Get duplicates error:', error);
+    res.status(500).json({ error: 'Failed to get duplicates' });
+  }
+});
+
+const duplicateCheckSchema = z.object({
+  canonicalListingId: z.string(),
+  minConfidence: z.number().min(0).max(100).optional().default(60),
+});
+
+router.post('/marketplace/duplicates/check', async (req, res) => {
+  try {
+    const { canonicalListingId, minConfidence } = duplicateCheckSchema.parse(req.body);
+    
+    const listing = await liv2Repo.getCurrentListingById(canonicalListingId);
+    if (!listing) {
+      return res.status(404).json({ error: 'Listing not found' });
+    }
+    
+    const allListings = await liv2Repo.getCurrentListings({ limit: 500 });
+    
+    const matches = findDuplicatesForListing(listing, allListings, minConfidence);
+    
+    res.json({
+      sourceListingId: canonicalListingId,
+      potentialDuplicates: matches.map(m => ({
+        confidence: m.confidence,
+        matchReasons: m.matchReasons,
+        scores: m.scores,
+        listing: {
+          id: m.listing2.id,
+          canonicalListingId: m.listing2.canonicalListingId,
+          title: m.listing2.title,
+          city: m.listing2.city,
+          state: m.listing2.state,
+          slips: m.listing2.slips,
+          askingPrice: m.listing2.askingPrice,
+          domain: m.listing2.domain,
+        },
+      })),
+      count: matches.length,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation error', details: error.errors });
+    }
+    console.error('[LIV2] Check duplicates error:', error);
+    res.status(500).json({ error: 'Failed to check duplicates' });
+  }
+});
+
+const mergeListingsSchema = z.object({
+  primaryListingId: z.string(),
+  secondaryListingId: z.string(),
+});
+
+router.post('/marketplace/duplicates/merge', async (req, res) => {
+  try {
+    const { primaryListingId, secondaryListingId } = mergeListingsSchema.parse(req.body);
+    
+    if (primaryListingId === secondaryListingId) {
+      return res.status(400).json({ error: 'Cannot merge a listing with itself' });
+    }
+    
+    const result = await liv2Repo.mergeListings(primaryListingId, secondaryListingId);
+    
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+    
+    const mergedListing = await liv2Repo.getCurrentListingById(primaryListingId);
+    
+    res.json({
+      success: true,
+      mergedListingId: primaryListingId,
+      deletedListingId: secondaryListingId,
+      listing: mergedListing,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation error', details: error.errors });
+    }
+    console.error('[LIV2] Merge listings error:', error);
+    res.status(500).json({ error: 'Failed to merge listings' });
+  }
+});
+
+router.get('/marketplace/sources', async (req, res) => {
+  try {
+    const sources = await liv2Repo.getActiveSources();
+    res.json({
+      sources: sources.map(s => ({
+        id: s.id,
+        name: s.name,
+        domain: s.domain,
+        isActive: s.isActive,
+        lastScrapedAt: s.lastScrapedAt,
+        createdAt: s.createdAt,
+      })),
+      allowedDomains: getAllowedMarinaDomains(),
+    });
+  } catch (error) {
+    console.error('[LIV2] Get marketplace sources error:', error);
+    res.status(500).json({ error: 'Failed to get sources' });
+  }
 });
 
 export default router;

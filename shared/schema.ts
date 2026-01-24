@@ -4561,9 +4561,18 @@ export const externalUserProjectAccess = pgTable("external_user_project_access",
   grantedBy: varchar("granted_by").notNull().references(() => users.id),
   status: externalUserProjectAccessStatusEnum("status").notNull().default("active"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  // Security hardening fields
+  ipWhitelist: text("ip_whitelist").array().default(sql`'{}'`), // Allowed IP addresses/CIDR ranges
+  downloadLimit: integer("download_limit"), // Max downloads per document (null = unlimited)
+  downloadCount: integer("download_count").notNull().default(0), // Current download count
+  accessToken: text("access_token").unique(), // Secure token for external access
+  tokenExpiresAt: timestamp("token_expires_at"), // Token-specific expiration
+  lastAccessAt: timestamp("last_access_at"), // Track last access time
+  lastAccessIp: text("last_access_ip"), // Track last access IP
 }, (table) => ({
   externalUserIdx: index("external_project_access_user_idx").on(table.externalUserId),
   projectIdx: index("external_project_access_project_idx").on(table.projectId),
+  accessTokenIdx: index("external_project_access_token_idx").on(table.accessToken),
 }));
 
 // Contact Roles table - defines relationships between contacts and deals

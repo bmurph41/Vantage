@@ -4,6 +4,7 @@ export { runListingScrape } from './runner/runScrape';
 export { resolveListingIdentity, generateCanonicalId, isConfidenceAcceptable } from './identity/identityResolver';
 export { extractListingImages, selectHeroImage, downloadAndHashImage, normalizeImageUrl } from './parse/images';
 export { validateListingPayload, sanitizePayload, shouldQuarantine } from './validate/validate';
-export { checkSSRF, sanitizeUrl } from './fetch/ssrfGuard';
+export { checkSSRF, sanitizeUrl, checkMarketplaceScrapeUrl, isAllowedMarinaDomain, getAllowedMarinaDomains } from './fetch/ssrfGuard';
+export { calculateDuplicateScore, findDuplicatesInBatch, findDuplicatesForListing, type DuplicateMatch, type DuplicateCheckResult } from './identity/duplicateDetector';
 export * from './schema';
 export { default as liv2Routes } from './routes';

@@ -2300,4 +2300,416 @@ router.delete('/documents/:documentId/watermark', requireAuth, requireVdrAccess(
   }
 });
 
+// ============================================================================
+// EXTERNAL USER ACCESS CONTROL ENDPOINTS
+// ============================================================================
+
+function validateIpAddress(clientIp: string, ipWhitelist: string[]): boolean {
+  if (!ipWhitelist || ipWhitelist.length === 0) {
+    return true;
+  }
+  
+  const normalizeIp = (ip: string) => {
+    if (ip.startsWith('::ffff:')) {
+      return ip.substring(7);
+    }
+    return ip;
+  };
+  
+  const normalizedClientIp = normalizeIp(clientIp);
+  
+  for (const allowedIp of ipWhitelist) {
+    const normalizedAllowed = normalizeIp(allowedIp.trim());
+    
+    if (normalizedAllowed.includes('/')) {
+      const [subnet, bits] = normalizedAllowed.split('/');
+      const mask = parseInt(bits, 10);
+      const subnetParts = subnet.split('.').map(Number);
+      const clientParts = normalizedClientIp.split('.').map(Number);
+      
+      if (subnetParts.length === 4 && clientParts.length === 4) {
+        const subnetNum = (subnetParts[0] << 24) | (subnetParts[1] << 16) | (subnetParts[2] << 8) | subnetParts[3];
+        const clientNum = (clientParts[0] << 24) | (clientParts[1] << 16) | (clientParts[2] << 8) | clientParts[3];
+        const maskBits = ~((1 << (32 - mask)) - 1);
+        
+        if ((subnetNum & maskBits) === (clientNum & maskBits)) {
+          return true;
+        }
+      }
+    } else if (normalizedClientIp === normalizedAllowed) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+router.post('/documents/:documentId/download-watermarked', async (req: Request, res: Response) => {
+  const { documentId } = req.params;
+  const { accessToken } = req.body;
+  
+  if (!accessToken) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  try {
+    const [access] = await db.select()
+      .from(externalUserProjectAccess)
+      .where(eq(externalUserProjectAccess.accessToken, accessToken))
+      .limit(1);
+    
+    if (!access) {
+      return res.status(401).json({ error: 'Invalid access token' });
+    }
+    
+    const now = new Date();
+    if (access.expiresAt && access.expiresAt < now) {
+      return res.status(403).json({ error: 'Access has expired' });
+    }
+    if (access.tokenExpiresAt && access.tokenExpiresAt < now) {
+      return res.status(403).json({ error: 'Access token has expired' });
+    }
+    if (access.status !== 'active') {
+      return res.status(403).json({ error: 'Access has been revoked' });
+    }
+    
+    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() 
+      || req.socket?.remoteAddress 
+      || 'unknown';
+    
+    if (access.ipWhitelist && access.ipWhitelist.length > 0) {
+      if (!validateIpAddress(clientIp, access.ipWhitelist)) {
+        await vdrAuditService.logEvent({
+          projectId: access.projectId,
+          orgId: access.orgId,
+          externalUserId: access.externalUserId,
+          eventType: 'access_denied',
+          metadata: { 
+            reason: 'ip_restriction',
+            clientIp,
+            documentId,
+          },
+          req,
+        });
+        return res.status(403).json({ error: 'Access denied from this IP address' });
+      }
+    }
+    
+    if (access.downloadLimit !== null && access.downloadCount >= access.downloadLimit) {
+      return res.status(403).json({ error: 'Download limit exceeded' });
+    }
+    
+    const document = await storage.vdr.documents.getDocument(documentId, access.orgId);
+    if (!document) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+    
+    if (document.projectId !== access.projectId) {
+      return res.status(403).json({ error: 'Document not accessible with this token' });
+    }
+    
+    const stream = await defaultStorageProvider.download(document.storagePath);
+    
+    const watermarkResult = await vdrWatermarkService.applyWatermarkToDownload(
+      documentId,
+      null,
+      access.externalUserId,
+      access.orgId,
+      stream,
+      document.mimeType,
+      clientIp
+    );
+    
+    await db.update(externalUserProjectAccess)
+      .set({
+        downloadCount: sql`${externalUserProjectAccess.downloadCount} + 1`,
+        lastAccessAt: now,
+        lastAccessIp: clientIp,
+      })
+      .where(eq(externalUserProjectAccess.id, access.id));
+    
+    await vdrAuditService.logEvent({
+      projectId: document.projectId,
+      orgId: access.orgId,
+      externalUserId: access.externalUserId,
+      documentId,
+      eventType: 'download',
+      metadata: { 
+        documentName: document.filename,
+        watermarkApplied: watermarkResult.watermarkApplied,
+        watermarkText: watermarkResult.watermarkText,
+        downloadType: 'external_watermarked',
+        clientIp,
+      },
+      req,
+    });
+
+    res.setHeader('Content-Type', document.mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${document.filename}"`);
+    
+    if (watermarkResult.watermarkApplied && watermarkResult.watermarkText) {
+      res.setHeader('X-Watermark-Applied', 'true');
+      res.setHeader('X-Watermark-Info', encodeURIComponent(watermarkResult.watermarkText.split('\n')[0]));
+    }
+    
+    watermarkResult.stream.pipe(res);
+  } catch (error: any) {
+    console.error('Error downloading watermarked document:', error);
+    res.status(500).json({ error: 'Failed to download document' });
+  }
+});
+
+router.patch('/external-access/:accessId', requireAuth, async (req: Request, res: Response) => {
+  const { accessId } = req.params;
+  const orgId = (req.user as any).orgId;
+  const userId = (req.user as any).id;
+
+  try {
+    const [existingAccess] = await db.select()
+      .from(externalUserProjectAccess)
+      .where(and(
+        eq(externalUserProjectAccess.id, accessId),
+        eq(externalUserProjectAccess.orgId, orgId)
+      ))
+      .limit(1);
+    
+    if (!existingAccess) {
+      return res.status(404).json({ error: 'External access not found' });
+    }
+
+    const updateSchema = z.object({
+      expiresAt: z.string().datetime().nullable().optional(),
+      tokenExpiresAt: z.string().datetime().nullable().optional(),
+      ipWhitelist: z.array(z.string()).optional(),
+      downloadLimit: z.number().min(0).nullable().optional(),
+      status: z.enum(['active', 'revoked', 'expired']).optional(),
+      canViewFolders: z.array(z.string()).optional(),
+      canViewRequests: z.array(z.string()).optional(),
+    });
+
+    const validated = updateSchema.parse(req.body);
+    
+    const updateData: Record<string, any> = {};
+    
+    if (validated.expiresAt !== undefined) {
+      updateData.expiresAt = validated.expiresAt ? new Date(validated.expiresAt) : null;
+    }
+    if (validated.tokenExpiresAt !== undefined) {
+      updateData.tokenExpiresAt = validated.tokenExpiresAt ? new Date(validated.tokenExpiresAt) : null;
+    }
+    if (validated.ipWhitelist !== undefined) {
+      updateData.ipWhitelist = validated.ipWhitelist;
+    }
+    if (validated.downloadLimit !== undefined) {
+      updateData.downloadLimit = validated.downloadLimit;
+    }
+    if (validated.status !== undefined) {
+      updateData.status = validated.status;
+    }
+    if (validated.canViewFolders !== undefined) {
+      updateData.canViewFolders = validated.canViewFolders;
+    }
+    if (validated.canViewRequests !== undefined) {
+      updateData.canViewRequests = validated.canViewRequests;
+    }
+    
+    const [updatedAccess] = await db.update(externalUserProjectAccess)
+      .set(updateData)
+      .where(eq(externalUserProjectAccess.id, accessId))
+      .returning();
+    
+    await vdrAuditService.logEvent({
+      projectId: updatedAccess.projectId,
+      orgId,
+      userId,
+      externalUserId: updatedAccess.externalUserId,
+      eventType: 'permission_change',
+      metadata: { 
+        accessId,
+        changes: validated,
+        updatedBy: userId,
+      },
+      req,
+    });
+
+    res.json(updatedAccess);
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: 'Validation failed', details: error.errors });
+    } else {
+      console.error('Error updating external access:', error);
+      res.status(500).json({ error: 'Failed to update external access' });
+    }
+  }
+});
+
+router.get('/external-access/:accessId/audit', requireAuth, async (req: Request, res: Response) => {
+  const { accessId } = req.params;
+  const orgId = (req.user as any).orgId;
+  const { limit = '50', offset = '0' } = req.query;
+
+  try {
+    const [access] = await db.select()
+      .from(externalUserProjectAccess)
+      .where(and(
+        eq(externalUserProjectAccess.id, accessId),
+        eq(externalUserProjectAccess.orgId, orgId)
+      ))
+      .limit(1);
+    
+    if (!access) {
+      return res.status(404).json({ error: 'External access not found' });
+    }
+    
+    const [externalUser] = await db.select()
+      .from(externalUsers)
+      .where(eq(externalUsers.id, access.externalUserId))
+      .limit(1);
+    
+    const auditLogs = await db.select({
+      id: vdrAuditLogs.id,
+      eventType: vdrAuditLogs.eventType,
+      documentId: vdrAuditLogs.documentId,
+      folderId: vdrAuditLogs.folderId,
+      ipAddress: vdrAuditLogs.ipAddress,
+      userAgent: vdrAuditLogs.userAgent,
+      metadata: vdrAuditLogs.metadata,
+      timestamp: vdrAuditLogs.timestamp,
+      documentName: vdrDocuments.filename,
+    })
+      .from(vdrAuditLogs)
+      .leftJoin(vdrDocuments, eq(vdrAuditLogs.documentId, vdrDocuments.id))
+      .where(and(
+        eq(vdrAuditLogs.externalUserId, access.externalUserId),
+        eq(vdrAuditLogs.orgId, orgId)
+      ))
+      .orderBy(desc(vdrAuditLogs.timestamp))
+      .limit(parseInt(limit as string, 10))
+      .offset(parseInt(offset as string, 10));
+    
+    const [countResult] = await db.select({ count: sql<number>`count(*)` })
+      .from(vdrAuditLogs)
+      .where(and(
+        eq(vdrAuditLogs.externalUserId, access.externalUserId),
+        eq(vdrAuditLogs.orgId, orgId)
+      ));
+    
+    res.json({
+      access: {
+        ...access,
+        externalUser: externalUser ? {
+          id: externalUser.id,
+          email: externalUser.email,
+          name: externalUser.name,
+          company: externalUser.company,
+          role: externalUser.role,
+        } : null,
+      },
+      auditLogs,
+      total: countResult?.count || 0,
+      limit: parseInt(limit as string, 10),
+      offset: parseInt(offset as string, 10),
+    });
+  } catch (error: any) {
+    console.error('Error fetching external access audit:', error);
+    res.status(500).json({ error: 'Failed to fetch audit logs' });
+  }
+});
+
+router.post('/external-access/:accessId/regenerate-token', requireAuth, async (req: Request, res: Response) => {
+  const { accessId } = req.params;
+  const orgId = (req.user as any).orgId;
+  const userId = (req.user as any).id;
+
+  try {
+    const [existingAccess] = await db.select()
+      .from(externalUserProjectAccess)
+      .where(and(
+        eq(externalUserProjectAccess.id, accessId),
+        eq(externalUserProjectAccess.orgId, orgId)
+      ))
+      .limit(1);
+    
+    if (!existingAccess) {
+      return res.status(404).json({ error: 'External access not found' });
+    }
+    
+    const crypto = await import('crypto');
+    const newToken = crypto.randomBytes(32).toString('hex');
+    const tokenExpiresAt = req.body.expiresInDays 
+      ? new Date(Date.now() + req.body.expiresInDays * 24 * 60 * 60 * 1000)
+      : null;
+    
+    const [updatedAccess] = await db.update(externalUserProjectAccess)
+      .set({
+        accessToken: newToken,
+        tokenExpiresAt,
+      })
+      .where(eq(externalUserProjectAccess.id, accessId))
+      .returning();
+    
+    await vdrAuditService.logEvent({
+      projectId: updatedAccess.projectId,
+      orgId,
+      userId,
+      externalUserId: updatedAccess.externalUserId,
+      eventType: 'permission_change',
+      metadata: { 
+        accessId,
+        action: 'token_regenerated',
+        tokenExpiresAt,
+      },
+      req,
+    });
+
+    res.json({
+      accessToken: newToken,
+      tokenExpiresAt,
+    });
+  } catch (error: any) {
+    console.error('Error regenerating access token:', error);
+    res.status(500).json({ error: 'Failed to regenerate access token' });
+  }
+});
+
+router.get('/external-access', requireAuth, async (req: Request, res: Response) => {
+  const orgId = (req.user as any).orgId;
+  const { projectId, status } = req.query;
+
+  try {
+    let query = db.select({
+      access: externalUserProjectAccess,
+      externalUser: {
+        id: externalUsers.id,
+        email: externalUsers.email,
+        name: externalUsers.name,
+        company: externalUsers.company,
+        role: externalUsers.role,
+      },
+    })
+      .from(externalUserProjectAccess)
+      .leftJoin(externalUsers, eq(externalUserProjectAccess.externalUserId, externalUsers.id))
+      .where(eq(externalUserProjectAccess.orgId, orgId));
+    
+    const results = await query;
+    
+    let filteredResults = results;
+    
+    if (projectId) {
+      filteredResults = filteredResults.filter(r => r.access.projectId === projectId);
+    }
+    if (status) {
+      filteredResults = filteredResults.filter(r => r.access.status === status);
+    }
+    
+    res.json(filteredResults.map(r => ({
+      ...r.access,
+      externalUser: r.externalUser,
+    })));
+  } catch (error: any) {
+    console.error('Error fetching external access list:', error);
+    res.status(500).json({ error: 'Failed to fetch external access list' });
+  }
+});
+
 export default router;

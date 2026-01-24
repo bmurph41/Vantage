@@ -9,6 +9,29 @@ const BLOCKED_HOSTS = [
   '169.254.169.254',
 ];
 
+const ALLOWED_MARINA_DOMAINS = [
+  'marinasforsale.com',
+  'boatyard.com',
+  'loopnet.com',
+  'crexi.com',
+  'commercialcafe.com',
+  'yachtworld.com',
+  'boatsandoutboards.com',
+  'boats.com',
+  'boattrader.com',
+  'marinas.com',
+  'dockwa.com',
+  'snagaslip.com',
+  'marinahub.com',
+  'boatbound.co',
+  'marinadockage.com',
+  'activecaptain.com',
+  'waterwaymarine.com',
+  'boatline.com',
+  'sailboatlistings.com',
+  'marinalife.com',
+];
+
 const PRIVATE_IP_RANGES = [
   { start: [10, 0, 0, 0], end: [10, 255, 255, 255] },
   { start: [172, 16, 0, 0], end: [172, 31, 255, 255] },
@@ -107,4 +130,36 @@ export function sanitizeUrl(url: string): string | null {
     return null;
   }
   return url;
+}
+
+export function isAllowedMarinaDomain(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+    return ALLOWED_MARINA_DOMAINS.some(domain => 
+      hostname === domain || hostname.endsWith(`.${domain}`)
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function checkMarketplaceScrapeUrl(url: string): SSRFCheckResult {
+  const baseCheck = checkSSRF(url);
+  if (!baseCheck.allowed) {
+    return baseCheck;
+  }
+  
+  if (!isAllowedMarinaDomain(url)) {
+    return {
+      allowed: false,
+      reason: `Domain not in whitelist. URL: ${url}`,
+    };
+  }
+  
+  return { allowed: true };
+}
+
+export function getAllowedMarinaDomains(): string[] {
+  return [...ALLOWED_MARINA_DOMAINS];
 }

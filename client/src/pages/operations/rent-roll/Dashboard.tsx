@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageTour } from "@/components/onboarding/PageTour";
 import { TOUR_IDS, rentRollTourSteps } from "@/lib/tour-configs";
+import { SyncStatusBanner } from "@/components/operations/SyncStatusBanner";
 import { 
   Building2, 
   TrendingUp, 
@@ -265,6 +266,8 @@ export default function RentRollDashboard() {
         steps={rentRollTourSteps}
         videoTitle="Rent Roll Deep Dive"
       />
+      
+      <SyncStatusBanner moduleName="rent-roll" />
       
       <div className="flex items-center justify-between" data-tour="rentroll-summary">
         <div>

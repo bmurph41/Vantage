@@ -14,6 +14,7 @@ import { getBusinessDay } from "@/lib/fuel-utils";
 import { AssetSelector } from "@/components/AssetSelector";
 import { PageTour } from "@/components/onboarding/PageTour";
 import { TOUR_IDS, fuelSalesTourSteps } from "@/lib/tour-configs";
+import { SyncStatusBanner } from "@/components/operations/SyncStatusBanner";
 import { 
   DollarSign, 
   Fuel, 
@@ -194,6 +195,10 @@ export default function Dashboard() {
         title="Fuel Sales Dashboard"
         subtitle="Welcome back! Here's what's happening with your fuel sales."
       />
+
+      <div className="px-6 pt-4">
+        <SyncStatusBanner moduleName="fuel" />
+      </div>
 
       <div className="px-6 pt-4 border-b border-border">
         <div className="flex justify-end pb-4">

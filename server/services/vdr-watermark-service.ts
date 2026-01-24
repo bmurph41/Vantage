@@ -1,5 +1,5 @@
 import { db } from '../db';
-import { vdrWatermarks, vdrDocuments, vdrFolders, projects, users, externalUsers, organizations } from '@shared/schema';
+import { vdrWatermarks, vdrDocuments, vdrFolders, vdrAuditLogs, projects, users, externalUsers, organizations } from '@shared/schema';
 import { eq, and, isNotNull, or } from 'drizzle-orm';
 import { Readable } from 'stream';
 import { format } from 'date-fns';
@@ -18,6 +18,7 @@ export interface WatermarkContext {
   organizationName: string;
   timestamp: Date;
   documentName: string;
+  documentId: string;
   projectName: string;
   ipAddress?: string;
 }
@@ -155,6 +156,7 @@ class VdrWatermarkService {
       organizationName,
       timestamp: new Date(),
       documentName,
+      documentId,
       projectName,
       ipAddress,
     };
@@ -171,6 +173,7 @@ class VdrWatermarkService {
       `Downloaded by: ${context.userName}`,
       `Email: ${context.userEmail}`,
       `Date: ${formattedDate}`,
+      `Document ID: ${context.documentId}`,
     ];
     
     if (context.ipAddress) {
@@ -400,14 +403,40 @@ class VdrWatermarkService {
     };
   }
 
-  generateWatermarkMetadata(context: WatermarkContext): string {
-    return JSON.stringify({
+  generateWatermarkMetadata(context: WatermarkContext): Record<string, any> {
+    return {
       downloadedBy: context.userName,
       email: context.userEmail,
       timestamp: context.timestamp.toISOString(),
+      documentId: context.documentId,
       document: context.documentName,
       project: context.projectName,
       ipAddress: context.ipAddress,
+    };
+  }
+
+  async logWatermarkedDownload(
+    context: WatermarkContext,
+    orgId: string,
+    userId: string | null,
+    externalUserId: string | null,
+    projectId: string,
+    watermarkApplied: boolean
+  ): Promise<void> {
+    const metadata = this.generateWatermarkMetadata(context);
+    
+    await db.insert(vdrAuditLogs).values({
+      documentId: context.documentId,
+      userId: userId,
+      externalUserId: externalUserId,
+      eventType: 'download',
+      ipAddress: context.ipAddress || null,
+      metadata: {
+        ...metadata,
+        watermarkApplied,
+        downloadType: 'watermarked',
+      },
+      orgId,
     });
   }
 }

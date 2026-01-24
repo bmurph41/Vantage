@@ -340,4 +340,67 @@ export const liv2Repo = {
       .where(eq(liv2ListingPayloads.canonicalListingId, canonicalListingId))
       .orderBy(desc(liv2ListingPayloads.extractedAt));
   },
+
+  async mergeListings(primaryId: string, secondaryId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const [primary] = await db.select().from(liv2ListingsCurrent)
+        .where(eq(liv2ListingsCurrent.canonicalListingId, primaryId));
+      const [secondary] = await db.select().from(liv2ListingsCurrent)
+        .where(eq(liv2ListingsCurrent.canonicalListingId, secondaryId));
+      
+      if (!primary) {
+        return { success: false, error: 'Primary listing not found' };
+      }
+      if (!secondary) {
+        return { success: false, error: 'Secondary listing not found' };
+      }
+      
+      const merged = {
+        title: primary.title || secondary.title,
+        description: primary.description || secondary.description,
+        askingPrice: primary.askingPrice || secondary.askingPrice,
+        address1: primary.address1 || secondary.address1,
+        city: primary.city || secondary.city,
+        state: primary.state || secondary.state,
+        postalCode: primary.postalCode || secondary.postalCode,
+        lat: primary.lat || secondary.lat,
+        lng: primary.lng || secondary.lng,
+        slips: primary.slips || secondary.slips,
+        dryRacks: primary.dryRacks || secondary.dryRacks,
+        acreage: primary.acreage || secondary.acreage,
+        waterfrontFeet: primary.waterfrontFeet || secondary.waterfrontFeet,
+        capRate: primary.capRate || secondary.capRate,
+        noi: primary.noi || secondary.noi,
+        revenue: primary.revenue || secondary.revenue,
+        yearBuilt: primary.yearBuilt || secondary.yearBuilt,
+        brokerName: primary.brokerName || secondary.brokerName,
+        brokerCompany: primary.brokerCompany || secondary.brokerCompany,
+        brokerPhone: primary.brokerPhone || secondary.brokerPhone,
+        brokerEmail: primary.brokerEmail || secondary.brokerEmail,
+        heroImageUrl: primary.heroImageUrl || secondary.heroImageUrl,
+        imageCount: Math.max(primary.imageCount || 0, secondary.imageCount || 0),
+        updatedAt: new Date(),
+      };
+      
+      await db.update(liv2ListingsCurrent)
+        .set(merged)
+        .where(eq(liv2ListingsCurrent.canonicalListingId, primaryId));
+      
+      await db.update(liv2ListingAssets)
+        .set({ canonicalListingId: primaryId })
+        .where(eq(liv2ListingAssets.canonicalListingId, secondaryId));
+      
+      await db.delete(liv2ListingsCurrent)
+        .where(eq(liv2ListingsCurrent.canonicalListingId, secondaryId));
+      
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async deleteQuarantineItem(id: string): Promise<boolean> {
+    const result = await db.delete(liv2Quarantine).where(eq(liv2Quarantine.id, id));
+    return true;
+  },
 };
