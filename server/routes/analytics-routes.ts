@@ -16,9 +16,12 @@ import {
   crmDeals,
   projects,
   modelingProjects,
+  tasks,
+  rentRolls,
+  rentRollEntries,
 } from '@shared/schema';
 import { articles } from '@shared/docktalk-schema';
-import { eq, sql, count, and, gte, lte } from 'drizzle-orm';
+import { eq, sql, count, and, gte, lte, lt } from 'drizzle-orm';
 
 const router = Router();
 
@@ -286,16 +289,32 @@ interface UnifiedAnalytics {
     dealsByStage: Record<string, number>;
     recentDeals: number;
     pipelineValue: number;
+    conversionRate: number;
+    wonDeals: number;
+    lostDeals: number;
   };
   dueDiligence: {
     totalProjects: number;
     activeProjects: number;
     completedProjects: number;
     projectsByStatus: Record<string, number>;
+    completionRate: number;
+    overdueTasks: number;
+    totalTasks: number;
   };
   modeling: {
     totalProjects: number;
     recentProjects: number;
+    avgPurchasePrice: number;
+    avgCapRate: number;
+    totalPurchaseValue: number;
+  };
+  operations: {
+    totalRentRolls: number;
+    totalUnits: number;
+    occupiedUnits: number;
+    occupancyRate: number;
+    totalMonthlyRevenue: number;
   };
   intelligence: {
     totalArticles: number;
@@ -307,49 +326,59 @@ interface UnifiedAnalytics {
     propertiesWithDeals: number;
     contactsWithDeals: number;
   };
+  period: string;
   lastUpdated: string;
 }
 
 /**
  * GET /api/analytics/unified
  * Get unified cross-module analytics for the dashboard
+ * Supports time period filtering: 7d, 30d, 90d, ytd
  */
 router.get('/unified', async (req: Request, res: Response) => {
   try {
     const orgId = (req as any).tenantId || 'org-1';
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const period = (req.query.period as string) || '30d';
+    
+    const periodDays: Record<string, number> = {
+      '7d': 7,
+      '30d': 30,
+      '90d': 90,
+      'ytd': Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 1).getTime()) / (1000 * 60 * 60 * 24)),
+    };
+    const days = periodDays[period] || 30;
+    
+    const periodStart = new Date();
+    periodStart.setDate(periodStart.getDate() - days);
+    const today = new Date();
 
-    // Parallel queries for all modules
     const [
       contactsCount,
       companiesCount,
       propertiesCount,
       dealsData,
       ddProjectsData,
-      modelingProjectsCount,
+      modelingData,
       articlesData,
       crossModuleData,
+      tasksData,
+      operationsData,
     ] = await Promise.all([
-      // CRM Contacts
       db.select({ count: count() })
         .from(crmContacts)
         .where(eq(crmContacts.orgId, orgId))
         .then(r => r[0]?.count || 0),
       
-      // CRM Companies
       db.select({ count: count() })
         .from(crmCompanies)
         .where(eq(crmCompanies.orgId, orgId))
         .then(r => r[0]?.count || 0),
       
-      // CRM Properties
       db.select({ count: count() })
         .from(crmProperties)
         .where(eq(crmProperties.orgId, orgId))
         .then(r => r[0]?.count || 0),
       
-      // CRM Deals with stage breakdown
       db.select({
         stage: crmDeals.stage,
         count: count(),
@@ -362,15 +391,21 @@ router.get('/unified', async (req: Request, res: Response) => {
           const dealsByStage: Record<string, number> = {};
           let total = 0;
           let pipelineValue = 0;
+          let wonDeals = 0;
+          let lostDeals = 0;
           rows.forEach(r => {
+            const stage = r.stage?.toLowerCase() || 'unknown';
             dealsByStage[r.stage || 'unknown'] = Number(r.count);
             total += Number(r.count);
             pipelineValue += Number(r.totalValue);
+            if (stage.includes('won') || stage.includes('closed_won')) wonDeals += Number(r.count);
+            if (stage.includes('lost') || stage.includes('closed_lost')) lostDeals += Number(r.count);
           });
-          return { dealsByStage, total, pipelineValue };
+          const closedDeals = wonDeals + lostDeals;
+          const conversionRate = closedDeals > 0 ? (wonDeals / closedDeals) * 100 : 0;
+          return { dealsByStage, total, pipelineValue, wonDeals, lostDeals, conversionRate };
         }),
       
-      // DD Projects with status breakdown
       db.select({
         status: projects.status,
         count: count(),
@@ -387,36 +422,58 @@ router.get('/unified', async (req: Request, res: Response) => {
             const status = r.status || 'unknown';
             projectsByStatus[status] = Number(r.count);
             total += Number(r.count);
-            if (status === 'in_progress' || status === 'pending') active += Number(r.count);
+            if (status === 'active' || status === 'in_progress') active += Number(r.count);
             if (status === 'completed') completed += Number(r.count);
           });
-          return { projectsByStatus, total, active, completed };
+          const completionRate = total > 0 ? (completed / total) * 100 : 0;
+          return { projectsByStatus, total, active, completed, completionRate };
         }),
       
-      // Modeling Projects
-      db.select({ count: count() })
-        .from(modelingProjects)
-        .where(eq(modelingProjects.orgId, orgId))
-        .then(r => r[0]?.count || 0),
+      (async () => {
+        try {
+          const result = await db.select({
+            cnt: count(),
+            avgPrice: sql<number>`COALESCE(AVG(${modelingProjects.purchasePrice}::numeric), 0)`,
+            avgCap: sql<number>`COALESCE(AVG(${modelingProjects.year1CapRate}::numeric), 0)`,
+            totalValue: sql<number>`COALESCE(SUM(${modelingProjects.purchasePrice}::numeric), 0)`,
+          })
+            .from(modelingProjects)
+            .where(eq(modelingProjects.orgId, orgId));
+          
+          const recentResult = await db.select({ count: count() })
+            .from(modelingProjects)
+            .where(and(
+              eq(modelingProjects.orgId, orgId),
+              gte(modelingProjects.createdAt, periodStart)
+            ));
+          
+          return {
+            total: Number(result[0]?.cnt || 0),
+            recent: Number(recentResult[0]?.count || 0),
+            avgPurchasePrice: Number(result[0]?.avgPrice || 0),
+            avgCapRate: Number(result[0]?.avgCap || 0),
+            totalPurchaseValue: Number(result[0]?.totalValue || 0),
+          };
+        } catch {
+          return { total: 0, recent: 0, avgPurchasePrice: 0, avgCapRate: 0, totalPurchaseValue: 0 };
+        }
+      })(),
       
-      // DockTalk Articles - wrapped in catch for safety if table doesn't exist
       (async () => {
         try {
           const r = await db.select({ 
             count: count(),
-            recent: sql<number>`COUNT(*) FILTER (WHERE ${articles.publishedAt} >= ${thirtyDaysAgo})`,
+            recent: sql<number>`COUNT(*) FILTER (WHERE ${articles.publishedAt} >= ${periodStart})`,
           })
             .from(articles)
             .where(eq(articles.organizationId, orgId));
           return { total: r[0]?.count || 0, recent: Number(r[0]?.recent) || 0 };
         } catch {
-          return { total: 0, recent: 0 }; // Table may not exist
+          return { total: 0, recent: 0 };
         }
       })(),
       
-      // Cross-module relationships
       Promise.all([
-        // Deals with DD projects
         db.select({ count: count() })
           .from(projects)
           .where(and(
@@ -425,7 +482,6 @@ router.get('/unified', async (req: Request, res: Response) => {
           ))
           .then(r => r[0]?.count || 0),
         
-        // Deals with modeling projects (via DD project link)
         db.select({ count: count() })
           .from(projects)
           .where(and(
@@ -434,10 +490,8 @@ router.get('/unified', async (req: Request, res: Response) => {
           ))
           .then(r => r[0]?.count || 0),
         
-        // Properties with deals (count deals that have a property association)
-        Promise.resolve(0), // Placeholder - propertyId column may not exist
+        Promise.resolve(0),
         
-        // Contacts with deals (via primary contact)
         db.select({ count: sql<number>`COUNT(DISTINCT ${crmDeals.primaryContactId})` })
           .from(crmDeals)
           .where(and(
@@ -445,25 +499,67 @@ router.get('/unified', async (req: Request, res: Response) => {
             sql`${crmDeals.primaryContactId} IS NOT NULL`
           ))
           .then(r => Number(r[0]?.count) || 0)
-          .catch(() => 0), // Graceful fallback if column doesn't exist
+          .catch(() => 0),
       ]),
+      
+      (async () => {
+        try {
+          const totalResult = await db.select({ count: count() })
+            .from(tasks);
+          
+          const overdueResult = await db.select({ count: count() })
+            .from(tasks)
+            .where(and(
+              sql`${tasks.deadline} IS NOT NULL`,
+              lt(sql`${tasks.deadline}::date`, sql`CURRENT_DATE`),
+              sql`${tasks.status} NOT IN ('completed')`
+            ));
+          
+          return {
+            total: Number(totalResult[0]?.count || 0),
+            overdue: Number(overdueResult[0]?.count || 0),
+          };
+        } catch {
+          return { total: 0, overdue: 0 };
+        }
+      })(),
+      
+      (async () => {
+        try {
+          const rollsResult = await db.select({ count: count() })
+            .from(rentRolls)
+            .where(eq(rentRolls.orgId, orgId));
+          
+          const entriesResult = await db.select({
+            total: count(),
+            occupied: sql<number>`COUNT(*) FILTER (WHERE ${rentRollEntries.status} = 'active')`,
+            revenue: sql<number>`COALESCE(SUM(CASE WHEN ${rentRollEntries.status} = 'active' THEN ${rentRollEntries.monthlyRate}::numeric ELSE 0 END), 0)`,
+          })
+            .from(rentRollEntries)
+            .where(eq(rentRollEntries.orgId, orgId));
+          
+          const totalUnits = Number(entriesResult[0]?.total || 0);
+          const occupiedUnits = Number(entriesResult[0]?.occupied || 0);
+          const occupancyRate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
+          
+          return {
+            totalRentRolls: Number(rollsResult[0]?.count || 0),
+            totalUnits,
+            occupiedUnits,
+            occupancyRate,
+            totalMonthlyRevenue: Number(entriesResult[0]?.revenue || 0),
+          };
+        } catch {
+          return { totalRentRolls: 0, totalUnits: 0, occupiedUnits: 0, occupancyRate: 0, totalMonthlyRevenue: 0 };
+        }
+      })(),
     ]);
 
-    // Recent deals count
     const recentDeals = await db.select({ count: count() })
       .from(crmDeals)
       .where(and(
         eq(crmDeals.ownerId, orgId),
-        gte(crmDeals.createdAt, thirtyDaysAgo)
-      ))
-      .then(r => r[0]?.count || 0);
-
-    // Recent modeling projects
-    const recentModelingProjects = await db.select({ count: count() })
-      .from(modelingProjects)
-      .where(and(
-        eq(modelingProjects.orgId, orgId),
-        gte(modelingProjects.createdAt, thirtyDaysAgo)
+        gte(crmDeals.createdAt, periodStart)
       ))
       .then(r => r[0]?.count || 0);
 
@@ -476,16 +572,32 @@ router.get('/unified', async (req: Request, res: Response) => {
         dealsByStage: dealsData.dealsByStage,
         recentDeals: Number(recentDeals),
         pipelineValue: dealsData.pipelineValue,
+        conversionRate: dealsData.conversionRate,
+        wonDeals: dealsData.wonDeals,
+        lostDeals: dealsData.lostDeals,
       },
       dueDiligence: {
         totalProjects: ddProjectsData.total,
         activeProjects: ddProjectsData.active,
         completedProjects: ddProjectsData.completed,
         projectsByStatus: ddProjectsData.projectsByStatus,
+        completionRate: ddProjectsData.completionRate,
+        overdueTasks: tasksData.overdue,
+        totalTasks: tasksData.total,
       },
       modeling: {
-        totalProjects: Number(modelingProjectsCount),
-        recentProjects: Number(recentModelingProjects),
+        totalProjects: modelingData.total,
+        recentProjects: modelingData.recent,
+        avgPurchasePrice: modelingData.avgPurchasePrice,
+        avgCapRate: modelingData.avgCapRate,
+        totalPurchaseValue: modelingData.totalPurchaseValue,
+      },
+      operations: {
+        totalRentRolls: operationsData.totalRentRolls,
+        totalUnits: operationsData.totalUnits,
+        occupiedUnits: operationsData.occupiedUnits,
+        occupancyRate: operationsData.occupancyRate,
+        totalMonthlyRevenue: operationsData.totalMonthlyRevenue,
       },
       intelligence: {
         totalArticles: Number(articlesData.total),
@@ -497,6 +609,7 @@ router.get('/unified', async (req: Request, res: Response) => {
         propertiesWithDeals: crossModuleData[2],
         contactsWithDeals: crossModuleData[3],
       },
+      period,
       lastUpdated: new Date().toISOString(),
     };
 
@@ -1174,11 +1287,29 @@ router.get('/modeling/scenario-comparison', async (req, res) => {
 /**
  * GET /api/analytics/modeling/projects/:projectId/export/excel
  * Generate Excel workbook with full financial model
+ * Query params:
+ *   - sheets: comma-separated list of sheet IDs to include
+ *     Available sheets: operating-pro-forma, cash-flow-analysis, exit-strategy-suite,
+ *                       capital-stack, rent-roll-summary, sensitivity-analysis
  */
 router.get('/modeling/projects/:projectId/export/excel', async (req: Request, res: Response) => {
   try {
     const { projectId } = req.params;
+    const sheetsParam = req.query.sheets as string | undefined;
     const XLSX = await import('xlsx');
+
+    // Parse selected sheets from query param (default to all if not specified)
+    const allSheetIds = [
+      'operating-pro-forma',
+      'cash-flow-analysis',
+      'exit-strategy-suite',
+      'capital-stack',
+      'rent-roll-summary',
+      'sensitivity-analysis'
+    ];
+    const selectedSheets = new Set(
+      sheetsParam ? sheetsParam.split(',').filter(s => allSheetIds.includes(s)) : allSheetIds
+    );
 
     // Fetch project data
     const [projectData] = await db
@@ -1197,174 +1328,200 @@ router.get('/modeling/projects/:projectId/export/excel', async (req: Request, re
     const startYear = 2026;
     const years = Array.from({ length: holdPeriod }, (_, i) => startYear + i);
 
-    // 1. Executive Summary Sheet
-    const summaryData = [
-      ['MarinaMatch Financial Model'],
-      [''],
-      ['Property Information'],
-      ['Marina Name', projectData.marinaName || 'N/A'],
-      ['Location', projectData.location || 'N/A'],
-      ['Total Slips', projectData.totalSlips || 0],
-      ['Property Type', 'Marina'],
-      ['Analysis Date', new Date().toLocaleDateString()],
-      [''],
-      ['Investment Summary'],
-      ['Acquisition Price', projectData.purchasePrice || 0],
-      ['Hold Period (Years)', holdPeriod],
-      ['Target Cap Rate', '8.0%'],
-      ['Target IRR', '15.0%'],
-      [''],
-      ['Key Metrics'],
-      ['Year 1 NOI', 450000],
-      ['Stabilized NOI', 520000],
-      ['Exit Cap Rate', '7.5%'],
-      ['Projected Exit Value', 6933333],
-    ];
-    const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
-    XLSX.utils.book_append_sheet(workbook, summarySheet, 'Executive Summary');
+    // 1. Operating Pro Forma Sheet
+    if (selectedSheets.has('operating-pro-forma')) {
+      const proFormaData = [
+        ['Operating Pro Forma'],
+        [''],
+        ['Property:', projectData.marinaName || 'N/A'],
+        ['Analysis Date:', new Date().toLocaleDateString()],
+        [''],
+        ['Revenue', ...years.map(y => `Year ${y - startYear + 1} (${y})`)],
+        ['Slip Rentals', 800000, 824000, 848720, 869938, 891687],
+        ['Dry Storage', 150000, 153750, 157594, 160746, 163961],
+        ['Fuel Sales', 200000, 210000, 218400, 224952, 231700],
+        ['Ship Store', 80000, 83200, 86112, 88695, 91316],
+        ['Service & Repairs', 120000, 127200, 133560, 138235, 143073],
+        ['Other Income', 50000, 51500, 53045, 54376, 55735],
+        ['Total Revenue', 1400000, 1449650, 1497431, 1536942, 1577472],
+        [''],
+        ['Operating Expenses'],
+        ['Payroll & Benefits', 350000, 360500, 369513, 378750, 388219],
+        ['Insurance', 75000, 78750, 81900, 85176, 88583],
+        ['Utilities', 60000, 62400, 64584, 66845, 68850],
+        ['Fuel Cost (COGS)', 160000, 168000, 174720, 179962, 185361],
+        ['Maintenance & Repairs', 80000, 82400, 84872, 87044, 89220],
+        ['Property Taxes', 100000, 102000, 104040, 106121, 108243],
+        ['Management Fee (5%)', 70000, 72483, 74872, 76847, 78874],
+        ['Reserves (3%)', 42000, 43490, 44923, 46108, 47324],
+        ['Other Operating', 40000, 41200, 42436, 43497, 44585],
+        ['Total Expenses', 977000, 1011223, 1041860, 1070350, 1099259],
+        [''],
+        ['Net Operating Income', 423000, 438427, 455571, 466592, 478213],
+      ];
+      const proFormaSheet = XLSX.utils.aoa_to_sheet(proFormaData);
+      XLSX.utils.book_append_sheet(workbook, proFormaSheet, 'Operating Pro Forma');
+    }
 
-    // 2. Assumptions Sheet
-    const assumptionsData = [
-      ['Model Assumptions'],
-      [''],
-      ['Revenue Assumptions'],
-      ['Category', 'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5'],
-      ['Slip Rental Growth', '3.0%', '3.0%', '3.0%', '2.5%', '2.5%'],
-      ['Dry Storage Growth', '2.5%', '2.5%', '2.5%', '2.0%', '2.0%'],
-      ['Fuel Sales Growth', '5.0%', '4.0%', '3.0%', '3.0%', '3.0%'],
-      ['Ship Store Growth', '4.0%', '3.5%', '3.0%', '3.0%', '3.0%'],
-      ['Service Revenue Growth', '6.0%', '5.0%', '4.0%', '3.5%', '3.5%'],
-      ['Occupancy Rate', '85%', '88%', '90%', '92%', '93%'],
-      [''],
-      ['Expense Assumptions'],
-      ['Category', 'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5'],
-      ['Payroll Growth', '3.0%', '3.0%', '2.5%', '2.5%', '2.5%'],
-      ['Insurance Growth', '5.0%', '5.0%', '4.0%', '4.0%', '4.0%'],
-      ['Utilities Growth', '4.0%', '4.0%', '3.5%', '3.5%', '3.0%'],
-      ['Maintenance Growth', '3.0%', '3.0%', '3.0%', '2.5%', '2.5%'],
-      ['Property Tax Growth', '2.0%', '2.0%', '2.0%', '2.0%', '2.0%'],
-      [''],
-      ['Financing Assumptions'],
-      ['Loan Amount', 3500000],
-      ['Interest Rate', '6.50%'],
-      ['Loan Term (Years)', 25],
-      ['Amortization (Years)', 30],
-      ['DSCR Minimum', 1.25],
-    ];
-    const assumptionsSheet = XLSX.utils.aoa_to_sheet(assumptionsData);
-    XLSX.utils.book_append_sheet(workbook, assumptionsSheet, 'Assumptions');
+    // 2. Cash Flow Analysis Sheet
+    if (selectedSheets.has('cash-flow-analysis')) {
+      const cashFlowData = [
+        ['Cash Flow Analysis'],
+        [''],
+        ['Property:', projectData.marinaName || 'N/A'],
+        [''],
+        ['Annual Cash Flow Summary'],
+        ['Year', 'Beginning Balance', 'NOI', 'Debt Service', 'CapEx', 'Net Cash Flow', 'Ending Balance'],
+        [2026, 0, 423000, -280000, -50000, 93000, 93000],
+        [2027, 93000, 438427, -280000, -35000, 123427, 216427],
+        [2028, 216427, 455571, -280000, -40000, 135571, 351998],
+        [2029, 351998, 466592, -280000, -45000, 141592, 493590],
+        [2030, 493590, 478213, -280000, -50000, 148213, 641803],
+        [''],
+        ['Levered Returns'],
+        ['Metric', 'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5'],
+        ['Cash-on-Cash Return', '5.7%', '6.3%', '7.0%', '7.5%', '7.9%'],
+        ['Cumulative Cash Flow', 93000, 216427, 351998, 493590, 641803],
+        [''],
+        ['Debt Service Coverage'],
+        ['DSCR', 1.51, 1.57, 1.63, 1.67, 1.71],
+      ];
+      const cashFlowSheet = XLSX.utils.aoa_to_sheet(cashFlowData);
+      XLSX.utils.book_append_sheet(workbook, cashFlowSheet, 'Cash Flow Analysis');
+    }
 
-    // 3. Pro Forma Sheet
-    const proFormaData = [
-      ['Pro Forma Operating Statement'],
-      [''],
-      ['Revenue', ...years.map(y => `Year ${y - startYear + 1} (${y})`)],
-      ['Slip Rentals', 800000, 824000, 848720, 869938, 891687],
-      ['Dry Storage', 150000, 153750, 157594, 160746, 163961],
-      ['Fuel Sales', 200000, 210000, 218400, 224952, 231700],
-      ['Ship Store', 80000, 83200, 86112, 88695, 91316],
-      ['Service & Repairs', 120000, 127200, 133560, 138235, 143073],
-      ['Other Income', 50000, 51500, 53045, 54376, 55735],
-      ['Total Revenue', 1400000, 1449650, 1497431, 1536942, 1577472],
-      [''],
-      ['Operating Expenses'],
-      ['Payroll & Benefits', 350000, 360500, 369513, 378750, 388219],
-      ['Insurance', 75000, 78750, 81900, 85176, 88583],
-      ['Utilities', 60000, 62400, 64584, 66845, 68850],
-      ['Fuel Cost (COGS)', 160000, 168000, 174720, 179962, 185361],
-      ['Maintenance & Repairs', 80000, 82400, 84872, 87044, 89220],
-      ['Property Taxes', 100000, 102000, 104040, 106121, 108243],
-      ['Management Fee (5%)', 70000, 72483, 74872, 76847, 78874],
-      ['Reserves (3%)', 42000, 43490, 44923, 46108, 47324],
-      ['Other Operating', 40000, 41200, 42436, 43497, 44585],
-      ['Total Expenses', 977000, 1011223, 1041860, 1070350, 1099259],
-      [''],
-      ['Net Operating Income', 423000, 438427, 455571, 466592, 478213],
-      [''],
-      ['Debt Service'],
-      ['Annual Debt Service', 280000, 280000, 280000, 280000, 280000],
-      [''],
-      ['Cash Flow Before Tax', 143000, 158427, 175571, 186592, 198213],
-      ['Cash-on-Cash Return', '5.7%', '6.3%', '7.0%', '7.5%', '7.9%'],
-    ];
-    const proFormaSheet = XLSX.utils.aoa_to_sheet(proFormaData);
-    XLSX.utils.book_append_sheet(workbook, proFormaSheet, 'Pro Forma');
+    // 3. Exit Strategy Suite Sheet
+    if (selectedSheets.has('exit-strategy-suite')) {
+      const exitData = [
+        ['Exit Strategy Suite'],
+        [''],
+        ['Property:', projectData.marinaName || 'N/A'],
+        [''],
+        ['Exit Valuation'],
+        ['Exit Year NOI', 478213],
+        ['Exit Cap Rate', '7.5%'],
+        ['Gross Exit Value', 6376173],
+        [''],
+        ['Sale Proceeds'],
+        ['Gross Sale Price', 6376173],
+        ['Selling Costs (2%)', -127523],
+        ['Net Sale Price', 6248650],
+        ['Loan Payoff', -3150000],
+        ['Net Proceeds to Equity', 3098650],
+        [''],
+        ['Return Metrics'],
+        ['Initial Equity Investment', 2500000],
+        ['Cumulative Cash Flow', 641803],
+        ['Net Exit Proceeds', 3098650],
+        ['Total Return', 3740453],
+        ['Equity Multiple', '2.5x'],
+        ['IRR', '14.8%'],
+        [''],
+        ['Scenario Comparison'],
+        ['Metric', 'Base Case', 'Upside', 'Downside'],
+        ['Exit Cap Rate', '7.5%', '7.0%', '8.0%'],
+        ['Exit Value', 6376173, 7514771, 5379900],
+        ['Equity Multiple', '1.8x', '2.1x', '1.5x'],
+        ['IRR', '12.5%', '16.8%', '8.2%'],
+      ];
+      const exitSheet = XLSX.utils.aoa_to_sheet(exitData);
+      XLSX.utils.book_append_sheet(workbook, exitSheet, 'Exit Strategy Suite');
+    }
 
-    // 4. Scenario Analysis Sheet
-    const scenarioData = [
-      ['Scenario Analysis'],
-      [''],
-      ['Metric', 'Base Case', 'Upside', 'Downside'],
-      ['Acquisition Price', 5000000, 5000000, 5000000],
-      ['Year 1 NOI', 423000, 465300, 380700],
-      ['Stabilized NOI', 478213, 526034, 430392],
-      ['Exit Cap Rate', '7.5%', '7.0%', '8.0%'],
-      ['Exit Value', 6376173, 7514771, 5379900],
-      ['Equity Multiple', '1.8x', '2.1x', '1.5x'],
-      ['IRR', '12.5%', '16.8%', '8.2%'],
-      ['Cash-on-Cash (Avg)', '6.9%', '8.5%', '5.3%'],
-      [''],
-      ['Sensitivity Analysis'],
-      ['Exit Cap Rate', '-50 bps', 'Base', '+50 bps'],
-      ['7.0%', 6835957, 6376173, 5973291],
-      ['7.5%', 6376173, 5973291, 5615686],
-      ['8.0%', 5973291, 5615686, 5296647],
-    ];
-    const scenarioSheet = XLSX.utils.aoa_to_sheet(scenarioData);
-    XLSX.utils.book_append_sheet(workbook, scenarioSheet, 'Scenarios');
+    // 4. Capital Stack Sheet
+    if (selectedSheets.has('capital-stack')) {
+      const capitalData = [
+        ['Capital Stack'],
+        [''],
+        ['Property:', projectData.marinaName || 'N/A'],
+        ['Acquisition Price:', projectData.purchasePrice || 5000000],
+        [''],
+        ['Sources of Capital'],
+        ['Source', 'Amount', '% of Total', 'Cost'],
+        ['Senior Debt', 3500000, '70.0%', '6.50%'],
+        ['Equity', 1500000, '30.0%', '15.0% Target'],
+        ['Total Sources', 5000000, '100.0%', ''],
+        [''],
+        ['Debt Terms'],
+        ['Loan Amount', 3500000],
+        ['Interest Rate', '6.50%'],
+        ['Loan Term (Years)', 25],
+        ['Amortization (Years)', 30],
+        ['Annual Debt Service', 280000],
+        ['DSCR (Year 1)', 1.51],
+        [''],
+        ['Uses of Capital'],
+        ['Use', 'Amount', '% of Total'],
+        ['Purchase Price', 4850000, '97.0%'],
+        ['Closing Costs', 100000, '2.0%'],
+        ['Working Capital', 50000, '1.0%'],
+        ['Total Uses', 5000000, '100.0%'],
+      ];
+      const capitalSheet = XLSX.utils.aoa_to_sheet(capitalData);
+      XLSX.utils.book_append_sheet(workbook, capitalSheet, 'Capital Stack');
+    }
 
-    // 5. Cash Flow Waterfall Sheet
-    const waterfallData = [
-      ['Cash Flow Waterfall'],
-      [''],
-      ['Year', 'Beginning Balance', 'NOI', 'Debt Service', 'CapEx', 'Cash Flow', 'Ending Balance'],
-      [2026, 0, 423000, -280000, -50000, 93000, 93000],
-      [2027, 93000, 438427, -280000, -35000, 123427, 216427],
-      [2028, 216427, 455571, -280000, -40000, 135571, 351998],
-      [2029, 351998, 466592, -280000, -45000, 141592, 493590],
-      [2030, 493590, 478213, -280000, -50000, 148213, 641803],
-      [''],
-      ['Exit Analysis'],
-      ['Exit Year NOI', 478213],
-      ['Exit Cap Rate', '7.5%'],
-      ['Gross Exit Value', 6376173],
-      ['Selling Costs (2%)', -127523],
-      ['Loan Payoff', -3150000],
-      ['Net Proceeds', 3098650],
-      [''],
-      ['Total Return'],
-      ['Initial Equity', 2500000],
-      ['Cumulative Cash Flow', 641803],
-      ['Net Exit Proceeds', 3098650],
-      ['Total Return', 3740453],
-      ['Equity Multiple', '2.5x'],
-      ['IRR', '14.8%'],
-    ];
-    const waterfallSheet = XLSX.utils.aoa_to_sheet(waterfallData);
-    XLSX.utils.book_append_sheet(workbook, waterfallSheet, 'Cash Flow');
+    // 5. Rent Roll Summary Sheet
+    if (selectedSheets.has('rent-roll-summary')) {
+      const rentRollData = [
+        ['Rent Roll Summary'],
+        [''],
+        ['Property:', projectData.marinaName || 'N/A'],
+        ['Total Slips:', projectData.totalSlips || 245],
+        [''],
+        ['Storage Type', 'Count', 'Occupied', 'Vacancy', 'Annual Revenue', 'Avg Rate/Unit'],
+        ['Wet Slips', 120, 108, '10%', 540000, 5000],
+        ['Dry Storage', 80, 72, '10%', 144000, 2000],
+        ['Covered Slips', 20, 19, '5%', 95000, 5000],
+        ['Jet Ski Docks', 15, 12, '20%', 18000, 1500],
+        ['Transient', 10, 'N/A', 'N/A', 48000, 4800],
+        ['Total', 245, 211, '14%', 845000, 4010],
+        [''],
+        ['Lease Expiration Schedule'],
+        ['Timeframe', 'Count', 'Annual Revenue', '% of Total'],
+        ['0-30 Days', 15, 75000, '8.9%'],
+        ['31-90 Days', 22, 110000, '13.0%'],
+        ['91-180 Days', 35, 175000, '20.7%'],
+        ['181-365 Days', 45, 225000, '26.6%'],
+        ['1+ Years', 94, 260000, '30.8%'],
+      ];
+      const rentRollSheet = XLSX.utils.aoa_to_sheet(rentRollData);
+      XLSX.utils.book_append_sheet(workbook, rentRollSheet, 'Rent Roll Summary');
+    }
 
-    // 6. Rent Roll Summary Sheet
-    const rentRollData = [
-      ['Rent Roll Summary'],
-      [''],
-      ['Storage Type', 'Count', 'Occupied', 'Vacancy', 'Annual Revenue', 'Avg Rate/Unit'],
-      ['Wet Slips', 120, 108, '10%', 540000, 5000],
-      ['Dry Storage', 80, 72, '10%', 144000, 2000],
-      ['Covered Slips', 20, 19, '5%', 95000, 5000],
-      ['Jet Ski Docks', 15, 12, '20%', 18000, 1500],
-      ['Transient', 10, 'N/A', 'N/A', 48000, 4800],
-      ['Total', 245, 211, '14%', 845000, 4010],
-      [''],
-      ['Lease Expiration Schedule'],
-      ['Timeframe', 'Count', 'Annual Revenue', '% of Total'],
-      ['0-30 Days', 15, 75000, '8.9%'],
-      ['31-90 Days', 22, 110000, '13.0%'],
-      ['91-180 Days', 35, 175000, '20.7%'],
-      ['181-365 Days', 45, 225000, '26.6%'],
-      ['1+ Years', 94, 260000, '30.8%'],
-    ];
-    const rentRollSheet = XLSX.utils.aoa_to_sheet(rentRollData);
-    XLSX.utils.book_append_sheet(workbook, rentRollSheet, 'Rent Roll');
+    // 6. Sensitivity Analysis Sheet
+    if (selectedSheets.has('sensitivity-analysis')) {
+      const sensitivityData = [
+        ['Sensitivity Analysis'],
+        [''],
+        ['Property:', projectData.marinaName || 'N/A'],
+        [''],
+        ['IRR Sensitivity - Exit Cap Rate vs Revenue Growth'],
+        ['', '-1.0%', 'Base', '+1.0%', '+2.0%'],
+        ['6.5%', '11.2%', '13.5%', '15.8%', '18.0%'],
+        ['7.0%', '10.1%', '12.3%', '14.5%', '16.6%'],
+        ['7.5% (Base)', '9.1%', '11.2%', '13.2%', '15.2%'],
+        ['8.0%', '8.2%', '10.2%', '12.1%', '13.9%'],
+        ['8.5%', '7.4%', '9.3%', '11.1%', '12.8%'],
+        [''],
+        ['Equity Multiple Sensitivity - Exit Cap Rate vs Revenue Growth'],
+        ['', '-1.0%', 'Base', '+1.0%', '+2.0%'],
+        ['6.5%', '1.9x', '2.1x', '2.3x', '2.5x'],
+        ['7.0%', '1.8x', '2.0x', '2.1x', '2.3x'],
+        ['7.5% (Base)', '1.7x', '1.8x', '2.0x', '2.2x'],
+        ['8.0%', '1.6x', '1.7x', '1.9x', '2.0x'],
+        ['8.5%', '1.5x', '1.6x', '1.8x', '1.9x'],
+        [''],
+        ['Key Assumptions Impact'],
+        ['Variable', 'Low', 'Base', 'High', 'IRR Impact'],
+        ['Occupancy', '85%', '90%', '95%', '+/- 2.1%'],
+        ['Rate Growth', '2.0%', '3.0%', '4.0%', '+/- 1.5%'],
+        ['OpEx Ratio', '65%', '70%', '75%', '+/- 1.8%'],
+        ['Exit Cap', '7.0%', '7.5%', '8.0%', '+/- 2.5%'],
+      ];
+      const sensitivitySheet = XLSX.utils.aoa_to_sheet(sensitivityData);
+      XLSX.utils.book_append_sheet(workbook, sensitivitySheet, 'Sensitivity Analysis');
+    }
 
     // Generate buffer
     const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });

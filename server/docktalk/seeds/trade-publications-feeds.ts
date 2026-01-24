@@ -166,6 +166,20 @@ const WEB_SCRAPE_SOURCES = [
     description: "Recreational boating industry association news and statistics",
     sourceType: "web_scrape",
   },
+  {
+    name: "Marinas.com News",
+    url: "https://www.marinas.com/news",
+    category: "Trade Publication",
+    description: "Marina directory and industry news platform covering marina listings and industry updates",
+    sourceType: "web_scrape",
+  },
+  {
+    name: "Waterway Guide News",
+    url: "https://www.waterwayguide.com/news",
+    category: "Trade Publication",
+    description: "Cruising guides and waterway news covering marinas, anchorages, and boating destinations",
+    sourceType: "web_scrape",
+  },
 ];
 
 const ASSOCIATION_FEEDS = [

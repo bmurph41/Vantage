@@ -7,6 +7,7 @@ import { summarizeArticle } from "./ai-summarizer";
 import { enrichArticle } from "./ai-enrichment";
 import { broadcastNewArticle } from "../websocket";
 import { scrapeWebPage, validateScrapedArticle, fetchArticleBody, type ScrapedArticle } from "./web-scraper";
+import { analyzeMAContent, quickMACheck } from "./ma-tracker";
 
 // Normalize entity types from AI to database enum values
 function normalizeEntityType(type: string): 'company' | 'person' | 'location' | 'asset' | null {
@@ -151,13 +152,53 @@ async function processScrapedArticle(article: ScrapedArticle, sourceName: string
     } catch (error) {
     }
 
+    // Run M&A tracking analysis for enhanced deal detection
+    const maAnalysis = analyzeMAContent(title, content, summary || undefined);
+    if (maAnalysis.isMAArticle) {
+      // Add M&A tag if not already present
+      if (!tags.includes('M&A')) {
+        tags.push('M&A');
+      }
+      // If AI didn't detect a deal but M&A tracker did, create basic dealMetadata
+      if (!dealMetadata && maAnalysis.maType) {
+        dealMetadata = {
+          isDeal: true,
+          dealType: maAnalysis.maType === 'acquisition' ? 'acquisition' : 
+                   maAnalysis.maType === 'merger' ? 'm&a' :
+                   maAnalysis.maType === 'investment' ? 'financing' :
+                   maAnalysis.maType === 'partnership' ? 'partnership' :
+                   maAnalysis.maType === 'sale' || maAnalysis.maType === 'divestiture' ? 'acquisition' : 'partnership',
+          parties: Object.values(maAnalysis.parties).filter(Boolean),
+          operators: [],
+          marinas: [],
+          metrics: []
+        };
+      }
+      // Merge M&A parties into dealMetadata if available
+      if (dealMetadata && maAnalysis.parties) {
+        if (maAnalysis.parties.buyer) {
+          dealMetadata.parties = dealMetadata.parties || [];
+          if (!dealMetadata.parties.includes(maAnalysis.parties.buyer)) {
+            dealMetadata.parties.push(maAnalysis.parties.buyer);
+          }
+        }
+        if (maAnalysis.parties.seller) {
+          dealMetadata.parties = dealMetadata.parties || [];
+          if (!dealMetadata.parties.includes(maAnalysis.parties.seller)) {
+            dealMetadata.parties.push(maAnalysis.parties.seller);
+          }
+        }
+      }
+    }
+
     const searchText = [
       title,
       summary || content,
       tags.join(" "),
       sourceName,
       categories.join(" "),
-      geography.join(" ")
+      geography.join(" "),
+      maAnalysis.isMAArticle ? 'M&A merger acquisition deal transaction' : ''
     ].join(" ").toLowerCase();
 
     const publishedAt = article.publishedAt || new Date();
@@ -366,6 +407,45 @@ async function processRssItem(item: FeedItem, sourceName: string, customKeywords
     } catch (error) {
     }
 
+    // Run M&A tracking analysis for enhanced deal detection
+    const maAnalysis = analyzeMAContent(title, content, summary || undefined);
+    if (maAnalysis.isMAArticle) {
+      // Add M&A tag if not already present
+      if (!tags.includes('M&A')) {
+        tags.push('M&A');
+      }
+      // If AI didn't detect a deal but M&A tracker did, create basic dealMetadata
+      if (!dealMetadata && maAnalysis.maType) {
+        dealMetadata = {
+          isDeal: true,
+          dealType: maAnalysis.maType === 'acquisition' ? 'acquisition' : 
+                   maAnalysis.maType === 'merger' ? 'm&a' :
+                   maAnalysis.maType === 'investment' ? 'financing' :
+                   maAnalysis.maType === 'partnership' ? 'partnership' :
+                   maAnalysis.maType === 'sale' || maAnalysis.maType === 'divestiture' ? 'acquisition' : 'partnership',
+          parties: Object.values(maAnalysis.parties).filter(Boolean),
+          operators: [],
+          marinas: [],
+          metrics: []
+        };
+      }
+      // Merge M&A parties into dealMetadata if available
+      if (dealMetadata && maAnalysis.parties) {
+        if (maAnalysis.parties.buyer) {
+          dealMetadata.parties = dealMetadata.parties || [];
+          if (!dealMetadata.parties.includes(maAnalysis.parties.buyer)) {
+            dealMetadata.parties.push(maAnalysis.parties.buyer);
+          }
+        }
+        if (maAnalysis.parties.seller) {
+          dealMetadata.parties = dealMetadata.parties || [];
+          if (!dealMetadata.parties.includes(maAnalysis.parties.seller)) {
+            dealMetadata.parties.push(maAnalysis.parties.seller);
+          }
+        }
+      }
+    }
+
     // Create search text
     const searchText = [
       title,
@@ -373,7 +453,8 @@ async function processRssItem(item: FeedItem, sourceName: string, customKeywords
       tags.join(" "),
       sourceName,
       categories.join(" "),
-      geography.join(" ")
+      geography.join(" "),
+      maAnalysis.isMAArticle ? 'M&A merger acquisition deal transaction' : ''
     ].join(" ").toLowerCase();
 
     const publishedAt = item.isoDate ? new Date(item.isoDate) : 

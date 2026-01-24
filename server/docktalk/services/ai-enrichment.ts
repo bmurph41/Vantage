@@ -245,14 +245,52 @@ function extractEntitiesFallback(title: string, summary: string, content: string
 function detectSentimentFallback(title: string, summary: string): 'positive' | 'neutral' | 'negative' {
   const text = `${title} ${summary}`.toLowerCase();
   
-  const positiveKeywords = ['growth', 'expands', 'record', 'success', 'award', 'investment', 'acquisition', 'partnership', 'opens', 'new', 'innovative', 'advanced', 'improvement'];
-  const negativeKeywords = ['decline', 'closes', 'bankrupt', 'lawsuit', 'violation', 'damage', 'loss', 'concern', 'risk', 'emergency', 'accident', 'closure'];
+  // Marina industry-specific positive keywords
+  const positiveKeywords = [
+    // Business growth
+    'growth', 'expands', 'expansion', 'record', 'success', 'award', 'investment', 
+    'acquisition', 'partnership', 'opens', 'new', 'innovative', 'advanced', 'improvement',
+    // Marina-specific positive
+    'upgrade', 'modernization', 'renovation', 'development', 'approved', 'completion',
+    'milestone', 'launch', 'grand opening', 'increased occupancy', 'strong demand',
+    'sold out', 'waiting list', 'record season', 'booming', 'thriving',
+    // Financial positive
+    'revenue growth', 'profit', 'earnings', 'dividend', 'strategic', 'premium',
+    'high occupancy', 'rate increase', 'strong performance', 'outperform',
+    // Industry positive
+    'industry leader', 'market leader', 'best practices', 'innovation award',
+    'sustainability', 'green marina', 'clean marina', 'certified'
+  ];
+  
+  // Marina industry-specific negative keywords
+  const negativeKeywords = [
+    // Business challenges
+    'decline', 'closes', 'closing', 'bankrupt', 'bankruptcy', 'lawsuit', 'litigation',
+    'violation', 'damage', 'loss', 'concern', 'risk', 'emergency', 'accident', 'closure',
+    // Marina-specific negative
+    'dredging issues', 'permit denied', 'environmental violation', 'contamination',
+    'storm damage', 'hurricane damage', 'flooding', 'erosion', 'sinking', 'capsized',
+    'vacancy', 'low occupancy', 'foreclosure', 'default', 'delinquent',
+    // Financial negative
+    'revenue decline', 'losses', 'impairment', 'write-off', 'restructuring',
+    'layoffs', 'downsizing', 'cost cutting', 'debt burden',
+    // Industry negative
+    'regulatory penalty', 'fine', 'citation', 'investigation', 'recall',
+    'supply shortage', 'labor shortage', 'delays'
+  ];
   
   const positiveCount = positiveKeywords.filter(word => text.includes(word)).length;
   const negativeCount = negativeKeywords.filter(word => text.includes(word)).length;
   
-  if (positiveCount > negativeCount) return 'positive';
-  if (negativeCount > positiveCount) return 'negative';
+  // Weight stronger signals more heavily
+  const strongPositive = ['record', 'expands', 'acquisition', 'award', 'growth', 'booming'].filter(w => text.includes(w)).length * 2;
+  const strongNegative = ['bankrupt', 'lawsuit', 'closure', 'violation', 'damage', 'foreclosure'].filter(w => text.includes(w)).length * 2;
+  
+  const totalPositive = positiveCount + strongPositive;
+  const totalNegative = negativeCount + strongNegative;
+  
+  if (totalPositive > totalNegative + 1) return 'positive';
+  if (totalNegative > totalPositive + 1) return 'negative';
   return 'neutral';
 }
 

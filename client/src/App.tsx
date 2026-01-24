@@ -93,6 +93,7 @@ const PendingContacts = lazy(() => import("@/pages/pending-contacts"));
 const PendingCompanies = lazy(() => import("@/pages/pending-companies"));
 const Prospecting = lazy(() => import("@/pages/prospecting"));
 const Analytics = lazy(() => import("@/pages/analytics"));
+const UnifiedAnalytics = lazy(() => import("@/pages/analytics/UnifiedAnalytics"));
 const Forecast = lazy(() => import("@/pages/forecast"));
 const Forms = lazy(() => import("@/pages/forms"));
 const Labels = lazy(() => import("@/pages/labels"));
@@ -1225,6 +1226,15 @@ function Router() {
           window.location.replace('/marketing?tab=settings');
           return null;
         }}
+      </Route>
+
+      {/* Cross-Module Analytics Dashboard */}
+      <Route path="/analytics/unified">
+        {() => (
+          <UnifiedLayout>
+            <UnifiedAnalytics />
+          </UnifiedLayout>
+        )}
       </Route>
 
       {/* CRM Routes with Unified Layout */}

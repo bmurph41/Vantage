@@ -39,46 +39,46 @@ interface ExportSheet {
 
 const EXPORT_SHEETS: ExportSheet[] = [
   {
-    id: 'executive-summary',
-    name: 'Executive Summary',
-    description: 'Property info, investment summary, key metrics',
-    icon: <FileText className="h-4 w-4" />,
-    category: 'summary',
-  },
-  {
-    id: 'assumptions',
-    name: 'Model Assumptions',
-    description: 'Revenue, expense, and financing assumptions',
-    icon: <Calculator className="h-4 w-4" />,
-    category: 'summary',
-  },
-  {
-    id: 'pro-forma',
-    name: 'Pro Forma Statement',
-    description: '5-year operating projections with line items',
+    id: 'operating-pro-forma',
+    name: 'Operating Pro Forma',
+    description: '5-year operating projections with revenue and expense line items',
     icon: <DollarSign className="h-4 w-4" />,
     category: 'operations',
   },
   {
-    id: 'scenarios',
-    name: 'Scenario Analysis',
-    description: 'Base, upside, downside case comparison',
-    icon: <BarChart3 className="h-4 w-4" />,
-    category: 'analysis',
-  },
-  {
-    id: 'cash-flow',
-    name: 'Cash Flow Waterfall',
-    description: 'Annual cash flows and exit analysis',
+    id: 'cash-flow-analysis',
+    name: 'Cash Flow Analysis',
+    description: 'Annual cash flows, debt service, and levered returns',
     icon: <TrendingUp className="h-4 w-4" />,
     category: 'analysis',
   },
   {
-    id: 'rent-roll',
+    id: 'exit-strategy-suite',
+    name: 'Exit Strategy Suite',
+    description: 'Exit valuation, sale proceeds, and return metrics',
+    icon: <BarChart3 className="h-4 w-4" />,
+    category: 'analysis',
+  },
+  {
+    id: 'capital-stack',
+    name: 'Capital Stack',
+    description: 'Debt and equity structure, financing terms, sources & uses',
+    icon: <Layers className="h-4 w-4" />,
+    category: 'summary',
+  },
+  {
+    id: 'rent-roll-summary',
     name: 'Rent Roll Summary',
     description: 'Occupancy, revenue by type, lease expirations',
     icon: <Building2 className="h-4 w-4" />,
     category: 'operations',
+  },
+  {
+    id: 'sensitivity-analysis',
+    name: 'Sensitivity Analysis',
+    description: 'IRR and equity multiple sensitivity to key assumptions',
+    icon: <Calculator className="h-4 w-4" />,
+    category: 'analysis',
   },
 ];
 
@@ -92,7 +92,8 @@ export default function ExportModel({ projectId, projectName, onTabChange }: Exp
     mutationFn: async () => {
       setExportProgress(10);
       
-      const response = await fetch(`/api/analytics/modeling/projects/${projectId}/export/excel`);
+      const sheetsParam = Array.from(selectedSheets).join(',');
+      const response = await fetch(`/api/analytics/modeling/projects/${projectId}/export/excel?sheets=${encodeURIComponent(sheetsParam)}`);
       
       setExportProgress(60);
       
