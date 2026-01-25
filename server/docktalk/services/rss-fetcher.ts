@@ -123,7 +123,7 @@ async function processScrapedArticle(article: ScrapedArticle, sourceName: string
     
     const relevanceScore = scoreArticle(title, content, sourceName);
     
-    if (relevanceScore < 25) {
+    if (relevanceScore < 40) { // Increased threshold from 25 to 40 to reduce irrelevant articles
       return 0;
     }
 
@@ -375,7 +375,7 @@ async function processRssItem(item: FeedItem, sourceName: string, customKeywords
     const relevanceScore = scoreArticle(title, content, sourceName);
     
     // Skip low relevance articles (lowered threshold to capture more marina content)
-    if (relevanceScore < 25) {
+    if (relevanceScore < 40) { // Increased threshold from 25 to 40 to reduce irrelevant articles
       return 0;
     }
 

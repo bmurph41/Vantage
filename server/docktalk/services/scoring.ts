@@ -1,3 +1,12 @@
+// REQUIRED_MARINA_TERMS - At least one of these MUST appear for an article to be included
+// These are the core keywords that signal marina industry relevance
+const REQUIRED_MARINA_TERMS = [
+  "marina", "marina for sale", "marina broker", "marina investment", "marina operations",
+  "marinas for sale", "marinas", "boat sales", "private equity in marinas", "boat slip",
+  "dry stack", "yacht club", "boatyard", "superyacht marina", "megayacht", "dockage",
+  "boat storage", "marine industry", "marina operator", "marina owner", "marina management"
+];
+
 const MARINA_TERMS = [
   "marina", "boat", "boating", "slip", "dry stack", "dock", "fuel dock", "harbor",
   "moorage", "berth", "yacht", "nautical", "boat sales", "outboard", "inboard",
@@ -32,9 +41,33 @@ const REGULATORY_TERMS = [
   "policy", "tax", "tariff", "trade", "import", "export", "customs"
 ];
 
+// Check if article has at least one required marina keyword
+export function hasRequiredMarinaKeyword(title: string, content: string): boolean {
+  const text = `${title} ${content}`.toLowerCase();
+  return REQUIRED_MARINA_TERMS.some(term => text.includes(term.toLowerCase()));
+}
+
+// Get matched required keywords (for debugging/logging)
+export function getMatchedRequiredKeywords(title: string, content: string): string[] {
+  const text = `${title} ${content}`.toLowerCase();
+  return REQUIRED_MARINA_TERMS.filter(term => text.includes(term.toLowerCase()));
+}
+
 export function scoreArticle(title: string, content: string, source: string): number {
   const text = `${title} ${content}`.toLowerCase();
   let score = 0;
+
+  // CRITICAL: Check for required marina keyword first
+  // If no required marina keyword is found, return 0 immediately
+  const hasRequired = hasRequiredMarinaKeyword(title, content);
+  if (!hasRequired) {
+    // Only allow if it's from a known marina-industry source AND has some marina context
+    const isFromMarinaSource = /marina|boating|dock|yacht|maritime|superyacht/i.test(source);
+    const hasAnyMarinaContext = MARINA_TERMS.some(term => text.includes(term));
+    if (!isFromMarinaSource || !hasAnyMarinaContext) {
+      return 0; // Reject articles without marina relevance
+    }
+  }
 
   // Base score for marina industry sources
   if (/marina|boating|dock|yacht|maritime|superyacht/i.test(source)) {
