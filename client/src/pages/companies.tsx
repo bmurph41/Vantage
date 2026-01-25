@@ -8,7 +8,9 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Building, Plus, Edit, Trash2, Upload, Search, Globe, Users, MapPin, TrendingUp, Download, Phone, Settings, Calendar, Briefcase, Home, Loader2, User, ChevronRight, Anchor, DollarSign } from "lucide-react";
+import { Building, Plus, Edit, Trash2, Upload, Search, Globe, Users, MapPin, TrendingUp, Download, Phone, Settings, Calendar, Briefcase, Home, Loader2, User, ChevronRight, Anchor, DollarSign, Merge, AlertTriangle } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import CompanyFormModal from "@/components/modals/company-form-modal";
 import { FileUpload } from "@/components/file-upload";
 import KpiSettingsModal from "@/components/modals/kpi-settings-modal";
@@ -103,6 +105,9 @@ export default function Companies() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isKpiSettingsOpen, setIsKpiSettingsOpen] = useState(false);
   const [showPropertiesModal, setShowPropertiesModal] = useState(false);
+  const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
+  const [showMergeDialog, setShowMergeDialog] = useState(false);
+  const [mergeMode, setMergeMode] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -230,6 +235,29 @@ export default function Companies() {
     },
   });
 
+  const mergeMutation = useMutation({
+    mutationFn: async ({ primaryId, secondaryId }: { primaryId: string; secondaryId: string }) => {
+      const response = await apiRequest('POST', '/api/crm/companies/merge', { primaryId, secondaryId });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/companies'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
+      toast({ title: "Companies merged successfully" });
+      setSelectedCompanies(new Set());
+      setShowMergeDialog(false);
+      setMergeMode(false);
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to merge companies", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
   const handleEdit = (company: Company) => {
     setEditingCompany(company);
     setIsFormOpen(true);
@@ -298,6 +326,39 @@ export default function Companies() {
     toast({ title: `Exported ${selectedIds.size} company(ies)` });
   };
 
+  const handleToggleSelect = (companyId: string) => {
+    const newSelected = new Set(selectedCompanies);
+    if (newSelected.has(companyId)) {
+      newSelected.delete(companyId);
+    } else {
+      newSelected.add(companyId);
+    }
+    setSelectedCompanies(newSelected);
+  };
+
+  const handleMerge = () => {
+    if (selectedCompanies.size !== 2) {
+      toast({ 
+        title: "Select exactly 2 companies", 
+        description: "Please select exactly 2 companies to merge",
+        variant: "destructive" 
+      });
+      return;
+    }
+    setShowMergeDialog(true);
+  };
+
+  const confirmMerge = () => {
+    const ids = Array.from(selectedCompanies);
+    mergeMutation.mutate({ primaryId: ids[0], secondaryId: ids[1] });
+  };
+
+  const getSelectedCompaniesData = () => {
+    const ids = Array.from(selectedCompanies);
+    if (!companies) return [];
+    return ids.map(id => companies.find((c: Company) => c.id === id)).filter(Boolean);
+  };
+
   const getIndustryCategory = (industry?: string): string => {
     if (!industry) return 'other';
     const normalized = industry.toLowerCase();
@@ -336,6 +397,19 @@ export default function Companies() {
   }, [companies, searchTerm, industryFilter, sizeFilter]);
 
   const columns: CrmColumn<Company>[] = [
+    ...(mergeMode ? [{
+      key: 'select',
+      header: '',
+      width: 'w-10',
+      render: (company: Company) => (
+        <div onClick={(e) => e.stopPropagation()}>
+          <Checkbox
+            checked={selectedCompanies.has(company.id)}
+            onCheckedChange={() => handleToggleSelect(company.id)}
+          />
+        </div>
+      ),
+    }] : []),
     {
       key: 'company',
       header: 'Company',
@@ -587,6 +661,28 @@ export default function Companies() {
         subtitle={`${companies?.length || 0} companies`}
         actions={
           <>
+            <Button
+              variant={mergeMode ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                setMergeMode(!mergeMode);
+                if (mergeMode) {
+                  setSelectedCompanies(new Set());
+                }
+              }}
+            >
+              <Merge className="h-4 w-4 mr-2" />
+              {mergeMode ? "Cancel Merge" : "Merge Duplicates"}
+            </Button>
+            {mergeMode && selectedCompanies.size > 0 && (
+              <Button
+                size="sm"
+                onClick={handleMerge}
+                disabled={selectedCompanies.size !== 2}
+              >
+                Merge Selected ({selectedCompanies.size}/2)
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => setShowFileUpload(!showFileUpload)}>
               <Upload className="h-4 w-4 mr-2" />Import
             </Button>
@@ -684,6 +780,43 @@ export default function Companies() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={showMergeDialog} onOpenChange={setShowMergeDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Confirm Merge
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>This will merge these two companies:</p>
+                {getSelectedCompaniesData().length === 2 && (
+                  <div className="space-y-2">
+                    <div className="p-2 border rounded bg-green-50 dark:bg-green-950">
+                      <p className="font-medium text-green-700 dark:text-green-300">Keep: {getSelectedCompaniesData()[0]?.name}</p>
+                      <p className="text-xs text-muted-foreground">All contacts and properties will be moved here</p>
+                    </div>
+                    <div className="p-2 border rounded bg-red-50 dark:bg-red-950">
+                      <p className="font-medium text-red-700 dark:text-red-300">Delete: {getSelectedCompaniesData()[1]?.name}</p>
+                      <p className="text-xs text-muted-foreground">This company will be removed after merge</p>
+                    </div>
+                  </div>
+                )}
+                <p className="text-sm text-muted-foreground">
+                  All linked contacts and properties from the deleted company will be transferred to the kept company.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmMerge} disabled={mergeMutation.isPending}>
+              {mergeMutation.isPending ? "Merging..." : "Confirm Merge"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </CrmPageShell>
   );
 }

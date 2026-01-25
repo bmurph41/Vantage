@@ -15,6 +15,7 @@ import { CompanyLinkingService } from "./company-linking-service";
 import { CalendarService } from "./calendar-service";
 import { FuelSyncService } from "./services/fuel/fuel-sync-service";
 import { findAllPotentialDuplicates, getDuplicateExplanation } from "./services/duplicate-finder";
+import { findCompanyDuplicates, type CompanyDuplicateMatch } from "./services/company-duplicate-service";
 import { requirePermission, requireRole } from "./middleware/rbac";
 import { AuditService } from "./services/audit-service";
 import { setTenantContext, clearTenantContext } from "./middleware/tenant-context";
@@ -113,7 +114,7 @@ import {
   insertTaskDependencySchema, insertTaskFileSchema, insertUserEmailSchema, insertCalendarGuestSchema,
   insertCddDocumentSchema, insertKpiSchema, insertFindingSchema, insertRecommendationSchema,
   insertCrmTaskSchema, insertCrmFileSchema, insertCalendarSettingsSchema,
-  crmTasks, crmFiles, crmContacts, crmDeals, crmCompanies, crmPipelines, crmPipelineStages, crmActivities, crmProperties, crmNotes,
+  crmTasks, crmFiles, crmContacts, crmDeals, crmCompanies, crmPipelines, crmPipelineStages, crmActivities, crmProperties, crmNotes, crmContactCompanies, crmCompanyProperties,
   salesComps, rateComps, propertySalesComps, propertyRateComps,
   type InsertCrmFile,
   insertScSavedSearchSchema,
@@ -6938,6 +6939,119 @@ Current context: Project ${req.params.projectId}`;
     } catch (error: any) {
       console.error("Failed to delete company:", error);
       res.status(500).json({ error: "Failed to delete company" });
+    }
+  });
+  
+  // Company Duplicate Detection
+  app.get("/api/crm/companies/check-duplicates", async (req: any, res) => {
+    try {
+      const { name, address, city, state, zipCode, excludeId } = req.query;
+      
+      if (!name) {
+        return res.json({ duplicates: [] });
+      }
+
+      const companies = await storage.getCrmCompaniesForOrg(req.user.orgId);
+      const duplicates = findCompanyDuplicates(
+        String(name),
+        address ? String(address) : null,
+        city ? String(city) : null,
+        state ? String(state) : null,
+        zipCode ? String(zipCode) : null,
+        companies,
+        excludeId ? String(excludeId) : undefined,
+        40 // minimum similarity threshold
+      );
+      
+      res.json({ duplicates });
+    } catch (error: any) {
+      console.error("Failed to check company duplicates:", error);
+      res.status(500).json({ error: "Failed to check for duplicate companies" });
+    }
+  });
+
+  // Merge Companies
+  app.post("/api/crm/companies/merge", async (req: any, res) => {
+    try {
+      const { primaryId, secondaryId } = req.body;
+      
+      if (!primaryId || !secondaryId) {
+        return res.status(400).json({ error: "Primary and secondary company IDs are required" });
+      }
+      
+      if (primaryId === secondaryId) {
+        return res.status(400).json({ error: "Cannot merge a company with itself" });
+      }
+
+      // Get both companies to verify they exist and belong to this org
+      const primary = await storage.getCrmCompany(primaryId);
+      const secondary = await storage.getCrmCompany(secondaryId);
+      
+      if (!primary || !secondary) {
+        return res.status(404).json({ error: "One or both companies not found" });
+      }
+      
+      // Verify org ownership
+      if (primary.orgId !== req.user.orgId || secondary.orgId !== req.user.orgId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Transfer all relationships from secondary to primary
+      // 1. Transfer contact-company links
+      const contactCompanyLinks = await db.select().from(crmContactCompanies).where(eq(crmContactCompanies.companyId, secondaryId));
+      for (const link of contactCompanyLinks) {
+        // Check if this contact is already linked to primary
+        const existingLink = await db.select().from(crmContactCompanies)
+          .where(and(
+            eq(crmContactCompanies.contactId, link.contactId),
+            eq(crmContactCompanies.companyId, primaryId)
+          )).limit(1);
+        
+        if (existingLink.length === 0) {
+          // Move the link to primary
+          await db.update(crmContactCompanies)
+            .set({ companyId: primaryId })
+            .where(eq(crmContactCompanies.id, link.id));
+        } else {
+          // Delete duplicate link
+          await db.delete(crmContactCompanies).where(eq(crmContactCompanies.id, link.id));
+        }
+      }
+
+      // 2. Transfer company-property links
+      const companyPropertyLinks = await db.select().from(crmCompanyProperties).where(eq(crmCompanyProperties.companyId, secondaryId));
+      for (const link of companyPropertyLinks) {
+        // Check if this property is already linked to primary
+        const existingLink = await db.select().from(crmCompanyProperties)
+          .where(and(
+            eq(crmCompanyProperties.propertyId, link.propertyId),
+            eq(crmCompanyProperties.companyId, primaryId)
+          )).limit(1);
+        
+        if (existingLink.length === 0) {
+          // Move the link to primary
+          await db.update(crmCompanyProperties)
+            .set({ companyId: primaryId })
+            .where(eq(crmCompanyProperties.id, link.id));
+        } else {
+          // Delete duplicate link
+          await db.delete(crmCompanyProperties).where(eq(crmCompanyProperties.id, link.id));
+        }
+      }
+
+      // 3. Delete the secondary company
+      await storage.deleteCrmCompany(secondaryId);
+
+      // Return the updated primary company
+      const updatedPrimary = await storage.getCrmCompany(primaryId);
+      res.json({ 
+        success: true, 
+        message: "Companies merged successfully",
+        company: updatedPrimary 
+      });
+    } catch (error: any) {
+      console.error("Failed to merge companies:", error);
+      res.status(500).json({ error: "Failed to merge companies" });
     }
   });
 

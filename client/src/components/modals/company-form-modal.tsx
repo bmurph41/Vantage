@@ -14,7 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, X, User, Building, Star, MapPin } from "lucide-react";
+import { Plus, X, User, Building, Star, MapPin, AlertTriangle, Check, AlertCircle } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { AddressInput, type AddressComponents } from "@/components/address-input";
 import { StateSelect } from "@/components/ui/state-select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,6 +34,17 @@ interface CompanyFormModalProps {
   company: Company | null;
   pendingCompanyId?: string | null;
   onSuccess?: () => void;
+}
+
+interface CompanyDuplicateMatch {
+  company: Company;
+  similarityScore: number;
+  matchReasons: string[];
+  matchDetails: {
+    nameMatch: number;
+    addressMatch: number;
+    overallConfidence: 'high' | 'medium' | 'low';
+  };
 }
 
 const companySizes = [
@@ -91,6 +103,12 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
   const [pendingContacts, setPendingContacts] = useState<Array<{contact: Contact, role?: string}>>([]);
   const [pendingContactsToCreate, setPendingContactsToCreate] = useState<Array<{data: any, role?: string}>>([]);
   const [pendingProperties, setPendingProperties] = useState<Property[]>([]);
+
+  // Duplicate detection state
+  const [duplicates, setDuplicates] = useState<CompanyDuplicateMatch[]>([]);
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+  const [pendingFormData, setPendingFormData] = useState<any>(null);
+  const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false);
 
   // Query to fetch linked contacts for existing company
   const { data: linkedContacts = [], refetch: refetchLinkedContacts } = useQuery<CompanyContactWithContact[]>({
@@ -472,8 +490,27 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
     },
   });
 
-  const onSubmit = (data: any) => {
-    
+  // Check for duplicate companies
+  const checkForDuplicates = async (name: string): Promise<CompanyDuplicateMatch[]> => {
+    try {
+      const params = new URLSearchParams({
+        name,
+        ...(address && { address }),
+        ...(city && { city }),
+        ...(state && { state }),
+        ...(zipCode && { zipCode }),
+        ...(company?.id && { excludeId: company.id }),
+      });
+      const response = await fetch(`/api/crm/companies/check-duplicates?${params}`);
+      const data = await response.json();
+      return data.duplicates || [];
+    } catch (error) {
+      console.error("Failed to check for duplicates:", error);
+      return [];
+    }
+  };
+
+  const onSubmit = async (data: any) => {
     // Validate required address fields
     if (!address.trim() || !city.trim() || !state.trim() || !zipCode.trim()) {
       toast({
@@ -489,8 +526,36 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
     } else if (company?.id) {
       updateCompanyMutation.mutate(data);
     } else {
-      createCompanyMutation.mutate(data);
+      // For new companies, check for duplicates first
+      setIsCheckingDuplicates(true);
+      const foundDuplicates = await checkForDuplicates(data.name);
+      setIsCheckingDuplicates(false);
+      
+      if (foundDuplicates.length > 0) {
+        // Show warning dialog with duplicates
+        setDuplicates(foundDuplicates);
+        setPendingFormData(data);
+        setShowDuplicateWarning(true);
+      } else {
+        // No duplicates found, proceed with creation
+        createCompanyMutation.mutate(data);
+      }
     }
+  };
+
+  const handleConfirmCreate = () => {
+    if (pendingFormData) {
+      createCompanyMutation.mutate(pendingFormData);
+      setShowDuplicateWarning(false);
+      setPendingFormData(null);
+      setDuplicates([]);
+    }
+  };
+
+  const handleCancelCreate = () => {
+    setShowDuplicateWarning(false);
+    setPendingFormData(null);
+    setDuplicates([]);
   };
 
   // Helper functions
@@ -619,7 +684,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
     setPendingProperties(pendingProperties.filter((_, i) => i !== index));
   };
 
-  const isLoading = createCompanyMutation.isPending || updateCompanyMutation.isPending || updatePendingCompanyMutation.isPending;
+  const isLoading = createCompanyMutation.isPending || updateCompanyMutation.isPending || updatePendingCompanyMutation.isPending || isCheckingDuplicates;
   const availableContacts = allContacts.filter((contact: Contact) => 
     !linkedContacts.some((linked: CompanyContactWithContact) => linked.contact.id === contact.id) &&
     !pendingContacts.some(pending => pending.contact.id === contact.id)
@@ -1422,6 +1487,55 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                 )}
           </TabsContent>
         </Tabs>
+
+        {/* Duplicate Warning Dialog */}
+        <AlertDialog open={showDuplicateWarning} onOpenChange={setShowDuplicateWarning}>
+          <AlertDialogContent className="max-w-lg">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-amber-500" />
+                Potential Duplicate Found
+              </AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-3">
+                  <p>We found {duplicates.length} existing {duplicates.length === 1 ? 'company' : 'companies'} that may be a duplicate:</p>
+                  <div className="max-h-48 overflow-y-auto space-y-2">
+                    {duplicates.map((match) => (
+                      <div key={match.company.id} className="p-3 border rounded-lg bg-muted/50">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">{match.company.name}</span>
+                          <Badge variant={
+                            match.matchDetails.overallConfidence === 'high' ? 'destructive' :
+                            match.matchDetails.overallConfidence === 'medium' ? 'default' : 'secondary'
+                          }>
+                            {match.similarityScore}% match
+                          </Badge>
+                        </div>
+                        {match.company.address && (
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {match.company.address}
+                            {match.company.city && `, ${match.company.city}`}
+                            {match.company.state && `, ${match.company.state}`}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {match.matchReasons.join(' • ')}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-sm">Do you still want to create a new company?</p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={handleCancelCreate}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmCreate}>
+                Create Anyway
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </StandardDialogShell>
   );
