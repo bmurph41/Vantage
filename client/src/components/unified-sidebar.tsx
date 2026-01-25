@@ -112,10 +112,7 @@ const marinalyticsNav = [
   { name: "Portfolio Analytics", href: "/analysis/marinalytics", icon: BarChart3 },
 ];
 
-// Integrations Navigation
-const integrationsNav = [
-  { name: "Marketplace", href: "/settings/integrations", icon: Plug },
-];
+// Integrations - direct link (no sub-navigation)
 
 type PendingItem = {
   id: string;
@@ -145,7 +142,6 @@ export default function UnifiedSidebar() {
   const [underwritingToolsExpanded, setUnderwritingToolsExpanded] = useState(false);
   const [investorServicesExpanded, setInvestorServicesExpanded] = useState(false);
   const [marinalyticsExpanded, setMarinalyticsExpanded] = useState(false);
-  const [integrationsExpanded, setIntegrationsExpanded] = useState(false);
   const [pendingExpanded, setPendingExpanded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
@@ -776,21 +772,19 @@ export default function UnifiedSidebar() {
           </div>
         )}
 
-        {/* Integrations Section */}
+        {/* Integrations - Direct Link */}
         <div className="mb-2">
-          <SectionHeader
-            title="Integrations"
-            expanded={integrationsExpanded}
-            onToggle={() => setIntegrationsExpanded(!integrationsExpanded)}
-            isActive={location.startsWith("/settings/integrations")}
-          />
-          {integrationsExpanded && (
-            <div className="ml-4 mt-1 mb-2">
-              {integrationsNav.map((item) => (
-                <NavLink key={item.name} item={item} />
-              ))}
+          <Link href="/settings/integrations">
+            <div className={cn(
+              "flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg cursor-pointer transition-colors",
+              location.startsWith("/settings/integrations")
+                ? "bg-blue-50 text-blue-700"
+                : "text-gray-700 hover:bg-gray-100"
+            )}>
+              <Plug className="w-4 h-4" />
+              {!sidebarCollapsed && <span>Integrations</span>}
             </div>
-          )}
+          </Link>
         </div>
       </nav>
       
