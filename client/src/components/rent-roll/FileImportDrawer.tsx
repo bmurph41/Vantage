@@ -55,25 +55,75 @@ type ImportPreview = {
 };
 
 const LEASE_FIELDS = [
-  { value: 'skip', label: 'Skip this column' },
-  { value: 'tenantName', label: 'Tenant Name' },
-  { value: 'tenantEmail', label: 'Tenant Email' },
-  { value: 'tenantPhone', label: 'Tenant Phone' },
-  { value: 'leaseType', label: 'Lease Type' },
-  { value: 'storageType', label: 'Storage Type' },
-  { value: 'startDate', label: 'Start Date' },
-  { value: 'endDate', label: 'End Date' },
-  { value: 'baseRent', label: 'Base Rent' },
-  { value: 'rentPeriod', label: 'Rent Period' },
-  { value: 'discountType', label: 'Discount Type' },
-  { value: 'discountValue', label: 'Discount Value' },
-  { value: 'slipNumber', label: 'Slip/Unit Number' },
-  { value: 'vesselName', label: 'Vessel Name' },
-  { value: 'vesselType', label: 'Vessel Type' },
-  { value: 'vesselLength', label: 'Vessel Length' },
-  { value: 'vesselBeam', label: 'Vessel Beam' },
-  { value: 'notes', label: 'Notes' },
+  { value: 'skip', label: 'Skip this column', required: false },
+  { value: 'tenantName', label: 'Tenant Name', required: true },
+  { value: 'tenantEmail', label: 'Tenant Email', required: false },
+  { value: 'tenantPhone', label: 'Tenant Phone', required: false },
+  { value: 'leaseType', label: 'Lease Type', required: false },
+  { value: 'storageType', label: 'Storage Type', required: false },
+  { value: 'startDate', label: 'Start Date', required: false },
+  { value: 'endDate', label: 'End Date', required: false },
+  { value: 'baseRent', label: 'Base Rent', required: false },
+  { value: 'rentPeriod', label: 'Rent Period', required: false },
+  { value: 'discountType', label: 'Discount Type', required: false },
+  { value: 'discountValue', label: 'Discount Value', required: false },
+  { value: 'slipNumber', label: 'Slip/Unit Number', required: false },
+  { value: 'vesselName', label: 'Vessel Name', required: false },
+  { value: 'vesselType', label: 'Vessel Type', required: false },
+  { value: 'vesselLength', label: 'Vessel Length', required: false },
+  { value: 'vesselBeam', label: 'Vessel Beam', required: false },
+  { value: 'notes', label: 'Notes', required: false },
 ];
+
+type MappingConfidence = 'high' | 'medium' | 'low' | 'none';
+
+function getMappingConfidence(header: string, targetField: string): MappingConfidence {
+  if (targetField === 'skip') return 'none';
+  const normalized = header.toLowerCase().replace(/[^a-z0-9]/g, '');
+  
+  const highConfidencePatterns: Record<string, string[]> = {
+    tenantName: ['tenantname', 'tenant', 'name', 'customer', 'renter', 'lessee'],
+    tenantEmail: ['email', 'mail', 'tenantemail'],
+    tenantPhone: ['phone', 'tel', 'mobile', 'cell', 'tenantphone'],
+    leaseType: ['leasetype', 'type', 'category'],
+    storageType: ['storagetype', 'storage'],
+    startDate: ['startdate', 'start', 'begin', 'leasestart', 'from'],
+    endDate: ['enddate', 'end', 'expire', 'expiry', 'leaseend', 'to'],
+    baseRent: ['rent', 'baserent', 'rate', 'monthly', 'amount', 'fee', 'price'],
+    rentPeriod: ['period', 'frequency', 'rentperiod', 'billing'],
+    slipNumber: ['slip', 'unit', 'dock', 'space', 'slip#', 'slipnumber', 'unitnumber'],
+    vesselName: ['vesselname', 'vessel', 'boatname', 'boat'],
+    vesselType: ['vesseltype', 'boattype'],
+    vesselLength: ['length', 'loa', 'vessellength', 'boatlength', 'ft'],
+    vesselBeam: ['beam', 'width', 'vesselbeam'],
+    notes: ['notes', 'comment', 'comments', 'memo', 'description'],
+  };
+
+  const patterns = highConfidencePatterns[targetField] || [];
+  
+  if (patterns.some(p => normalized === p)) return 'high';
+  if (patterns.some(p => normalized.includes(p))) return 'medium';
+  if (targetField !== 'skip' && patterns.length > 0) return 'low';
+  return 'none';
+}
+
+function getConfidenceColor(confidence: MappingConfidence): string {
+  switch (confidence) {
+    case 'high': return 'text-green-600 bg-green-50 border-green-200';
+    case 'medium': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+    case 'low': return 'text-orange-600 bg-orange-50 border-orange-200';
+    default: return 'text-muted-foreground bg-muted border-transparent';
+  }
+}
+
+function getConfidenceLabel(confidence: MappingConfidence): string {
+  switch (confidence) {
+    case 'high': return 'High match';
+    case 'medium': return 'Likely match';
+    case 'low': return 'Manual';
+    default: return 'Skipped';
+  }
+}
 
 function guessFieldMapping(header: string): string {
   const normalized = header.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -488,54 +538,126 @@ export function FileImportDrawer({
                     <TableRow>
                       <TableHead className="w-[200px]">Source Column</TableHead>
                       <TableHead className="w-[200px]">Map To</TableHead>
+                      <TableHead className="w-[100px]">Confidence</TableHead>
                       <TableHead>Sample Values</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {preview.headers.map((header, idx) => (
-                      <TableRow key={`col-${idx}`}>
-                        <TableCell className="font-medium">{header || `Column ${idx + 1}`}</TableCell>
-                        <TableCell>
-                          <Select 
-                            value={mappings[idx]} 
-                            onValueChange={(value) => updateMapping(idx, value)}
-                          >
-                            <SelectTrigger className="w-full" data-testid={`mapping-${idx}`}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {LEASE_FIELDS.map(field => (
-                                <SelectItem key={field.value} value={field.value}>
-                                  {field.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {preview.rows.slice(0, 3).map(row => row[idx] || '-').join(', ')}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {preview.headers.map((header, idx) => {
+                      const targetField = mappings[idx] || 'skip';
+                      const confidence = getMappingConfidence(header, targetField);
+                      return (
+                        <TableRow key={`col-${idx}`} className={targetField === 'skip' ? 'opacity-50' : ''}>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              {header || `Column ${idx + 1}`}
+                              {LEASE_FIELDS.find(f => f.value === targetField)?.required && (
+                                <Badge variant="outline" className="text-xs bg-red-50 text-red-600 border-red-200">Required</Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Select 
+                              value={targetField} 
+                              onValueChange={(value) => updateMapping(idx, value)}
+                            >
+                              <SelectTrigger className="w-full" data-testid={`mapping-${idx}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {LEASE_FIELDS.map(field => (
+                                  <SelectItem key={field.value} value={field.value}>
+                                    <span className="flex items-center gap-2">
+                                      {field.label}
+                                      {field.required && <span className="text-red-500">*</span>}
+                                    </span>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant="outline" 
+                              className={cn("text-xs border", getConfidenceColor(confidence))}
+                            >
+                              {confidence === 'high' && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                              {confidence === 'medium' && <AlertCircle className="h-3 w-3 mr-1" />}
+                              {getConfidenceLabel(confidence)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">
+                            {preview.rows.slice(0, 3).map(row => row[idx] || '-').join(' | ')}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-                <div className="text-sm">
-                  <span className="font-medium">{getMappedFieldsCount()}</span> of {preview.headers.length} columns mapped
+              <div className="p-4 bg-muted/50 rounded-lg space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4 text-sm">
+                    <div>
+                      <span className="font-medium">{getMappedFieldsCount()}</span> of {preview.headers.length} columns mapped
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs bg-green-50 text-green-600 border-green-200">
+                        {preview.headers.filter((header, idx) => {
+                          const targetField = mappings[idx] || 'skip';
+                          return getMappingConfidence(header, targetField) === 'high';
+                        }).length} High
+                      </Badge>
+                      <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-600 border-yellow-200">
+                        {preview.headers.filter((header, idx) => {
+                          const targetField = mappings[idx] || 'skip';
+                          return getMappingConfidence(header, targetField) === 'medium';
+                        }).length} Medium
+                      </Badge>
+                      <Badge variant="outline" className="text-xs bg-orange-50 text-orange-600 border-orange-200">
+                        {preview.headers.filter((header, idx) => {
+                          const targetField = mappings[idx] || 'skip';
+                          return getMappingConfidence(header, targetField) === 'low';
+                        }).length} Manual
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {!Object.values(mappings).includes('tenantName') && (
+                      <span className="text-red-500 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        Tenant Name mapping required
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => setStep('upload')}>
-                    Back
-                  </Button>
+                <div className="flex items-center justify-between">
                   <Button 
-                    onClick={handleStartImport}
-                    disabled={getMappedFieldsCount() === 0}
-                    data-testid="btn-start-import"
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => {
+                      const newMappings: Record<number, string> = {};
+                      preview.headers.forEach((_, idx) => {
+                        newMappings[idx] = 'skip';
+                      });
+                      setMappings(newMappings);
+                    }}
                   >
-                    Import {preview.totalRows} Rows
+                    Clear All
                   </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setStep('upload')}>
+                      Back
+                    </Button>
+                    <Button 
+                      onClick={handleStartImport}
+                      disabled={getMappedFieldsCount() === 0 || !Object.values(mappings).includes('tenantName')}
+                      data-testid="btn-start-import"
+                    >
+                      Import {preview.totalRows} Rows
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
