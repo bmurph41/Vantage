@@ -239,10 +239,17 @@ export default function CompanyDetailModal({
   // Link property to company mutation
   const linkPropertyMutation = useMutation({
     mutationFn: async ({ propertyId, relationship }: { propertyId: string; relationship: string }) => {
-      return await apiRequest('POST', `/api/properties/${propertyId}/companies`, { 
-        companyId: company?.id, 
+      if (!company?.id) {
+        throw new Error("Company ID is required");
+      }
+      if (!propertyId) {
+        throw new Error("Property ID is required");
+      }
+      const response = await apiRequest('POST', `/api/properties/${propertyId}/companies`, { 
+        companyId: company.id, 
         relationship 
       });
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/companies', company?.id, 'properties'] });
@@ -251,8 +258,13 @@ export default function CompanyDetailModal({
       setSelectedPropertyToLink("");
       toast({ title: "Property linked successfully" });
     },
-    onError: () => {
-      toast({ title: "Failed to link property", variant: "destructive" });
+    onError: (error: any) => {
+      console.error("Link property error:", error);
+      toast({ 
+        title: "Failed to link property", 
+        description: error?.message || "An error occurred",
+        variant: "destructive" 
+      });
     },
   });
 
