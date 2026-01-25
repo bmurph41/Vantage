@@ -266,6 +266,7 @@ export const rssSources = pgTable("docktalk_rss_sources", {
   url: text("url").notNull().unique(),
   sourceType: sourceTypeEnum("source_type").notNull().default("rss"),
   isActive: boolean("is_active").default(true),
+  isTrustedSource: boolean("is_trusted_source").default(false),
   minRelevanceScore: integer("min_relevance_score").default(50),
   customKeywords: text("custom_keywords").array(),
   lastFetched: timestamp("last_fetched"),

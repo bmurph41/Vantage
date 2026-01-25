@@ -68,7 +68,7 @@ export async function fetchRssFeeds(): Promise<number> {
           
           for (const article of articles) {
             if (validateScrapedArticle(article)) {
-              const newArticles = await processScrapedArticle(article, source.name);
+              const newArticles = await processScrapedArticle(article, source.name, !!source.isTrustedSource);
               totalNewArticles += newArticles;
             }
           }
@@ -79,7 +79,7 @@ export async function fetchRssFeeds(): Promise<number> {
           const feed = await parser.parseURL(source.url);
           
           for (const item of feed.items || []) {
-            const newArticles = await processRssItem(item, source.name, source.customKeywords);
+            const newArticles = await processRssItem(item, source.name, source.customKeywords, !!source.isTrustedSource);
             totalNewArticles += newArticles;
           }
           
@@ -99,7 +99,7 @@ export async function fetchRssFeeds(): Promise<number> {
   }
 }
 
-async function processScrapedArticle(article: ScrapedArticle, sourceName: string): Promise<number> {
+async function processScrapedArticle(article: ScrapedArticle, sourceName: string, isTrustedSource: boolean = false): Promise<number> {
   try {
     if (!article.url || !article.title) {
       return 0;
@@ -123,7 +123,8 @@ async function processScrapedArticle(article: ScrapedArticle, sourceName: string
     
     const relevanceScore = await scoreArticleAsync(title, content, sourceName);
     
-    if (relevanceScore < 40) { // Increased threshold from 25 to 40 to reduce irrelevant articles
+    // Skip low relevance articles UNLESS this is a trusted source (show all articles from trusted sources)
+    if (!isTrustedSource && relevanceScore < 40) {
       return 0;
     }
 
@@ -350,7 +351,7 @@ async function processScrapedArticle(article: ScrapedArticle, sourceName: string
   }
 }
 
-async function processRssItem(item: FeedItem, sourceName: string, customKeywords?: string[] | null): Promise<number> {
+async function processRssItem(item: FeedItem, sourceName: string, customKeywords?: string[] | null, isTrustedSource: boolean = false): Promise<number> {
   try {
     const url = item.link || item.guid;
     if (!url || !item.title) {
@@ -367,6 +368,7 @@ async function processRssItem(item: FeedItem, sourceName: string, customKeywords
     const title = item.title;
     
     // Check custom keyword filter (for sources like Yahoo Finance that need marina-specific filtering)
+    // Note: Custom keywords still apply even for trusted sources to maintain source-specific filtering
     if (!matchesCustomKeywords(title, content, customKeywords || null)) {
       return 0;
     }
@@ -374,8 +376,8 @@ async function processRssItem(item: FeedItem, sourceName: string, customKeywords
     // Score article for relevance
     const relevanceScore = await scoreArticleAsync(title, content, sourceName);
     
-    // Skip low relevance articles (lowered threshold to capture more marina content)
-    if (relevanceScore < 40) { // Increased threshold from 25 to 40 to reduce irrelevant articles
+    // Skip low relevance articles UNLESS this is a trusted source (show all articles from trusted sources)
+    if (!isTrustedSource && relevanceScore < 40) {
       return 0;
     }
 
