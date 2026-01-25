@@ -22531,3 +22531,70 @@ export type ValuatorProjectContext = typeof valuatorProjectContext.$inferSelect;
 export type InsertValuatorProjectContext = z.infer<typeof insertValuatorProjectContextSchema>;
 
 export * from "./models/auth";
+
+// ============================================================================
+// DOCKTALK_KEYWORD_BANK - Configurable keywords for article filtering
+// ============================================================================
+export const docktalkKeywordCategoryEnum = pgEnum('docktalk_keyword_category', [
+  'marina',
+  'investment', 
+  'operations',
+  'macro',
+  'regulatory',
+  'required'  // Keywords that MUST appear for article to be included
+]);
+
+export const docktalkKeywordBank = pgTable('docktalk_keyword_bank', {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  keyword: varchar("keyword", { length: 100 }).notNull(),
+  category: docktalkKeywordCategoryEnum("category").notNull().default('marina'),
+  weight: integer("weight").notNull().default(5), // Scoring weight (1-10)
+  isActive: boolean("is_active").notNull().default(true),
+  isRequired: boolean("is_required").notNull().default(false), // If true, article must match at least one required keyword
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('docktalk_keyword_bank_org_idx').on(table.orgId),
+  categoryIdx: index('docktalk_keyword_bank_category_idx').on(table.category),
+  keywordIdx: index('docktalk_keyword_bank_keyword_idx').on(table.keyword),
+}));
+
+// ============================================================================
+// DOCKTALK_SCORING_CONFIG - Global scoring configuration per organization
+// ============================================================================
+export const docktalkScoringConfig = pgTable('docktalk_scoring_config', {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().unique().references(() => organizations.id, { onDelete: "cascade" }),
+  minimumScore: integer("minimum_score").notNull().default(40), // Minimum score to include article (0-100)
+  requireKeywordMatch: boolean("require_keyword_match").notNull().default(true), // Require at least one keyword match
+  requireRequiredKeyword: boolean("require_required_keyword").notNull().default(true), // Require at least one "required" category keyword
+  marinaWeight: integer("marina_weight").notNull().default(8),
+  investmentWeight: integer("investment_weight").notNull().default(5),
+  operationsWeight: integer("operations_weight").notNull().default(4),
+  macroWeight: integer("macro_weight").notNull().default(3),
+  regulatoryWeight: integer("regulatory_weight").notNull().default(3),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('docktalk_scoring_config_org_idx').on(table.orgId),
+}));
+
+// Insert/Select schemas for keyword bank
+export const insertDocktalkKeywordBankSchema = createInsertSchema(docktalkKeywordBank).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertDocktalkKeywordBank = z.infer<typeof insertDocktalkKeywordBankSchema>;
+export type DocktalkKeywordBank = typeof docktalkKeywordBank.$inferSelect;
+
+// Insert/Select schemas for scoring config
+export const insertDocktalkScoringConfigSchema = createInsertSchema(docktalkScoringConfig).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertDocktalkScoringConfig = z.infer<typeof insertDocktalkScoringConfigSchema>;
+export type DocktalkScoringConfig = typeof docktalkScoringConfig.$inferSelect;
