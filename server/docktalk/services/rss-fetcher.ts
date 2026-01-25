@@ -1,7 +1,7 @@
 import Parser from "rss-parser";
 import * as cheerio from "cheerio";
 import { storage } from "../storage";
-import { scoreArticle } from "./scoring";
+import { scoreArticle, scoreArticleAsync } from "./scoring";
 import { categorizeAndTag } from "./categorizer";
 import { summarizeArticle } from "./ai-summarizer";
 import { enrichArticle } from "./ai-enrichment";
@@ -121,7 +121,7 @@ async function processScrapedArticle(article: ScrapedArticle, sourceName: string
     
     const title = article.title;
     
-    const relevanceScore = scoreArticle(title, content, sourceName);
+    const relevanceScore = await scoreArticleAsync(title, content, sourceName);
     
     if (relevanceScore < 40) { // Increased threshold from 25 to 40 to reduce irrelevant articles
       return 0;
@@ -372,7 +372,7 @@ async function processRssItem(item: FeedItem, sourceName: string, customKeywords
     }
     
     // Score article for relevance
-    const relevanceScore = scoreArticle(title, content, sourceName);
+    const relevanceScore = await scoreArticleAsync(title, content, sourceName);
     
     // Skip low relevance articles (lowered threshold to capture more marina content)
     if (relevanceScore < 40) { // Increased threshold from 25 to 40 to reduce irrelevant articles
