@@ -686,4 +686,55 @@ router.get("/audit-log", async (req: AuthenticatedRequest, res) => {
   }
 });
 
+// Find matching sales/rate comps based on modeling project criteria
+router.get("/modeling-projects/:projectId/find-matching-comps", async (req: AuthenticatedRequest, res) => {
+  try {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+    
+    const { projectId } = req.params;
+    const { compType } = req.query;
+    
+    validateUUID(projectId, 'projectId');
+    
+    if (compType !== 'sales' && compType !== 'rate') {
+      throw new ValidationError("compType must be 'sales' or 'rate'");
+    }
+    
+    // Get the modeling project to extract matching criteria
+    const project = await integrationStorage.getModelingProject(projectId, auth.orgId);
+    if (!project) {
+      throw new NotFoundError("Modeling project not found");
+    }
+    
+    const criteria = {
+      state: project.state,
+      region: project.region,
+      city: project.city,
+      totalSlips: project.totalStorageUnits,
+    };
+    
+    let matchingComps;
+    if (compType === 'sales') {
+      matchingComps = await integrationStorage.findMatchingSalesComps(auth.orgId, criteria);
+    } else {
+      matchingComps = await integrationStorage.findMatchingRateComps(auth.orgId, criteria);
+    }
+    
+    res.json({
+      projectCriteria: {
+        state: project.state,
+        region: project.region,
+        city: project.city,
+        totalSlips: project.totalStorageUnits,
+        marinaName: project.marinaName,
+      },
+      matches: matchingComps,
+      totalMatches: matchingComps.length,
+    });
+  } catch (error: any) {
+    handleError(error, res, "finding matching comps");
+  }
+});
+
 export default router;

@@ -538,6 +538,174 @@ export class IntegrationStorage implements IIntegrationStorage {
 
     return query;
   }
+
+  // ============================================================================
+  // COMP MATCHING / SEARCH
+  // ============================================================================
+
+  async findMatchingSalesComps(
+    orgId: string,
+    criteria: {
+      state?: string;
+      region?: string;
+      totalSlips?: number;
+      city?: string;
+    }
+  ): Promise<Array<any & { relevanceScore: number }>> {
+    const allComps = await db
+      .select()
+      .from(salesComps)
+      .where(eq(salesComps.orgId, orgId));
+
+    return allComps
+      .map(comp => {
+        let score = 0;
+        const reasons: string[] = [];
+
+        // Same state: +40 points
+        if (criteria.state && comp.state?.toLowerCase() === criteria.state.toLowerCase()) {
+          score += 40;
+          reasons.push('same_state');
+        }
+        // Same region: +25 points
+        else if (criteria.region && comp.region?.toLowerCase() === criteria.region.toLowerCase()) {
+          score += 25;
+          reasons.push('same_region');
+        }
+
+        // Same city: +15 points bonus
+        if (criteria.city && comp.city?.toLowerCase() === criteria.city.toLowerCase()) {
+          score += 15;
+          reasons.push('same_city');
+        }
+
+        // Size similarity (within 30%): +30 points
+        if (criteria.totalSlips && criteria.totalSlips > 0) {
+          const compSlips = (comp.wetSlips || 0) + (comp.dryRacks || 0);
+          if (compSlips > 0) {
+            const sizeDiff = Math.abs(compSlips - criteria.totalSlips) / criteria.totalSlips;
+            if (sizeDiff <= 0.1) {
+              score += 30;
+              reasons.push('similar_size');
+            } else if (sizeDiff <= 0.3) {
+              score += 20;
+              reasons.push('comparable_size');
+            } else if (sizeDiff <= 0.5) {
+              score += 10;
+              reasons.push('rough_size_match');
+            }
+          }
+        }
+
+        // Has sale price: +5 bonus
+        if (comp.salePrice) {
+          score += 5;
+          reasons.push('has_price');
+        }
+
+        // Recent sale (last 5 years): +10 bonus
+        const currentYear = new Date().getFullYear();
+        if (comp.saleYear && comp.saleYear >= currentYear - 5) {
+          score += 10;
+          reasons.push('recent_sale');
+        }
+
+        return {
+          ...comp,
+          relevanceScore: Math.min(100, score),
+          matchReasons: reasons,
+        };
+      })
+      .filter(comp => comp.relevanceScore >= 20)
+      .sort((a, b) => b.relevanceScore - a.relevanceScore)
+      .slice(0, 25);
+  }
+
+  async findMatchingRateComps(
+    orgId: string,
+    criteria: {
+      state?: string;
+      region?: string;
+      totalSlips?: number;
+      city?: string;
+    }
+  ): Promise<Array<any & { relevanceScore: number }>> {
+    const allComps = await db
+      .select()
+      .from(rateComps)
+      .where(eq(rateComps.orgId, orgId));
+
+    return allComps
+      .map((comp: any) => {
+        let score = 0;
+        const reasons: string[] = [];
+
+        // Same state: +40 points
+        if (criteria.state && comp.state?.toLowerCase() === criteria.state.toLowerCase()) {
+          score += 40;
+          reasons.push('same_state');
+        }
+        // Same region: +25 points
+        else if (criteria.region && comp.region?.toLowerCase() === criteria.region.toLowerCase()) {
+          score += 25;
+          reasons.push('same_region');
+        }
+
+        // Same city: +15 points bonus
+        if (criteria.city && comp.city?.toLowerCase() === criteria.city.toLowerCase()) {
+          score += 15;
+          reasons.push('same_city');
+        }
+
+        // Size similarity: +30 points
+        if (criteria.totalSlips && criteria.totalSlips > 0) {
+          const compSlips = comp.totalSlips || 0;
+          if (compSlips > 0) {
+            const sizeDiff = Math.abs(compSlips - criteria.totalSlips) / criteria.totalSlips;
+            if (sizeDiff <= 0.1) {
+              score += 30;
+              reasons.push('similar_size');
+            } else if (sizeDiff <= 0.3) {
+              score += 20;
+              reasons.push('comparable_size');
+            } else if (sizeDiff <= 0.5) {
+              score += 10;
+              reasons.push('rough_size_match');
+            }
+          }
+        }
+
+        // Has rate data: +10 bonus
+        if (comp.averageRate) {
+          score += 10;
+          reasons.push('has_rate');
+        }
+
+        // Has occupancy data: +5 bonus
+        if (comp.occupancyRate) {
+          score += 5;
+          reasons.push('has_occupancy');
+        }
+
+        return {
+          ...comp,
+          relevanceScore: Math.min(100, score),
+          matchReasons: reasons,
+        };
+      })
+      .filter((comp: any) => comp.relevanceScore >= 20)
+      .sort((a: any, b: any) => b.relevanceScore - a.relevanceScore)
+      .slice(0, 25);
+  }
+
+  async getModelingProject(projectId: string, orgId: string): Promise<any | null> {
+    const [project] = await db
+      .select()
+      .from(modelingProjects)
+      .where(and(eq(modelingProjects.id, projectId), eq(modelingProjects.orgId, orgId)))
+      .limit(1);
+    return project || null;
+  }
 }
 
 export const integrationStorage = new IntegrationStorage();
