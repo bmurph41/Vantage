@@ -137,7 +137,7 @@ type BootstrapData = {
 
 export default function UnifiedSidebar() {
   const [location] = useLocation();
-  const [operationsExpanded, setOperationsExpanded] = useState(true); // Default expanded for Operations
+  const [operationsExpanded, setOperationsExpanded] = useState(false); // Default collapsed for Operations
   const [crmExpanded, setCrmExpanded] = useState(false);
   const [pipelineExpanded, setPipelineExpanded] = useState(false); // Pipeline deals section
   const [prospectingExpanded, setProspectingExpanded] = useState(false); // Prospecting, Analytics
