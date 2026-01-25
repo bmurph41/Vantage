@@ -133,7 +133,7 @@ export default function IntegrationsMarketplace() {
               <Plug className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">Integrations Marketplace</h1>
+              <h1 className="text-2xl font-bold">Integrations</h1>
               <p className="text-muted-foreground">
                 Connect your marina software to consolidate operations in MarinaMatch
               </p>
