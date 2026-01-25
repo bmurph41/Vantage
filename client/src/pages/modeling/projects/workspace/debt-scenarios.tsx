@@ -24,6 +24,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { DebtScenario, ModelingProject } from "@shared/schema";
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
+import { MarketRatePicker, CurrentRateBadge } from '@/components/modeling/MarketRatePicker';
 
 interface WorkspaceDebtScenariosProps {
   projectId: string;
@@ -673,7 +674,32 @@ export default function WorkspaceDebtScenarios({ projectId, onTabChange }: Works
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Base Rate</Label>
+                  <div className="flex items-center justify-between">
+                    <Label>Base Rate</Label>
+                    <MarketRatePicker 
+                      compact
+                      filterRateTypes={['sofr', 'treasury', 'prime', 'fed_funds']}
+                      onSelectRate={(rate, label) => {
+                        const spreadVal = parseInt(inputs.spreadBps) || 0;
+                        const allInRate = rate + (spreadVal / 100);
+                        if (label.includes('SOFR')) {
+                          updateInput('baseRate', label.includes('90') ? 'SOFR90DAYAVG' : label.includes('30') ? 'SOFR30DAYAVG' : 'SOFR');
+                        } else if (label.includes('Prime')) {
+                          updateInput('baseRate', 'DPRIME');
+                        } else if (label.includes('Fed')) {
+                          updateInput('baseRate', 'DFF');
+                        } else if (label.includes('2-Year')) {
+                          updateInput('baseRate', 'DGS2');
+                        } else if (label.includes('5-Year')) {
+                          updateInput('baseRate', 'DGS5');
+                        } else if (label.includes('10-Year')) {
+                          updateInput('baseRate', 'DGS10');
+                        } else if (label.includes('30-Year')) {
+                          updateInput('baseRate', 'DGS30');
+                        }
+                      }}
+                    />
+                  </div>
                   <Select value={inputs.baseRate} onValueChange={(v) => updateInput('baseRate', v)}>
                     <SelectTrigger data-testid="select-base-rate">
                       <SelectValue />
@@ -684,6 +710,11 @@ export default function WorkspaceDebtScenarios({ projectId, onTabChange }: Works
                       ))}
                     </SelectContent>
                   </Select>
+                  <CurrentRateBadge 
+                    rateType={inputs.baseRate === 'SOFR' || inputs.baseRate.includes('SOFR') ? 'sofr' : inputs.baseRate === 'DPRIME' ? 'prime' : inputs.baseRate === 'DFF' ? 'fed_funds' : 'treasury'}
+                    tenor={inputs.baseRate.includes('DGS2') ? '2y' : inputs.baseRate.includes('DGS5') ? '5y' : inputs.baseRate.includes('DGS10') ? '10y' : inputs.baseRate.includes('DGS30') ? '30y' : inputs.baseRate === 'SOFR30DAYAVG' ? '1m' : inputs.baseRate === 'SOFR90DAYAVG' ? '3m' : 'overnight'}
+                    className="mt-1"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Spread (bps)</Label>

@@ -34,6 +34,7 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { cn } from '@/lib/utils';
 import debounce from 'lodash.debounce';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
+import { MarketRatePicker, MarketRateContext } from '@/components/modeling/MarketRatePicker';
 
 interface DCFScenario {
   id: string;
@@ -262,7 +263,18 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
             </div>
 
             <div className="space-y-2">
-              <Label>Discount Rate</Label>
+              <div className="flex items-center justify-between">
+                <Label>Discount Rate</Label>
+                <MarketRatePicker 
+                  compact
+                  filterRateTypes={['treasury']}
+                  onSelectRate={(rate, label) => {
+                    const riskPremium = 4;
+                    handleInputChange('discountRate', rate + riskPremium);
+                  }}
+                  buttonLabel="Risk-Free + Premium"
+                />
+              </div>
               <div className="flex items-center gap-2">
                 <Slider
                   value={[liveInputs.discountRate]}
@@ -274,6 +286,12 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                 />
                 <span className="text-sm w-12 text-right">{liveInputs.discountRate}%</span>
               </div>
+              <MarketRateContext 
+                currentRate={liveInputs.discountRate}
+                rateType="treasury"
+                tenor="10y"
+                className="mt-1"
+              />
             </div>
 
             <div className="space-y-2">

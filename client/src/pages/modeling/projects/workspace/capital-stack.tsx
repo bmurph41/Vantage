@@ -50,6 +50,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { CapitalStack, DebtTranche, EquityLayer, CapitalStackProjection, Fund, FundDealAllocation, FundCapitalStackTemplate } from '@shared/schema';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
+import { MarketRatePicker } from '@/components/modeling/MarketRatePicker';
 
 interface CapitalStackWorkspaceProps {
   projectId: string;
@@ -1503,7 +1504,16 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                               <div className="grid grid-cols-3 gap-4">
                                 <FormField control={debtForm.control} name="interestRate" render={({ field }) => (
                                   <FormItem>
-                                    <FormLabel>{debtForm.watch('indexRate') === 'fixed' ? 'Interest Rate *' : 'All-In Rate *'}</FormLabel>
+                                    <div className="flex items-center justify-between">
+                                      <FormLabel>{debtForm.watch('indexRate') === 'fixed' ? 'Interest Rate *' : 'All-In Rate *'}</FormLabel>
+                                      <MarketRatePicker 
+                                        compact
+                                        onSelectRate={(rate, label) => {
+                                          field.onChange((rate / 100).toFixed(4));
+                                        }}
+                                        currentValue={parseFloat(field.value) * 100}
+                                      />
+                                    </div>
                                     <FormControl><Input {...field} type="number" step="0.0001" placeholder="0.065" /></FormControl>
                                     <FormDescription>As decimal (e.g., 0.065 = 6.5%)</FormDescription>
                                     <FormMessage />

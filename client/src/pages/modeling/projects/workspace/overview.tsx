@@ -23,6 +23,7 @@ import {
 import type { ModelingProject } from '@shared/schema';
 import { LiveDataStatusPanel } from '@/components/modeling/LiveDataStatusPanel';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
+import { MarketRatesSummary } from '@/components/modeling/MarketRatesSummary';
 
 interface WorkspaceOverviewProps {
   project: ModelingProject;
@@ -306,6 +307,8 @@ export default function WorkspaceOverview({ project, onTabChange }: WorkspaceOve
           </CardContent>
         </Card>
       </div>
+
+      <MarketRatesSummary />
 
       <LiveDataStatusPanel 
         projectId={project.id} 
