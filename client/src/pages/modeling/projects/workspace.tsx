@@ -35,8 +35,7 @@ import {
   Activity,
   Tornado,
   AlertTriangle,
-  Fuel,
-  ShoppingCart
+  Store
 } from 'lucide-react';
 import type { ModelingProject } from '@shared/schema';
 import { FavoriteButton, PinButton } from '@/components/quick-access';
@@ -71,9 +70,7 @@ import ScenarioComparisonCharts from './workspace/scenario-comparison-charts';
 import ExportModel from './workspace/export-model';
 import SensitivityTornado from './workspace/sensitivity-tornado';
 import ValidationWarnings from './workspace/validation-warnings';
-import ValuatorFuelSalesTab from './workspace/valuator-fuel-sales';
-import ValuatorShipStoreTab from './workspace/valuator-ship-store';
-import ValuatorOperationsSummary from './workspace/valuator-operations-summary';
+import ValuatorProfitCenters from './workspace/valuator-profit-centers';
 
 export default function ProjectWorkspace() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -306,7 +303,7 @@ export default function ProjectWorkspace() {
               <span className="hidden sm:inline">Rent Roll</span>
             </TabsTrigger>
             <TabsTrigger value="profit" className="gap-2" data-testid="tab-profit">
-              <Anchor className="h-4 w-4" />
+              <Store className="h-4 w-4" />
               <span className="hidden sm:inline">Profit Ctrs</span>
             </TabsTrigger>
             <TabsTrigger value="dcf" className="gap-2" data-testid="tab-dcf">
@@ -336,18 +333,6 @@ export default function ProjectWorkspace() {
             <TabsTrigger value="export" className="gap-2" data-testid="tab-export">
               <FileSpreadsheet className="h-4 w-4" />
               <span className="hidden sm:inline">Export</span>
-            </TabsTrigger>
-            <TabsTrigger value="ops-fuel" className="gap-2" data-testid="tab-ops-fuel">
-              <Fuel className="h-4 w-4" />
-              <span className="hidden sm:inline">Fuel</span>
-            </TabsTrigger>
-            <TabsTrigger value="ops-store" className="gap-2" data-testid="tab-ops-store">
-              <ShoppingCart className="h-4 w-4" />
-              <span className="hidden sm:inline">Store</span>
-            </TabsTrigger>
-            <TabsTrigger value="ops-summary" className="gap-2" data-testid="tab-ops-summary">
-              <BarChart3 className="h-4 w-4" />
-              <span className="hidden sm:inline">Ops Summary</span>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -425,7 +410,7 @@ export default function ProjectWorkspace() {
         </TabsContent>
 
         <TabsContent value="profit" className="space-y-6">
-          <ProfitCentersPage />
+          <ValuatorProfitCenters projectId={projectId!} projectName={project.marinaName} />
         </TabsContent>
 
         <TabsContent value="dcf" className="space-y-6">
@@ -454,18 +439,6 @@ export default function ProjectWorkspace() {
 
         <TabsContent value="export" className="space-y-6">
           <ExportModel projectId={projectId!} projectName={project.marinaName} onTabChange={setActiveTab} />
-        </TabsContent>
-
-        <TabsContent value="ops-fuel" className="space-y-6">
-          <ValuatorFuelSalesTab projectId={projectId!} projectName={project.marinaName} />
-        </TabsContent>
-
-        <TabsContent value="ops-store" className="space-y-6">
-          <ValuatorShipStoreTab projectId={projectId!} projectName={project.marinaName} />
-        </TabsContent>
-
-        <TabsContent value="ops-summary" className="space-y-6">
-          <ValuatorOperationsSummary projectId={projectId!} projectName={project.marinaName} />
         </TabsContent>
       </Tabs>
     </div>
