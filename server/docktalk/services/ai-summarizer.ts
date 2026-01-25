@@ -8,11 +8,17 @@ const openai = new OpenAI({
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY_ENV_VAR || "";
 
 export async function summarizeArticle(text: string): Promise<string> {
-  const prompt = `Summarize this marina industry article in 2-3 sentences for marina investors and operators. Focus on:
-1. Marina relevance and implications
-2. Investment/business impact
-3. Operational considerations
-4. Key financial or strategic details
+  const prompt = `Create a 1-2 sentence summary of this marina industry article for marina investors and operators.
+
+IMPORTANT: Start the summary with an action verb like "Discusses", "Covers", "Explores", "Examines", "Reports on", "Highlights", "Announces", "Reviews", or "Details".
+
+Examples of good summaries:
+- "Discusses the upcoming New York and Minneapolis Boat Shows and key industry trends expected."
+- "Covers the recent acquisition of Belfast Marine by Safe Harbor Marinas, including deal terms."
+- "Explores rising marina valuations in the Southeast region and factors driving growth."
+- "Reports on new environmental regulations affecting marina operations in coastal states."
+
+Focus on the key news, event, deal, or trend - be specific about names, locations, and companies when mentioned.
 
 Text: ${text.slice(0, 6000)}`;
 
@@ -24,7 +30,7 @@ Text: ${text.slice(0, 6000)}`;
         messages: [
           {
             role: "system",
-            content: "You are a marina industry expert who creates concise, actionable summaries for marina investors and operators."
+            content: "You are a marina industry expert who creates concise 1-2 sentence summaries. Always start with an action verb like 'Discusses', 'Covers', 'Explores', 'Reports on', or 'Announces'. Be specific about names, companies, and locations."
           },
           {
             role: "user",
@@ -52,7 +58,7 @@ Text: ${text.slice(0, 6000)}`;
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
           max_tokens: 200,
-          system: "You are a marina industry expert who creates concise, actionable summaries for marina investors and operators.",
+          system: "You are a marina industry expert who creates concise 1-2 sentence summaries. Always start with an action verb like 'Discusses', 'Covers', 'Explores', 'Reports on', or 'Announces'. Be specific about names, companies, and locations.",
           messages: [
             {
               role: "user",
@@ -72,7 +78,11 @@ Text: ${text.slice(0, 6000)}`;
 
   // Fallback to basic extraction if no AI is available
   const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 20);
-  return sentences.slice(0, 2).join(". ") + ".";
+  const firstSentence = sentences[0]?.trim() || "";
+  if (firstSentence) {
+    return `Discusses ${firstSentence.charAt(0).toLowerCase()}${firstSentence.slice(1)}.`;
+  }
+  return "Covers marina industry news and developments.";
 }
 
 export async function analyzeMarketSentiment(text: string): Promise<{
