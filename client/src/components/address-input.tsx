@@ -235,13 +235,6 @@ export function AddressInput({
           );
         }
         
-        toast({
-          title: 'Address Autocomplete Unavailable',
-          description: isReferrerIssue 
-            ? 'API key restriction detected. Check console for details.'
-            : 'Using manual address entry instead.',
-          variant: 'default',
-        });
       } finally {
         setIsLoading(false);
       }
