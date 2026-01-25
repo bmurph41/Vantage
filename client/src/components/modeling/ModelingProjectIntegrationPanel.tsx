@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   TrendingUp, DollarSign, Building2, MapPin, Calendar, Trash2, Plus, Search,
-  Link2, Star, Anchor, PercentIcon, Weight, CheckCircle, ExternalLink
+  Link2, Star, Anchor, PercentIcon, Weight, CheckCircle, ExternalLink, Sparkles
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -152,20 +152,211 @@ function LinkedCompCard({ compLink, onUnlink }: {
   );
 }
 
-function LinkCompModal({ isOpen, onClose, projectId, compType }: {
+function FindCompsModal({ isOpen, onClose, projectId, compType, onLinkComp }: {
   isOpen: boolean;
   onClose: () => void;
   projectId: string;
   compType: "sales" | "rate";
+  onLinkComp: (compId: string) => void;
+}) {
+  const { toast } = useToast();
+
+  const { data, isLoading, error } = useQuery<{
+    projectCriteria: { state: string; region: string; city: string; totalSlips: number; marinaName: string };
+    matches: Array<any & { relevanceScore: number; matchReasons: string[] }>;
+    totalMatches: number;
+  }>({
+    queryKey: [`/api/integration/modeling-projects/${projectId}/find-matching-comps`, compType],
+    queryFn: async () => {
+      const res = await fetch(`/api/integration/modeling-projects/${projectId}/find-matching-comps?compType=${compType}`);
+      if (!res.ok) throw new Error('Failed to find matching comps');
+      return res.json();
+    },
+    enabled: isOpen,
+  });
+
+  const getReasonLabel = (reason: string) => {
+    const labels: Record<string, string> = {
+      same_state: 'Same State',
+      same_region: 'Same Region',
+      same_city: 'Same City',
+      similar_size: 'Similar Size',
+      comparable_size: 'Comparable Size',
+      rough_size_match: 'Rough Size Match',
+      has_price: 'Has Price',
+      has_rate: 'Has Rate',
+      has_occupancy: 'Has Occupancy',
+      recent_sale: 'Recent Sale',
+    };
+    return labels[reason] || reason;
+  };
+
+  const getScoreColor = (score: number) => {
+    if (score >= 70) return 'bg-green-100 text-green-800 border-green-300';
+    if (score >= 50) return 'bg-blue-100 text-blue-800 border-blue-300';
+    if (score >= 30) return 'bg-amber-100 text-amber-800 border-amber-300';
+    return 'bg-gray-100 text-gray-600 border-gray-300';
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-3xl max-h-[85vh]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-amber-500" />
+            Find Matching {compType === "sales" ? "Sales" : "Rate"} Comps
+          </DialogTitle>
+          <DialogDescription>
+            {data?.projectCriteria && (
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <span className="text-gray-600">Matching criteria for</span>
+                <Badge variant="outline">{data.projectCriteria.marinaName}</Badge>
+                {data.projectCriteria.city && <Badge variant="secondary">{data.projectCriteria.city}</Badge>}
+                {data.projectCriteria.state && <Badge variant="secondary">{data.projectCriteria.state}</Badge>}
+                {data.projectCriteria.totalSlips && <Badge variant="secondary">{data.projectCriteria.totalSlips} slips</Badge>}
+              </div>
+            )}
+          </DialogDescription>
+        </DialogHeader>
+
+        <ScrollArea className="h-[400px] border rounded-md">
+          {isLoading ? (
+            <div className="p-4 space-y-2">
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-20 w-full" />
+              ))}
+            </div>
+          ) : error ? (
+            <div className="p-8 text-center text-red-500">
+              Failed to find matching comps. Please try again.
+            </div>
+          ) : !data?.matches?.length ? (
+            <div className="p-8 text-center text-gray-500">
+              <Search className="w-10 h-10 mx-auto mb-2 opacity-50" />
+              <p className="text-sm font-medium">No matching {compType} comps found</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Try adding more comps to your database or adjust your project location/size
+              </p>
+            </div>
+          ) : (
+            <div className="p-3 space-y-3">
+              {data.matches.map((comp) => (
+                <div
+                  key={comp.id}
+                  className="p-4 rounded-lg border bg-white hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        {compType === "sales" ? (
+                          <Building2 className="w-4 h-4 text-blue-600" />
+                        ) : (
+                          <TrendingUp className="w-4 h-4 text-green-600" />
+                        )}
+                        <span className="font-semibold text-sm">
+                          {comp.marina || comp.marinaName || "Unnamed Marina"}
+                        </span>
+                        <Badge className={`text-xs ${getScoreColor(comp.relevanceScore)}`}>
+                          {comp.relevanceScore}% Match
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs text-gray-600 mb-2">
+                        <div className="flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          <span>{comp.city}, {comp.state || "N/A"}</span>
+                        </div>
+                        {compType === "sales" ? (
+                          <>
+                            <div className="flex items-center gap-1">
+                              <DollarSign className="w-3 h-3" />
+                              <span>{comp.salePrice ? formatCurrency(comp.salePrice) : "Not disclosed"}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              <span>{comp.saleYear || "N/A"}</span>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-1">
+                              <DollarSign className="w-3 h-3" />
+                              <span>{comp.averageRate ? formatCurrency(comp.averageRate) + "/mo" : "N/A"}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <PercentIcon className="w-3 h-3" />
+                              <span>{comp.occupancyRate ? formatPercent(comp.occupancyRate) + " occ" : "N/A"}</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {comp.matchReasons?.map((reason: string) => (
+                          <Badge key={reason} variant="outline" className="text-xs py-0.5">
+                            {getReasonLabel(reason)}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        onLinkComp(comp.id);
+                        toast({
+                          title: "Comp Added",
+                          description: "Opening link dialog to configure the comp...",
+                        });
+                        onClose();
+                      }}
+                      className="ml-2 shrink-0"
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Link
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </ScrollArea>
+
+        <DialogFooter>
+          <div className="flex items-center justify-between w-full">
+            <span className="text-sm text-gray-500">
+              {data?.totalMatches || 0} matching comps found
+            </span>
+            <Button variant="outline" onClick={onClose}>
+              Close
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function LinkCompModal({ isOpen, onClose, projectId, compType, preselectedCompId }: {
+  isOpen: boolean;
+  onClose: () => void;
+  projectId: string;
+  compType: "sales" | "rate";
+  preselectedCompId?: string | null;
 }) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCompId, setSelectedCompId] = useState<string | null>(null);
+  const [selectedCompId, setSelectedCompId] = useState<string | null>(preselectedCompId || null);
   const [isPrimary, setIsPrimary] = useState(false);
   const [usedInValuation, setUsedInValuation] = useState(false);
   const [weight, setWeight] = useState<number>(0);
   const [notes, setNotes] = useState("");
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // Auto-select when preselectedCompId changes
+  useEffect(() => {
+    if (preselectedCompId && isOpen) {
+      setSelectedCompId(preselectedCompId);
+    }
+  }, [preselectedCompId, isOpen]);
 
   const { data: salesComps = [], isLoading: salesLoading } = useQuery<SalesComp[]>({
     queryKey: ['/api/sales-comps'],
@@ -388,6 +579,9 @@ function LinkCompModal({ isOpen, onClose, projectId, compType }: {
 export default function ModelingProjectIntegrationPanel({ projectId, projectName }: ModelingProjectIntegrationPanelProps) {
   const [linkModalOpen, setLinkModalOpen] = useState(false);
   const [linkCompType, setLinkCompType] = useState<"sales" | "rate">("sales");
+  const [findModalOpen, setFindModalOpen] = useState(false);
+  const [findCompType, setFindCompType] = useState<"sales" | "rate">("sales");
+  const [preselectedCompId, setPreselectedCompId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -419,6 +613,17 @@ export default function ModelingProjectIntegrationPanel({ projectId, projectName
     setLinkModalOpen(true);
   };
 
+  const openFindModal = (type: "sales" | "rate") => {
+    setFindCompType(type);
+    setFindModalOpen(true);
+  };
+
+  const handleLinkFromFind = (compId: string) => {
+    setPreselectedCompId(compId);
+    setLinkCompType(findCompType);
+    setLinkModalOpen(true);
+  };
+
   return (
     <>
       <div className="space-y-6" data-testid="modeling-integration-panel">
@@ -434,7 +639,27 @@ export default function ModelingProjectIntegrationPanel({ projectId, projectName
                   {comps.length} comparable{comps.length !== 1 ? "s" : ""} linked for valuation analysis
                 </CardDescription>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => openFindModal("sales")}
+                  className="border-amber-300 text-amber-700 hover:bg-amber-50"
+                  data-testid="button-find-sales-comp"
+                >
+                  <Sparkles className="w-4 h-4 mr-1" />
+                  Find Sales
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => openFindModal("rate")}
+                  className="border-amber-300 text-amber-700 hover:bg-amber-50"
+                  data-testid="button-find-rate-comp"
+                >
+                  <Sparkles className="w-4 h-4 mr-1" />
+                  Find Rates
+                </Button>
                 <Button
                   size="sm"
                   onClick={() => openLinkModal("sales")}
@@ -562,9 +787,21 @@ export default function ModelingProjectIntegrationPanel({ projectId, projectName
 
       <LinkCompModal
         isOpen={linkModalOpen}
-        onClose={() => setLinkModalOpen(false)}
+        onClose={() => {
+          setLinkModalOpen(false);
+          setPreselectedCompId(null);
+        }}
         projectId={projectId}
         compType={linkCompType}
+        preselectedCompId={preselectedCompId}
+      />
+
+      <FindCompsModal
+        isOpen={findModalOpen}
+        onClose={() => setFindModalOpen(false)}
+        projectId={projectId}
+        compType={findCompType}
+        onLinkComp={handleLinkFromFind}
       />
     </>
   );

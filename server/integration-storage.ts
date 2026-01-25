@@ -61,6 +61,11 @@ export interface IIntegrationStorage {
     action?: string;
     limit?: number;
   }): Promise<CrossModuleAuditLog[]>;
+
+  // Comp Matching
+  findMatchingSalesComps(orgId: string, criteria: { state?: string; region?: string; totalSlips?: number; city?: string; }): Promise<Array<any & { relevanceScore: number }>>;
+  findMatchingRateComps(orgId: string, criteria: { state?: string; region?: string; totalSlips?: number; city?: string; }): Promise<Array<any & { relevanceScore: number }>>;
+  getModelingProject(projectId: string, orgId: string): Promise<any | null>;
 }
 
 export class IntegrationStorage implements IIntegrationStorage {
