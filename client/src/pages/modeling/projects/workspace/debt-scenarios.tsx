@@ -25,6 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { DebtScenario, ModelingProject } from "@shared/schema";
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { MarketRatePicker, CurrentRateBadge } from '@/components/modeling/MarketRatePicker';
+import { useAllMarketRates } from '@/hooks/use-market-rates';
 
 interface WorkspaceDebtScenariosProps {
   projectId: string;
@@ -349,7 +350,29 @@ export default function WorkspaceDebtScenarios({ projectId, onTabChange }: Works
   const equity = purchasePrice - loanAmount;
   const noi = parseFormattedNumber(inputs.noi);
   const spreadBps = parseFloat(inputs.spreadBps) || 0;
-  const baseRateValue = 4.5;
+  
+  const { 
+    getSofrOvernight, getSofr30Day, getSofr90Day, 
+    getPrimeRate, getFedFundsRate, 
+    getTreasuryRate 
+  } = useAllMarketRates();
+  
+  const getBaseRateValue = (): number => {
+    switch (inputs.baseRate) {
+      case 'SOFR': return getSofrOvernight() ?? 4.5;
+      case 'SOFR30DAYAVG': return getSofr30Day() ?? 4.5;
+      case 'SOFR90DAYAVG': return getSofr90Day() ?? 4.5;
+      case 'DPRIME': return getPrimeRate() ?? 7.5;
+      case 'DFF': return getFedFundsRate() ?? 4.5;
+      case 'DGS2': return getTreasuryRate('2y') ?? 4.0;
+      case 'DGS5': return getTreasuryRate('5y') ?? 4.2;
+      case 'DGS10': return getTreasuryRate('10y') ?? 4.3;
+      case 'DGS30': return getTreasuryRate('30y') ?? 4.5;
+      default: return 4.5;
+    }
+  };
+  
+  const baseRateValue = getBaseRateValue();
   const allInRate = baseRateValue + (spreadBps / 100);
   const annualDebtService = calculateDebtService(loanAmount, allInRate, parseInt(inputs.amortizationYears), parseInt(inputs.interestOnlyYears));
   const dscr = annualDebtService > 0 ? noi / annualDebtService : 0;
