@@ -886,6 +886,43 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
+  // Re-summarize existing articles with updated AI prompt (admin only)
+  app.post("/api/docktalk/admin/resummarize-articles", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    if (req.dockTalkUser?.role !== 'admin') {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    
+    try {
+      const ResummarizeOptionsSchema = z.object({
+        batchSize: z.number().min(1).max(50).optional().default(10),
+        maxArticles: z.number().min(10).max(1000).optional().default(500),
+        onlyMissing: z.boolean().optional().default(false),
+      });
+      
+      const options = ResummarizeOptionsSchema.parse(req.body);
+      
+      // Start the re-summarization in the background
+      const { resummarizeExistingArticles } = await import("./services/backfill");
+      
+      // Run asynchronously so we don't block the request
+      resummarizeExistingArticles(options).then(result => {
+        console.log(`[DockTalk] Re-summarization completed: ${result.updated} updated, ${result.errors} errors, ${result.skipped} skipped`);
+      }).catch(error => {
+        console.error('[DockTalk] Re-summarization failed:', error);
+      });
+      
+      res.json({ 
+        success: true,
+        message: `Re-summarization started for up to ${options.maxArticles} articles. Check server logs for progress.`
+      });
+    } catch (error) {
+      console.error("Error starting re-summarization:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Internal server error" 
+      });
+    }
+  });
+
   // Manual summary generation (admin only)
   app.post("/api/docktalk/admin/generate-summaries", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     // Admin role check

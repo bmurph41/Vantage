@@ -489,5 +489,75 @@ async function discoverArchiveUrls(baseUrl: string, sourceName: string): Promise
   return archiveUrls;
 }
 
+/**
+ * Re-summarize existing articles with the updated AI prompt
+ * Processes articles in batches to avoid overwhelming the AI service
+ */
+export async function resummarizeExistingArticles(options: {
+  batchSize?: number;
+  maxArticles?: number;
+  onlyMissing?: boolean;
+} = {}): Promise<{ updated: number; errors: number; skipped: number }> {
+  const { batchSize = 10, maxArticles = 500, onlyMissing = false } = options;
+  
+  let updated = 0;
+  let errors = 0;
+  let skipped = 0;
+  
+  try {
+    // Get articles that need re-summarization
+    const articles = await storage.getArticles(null, {
+      limit: maxArticles,
+      offset: 0,
+      sortBy: 'newest'
+    });
+    
+    console.log(`Starting re-summarization of ${articles.length} articles...`);
+    
+    // Process in batches to avoid rate limits
+    for (let i = 0; i < articles.length; i += batchSize) {
+      const batch = articles.slice(i, i + batchSize);
+      
+      for (const article of batch) {
+        try {
+          // Skip articles that already have action-verb summaries if onlyMissing
+          if (onlyMissing && article.summary) {
+            const actionVerbs = ['Discusses', 'Covers', 'Explores', 'Examines', 'Reports', 'Highlights', 'Announces', 'Reviews', 'Details'];
+            if (actionVerbs.some(verb => article.summary?.startsWith(verb))) {
+              skipped++;
+              continue;
+            }
+          }
+          
+          // Get content for summarization
+          const textToSummarize = `${article.title}\n\n${article.content || article.summary || ''}`;
+          
+          // Generate new summary
+          const newSummary = await summarizeArticle(textToSummarize);
+          
+          // Update the article
+          await storage.updateArticle(article.id, { summary: newSummary });
+          updated++;
+          
+          // Small delay to avoid rate limits
+          await new Promise(resolve => setTimeout(resolve, 200));
+        } catch (error) {
+          console.error(`Error re-summarizing article ${article.id}:`, error);
+          errors++;
+        }
+      }
+      
+      console.log(`Processed ${Math.min(i + batchSize, articles.length)}/${articles.length} articles (${updated} updated, ${errors} errors, ${skipped} skipped)`);
+    }
+    
+    console.log(`Re-summarization complete: ${updated} updated, ${errors} errors, ${skipped} skipped`);
+  } catch (error) {
+    console.error('Error in re-summarization process:', error);
+    throw error;
+  }
+  
+  return { updated, errors, skipped };
+}
+
 // Re-export the types for use in routes
 export type { BackfillOptions, BackfillResult };
