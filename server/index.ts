@@ -19,6 +19,14 @@ import { centralizedErrorHandler, notFoundHandler } from "./middleware/error-han
 import { tenantContextMiddleware } from "./middleware/tenant-context";
 import { logger } from "./lib/logger";
 
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 const app = express();
 
 app.use(requestIdMiddleware);
@@ -38,6 +46,11 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.use(requestLoggingMiddleware);
+
+// Basic health check - always accessible
+app.get("/health", (_req: Request, res: Response) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
 
 // Database health check endpoint - returns hostname only, no credentials
 app.get("/health/db", (req: Request, res: Response) => {
