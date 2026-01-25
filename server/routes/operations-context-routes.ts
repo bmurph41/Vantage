@@ -1796,11 +1796,90 @@ router.post('/projects/:projectId/ops/import', async (req: Request, res: Respons
       }
     }
     
+    let importedService = 0;
+    if (dataTypes.includes('service')) {
+      let conditions: SQL<unknown>[] = [
+        eq(opsServiceWorkOrders.marinaId, marinaId),
+        eq(opsServiceWorkOrders.orgId, orgId),
+      ];
+      
+      if (startDate && endDate) {
+        conditions.push(
+          gte(opsServiceWorkOrders.openDate, startDate),
+          lte(opsServiceWorkOrders.openDate, endDate)
+        );
+      }
+      
+      const marinaService = await db
+        .select()
+        .from(opsServiceWorkOrders)
+        .where(and(...conditions));
+      
+      for (const order of marinaService) {
+        await db.insert(opsServiceWorkOrders).values({
+          id: randomUUID(),
+          orgId,
+          modelingProjectId: projectId,
+          marinaId: null,
+          openDate: order.openDate,
+          closeDate: order.closeDate,
+          laborRevenue: order.laborRevenue,
+          partsRevenue: order.partsRevenue,
+          cogs: order.cogs,
+          status: order.status,
+          source: 'CSV_IMPORT',
+          notes: `Imported from marina on ${new Date().toISOString().split('T')[0]}`,
+          createdBy: userId,
+        });
+        importedService++;
+      }
+    }
+    
+    let importedRentals = 0;
+    if (dataTypes.includes('rentals')) {
+      let conditions: SQL<unknown>[] = [
+        eq(opsBoatRentals.marinaId, marinaId),
+        eq(opsBoatRentals.orgId, orgId),
+      ];
+      
+      if (startDate && endDate) {
+        conditions.push(
+          gte(opsBoatRentals.rentalDate, startDate),
+          lte(opsBoatRentals.rentalDate, endDate)
+        );
+      }
+      
+      const marinaRentals = await db
+        .select()
+        .from(opsBoatRentals)
+        .where(and(...conditions));
+      
+      for (const rental of marinaRentals) {
+        await db.insert(opsBoatRentals).values({
+          id: randomUUID(),
+          orgId,
+          modelingProjectId: projectId,
+          marinaId: null,
+          rentalDate: rental.rentalDate,
+          hours: rental.hours,
+          grossSales: rental.grossSales,
+          channel: rental.channel,
+          boatType: rental.boatType,
+          source: 'CSV_IMPORT',
+          notes: `Imported from marina on ${new Date().toISOString().split('T')[0]}`,
+          createdBy: userId,
+        });
+        importedRentals++;
+      }
+    }
+    
     res.json({
       success: true,
       data: {
         imported: {
           fuelTransactions: importedFuel,
+          serviceWorkOrders: importedService,
+          boatRentals: importedRentals,
           shipStoreSales: importedStore,
         },
       },
@@ -1811,4 +1890,286 @@ router.post('/projects/:projectId/ops/import', async (req: Request, res: Respons
   }
 });
 
+
+// ============================================================================
+// SERVICE DEPT ROUTES (Valuator context - project-scoped)
+// ============================================================================
+
+router.get('/projects/:projectId/ops/service', async (req: Request, res: Response) => {
+  try {
+    const { projectId } = req.params;
+    const { startDate, endDate } = req.query;
+    const orgId = req.tenantId!;
+    
+    await requireProjectInOrg(projectId, orgId);
+    
+    let conditions: SQL<unknown>[] = [
+      eq(opsServiceWorkOrders.modelingProjectId, projectId),
+      eq(opsServiceWorkOrders.orgId, orgId),
+    ];
+    
+    if (startDate && endDate) {
+      conditions.push(
+        gte(opsServiceWorkOrders.openDate, startDate as string),
+        lte(opsServiceWorkOrders.openDate, endDate as string)
+      );
+    }
+    
+    const workOrders = await db
+      .select()
+      .from(opsServiceWorkOrders)
+      .where(and(...conditions))
+      .orderBy(desc(opsServiceWorkOrders.openDate));
+    
+    res.json({ success: true, data: workOrders });
+  } catch (error) {
+    console.error('Error fetching project service work orders:', error);
+    res.status(500).json({ error: 'Failed to fetch service work orders' });
+  }
+});
+
+router.post('/projects/:projectId/ops/service', async (req: Request, res: Response) => {
+  try {
+    const { projectId } = req.params;
+    const orgId = req.tenantId!;
+    const userId = req.userId;
+    
+    await requireProjectInOrg(projectId, orgId);
+    
+    const [workOrder] = await db.insert(opsServiceWorkOrders).values({
+      id: randomUUID(),
+      orgId,
+      modelingProjectId: projectId,
+      marinaId: null,
+      openDate: req.body.openDate,
+      closeDate: req.body.closeDate || null,
+      laborRevenue: req.body.laborRevenue || '0',
+      partsRevenue: req.body.partsRevenue || '0',
+      cogs: req.body.cogs || '0',
+      status: req.body.status || 'closed',
+      source: 'MANUAL',
+      notes: req.body.notes || null,
+      createdBy: userId,
+    }).returning();
+    
+    res.json({ success: true, data: workOrder });
+  } catch (error) {
+    console.error('Error creating service work order:', error);
+    res.status(500).json({ error: 'Failed to create service work order' });
+  }
+});
+
+router.delete('/projects/:projectId/ops/service/:orderId', async (req: Request, res: Response) => {
+  try {
+    const { projectId, orderId } = req.params;
+    const orgId = req.tenantId!;
+    
+    await requireProjectInOrg(projectId, orgId);
+    
+    await db.delete(opsServiceWorkOrders)
+      .where(and(
+        eq(opsServiceWorkOrders.id, orderId),
+        eq(opsServiceWorkOrders.modelingProjectId, projectId),
+        eq(opsServiceWorkOrders.orgId, orgId)
+      ));
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting service work order:', error);
+    res.status(500).json({ error: 'Failed to delete service work order' });
+  }
+});
+
+router.get('/projects/:projectId/ops/service/summary', async (req: Request, res: Response) => {
+  try {
+    const { projectId } = req.params;
+    const { startDate, endDate } = req.query;
+    const orgId = req.tenantId!;
+    
+    await requireProjectInOrg(projectId, orgId);
+    
+    let conditions: SQL<unknown>[] = [
+      eq(opsServiceWorkOrders.modelingProjectId, projectId),
+      eq(opsServiceWorkOrders.orgId, orgId),
+    ];
+    
+    if (startDate && endDate) {
+      conditions.push(
+        gte(opsServiceWorkOrders.openDate, startDate as string),
+        lte(opsServiceWorkOrders.openDate, endDate as string)
+      );
+    }
+    
+    const result = await db
+      .select({
+        totalLaborRevenue: sql<number>`COALESCE(SUM(${opsServiceWorkOrders.laborRevenue}), 0)`,
+        totalPartsRevenue: sql<number>`COALESCE(SUM(${opsServiceWorkOrders.partsRevenue}), 0)`,
+        totalCogs: sql<number>`COALESCE(SUM(${opsServiceWorkOrders.cogs}), 0)`,
+        orderCount: sql<string>`COUNT(*)`,
+      })
+      .from(opsServiceWorkOrders)
+      .where(and(...conditions));
+    
+    const row = result[0];
+    const totalLaborRevenue = Number(row?.totalLaborRevenue || 0);
+    const totalPartsRevenue = Number(row?.totalPartsRevenue || 0);
+    const totalRevenue = totalLaborRevenue + totalPartsRevenue;
+    const totalCogs = Number(row?.totalCogs || 0);
+    const grossMargin = totalRevenue - totalCogs;
+    const marginPercent = totalRevenue > 0 ? (grossMargin / totalRevenue) * 100 : 0;
+    
+    res.json({
+      success: true,
+      data: {
+        totalLaborRevenue,
+        totalPartsRevenue,
+        totalRevenue,
+        totalCogs,
+        grossMargin,
+        marginPercent,
+        orderCount: row?.orderCount || '0',
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching service summary:', error);
+    res.status(500).json({ error: 'Failed to fetch service summary' });
+  }
+});
+
+// ============================================================================
+// BOAT RENTALS ROUTES (Valuator context - project-scoped)
+// ============================================================================
+
+router.get('/projects/:projectId/ops/rentals', async (req: Request, res: Response) => {
+  try {
+    const { projectId } = req.params;
+    const { startDate, endDate } = req.query;
+    const orgId = req.tenantId!;
+    
+    await requireProjectInOrg(projectId, orgId);
+    
+    let conditions: SQL<unknown>[] = [
+      eq(opsBoatRentals.modelingProjectId, projectId),
+      eq(opsBoatRentals.orgId, orgId),
+    ];
+    
+    if (startDate && endDate) {
+      conditions.push(
+        gte(opsBoatRentals.rentalDate, startDate as string),
+        lte(opsBoatRentals.rentalDate, endDate as string)
+      );
+    }
+    
+    const rentals = await db
+      .select()
+      .from(opsBoatRentals)
+      .where(and(...conditions))
+      .orderBy(desc(opsBoatRentals.rentalDate));
+    
+    res.json({ success: true, data: rentals });
+  } catch (error) {
+    console.error('Error fetching project boat rentals:', error);
+    res.status(500).json({ error: 'Failed to fetch boat rentals' });
+  }
+});
+
+router.post('/projects/:projectId/ops/rentals', async (req: Request, res: Response) => {
+  try {
+    const { projectId } = req.params;
+    const orgId = req.tenantId!;
+    const userId = req.userId;
+    
+    await requireProjectInOrg(projectId, orgId);
+    
+    const [rental] = await db.insert(opsBoatRentals).values({
+      id: randomUUID(),
+      orgId,
+      modelingProjectId: projectId,
+      marinaId: null,
+      rentalDate: req.body.rentalDate,
+      hours: req.body.hours,
+      grossSales: req.body.grossSales,
+      channel: req.body.channel || null,
+      boatType: req.body.boatType || null,
+      source: 'MANUAL',
+      notes: req.body.notes || null,
+      createdBy: userId,
+    }).returning();
+    
+    res.json({ success: true, data: rental });
+  } catch (error) {
+    console.error('Error creating boat rental:', error);
+    res.status(500).json({ error: 'Failed to create boat rental' });
+  }
+});
+
+router.delete('/projects/:projectId/ops/rentals/:rentalId', async (req: Request, res: Response) => {
+  try {
+    const { projectId, rentalId } = req.params;
+    const orgId = req.tenantId!;
+    
+    await requireProjectInOrg(projectId, orgId);
+    
+    await db.delete(opsBoatRentals)
+      .where(and(
+        eq(opsBoatRentals.id, rentalId),
+        eq(opsBoatRentals.modelingProjectId, projectId),
+        eq(opsBoatRentals.orgId, orgId)
+      ));
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting boat rental:', error);
+    res.status(500).json({ error: 'Failed to delete boat rental' });
+  }
+});
+
+router.get('/projects/:projectId/ops/rentals/summary', async (req: Request, res: Response) => {
+  try {
+    const { projectId } = req.params;
+    const { startDate, endDate } = req.query;
+    const orgId = req.tenantId!;
+    
+    await requireProjectInOrg(projectId, orgId);
+    
+    let conditions: SQL<unknown>[] = [
+      eq(opsBoatRentals.modelingProjectId, projectId),
+      eq(opsBoatRentals.orgId, orgId),
+    ];
+    
+    if (startDate && endDate) {
+      conditions.push(
+        gte(opsBoatRentals.rentalDate, startDate as string),
+        lte(opsBoatRentals.rentalDate, endDate as string)
+      );
+    }
+    
+    const result = await db
+      .select({
+        totalRevenue: sql<number>`COALESCE(SUM(${opsBoatRentals.grossSales}), 0)`,
+        totalHours: sql<number>`COALESCE(SUM(${opsBoatRentals.hours}), 0)`,
+        rentalCount: sql<string>`COUNT(*)`,
+      })
+      .from(opsBoatRentals)
+      .where(and(...conditions));
+    
+    const row = result[0];
+    const totalRevenue = Number(row?.totalRevenue || 0);
+    const totalHours = Number(row?.totalHours || 0);
+    const averageRevenuePerHour = totalHours > 0 ? totalRevenue / totalHours : 0;
+    
+    res.json({
+      success: true,
+      data: {
+        totalRevenue,
+        totalHours,
+        averageRevenuePerHour,
+        rentalCount: row?.rentalCount || '0',
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching rentals summary:', error);
+    res.status(500).json({ error: 'Failed to fetch rentals summary' });
+  }
+});
 export default router;

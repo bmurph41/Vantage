@@ -749,8 +749,6 @@ export const projectSettings = pgTable("project_settings", {
   quietHoursEnd: text("quiet_hours_end").default("08:00"), // 8 AM
   weekendNotifications: boolean("weekend_notifications").notNull().default(false),
 });
-
-
 // Project Templates
 export const projectTemplates = pgTable("project_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -759,8 +757,6 @@ export const projectTemplates = pgTable("project_templates", {
   description: text("description"),
   tasksBlueprint: text("tasks_blueprint").array().default(sql`'{}'`),
 });
-
-
 // Tasks
 export const tasks = pgTable("tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1898,8 +1894,6 @@ export const insertProjectSchema = createInsertSchema(projects).omit({
 });
 
 export const insertProjectSettingsSchema = createInsertSchema(projectSettings);
-
-
 export const insertProjectTemplateSchema = createInsertSchema(projectTemplates).omit({
   id: true,
 });
@@ -2060,8 +2054,6 @@ export type InsertProject = z.infer<typeof insertProjectSchema>;
 
 export type ProjectSettings = typeof projectSettings.$inferSelect;
 export type InsertProjectSettings = z.infer<typeof insertProjectSettingsSchema>;
-
-
 export type ProjectTemplate = typeof projectTemplates.$inferSelect;
 export type InsertProjectTemplate = z.infer<typeof insertProjectTemplateSchema>;
 
@@ -2216,8 +2208,6 @@ export type InsertChecklistItem = z.infer<typeof insertChecklistItemSchema>;
 // ============================================================================
 // CRM SCHEMA - Converted from UUID to VARCHAR for compatibility
 // ============================================================================
-
-
 export const crmCompanies = pgTable("crm_companies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
@@ -4758,8 +4748,6 @@ export const crmContactRoles = pgTable("crm_contact_roles", {
   isPrimary: boolean("is_primary").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
-
-
 // Tasks table - action items and to-dos
 
 export const crmTasks = pgTable("crm_tasks", {
@@ -20707,8 +20695,6 @@ export interface ParsedImportRow {
   errors?: string[];
   warnings?: string[];
 }
-
-
 // ================================================================================
 // MARINALYTICS - Portfolio Company & Operating Metrics Analytics
 // ================================================================================
@@ -21997,14 +21983,15 @@ export const opsShipStoreSales = pgTable("ops_ship_store_sales", {
 // ============================================================================
 export const opsServiceWorkOrders = pgTable("ops_service_work_orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  marinaId: varchar("marina_id").notNull().references(() => opsMarinas.id, { onDelete: "cascade" }),
+  marinaId: varchar("marina_id").references(() => opsMarinas.id, { onDelete: "cascade" }),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
+  modelingProjectId: varchar("modeling_project_id").references(() => modelingProjects.id, { onDelete: "cascade" }),
   openDate: date("open_date").notNull(),
   closeDate: date("close_date"),
   laborRevenue: decimal("labor_revenue", { precision: 14, scale: 2 }).default("0"),
   partsRevenue: decimal("parts_revenue", { precision: 14, scale: 2 }).default("0"),
   cogs: decimal("cogs", { precision: 14, scale: 2 }).default("0"),
-  status: varchar("status", { length: 20 }).default("open"), // open, in_progress, closed
+  status: varchar("status", { length: 20 }).default("open"),
   source: opsDataSourceEnum("source").default("MANUAL"),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => users.id),
@@ -22013,19 +22000,19 @@ export const opsServiceWorkOrders = pgTable("ops_service_work_orders", {
 }, (table) => ({
   marinaOpenIdx: index("ops_service_marina_open_idx").on(table.marinaId, table.openDate),
   orgIdx: index("ops_service_org_idx").on(table.orgId),
+  modelingProjectIdx: index("ops_service_modeling_project_idx").on(table.modelingProjectId),
 }));
-
 // ============================================================================
 // OPS_BOAT_RENTALS - Boat rental actuals
-// ============================================================================
 export const opsBoatRentals = pgTable("ops_boat_rentals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  marinaId: varchar("marina_id").notNull().references(() => opsMarinas.id, { onDelete: "cascade" }),
+  marinaId: varchar("marina_id").references(() => opsMarinas.id, { onDelete: "cascade" }),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
+  modelingProjectId: varchar("modeling_project_id").references(() => modelingProjects.id, { onDelete: "cascade" }),
   rentalDate: date("rental_date").notNull(),
   hours: decimal("hours", { precision: 8, scale: 2 }).notNull(),
   grossSales: decimal("gross_sales", { precision: 14, scale: 2 }).notNull(),
-  channel: varchar("channel", { length: 50 }), // walk-in, online, phone
+  channel: varchar("channel", { length: 50 }),
   boatType: varchar("boat_type", { length: 100 }),
   source: opsDataSourceEnum("source").default("MANUAL"),
   notes: text("notes"),
@@ -22035,6 +22022,7 @@ export const opsBoatRentals = pgTable("ops_boat_rentals", {
 }, (table) => ({
   marinaDateIdx: index("ops_boat_rentals_marina_date_idx").on(table.marinaId, table.rentalDate),
   orgIdx: index("ops_boat_rentals_org_idx").on(table.orgId),
+  modelingProjectIdx: index("ops_boat_rentals_modeling_project_idx").on(table.modelingProjectId),
 }));
 
 // ============================================================================

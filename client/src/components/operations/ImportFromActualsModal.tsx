@@ -33,6 +33,7 @@ interface ImportFromActualsModalProps {
   onOpenChange: (open: boolean) => void;
   projectId: string;
   projectName?: string;
+  dataTypes?: string[];
 }
 
 export default function ImportFromActualsModal({
@@ -40,11 +41,14 @@ export default function ImportFromActualsModal({
   onOpenChange,
   projectId,
   projectName,
+  dataTypes: preselectedTypes,
 }: ImportFromActualsModalProps) {
   const { toast } = useToast();
   const [selectedMarina, setSelectedMarina] = useState<string | null>(null);
-  const [importFuel, setImportFuel] = useState(true);
-  const [importStore, setImportStore] = useState(true);
+  const [importFuel, setImportFuel] = useState(!preselectedTypes || preselectedTypes.includes("fuel"));
+  const [importStore, setImportStore] = useState(!preselectedTypes || preselectedTypes.includes("ship-store"));
+  const [importService, setImportService] = useState(!preselectedTypes || preselectedTypes.includes("service"));
+  const [importRentals, setImportRentals] = useState(!preselectedTypes || preselectedTypes.includes("rentals"));
   const [startDate, setStartDate] = useState(format(subMonths(new Date(), 12), "yyyy-MM-dd"));
   const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
 
@@ -66,6 +70,8 @@ export default function ImportFromActualsModal({
       const dataTypes: string[] = [];
       if (importFuel) dataTypes.push("fuel");
       if (importStore) dataTypes.push("ship-store");
+      if (importService) dataTypes.push("service");
+      if (importRentals) dataTypes.push("rentals");
       
       return apiRequest(`/api/operations-context/projects/${projectId}/ops/import`, {
         method: "POST",
@@ -80,9 +86,14 @@ export default function ImportFromActualsModal({
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/operations-context/projects", projectId] });
       const imported = data.data?.imported || {};
+      const parts = [];
+      if (imported.fuelTransactions) parts.push(`${imported.fuelTransactions} fuel transactions`);
+      if (imported.shipStoreSales) parts.push(`${imported.shipStoreSales} ship store sales`);
+      if (imported.serviceWorkOrders) parts.push(`${imported.serviceWorkOrders} service work orders`);
+      if (imported.boatRentals) parts.push(`${imported.boatRentals} boat rentals`);
       toast({
         title: "Import Complete",
-        description: `Imported ${imported.fuelTransactions || 0} fuel transactions and ${imported.shipStoreSales || 0} ship store sales`,
+        description: parts.length > 0 ? `Imported ${parts.join(", ")}` : "No records found to import",
       });
       onOpenChange(false);
       setSelectedMarina(null);
