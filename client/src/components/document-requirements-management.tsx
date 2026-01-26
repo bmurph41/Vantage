@@ -54,12 +54,15 @@ import {
   AlertTriangle,
   CheckCircle,
   FileText,
-  ExternalLink
+  ExternalLink,
+  Upload
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { DocumentRequirement } from "@shared/schema";
 
 const createRequirementSchema = z.object({
@@ -202,13 +205,74 @@ function AddRequirementDialog({ taskId, isOpen, onOpenChange }: AddRequirementDi
 
 interface RequirementItemProps {
   requirement: DocumentRequirement;
+  taskId: string;
   readOnly?: boolean;
 }
 
-function RequirementItem({ requirement, readOnly }: RequirementItemProps) {
+function RequirementItem({ requirement, taskId, readOnly }: RequirementItemProps) {
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const updateRequirement = useUpdateDocumentRequirement();
   const deleteRequirement = useDeleteDocumentRequirement();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const uploadFileMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('notes', `Document for requirement: ${requirement.title}`);
+
+      const response = await fetch(`/api/dd/tasks/${taskId}/files`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to upload file');
+      }
+
+      return response.json();
+    },
+    onSuccess: async (uploadedFile) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dd/tasks', taskId, 'files'] });
+      
+      await updateRequirement.mutateAsync({
+        requirementId: requirement.id,
+        data: {
+          status: 'received',
+          externalDocId: uploadedFile.id,
+          externalVersion: uploadedFile.name,
+        },
+      });
+      
+      toast({
+        title: "Document uploaded",
+        description: `${uploadedFile.name} has been uploaded and linked to this requirement.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Upload failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      await uploadFileMutation.mutateAsync(file);
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
   
   const statusForm = useForm({
     resolver: zodResolver(updateRequirementSchema),
@@ -277,6 +341,28 @@ function RequirementItem({ requirement, readOnly }: RequirementItemProps) {
 
       {!readOnly && (
         <div className="flex items-center gap-2 ml-4">
+          <label className="cursor-pointer">
+            <input
+              type="file"
+              className="hidden"
+              onChange={handleFileUpload}
+              disabled={uploading}
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg"
+              data-testid={`input-upload-file-${requirement.id}`}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              disabled={uploading}
+            >
+              <span>
+                <Upload className="h-4 w-4 mr-2" />
+                {uploading ? "Uploading..." : "Upload"}
+              </span>
+            </Button>
+          </label>
+          
           <Button
             variant="outline"
             size="sm"
@@ -482,6 +568,7 @@ export function DocumentRequirementsManagement({
             <RequirementItem
               key={requirement.id}
               requirement={requirement}
+              taskId={taskId}
               readOnly={readOnly}
             />
           ))}

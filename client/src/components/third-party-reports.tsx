@@ -12,8 +12,9 @@ import { TaskDocumentStatus } from "./task-document-status";
 import { Search, Plus, Upload, Trash2, ChevronUp, ChevronDown, MessageCircle, FileDown, Edit, StickyNote, FileText, DollarSign } from "lucide-react";
 import type { Task, Project, ProjectSettings } from "@shared/schema";
 import { useUpdateTask, useDeleteTask } from "@/hooks/use-tasks";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ddClient } from "@/lib/ddClient";
+import { useToast } from "@/hooks/use-toast";
 import { AddTaskModal } from "@/components/add-task-modal";
 import { TimelineNotes } from "@/components/timeline-notes";
 import { ExportReportModal } from "@/components/export-report-modal";
@@ -63,6 +64,56 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
       companyZip?: string;
     };
   }>({ isOpen: false, companyName: '', contactInfo: {} });
+  const [uploadingTaskId, setUploadingTaskId] = useState<string | null>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const uploadFileMutation = useMutation({
+    mutationFn: async ({ taskId, file }: { taskId: string; file: File }) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('notes', `Uploaded for task`);
+
+      const response = await fetch(`/api/dd/tasks/${taskId}/files`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to upload file');
+      }
+
+      return response.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dd/tasks', variables.taskId, 'files'] });
+      toast({
+        title: "Document uploaded",
+        description: "The document has been uploaded successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Upload failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleTaskFileUpload = async (taskId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingTaskId(taskId);
+    try {
+      await uploadFileMutation.mutateAsync({ taskId, file });
+    } finally {
+      setUploadingTaskId(null);
+      e.target.value = '';
+    }
+  };
 
   const toggleTaskExpansion = (taskId: string) => {
     const newExpanded = new Set(expandedTasks);
@@ -825,6 +876,28 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                             Note
                           </Button>
                           
+                          {/* Upload Document Button */}
+                          <label className="cursor-pointer">
+                            <input
+                              type="file"
+                              className="hidden"
+                              onChange={(e) => handleTaskFileUpload(task.id, e)}
+                              disabled={uploadingTaskId === task.id}
+                              accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg"
+                              data-testid={`input-upload-task-file-${task.id}`}
+                            />
+                            <Button
+                              asChild
+                              className="h-7 px-2.5 rounded-full bg-green-500 hover:bg-green-600 text-white text-xs font-medium border-0 shadow-sm"
+                              disabled={uploadingTaskId === task.id}
+                            >
+                              <span>
+                                <Upload className="w-3 h-3 mr-1" />
+                                {uploadingTaskId === task.id ? "..." : "Upload"}
+                              </span>
+                            </Button>
+                          </label>
+                          
                           {/* Delete Button */}
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
@@ -1168,6 +1241,27 @@ export function ThirdPartyReports({ tasks, projectId, project, settings }: Third
                       >
                         ✏️
                       </Button>
+                      <label className="cursor-pointer">
+                        <input
+                          type="file"
+                          className="hidden"
+                          onChange={(e) => handleTaskFileUpload(task.id, e)}
+                          disabled={uploadingTaskId === task.id}
+                          accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg"
+                          data-testid={`input-upload-completed-task-file-${task.id}`}
+                        />
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          disabled={uploadingTaskId === task.id}
+                        >
+                          <span>
+                            {uploadingTaskId === task.id ? "..." : "📤"}
+                          </span>
+                        </Button>
+                      </label>
                       <Button
                         data-testid={`button-duplicate-${task.id}`}
                         variant="outline"
