@@ -298,8 +298,29 @@ export default function UnifiedSidebar() {
 
   const NavLink = ({ item }: { item: { name: string; href: string; icon: any; badge?: string; disabled?: boolean } }) => {
     // Check if current location is a child of this nav item's href
-    // Exact match OR location starts with href followed by / or ?
-    const isActive = location === item.href || 
+    // Parse both location and href to handle query parameters using wouter's location string
+    const [itemPath, itemQuery] = item.href.split('?');
+    
+    // Parse current location for query params (location from wouter may include query string)
+    const [currentPath, currentQueryStr] = location.split('?');
+    const currentTabParam = currentQueryStr ? new URLSearchParams('?' + currentQueryStr).get('tab') : null;
+    const itemTabParam = itemQuery ? new URLSearchParams('?' + itemQuery).get('tab') : null;
+    
+    // For workspace sub-nav with query params, check if we're on the same workspace and same tab
+    const isWorkspaceTabLink = itemPath.startsWith('/workspaces/') && itemTabParam;
+    const isActiveTab = isWorkspaceTabLink 
+      ? (currentPath.startsWith(itemPath) || currentPath === itemPath) && currentTabParam === itemTabParam
+      : false;
+    
+    // For workspace overview (no tab param), check if no tab is in URL
+    const isWorkspaceOverview = itemPath.startsWith('/workspaces/') && !itemTabParam && itemPath !== '/workspaces';
+    const isActiveOverview = isWorkspaceOverview 
+      ? (currentPath === itemPath || currentPath.startsWith(itemPath)) && !currentTabParam
+      : false;
+    
+    // Standard matching: Exact match OR location starts with href followed by / or ?
+    const isActive = isActiveTab || isActiveOverview || 
+      location === item.href || 
       (item.href !== '/' && location.startsWith(item.href + '/')) ||
       (item.href !== '/' && location.startsWith(item.href + '?'));
     const isDisabled = item.disabled || false;

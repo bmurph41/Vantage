@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useLocation, Link } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
 import { useWorkspaceOverview, useUpdateWorkspace, useLinkWorkspaceEntities } from '@/hooks/useDealWorkspaces';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +9,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   ArrowLeft,
   Building2,
@@ -49,6 +58,13 @@ const ROLE_LABELS: Record<string, string> = {
   consultant: 'Consultant',
 };
 
+interface DDProject {
+  id: string;
+  name: string;
+  status: string;
+  createdAt: string;
+}
+
 export default function WorkspaceDetailPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const [location, navigate] = useLocation();
@@ -58,6 +74,15 @@ export default function WorkspaceDetailPage() {
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
   const tabFromUrl = urlParams.get('tab') || 'overview';
   const [activeTab, setActiveTab] = useState(tabFromUrl);
+  const [showLinkDDDialog, setShowLinkDDDialog] = useState(false);
+  const [selectedDDProjectId, setSelectedDDProjectId] = useState<string | null>(null);
+  
+  const { data: ddProjects = [], isLoading: isLoadingDDProjects } = useQuery<DDProject[]>({
+    queryKey: ['/api/projects'],
+    enabled: showLinkDDDialog,
+  });
+  
+  const linkEntities = useLinkWorkspaceEntities();
   
   // Sync tab state when URL changes
   useEffect(() => {
@@ -72,6 +97,24 @@ export default function WorkspaceDetailPage() {
       ? `/workspaces/${workspaceId}`
       : `/workspaces/${workspaceId}?tab=${newTab}`;
     window.history.replaceState(null, '', newUrl);
+  };
+  
+  const handleLinkDDProject = () => {
+    if (!selectedDDProjectId || !workspaceId) return;
+    
+    linkEntities.mutate(
+      { id: workspaceId, entities: { ddProjectId: selectedDDProjectId } },
+      {
+        onSuccess: () => {
+          toast({ title: 'Success', description: 'DD Project linked successfully' });
+          setShowLinkDDDialog(false);
+          setSelectedDDProjectId(null);
+        },
+        onError: () => {
+          toast({ title: 'Error', description: 'Failed to link DD project', variant: 'destructive' });
+        },
+      }
+    );
   };
 
   const { data, isLoading, error } = useWorkspaceOverview(workspaceId);
@@ -304,7 +347,7 @@ export default function WorkspaceDetailPage() {
                         <div className="text-sm text-muted-foreground">Not linked</div>
                       </div>
                     </div>
-                    <Button size="sm" variant="outline">
+                    <Button size="sm" variant="outline" onClick={() => setShowLinkDDDialog(true)}>
                       <Link2 className="h-4 w-4 mr-1" />
                       Link
                     </Button>
@@ -488,7 +531,7 @@ export default function WorkspaceDetailPage() {
                   <p className="text-muted-foreground mb-4">
                     Link a DD project to access its data room for document management.
                   </p>
-                  <Button variant="outline">Link DD Project</Button>
+                  <Button variant="outline" onClick={() => setShowLinkDDDialog(true)}>Link DD Project</Button>
                 </div>
               )}
             </CardContent>
@@ -515,6 +558,77 @@ export default function WorkspaceDetailPage() {
           </Card>
         </TabsContent>
       </Tabs>
+      
+      <Dialog open={showLinkDDDialog} onOpenChange={setShowLinkDDDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Link DD Project</DialogTitle>
+            <DialogDescription>
+              Select a DD project to link to this workspace. This will enable access to its documents and data room.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-64 overflow-y-auto py-4">
+            {isLoadingDDProjects ? (
+              <div className="text-center py-8">
+                <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin text-muted-foreground" />
+                <p className="text-muted-foreground">Loading projects...</p>
+              </div>
+            ) : ddProjects.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <ClipboardList className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>No DD projects available</p>
+                <Button
+                  variant="link"
+                  className="mt-2"
+                  onClick={() => {
+                    setShowLinkDDDialog(false);
+                    navigate('/projects');
+                  }}
+                >
+                  Create a DD Project
+                </Button>
+              </div>
+            ) : (
+              ddProjects.map((project) => (
+                <div
+                  key={project.id}
+                  onClick={() => setSelectedDDProjectId(project.id)}
+                  className={`flex items-center justify-between p-3 rounded-lg cursor-pointer border transition-colors ${
+                    selectedDDProjectId === project.id
+                      ? 'border-primary bg-primary/5'
+                      : 'border-transparent hover:bg-muted'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <ClipboardList className="h-5 w-5 text-purple-600" />
+                    <div>
+                      <div className="font-medium">{project.name}</div>
+                      <div className="text-sm text-muted-foreground capitalize">
+                        {project.status?.replace(/_/g, ' ') || 'Active'}
+                      </div>
+                    </div>
+                  </div>
+                  {selectedDDProjectId === project.id && (
+                    <CheckCircle2 className="h-5 w-5 text-primary" />
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLinkDDDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleLinkDDProject}
+              disabled={!selectedDDProjectId || linkEntities.isPending}
+            >
+              {linkEntities.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Link Project
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
