@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { ComparativeAnalysis, AnalyticsFilters } from './analyticsService';
+import { checkAISpendingLimit, trackAIUsage } from '../ai/spending-guard';
 
 const anthropic = new Anthropic({
   apiKey: process.env.OPENAI_API_KEY, // Replit's integration uses this key name
@@ -107,9 +108,27 @@ function formatMetricsForPrompt(analysis: ComparativeAnalysis): string {
 
 export async function generateAIInsights(
   analysis: ComparativeAnalysis,
-  filters: AnalyticsFilters
+  filters: AnalyticsFilters,
+  context?: { orgId: string; userId: string }
 ): Promise<AIInsight[]> {
   try {
+    // Check spending limit if context provided
+    if (context?.orgId) {
+      const limitCheck = await checkAISpendingLimit(context.orgId, 10); // Estimate ~10 cents for Claude
+      if (!limitCheck.allowed) {
+        console.warn(`AI spending limit reached for org ${context.orgId}: ${limitCheck.reason}`);
+        return [
+          {
+            category: 'risk',
+            title: 'AI Analysis Limit Reached',
+            description: `Monthly AI spending limit reached. Basic statistics shown above. Contact support to increase your limit.`,
+            confidence: 'high',
+            priority: 5,
+          },
+        ];
+      }
+    }
+
     const filtersText = formatFiltersForPrompt(filters);
     const metricsText = formatMetricsForPrompt(analysis);
 
@@ -158,6 +177,20 @@ Return ONLY a valid JSON array of insights, with no additional text. Example for
         },
       ],
     });
+
+    // Track AI usage if context provided
+    if (context?.orgId && context?.userId && message.usage) {
+      await trackAIUsage({
+        orgId: context.orgId,
+        userId: context.userId,
+        operationType: 'insights',
+        provider: 'anthropic',
+        model: 'claude-3-5-sonnet-20241022',
+        inputTokens: message.usage.input_tokens,
+        outputTokens: message.usage.output_tokens,
+        metadata: { compsCount: analysis.overall.count }
+      });
+    }
 
     const content = message.content[0];
     if (content.type !== 'text') {

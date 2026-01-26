@@ -3,6 +3,10 @@ import fs from 'fs/promises';
 import path from 'path';
 import { Request } from 'express';
 import multer from 'multer';
+import { uploadToS3, downloadFromS3, deleteFromS3, getSignedDownloadUrl, fileExistsInS3 } from './storage/s3-client';
+
+// Check if S3 is configured
+const USE_S3 = !!(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && process.env.S3_BUCKET_NAME);
 
 export interface FileValidationConfig {
   maxSizeBytes: number;
@@ -18,6 +22,7 @@ export interface UploadedFileInfo {
   checksum: string;
   storagePath: string;
   tempPath?: string;
+  s3Url?: string;
 }
 
 export class VdrFileService {
@@ -51,11 +56,22 @@ export class VdrFileService {
   constructor(uploadDir: string = 'server/uploads/vdr', tempDir: string = 'server/uploads/temp') {
     this.uploadDir = uploadDir;
     this.tempDir = tempDir;
+    
+    if (USE_S3) {
+      console.log('✓ VDR File Service: Using S3 storage');
+    } else {
+      console.log('⚠ VDR File Service: Using local storage (S3 not configured)');
+    }
   }
 
   async initialize(): Promise<void> {
-    await fs.mkdir(this.uploadDir, { recursive: true });
+    // Always create temp dir for multer
     await fs.mkdir(this.tempDir, { recursive: true });
+    
+    // Only create upload dir if not using S3
+    if (!USE_S3) {
+      await fs.mkdir(this.uploadDir, { recursive: true });
+    }
   }
 
   validateFile(filename: string, mimeType: string, size: number, config?: Partial<FileValidationConfig>): { valid: boolean; error?: string } {
@@ -93,12 +109,23 @@ export class VdrFileService {
     return hashSum.digest('hex');
   }
 
+  async calculateChecksumFromBuffer(buffer: Buffer): Promise<string> {
+    const hashSum = crypto.createHash('sha256');
+    hashSum.update(buffer);
+    return hashSum.digest('hex');
+  }
+
   generateStoragePath(orgId: string, projectId: string, filename: string): string {
     const timestamp = Date.now();
     const randomString = crypto.randomBytes(8).toString('hex');
     const ext = path.extname(filename);
     const sanitizedName = path.basename(filename, ext).replace(/[^a-zA-Z0-9-_]/g, '_');
     const storageName = `${sanitizedName}_${timestamp}_${randomString}${ext}`;
+    
+    // S3 uses forward slashes
+    if (USE_S3) {
+      return `vdr/${orgId}/${projectId}/${storageName}`;
+    }
     return path.join(orgId, projectId, storageName);
   }
 
@@ -125,37 +152,114 @@ export class VdrFileService {
       throw new Error(validation.error);
     }
 
-    const checksum = await this.calculateChecksum(tempPath);
     const storagePath = this.generateStoragePath(orgId, projectId, originalFilename);
     
-    await this.moveToStorage(tempPath, storagePath);
+    if (USE_S3) {
+      // Upload to S3
+      const fileBuffer = await fs.readFile(tempPath);
+      const checksum = await this.calculateChecksumFromBuffer(fileBuffer);
+      
+      const s3Result = await uploadToS3({
+        key: storagePath,
+        body: fileBuffer,
+        contentType: mimeType,
+        metadata: {
+          originalFilename,
+          checksum,
+          orgId,
+          projectId
+        }
+      });
+      
+      await this.cleanupTempFile(tempPath);
+      
+      if (!s3Result.success) {
+        throw new Error(`S3 upload failed: ${s3Result.error}`);
+      }
+      
+      return {
+        filename: path.basename(storagePath),
+        originalFilename,
+        mimeType,
+        size,
+        checksum,
+        storagePath,
+        s3Url: s3Result.url
+      };
+    } else {
+      // Local storage fallback
+      const checksum = await this.calculateChecksum(tempPath);
+      await this.moveToStorage(tempPath, storagePath);
 
-    return {
-      filename: path.basename(storagePath),
-      originalFilename,
-      mimeType,
-      size,
-      checksum,
-      storagePath,
-    };
+      return {
+        filename: path.basename(storagePath),
+        originalFilename,
+        mimeType,
+        size,
+        checksum,
+        storagePath,
+      };
+    }
   }
 
   async deleteFile(storagePath: string): Promise<void> {
-    const fullPath = path.join(this.uploadDir, storagePath);
-    try {
-      await fs.unlink(fullPath);
-    } catch (error: any) {
-      if (error.code !== 'ENOENT') {
-        throw error;
+    if (USE_S3) {
+      const result = await deleteFromS3(storagePath);
+      if (!result.success) {
+        console.error('Failed to delete from S3:', result.error);
+      }
+    } else {
+      const fullPath = path.join(this.uploadDir, storagePath);
+      try {
+        await fs.unlink(fullPath);
+      } catch (error: any) {
+        if (error.code !== 'ENOENT') {
+          throw error;
+        }
       }
     }
   }
 
   async getFilePath(storagePath: string): Promise<string> {
+    if (USE_S3) {
+      // Return a signed URL for S3 files
+      const result = await getSignedDownloadUrl(storagePath, 3600); // 1 hour
+      if (!result.success) {
+        throw new Error(`Failed to get S3 URL: ${result.error}`);
+      }
+      return result.url!;
+    }
     return path.join(this.uploadDir, storagePath);
   }
 
+  async getFileBuffer(storagePath: string): Promise<Buffer> {
+    if (USE_S3) {
+      const result = await downloadFromS3(storagePath);
+      if (!result.success || !result.data) {
+        throw new Error(`Failed to download from S3: ${result.error}`);
+      }
+      return result.data;
+    }
+    const fullPath = path.join(this.uploadDir, storagePath);
+    return fs.readFile(fullPath);
+  }
+
+  async getSignedUrl(storagePath: string, expiresInSeconds: number = 3600): Promise<string> {
+    if (USE_S3) {
+      const result = await getSignedDownloadUrl(storagePath, expiresInSeconds);
+      if (!result.success) {
+        throw new Error(`Failed to get signed URL: ${result.error}`);
+      }
+      return result.url!;
+    }
+    // For local storage, return the file path (would need a download endpoint)
+    return `/api/vdr/download/${encodeURIComponent(storagePath)}`;
+  }
+
   async fileExists(storagePath: string): Promise<boolean> {
+    if (USE_S3) {
+      return fileExistsInS3(storagePath);
+    }
     const fullPath = path.join(this.uploadDir, storagePath);
     try {
       await fs.access(fullPath);
@@ -211,6 +315,10 @@ export class VdrFileService {
         }
       }
     };
+  }
+  
+  isUsingS3(): boolean {
+    return USE_S3;
   }
 }
 

@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import type { SalesComp, ProjectProfile } from "@shared/schema";
+import { checkAISpendingLimit, trackAIUsage } from '../ai/spending-guard';
 
 export interface AICompScore {
   compId: string;
@@ -43,7 +44,8 @@ export class AICompMatchingService {
     projectProfile: ProjectProfile,
     comps: SalesComp[],
     existingScores: Array<{ compId: string; ruleBasedScore: number }>,
-    timeoutMs: number = 8000
+    timeoutMs: number = 8000,
+    context?: { orgId: string; userId: string }
   ): Promise<AIBatchScore | null> {
     if (!this.enabled || !this.openai) {
       return null;
@@ -51,6 +53,15 @@ export class AICompMatchingService {
 
     if (comps.length === 0) {
       return { scores: [], model: 'gpt-4o-mini', promptVersion: this.PROMPT_VERSION };
+    }
+
+    // Check spending limit if context provided
+    if (context?.orgId) {
+      const limitCheck = await checkAISpendingLimit(context.orgId, 5); // Estimate ~5 cents
+      if (!limitCheck.allowed) {
+        console.warn(`AI spending limit reached for org ${context.orgId}: ${limitCheck.reason}`);
+        return null;
+      }
     }
 
     // Limit batch size to prevent token overflow and slow responses
@@ -100,6 +111,20 @@ Return scores as JSON matching the exact schema provided.`
 
       const completion = await Promise.race([completionPromise, timeoutPromise]);
 
+      // Track AI usage if context provided
+      if (context?.orgId && context?.userId && completion.usage) {
+        await trackAIUsage({
+          orgId: context.orgId,
+          userId: context.userId,
+          operationType: 'comp_matching',
+          provider: 'openai',
+          model: completion.model,
+          inputTokens: completion.usage.prompt_tokens,
+          outputTokens: completion.usage.completion_tokens,
+          metadata: { compsCount: comps.length }
+        });
+      }
+
       const responseText = completion.choices[0]?.message?.content;
       if (!responseText) {
         throw new Error('Empty response from OpenAI');
@@ -122,7 +147,6 @@ Return scores as JSON matching the exact schema provided.`
       };
     } catch (error) {
       console.error('Error scoring comps with AI:', error);
-      // Return null to signal fallback to rule-based scoring only
       return null;
     }
   }

@@ -22598,3 +22598,44 @@ export const insertDocktalkScoringConfigSchema = createInsertSchema(docktalkScor
 });
 export type InsertDocktalkScoringConfig = z.infer<typeof insertDocktalkScoringConfigSchema>;
 export type DocktalkScoringConfig = typeof docktalkScoringConfig.$inferSelect;
+
+// ============================================================================
+// AI USAGE TRACKING - Track AI API calls and costs
+// ============================================================================
+export const aiUsageTracking = pgTable('ai_usage_tracking', {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  operationType: text("operation_type").notNull(), // 'chat', 'rag', 'document_parse', 'summary', 'embedding'
+  provider: text("provider").notNull(), // 'openai', 'anthropic'
+  model: text("model").notNull(),
+  inputTokens: integer("input_tokens").notNull().default(0),
+  outputTokens: integer("output_tokens").notNull().default(0),
+  estimatedCostCents: integer("estimated_cost_cents").notNull(),
+  metadata: jsonb("metadata").default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  orgDateIdx: index('ai_usage_tracking_org_date_idx').on(table.orgId, table.createdAt),
+  userDateIdx: index('ai_usage_tracking_user_date_idx').on(table.userId, table.createdAt),
+}));
+
+// ============================================================================
+// AI SPENDING LIMITS - Monthly spending caps per organization
+// ============================================================================
+export const aiSpendingLimits = pgTable('ai_spending_limits', {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().unique(),
+  monthlyLimitCents: integer("monthly_limit_cents").notNull().default(10000), // $100 default
+  currentMonthSpendCents: integer("current_month_spend_cents").notNull().default(0),
+  lastResetAt: timestamp("last_reset_at").defaultNow().notNull(),
+  hardLimitReachedAt: timestamp("hard_limit_reached_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('ai_spending_limits_org_idx').on(table.orgId),
+}));
+
+// Insert/Select schemas for AI tracking
+export type AiUsageTracking = typeof aiUsageTracking.$inferSelect;
+export type InsertAiUsageTracking = typeof aiUsageTracking.$inferInsert;
+export type AiSpendingLimits = typeof aiSpendingLimits.$inferSelect;
