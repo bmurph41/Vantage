@@ -10,15 +10,16 @@ import {
   CheckCircle,
   AlertTriangle,
   Download,
-  ArrowLeft,
   Target,
   Activity,
   DollarSign,
   TrendingUp,
   Building2,
   AlertCircle,
-  Info
+  Info,
+  Plus
 } from "lucide-react";
+import { CreateProjectDialog } from "@/components/create-project-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -178,18 +179,9 @@ export default function AllProjectsSummaryPage() {
       <div className="print:hidden bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Link href="/">
-                <Button variant="ghost" size="sm" data-testid="button-back">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Projects
-                </Button>
-              </Link>
-              <Separator orientation="vertical" className="h-8" />
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Portfolio Summary Report</h1>
-                <p className="text-sm text-gray-500">All Projects Overview</p>
-              </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Portfolio Summary Report</h1>
+              <p className="text-sm text-gray-500">All Projects Overview</p>
             </div>
             <div className="flex items-center space-x-2">
               <Button variant="outline" onClick={handlePrint} data-testid="button-print">
@@ -351,11 +343,12 @@ export default function AllProjectsSummaryPage() {
 
         {/* Individual Project Summaries */}
         <Card className="mb-8">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center">
               <FileText className="h-5 w-5 mr-2" />
               Project Details
             </CardTitle>
+            <CreateProjectDialog />
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
