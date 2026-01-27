@@ -203,18 +203,18 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
   });
 
   const { data: items = [], isLoading, refetch } = useQuery<ExtractedItem[]>({
-    queryKey: ["/api/doc-intel/uploads", uploadId, "items"],
+    queryKey: ["/api/modeling/projects", projectId, "documents", uploadId, "items"],
     queryFn: async () => {
-      const res = await fetch(`/api/doc-intel/uploads/${uploadId}/items`);
+      const res = await fetch(`/api/modeling/projects/${projectId}/documents/${uploadId}/items`);
       if (!res.ok) throw new Error("Failed to fetch items");
       return res.json();
     },
   });
 
   const { data: groupedData, isLoading: isLoadingGrouped } = useQuery<GroupedItemsResponse>({
-    queryKey: ["/api/doc-intel/uploads", uploadId, "items", "grouped"],
+    queryKey: ["/api/modeling/projects", projectId, "documents", uploadId, "items", "grouped"],
     queryFn: async () => {
-      const res = await fetch(`/api/doc-intel/uploads/${uploadId}/items?grouped=true`);
+      const res = await fetch(`/api/modeling/projects/${projectId}/documents/${uploadId}/items?grouped=true`);
       if (!res.ok) throw new Error("Failed to fetch grouped items");
       return res.json();
     },
@@ -247,8 +247,8 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
     onSuccess: async (_, variables) => {
       // Invalidate and wait for refetch to complete before clearing pending state
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["/api/doc-intel/uploads", uploadId, "items"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/doc-intel/uploads", uploadId, "items", "grouped"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", uploadId, "items"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", uploadId, "items", "grouped"] }),
       ]);
       // Now clear pending edit - fresh data is already in cache
       setPendingMonthlyEdits(prev => {
@@ -277,8 +277,8 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
       return apiRequest("PATCH", `/api/doc-intel/uploads/${uploadId}/items/bulk`, updates);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/doc-intel/uploads", uploadId, "items"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/doc-intel/uploads", uploadId, "items", "grouped"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", uploadId, "items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", uploadId, "items", "grouped"] });
       setSelectedIds(new Set());
       toast({ title: "Updated", description: "Selected items have been updated." });
     },
@@ -307,7 +307,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
       return res.json();
     },
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/doc-intel/uploads", uploadId, "items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", uploadId, "items"] });
       queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "pnl"] });
       const count = Array.isArray(data) ? data.length : 0;
       toast({ 

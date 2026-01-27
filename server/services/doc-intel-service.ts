@@ -1490,19 +1490,27 @@ class DocIntelService {
     let confirmedCount = 0;
 
     for (const item of items) {
-      if (
-        item.status === 'pending' && 
-        item.categorySuggested && 
-        item.confidenceScore && 
-        parseFloat(item.confidenceScore) >= threshold
-      ) {
-        await this.confirmItem(
-          orgId, 
-          item.id, 
-          item.categorySuggested, 
-          userId,
-          item.amount ? parseFloat(item.amount) : undefined
-        );
+      // Check if item has high confidence AND has tier/dept suggestions
+      const hasConfidence = item.confidenceScore && parseFloat(item.confidenceScore) >= threshold;
+      const hasTierSuggestion = item.categoryTierSuggested;
+      const hasDeptSuggestion = item.revenueCogsDeptSuggested || item.expenseDeptSuggested;
+      
+      if (item.status === 'pending' && hasConfidence && hasTierSuggestion) {
+        // Auto-confirm by copying suggested values to confirmed
+        await db
+          .update(docIntelExtractedItems)
+          .set({
+            status: 'confirmed',
+            categoryTierConfirmed: item.categoryTierSuggested,
+            revenueCogsDeptConfirmed: item.revenueCogsDeptSuggested,
+            expenseDeptConfirmed: item.expenseDeptSuggested,
+            amountConfirmed: item.amount,
+            confirmedBy: userId,
+            confirmedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(docIntelExtractedItems.id, item.id));
+        
         confirmedCount++;
       }
     }
