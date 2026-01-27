@@ -35,6 +35,7 @@ import * as crypto from 'crypto';
 import path from 'path';
 import * as XLSX from 'xlsx';
 import { extractDocument } from '../utils/ocr';
+import { findAliasMatch, getMatchResult } from "./pnl-alias-matcher";
 
 interface ParsedLineItem {
   rawText: string;
@@ -825,15 +826,41 @@ class DocIntelService {
   }
 
   private isHeaderOrSubtotalRow(text: string): boolean {
-    const patterns = [
-      /^(total|subtotal|net|gross|summary|header|income|expense|revenue|cogs|cost\s*of\s*(goods\s*)?sold)s?$/i,
-      /^(ordinary\s*income|operating\s*expense|other\s*income|other\s*expense)s?$/i,
-      /^\s*$/,
-    ];
-    
     const lowerText = text.toLowerCase().trim();
     
-    if (patterns.some(p => p.test(lowerText))) {
+    // Skip empty
+    if (!lowerText || /^\s*$/.test(lowerText)) return true;
+    
+    // Skip rows that are clearly subtotals/totals (MUST filter these out)
+    const subtotalPatterns = [
+      /^total\s/i,                    // "Total Income", "Total COGS"
+      /\stotal$/i,                    // "Gross Profit Total" 
+      /^gross\s*profit/i,             // "Gross Profit"
+      /^net\s*(ordinary\s*)?(income|profit|loss)/i,  // "Net Ordinary Income", "Net Income"
+      /^operating\s*(income|expense|profit)/i,
+      /^ebitda/i,
+      /^ebit\b/i,
+      /^noi\b/i,                      // Net Operating Income
+      /^total\s*cogs/i,
+      /^total\s*cost/i,
+      /^cost\s*of\s*(goods\s*)?sold$/i,  // Just the header "Cost of Goods Sold"
+      /^other\s*(income|expense)s?\s*(net)?$/i,
+    ];
+    
+    if (subtotalPatterns.some(p => p.test(lowerText))) {
+      return true;
+    }
+    
+    // Skip section headers (single words that are category names)
+    const sectionHeaders = [
+      /^income$/i,
+      /^expenses?$/i,
+      /^revenue$/i,
+      /^cogs$/i,
+      /^ordinary\s*income\/expense/i,
+    ];
+    
+    if (sectionHeaders.some(p => p.test(lowerText))) {
       return true;
     }
     
@@ -919,6 +946,34 @@ class DocIntelService {
 
         extractedItems.push(extracted);
       }
+
+      // Auto-categorize items using alias bank
+      console.log(`[DocIntelService] Auto-categorizing ${extractedItems.length} items...`);
+      let categorizedCount = 0;
+      for (const item of extractedItems) {
+        if (item.status === 'excluded') continue;
+        
+        try {
+          const match = await findAliasMatch(item.rawText || '');
+          if (match && match.confidence >= 0.4) {
+            const result = getMatchResult(match);
+            await db
+              .update(docIntelExtractedItems)
+              .set({
+                categoryTierSuggested: result.categoryTier,
+                revenueCogsDeptSuggested: result.revenueCogsDept,
+                expenseDeptSuggested: result.expenseDept,
+                confidenceScore: match.confidence.toFixed(2),
+                updatedAt: new Date(),
+              })
+              .where(eq(docIntelExtractedItems.id, item.id));
+            categorizedCount++;
+          }
+        } catch (err) {
+          console.error(`[DocIntelService] Error categorizing item ${item.id}:`, err);
+        }
+      }
+      console.log(`[DocIntelService] Auto-categorized ${categorizedCount} of ${extractedItems.length} items`);
 
       const holdingNotes = usedOcrFallback 
         ? 'OCR was used because the PDF text was unreadable. Some line items may need manual review.'
