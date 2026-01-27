@@ -422,9 +422,15 @@ export default function WeekProspectingModal({
   const autosaveMutation = useMutation({
     mutationFn: async (data: any) => {
       setSaveStatus('saving');
-      const response = await apiRequest('PUT', `/api/prospecting/entries/${year}/${quarter}/${weekNumber}`, data);
-      const result = await response.json();
-      return result;
+      try {
+        const response = await apiRequest('PUT', `/api/prospecting/entries/${year}/${quarter}/${weekNumber}`, data);
+        const result = await response.json();
+        return result;
+      } catch (error: any) {
+        console.error('Prospecting save error:', error?.message || error);
+        console.error('Request data:', JSON.stringify(data, null, 2).substring(0, 500));
+        throw error;
+      }
     },
     onMutate: async (newData: any) => {
       // Cancel any outgoing refetches to avoid overwriting optimistic update
