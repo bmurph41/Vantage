@@ -279,10 +279,10 @@ export default function DDProgressReportPage() {
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Link href={`/projects/${projectId}`}>
+            <Link href="/projects">
               <Button variant="ghost" size="sm" data-testid="link-back-project">
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Project
+                Back to Projects
               </Button>
             </Link>
             <div>
