@@ -57,6 +57,13 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteConfirmName, setDeleteConfirmName] = useState<string>("");
+
+  const { data: uploads = [], isLoading } = useQuery<UploadWithStats[]>({
+    queryKey: ['/api/modeling/projects', projectId, 'documents'],
+    enabled: !!projectId,
+  });
+
   // Rotating AI processing messages
   const [processingMessageIndex, setProcessingMessageIndex] = useState(0);
   const processingMessages = [
@@ -76,12 +83,6 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
     }, 3000);
     return () => clearInterval(interval);
   }, [hasProcessingUploads, processingMessages.length]);
-  const [deleteConfirmName, setDeleteConfirmName] = useState<string>("");
-
-  const { data: uploads = [], isLoading } = useQuery<UploadWithStats[]>({
-    queryKey: ['/api/modeling/projects', projectId, 'documents'],
-    enabled: !!projectId,
-  });
 
   const deleteMutation = useMutation({
     mutationFn: (uploadId: string) => apiRequest('DELETE', `/api/modeling/projects/${projectId}/documents/${uploadId}`),
