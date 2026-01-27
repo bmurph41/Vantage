@@ -58,12 +58,6 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
   const [, navigate] = useLocation();
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState<string>("");
-
-  const { data: uploads = [], isLoading } = useQuery<UploadWithStats[]>({
-    queryKey: ['/api/modeling/projects', projectId, 'documents'],
-    enabled: !!projectId,
-  });
-
   // Rotating AI processing messages
   const [processingMessageIndex, setProcessingMessageIndex] = useState(0);
   const processingMessages = [
@@ -74,6 +68,12 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
     "Almost there..."
   ];
   
+
+  const { data: uploads = [], isLoading } = useQuery<UploadWithStats[]>({
+    queryKey: ['/api/modeling/projects', projectId, 'documents'],
+    enabled: !!projectId,
+  });
+
   // Rotate messages every 3 seconds when processing
   const hasProcessingUploads = uploads.some(u => u.status === "processing" || u.status === "uploaded");
   useEffect(() => {
