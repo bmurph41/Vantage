@@ -68,8 +68,7 @@ const operationsModulesNav = [
 
 // Deal Workspace Navigation - Consolidated DD, VDR, and Modeling
 const dealWorkspaceNav = [
-  { name: "Projects", href: "/workspaces", icon: Briefcase },
-  { name: "DD Projects", href: "/projects", icon: ClipboardList },
+  { name: "Projects", href: "/projects", icon: ClipboardList },
   { name: "Data Room", href: "/vdr", icon: FolderLock },
 ];
 
@@ -244,7 +243,7 @@ export default function UnifiedSidebar() {
     // Prospecting section: Overview and Workroom
     const isProspectingPage = location === '/prospecting' || location.startsWith('/prospecting/');
     // Deal Workspace: consolidated DD, VDR pages (workspaces, DD projects, data room)
-    const isDealWorkspacePage = location.startsWith('/workspaces') || location === '/projects' || location === '/progress-report' || location.startsWith('/vdr');
+    const isDealWorkspacePage = location.startsWith('/workspaces') || location.startsWith('/projects') || location === '/progress-report' || location.startsWith('/vdr');
     // Underwriting Tools: Modeling Projects (Valuator), Debt Scenarios, Exit Strategies, P&L Parser, OM Builder, Modeling Settings
     const isUnderwritingToolsPage = location.startsWith('/modeling/projects') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/om') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings');
     // Investor Services: Fund Management, LP Portal (GP only)
@@ -701,7 +700,7 @@ export default function UnifiedSidebar() {
               title="Deal Workspace" 
               expanded={dealWorkspaceExpanded} 
               onToggle={() => setDealWorkspaceExpanded(!dealWorkspaceExpanded)}
-              isActive={location.startsWith('/workspaces') || location === '/projects' || location === '/progress-report' || location.startsWith('/vdr')}
+              isActive={location.startsWith('/workspaces') || location.startsWith('/projects') || location === '/progress-report' || location.startsWith('/vdr')}
             />
             {dealWorkspaceExpanded && (
               <>
