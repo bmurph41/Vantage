@@ -205,13 +205,13 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                   <FormLabel>Link to Deal</FormLabel>
                   <Select
                     onValueChange={(value) => {
-                      field.onChange(value);
+                      field.onChange(value === "_none" ? "" : value);
                       const deal = deals.find(d => d.id === value);
                       if (deal && !form.getValues("name")) {
                         form.setValue("name", `${deal.name} DD`);
                       }
                     }}
-                    value={field.value}
+                    value={field.value || "_none"}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -219,7 +219,7 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">No deal</SelectItem>
+                      <SelectItem value="_none">No deal</SelectItem>
                       {deals.map((deal) => (
                         <SelectItem key={deal.id} value={deal.id}>
                           {deal.name}
@@ -241,14 +241,17 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Link to Property</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select 
+                    onValueChange={(value) => field.onChange(value === "_none" ? "" : value)} 
+                    value={field.value || "_none"}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a property (optional)" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">No property</SelectItem>
+                      <SelectItem value="_none">No property</SelectItem>
                       {properties.map((property) => (
                         <SelectItem key={property.id} value={property.id}>
                           {property.name}
