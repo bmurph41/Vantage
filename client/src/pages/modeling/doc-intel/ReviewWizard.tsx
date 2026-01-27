@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, FileSpreadsheet, Brain, Check, X, Zap, Download, ListChecks, Eye, CheckCircle2, AlertTriangle, Building2, ChevronDown, ChevronRight, Pencil, Table2, List, LayoutGrid } from "lucide-react";
+import { ArrowLeft, ArrowRight, FileSpreadsheet, Brain, Check, X, Zap, Download, ListChecks, Eye, CheckCircle2, AlertTriangle, Building2, ChevronDown, ChevronRight, Pencil, Table2, List, LayoutGrid, Search, Filter, Clock, XCircle, MinusCircle, Layers, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { PLTableView } from "@/components/doc-intel/PLTableView";
 import { PLReviewGrid } from "@/components/doc-intel/PLReviewGrid";
 import { Button } from "@/components/ui/button";
@@ -113,7 +113,9 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [approvalNotes, setApprovalNotes] = useState("");
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
-  const [viewMode, setViewMode] = useState<'list' | 'table' | 'spreadsheet'>('spreadsheet');
+  const [viewMode, setViewMode] = useState<'list' | 'table' | 'spreadsheet' | 'grouped'>('spreadsheet');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'rejected' | 'excluded'>('all');
+  const [searchText, setSearchText] = useState("");
   
   const maxAllowedStep = getMaxAllowedStep(upload.status);
   
@@ -241,6 +243,30 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
   const rejectedItems = items.filter(i => i.status === "rejected");
   const excludedItems = items.filter(i => i.status === "excluded");
   const highConfidenceItems = items.filter(i => i.confidenceScore && parseFloat(i.confidenceScore) >= 0.9);
+  const mediumConfidenceItems = items.filter(i => i.confidenceScore && parseFloat(i.confidenceScore) >= 0.7 && parseFloat(i.confidenceScore) < 0.9);
+  const lowConfidenceItems = items.filter(i => !i.confidenceScore || parseFloat(i.confidenceScore) < 0.7);
+
+  const matchesSearch = (item: ExtractedItemWithCategory, search: string): boolean => {
+    if (!search) return true;
+    const searchLower = search.toLowerCase();
+    return (
+      (item.rawText && item.rawText.toLowerCase().includes(searchLower)) ||
+      (item.amount && item.amount.includes(searchLower)) ||
+      categories.find(c => c.id === (item.categoryConfirmed || item.categorySuggested))?.name?.toLowerCase().includes(searchLower) ||
+      getDepartmentLabel(item.departmentConfirmed || item.departmentSuggested)?.toLowerCase().includes(searchLower) ||
+      false
+    );
+  };
+
+  const matchesFilter = (item: ExtractedItemWithCategory): boolean => {
+    if (statusFilter !== 'all' && item.status !== statusFilter) return false;
+    if (searchText.trim() && !matchesSearch(item, searchText.trim())) return false;
+    return true;
+  };
+
+  const filteredItems = useMemo(() => {
+    return items.filter(matchesFilter);
+  }, [items, statusFilter, searchText, categories]);
 
   const varianceData = useMemo<VarianceItem[]>(() => {
     if (confirmedItems.length === 0) return [];
@@ -489,64 +515,170 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
 
       {currentStep === 3 && (
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Step 3: Review Line Items</CardTitle>
-                <CardDescription>
-                  Confirm categories and departments for each item. {confirmedItems.length} of {items.length} confirmed.
+                <CardTitle className="text-xl">Step 3: Review Line Items</CardTitle>
+                <CardDescription className="mt-1">
+                  Review AI suggestions and confirm categories for each extracted line item
                 </CardDescription>
               </div>
-              <div className="flex gap-2">
-                <div className="flex border rounded-md">
-                  <Button
-                    variant={viewMode === 'spreadsheet' ? 'secondary' : 'ghost'}
-                    size="sm"
-                    onClick={() => setViewMode('spreadsheet')}
-                    className="rounded-r-none"
-                    data-testid="button-spreadsheet-view"
-                    title="Spreadsheet View (Recommended)"
-                  >
-                    <LayoutGrid className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant={viewMode === 'list' ? 'secondary' : 'ghost'}
-                    size="sm"
-                    onClick={() => setViewMode('list')}
-                    className="rounded-none border-x"
-                    data-testid="button-list-view"
-                    title="List View"
-                  >
-                    <List className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant={viewMode === 'table' ? 'secondary' : 'ghost'}
-                    size="sm"
-                    onClick={() => setViewMode('table')}
-                    className="rounded-l-none"
-                    data-testid="button-table-view"
-                    title="Table View"
-                  >
-                    <Table2 className="h-4 w-4" />
-                  </Button>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => autoConfirmMutation.mutate(0.9)}
-                  disabled={autoConfirmMutation.isPending || highConfidenceItems.length === 0}
-                  data-testid="button-auto-confirm"
-                >
-                  <Zap className="h-4 w-4 mr-2" />
-                  Auto-Confirm High ({highConfidenceItems.length})
-                </Button>
-              </div>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => autoConfirmMutation.mutate(0.9)}
+                disabled={autoConfirmMutation.isPending || pendingItems.filter(i => i.confidenceScore && parseFloat(i.confidenceScore) >= 0.9).length === 0}
+                className="bg-green-600 hover:bg-green-700"
+                data-testid="button-auto-confirm"
+              >
+                <Zap className="h-4 w-4 mr-2" />
+                Auto-Confirm High Confidence ({pendingItems.filter(i => i.confidenceScore && parseFloat(i.confidenceScore) >= 0.9).length})
+              </Button>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <button
+                onClick={() => setStatusFilter(statusFilter === 'pending' ? 'all' : 'pending')}
+                className={`p-3 rounded-lg border-2 transition-all text-left ${
+                  statusFilter === 'pending' 
+                    ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/50' 
+                    : 'border-transparent bg-amber-50/50 dark:bg-amber-950/30 hover:border-amber-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-amber-600" />
+                  <span className="text-2xl font-bold text-amber-700 dark:text-amber-400">{pendingItems.length}</span>
+                </div>
+                <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">Pending Review</p>
+              </button>
+              <button
+                onClick={() => setStatusFilter(statusFilter === 'confirmed' ? 'all' : 'confirmed')}
+                className={`p-3 rounded-lg border-2 transition-all text-left ${
+                  statusFilter === 'confirmed' 
+                    ? 'border-green-500 bg-green-50 dark:bg-green-950/50' 
+                    : 'border-transparent bg-green-50/50 dark:bg-green-950/30 hover:border-green-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <span className="text-2xl font-bold text-green-700 dark:text-green-400">{confirmedItems.length}</span>
+                </div>
+                <p className="text-xs text-green-600 dark:text-green-500 mt-1">Confirmed</p>
+              </button>
+              <button
+                onClick={() => setStatusFilter(statusFilter === 'rejected' ? 'all' : 'rejected')}
+                className={`p-3 rounded-lg border-2 transition-all text-left ${
+                  statusFilter === 'rejected' 
+                    ? 'border-red-500 bg-red-50 dark:bg-red-950/50' 
+                    : 'border-transparent bg-red-50/50 dark:bg-red-950/30 hover:border-red-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <XCircle className="h-4 w-4 text-red-600" />
+                  <span className="text-2xl font-bold text-red-700 dark:text-red-400">{rejectedItems.length}</span>
+                </div>
+                <p className="text-xs text-red-600 dark:text-red-500 mt-1">Rejected</p>
+              </button>
+              <button
+                onClick={() => setStatusFilter(statusFilter === 'excluded' ? 'all' : 'excluded')}
+                className={`p-3 rounded-lg border-2 transition-all text-left ${
+                  statusFilter === 'excluded' 
+                    ? 'border-gray-500 bg-gray-50 dark:bg-gray-950/50' 
+                    : 'border-transparent bg-gray-50/50 dark:bg-gray-950/30 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <MinusCircle className="h-4 w-4 text-gray-600" />
+                  <span className="text-2xl font-bold text-gray-700 dark:text-gray-400">{excludedItems.length}</span>
+                </div>
+                <p className="text-xs text-gray-600 dark:text-gray-500 mt-1">Excluded</p>
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 py-2">
+              <div className="relative flex-1 min-w-[200px] max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder={viewMode === 'spreadsheet' ? "Switch view to filter..." : "Search line items..."}
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  className="pl-9"
+                  disabled={viewMode === 'spreadsheet'}
+                />
+              </div>
+              <div className="flex items-center gap-1 border rounded-lg p-1 bg-muted/30">
+                <Button
+                  variant={viewMode === 'spreadsheet' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('spreadsheet')}
+                  className="h-8 px-3"
+                  title="Spreadsheet View"
+                >
+                  <LayoutGrid className="h-4 w-4 mr-1" />
+                  <span className="hidden sm:inline text-xs">Grid</span>
+                </Button>
+                <Button
+                  variant={viewMode === 'grouped' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('grouped')}
+                  className="h-8 px-3"
+                  title="Grouped by Category"
+                >
+                  <Layers className="h-4 w-4 mr-1" />
+                  <span className="hidden sm:inline text-xs">Grouped</span>
+                </Button>
+                <Button
+                  variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('table')}
+                  className="h-8 px-3"
+                  title="Table View"
+                >
+                  <Table2 className="h-4 w-4 mr-1" />
+                  <span className="hidden sm:inline text-xs">Table</span>
+                </Button>
+                <Button
+                  variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('list')}
+                  className="h-8 px-3"
+                  title="Card View"
+                >
+                  <List className="h-4 w-4 mr-1" />
+                  <span className="hidden sm:inline text-xs">Cards</span>
+                </Button>
+              </div>
+              {statusFilter !== 'all' && (
+                <Button variant="ghost" size="sm" onClick={() => setStatusFilter('all')} className="h-8">
+                  <X className="h-3 w-3 mr-1" />
+                  Clear filter
+                </Button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-4 text-xs text-muted-foreground border-b pb-2">
+              <span className="font-medium">Confidence:</span>
+              <div className="flex items-center gap-1">
+                <TrendingUp className="h-3 w-3 text-green-600" />
+                <span className="text-green-700 dark:text-green-400">High: {highConfidenceItems.length}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Minus className="h-3 w-3 text-amber-600" />
+                <span className="text-amber-700 dark:text-amber-400">Medium: {mediumConfidenceItems.length}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <TrendingDown className="h-3 w-3 text-red-600" />
+                <span className="text-red-700 dark:text-red-400">Low: {lowConfidenceItems.length}</span>
+              </div>
+              <span className="ml-auto">
+                Showing {filteredItems.length} of {items.length} items
+              </span>
+            </div>
+
             <Progress 
               value={(confirmedItems.length / Math.max(items.length, 1)) * 100} 
-              className="mb-4 h-2"
+              className="h-2"
             />
 
             {viewMode === 'spreadsheet' ? (
@@ -557,28 +689,137 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
                   onApplyToModeling={() => setCurrentStep(4)}
                 />
               </div>
+            ) : viewMode === 'grouped' ? (
+              <ScrollArea className="h-[500px]">
+                <div className="space-y-4">
+                  {itemsLoading ? (
+                    <div className="flex justify-center py-8">
+                      <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+                    </div>
+                  ) : (
+                    Array.from(itemsByCategory.entries()).map(([catId, catItems]) => {
+                      const category = categories.find(c => c.id === catId);
+                      const categoryName = category?.name || (catId === "uncategorized" ? "Uncategorized" : "Unknown");
+                      const filteredCatItems = catItems.filter(matchesFilter);
+                      if (filteredCatItems.length === 0) return null;
+                      const isExpanded = expandedCategories.has(catId);
+                      const confirmedCount = filteredCatItems.filter(i => i.status === "confirmed").length;
+                      const pendingCount = filteredCatItems.filter(i => i.status === "pending").length;
+                      const totalAmount = filteredCatItems.reduce((sum, i) => sum + (parseFloat(i.amount || "0")), 0);
+                      
+                      return (
+                        <Collapsible key={catId} open={isExpanded} onOpenChange={() => toggleCategoryExpanded(catId)}>
+                          <CollapsibleTrigger asChild>
+                            <button className="w-full flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted/70 transition-colors">
+                              <div className="flex items-center gap-3">
+                                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                <span className="font-medium">{categoryName}</span>
+                                <Badge variant="outline" className="text-xs">
+                                  {filteredCatItems.length} items
+                                </Badge>
+                                {confirmedCount > 0 && (
+                                  <Badge className="bg-green-100 text-green-700 text-xs">
+                                    {confirmedCount} confirmed
+                                  </Badge>
+                                )}
+                                {pendingCount > 0 && (
+                                  <Badge className="bg-amber-100 text-amber-700 text-xs">
+                                    {pendingCount} pending
+                                  </Badge>
+                                )}
+                              </div>
+                              <span className="font-mono text-sm">{formatAmount(totalAmount)}</span>
+                            </button>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="mt-2 pl-7 space-y-2">
+                            {filteredCatItems.map((item) => (
+                              <div
+                                key={item.id}
+                                className={`flex items-center justify-between p-2 border rounded-md text-sm ${
+                                  item.status === "confirmed" ? "bg-green-50 border-green-200 dark:bg-green-950/30" :
+                                  item.status === "rejected" ? "bg-red-50 border-red-200 dark:bg-red-950/30" :
+                                  item.status === "excluded" ? "bg-gray-50 border-gray-200 opacity-60" :
+                                  "bg-background"
+                                }`}
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <p className="truncate">{sanitizeDisplayText(item.rawText)}</p>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <span className="font-mono">{formatAmount(item.amount)}</span>
+                                  {getConfidenceBadge(item.confidenceScore)}
+                                  {item.status === "pending" && (
+                                    <div className="flex gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 text-green-600 hover:bg-green-100"
+                                        onClick={() => {
+                                          if (item.categorySuggested) {
+                                            confirmItemMutation.mutate({
+                                              itemId: item.id,
+                                              categoryId: item.categorySuggested,
+                                              amount: item.amount ? parseFloat(item.amount) : undefined,
+                                              department: item.departmentSuggested || undefined,
+                                            });
+                                          }
+                                        }}
+                                        disabled={!item.categorySuggested}
+                                      >
+                                        <Check className="h-3 w-3" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 text-red-600 hover:bg-red-100"
+                                        onClick={() => rejectItemMutation.mutate(item.id)}
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                  {item.status === "confirmed" && <Check className="h-4 w-4 text-green-600" />}
+                                  {item.status === "rejected" && <X className="h-4 w-4 text-red-600" />}
+                                </div>
+                              </div>
+                            ))}
+                          </CollapsibleContent>
+                        </Collapsible>
+                      );
+                    })
+                  )}
+                </div>
+              </ScrollArea>
             ) : viewMode === 'table' ? (
               <div className="border rounded-lg overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="text-left p-3 font-medium text-sm">Category</th>
-                      <th className="text-left p-3 font-medium text-sm">Department</th>
-                      <th className="text-left p-3 font-medium text-sm">Line Item</th>
-                      <th className="text-right p-3 font-medium text-sm">Amount</th>
-                      <th className="text-right p-3 font-medium text-sm">Confidence</th>
-                      <th className="text-center p-3 font-medium text-sm">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {itemsLoading ? (
+                <div className="max-h-[500px] overflow-auto">
+                  <table className="w-full">
+                    <thead className="bg-muted/50 sticky top-0 z-10">
                       <tr>
-                        <td colSpan={6} className="text-center py-8">
-                          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto" />
-                        </td>
+                        <th className="text-left p-3 font-medium text-sm bg-muted/50">Status</th>
+                        <th className="text-left p-3 font-medium text-sm bg-muted/50">Category</th>
+                        <th className="text-left p-3 font-medium text-sm bg-muted/50">Department</th>
+                        <th className="text-left p-3 font-medium text-sm bg-muted/50">Line Item</th>
+                        <th className="text-right p-3 font-medium text-sm bg-muted/50">Amount</th>
+                        <th className="text-center p-3 font-medium text-sm bg-muted/50">Confidence</th>
+                        <th className="text-center p-3 font-medium text-sm bg-muted/50">Actions</th>
                       </tr>
-                    ) : (
-                      items.map((item) => (
+                    </thead>
+                    <tbody>
+                      {itemsLoading ? (
+                        <tr>
+                          <td colSpan={7} className="text-center py-8">
+                            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto" />
+                          </td>
+                        </tr>
+                      ) : filteredItems.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="text-center py-8 text-muted-foreground">
+                            No items match your filter criteria
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredItems.map((item) => (
                         <tr 
                           key={item.id}
                           className={`border-t ${
@@ -589,19 +830,45 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
                           }`}
                           data-testid={`table-row-${item.id}`}
                         >
+                          <td className="p-3">
+                            {item.status === "pending" && (
+                              <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-100 text-xs">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Pending
+                              </Badge>
+                            )}
+                            {item.status === "confirmed" && (
+                              <Badge className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-100 text-xs">
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                Confirmed
+                              </Badge>
+                            )}
+                            {item.status === "rejected" && (
+                              <Badge className="bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-100 text-xs">
+                                <XCircle className="h-3 w-3 mr-1" />
+                                Rejected
+                              </Badge>
+                            )}
+                            {item.status === "excluded" && (
+                              <Badge className="bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-100 text-xs">
+                                <MinusCircle className="h-3 w-3 mr-1" />
+                                Excluded
+                              </Badge>
+                            )}
+                          </td>
                           <td className="p-3 text-sm">
                             {categories.find(c => c.id === (item.categoryConfirmed || item.categorySuggested))?.name || '-'}
                           </td>
                           <td className="p-3 text-sm">
                             {getDepartmentLabel(item.departmentConfirmed || item.departmentSuggested) || '-'}
                           </td>
-                          <td className="p-3 text-sm max-w-[300px] truncate">
+                          <td className="p-3 text-sm max-w-[300px] truncate" title={sanitizeDisplayText(item.rawText)}>
                             {sanitizeDisplayText(item.rawText)}
                           </td>
                           <td className="p-3 text-sm text-right font-mono">
                             {formatAmount(item.amountConfirmed || item.amount)}
                           </td>
-                          <td className="p-3 text-sm text-right">
+                          <td className="p-3 text-center">
                             {getConfidenceBadge(item.confidenceScore)}
                           </td>
                           <td className="p-3 text-center">
@@ -637,8 +904,6 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
                                 </Button>
                               </div>
                             )}
-                            {item.status === "confirmed" && <Check className="h-4 w-4 text-green-600 mx-auto" />}
-                            {item.status === "rejected" && <X className="h-4 w-4 text-red-600 mx-auto" />}
                           </td>
                         </tr>
                       ))
@@ -653,8 +918,12 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
                   <div className="flex justify-center py-8">
                     <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
                   </div>
+                ) : filteredItems.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No items match your filter criteria
+                  </div>
                 ) : (
-                  items.map((item) => (
+                  filteredItems.map((item) => (
                     <div
                       key={item.id}
                       className={`p-3 border rounded-lg transition-colors ${
