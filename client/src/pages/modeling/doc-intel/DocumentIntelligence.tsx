@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
-import { ArrowLeft, Upload, FileSpreadsheet, Brain, CheckCircle2, AlertCircle, Clock, Settings, Inbox } from "lucide-react";
+import { ArrowLeft, Upload, FileSpreadsheet, Brain, CheckCircle2, AlertCircle, Clock, Settings, Inbox, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +55,48 @@ export default function DocumentIntelligence() {
       toast({ title: "Error", description: "Failed to initialize document intelligence.", variant: "destructive" });
     },
   });
+
+  const deleteDocumentMutation = useMutation({
+    mutationFn: async (documentId: string) => {
+      return apiRequest("DELETE", `/api/modeling/projects/${projectId}/documents/${documentId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents"] });
+      toast({ title: "Deleted", description: "Document has been removed." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete document.", variant: "destructive" });
+    },
+  });
+
+  const deleteAllDocumentsMutation = useMutation({
+    mutationFn: async () => {
+      const deletePromises = uploads.map(upload => 
+        apiRequest("DELETE", `/api/modeling/projects/${projectId}/documents/${upload.id}`)
+      );
+      return Promise.all(deletePromises);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents"] });
+      toast({ title: "All deleted", description: "All documents have been removed." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete documents.", variant: "destructive" });
+    },
+  });
+
+  const handleDeleteDocument = (e: React.MouseEvent, documentId: string) => {
+    e.stopPropagation();
+    if (confirm("Are you sure you want to delete this document?")) {
+      deleteDocumentMutation.mutate(documentId);
+    }
+  };
+
+  const handleDeleteAll = () => {
+    if (confirm(`Are you sure you want to delete all ${uploads.length} documents?`)) {
+      deleteAllDocumentsMutation.mutate();
+    }
+  };
 
   const handleUploadComplete = (upload: DocIntelUpload) => {
     queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents"] });
@@ -160,9 +202,23 @@ export default function DocumentIntelligence() {
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Recent Uploads</CardTitle>
-              <CardDescription>View and manage your uploaded documents</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Recent Uploads</CardTitle>
+                <CardDescription>View and manage your uploaded documents</CardDescription>
+              </div>
+              {uploads.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDeleteAll}
+                  disabled={deleteAllDocumentsMutation.isPending}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Clear All
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               {uploadsLoading ? (
@@ -208,6 +264,15 @@ export default function DocumentIntelligence() {
                           </div>
                         )}
                         {getStatusBadge(upload.status)}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => handleDeleteDocument(e, upload.id)}
+                          disabled={deleteDocumentMutation.isPending}
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   ))}
