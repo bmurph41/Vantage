@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { queryClient, apiRequest } from '@/lib/queryClient';
@@ -57,6 +57,25 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  // Rotating AI processing messages
+  const [processingMessageIndex, setProcessingMessageIndex] = useState(0);
+  const processingMessages = [
+    "Analyzing document structure...",
+    "Extracting line items...",
+    "Classifying revenue and expenses...",
+    "Matching to chart of accounts...",
+    "Almost there..."
+  ];
+  
+  // Rotate messages every 3 seconds when processing
+  const hasProcessingUploads = uploads.some(u => u.status === "processing" || u.status === "uploaded");
+  useEffect(() => {
+    if (!hasProcessingUploads) return;
+    const interval = setInterval(() => {
+      setProcessingMessageIndex((prev) => (prev + 1) % processingMessages.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [hasProcessingUploads, processingMessages.length]);
   const [deleteConfirmName, setDeleteConfirmName] = useState<string>("");
 
   const { data: uploads = [], isLoading } = useQuery<UploadWithStats[]>({
@@ -161,7 +180,7 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
               {pendingUploads.map((upload) => (
                 <div
                   key={upload.id}
-                  className="flex items-center justify-between p-4 rounded-lg border"
+                  className={`flex items-center justify-between p-4 rounded-lg border transition-all duration-500 ${(upload.status === "processing" || upload.status === "uploaded") ? "border-blue-400 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 dark:from-blue-950/30 dark:to-indigo-950/30 shadow-md" : ""}`}
                   data-testid={`upload-pending-${upload.id}`}
                 >
                   <div className="flex items-center gap-4 flex-1 min-w-0">

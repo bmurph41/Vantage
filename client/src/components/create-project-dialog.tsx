@@ -58,15 +58,17 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: deals = [] } = useQuery<CrmDeal[]>({
+  const { data: dealsResponse } = useQuery<{ deals: CrmDeal[] }>({
     queryKey: ["/api/crm/deals"],
     enabled: open,
   });
+  const deals = dealsResponse?.deals || [];
 
-  const { data: properties = [] } = useQuery<CrmProperty[]>({
+  const { data: propertiesResponse } = useQuery<{ properties: CrmProperty[] }>({
     queryKey: ["/api/crm/properties"],
     enabled: open,
   });
+  const properties = propertiesResponse?.properties || [];
 
   const form = useForm<CreateProjectFormValues>({
     resolver: zodResolver(createProjectSchema),
