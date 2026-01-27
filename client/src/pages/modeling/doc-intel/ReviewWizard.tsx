@@ -911,6 +911,7 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
                   </tbody>
                 </table>
               </div>
+            </div>
             ) : (
             <ScrollArea className="h-[500px]">
               <div className="space-y-2">
