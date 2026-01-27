@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { ArrowLeft, Upload, FileSpreadsheet, Brain, CheckCircle2, AlertCircle, Clock, Settings, Inbox, Trash2 } from "lucide-react";
@@ -29,10 +29,36 @@ interface UploadWithStats extends DocIntelUpload {
 
 export default function DocumentIntelligence() {
   const { projectId } = useParams<{ projectId: string }>();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("holding");
   const [selectedUpload, setSelectedUpload] = useState<string | null>(null);
+
+  // Read upload parameter from URL on mount and when URL changes
+  useEffect(() => {
+    // Parse URL search params (handle both ? and encoded %3F)
+    const fullUrl = window.location.href;
+    let uploadParam: string | null = null;
+    
+    // Try standard URL parsing first
+    const urlParams = new URLSearchParams(window.location.search);
+    uploadParam = urlParams.get('upload');
+    
+    // If not found, check for encoded query string in the path
+    if (!uploadParam && fullUrl.includes('%3F')) {
+      const decodedUrl = decodeURIComponent(fullUrl);
+      const queryStart = decodedUrl.indexOf('?');
+      if (queryStart !== -1) {
+        const queryString = decodedUrl.substring(queryStart + 1);
+        const params = new URLSearchParams(queryString);
+        uploadParam = params.get('upload');
+      }
+    }
+    
+    if (uploadParam) {
+      setSelectedUpload(uploadParam);
+    }
+  }, [location]);
 
   const { data: uploads = [], isLoading: uploadsLoading } = useQuery<UploadWithStats[]>({
     queryKey: ["/api/modeling/projects", projectId, "documents"],
