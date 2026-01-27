@@ -796,7 +796,7 @@ class DocIntelService {
   }
 
   private extractLineItemName(row: any[]): string {
-    for (let i = 0; i < Math.min(3, row.length); i++) {
+    for (let i = 0; i < Math.min(6, row.length); i++) {
       const cell = row[i];
       if (cell === null || cell === undefined || cell === '') continue;
       
