@@ -107,6 +107,7 @@ export interface IVdrExternalUserRepository {
 
 export interface IVdrTemplateRepository {
   getTemplate(id: string, orgId: string): Promise<VdrTemplate | undefined>;
+  getDefaultTemplate(): Promise<VdrTemplate | undefined>;
   listTemplates(orgId: string): Promise<VdrTemplate[]>;
   getTemplateFolders(templateId: string): Promise<VdrTemplateFolder[]>;
   createTemplate(data: InsertVdrTemplate): Promise<VdrTemplate>;
@@ -930,6 +931,18 @@ export class VdrTemplateRepository implements IVdrTemplateRepository {
           eq(vdrTemplates.isPublic, true),
           eq(vdrTemplates.orgId, orgId)
         )
+      ))
+      .limit(1);
+    
+    return template || undefined;
+  }
+
+  async getDefaultTemplate(): Promise<VdrTemplate | undefined> {
+    const [template] = await db.select()
+      .from(vdrTemplates)
+      .where(and(
+        eq(vdrTemplates.isDefault, true),
+        eq(vdrTemplates.isPublic, true)
       ))
       .limit(1);
     

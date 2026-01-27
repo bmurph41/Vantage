@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, FileBarChart, Plus } from "lucide-react";
+import { ArrowLeft, FileBarChart, Plus, FolderOpen } from "lucide-react";
 import { ProjectHeader } from "@/components/project-header";
 import { ThirdPartyReports } from "@/components/third-party-reports";
+import { DocumentsWorkspace } from "@/components/vdr/DocumentsWorkspace";
 import { ProjectSetup } from "@/components/project-setup";
 import { TimelineView } from "@/components/timeline-view";
 import { TaskOwnersView } from "@/components/task-owners-view";
@@ -88,6 +89,7 @@ export default function ProjectPage() {
 
   const tabs = [
     { id: "reports", label: "Tasks & Timeline" },
+    { id: "documents", label: "Documents" },
     { id: "templates", label: "Templates" },
     { id: "setup", label: "Deal Details" },
     { id: "owners", label: "Task Owners" },
@@ -170,6 +172,24 @@ export default function ProjectPage() {
               </div>
               <ThirdPartyReports tasks={tasks} projectId={project.id} project={project} settings={settings} />
             </>
+          )}
+          {activeTab === "documents" && (
+            <div className="h-[calc(100vh-20rem)] border rounded-lg bg-card overflow-hidden">
+              <div className="flex items-center justify-between p-4 border-b bg-muted/30">
+                <div className="flex items-center gap-2">
+                  <FolderOpen className="h-5 w-5 text-primary" />
+                  <h2 className="font-semibold">Data Room</h2>
+                </div>
+                <Link href={`/vdr/projects/${project.id}`}>
+                  <Button variant="outline" size="sm">
+                    Open Full Data Room
+                  </Button>
+                </Link>
+              </div>
+              <div className="h-[calc(100%-4rem)]">
+                <DocumentsWorkspace projectId={project.id} />
+              </div>
+            </div>
           )}
           {activeTab === "templates" && (
             <TemplatesView projectId={project.id} />

@@ -68,6 +68,7 @@ import modelingValidationRoutes from "./routes/modeling-validation-routes";
 import operationsContextRoutes from "./routes/operations-context-routes";
 import { userSessions, insertProspectingEntrySchema, users, salesComps, rateComps, industryStandards } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
+import { initializeVdrForProject } from "./services/vdr-initialization-service";
 import { rentRollService } from "./services/rent-roll-service";
 import { marketingService } from "./services/marketing-service";
 import { personaService } from "./services/persona-service";
@@ -936,6 +937,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         action: "created",
         after: project,
       });
+      
+      // Initialize VDR Data Room with default template
+      try {
+        await initializeVdrForProject(project.id, req.user.orgId, req.user.id);
+      } catch (vdrError) {
+        console.error("[DD Project] Failed to initialize VDR:", vdrError);
+      }
 
       res.json(project);
     } catch (error: any) {
@@ -25459,6 +25467,13 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         action: 'create',
         after: project,
       });
+      
+      // Initialize VDR Data Room with default template
+      try {
+        await initializeVdrForProject(project.id, req.user.orgId, req.user.id);
+      } catch (vdrError) {
+        console.error("[DD Project] Failed to initialize VDR:", vdrError);
+      }
 
       // Auto-run recommendations and add matching comps if project has meaningful profile criteria
       let recommendations = null;
@@ -28027,6 +28042,13 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         action: 'create',
         after: project,
       });
+      
+      // Initialize VDR Data Room with default template
+      try {
+        await initializeVdrForProject(project.id, req.user.orgId, req.user.id);
+      } catch (vdrError) {
+        console.error("[DD Project] Failed to initialize VDR:", vdrError);
+      }
 
       // Auto-run recommendations and add matching comps if project has meaningful profile criteria
       let recommendations = null;
