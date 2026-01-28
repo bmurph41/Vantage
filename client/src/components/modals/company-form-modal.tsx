@@ -109,6 +109,9 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const [pendingFormData, setPendingFormData] = useState<any>(null);
   const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false);
+  
+  // Successfully created pending contacts (for success state UI)
+  const [createdPendingContacts, setCreatedPendingContacts] = useState<Array<{data: any, pendingContactId: string}>>([]);
 
   // Query to fetch linked contacts for existing company
   const { data: linkedContacts = [], refetch: refetchLinkedContacts } = useQuery<CompanyContactWithContact[]>({
@@ -233,6 +236,8 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
       setPendingContactsToCreate([]);
       setPendingProperties([]);
     }
+    // Reset created pending contacts (success state)
+    setCreatedPendingContacts([]);
     // Reset active tab when opening modal
     setActiveTab("basic");
   }, [company, form, isOpen]);
@@ -430,6 +435,41 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
     },
   });
 
+  const createPendingContactMutation = useMutation<any, Error, any>({
+    mutationFn: async (contactData: any) => {
+      const response = await apiRequest('POST', '/api/crm/pending-contacts', {
+        firstName: contactData.firstName || null,
+        lastName: contactData.lastName || null,
+        email: contactData.email || null,
+        phone: contactData.phone || null,
+        position: contactData.position || null,
+        companyId: company?.id || null,
+        linkedPropertyIds: linkedProperties?.map((lp: any) => lp.property?.id).filter(Boolean) || [],
+      });
+      return await response.json();
+    },
+    onSuccess: (pendingContact, variables) => {
+      setCreatedPendingContacts(prev => [...prev, { 
+        data: variables, 
+        pendingContactId: pendingContact.id 
+      }]);
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-contacts'] });
+      setIsCreatingContact(false);
+      contactForm.reset();
+      toast({ 
+        title: "Contact created and linked",
+        description: "Click 'Update' to save the company with the linked contact."
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to create pending contact",
+        description: error.message,
+        variant: "destructive"
+      });
+    },
+  });
+
   const linkContactMutation = useMutation({
     mutationFn: async (data: { contactId: string; companyId: string; role?: string | null; isPrimary?: boolean }) => {
       return await apiRequest('POST', '/api/contact-companies', data);
@@ -583,8 +623,8 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
 
   const handleCreateNewContact = (data: any) => {
     if (company?.id) {
-      // Existing company - create and link immediately
-      createContactMutation.mutate(data);
+      // Existing company - create pending contact linked to company
+      createPendingContactMutation.mutate(data);
     } else {
       // New company - add to pending (use position as role)
       setPendingContactsToCreate([...pendingContactsToCreate, { data, role: data.position || undefined }]);
@@ -1004,8 +1044,8 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
               </div>
 
               {company ? (
-                // Existing company - show linked contacts
-                linkedContacts?.length === 0 ? (
+                // Existing company - show linked contacts and created pending contacts
+                (linkedContacts?.length === 0 && createdPendingContacts.length === 0) ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
                     <p>No contacts linked to this company yet.</p>
@@ -1013,6 +1053,42 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                   </div>
                 ) : (
                   <div className="space-y-3">
+                    {/* Successfully created pending contacts with green success state */}
+                    {createdPendingContacts.map((created, index) => (
+                      <div
+                        key={`created-pending-${index}`}
+                        className="flex items-center justify-between p-4 border-2 border-green-500 rounded-lg bg-green-50 dark:bg-green-900/20"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 bg-green-500 rounded-full flex items-center justify-center">
+                            <Check className="h-5 w-5 text-white" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-green-800 dark:text-green-200">
+                                {created.data.firstName} {created.data.lastName}
+                              </span>
+                              <Badge className="bg-green-500 text-white text-xs">
+                                <Check className="h-3 w-3 mr-1" />
+                                Linked
+                              </Badge>
+                            </div>
+                            <div className="text-sm text-green-700 dark:text-green-300">
+                              {created.data.email}
+                              {created.data.position && (
+                                <Badge variant="outline" className="ml-2 text-xs border-green-500 text-green-700 dark:text-green-300">
+                                  {created.data.position}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-sm text-green-600 dark:text-green-400 italic">
+                          Click Update to save
+                        </span>
+                      </div>
+                    ))}
+                    {/* Existing linked contacts */}
                     {linkedContacts?.map((linkedContact: any) => (
                         <div
                           key={linkedContact.id}
