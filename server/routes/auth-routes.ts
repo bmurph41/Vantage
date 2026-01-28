@@ -8,6 +8,7 @@ import { eq, and, gt } from 'drizzle-orm';
 import { logger } from '../lib/logger';
 import { z } from 'zod';
 import { sendEmailVerification, sendMagicLinkEmail, generateVerificationToken } from '../services/email-service';
+import { CONSENT_VERSION } from '@shared/consent-constants';
 
 declare global {
   namespace Express {
@@ -71,6 +72,7 @@ const registerSchema = z.object({
   name: z.string().min(1),
   orgId: z.string().optional(),
   orgName: z.string().optional(),
+  dataBenchmarkingConsent: z.boolean(),
 });
 
 function getDeviceInfo(req: Request): DeviceInfo {
@@ -297,7 +299,12 @@ router.post('/register', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid request', details: parsed.error.errors });
     }
 
-    const { email, password, name, orgId, orgName } = parsed.data;
+    const { email, password, name, orgId, orgName, dataBenchmarkingConsent } = parsed.data;
+
+    // Validate consent - required for account creation
+    if (!dataBenchmarkingConsent) {
+      return res.status(400).json({ error: 'Data use consent is required to create an account.' });
+    }
 
     const existingUser = await db.query.users.findFirst({
       where: eq(users.email, email.toLowerCase())
@@ -329,6 +336,11 @@ router.post('/register', async (req: Request, res: Response) => {
         passwordHash,
         role: 'owner',
         isActive: true,
+        dataBenchmarkingConsent: true,
+        consentTimestamp: new Date(),
+        consentVersion: CONSENT_VERSION,
+        benchmarkingOptOut: false,
+        optOutTimestamp: null,
       })
       .returning();
 
@@ -635,6 +647,66 @@ router.delete('/sessions', requireSession, async (req: Request, res: Response) =
   } catch (error) {
     logger.error({ error }, 'Revoke all sessions error');
     res.status(500).json({ error: 'Failed to revoke sessions' });
+  }
+});
+
+// Benchmarking opt-out settings endpoint
+router.get('/account/benchmarking', requireSession, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId)
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      benchmarkingOptOut: user.benchmarkingOptOut || false,
+      optOutTimestamp: user.optOutTimestamp,
+      dataBenchmarkingConsent: user.dataBenchmarkingConsent,
+      consentTimestamp: user.consentTimestamp,
+      consentVersion: user.consentVersion,
+    });
+  } catch (error) {
+    logger.error({ error }, 'Get benchmarking settings error');
+    res.status(500).json({ error: 'Failed to get benchmarking settings' });
+  }
+});
+
+router.patch('/account/benchmarking', requireSession, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { benchmarkingOptOut } = req.body;
+
+    if (typeof benchmarkingOptOut !== 'boolean') {
+      return res.status(400).json({ error: 'benchmarkingOptOut must be a boolean' });
+    }
+
+    const updateData: any = {
+      benchmarkingOptOut,
+    };
+
+    if (benchmarkingOptOut) {
+      updateData.optOutTimestamp = new Date();
+    } else {
+      updateData.optOutTimestamp = null;
+    }
+
+    await db.update(users)
+      .set(updateData)
+      .where(eq(users.id, userId));
+
+    res.json({ 
+      success: true, 
+      benchmarkingOptOut,
+      optOutTimestamp: updateData.optOutTimestamp,
+    });
+  } catch (error) {
+    logger.error({ error }, 'Update benchmarking settings error');
+    res.status(500).json({ error: 'Failed to update benchmarking settings' });
   }
 });
 
