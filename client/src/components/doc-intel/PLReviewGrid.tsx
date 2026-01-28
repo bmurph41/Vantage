@@ -67,6 +67,7 @@ import {
   getDeptLabel,
   CATEGORY_TIER_LABELS,
 } from "@/lib/pnl-categories";
+import { AutoConfirmedBadge } from "./AutoConfirmedBadge";
 
 interface ExtractedItem {
   id: string;
@@ -84,6 +85,10 @@ interface ExtractedItem {
   sourcePage: number | null;
   sourceRow: number | null;
   amountConfirmed: string | null;
+  autoConfirmed?: boolean;
+  confidence?: 'high' | 'medium' | 'low';
+  ruleId?: string;
+  learningRuleApplied?: boolean;
 }
 
 interface MonthlyDataItem {
@@ -538,11 +543,14 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
 
           return (
             <div
-              className="cursor-pointer hover:bg-muted/50 px-2 py-1 rounded text-sm max-w-[300px] truncate"
+              className="cursor-pointer hover:bg-muted/50 px-2 py-1 rounded text-sm max-w-[300px] flex items-center gap-2"
               onClick={() => setEditingCell({ id: item.id, field: "rawText" })}
               title={value}
             >
-              {value}
+              <span className="truncate">{value}</span>
+              {(item.autoConfirmed || item.learningRuleApplied) && (
+                <AutoConfirmedBadge item={item} variant="compact" />
+              )}
             </div>
           );
         },

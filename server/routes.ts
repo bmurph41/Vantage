@@ -19989,12 +19989,23 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         return res.json(groupedItems);
       }
 
-      const withCategories = req.query.withCategories === 'true';
-      const items = withCategories 
-        ? await docIntelService.getExtractedItemsWithCategories(orgId, uploadId)
-        : await docIntelService.getExtractedItems(orgId, uploadId);
+      // Always apply learning rules for auto-confirmation
+      const marinaId = upload.marinaId ?? null;
+      const itemsWithRules = await docIntelService.getExtractedItemsWithLearningRules(orgId, uploadId, marinaId);
       
-      res.json(items);
+      const withCategories = req.query.withCategories === 'true';
+      if (withCategories) {
+        const categories = await docIntelService.getCategories(orgId);
+        const categoryMap = new Map(categories.map((c: any) => [c.id, c]));
+        const items = itemsWithRules.map((item: any) => ({
+          ...item,
+          suggestedCategory: item.categorySuggested ? categoryMap.get(item.categorySuggested) : undefined,
+          confirmedCategory: item.categoryConfirmed ? categoryMap.get(item.categoryConfirmed) : undefined,
+        }));
+        return res.json(items);
+      }
+      
+      res.json(itemsWithRules);
     } catch (error: any) {
       console.error('Failed to fetch extracted items:', error);
       res.status(500).json({ error: 'Failed to fetch extracted items' });

@@ -36,7 +36,7 @@ import path from 'path';
 import * as XLSX from 'xlsx';
 import { extractDocument } from '../utils/ocr';
 import { findAliasMatch, getMatchResult, learnAlias, buildCoaCode } from "./pnl-alias-matcher";
-import { onLineItemConfirmed } from './learning-rules.integration';
+import { onLineItemConfirmed, applyLearningRulesOnRetrieval } from './learning-rules.integration';
 
 interface ParsedLineItem {
   rawText: string;
@@ -1261,6 +1261,59 @@ class DocIntelService {
         eq(docIntelExtractedItems.uploadId, uploadId)
       ))
       .orderBy(asc(docIntelExtractedItems.sourceRow));
+  }
+
+  async getExtractedItemsWithLearningRules(
+    orgId: string,
+    uploadId: string,
+    marinaId?: string | null
+  ): Promise<(DocIntelExtractedItem & {
+    autoConfirmed?: boolean;
+    confidence?: 'high' | 'medium' | 'low';
+    ruleId?: string;
+    learningRuleApplied?: boolean;
+  })[]> {
+    const items = await this.getExtractedItems(orgId, uploadId);
+    
+    const itemsForRules = items
+      .filter(item => item.status === 'pending')
+      .map(item => ({
+        id: item.id,
+        name: item.rawText,
+        value: parseFloat(item.amount || '0') || undefined,
+        status: item.status as 'pending' | 'confirmed' | 'rejected',
+        category: item.categoryTierConfirmed || item.categoryTierSuggested || undefined,
+        subcategory: item.expenseDeptConfirmed || item.revenueCogsDeptConfirmed || undefined,
+        department: item.expenseDeptConfirmed || item.revenueCogsDeptConfirmed || undefined,
+      }));
+
+    const enhancedItems = await applyLearningRulesOnRetrieval({
+      tenantId: orgId,
+      marinaId: marinaId ?? null,
+      lineItems: itemsForRules,
+    });
+
+    const enhancedMap = new Map(enhancedItems.map(e => [e.id, e]));
+
+    return items.map(item => {
+      const enhanced = enhancedMap.get(item.id);
+      if (enhanced?.autoConfirmed) {
+        return {
+          ...item,
+          status: 'confirmed' as const,
+          categoryTierConfirmed: enhanced.category?.split(':')[0] as any || item.categoryTierConfirmed,
+          autoConfirmed: enhanced.autoConfirmed,
+          confidence: enhanced.confidence,
+          ruleId: enhanced.ruleId,
+          learningRuleApplied: enhanced.learningRuleApplied,
+        };
+      }
+      return {
+        ...item,
+        autoConfirmed: false,
+        learningRuleApplied: enhanced?.learningRuleApplied ?? false,
+      };
+    });
   }
 
   async getExtractedItemsWithCategories(orgId: string, uploadId: string): Promise<(DocIntelExtractedItem & { suggestedCategory?: PnlCategory; confirmedCategory?: PnlCategory })[]> {
