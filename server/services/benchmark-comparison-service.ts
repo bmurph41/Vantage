@@ -1,11 +1,28 @@
+/**
+ * IMPORTANT: Benchmarking Opt-Out Guardrails
+ * 
+ * This service aggregates cross-user data for industry benchmarks.
+ * Before querying user data for benchmarks, ensure you exclude users who have
+ * opted out of anonymized benchmarking.
+ * 
+ * Use the utilities from './benchmarking-guardrails.ts':
+ * - getOptedOutUserIds() - Get user IDs to exclude
+ * - getOptedOutOrgIds() - Get org IDs to exclude  
+ * - benchmarkingOptOutCondition - Drizzle ORM WHERE clause
+ * 
+ * @see ./benchmarking-guardrails.ts
+ */
+
 import { db } from '../db';
 import { 
   modelingProjects,
   modelingScenarioVersions,
   modelingActuals,
-  salesComps
+  salesComps,
+  users
 } from '@shared/schema';
-import { eq, and, gte, lte, avg, count, sql } from 'drizzle-orm';
+import { eq, and, gte, lte, avg, count, sql, notInArray } from 'drizzle-orm';
+import { getOptedOutOrgIds } from './benchmarking-guardrails';
 
 export interface BenchmarkMetrics {
   projectValue: number;

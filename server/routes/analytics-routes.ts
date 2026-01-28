@@ -3,6 +3,13 @@
  * 
  * Provides endpoints for institutional-grade KPI calculations and benchmarking
  * Including unified cross-module analytics dashboard (Phase 4B)
+ * 
+ * IMPORTANT: Benchmarking Opt-Out Guardrails
+ * Any endpoints that aggregate cross-user data for industry benchmarks MUST
+ * exclude users who have opted out of anonymized benchmarking.
+ * Use utilities from '../services/benchmarking-guardrails.ts' to filter users.
+ * 
+ * @see ../services/benchmarking-guardrails.ts
  */
 
 import { Router, Request, Response } from 'express';
