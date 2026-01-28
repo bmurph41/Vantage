@@ -1224,18 +1224,50 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                                         ? formatCurrency(month.amount)
                                         : "-"}
                                     </div>
-                                    <Badge
-                                      variant="outline"
-                                      className={`mt-1 text-xs ${
-                                        month.status === "confirmed"
-                                          ? "border-green-500 text-green-700"
-                                          : month.status === "excluded"
-                                          ? "border-gray-400 text-gray-500"
-                                          : "border-yellow-500 text-yellow-700"
-                                      }`}
-                                    >
-                                      {month.status}
-                                    </Badge>
+                                    <div className="flex items-center justify-between mt-2">
+                                      <Badge
+                                        variant="outline"
+                                        className={`text-xs ${
+                                          month.status === "confirmed"
+                                            ? "border-green-500 text-green-700"
+                                            : month.status === "excluded"
+                                            ? "border-gray-400 text-gray-500"
+                                            : "border-yellow-500 text-yellow-700"
+                                        }`}
+                                      >
+                                        {month.status}
+                                      </Badge>
+                                      <div className="flex gap-1">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                          onClick={() => {
+                                            bulkUpdateMutation.mutate({
+                                              itemIds: [month.id],
+                                              updates: { status: "confirmed" },
+                                            });
+                                          }}
+                                          disabled={bulkUpdateMutation.isPending || month.status === "confirmed"}
+                                        >
+                                          <Check className="h-3.5 w-3.5" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                          onClick={() => {
+                                            bulkUpdateMutation.mutate({
+                                              itemIds: [month.id],
+                                              updates: { status: "excluded" },
+                                            });
+                                          }}
+                                          disabled={bulkUpdateMutation.isPending || month.status === "excluded"}
+                                        >
+                                          <X className="h-3.5 w-3.5" />
+                                        </Button>
+                                      </div>
+                                    </div>
                                   </div>
                                 ))}
                               </div>
