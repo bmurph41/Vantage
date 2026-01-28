@@ -4,7 +4,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, User, Mail, Calendar, HelpCircle, RotateCcw, Play, CheckCircle2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ArrowLeft, User, Mail, Calendar, HelpCircle, RotateCcw, Play, CheckCircle2, Shield, Info } from "lucide-react";
 import { useLocation } from "wouter";
 import { EmailManagement } from "@/components/email-management";
 import { useToast } from "@/hooks/use-toast";
@@ -47,6 +49,39 @@ export default function UserSettingsPage() {
   });
 
   const completedTours = tourProgress?.tours || {};
+
+  // Fetch benchmarking settings
+  const { data: benchmarkingSettings, isLoading: isLoadingBenchmarking } = useQuery<{
+    benchmarkingOptOut: boolean;
+    optOutTimestamp: string | null;
+    dataBenchmarkingConsent: boolean;
+    consentTimestamp: string | null;
+    consentVersion: string | null;
+  }>({
+    queryKey: ['/api/auth/account/benchmarking'],
+  });
+
+  // Update benchmarking settings mutation
+  const updateBenchmarkingMutation = useMutation({
+    mutationFn: async (benchmarkingOptOut: boolean) => {
+      const response = await apiRequest("PATCH", "/api/auth/account/benchmarking", { benchmarkingOptOut });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/account/benchmarking'] });
+      toast({ 
+        title: "Settings updated", 
+        description: "Your privacy preferences have been saved." 
+      });
+    },
+    onError: () => {
+      toast({ 
+        title: "Error", 
+        description: "Failed to update privacy settings. Please try again.",
+        variant: "destructive"
+      });
+    },
+  });
 
   // Reset single tour mutation
   const resetTourMutation = useMutation({
@@ -101,7 +136,7 @@ export default function UserSettingsPage() {
       {/* Content */}
       <div className="flex-1 space-y-6 p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4" data-testid="tabs-user-settings">
+          <TabsList className="grid w-full grid-cols-5" data-testid="tabs-user-settings">
             <TabsTrigger value="emails" className="gap-2" data-testid="tab-emails">
               <Mail className="h-4 w-4" />
               Email Management
@@ -117,6 +152,10 @@ export default function UserSettingsPage() {
             <TabsTrigger value="tours" className="gap-2" data-testid="tab-tours">
               <HelpCircle className="h-4 w-4" />
               Tours & Help
+            </TabsTrigger>
+            <TabsTrigger value="privacy" className="gap-2" data-testid="tab-privacy">
+              <Shield className="h-4 w-4" />
+              Privacy & Data
             </TabsTrigger>
           </TabsList>
 
@@ -326,6 +365,70 @@ export default function UserSettingsPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="privacy" className="space-y-6">
+            <Card data-testid="card-privacy-settings">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2" data-testid="text-privacy-title">
+                  <Shield className="h-5 w-5" />
+                  Privacy & Data
+                </CardTitle>
+                <CardDescription data-testid="text-privacy-description">
+                  Manage how your data is used for industry benchmarks
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="flex items-start justify-between p-4 border border-border rounded-lg">
+                    <div className="flex-1 pr-4">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-medium text-foreground">Contribute to anonymized industry benchmarks</h4>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p>Anonymized benchmarking means your data is combined with many others and cannot be traced back to your marina.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        This helps improve industry analytics for all MarinaMatch users. Your marina's identity is never disclosed. You can opt out at any time.
+                      </p>
+                      {benchmarkingSettings?.optOutTimestamp && benchmarkingSettings.benchmarkingOptOut && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Opted out on {new Date(benchmarkingSettings.optOutTimestamp).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                    <Switch
+                      checked={!benchmarkingSettings?.benchmarkingOptOut}
+                      onCheckedChange={(checked) => updateBenchmarkingMutation.mutate(!checked)}
+                      disabled={isLoadingBenchmarking || updateBenchmarkingMutation.isPending}
+                      data-testid="switch-benchmarking"
+                    />
+                  </div>
+
+                  {benchmarkingSettings?.dataBenchmarkingConsent && (
+                    <div className="p-4 bg-muted/30 rounded-lg">
+                      <h4 className="font-medium text-foreground text-sm">Consent Information</h4>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        You agreed to the Data Use & Anonymized Benchmarking Terms
+                        {benchmarkingSettings.consentTimestamp && (
+                          <> on {new Date(benchmarkingSettings.consentTimestamp).toLocaleDateString()}</>
+                        )}
+                        {benchmarkingSettings.consentVersion && (
+                          <> (Version: {benchmarkingSettings.consentVersion})</>
+                        )}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
