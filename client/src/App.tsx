@@ -2000,16 +2000,16 @@ function Router() {
         )}
       </Route>
       <Route path="/om/templates">
+        {() => (
+          <UnifiedLayout>
+            <OMTemplates />
+          </UnifiedLayout>
+        )}
+      </Route>
       <Route path="/document-builder/:documentId?">
         {(params: { documentId?: string }) => (
           <UnifiedLayout>
             <DocumentBuilderPage documentId={params.documentId} />
-          </UnifiedLayout>
-        )}
-      </Route>
-        {() => (
-          <UnifiedLayout>
-            <OMTemplates />
           </UnifiedLayout>
         )}
       </Route>
