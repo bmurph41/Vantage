@@ -292,25 +292,11 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
 
   const applyToModelingMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/modeling/projects/${projectId}/documents/${uploadId}/import`, {
+      return apiRequest(`/api/modeling/projects/${projectId}/documents/${uploadId}/import`, {
         method: "POST",
         body: JSON.stringify({}),
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
       });
-      
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        if (res.status === 403) {
-          throw new Error("You don't have permission to perform this action.");
-        }
-        if (res.status === 401) {
-          throw new Error("Please log in to continue.");
-        }
-        throw new Error(errorData.message || errorData.error || `Failed to import (${res.status})`);
-      }
-      
-      return res.json();
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", uploadId, "items"] });
@@ -884,7 +870,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
               ) : (
                 <>
                   <Check className="h-4 w-4 mr-1" />
-                  Apply to Modeling ({confirmedCount} items)
+                  Apply to Model ({confirmedCount} items)
                 </>
               )}
             </Button>

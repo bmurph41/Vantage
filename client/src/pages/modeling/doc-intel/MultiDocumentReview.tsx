@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQueries, useMutation } from "@tanstack/react-query";
 import { 
   ArrowLeft, 
   FileSpreadsheet, 
@@ -92,14 +92,14 @@ export function MultiDocumentReview({
   // View mode: 'matrix' shows P&L grid with periods, 'list' shows simple line item list
   const [viewMode, setViewMode] = useState<'matrix' | 'list'>('matrix');
 
-  // Fetch items for each document
-  const itemQueries = uploads.map(upload => 
-    useQuery<ExtractedItemWithCategory[]>({
-      queryKey: ["/api/modeling/projects", projectId, "documents", upload.id, "items"],
+  // Fetch items for each document using useQueries to avoid hooks ordering issues
+  const itemQueries = useQueries({
+    queries: uploads.map(upload => ({
+      queryKey: ["/api/modeling/projects", projectId, "documents", upload.id, "items"] as const,
       enabled: !!upload.id,
       refetchInterval: 3000,
-    })
-  );
+    })),
+  });
 
   // Update document items state when queries complete
   useEffect(() => {
