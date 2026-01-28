@@ -602,7 +602,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
 
           return (
             <div
-              className="cursor-pointer hover:bg-muted/50 px-2 py-1 rounded text-sm font-mono text-right"
+              className="cursor-pointer hover:bg-muted/50 px-2 py-1 rounded text-sm text-right tabular-nums"
               onClick={() => setEditingCell({ id: item.id, field: "amount" })}
             >
               {formatCurrency(displayAmount)}
@@ -982,7 +982,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
                               return (
                                 <TableCell 
                                   key={period} 
-                                  className={`text-center text-sm font-mono ${statusColor} ${!isEditingThisCell ? 'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/30' : ''}`}
+                                  className={`text-center text-sm tabular-nums ${statusColor} ${!isEditingThisCell ? 'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/30' : ''}`}
                                   onClick={() => {
                                     if (monthData && !isEditingThisCell) {
                                       setEditingCell({ id: monthData.id, field: "amount" });
@@ -1047,7 +1047,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
                               
                               return (
                                 <TableCell 
-                                  className={`text-right font-mono ${statusColor} ${!isEditingThisCell ? 'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/30' : ''}`}
+                                  className={`text-right tabular-nums ${statusColor} ${!isEditingThisCell ? 'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/30' : ''}`}
                                   onClick={() => {
                                     if (singleItem && !isEditingThisCell) {
                                       setEditingCell({ id: singleItem.id, field: "amount" });
