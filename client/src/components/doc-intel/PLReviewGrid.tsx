@@ -57,6 +57,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatPeriodLabel } from "@/lib/period-utils";
@@ -452,6 +453,41 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
     });
   };
 
+  const handleConfirmAllPending = () => {
+    const pendingWithCategory = items.filter(
+      (i) => (i.status === "pending" || i.status === "needs_review") && hasValidCategorization(i)
+    );
+    if (pendingWithCategory.length === 0) {
+      toast({
+        title: "No Items to Confirm",
+        description: "All pending items need a category assigned before confirming.",
+        variant: "destructive",
+      });
+      return;
+    }
+    bulkUpdateMutation.mutate({
+      itemIds: pendingWithCategory.map((i) => i.id),
+      updates: { status: "confirmed" },
+    });
+  };
+
+  const handleExcludeAllPending = () => {
+    const pendingItems = items.filter(
+      (i) => i.status === "pending" || i.status === "needs_review"
+    );
+    if (pendingItems.length === 0) {
+      toast({
+        title: "No Pending Items",
+        description: "There are no pending items to exclude.",
+      });
+      return;
+    }
+    bulkUpdateMutation.mutate({
+      itemIds: pendingItems.map((i) => i.id),
+      updates: { status: "excluded" },
+    });
+  };
+
   const handleBulkCategoryChange = (tier: CategoryTier) => {
     bulkUpdateMutation.mutate({
       itemIds: Array.from(selectedIds),
@@ -814,6 +850,27 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
           <Button variant="ghost" size="sm" onClick={() => refetch()}>
             <RefreshCw className="h-4 w-4 mr-1" />
             Refresh
+          </Button>
+          <Separator orientation="vertical" className="h-6" />
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleConfirmAllPending}
+            disabled={bulkUpdateMutation.isPending || pendingCount === 0}
+            className="text-green-600 hover:text-green-700 border-green-200 hover:border-green-300 hover:bg-green-50"
+          >
+            <Check className="h-4 w-4 mr-1" />
+            Confirm All ({pendingCount})
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleExcludeAllPending}
+            disabled={bulkUpdateMutation.isPending || pendingCount === 0}
+            className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50"
+          >
+            <X className="h-4 w-4 mr-1" />
+            Exclude All ({pendingCount})
           </Button>
         </div>
         <div className="flex items-center gap-2">

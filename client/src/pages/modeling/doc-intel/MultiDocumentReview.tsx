@@ -106,22 +106,27 @@ export function MultiDocumentReview({
     })),
   });
 
-  // Update document items state when queries complete
-  useEffect(() => {
-    const newState: DocumentItemsState = {};
+  // Build reactive document items from query data (not state)
+  const queryDataMap = useMemo(() => {
+    const map: DocumentItemsState = {};
     uploads.forEach((upload, index) => {
       const query = itemQueries[index];
       if (query.data) {
-        newState[upload.id] = query.data;
+        map[upload.id] = query.data;
       }
     });
-    setDocumentItems(newState);
-  }, [itemQueries.map(q => q.data).join(',')]);
+    return map;
+  }, [uploads, itemQueries]);
 
-  // Calculate totals across all documents
+  // Update local state for components that need it
+  useEffect(() => {
+    setDocumentItems(queryDataMap);
+  }, [queryDataMap]);
+
+  // Calculate totals across all documents - use query data directly for reactivity
   const allItems = useMemo(() => {
-    return Object.values(documentItems).flat();
-  }, [documentItems]);
+    return Object.values(queryDataMap).flat();
+  }, [queryDataMap]);
 
   const totalPending = allItems.filter(i => i.status === "pending").length;
   const totalConfirmed = allItems.filter(i => i.status === "confirmed").length;
@@ -278,14 +283,15 @@ export function MultiDocumentReview({
     return categories.find(c => c.id === categoryId)?.name || "Unknown";
   };
 
-  // Get per-document stats
+  // Get per-document stats - uses queryDataMap for real-time reactivity
   const getDocumentStats = (uploadId: string) => {
-    const items = documentItems[uploadId] || [];
+    const items = queryDataMap[uploadId] || [];
     return {
       total: items.length,
-      pending: items.filter(i => i.status === "pending").length,
+      pending: items.filter(i => i.status === "pending" || i.status === "needs_review").length,
       confirmed: items.filter(i => i.status === "confirmed").length,
       rejected: items.filter(i => i.status === "rejected").length,
+      excluded: items.filter(i => i.status === "excluded").length,
     };
   };
 
