@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, FileSpreadsheet, Brain, Check, X, Zap, Download, ListChecks, Eye, CheckCircle2, AlertTriangle, Building2, ChevronDown, ChevronRight, Pencil, Table2, List, LayoutGrid, Search, Filter, Clock, XCircle, MinusCircle, Layers, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { ArrowLeft, ArrowRight, FileSpreadsheet, Brain, Check, X, Zap, Download, ListChecks, Eye, CheckCircle2, AlertTriangle, Building2, ChevronDown, ChevronRight, Pencil, Table2, List, LayoutGrid, Search, Filter, Clock, XCircle, MinusCircle, Layers, TrendingUp, TrendingDown, Minus, Loader2 } from "lucide-react";
 import { PLTableView } from "@/components/doc-intel/PLTableView";
 import { PLReviewGrid } from "@/components/doc-intel/PLReviewGrid";
 import { Button } from "@/components/ui/button";
@@ -367,6 +367,17 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
 
   return (
     <div className="container mx-auto py-6 space-y-6">
+      {autoConfirmMutation.isPending && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-4 p-8 rounded-lg bg-card border shadow-lg">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <div className="text-center">
+              <p className="text-lg font-semibold">Auto-Confirming Items</p>
+              <p className="text-sm text-muted-foreground">Processing high confidence items...</p>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={onClose} data-testid="button-back">
