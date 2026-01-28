@@ -63,6 +63,7 @@ export default function DocumentIntelligence() {
   const { data: uploads = [], isLoading: uploadsLoading } = useQuery<UploadWithStats[]>({
     queryKey: ["/api/modeling/projects", projectId, "documents"],
     enabled: !!projectId,
+    refetchInterval: selectedUpload ? 2000 : false, // Poll every 2s when reviewing
   });
 
   const { data: categories = [] } = useQuery<PnlCategory[]>({
