@@ -22751,3 +22751,51 @@ export const aiSpendingLimits = pgTable('ai_spending_limits', {
 export type AiUsageTracking = typeof aiUsageTracking.$inferSelect;
 export type InsertAiUsageTracking = typeof aiUsageTracking.$inferInsert;
 export type AiSpendingLimits = typeof aiSpendingLimits.$inferSelect;
+
+// ============================================================================
+// LINE ITEM LEARNING RULES - Learning from user confirmations
+// ============================================================================
+export const confidenceTierEnum = ['high', 'medium', 'low'] as const;
+export type ConfidenceTier = (typeof confidenceTierEnum)[number];
+export const ruleSourceEnum = ['user_confirmed', 'bulk_import', 'admin_override'] as const;
+export type RuleSource = (typeof ruleSourceEnum)[number];
+
+export const lineItemLearningRules = pgTable('line_item_learning_rules', {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull(),
+  marinaId: varchar("marina_id"),
+  normalizedLineItem: text("normalized_line_item").notNull(),
+  originalLineItem: text("original_line_item"),
+  category: text("category").notNull(),
+  subcategory: text("subcategory"),
+  department: text("department"),
+  confidenceTier: text("confidence_tier").notNull().$type<ConfidenceTier>().default('high'),
+  source: text("source").notNull().$type<RuleSource>().default('user_confirmed'),
+  createdByUserId: varchar("created_by_user_id"),
+  timesUsed: integer("times_used").notNull().default(0),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  tenantIdIdx: index('line_item_rules_tenant_id_idx').on(table.tenantId),
+  tenantMarinaIdx: index('line_item_rules_tenant_marina_idx').on(table.tenantId, table.marinaId),
+  normalizedLineItemIdx: index('line_item_rules_normalized_idx').on(table.normalizedLineItem),
+  categoryIdx: index('line_item_rules_category_idx').on(table.category),
+}));
+
+export type LineItemLearningRule = typeof lineItemLearningRules.$inferSelect;
+export type NewLineItemLearningRule = typeof lineItemLearningRules.$inferInsert;
+export const insertLineItemLearningRuleSchema = createInsertSchema(lineItemLearningRules);
+export const upsertLearningRuleSchema = z.object({
+  tenantId: z.string(),
+  marinaId: z.string().nullable().optional(),
+  normalizedLineItem: z.string().min(1),
+  originalLineItem: z.string().optional(),
+  category: z.string().min(1),
+  subcategory: z.string().nullable().optional(),
+  department: z.string().nullable().optional(),
+  confidenceTier: z.enum(confidenceTierEnum).default('high'),
+  source: z.enum(ruleSourceEnum).default('user_confirmed'),
+  createdByUserId: z.string().optional(),
+});
+export type UpsertLearningRuleInput = z.infer<typeof upsertLearningRuleSchema>;
