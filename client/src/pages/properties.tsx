@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Upload, Plus, Search, Edit, Trash2, MapPin, Anchor, Building, DollarSign, Home, TrendingUp, FolderPlus } from "lucide-react";
 import { FileUpload } from "@/components/file-upload";
 import PropertyFormModal from "@/components/modals/property-form-modal";
+import { CreatePropertyWizardModal } from "@/components/modals/create-property-wizard-modal";
 import PortfolioWizard from "@/components/salescomps/sales-comps/PortfolioWizard";
 import { CrmPageShell } from "@/components/crm/CrmPageShell";
 import { CrmTopBar } from "@/components/crm/CrmTopBar";
@@ -76,6 +77,7 @@ export default function Properties() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isPropertyFormOpen, setIsPropertyFormOpen] = useState(false);
+  const [isCreateWizardOpen, setIsCreateWizardOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [showFileUpload, setShowFileUpload] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
@@ -134,7 +136,7 @@ export default function Properties() {
 
   const handleAdd = () => {
     setEditingProperty(null);
-    setIsPropertyFormOpen(true);
+    setIsCreateWizardOpen(true);
   };
 
   const handleFileUpload = async (files: File[]) => {
@@ -479,6 +481,11 @@ export default function Properties() {
 
       <PropertyFormModal isOpen={isPropertyFormOpen} onClose={() => { setIsPropertyFormOpen(false); setEditingProperty(null); }} property={editingProperty} />
       <PortfolioWizard open={showPortfolioWizard} onClose={() => setShowPortfolioWizard(false)} />
+      
+      <CreatePropertyWizardModal
+        open={isCreateWizardOpen}
+        onOpenChange={setIsCreateWizardOpen}
+      />
     </CrmPageShell>
   );
 }

@@ -10,6 +10,7 @@ import { Plus, Search, Edit, Trash2, Mail, Phone, Building, Upload, Users, User,
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import ContactFormModal from "@/components/modals/contact-form-modal";
+import { CreateContactWizardModal } from "@/components/modals/create-contact-wizard-modal";
 import { FileUpload } from "@/components/file-upload";
 import { ImportResultsModal, type ImportResult } from "@/components/import-results-modal";
 import { CrmPageShell } from "@/components/crm/CrmPageShell";
@@ -52,6 +53,7 @@ export default function Contacts() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [contactTagFilter, setContactTagFilter] = useState('all');
   const [isContactFormOpen, setIsContactFormOpen] = useState(false);
+  const [isCreateWizardOpen, setIsCreateWizardOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [selectedContact, setSelectedContact] = useState<ContactWithCompany | null>(null);
   const [showFileUpload, setShowFileUpload] = useState(false);
@@ -120,7 +122,7 @@ export default function Contacts() {
 
   const handleAdd = () => {
     setEditingContact(null);
-    setIsContactFormOpen(true);
+    setIsCreateWizardOpen(true);
   };
 
   const handleRowClick = (contact: ContactWithCompany) => {
@@ -605,6 +607,11 @@ export default function Contacts() {
         onClose={() => setShowImportResults(false)}
         results={importResults}
         entityType="contacts"
+      />
+
+      <CreateContactWizardModal
+        open={isCreateWizardOpen}
+        onOpenChange={setIsCreateWizardOpen}
       />
     </CrmPageShell>
   );

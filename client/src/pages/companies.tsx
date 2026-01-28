@@ -12,6 +12,7 @@ import { Building, Plus, Edit, Trash2, Upload, Search, Globe, Users, MapPin, Tre
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import CompanyFormModal from "@/components/modals/company-form-modal";
+import { CreateCompanyWizardModal } from "@/components/modals/create-company-wizard-modal";
 import { FileUpload } from "@/components/file-upload";
 import KpiSettingsModal from "@/components/modals/kpi-settings-modal";
 import { CrmPageShell } from "@/components/crm/CrmPageShell";
@@ -99,6 +100,7 @@ export default function Companies() {
   const [industryFilter, setIndustryFilter] = useState('all');
   const [sizeFilter, setSizeFilter] = useState('all');
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isCreateWizardOpen, setIsCreateWizardOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [showFileUpload, setShowFileUpload] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
@@ -271,7 +273,7 @@ export default function Companies() {
 
   const handleAdd = () => {
     setEditingCompany(null);
-    setIsFormOpen(true);
+    setIsCreateWizardOpen(true);
   };
 
   const handleRowClick = (company: Company) => {
@@ -817,6 +819,11 @@ export default function Companies() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <CreateCompanyWizardModal
+        open={isCreateWizardOpen}
+        onOpenChange={setIsCreateWizardOpen}
+      />
     </CrmPageShell>
   );
 }
