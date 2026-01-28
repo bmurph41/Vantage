@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { UploadDropzone } from "./UploadDropzone";
-import { ReviewWizard } from "./ReviewWizard";
+import { MultiDocumentReview } from "./MultiDocumentReview";
 import { CategoryManager } from "./CategoryManager";
 import { HoldingStation } from "./HoldingStation";
 import type { DocIntelUpload, PnlCategory } from "@shared/schema";
@@ -32,19 +32,19 @@ export default function DocumentIntelligence() {
   const [location, navigate] = useLocation();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("holding");
-  const [selectedUpload, setSelectedUpload] = useState<string | null>(null);
+  
+  // Multi-document review state
+  const [reviewingDocumentIds, setReviewingDocumentIds] = useState<string[]>([]);
+  const [isMultiReviewMode, setIsMultiReviewMode] = useState(false);
 
-  // Read upload parameter from URL on mount and when URL changes
+  // Read upload parameter from URL on mount
   useEffect(() => {
-    // Parse URL search params (handle both ? and encoded %3F)
     const fullUrl = window.location.href;
     let uploadParam: string | null = null;
     
-    // Try standard URL parsing first
     const urlParams = new URLSearchParams(window.location.search);
     uploadParam = urlParams.get('upload');
     
-    // If not found, check for encoded query string in the path
     if (!uploadParam && fullUrl.includes('%3F')) {
       const decodedUrl = decodeURIComponent(fullUrl);
       const queryStart = decodedUrl.indexOf('?');
@@ -55,15 +55,20 @@ export default function DocumentIntelligence() {
       }
     }
     
+    // Handle comma-separated list of upload IDs
     if (uploadParam) {
-      setSelectedUpload(uploadParam);
+      const ids = uploadParam.split(',').filter(Boolean);
+      if (ids.length > 0) {
+        setReviewingDocumentIds(ids);
+        setIsMultiReviewMode(true);
+      }
     }
   }, [location]);
 
   const { data: uploads = [], isLoading: uploadsLoading } = useQuery<UploadWithStats[]>({
     queryKey: ["/api/modeling/projects", projectId, "documents"],
     enabled: !!projectId,
-    refetchInterval: selectedUpload ? 2000 : false, // Poll every 2s when reviewing
+    refetchInterval: isMultiReviewMode ? 2000 : false,
   });
 
   const { data: categories = [] } = useQuery<PnlCategory[]>({
@@ -125,16 +130,33 @@ export default function DocumentIntelligence() {
     }
   };
 
-  const handleUploadComplete = (upload: DocIntelUpload) => {
-    queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents"] });
-    setSelectedUpload(upload.id);
-    toast({ title: "Upload successful", description: `${upload.originalName} is ready for processing.` });
+  /**
+   * Called from HoldingStation when user clicks "Review All"
+   * Enters multi-document review mode with tabs
+   */
+  const handleReviewDocuments = (documentIds: string[]) => {
+    if (documentIds.length === 0) return;
+    setReviewingDocumentIds(documentIds);
+    setIsMultiReviewMode(true);
   };
 
-  const handleReviewComplete = () => {
-    setSelectedUpload(null);
+  /**
+   * Exit multi-document review mode
+   */
+  const handleCloseMultiReview = () => {
+    setReviewingDocumentIds([]);
+    setIsMultiReviewMode(false);
     queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents"] });
-    toast({ title: "Import complete", description: "Line items have been imported to your P&L." });
+  };
+
+  /**
+   * Called when all documents have been applied to the model
+   */
+  const handleReviewComplete = () => {
+    setReviewingDocumentIds([]);
+    setIsMultiReviewMode(false);
+    queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents"] });
+    toast({ title: "Import complete", description: "All documents have been imported to your model." });
   };
 
   const getStatusBadge = (status: string) => {
@@ -155,21 +177,22 @@ export default function DocumentIntelligence() {
     );
   };
 
-  if (selectedUpload) {
-    const upload = uploads.find(u => u.id === selectedUpload);
-    if (upload) {
-      return (
-        <ReviewWizard
-          projectId={projectId!}
-          upload={upload}
-          categories={categories}
-          onClose={() => setSelectedUpload(null)}
-          onComplete={handleReviewComplete}
-        />
-      );
-    }
+  // MULTI-DOCUMENT REVIEW MODE
+  if (isMultiReviewMode && reviewingDocumentIds.length > 0) {
+    const reviewUploads = uploads.filter(u => reviewingDocumentIds.includes(u.id));
+    
+    return (
+      <MultiDocumentReview
+        projectId={projectId!}
+        uploads={reviewUploads}
+        categories={categories}
+        onClose={handleCloseMultiReview}
+        onComplete={handleReviewComplete}
+      />
+    );
   }
 
+  // NORMAL VIEW
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -193,120 +216,19 @@ export default function DocumentIntelligence() {
         <TabsList>
           <TabsTrigger value="holding" data-testid="tab-holding">
             <Inbox className="h-4 w-4 mr-2" />
-            Holding Station
-          </TabsTrigger>
-          <TabsTrigger value="uploads" data-testid="tab-uploads">
-            <Upload className="h-4 w-4 mr-2" />
-            Processing
+            Upload & Process
           </TabsTrigger>
           <TabsTrigger value="categories" data-testid="tab-categories">
             <Settings className="h-4 w-4 mr-2" />
-            Categories
+            Categories & Aliases
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="holding" className="space-y-6">
           <HoldingStation
             projectId={projectId!}
-            onProcessDocument={(uploadId) => {
-              setActiveTab("uploads");
-              setSelectedUpload(uploadId);
-            }}
+            onReviewDocuments={handleReviewDocuments}
           />
-        </TabsContent>
-
-        <TabsContent value="uploads" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Upload Documents</CardTitle>
-              <CardDescription>
-                Upload Excel, CSV, or PDF files containing P&L statements or Rent Rolls for AI-powered parsing
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <UploadDropzone projectId={projectId!} onUploadComplete={handleUploadComplete} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Recent Uploads</CardTitle>
-                <CardDescription>View and manage your uploaded documents</CardDescription>
-              </div>
-              {uploads.length > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDeleteAll}
-                  disabled={deleteAllDocumentsMutation.isPending}
-                  className="text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Clear All
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent>
-              {uploadsLoading ? (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-                </div>
-              ) : uploads.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <FileSpreadsheet className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No documents uploaded yet</p>
-                  <p className="text-sm">Upload a P&L or Rent Roll to get started</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {uploads.map((upload) => (
-                    <div
-                      key={upload.id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                      onClick={() => setSelectedUpload(upload.id)}
-                      data-testid={`upload-item-${upload.id}`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <FileSpreadsheet className="h-8 w-8 text-green-600" />
-                        <div>
-                          <p className="font-medium">{upload.originalName}</p>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <span>{upload.docType?.toUpperCase() || "Unknown"}</span>
-                            {upload.year && <span>• {upload.year}</span>}
-                            <span>• {(upload.fileSize / 1024).toFixed(1)} KB</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        {upload.stats && upload.status === "reviewing" && (
-                          <div className="flex items-center gap-2">
-                            <Progress 
-                              value={(upload.stats.confirmed / upload.stats.total) * 100} 
-                              className="w-24 h-2"
-                            />
-                            <span className="text-sm text-muted-foreground">
-                              {upload.stats.confirmed}/{upload.stats.total}
-                            </span>
-                          </div>
-                        )}
-                        {getStatusBadge(upload.status)}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => handleDeleteDocument(e, upload.id)}
-                          disabled={deleteDocumentMutation.isPending}
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="categories">

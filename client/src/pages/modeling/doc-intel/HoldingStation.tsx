@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDropzone } from "react-dropzone";
 import { 
@@ -6,19 +6,15 @@ import {
   FileSpreadsheet, 
   FileText, 
   Trash2, 
-  Tag, 
   AlertTriangle, 
   CheckCircle2, 
   Clock, 
   MoreVertical,
-  Play,
   X,
-  Filter,
-  Pencil,
-  Check,
   Loader2,
   Brain,
-  Plus
+  Plus,
+  Eye
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,7 +23,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -39,7 +34,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -60,23 +54,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { DocIntelUpload, CustomDocumentType } from "@shared/schema";
-import { format } from "date-fns";
 
 type DocType = "pnl" | "rent_roll" | "balance_sheet" | "rate_sheet" | "invoice" | "other" | string;
-type HoldingStatus = "staging" | "validated" | "ready_to_process" | "processing" | "processed";
 
 interface HoldingStationProps {
   projectId: string;
-  onProcessDocument: (uploadId: string) => void;
+  onReviewDocuments: (uploadIds: string[]) => void;
 }
 
 interface StagedFile {
@@ -86,11 +72,10 @@ interface StagedFile {
   docType: DocType;
   customTypeName?: string;
   year: string;
-  tags: string[];
-  notes: string;
-  status: "pending" | "uploading" | "uploaded" | "error";
+  status: "pending" | "uploading" | "uploaded" | "parsing" | "parsed" | "error";
   progress: number;
   errorMessage?: string;
+  uploadId?: string; // Set after upload completes
 }
 
 const BUILTIN_DOC_TYPES: Record<string, { label: string; icon: typeof FileSpreadsheet }> = {
@@ -102,29 +87,18 @@ const BUILTIN_DOC_TYPES: Record<string, { label: string; icon: typeof FileSpread
   other: { label: "Other", icon: FileText },
 };
 
-const HOLDING_STATUS_CONFIG: Record<HoldingStatus, { label: string; color: string; icon: typeof Clock }> = {
-  staging: { label: "Staging", color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300", icon: Clock },
-  validated: { label: "Validated", color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300", icon: CheckCircle2 },
-  ready_to_process: { label: "Ready", color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300", icon: Play },
-  processing: { label: "Processing", color: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300", icon: Clock },
-  processed: { label: "Processed", color: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300", icon: CheckCircle2 },
-};
-
-const COMMON_TAGS = ["2024", "2023", "2022", "Annual", "Q1", "Q2", "Q3", "Q4", "Audited", "Draft", "Final"];
-
-export function HoldingStation({ projectId, onProcessDocument }: HoldingStationProps) {
+export function HoldingStation({ projectId, onReviewDocuments }: HoldingStationProps) {
   const { toast } = useToast();
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [editingDocument, setEditingDocument] = useState<DocIntelUpload | null>(null);
-  const [filterStatus, setFilterStatus] = useState<HoldingStatus | "all">("all");
-  const [filterDocType, setFilterDocType] = useState<DocType | "all">("all");
   const [newCustomTypeName, setNewCustomTypeName] = useState("");
   const [showAddTypeDialog, setShowAddTypeDialog] = useState(false);
-  const [parsingDocId, setParsingDocId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState<string>("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingMessage, setProcessingMessage] = useState("");
 
+  // Fetch documents from server
   const { data: holdingQueue = [], isLoading, refetch } = useQuery<DocIntelUpload[]>({
     queryKey: ["/api/modeling/projects", projectId, "documents", "holding"],
     queryFn: async () => {
@@ -133,16 +107,28 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
       return res.json();
     },
     refetchInterval: (data) => {
+      // Poll more frequently while documents are processing
       const hasProcessingDocs = data?.state?.data?.some(
         (doc) => doc.status === "uploaded" || doc.status === "processing"
       );
-      return hasProcessingDocs ? 3000 : false;
+      return hasProcessingDocs ? 2000 : false;
     },
   });
 
   const { data: customDocTypes = [] } = useQuery<CustomDocumentType[]>({
     queryKey: ["/api/doc-intel/custom-document-types"],
   });
+
+  // Check if ALL documents are ready for review (parsed or reviewing status)
+  const parsedDocuments = holdingQueue.filter(
+    (doc) => doc.status === "parsed" || doc.status === "reviewing"
+  );
+  const processingDocuments = holdingQueue.filter(
+    (doc) => doc.status === "uploaded" || doc.status === "processing"
+  );
+  const allDocumentsReady = holdingQueue.length > 0 && 
+    processingDocuments.length === 0 && 
+    parsedDocuments.length === holdingQueue.length;
 
   const createCustomTypeMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -165,8 +151,6 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
       formData.append("file", stagedFile.file);
       formData.append("docType", stagedFile.docType === "other" && stagedFile.customTypeName ? "other" : stagedFile.docType);
       formData.append("year", stagedFile.year);
-      formData.append("tags", JSON.stringify(stagedFile.tags));
-      formData.append("notes", stagedFile.notes);
       formData.append("holdingStatus", "staging");
       formData.append("displayName", stagedFile.displayName);
       if (stagedFile.customTypeName) {
@@ -183,8 +167,12 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
       }
       return response.json();
     },
-    onSuccess: () => {
-      refetch();
+  });
+
+  const parseDocumentMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${id}/parse`);
+      return id;
     },
   });
 
@@ -206,24 +194,6 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
     },
   });
 
-  const parseDocumentMutation = useMutation({
-    mutationFn: async (id: string) => {
-      setParsingDocId(id);
-      await apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${id}/parse`);
-      return id;
-    },
-    onSuccess: (id) => {
-      refetch();
-      setParsingDocId(null);
-      toast({ title: "Parsed", description: "Document parsed successfully. Ready for review." });
-      onProcessDocument(id);
-    },
-    onError: (error: any) => {
-      setParsingDocId(null);
-      toast({ title: "Parse failed", description: error.message || "Failed to parse document", variant: "destructive" });
-    },
-  });
-
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const newStagedFiles: StagedFile[] = acceptedFiles.map((file) => ({
       file,
@@ -231,8 +201,6 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
       displayName: file.name,
       docType: guessDocType(file.name),
       year: new Date().getFullYear().toString(),
-      tags: [],
-      notes: "",
       status: "pending" as const,
       progress: 0,
     }));
@@ -279,26 +247,96 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
     setStagedFiles((prev) => prev.filter((f) => f.id !== id));
   };
 
-  const uploadAllStaged = async () => {
-    for (const staged of stagedFiles.filter((f) => f.status === "pending")) {
+  /**
+   * MAIN WORKFLOW: Upload all staged files, then automatically parse them
+   */
+  const uploadAndParseAll = async () => {
+    const pendingFiles = stagedFiles.filter((f) => f.status === "pending");
+    if (pendingFiles.length === 0) return;
+
+    setIsProcessing(true);
+    setProcessingMessage(`Uploading ${pendingFiles.length} document(s)...`);
+
+    const uploadedIds: string[] = [];
+
+    // Step 1: Upload all files
+    for (let i = 0; i < pendingFiles.length; i++) {
+      const staged = pendingFiles[i];
+      setProcessingMessage(`Uploading ${i + 1} of ${pendingFiles.length}: ${staged.displayName}`);
       updateStagedFile(staged.id, { status: "uploading", progress: 30 });
+      
       try {
-        await uploadMutation.mutateAsync(staged);
-        updateStagedFile(staged.id, { status: "uploaded", progress: 100 });
+        const result = await uploadMutation.mutateAsync(staged);
+        updateStagedFile(staged.id, { status: "uploaded", progress: 60, uploadId: result.id });
+        uploadedIds.push(result.id);
       } catch (error: any) {
         updateStagedFile(staged.id, { status: "error", errorMessage: error.message });
       }
     }
+
+    // Step 2: Automatically trigger parsing for all uploaded documents
+    if (uploadedIds.length > 0) {
+      setProcessingMessage(`AI parsing ${uploadedIds.length} document(s)...`);
+      
+      // Update staged files to show parsing status
+      stagedFiles.forEach((f) => {
+        if (f.uploadId && uploadedIds.includes(f.uploadId)) {
+          updateStagedFile(f.id, { status: "parsing", progress: 80 });
+        }
+      });
+
+      // Trigger parse for each document (in parallel)
+      const parsePromises = uploadedIds.map(async (uploadId) => {
+        try {
+          await parseDocumentMutation.mutateAsync(uploadId);
+          return { uploadId, success: true };
+        } catch (error: any) {
+          console.error(`Parse failed for ${uploadId}:`, error);
+          return { uploadId, success: false, error: error.message };
+        }
+      });
+
+      const parseResults = await Promise.all(parsePromises);
+      
+      // Update staged file statuses based on parse results
+      parseResults.forEach((result) => {
+        const staged = stagedFiles.find((f) => f.uploadId === result.uploadId);
+        if (staged) {
+          if (result.success) {
+            updateStagedFile(staged.id, { status: "parsed", progress: 100 });
+          } else {
+            updateStagedFile(staged.id, { status: "error", errorMessage: result.error });
+          }
+        }
+      });
+
+      const successCount = parseResults.filter((r) => r.success).length;
+      const failCount = parseResults.filter((r) => !r.success).length;
+
+      if (successCount > 0) {
+        toast({ 
+          title: "Processing complete", 
+          description: `${successCount} document(s) parsed successfully.${failCount > 0 ? ` ${failCount} failed.` : ''}` 
+        });
+      }
+    }
+
+    // Refetch the holding queue to get updated statuses
+    await refetch();
+
+    // Clear completed staged files after a delay
     setTimeout(() => {
-      setStagedFiles((prev) => prev.filter((f) => f.status !== "uploaded"));
+      setStagedFiles((prev) => prev.filter((f) => f.status !== "parsed" && f.status !== "uploaded"));
     }, 2000);
+
+    setIsProcessing(false);
+    setProcessingMessage("");
   };
 
-  const filteredQueue = holdingQueue.filter((doc) => {
-    if (filterStatus !== "all" && doc.holdingStatus !== filterStatus) return false;
-    if (filterDocType !== "all" && doc.docType !== filterDocType) return false;
-    return true;
-  });
+  const handleReviewAll = () => {
+    const readyDocIds = parsedDocuments.map((doc) => doc.id);
+    onReviewDocuments(readyDocIds);
+  };
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -310,14 +348,6 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
       }
       return next;
     });
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedIds.size === filteredQueue.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(filteredQueue.map((d) => d.id)));
-    }
   };
 
   const handleBatchDelete = async () => {
@@ -341,158 +371,168 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
     return custom?.name || docType;
   };
 
-  const allDocTypes = [
-    ...Object.entries(BUILTIN_DOC_TYPES).map(([key, { label }]) => ({ key, label })),
-    ...customDocTypes.map(t => ({ key: t.id, label: t.name })),
-  ];
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 10 }, (_, i) => (currentYear - i).toString());
 
   return (
     <div className="space-y-6">
+      {/* FULL-SCREEN PROCESSING OVERLAY */}
+      {isProcessing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-4 p-8 rounded-lg bg-card border shadow-lg max-w-md">
+            <div className="relative">
+              <Loader2 className="h-16 w-16 animate-spin text-primary" />
+              <Brain className="h-8 w-8 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-primary" />
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-semibold">Processing Documents</p>
+              <p className="text-sm text-muted-foreground mt-1">{processingMessage}</p>
+            </div>
+            <Progress value={undefined} className="w-64 h-2" />
+          </div>
+        </div>
+      )}
+
+      {/* Upload Dropzone Card */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
-            Document Uploads
+            Upload Documents
           </CardTitle>
           <CardDescription>
-            Upload P&L statements and rent rolls for AI-powered parsing and categorization
+            Drop P&L statements, rent rolls, or other financial documents for AI-powered analysis
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div
             {...getRootProps()}
-            className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+            className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
               isDragActive
                 ? "border-primary bg-primary/5"
                 : "border-muted-foreground/25 hover:border-primary/50"
             }`}
           >
             <input {...getInputProps()} />
-            <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+            <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             {isDragActive ? (
-              <p className="font-medium">Drop files here...</p>
+              <p className="font-medium text-lg">Drop files here...</p>
             ) : (
               <>
-                <p className="font-medium">Drag & drop a file here</p>
-                <p className="text-sm text-muted-foreground mt-1">or click to browse your files</p>
+                <p className="font-medium text-lg">Drag & drop files here</p>
+                <p className="text-sm text-muted-foreground mt-1">or click to browse</p>
                 <p className="text-xs text-muted-foreground mt-3">
-                  Supported formats: Excel (.xlsx, .xls), CSV, PDF • Max size: 50MB
+                  Supported: Excel (.xlsx, .xls), CSV, PDF • Max 50MB
                 </p>
               </>
             )}
           </div>
 
+          {/* Staged Files List */}
           {stagedFiles.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="font-medium text-sm">Staged Files ({stagedFiles.length})</h3>
-                <Button onClick={uploadAllStaged} size="sm">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload All
+                <h4 className="font-medium">Files to Upload ({stagedFiles.length})</h4>
+                <Button 
+                  onClick={uploadAndParseAll} 
+                  disabled={isProcessing || !stagedFiles.some((f) => f.status === "pending")}
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload & Process
+                    </>
+                  )}
                 </Button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+
+              <div className="space-y-2">
                 {stagedFiles.map((staged) => (
-                  <Card key={staged.id} className="p-3">
-                    <div className="space-y-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <FileSpreadsheet className="h-8 w-8 text-green-600 flex-shrink-0" />
-                          <div className="min-w-0">
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <p className="font-medium text-sm truncate">{staged.displayName}</p>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>{staged.file.name}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                            <p className="text-xs text-muted-foreground">{formatFileSize(staged.file.size)}</p>
-                          </div>
-                        </div>
+                  <div
+                    key={staged.id}
+                    className={`flex items-center gap-3 p-3 border rounded-lg ${
+                      staged.status === "parsed" ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950" :
+                      staged.status === "error" ? "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950" :
+                      "border-border"
+                    }`}
+                  >
+                    <FileSpreadsheet className="h-8 w-8 text-green-600 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{staged.displayName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatFileSize(staged.file.size)}
+                      </p>
+                    </div>
+
+                    {staged.status === "pending" && (
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={staged.docType}
+                          onValueChange={(v) => updateStagedFile(staged.id, { docType: v as DocType })}
+                        >
+                          <SelectTrigger className="w-32 h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(BUILTIN_DOC_TYPES).map(([key, { label }]) => (
+                              <SelectItem key={key} value={key}>{label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={staged.year}
+                          onValueChange={(v) => updateStagedFile(staged.id, { year: v })}
+                        >
+                          <SelectTrigger className="w-20 h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {yearOptions.map((y) => (
+                              <SelectItem key={y} value={y}>{y}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6 flex-shrink-0"
+                          className="h-8 w-8"
                           onClick={() => removeStagedFile(staged.id)}
                         >
-                          <X className="h-3 w-3" />
+                          <X className="h-4 w-4" />
                         </Button>
                       </div>
+                    )}
 
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <Label className="text-xs">Document Type</Label>
-                          <Select
-                            value={staged.docType}
-                            onValueChange={(v) => {
-                              updateStagedFile(staged.id, { docType: v as DocType, customTypeName: undefined });
-                            }}
-                          >
-                            <SelectTrigger className="h-8 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {allDocTypes.map(({ key, label }) => (
-                                <SelectItem key={key} value={key}>{label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label className="text-xs">Fiscal Year</Label>
-                          <Input
-                            type="number"
-                            value={staged.year}
-                            onChange={(e) => updateStagedFile(staged.id, { year: e.target.value })}
-                            className="h-8 text-xs"
-                          />
-                        </div>
+                    {staged.status === "uploading" && (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="text-xs text-muted-foreground">Uploading...</span>
                       </div>
+                    )}
 
-                      {staged.docType === "other" && (
-                        <div>
-                          <Label className="text-xs">Custom Type Name</Label>
-                          <div className="flex gap-2">
-                            <Input
-                              value={staged.customTypeName || ""}
-                              onChange={(e) => updateStagedFile(staged.id, { customTypeName: e.target.value })}
-                              placeholder="Enter custom type name"
-                              className="h-8 text-xs flex-1"
-                            />
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-8 px-2"
-                              onClick={() => {
-                                if (staged.customTypeName?.trim()) {
-                                  createCustomTypeMutation.mutate(staged.customTypeName.trim());
-                                }
-                              }}
-                              disabled={!staged.customTypeName?.trim() || createCustomTypeMutation.isPending}
-                            >
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      )}
+                    {staged.status === "parsing" && (
+                      <div className="flex items-center gap-2">
+                        <Brain className="h-4 w-4 animate-pulse text-primary" />
+                        <span className="text-xs text-muted-foreground">AI Parsing...</span>
+                      </div>
+                    )}
 
-                      {staged.status === "uploading" && (
-                        <Progress value={staged.progress} className="h-1.5" />
-                      )}
-                      {staged.status === "error" && (
-                        <p className="text-xs text-destructive">{staged.errorMessage}</p>
-                      )}
-                      {staged.status === "uploaded" && (
-                        <p className="text-xs text-green-600 flex items-center gap-1">
-                          <CheckCircle2 className="h-3 w-3" />
-                          Uploaded
-                        </p>
-                      )}
-                    </div>
-                  </Card>
+                    {staged.status === "parsed" && (
+                      <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    )}
+
+                    {staged.status === "error" && (
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-5 w-5 text-red-600" />
+                        <span className="text-xs text-red-600">{staged.errorMessage}</span>
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
@@ -500,16 +540,23 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
         </CardContent>
       </Card>
 
+      {/* Document Queue Card */}
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Clock className="h-5 w-5" />
-                Pending Review
+              <CardTitle className="flex items-center gap-2">
+                <FileSpreadsheet className="h-5 w-5" />
+                Document Queue
+                {processingDocuments.length > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    {processingDocuments.length} processing
+                  </Badge>
+                )}
               </CardTitle>
               <CardDescription>
-                Documents awaiting AI processing or user review
+                Documents awaiting or completed AI processing
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
@@ -527,6 +574,13 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
                   Delete ({selectedIds.size})
                 </Button>
               )}
+              {/* REVIEW ALL BUTTON - Only visible when all docs are ready */}
+              {allDocumentsReady && parsedDocuments.length > 0 && (
+                <Button onClick={handleReviewAll}>
+                  <Eye className="h-4 w-4 mr-2" />
+                  Review All ({parsedDocuments.length})
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -535,15 +589,15 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
             <div className="flex justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : filteredQueue.length === 0 ? (
+          ) : holdingQueue.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <FileSpreadsheet className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p className="font-medium">No Documents Yet</p>
-              <p className="text-sm">Upload your first P&L statement or rent roll to get started with AI-powered analysis.</p>
+              <p className="text-sm">Upload your first document to get started with AI-powered analysis.</p>
             </div>
           ) : (
             <div className="space-y-2">
-              {filteredQueue.map((doc) => (
+              {holdingQueue.map((doc) => (
                 <div
                   key={doc.id}
                   className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors"
@@ -562,47 +616,23 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant={doc.status === "parsed" || doc.status === "reviewing" ? "default" : "secondary"} className="text-xs">
+                    <Badge 
+                      variant={
+                        doc.status === "parsed" || doc.status === "reviewing" ? "default" : 
+                        doc.status === "error" ? "destructive" : "secondary"
+                      } 
+                      className="text-xs"
+                    >
                       {doc.status === "uploaded" && <Clock className="h-3 w-3 mr-1" />}
                       {doc.status === "processing" && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
-                      {doc.status === "parsed" && <CheckCircle2 className="h-3 w-3 mr-1" />}
-                      {doc.status === "reviewing" && <Brain className="h-3 w-3 mr-1" />}
+                      {(doc.status === "parsed" || doc.status === "reviewing") && <CheckCircle2 className="h-3 w-3 mr-1" />}
                       {doc.status === "error" && <AlertTriangle className="h-3 w-3 mr-1" />}
-                      {doc.status === "uploaded" ? "Pending" : 
+                      {doc.status === "uploaded" ? "Queued" : 
                        doc.status === "processing" ? "Processing..." : 
-                       doc.status === "reviewing" ? "Ready for Review" :
+                       doc.status === "parsed" || doc.status === "reviewing" ? "Ready" :
                        doc.status === "error" ? "Error" :
                        doc.status}
                     </Badge>
-                    {doc.status === "uploaded" && !(doc.status as string).includes("process") && (
-                      <Button
-                        size="sm"
-                        onClick={() => parseDocumentMutation.mutate(doc.id)}
-                        disabled={parsingDocId === doc.id}
-                      >
-                        {parsingDocId === doc.id ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                            Parsing...
-                          </>
-                        ) : (
-                          <>
-                            <Brain className="h-4 w-4 mr-1" />
-                            Parse
-                          </>
-                        )}
-                      </Button>
-                    )}
-                    {(doc.status === "parsed" || doc.status === "reviewing") && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onProcessDocument(doc.id)}
-                      >
-                        <CheckCircle2 className="h-4 w-4 mr-1" />
-                        Review
-                      </Button>
-                    )}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -612,7 +642,7 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => {
                           setDeleteConfirmId(doc.id);
-                          setDeleteConfirmName(doc.originalFileName || doc.displayName || "this document");
+                          setDeleteConfirmName(doc.originalName || "this document");
                         }}>
                           <Trash2 className="h-4 w-4 mr-2" />
                           Delete
@@ -627,12 +657,13 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
         </CardContent>
       </Card>
 
+      {/* Add Custom Type Dialog */}
       <Dialog open={showAddTypeDialog} onOpenChange={setShowAddTypeDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Custom Document Type</DialogTitle>
             <DialogDescription>
-              Create a new document type that will be available across all your projects.
+              Create a new document type for categorizing your uploads.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -667,6 +698,7 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
         </DialogContent>
       </Dialog>
 
+      {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => {
         if (!open) {
           setDeleteConfirmId(null);
@@ -677,7 +709,7 @@ export function HoldingStation({ projectId, onProcessDocument }: HoldingStationP
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Document</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{deleteConfirmName}"? This action cannot be undone and will permanently remove the document and all its extracted data.
+              Are you sure you want to delete "{deleteConfirmName}"? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

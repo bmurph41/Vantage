@@ -1,0 +1,587 @@
+import { useState, useEffect, useMemo } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { 
+  ArrowLeft, 
+  FileSpreadsheet, 
+  Brain, 
+  Check, 
+  X, 
+  Zap, 
+  CheckCircle2, 
+  AlertTriangle,
+  ChevronDown, 
+  ChevronRight, 
+  Search, 
+  Clock, 
+  XCircle, 
+  Loader2,
+  Download,
+  FileText
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import type { DocIntelUpload, DocIntelExtractedItem, PnlCategory } from "@shared/schema";
+
+interface ExtractedItemWithCategory extends DocIntelExtractedItem {
+  suggestedCategory?: PnlCategory;
+  confirmedCategory?: PnlCategory;
+}
+
+interface MultiDocumentReviewProps {
+  projectId: string;
+  uploads: DocIntelUpload[];
+  categories: PnlCategory[];
+  onClose: () => void;
+  onComplete: () => void;
+}
+
+interface DocumentItemsState {
+  [uploadId: string]: ExtractedItemWithCategory[];
+}
+
+const DEPARTMENTS = [
+  { value: "marina_ops", label: "Marina Operations" },
+  { value: "fuel_dock", label: "Fuel Dock" },
+  { value: "ship_store", label: "Ship Store" },
+  { value: "restaurant", label: "Restaurant" },
+  { value: "boat_sales", label: "Boat Sales" },
+  { value: "service_dept", label: "Service Department" },
+  { value: "storage", label: "Storage" },
+  { value: "admin", label: "Administration" },
+  { value: "other", label: "Other" },
+];
+
+function sanitizeDisplayText(text: string | null): string {
+  if (!text) return '(no description)';
+  const printableRatio = (text.match(/[a-zA-Z0-9\s.,\-$%()/]/g) || []).length / Math.max(text.length, 1);
+  if (printableRatio < 0.5 && text.length > 10) {
+    return text.replace(/[^a-zA-Z0-9\s.,\-$%()/&'":;]/g, '').trim() || '(garbled text)';
+  }
+  return text.replace(/[\u0000-\u001F\u007F-\u009F]/g, '').trim();
+}
+
+export function MultiDocumentReview({ 
+  projectId, 
+  uploads, 
+  categories, 
+  onClose, 
+  onComplete 
+}: MultiDocumentReviewProps) {
+  const { toast } = useToast();
+  const [activeDocumentId, setActiveDocumentId] = useState(uploads[0]?.id || "");
+  const [documentItems, setDocumentItems] = useState<DocumentItemsState>({});
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'rejected'>('all');
+  const [searchText, setSearchText] = useState("");
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [isApplying, setIsApplying] = useState(false);
+
+  // Fetch items for each document
+  const itemQueries = uploads.map(upload => 
+    useQuery<ExtractedItemWithCategory[]>({
+      queryKey: ["/api/modeling/projects", projectId, "documents", upload.id, "items"],
+      enabled: !!upload.id,
+      refetchInterval: 3000,
+    })
+  );
+
+  // Update document items state when queries complete
+  useEffect(() => {
+    const newState: DocumentItemsState = {};
+    uploads.forEach((upload, index) => {
+      const query = itemQueries[index];
+      if (query.data) {
+        newState[upload.id] = query.data;
+      }
+    });
+    setDocumentItems(newState);
+  }, [itemQueries.map(q => q.data).join(',')]);
+
+  // Calculate totals across all documents
+  const allItems = useMemo(() => {
+    return Object.values(documentItems).flat();
+  }, [documentItems]);
+
+  const totalPending = allItems.filter(i => i.status === "pending").length;
+  const totalConfirmed = allItems.filter(i => i.status === "confirmed").length;
+  const totalRejected = allItems.filter(i => i.status === "rejected").length;
+  const totalItems = allItems.length;
+
+  // Check if all items are processed (no pending items)
+  const allItemsProcessed = totalPending === 0 && totalItems > 0;
+
+  // Current document items
+  const currentItems = documentItems[activeDocumentId] || [];
+  const currentUpload = uploads.find(u => u.id === activeDocumentId);
+
+  const filteredItems = useMemo(() => {
+    return currentItems.filter(item => {
+      if (statusFilter !== 'all' && item.status !== statusFilter) return false;
+      if (searchText.trim()) {
+        const searchLower = searchText.toLowerCase();
+        const matchesText = item.rawText?.toLowerCase().includes(searchLower);
+        const matchesCategory = categories
+          .find(c => c.id === (item.categoryConfirmed || item.categorySuggested))
+          ?.name?.toLowerCase().includes(searchLower);
+        if (!matchesText && !matchesCategory) return false;
+      }
+      return true;
+    });
+  }, [currentItems, statusFilter, searchText, categories]);
+
+  // Mutations
+  const confirmItemMutation = useMutation({
+    mutationFn: async ({ uploadId, itemId, categoryId, amount, department }: { 
+      uploadId: string; 
+      itemId: string; 
+      categoryId: string; 
+      amount?: number; 
+      department?: string 
+    }) => {
+      return apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${uploadId}/items/${itemId}/confirm`, { 
+        categoryId, 
+        amount,
+        department 
+      });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/modeling/projects", projectId, "documents", variables.uploadId, "items"] 
+      });
+    },
+  });
+
+  const rejectItemMutation = useMutation({
+    mutationFn: async ({ uploadId, itemId }: { uploadId: string; itemId: string }) => {
+      return apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${uploadId}/items/${itemId}/reject`);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/modeling/projects", projectId, "documents", variables.uploadId, "items"] 
+      });
+    },
+  });
+
+  const autoConfirmMutation = useMutation({
+    mutationFn: async ({ uploadId, threshold }: { uploadId: string; threshold: number }) => {
+      return apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${uploadId}/items/confirm-high-confidence`, { threshold });
+    },
+    onSuccess: (data: { confirmed: number }, variables) => {
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/modeling/projects", projectId, "documents", variables.uploadId, "items"] 
+      });
+      toast({ title: "Auto-confirmed", description: `${data.confirmed} high-confidence items confirmed.` });
+    },
+  });
+
+  const importMutation = useMutation({
+    mutationFn: async (uploadId: string) => {
+      return apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${uploadId}/import`, { 
+        fiscalYear: uploads.find(u => u.id === uploadId)?.year 
+      });
+    },
+    onSuccess: (data: { imported: number }) => {
+      return data;
+    },
+    onError: () => {
+      toast({ title: "Import failed", description: "Could not import items.", variant: "destructive" });
+    },
+  });
+
+  // Apply all documents to model
+  const handleApplyToModel = async () => {
+    if (!allItemsProcessed) return;
+
+    setIsApplying(true);
+    let totalImported = 0;
+    let errors = 0;
+
+    for (const upload of uploads) {
+      const items = documentItems[upload.id] || [];
+      const confirmedCount = items.filter(i => i.status === "confirmed").length;
+      
+      if (confirmedCount > 0) {
+        try {
+          const result = await importMutation.mutateAsync(upload.id);
+          totalImported += result.imported;
+        } catch {
+          errors++;
+        }
+      }
+    }
+
+    setIsApplying(false);
+
+    if (errors === 0) {
+      toast({ 
+        title: "Applied to Model", 
+        description: `${totalImported} line items imported from ${uploads.length} documents.` 
+      });
+      onComplete();
+    } else {
+      toast({ 
+        title: "Partial Success", 
+        description: `${totalImported} items imported. ${errors} document(s) had errors.`,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleAutoConfirmAll = async () => {
+    for (const upload of uploads) {
+      await autoConfirmMutation.mutateAsync({ uploadId: upload.id, threshold: 0.9 });
+    }
+  };
+
+  const formatAmount = (amount: string | number | null) => {
+    if (amount === null || amount === undefined) return "-";
+    const num = typeof amount === "string" ? parseFloat(amount) : amount;
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(num);
+  };
+
+  const getConfidenceBadge = (score: string | null) => {
+    if (!score) return <Badge variant="outline">No match</Badge>;
+    const num = parseFloat(score);
+    if (num >= 0.9) return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">High ({(num * 100).toFixed(0)}%)</Badge>;
+    if (num >= 0.7) return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100">Medium ({(num * 100).toFixed(0)}%)</Badge>;
+    return <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100">Low ({(num * 100).toFixed(0)}%)</Badge>;
+  };
+
+  const getDepartmentLabel = (value: string | null) => {
+    if (!value) return null;
+    return DEPARTMENTS.find(d => d.value === value)?.label || value;
+  };
+
+  const getCategoryName = (categoryId: string | null) => {
+    if (!categoryId) return "Uncategorized";
+    return categories.find(c => c.id === categoryId)?.name || "Unknown";
+  };
+
+  // Get per-document stats
+  const getDocumentStats = (uploadId: string) => {
+    const items = documentItems[uploadId] || [];
+    return {
+      total: items.length,
+      pending: items.filter(i => i.status === "pending").length,
+      confirmed: items.filter(i => i.status === "confirmed").length,
+      rejected: items.filter(i => i.status === "rejected").length,
+    };
+  };
+
+  return (
+    <div className="container mx-auto py-6 space-y-6">
+      {/* Processing Overlay */}
+      {(autoConfirmMutation.isPending || isApplying) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-4 p-8 rounded-lg bg-card border shadow-lg">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <div className="text-center">
+              <p className="text-lg font-semibold">
+                {isApplying ? "Applying to Model" : "Auto-Confirming Items"}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {isApplying ? "Importing confirmed line items..." : "Processing high confidence items..."}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">Review Documents</h1>
+            <p className="text-muted-foreground">
+              Reviewing {uploads.length} document{uploads.length > 1 ? 's' : ''} • {totalItems} line items
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Overall Progress Card */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="space-y-1">
+              <h3 className="font-semibold">Overall Progress</h3>
+              <p className="text-sm text-muted-foreground">
+                {totalConfirmed} confirmed • {totalRejected} rejected • {totalPending} pending
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleAutoConfirmAll}
+                disabled={autoConfirmMutation.isPending || totalPending === 0}
+              >
+                <Zap className="h-4 w-4 mr-2" />
+                Auto-Confirm High Confidence
+              </Button>
+              <Button
+                onClick={handleApplyToModel}
+                disabled={!allItemsProcessed || isApplying || totalConfirmed === 0}
+                className={allItemsProcessed ? "" : "opacity-50"}
+              >
+                {isApplying ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Applying...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    Apply to Model
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+          <Progress 
+            value={totalItems > 0 ? ((totalConfirmed + totalRejected) / totalItems) * 100 : 0} 
+            className="h-3"
+          />
+          {!allItemsProcessed && totalPending > 0 && (
+            <p className="text-sm text-amber-600 dark:text-amber-400 mt-2 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              {totalPending} items still pending review. Confirm or reject all items to enable "Apply to Model".
+            </p>
+          )}
+          {allItemsProcessed && totalConfirmed > 0 && (
+            <p className="text-sm text-green-600 dark:text-green-400 mt-2 flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              All items reviewed! Ready to apply {totalConfirmed} confirmed items to the model.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Document Tabs */}
+      <Tabs value={activeDocumentId} onValueChange={setActiveDocumentId}>
+        <TabsList className="w-full justify-start overflow-x-auto">
+          {uploads.map((upload) => {
+            const stats = getDocumentStats(upload.id);
+            const isComplete = stats.pending === 0 && stats.total > 0;
+            return (
+              <TabsTrigger 
+                key={upload.id} 
+                value={upload.id}
+                className="flex items-center gap-2 min-w-fit"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                <span className="truncate max-w-[150px]" title={upload.originalName}>
+                  {upload.originalName}
+                </span>
+                {isComplete ? (
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                ) : stats.pending > 0 ? (
+                  <Badge variant="secondary" className="text-xs">
+                    {stats.pending}
+                  </Badge>
+                ) : null}
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
+
+        {uploads.map((upload) => (
+          <TabsContent key={upload.id} value={upload.id} className="space-y-4">
+            {/* Document Stats */}
+            <Card>
+              <CardContent className="pt-4">
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="text-center p-3 bg-muted rounded-lg">
+                    <p className="text-2xl font-bold">{getDocumentStats(upload.id).total}</p>
+                    <p className="text-xs text-muted-foreground">Total Items</p>
+                  </div>
+                  <div className="text-center p-3 bg-amber-50 dark:bg-amber-950 rounded-lg">
+                    <p className="text-2xl font-bold text-amber-600">{getDocumentStats(upload.id).pending}</p>
+                    <p className="text-xs text-muted-foreground">Pending</p>
+                  </div>
+                  <div className="text-center p-3 bg-green-50 dark:bg-green-950 rounded-lg">
+                    <p className="text-2xl font-bold text-green-600">{getDocumentStats(upload.id).confirmed}</p>
+                    <p className="text-xs text-muted-foreground">Confirmed</p>
+                  </div>
+                  <div className="text-center p-3 bg-red-50 dark:bg-red-950 rounded-lg">
+                    <p className="text-2xl font-bold text-red-600">{getDocumentStats(upload.id).rejected}</p>
+                    <p className="text-xs text-muted-foreground">Rejected</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Filters */}
+            <div className="flex items-center gap-4">
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search line items..."
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Filter status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Items</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="confirmed">Confirmed</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => autoConfirmMutation.mutate({ uploadId: upload.id, threshold: 0.9 })}
+                disabled={autoConfirmMutation.isPending || getDocumentStats(upload.id).pending === 0}
+              >
+                <Zap className="h-4 w-4 mr-2" />
+                Auto-Confirm
+              </Button>
+            </div>
+
+            {/* Line Items List */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Line Items</CardTitle>
+                <CardDescription>
+                  Review and confirm AI categorization for each line item
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[500px]">
+                  <div className="space-y-2">
+                    {filteredItems.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No items match your filter</p>
+                      </div>
+                    ) : (
+                      filteredItems.map((item) => (
+                        <div
+                          key={item.id}
+                          className={`p-4 border rounded-lg ${
+                            item.status === "confirmed" 
+                              ? "border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-950/50" 
+                              : item.status === "rejected"
+                              ? "border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/50"
+                              : "border-border"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate">
+                                {sanitizeDisplayText(item.rawText)}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                <span className="text-lg font-semibold">
+                                  {formatAmount(item.amountConfirmed || item.amount)}
+                                </span>
+                                {getConfidenceBadge(item.confidenceScore)}
+                                <Badge variant="outline">
+                                  {getCategoryName(item.categoryConfirmed || item.categorySuggested)}
+                                </Badge>
+                                {(item.departmentConfirmed || item.departmentSuggested) && (
+                                  <Badge variant="secondary">
+                                    {getDepartmentLabel(item.departmentConfirmed || item.departmentSuggested)}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {item.status === "pending" && (
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <Select
+                                  value={item.categoryConfirmed || item.categorySuggested || ""}
+                                  onValueChange={(categoryId) => {
+                                    confirmItemMutation.mutate({
+                                      uploadId: upload.id,
+                                      itemId: item.id,
+                                      categoryId,
+                                      department: item.departmentConfirmed || item.departmentSuggested || undefined,
+                                    });
+                                  }}
+                                >
+                                  <SelectTrigger className="w-[180px]">
+                                    <SelectValue placeholder="Select category" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {categories.map((cat) => (
+                                      <SelectItem key={cat.id} value={cat.id}>
+                                        {cat.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  className="text-green-600 hover:bg-green-50"
+                                  onClick={() => {
+                                    const categoryId = item.categoryConfirmed || item.categorySuggested;
+                                    if (categoryId) {
+                                      confirmItemMutation.mutate({
+                                        uploadId: upload.id,
+                                        itemId: item.id,
+                                        categoryId,
+                                        department: item.departmentConfirmed || item.departmentSuggested || undefined,
+                                      });
+                                    }
+                                  }}
+                                  disabled={!item.categorySuggested && !item.categoryConfirmed}
+                                >
+                                  <Check className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  className="text-red-600 hover:bg-red-50"
+                                  onClick={() => {
+                                    rejectItemMutation.mutate({
+                                      uploadId: upload.id,
+                                      itemId: item.id,
+                                    });
+                                  }}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
+
+                            {item.status === "confirmed" && (
+                              <CheckCircle2 className="h-6 w-6 text-green-600 flex-shrink-0" />
+                            )}
+
+                            {item.status === "rejected" && (
+                              <XCircle className="h-6 w-6 text-red-600 flex-shrink-0" />
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        ))}
+      </Tabs>
+    </div>
+  );
+}
