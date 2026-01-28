@@ -114,12 +114,18 @@ export function CreateContactWizardModal({ open, onOpenChange, onContactCreated 
   });
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [companyMode, setCompanyMode] = useState<"new" | "existing">("new");
+  const [companySearch, setCompanySearch] = useState("");
+  const [showCompanyDropdown, setShowCompanyDropdown] = useState(false);
 
   const { data: companiesData } = useQuery<Company[]>({
     queryKey: ["/api/companies"],
-    enabled: open && state.step === 3,
+    enabled: open && state.step === 3 && companyMode === "existing" && companySearch.length >= 1,
   });
-  const companies = companiesData || [];
+  
+  const filteredCompanies = (companiesData || []).filter(c => 
+    c.name?.toLowerCase().includes(companySearch.toLowerCase())
+  );
 
   useEffect(() => {
     if (open) {
@@ -148,6 +154,9 @@ export function CreateContactWizardModal({ open, onOpenChange, onContactCreated 
         leadStatus: "new",
       });
       setHasUnsavedChanges(false);
+      setCompanyMode("new");
+      setCompanySearch("");
+      setShowCompanyDropdown(false);
     }
   }, [open]);
 
@@ -348,24 +357,24 @@ export function CreateContactWizardModal({ open, onOpenChange, onContactCreated 
             Company
           </Label>
           <Select
-            value={state.companyId || "_manual"}
-            onValueChange={(v) => {
-              if (v === "_manual") {
+            value={companyMode}
+            onValueChange={(v: "new" | "existing") => {
+              setCompanyMode(v);
+              if (v === "new") {
                 setState(s => ({ ...s, companyId: null }));
+                setCompanySearch("");
+                setShowCompanyDropdown(false);
               } else {
-                const company = companies.find(c => c.id === v);
-                setState(s => ({ ...s, companyId: v, company: company?.name || "" }));
+                setState(s => ({ ...s, company: "" }));
               }
             }}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select or enter company" />
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="_manual">Enter manually</SelectItem>
-              {companies.map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-              ))}
+              <SelectItem value="new">New Company</SelectItem>
+              <SelectItem value="existing">Search existing</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -379,7 +388,8 @@ export function CreateContactWizardModal({ open, onOpenChange, onContactCreated 
           />
         </div>
       </div>
-      {!state.companyId && (
+      
+      {companyMode === "new" ? (
         <div className="space-y-2">
           <Label htmlFor="companyManual">Company Name</Label>
           <Input
@@ -388,6 +398,50 @@ export function CreateContactWizardModal({ open, onOpenChange, onContactCreated 
             value={state.company}
             onChange={(e) => setState(s => ({ ...s, company: e.target.value }))}
           />
+        </div>
+      ) : (
+        <div className="space-y-2 relative">
+          <Label htmlFor="companySearch">Search Company</Label>
+          <Input
+            id="companySearch"
+            placeholder="Type to search companies..."
+            value={state.companyId ? (companiesData?.find(c => c.id === state.companyId)?.name || companySearch) : companySearch}
+            onChange={(e) => {
+              setCompanySearch(e.target.value);
+              setState(s => ({ ...s, companyId: null, company: "" }));
+              setShowCompanyDropdown(e.target.value.length >= 1);
+            }}
+            onFocus={() => {
+              if (companySearch.length >= 1) {
+                setShowCompanyDropdown(true);
+              }
+            }}
+            onBlur={() => {
+              setTimeout(() => setShowCompanyDropdown(false), 200);
+            }}
+          />
+          {showCompanyDropdown && filteredCompanies.length > 0 && (
+            <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto">
+              {filteredCompanies.map((c) => (
+                <div
+                  key={c.id}
+                  className="px-3 py-2 cursor-pointer hover:bg-muted text-sm"
+                  onMouseDown={() => {
+                    setState(s => ({ ...s, companyId: c.id, company: c.name || "" }));
+                    setCompanySearch(c.name || "");
+                    setShowCompanyDropdown(false);
+                  }}
+                >
+                  {c.name}
+                </div>
+              ))}
+            </div>
+          )}
+          {showCompanyDropdown && companySearch.length >= 1 && filteredCompanies.length === 0 && (
+            <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg p-3 text-sm text-muted-foreground">
+              No companies found. Select "New Company" to create one.
+            </div>
+          )}
         </div>
       )}
       <div className="space-y-2">
