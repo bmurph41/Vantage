@@ -36,6 +36,7 @@ import path from 'path';
 import * as XLSX from 'xlsx';
 import { extractDocument } from '../utils/ocr';
 import { findAliasMatch, getMatchResult, learnAlias, buildCoaCode } from "./pnl-alias-matcher";
+import { onLineItemConfirmed } from './learning-rules.integration';
 
 interface ParsedLineItem {
   rawText: string;
@@ -2260,6 +2261,23 @@ class DocIntelService {
         const aliasResult = await learnAlias(rawText, coaCode, orgId);
         console.log(`[DocIntel Learning] Alias ${aliasResult.created ? 'created' : 'updated'}: "${rawText.substring(0, 30)}..." -> ${coaCode}`);
       }
+      
+      // Also add to normalized learning rules for auto-confirmation
+      const categoryStr = tier 
+        ? `${tier}${dept ? `:${dept}` : ''}` 
+        : updates.categoryTierConfirmed || 'unknown';
+      await onLineItemConfirmed({
+        tenantId: orgId,
+        marinaId: null,
+        userId,
+        lineItem: {
+          id: '',
+          name: rawText,
+          category: categoryStr,
+          subcategory: dept || null,
+          department: dept || null,
+        },
+      });
       
       console.log(`[DocIntel Learning] Created rule from confirmation: "${rawText.substring(0, 30)}..."`);
     } catch (error) {
