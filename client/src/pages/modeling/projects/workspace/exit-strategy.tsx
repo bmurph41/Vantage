@@ -359,6 +359,10 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
 
   return (
     <div className="space-y-6">
+      {onTabChange && (
+        <WorkflowNavigation currentTab="exit" onNavigate={onTabChange} />
+      )}
+      
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-xl font-semibold" data-testid="exit-strategy-title">Exit Strategy Suite</h2>
@@ -597,9 +601,6 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
         </TabsContent>
       </Tabs>
 
-      {onTabChange && (
-        <WorkflowNavigation currentTab="exit" onNavigate={onTabChange} />
-      )}
     </div>
   );
 }

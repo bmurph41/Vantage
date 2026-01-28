@@ -156,6 +156,8 @@ export default function WorkspaceOverview({ project, onTabChange }: WorkspaceOve
 
   return (
     <div className="space-y-6">
+      <WorkflowNavigation currentTab="overview" onNavigate={onTabChange} />
+      
       {/* Zilculator-Style KPI Cards */}
       <div className="grid gap-3 md:grid-cols-4">
         <div className="finance-kpi-card" data-testid="card-overview-price">
@@ -314,8 +316,6 @@ export default function WorkspaceOverview({ project, onTabChange }: WorkspaceOve
         projectId={project.id} 
         dealSource={(project as any).dealSource} 
       />
-
-      <WorkflowNavigation currentTab="overview" onNavigate={onTabChange} />
     </div>
   );
 }

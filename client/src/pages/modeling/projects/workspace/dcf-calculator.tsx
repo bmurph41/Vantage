@@ -191,6 +191,10 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
 
   return (
     <div className="space-y-6 p-6" data-testid="dcf-calculator-page">
+      {onTabChange && (
+        <WorkflowNavigation currentTab="dcf" onNavigate={onTabChange} />
+      )}
+      
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">DCF Calculator</h1>
@@ -730,9 +734,6 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
         </TabsContent>
       </Tabs>
 
-      {onTabChange && (
-        <WorkflowNavigation currentTab="dcf" onNavigate={onTabChange} />
-      )}
     </div>
   );
 }

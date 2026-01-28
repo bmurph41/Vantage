@@ -389,6 +389,10 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
 
   return (
     <div className="space-y-6">
+      {onTabChange && (
+        <WorkflowNavigation currentTab="pricing" onNavigate={onTabChange} />
+      )}
+      
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-semibold">Deal Pricing</h2>
@@ -980,9 +984,6 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
         </Card>
       )}
 
-      {onTabChange && (
-        <WorkflowNavigation currentTab="pricing" onNavigate={onTabChange} />
-      )}
     </div>
   );
 }

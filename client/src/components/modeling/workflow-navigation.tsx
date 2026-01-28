@@ -32,38 +32,40 @@ export function WorkflowNavigation({ currentTab, onNavigate }: WorkflowNavigatio
   const totalSteps = WORKFLOW_STEPS.length;
 
   return (
-    <div className="flex items-center justify-between pt-8 mt-8 border-t">
-      <div>
-        {previousStep ? (
-          <Button
-            variant="outline"
-            onClick={() => onNavigate(previousStep.id)}
-            className="gap-2"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Previous: {previousStep.label}
-          </Button>
-        ) : (
-          <div />
-        )}
-      </div>
-      
-      <div className="text-sm text-muted-foreground">
-        Step {stepNumber} of {totalSteps}
-      </div>
-      
-      <div>
-        {nextStep ? (
-          <Button
-            onClick={() => onNavigate(nextStep.id)}
-            className="gap-2"
-          >
-            Next: {nextStep.label}
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        ) : (
-          <div />
-        )}
+    <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b py-3 -mx-6 px-6 mb-6">
+      <div className="flex items-center justify-between">
+        <div>
+          {previousStep ? (
+            <Button
+              variant="outline"
+              onClick={() => onNavigate(previousStep.id)}
+              className="gap-2"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous: {previousStep.label}
+            </Button>
+          ) : (
+            <div />
+          )}
+        </div>
+        
+        <div className="text-sm text-muted-foreground">
+          Step {stepNumber} of {totalSteps}
+        </div>
+        
+        <div>
+          {nextStep ? (
+            <Button
+              onClick={() => onNavigate(nextStep.id)}
+              className="gap-2"
+            >
+              Next: {nextStep.label}
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          ) : (
+            <div />
+          )}
+        </div>
       </div>
     </div>
   );

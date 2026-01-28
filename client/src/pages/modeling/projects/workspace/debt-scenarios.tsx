@@ -447,6 +447,10 @@ export default function WorkspaceDebtScenarios({ projectId, onTabChange }: Works
 
   return (
     <div className="space-y-6">
+      {onTabChange && (
+        <WorkflowNavigation currentTab="debt" onNavigate={onTabChange} />
+      )}
+      
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold">Debt Scenarios</h2>
@@ -929,9 +933,6 @@ export default function WorkspaceDebtScenarios({ projectId, onTabChange }: Works
         </TabsContent>
       </Tabs>
 
-      {onTabChange && (
-        <WorkflowNavigation currentTab="debt" onNavigate={onTabChange} />
-      )}
     </div>
   );
 }

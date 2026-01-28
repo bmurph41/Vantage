@@ -163,6 +163,10 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
 
   return (
     <div className="space-y-6">
+      {onTabChange && (
+        <WorkflowNavigation currentTab="uploads" onNavigate={onTabChange} />
+      )}
+      
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-xl font-semibold">Document Uploads</h2>
@@ -337,9 +341,6 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
         </AlertDialogContent>
       </AlertDialog>
 
-      {onTabChange && (
-        <WorkflowNavigation currentTab="uploads" onNavigate={onTabChange} />
-      )}
     </div>
   );
 }

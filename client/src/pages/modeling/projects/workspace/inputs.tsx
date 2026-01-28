@@ -284,6 +284,10 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
 
   return (
     <div className="space-y-6">
+      {onTabChange && (
+        <WorkflowNavigation currentTab="inputs" onNavigate={onTabChange} />
+      )}
+      
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold">Project Inputs</h2>
@@ -596,10 +600,6 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
           </div>
         </CardContent>
       </Card>
-
-      {onTabChange && (
-        <WorkflowNavigation currentTab="inputs" onNavigate={onTabChange} />
-      )}
 
       <Dialog open={showAddProfitCenterDialog} onOpenChange={setShowAddProfitCenterDialog}>
         <DialogContent>

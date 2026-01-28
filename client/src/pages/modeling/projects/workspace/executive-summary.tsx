@@ -171,6 +171,10 @@ export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: Wo
 
   return (
     <div className="space-y-6">
+      {onTabChange && (
+        <WorkflowNavigation currentTab="summary" onNavigate={onTabChange} />
+      )}
+      
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold">Executive Summary</h2>
@@ -522,9 +526,6 @@ export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: Wo
         </CardContent>
       </Card>
 
-      {onTabChange && (
-        <WorkflowNavigation currentTab="summary" onNavigate={onTabChange} />
-      )}
     </div>
   );
 }

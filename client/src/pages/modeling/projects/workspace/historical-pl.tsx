@@ -271,6 +271,10 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
 
   return (
     <div className="space-y-6">
+      {onTabChange && (
+        <WorkflowNavigation currentTab="historical" onNavigate={onTabChange} />
+      )}
+      
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-xl font-semibold">Historical P&L</h2>
@@ -816,9 +820,6 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
         </CardContent>
       </Card>
 
-      {onTabChange && (
-        <WorkflowNavigation currentTab="historical" onNavigate={onTabChange} />
-      )}
     </div>
   );
 }

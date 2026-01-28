@@ -690,6 +690,10 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
 
   return (
     <div className="space-y-6">
+      {onTabChange && (
+        <WorkflowNavigation currentTab="capital" onNavigate={onTabChange} />
+      )}
+      
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">Capital Stack Builder</h2>
@@ -2883,9 +2887,6 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
         </div>
       )}
 
-      {onTabChange && (
-        <WorkflowNavigation currentTab="capital" onNavigate={onTabChange} />
-      )}
     </div>
   );
 }
