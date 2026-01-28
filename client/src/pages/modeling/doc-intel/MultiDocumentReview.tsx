@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQueries, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { 
   ArrowLeft, 
   FileSpreadsheet, 
@@ -11,6 +12,7 @@ import {
   AlertTriangle,
   ChevronDown, 
   ChevronRight, 
+  ChevronLeft,
   Search, 
   Clock, 
   XCircle, 
@@ -48,6 +50,7 @@ interface MultiDocumentReviewProps {
   categories: PnlCategory[];
   onClose: () => void;
   onComplete: () => void;
+  onTabChange?: (tab: string) => void;
 }
 
 interface DocumentItemsState {
@@ -80,9 +83,11 @@ export function MultiDocumentReview({
   uploads, 
   categories, 
   onClose, 
-  onComplete 
+  onComplete,
+  onTabChange 
 }: MultiDocumentReviewProps) {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [activeDocumentId, setActiveDocumentId] = useState(uploads[0]?.id || "");
   const [documentItems, setDocumentItems] = useState<DocumentItemsState>({});
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'rejected'>('all');
@@ -286,6 +291,44 @@ export function MultiDocumentReview({
 
   return (
     <div className="container mx-auto py-6 space-y-6">
+      {/* Workflow Navigation */}
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b py-3 -mx-6 px-6 mb-2">
+        <div className="flex items-center justify-between">
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (onTabChange) {
+                onTabChange('uploads');
+              } else {
+                onClose();
+              }
+            }}
+            className="gap-2"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Previous: Uploads
+          </Button>
+          
+          <div className="text-sm text-muted-foreground">
+            Review Documents
+          </div>
+          
+          <Button
+            onClick={() => {
+              if (onTabChange) {
+                onTabChange('historical');
+              } else {
+                navigate(`/modeling/projects/${projectId}?tab=historical`);
+              }
+            }}
+            className="gap-2"
+          >
+            Next: Historical
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
       {/* Processing Overlay */}
       {(autoConfirmMutation.isPending || isApplying) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">

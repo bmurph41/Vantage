@@ -856,25 +856,6 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
               </Button>
             </>
           )}
-          {confirmedCount > 0 && (
-            <Button 
-              size="sm" 
-              onClick={() => applyToModelingMutation.mutate()}
-              disabled={applyToModelingMutation.isPending}
-            >
-              {applyToModelingMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  Applying...
-                </>
-              ) : (
-                <>
-                  <Check className="h-4 w-4 mr-1" />
-                  Apply to Model ({confirmedCount} items)
-                </>
-              )}
-            </Button>
-          )}
         </div>
       </div>
 
