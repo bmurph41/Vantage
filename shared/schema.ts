@@ -291,6 +291,12 @@ export const users = pgTable("users", {
   emailVerified: boolean("email_verified").notNull().default(false),
   emailVerificationToken: text("email_verification_token"),
   emailVerificationExpires: timestamp("email_verification_expires"),
+  // Data Benchmarking Consent
+  dataBenchmarkingConsent: boolean("data_benchmarking_consent").notNull().default(false),
+  consentTimestamp: timestamp("consent_timestamp"),
+  consentVersion: varchar("consent_version", { length: 32 }),
+  benchmarkingOptOut: boolean("benchmarking_opt_out").notNull().default(false),
+  optOutTimestamp: timestamp("opt_out_timestamp"),
   // Phone verification
   phone: text("phone"),
   phoneVerified: boolean("phone_verified").notNull().default(false),
