@@ -39,7 +39,7 @@ export function WorkflowNavigation({ currentTab, onNavigate }: WorkflowNavigatio
             <Button
               variant="outline"
               onClick={() => onNavigate(previousStep.id)}
-              className="gap-2"
+              className="gap-2 bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300 dark:bg-blue-950/50 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-900/50"
             >
               <ChevronLeft className="h-4 w-4" />
               Previous: {previousStep.label}
