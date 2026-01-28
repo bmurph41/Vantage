@@ -92,6 +92,7 @@ export function CreatePropertyWizardModal({ open, onOpenChange, onPropertyCreate
   });
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (open) {
@@ -119,6 +120,7 @@ export function CreatePropertyWizardModal({ open, onOpenChange, onPropertyCreate
         notes: "",
       });
       setHasUnsavedChanges(false);
+      setValidationErrors({});
     }
   }, [open]);
 
@@ -165,13 +167,16 @@ export function CreatePropertyWizardModal({ open, onOpenChange, onPropertyCreate
 
   function handleNext() {
     if (state.step === 1 && !state.propertyType) {
+      setValidationErrors({ propertyType: true });
       toast({ title: "Select a property type", description: "Please choose a property type to continue.", variant: "destructive" });
       return;
     }
     if (state.step === 2 && !state.name.trim()) {
+      setValidationErrors({ name: true });
       toast({ title: "Name required", description: "Please enter a property name.", variant: "destructive" });
       return;
     }
+    setValidationErrors({});
     if (state.step < steps.length) {
       setState(s => ({ ...s, step: s.step + 1 }));
     }
@@ -185,9 +190,11 @@ export function CreatePropertyWizardModal({ open, onOpenChange, onPropertyCreate
 
   function handleFinish() {
     if (!state.name.trim()) {
+      setValidationErrors({ name: true });
       toast({ title: "Name required", description: "Please enter a property name.", variant: "destructive" });
       return;
     }
+    setValidationErrors({});
     createPropertyMutation.mutate(state);
   }
 
@@ -200,15 +207,21 @@ export function CreatePropertyWizardModal({ open, onOpenChange, onPropertyCreate
   const renderTypeStep = () => (
     <div className="space-y-4">
       <div className="text-center mb-6">
-        <h3 className="text-lg font-semibold">What type of property is this?</h3>
+        <h3 className="text-lg font-semibold">What type of property is this? <span className="text-red-500">*</span></h3>
         <p className="text-sm text-muted-foreground">
           Choose the property category
         </p>
       </div>
       <RadioGroup
         value={state.propertyType || ""}
-        onValueChange={(value) => setState(s => ({ ...s, propertyType: value as PropertyType }))}
-        className="space-y-3"
+        onValueChange={(value) => {
+          setState(s => ({ ...s, propertyType: value as PropertyType }));
+          setValidationErrors(prev => ({ ...prev, propertyType: false }));
+        }}
+        className={cn(
+          "space-y-3 rounded-lg",
+          validationErrors.propertyType && "ring-2 ring-red-500 ring-offset-2"
+        )}
       >
         {propertyTypes.map((type) => (
           <div
@@ -219,7 +232,10 @@ export function CreatePropertyWizardModal({ open, onOpenChange, onPropertyCreate
                 ? "border-[#1E4FAB] bg-[#1E4FAB]/5" 
                 : "hover:bg-muted/50"
             )}
-            onClick={() => setState(s => ({ ...s, propertyType: type.id as PropertyType }))}
+            onClick={() => {
+              setState(s => ({ ...s, propertyType: type.id as PropertyType }));
+              setValidationErrors(prev => ({ ...prev, propertyType: false }));
+            }}
           >
             <RadioGroupItem value={type.id} id={`type-${type.id}`} />
             <div className="p-2 rounded-lg bg-muted">
@@ -244,12 +260,18 @@ export function CreatePropertyWizardModal({ open, onOpenChange, onPropertyCreate
         <p className="text-sm text-muted-foreground">Enter the property name and address</p>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="name">Property Name *</Label>
+        <Label htmlFor="name">Property Name <span className="text-red-500">*</span></Label>
         <Input
           id="name"
           placeholder="Sunset Marina"
           value={state.name}
-          onChange={(e) => setState(s => ({ ...s, name: e.target.value }))}
+          onChange={(e) => {
+            setState(s => ({ ...s, name: e.target.value }));
+            if (e.target.value.trim()) {
+              setValidationErrors(prev => ({ ...prev, name: false }));
+            }
+          }}
+          className={cn(validationErrors.name && "border-red-500 ring-1 ring-red-500")}
         />
       </div>
       <div className="space-y-2">

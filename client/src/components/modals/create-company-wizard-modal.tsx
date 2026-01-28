@@ -123,6 +123,7 @@ export function CreateCompanyWizardModal({ open, onOpenChange, onCompanyCreated 
   });
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (open) {
@@ -149,6 +150,7 @@ export function CreateCompanyWizardModal({ open, onOpenChange, onCompanyCreated 
         notes: "",
       });
       setHasUnsavedChanges(false);
+      setValidationErrors({});
     }
   }, [open]);
 
@@ -194,13 +196,16 @@ export function CreateCompanyWizardModal({ open, onOpenChange, onCompanyCreated 
 
   function handleNext() {
     if (state.step === 1 && !state.companyType) {
+      setValidationErrors({ companyType: true });
       toast({ title: "Select a company type", description: "Please choose a company type to continue.", variant: "destructive" });
       return;
     }
     if (state.step === 2 && !state.name.trim()) {
+      setValidationErrors({ name: true });
       toast({ title: "Name required", description: "Please enter a company name.", variant: "destructive" });
       return;
     }
+    setValidationErrors({});
     if (state.step < steps.length) {
       setState(s => ({ ...s, step: s.step + 1 }));
     }
@@ -214,24 +219,32 @@ export function CreateCompanyWizardModal({ open, onOpenChange, onCompanyCreated 
 
   function handleFinish() {
     if (!state.name.trim()) {
+      setValidationErrors({ name: true });
       toast({ title: "Name required", description: "Please enter a company name.", variant: "destructive" });
       return;
     }
+    setValidationErrors({});
     createCompanyMutation.mutate(state);
   }
 
   const renderTypeStep = () => (
     <div className="space-y-4">
       <div className="text-center mb-6">
-        <h3 className="text-lg font-semibold">What type of company is this?</h3>
+        <h3 className="text-lg font-semibold">What type of company is this? <span className="text-red-500">*</span></h3>
         <p className="text-sm text-muted-foreground">
           Choose a category that best describes this company
         </p>
       </div>
       <RadioGroup
         value={state.companyType || ""}
-        onValueChange={(value) => setState(s => ({ ...s, companyType: value as CompanyType }))}
-        className="grid grid-cols-1 gap-2 max-h-[320px] overflow-y-auto pr-1"
+        onValueChange={(value) => {
+          setState(s => ({ ...s, companyType: value as CompanyType }));
+          setValidationErrors(prev => ({ ...prev, companyType: false }));
+        }}
+        className={cn(
+          "grid grid-cols-1 gap-2 max-h-[320px] overflow-y-auto pr-1 rounded-lg",
+          validationErrors.companyType && "ring-2 ring-red-500 ring-offset-2"
+        )}
       >
         {companyTypes.map((type) => (
           <div
@@ -242,7 +255,10 @@ export function CreateCompanyWizardModal({ open, onOpenChange, onCompanyCreated 
                 ? "border-[#1E4FAB] bg-[#1E4FAB]/5" 
                 : "hover:bg-muted/50"
             )}
-            onClick={() => setState(s => ({ ...s, companyType: type.id as CompanyType }))}
+            onClick={() => {
+              setState(s => ({ ...s, companyType: type.id as CompanyType }));
+              setValidationErrors(prev => ({ ...prev, companyType: false }));
+            }}
           >
             <RadioGroupItem value={type.id} id={`type-${type.id}`} />
             <div className="p-2 rounded-lg bg-muted">
@@ -267,12 +283,18 @@ export function CreateCompanyWizardModal({ open, onOpenChange, onCompanyCreated 
         <p className="text-sm text-muted-foreground">Enter the company's name and contact details</p>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="name">Company Name *</Label>
+        <Label htmlFor="name">Company Name <span className="text-red-500">*</span></Label>
         <Input
           id="name"
           placeholder="Acme Marina Group"
           value={state.name}
-          onChange={(e) => setState(s => ({ ...s, name: e.target.value }))}
+          onChange={(e) => {
+            setState(s => ({ ...s, name: e.target.value }));
+            if (e.target.value.trim()) {
+              setValidationErrors(prev => ({ ...prev, name: false }));
+            }
+          }}
+          className={cn(validationErrors.name && "border-red-500 ring-1 ring-red-500")}
         />
       </div>
       <div className="space-y-2">

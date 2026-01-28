@@ -117,6 +117,7 @@ export function CreateContactWizardModal({ open, onOpenChange, onContactCreated 
   const [companyMode, setCompanyMode] = useState<"new" | "existing">("new");
   const [companySearch, setCompanySearch] = useState("");
   const [showCompanyDropdown, setShowCompanyDropdown] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
 
   const { data: companiesData } = useQuery<Company[]>({
     queryKey: ["/api/companies"],
@@ -157,6 +158,7 @@ export function CreateContactWizardModal({ open, onOpenChange, onContactCreated 
       setCompanyMode("new");
       setCompanySearch("");
       setShowCompanyDropdown(false);
+      setValidationErrors({});
     }
   }, [open]);
 
@@ -204,13 +206,16 @@ export function CreateContactWizardModal({ open, onOpenChange, onContactCreated 
 
   function handleNext() {
     if (state.step === 1 && !state.contactTag) {
+      setValidationErrors({ contactTag: true });
       toast({ title: "Select a contact type", description: "Please choose a contact type to continue.", variant: "destructive" });
       return;
     }
     if (state.step === 2 && !state.firstName.trim()) {
+      setValidationErrors({ firstName: true });
       toast({ title: "Name required", description: "Please enter at least a first name.", variant: "destructive" });
       return;
     }
+    setValidationErrors({});
     if (state.step < steps.length) {
       setState(s => ({ ...s, step: s.step + 1 }));
     }
@@ -224,24 +229,32 @@ export function CreateContactWizardModal({ open, onOpenChange, onContactCreated 
 
   function handleFinish() {
     if (!state.firstName.trim()) {
+      setValidationErrors({ firstName: true });
       toast({ title: "Name required", description: "Please enter at least a first name.", variant: "destructive" });
       return;
     }
+    setValidationErrors({});
     createContactMutation.mutate(state);
   }
 
   const renderTypeStep = () => (
     <div className="space-y-4">
       <div className="text-center mb-6">
-        <h3 className="text-lg font-semibold">What type of contact is this?</h3>
+        <h3 className="text-lg font-semibold">What type of contact is this? <span className="text-red-500">*</span></h3>
         <p className="text-sm text-muted-foreground">
           Choose a category that best describes this contact
         </p>
       </div>
       <RadioGroup
         value={state.contactTag || ""}
-        onValueChange={(value) => setState(s => ({ ...s, contactTag: value as ContactTag }))}
-        className="grid grid-cols-1 gap-2 max-h-[320px] overflow-y-auto pr-1"
+        onValueChange={(value) => {
+          setState(s => ({ ...s, contactTag: value as ContactTag }));
+          setValidationErrors(prev => ({ ...prev, contactTag: false }));
+        }}
+        className={cn(
+          "grid grid-cols-1 gap-2 max-h-[320px] overflow-y-auto pr-1 rounded-lg",
+          validationErrors.contactTag && "ring-2 ring-red-500 ring-offset-2"
+        )}
       >
         {contactTags.map((tag) => (
           <div
@@ -252,7 +265,10 @@ export function CreateContactWizardModal({ open, onOpenChange, onContactCreated 
                 ? "border-[#1E4FAB] bg-[#1E4FAB]/5" 
                 : "hover:bg-muted/50"
             )}
-            onClick={() => setState(s => ({ ...s, contactTag: tag.id as ContactTag }))}
+            onClick={() => {
+              setState(s => ({ ...s, contactTag: tag.id as ContactTag }));
+              setValidationErrors(prev => ({ ...prev, contactTag: false }));
+            }}
           >
             <RadioGroupItem value={tag.id} id={`tag-${tag.id}`} />
             <div className="p-2 rounded-lg bg-muted">
@@ -278,12 +294,18 @@ export function CreateContactWizardModal({ open, onOpenChange, onContactCreated 
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
-          <Label htmlFor="firstName">First Name *</Label>
+          <Label htmlFor="firstName">First Name <span className="text-red-500">*</span></Label>
           <Input
             id="firstName"
             placeholder="John"
             value={state.firstName}
-            onChange={(e) => setState(s => ({ ...s, firstName: e.target.value }))}
+            onChange={(e) => {
+              setState(s => ({ ...s, firstName: e.target.value }));
+              if (e.target.value.trim()) {
+                setValidationErrors(prev => ({ ...prev, firstName: false }));
+              }
+            }}
+            className={cn(validationErrors.firstName && "border-red-500 ring-1 ring-red-500")}
           />
         </div>
         <div className="space-y-2">
