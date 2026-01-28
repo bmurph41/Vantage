@@ -59,6 +59,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { formatPeriodLabel } from "@/lib/period-utils";
 import {
   CategoryTier,
   CATEGORY_TIER_OPTIONS,
@@ -243,14 +244,6 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
       }
       return next;
     });
-  };
-
-  const formatPeriodLabel = (periodKey: string): string => {
-    if (periodKey === "single") return "";
-    const [year, month] = periodKey.split("-");
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const monthIdx = parseInt(month, 10) - 1;
-    return `${months[monthIdx] || month} '${year?.slice(-2) || year}`;
   };
 
   const updateItemMutation = useMutation({

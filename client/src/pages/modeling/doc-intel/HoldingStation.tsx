@@ -97,6 +97,8 @@ export function HoldingStation({ projectId, onReviewDocuments }: HoldingStationP
   const [deleteConfirmName, setDeleteConfirmName] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingMessage, setProcessingMessage] = useState("");
+  // Explicit state to track when processing has just completed - shows prominent Review CTA
+  const [processingJustCompleted, setProcessingJustCompleted] = useState(false);
 
   // Fetch documents from server
   const { data: holdingQueue = [], isLoading, refetch } = useQuery<DocIntelUpload[]>({
@@ -331,10 +333,16 @@ export function HoldingStation({ projectId, onReviewDocuments }: HoldingStationP
 
     setIsProcessing(false);
     setProcessingMessage("");
+    
+    // If we successfully processed documents, set flag to show prominent Review CTA
+    if (uploadedIds.length > 0) {
+      setProcessingJustCompleted(true);
+    }
   };
 
   const handleReviewAll = () => {
     const readyDocIds = parsedDocuments.map((doc) => doc.id);
+    setProcessingJustCompleted(false); // Clear the flag when user clicks Review
     onReviewDocuments(readyDocIds);
   };
 
@@ -391,6 +399,38 @@ export function HoldingStation({ projectId, onReviewDocuments }: HoldingStationP
             <Progress value={undefined} className="w-64 h-2" />
           </div>
         </div>
+      )}
+
+      {/* PROCESSING COMPLETE - REVIEW NOW BANNER */}
+      {processingJustCompleted && allDocumentsReady && parsedDocuments.length > 0 && (
+        <Card className="border-green-300 bg-green-50 dark:bg-green-950/30 dark:border-green-800">
+          <CardContent className="py-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
+                  <CheckCircle2 className="h-6 w-6 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-green-800 dark:text-green-200">
+                    Processing Complete!
+                  </h3>
+                  <p className="text-sm text-green-700 dark:text-green-300">
+                    {parsedDocuments.length} document{parsedDocuments.length > 1 ? 's are' : ' is'} ready for review. 
+                    Click the button to review and confirm line items.
+                  </p>
+                </div>
+              </div>
+              <Button 
+                size="lg" 
+                onClick={handleReviewAll}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <Eye className="h-5 w-5 mr-2" />
+                Review Documents ({parsedDocuments.length})
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Upload Dropzone Card */}

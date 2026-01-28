@@ -16,7 +16,10 @@ import {
   XCircle, 
   Loader2,
   Download,
-  FileText
+  FileText,
+  LayoutGrid,
+  List,
+  Table2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +31,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { PLReviewGrid } from "@/components/doc-intel/PLReviewGrid";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { DocIntelUpload, DocIntelExtractedItem, PnlCategory } from "@shared/schema";
@@ -84,6 +89,8 @@ export function MultiDocumentReview({
   const [searchText, setSearchText] = useState("");
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [isApplying, setIsApplying] = useState(false);
+  // View mode: 'matrix' shows P&L grid with periods, 'list' shows simple line item list
+  const [viewMode, setViewMode] = useState<'matrix' | 'list'>('matrix');
 
   // Fetch items for each document
   const itemQueries = uploads.map(upload => 
@@ -423,162 +430,187 @@ export function MultiDocumentReview({
               </CardContent>
             </Card>
 
-            {/* Filters */}
-            <div className="flex items-center gap-4">
-              <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search line items..."
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  className="pl-9"
-                />
+            {/* View Controls & Filters */}
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search line items..."
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Filter status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Items</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="confirmed">Confirmed</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => autoConfirmMutation.mutate({ uploadId: upload.id, threshold: 0.9 })}
+                  disabled={autoConfirmMutation.isPending || getDocumentStats(upload.id).pending === 0}
+                >
+                  <Zap className="h-4 w-4 mr-2" />
+                  Auto-Confirm
+                </Button>
               </div>
-              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Filter status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Items</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="confirmed">Confirmed</SelectItem>
-                  <SelectItem value="rejected">Rejected</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => autoConfirmMutation.mutate({ uploadId: upload.id, threshold: 0.9 })}
-                disabled={autoConfirmMutation.isPending || getDocumentStats(upload.id).pending === 0}
-              >
-                <Zap className="h-4 w-4 mr-2" />
-                Auto-Confirm
-              </Button>
+              
+              {/* View Mode Toggle */}
+              <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as 'matrix' | 'list')}>
+                <ToggleGroupItem value="matrix" aria-label="Matrix view" title="P&L Matrix View (shows periods)">
+                  <Table2 className="h-4 w-4" />
+                </ToggleGroupItem>
+                <ToggleGroupItem value="list" aria-label="List view" title="Simple List View">
+                  <List className="h-4 w-4" />
+                </ToggleGroupItem>
+              </ToggleGroup>
             </div>
 
-            {/* Line Items List */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Line Items</CardTitle>
-                <CardDescription>
-                  Review and confirm AI categorization for each line item
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-[500px]">
-                  <div className="space-y-2">
-                    {filteredItems.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p>No items match your filter</p>
-                      </div>
-                    ) : (
-                      filteredItems.map((item) => (
-                        <div
-                          key={item.id}
-                          className={`p-4 border rounded-lg ${
-                            item.status === "confirmed" 
-                              ? "border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-950/50" 
-                              : item.status === "rejected"
-                              ? "border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/50"
-                              : "border-border"
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium truncate">
-                                {sanitizeDisplayText(item.rawText)}
-                              </p>
-                              <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                <span className="text-lg font-semibold">
-                                  {formatAmount(item.amountConfirmed || item.amount)}
-                                </span>
-                                {getConfidenceBadge(item.confidenceScore)}
-                                <Badge variant="outline">
-                                  {getCategoryName(item.categoryConfirmed || item.categorySuggested)}
-                                </Badge>
-                                {(item.departmentConfirmed || item.departmentSuggested) && (
-                                  <Badge variant="secondary">
-                                    {getDepartmentLabel(item.departmentConfirmed || item.departmentSuggested)}
+            {/* Line Items Display - Matrix or List View */}
+            {viewMode === 'matrix' ? (
+              /* P&L Matrix View with periods as columns */
+              <PLReviewGrid
+                projectId={projectId}
+                uploadId={upload.id}
+                statusFilter={statusFilter}
+                onApplyToModeling={() => {
+                  queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", upload.id, "items"] });
+                }}
+              />
+            ) : (
+              /* Fallback List View */
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Line Items</CardTitle>
+                  <CardDescription>
+                    Review and confirm AI categorization for each line item
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-[500px]">
+                    <div className="space-y-2">
+                      {filteredItems.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                          <p>No items match your filter</p>
+                        </div>
+                      ) : (
+                        filteredItems.map((item) => (
+                          <div
+                            key={item.id}
+                            className={`p-4 border rounded-lg ${
+                              item.status === "confirmed" 
+                                ? "border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-950/50" 
+                                : item.status === "rejected"
+                                ? "border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/50"
+                                : "border-border"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium truncate">
+                                  {sanitizeDisplayText(item.rawText)}
+                                </p>
+                                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                  <span className="text-lg font-semibold">
+                                    {formatAmount(item.amountConfirmed || item.amount)}
+                                  </span>
+                                  {getConfidenceBadge(item.confidenceScore)}
+                                  <Badge variant="outline">
+                                    {getCategoryName(item.categoryConfirmed || item.categorySuggested)}
                                   </Badge>
-                                )}
+                                  {(item.departmentConfirmed || item.departmentSuggested) && (
+                                    <Badge variant="secondary">
+                                      {getDepartmentLabel(item.departmentConfirmed || item.departmentSuggested)}
+                                    </Badge>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                            
-                            {item.status === "pending" && (
-                              <div className="flex items-center gap-2 flex-shrink-0">
-                                <Select
-                                  value={item.categoryConfirmed || item.categorySuggested || ""}
-                                  onValueChange={(categoryId) => {
-                                    confirmItemMutation.mutate({
-                                      uploadId: upload.id,
-                                      itemId: item.id,
-                                      categoryId,
-                                      department: item.departmentConfirmed || item.departmentSuggested || undefined,
-                                    });
-                                  }}
-                                >
-                                  <SelectTrigger className="w-[180px]">
-                                    <SelectValue placeholder="Select category" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {categories.map((cat) => (
-                                      <SelectItem key={cat.id} value={cat.id}>
-                                        {cat.name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <Button
-                                  size="icon"
-                                  variant="outline"
-                                  className="text-green-600 hover:bg-green-50"
-                                  onClick={() => {
-                                    const categoryId = item.categoryConfirmed || item.categorySuggested;
-                                    if (categoryId) {
+                              
+                              {item.status === "pending" && (
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <Select
+                                    value={item.categoryConfirmed || item.categorySuggested || ""}
+                                    onValueChange={(categoryId) => {
                                       confirmItemMutation.mutate({
                                         uploadId: upload.id,
                                         itemId: item.id,
                                         categoryId,
                                         department: item.departmentConfirmed || item.departmentSuggested || undefined,
                                       });
-                                    }
-                                  }}
-                                  disabled={!item.categorySuggested && !item.categoryConfirmed}
-                                >
-                                  <Check className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  size="icon"
-                                  variant="outline"
-                                  className="text-red-600 hover:bg-red-50"
-                                  onClick={() => {
-                                    rejectItemMutation.mutate({
-                                      uploadId: upload.id,
-                                      itemId: item.id,
-                                    });
-                                  }}
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            )}
+                                    }}
+                                  >
+                                    <SelectTrigger className="w-[180px]">
+                                      <SelectValue placeholder="Select category" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {categories.map((cat) => (
+                                        <SelectItem key={cat.id} value={cat.id}>
+                                          {cat.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <Button
+                                    size="icon"
+                                    variant="outline"
+                                    className="text-green-600 hover:bg-green-50"
+                                    onClick={() => {
+                                      const categoryId = item.categoryConfirmed || item.categorySuggested;
+                                      if (categoryId) {
+                                        confirmItemMutation.mutate({
+                                          uploadId: upload.id,
+                                          itemId: item.id,
+                                          categoryId,
+                                          department: item.departmentConfirmed || item.departmentSuggested || undefined,
+                                        });
+                                      }
+                                    }}
+                                    disabled={!item.categorySuggested && !item.categoryConfirmed}
+                                  >
+                                    <Check className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="outline"
+                                    className="text-red-600 hover:bg-red-50"
+                                    onClick={() => {
+                                      rejectItemMutation.mutate({
+                                        uploadId: upload.id,
+                                        itemId: item.id,
+                                      });
+                                    }}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              )}
 
-                            {item.status === "confirmed" && (
-                              <CheckCircle2 className="h-6 w-6 text-green-600 flex-shrink-0" />
-                            )}
+                              {item.status === "confirmed" && (
+                                <CheckCircle2 className="h-6 w-6 text-green-600 flex-shrink-0" />
+                              )}
 
-                            {item.status === "rejected" && (
-                              <XCircle className="h-6 w-6 text-red-600 flex-shrink-0" />
-                            )}
+                              {item.status === "rejected" && (
+                                <XCircle className="h-6 w-6 text-red-600 flex-shrink-0" />
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </ScrollArea>
-              </CardContent>
-            </Card>
+                        ))
+                      )}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         ))}
       </Tabs>
