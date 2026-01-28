@@ -116,6 +116,7 @@ interface PLReviewGridProps {
   projectId: string;
   uploadId: string;
   onApplyToModeling?: () => void;
+  statusFilter?: 'all' | 'pending' | 'confirmed' | 'rejected' | 'excluded';
 }
 
 function formatCurrency(value: string | number | null): string {
@@ -187,7 +188,7 @@ function BulkDepartmentSelect({
   );
 }
 
-export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLReviewGridProps) {
+export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFilter = 'all' }: PLReviewGridProps) {
   const { toast } = useToast();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -777,6 +778,20 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
   const excludedCount = items.filter((i) => i.status === "excluded").length;
   const pendingCount = items.filter((i) => i.status === "pending" || i.status === "needs_review").length;
 
+  // Filter lineItems based on statusFilter prop
+  const filteredLineItems = useMemo(() => {
+    if (!groupedData?.lineItems) return [];
+    if (statusFilter === 'all') return groupedData.lineItems;
+    
+    return groupedData.lineItems.filter((lineItem) => {
+      // For pending filter, also include needs_review
+      if (statusFilter === 'pending') {
+        return lineItem.status === 'pending' || lineItem.status === 'needs_review';
+      }
+      return lineItem.status === statusFilter;
+    });
+  }, [groupedData?.lineItems, statusFilter]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -926,14 +941,14 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
                   </TableRow>
                 </TableHeader>
               <TableBody>
-                {groupedData.lineItems.length === 0 ? (
+                {filteredLineItems.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={groupedData.isMultiColumn ? groupedData.periods.length + 5 : 5} className="h-24 text-center">
-                      No line items found.
+                      {statusFilter !== 'all' ? 'No items match the selected filter.' : 'No line items found.'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  groupedData.lineItems.map((lineItem) => {
+                  filteredLineItems.map((lineItem) => {
                     const rowKey = `${lineItem.lineItemName}__${lineItem.sourceRow}`;
                     const isExpanded = expandedRows.has(rowKey);
                     

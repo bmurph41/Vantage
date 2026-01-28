@@ -699,6 +699,7 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
                   projectId={projectId}
                   uploadId={upload.id}
                   onApplyToModeling={() => setCurrentStep(4)}
+                  statusFilter={statusFilter}
                 />
               </div>
             ) : viewMode === 'grouped' ? (
