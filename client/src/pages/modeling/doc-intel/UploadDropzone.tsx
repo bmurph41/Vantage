@@ -263,41 +263,8 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
     }
   };
 
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    // For single P&L/Excel files, auto-upload immediately
-    if (acceptedFiles.length === 1) {
-      const file = acceptedFiles[0];
-      const docType = guessDocType(file.name);
-      
-      // Create a staged file entry for progress display
-      const stagedFile: StagedFile = {
-        id: crypto.randomUUID(),
-        file,
-        docType,
-        customTypeId: null,
-        customTypeName: "",
-        year: new Date().getFullYear().toString(),
-        status: "uploading" as const,
-        progress: 10,
-      };
-      
-      setStagedFiles([stagedFile]);
-      setIsUploading(true);
-      
-      // Auto-upload the file
-      const upload = await uploadSingleFile(stagedFile);
-      
-      setIsUploading(false);
-      
-      if (upload) {
-        // Clear staged files after brief delay to show success
-        setTimeout(() => setStagedFiles([]), 1500);
-        onUploadComplete(upload);
-      }
-      return;
-    }
-    
-    // For multiple files, use staging workflow
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    // Stage files - user clicks Upload to start processing
     const newStagedFiles: StagedFile[] = acceptedFiles.map((file) => ({
       id: crypto.randomUUID(),
       file,

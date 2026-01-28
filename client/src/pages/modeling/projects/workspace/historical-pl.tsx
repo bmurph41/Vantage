@@ -198,18 +198,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
 
   const isSeasonalMonth = (monthIndex: number) => seasonMonths.includes(monthIndex + 1);
 
-  const sampleData: PLLineItem[] = [
-    { id: '1', category: 'Revenue', subcategory: 'Wet Slips', description: 'Wet Slip Rentals', type: 'revenue', monthlyData: { Jan: 0, Feb: 0, Mar: 15000, Apr: 45000, May: 85000, Jun: 120000, Jul: 135000, Aug: 130000, Sep: 95000, Oct: 55000, Nov: 20000, Dec: 0 }, annualTotal: 700000 },
-    { id: '2', category: 'Revenue', subcategory: 'Dry Storage', description: 'Dry Rack Storage', type: 'revenue', monthlyData: { Jan: 0, Feb: 0, Mar: 8000, Apr: 22000, May: 38000, Jun: 52000, Jul: 58000, Aug: 55000, Sep: 42000, Oct: 28000, Nov: 12000, Dec: 0 }, annualTotal: 315000 },
-    { id: '3', category: 'Revenue', subcategory: 'Fuel Sales', description: 'Fuel Sales', type: 'revenue', monthlyData: { Jan: 0, Feb: 0, Mar: 12000, Apr: 35000, May: 68000, Jun: 95000, Jul: 110000, Aug: 105000, Sep: 75000, Oct: 42000, Nov: 15000, Dec: 0 }, annualTotal: 557000, dataSource: 'fuel_sales' },
-    { id: '4', category: 'Revenue', subcategory: 'Ship Store', description: 'Retail Sales', type: 'revenue', monthlyData: { Jan: 0, Feb: 0, Mar: 5000, Apr: 15000, May: 28000, Jun: 42000, Jul: 48000, Aug: 45000, Sep: 32000, Oct: 18000, Nov: 8000, Dec: 0 }, annualTotal: 241000, dataSource: 'ship_store' },
-    { id: '5', category: 'Revenue', subcategory: 'Third-Party Leases', description: 'Restaurant Lease', type: 'revenue', monthlyData: { Jan: 8000, Feb: 8000, Mar: 8000, Apr: 8000, May: 8000, Jun: 8000, Jul: 8000, Aug: 8000, Sep: 8000, Oct: 8000, Nov: 8000, Dec: 8000 }, annualTotal: 96000 },
-    { id: '6', category: 'COGS', subcategory: 'Fuel', description: 'Fuel Cost of Goods', type: 'cogs', monthlyData: { Jan: 0, Feb: 0, Mar: 10200, Apr: 29750, May: 57800, Jun: 80750, Jul: 93500, Aug: 89250, Sep: 63750, Oct: 35700, Nov: 12750, Dec: 0 }, annualTotal: 473450, dataSource: 'fuel_sales' },
-    { id: '7', category: 'COGS', subcategory: 'Ship Store', description: 'Retail Cost of Goods', type: 'cogs', monthlyData: { Jan: 0, Feb: 0, Mar: 3250, Apr: 9750, May: 18200, Jun: 27300, Jul: 31200, Aug: 29250, Sep: 20800, Oct: 11700, Nov: 5200, Dec: 0 }, annualTotal: 156650, dataSource: 'ship_store' },
-    { id: '8', category: 'Expenses', subcategory: 'Payroll', description: 'Salaries & Wages', type: 'expense', monthlyData: { Jan: 25000, Feb: 25000, Mar: 32000, Apr: 45000, May: 55000, Jun: 62000, Jul: 65000, Aug: 62000, Sep: 52000, Oct: 38000, Nov: 28000, Dec: 25000 }, annualTotal: 514000 },
-    { id: '9', category: 'Expenses', subcategory: 'Utilities', description: 'Electric & Water', type: 'expense', monthlyData: { Jan: 3500, Feb: 3500, Mar: 4200, Apr: 5800, May: 7500, Jun: 9200, Jul: 10500, Aug: 10200, Sep: 8500, Oct: 6200, Nov: 4500, Dec: 3500 }, annualTotal: 77100 },
-    { id: '10', category: 'Expenses', subcategory: 'Insurance', description: 'Property & Liability', type: 'expense', monthlyData: { Jan: 8500, Feb: 8500, Mar: 8500, Apr: 8500, May: 8500, Jun: 8500, Jul: 8500, Aug: 8500, Sep: 8500, Oct: 8500, Nov: 8500, Dec: 8500 }, annualTotal: 102000 },
-  ];
+  const emptyData: PLLineItem[] = [];
 
   const hasActualsData = actualsData?.grouped && actualsData.grouped.length > 0;
   
@@ -224,7 +213,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
         annualTotal: item.annualTotal,
         dataSource: actualsData.raw?.[0]?.dataSource
       }))
-    : (plData?.lineItems || sampleData);
+    : (plData?.lineItems || emptyData);
 
   const groupedData = lineItems.reduce((acc: Record<string, PLLineItem[]>, item: PLLineItem) => {
     if (!acc[item.category]) {
@@ -501,25 +490,22 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
         </Card>
       )}
 
-      {!hasActualsData && (
-        <Card className="bg-amber-50/50 border-amber-200">
-          <CardContent className="py-3">
-            <div className="flex items-center gap-3">
-              <Info className="h-5 w-5 text-amber-600" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-amber-800">Using Sample Data</p>
-                <p className="text-xs text-amber-700">
-                  Click "Sync Operations" to import real data from Rent Roll, Fuel Sales, and Ship Store modules.
-                </p>
-              </div>
+      {!hasActualsData && lineItems.length === 0 && (
+        <Card className="border-dashed">
+          <CardContent className="py-8 text-center">
+            <FileSpreadsheet className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+            <h4 className="font-semibold mb-2">No P&L Data Yet</h4>
+            <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
+              Upload financial documents via Doc Intel or sync operations data to populate your historical P&L statement.
+            </p>
+            <div className="flex justify-center gap-3">
               <Button 
                 size="sm" 
-                variant="outline" 
-                className="border-amber-300 text-amber-800 hover:bg-amber-100"
+                variant="outline"
                 onClick={() => setShowSyncDialog(true)}
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
-                Sync Now
+                Sync Operations Data
               </Button>
             </div>
           </CardContent>

@@ -72,6 +72,7 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
   const { data: uploads = [], isLoading } = useQuery<UploadWithStats[]>({
     queryKey: ['/api/modeling/projects', projectId, 'documents'],
     enabled: !!projectId,
+    refetchInterval: 2000, // Poll every 2s to catch status updates
   });
 
   // Rotate messages every 3 seconds when processing
@@ -83,6 +84,21 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
     }, 3000);
     return () => clearInterval(interval);
   }, [hasProcessingUploads, processingMessages.length]);
+  
+  // Auto-redirect to review when processing completes
+  useEffect(() => {
+    const readyUpload = uploads.find(u => 
+      (u.status === 'reviewing' || u.status === 'parsed') && 
+      u.stats?.pending > 0
+    );
+    if (readyUpload) {
+      // Small delay to show the status change
+      const timer = setTimeout(() => {
+        navigate(`/modeling/projects/${projectId}/doc-intel?upload=${readyUpload.id}`);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [uploads, projectId, navigate]);
 
   const deleteMutation = useMutation({
     mutationFn: (uploadId: string) => apiRequest('DELETE', `/api/modeling/projects/${projectId}/documents/${uploadId}`),
