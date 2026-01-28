@@ -13842,8 +13842,34 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const { status } = req.query;
 
-      const pendingCompanies = await storage.getPendingCompanies(orgId, status);
-      res.json(pendingCompanies);
+      const pendingCompanies = await storage.getPendingCompaniesForOrg(orgId);
+      
+      // Enrich with real-time duplicate detection using enhanced fuzzy matching
+      const allCompanies = await storage.getCompaniesForOrg(orgId);
+      
+      const enrichedPending = pendingCompanies.map((pending: any) => {
+        if (!pending.name) return pending;
+        
+        const duplicates = findCompanyDuplicates(
+          pending.name,
+          pending.address,
+          pending.city,
+          pending.state,
+          pending.zipCode,
+          allCompanies,
+          undefined,
+          40 // 40% minimum threshold
+        );
+        
+        // Update suggestedDuplicates with real-time matches
+        return {
+          ...pending,
+          suggestedDuplicates: duplicates.map(d => d.company.id),
+          duplicateMatches: duplicates
+        };
+      });
+      
+      res.json(enrichedPending);
     } catch (error: any) {
       console.error("Error fetching pending companies:", error);
       res.status(500).json({ message: "Failed to fetch pending companies" });
@@ -13862,36 +13888,25 @@ Current context: Project ${req.params.projectId}`;
 
       const allCompanies = await storage.getCompaniesForOrg(orgId);
 
-      const similarityScores = allCompanies.map(company => {
-        let score = 0;
-
-        if (pending.name && company.name) {
-          const normalizedPending = pending.name.toLowerCase().trim();
-          const normalizedCompany = company.name.toLowerCase().trim();
-          if (normalizedPending === normalizedCompany) score += 100;
-          else if (normalizedPending.includes(normalizedCompany) || normalizedCompany.includes(normalizedPending)) score += 70;
-        }
-
-        if (pending.website && company.website && pending.website.toLowerCase() === company.website.toLowerCase()) {
-          score += 60;
-        }
-
-        if (pending.phone && company.phone) {
-          const normalizedPendingPhone = pending.phone.replace(/\D/g, '');
-          const normalizedCompanyPhone = company.phone.replace(/\D/g, '');
-          if (normalizedPendingPhone === normalizedCompanyPhone) score += 50;
-        }
-
-        if (pending.city && company.city && pending.state && company.state) {
-          if (pending.city.toLowerCase() === company.city.toLowerCase() && 
-              pending.state.toLowerCase() === company.state.toLowerCase()) {
-            score += 30;
-          }
-        }
-
-        return { company, score };
-      }).filter(item => item.score > 0)
-        .sort((a, b) => b.score - a.score);
+      // Use enhanced fuzzy matching with entity suffix stripping
+      const duplicates = findCompanyDuplicates(
+        pending.name || '',
+        pending.address,
+        pending.city,
+        pending.state,
+        pending.zipCode,
+        allCompanies,
+        undefined,
+        30 // 30% minimum threshold for broader matches
+      );
+      
+      // Format for frontend compatibility
+      const similarityScores = duplicates.map(match => ({
+        company: match.company,
+        score: match.similarityScore,
+        matchReasons: match.matchReasons,
+        matchDetails: match.matchDetails
+      }));
 
       res.json(similarityScores);
     } catch (error: any) {
@@ -19968,6 +19983,12 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         return res.status(404).json({ error: 'Document not found' });
       }
       
+      const grouped = req.query.grouped === 'true';
+      if (grouped) {
+        const groupedItems = await docIntelService.getExtractedItemsGrouped(orgId, uploadId);
+        return res.json(groupedItems);
+      }
+
       const withCategories = req.query.withCategories === 'true';
       const items = withCategories 
         ? await docIntelService.getExtractedItemsWithCategories(orgId, uploadId)
