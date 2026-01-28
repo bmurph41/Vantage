@@ -88,14 +88,13 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
   // Auto-redirect to review when processing completes
   useEffect(() => {
     const readyUpload = uploads.find(u => 
-      (u.status === 'reviewing' || u.status === 'parsed') && 
-      u.stats?.pending > 0
+      u.status === 'reviewing' || u.status === 'parsed'
     );
     if (readyUpload) {
-      // Small delay to show the status change
+      // Small delay to show the status change, then redirect
       const timer = setTimeout(() => {
         navigate(`/modeling/projects/${projectId}/doc-intel?upload=${readyUpload.id}`);
-      }, 1000);
+      }, 1500);
       return () => clearTimeout(timer);
     }
   }, [uploads, projectId, navigate]);

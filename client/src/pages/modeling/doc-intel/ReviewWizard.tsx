@@ -126,26 +126,6 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
     }
   }, [upload.status]);
   
-  // Auto-trigger parsing when upload status is "uploaded"
-  useEffect(() => {
-    if (upload.status === 'uploaded' && !parseMutation.isPending) {
-      // Small delay to let the UI settle
-      const timer = setTimeout(() => {
-        parseMutation.mutate();
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [upload.status, upload.id]);
-  
-  // Auto-trigger categorization when status is "parsed"
-  useEffect(() => {
-    if (upload.status === 'parsed' && !categorizeMutation.isPending && items.length > 0) {
-      const timer = setTimeout(() => {
-        categorizeMutation.mutate();
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [upload.status, items.length]);
   
   const handleStepClick = (stepId: number) => {
     if (stepId <= maxAllowedStep) {

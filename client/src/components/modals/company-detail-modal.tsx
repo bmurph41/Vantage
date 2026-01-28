@@ -1233,9 +1233,14 @@ export default function CompanyDetailModal({
             <TabsContent value="contacts" className="mt-0 space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Contacts at {company.name}</h3>
-                <Button variant="outline" size="sm">
-                  <Plus className="w-4 h-4 mr-2" /> Add Contact
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm">
+                    <Link2 className="w-4 h-4 mr-2" /> Link Existing
+                  </Button>
+                  <Button size="sm">
+                    <Plus className="w-4 h-4 mr-2" /> Create New
+                  </Button>
+                </div>
               </div>
 
               {companyContacts.length === 0 ? (
@@ -1384,39 +1389,18 @@ export default function CompanyDetailModal({
                     size="sm"
                     onClick={() => setShowLinkPropertyDialog(true)}
                   >
-                    <Link2 className="w-4 h-4 mr-2" /> Link Property
+                    <Link2 className="w-4 h-4 mr-2" /> Link Existing
                   </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button size="sm" className="gap-2">
-                        <Plus className="w-4 h-4" /> Add Property
-                        <ChevronDown className="w-3 h-3" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => {
-                        setIsPortfolioMode(false);
-                        setPortfolioProperties([{ title: "", address: "", type: "marina" }]);
-                        setShowAddPropertyModal(true);
-                      }}>
-                        <Anchor className="w-4 h-4 mr-2" />
-                        Add Single Property
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => {
-                        setIsPortfolioMode(true);
-                        setPortfolioProperties([
-                          { title: "", address: "", type: "marina" },
-                          { title: "", address: "", type: "marina" }
-                        ]);
-                        setPortfolioName(`${company.name} Portfolio`);
-                        setShowAddPropertyModal(true);
-                      }}>
-                        <FolderPlus className="w-4 h-4 mr-2" />
-                        Add Portfolio (Multiple Properties)
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <Button 
+                    size="sm"
+                    onClick={() => {
+                      setIsPortfolioMode(false);
+                      setPortfolioProperties([{ title: "", address: "", type: "marina" }]);
+                      setShowAddPropertyModal(true);
+                    }}
+                  >
+                    <Plus className="w-4 h-4 mr-2" /> Create New
+                  </Button>
                 </div>
               </div>
 

@@ -205,7 +205,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
   const { data: items = [], isLoading, refetch } = useQuery<ExtractedItem[]>({
     queryKey: ["/api/modeling/projects", projectId, "documents", uploadId, "items"],
     queryFn: async () => {
-      const res = await fetch(`/api/modeling/projects/${projectId}/documents/${uploadId}/items`);
+      const res = await fetch(`/api/modeling/projects/${projectId}/documents/${uploadId}/items`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch items");
       return res.json();
     },
@@ -214,7 +214,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
   const { data: groupedData, isLoading: isLoadingGrouped } = useQuery<GroupedItemsResponse>({
     queryKey: ["/api/modeling/projects", projectId, "documents", uploadId, "items", "grouped"],
     queryFn: async () => {
-      const res = await fetch(`/api/modeling/projects/${projectId}/documents/${uploadId}/items?grouped=true`);
+      const res = await fetch(`/api/modeling/projects/${projectId}/documents/${uploadId}/items?grouped=true`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch grouped items");
       return res.json();
     },
