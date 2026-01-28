@@ -132,8 +132,45 @@ function normalizeText(text: string, abbreviations: Record<string, string[]>): s
   return normalized.replace(/\s+/g, ' ').trim();
 }
 
+// Suffixes to strip completely for comparison (business entity types)
+const STRIP_SUFFIXES = [
+  'corporation', 'corp', 'incorporated', 'inc', 
+  'company', 'co', 'llc', 'l.l.c.', 'llp', 'l.l.p.',
+  'limited', 'ltd', 'plc', 'p.l.c.',
+  'holdings', 'hldgs', 'holding',
+  'enterprises', 'enterprise', 'ent',
+  'group', 'grp', 'properties', 'partners', 'partnership',
+  'international', 'intl', 'int',
+  'association', 'assoc', 'assn',
+  'management', 'mgmt', 'mgt',
+  'services', 'service', 'svc', 'svcs',
+  'the', 'of', 'and', '&'
+];
+
+function stripEntitySuffixes(name: string): string {
+  if (!name) return '';
+  
+  let normalized = name.toLowerCase().trim();
+  // Remove punctuation
+  normalized = normalized.replace(/[.,#!$%^&*;:{}=_`~()\-]/g, ' ');
+  normalized = normalized.replace(/\s+/g, ' ').trim();
+  
+  // Strip all business entity suffixes
+  for (const suffix of STRIP_SUFFIXES) {
+    const pattern = new RegExp(`\\b${suffix}\\.?\\b`, 'gi');
+    normalized = normalized.replace(pattern, '');
+  }
+  
+  return normalized.replace(/\s+/g, ' ').trim();
+}
+
 function normalizeCompanyName(name: string): string {
   return normalizeText(name, COMPANY_ABBREVIATIONS);
+}
+
+// Enhanced company name comparison - strips entity suffixes for better matching
+function normalizeCompanyNameForMatching(name: string): string {
+  return stripEntitySuffixes(name);
 }
 
 function normalizeAddress(address: string): string {
@@ -141,13 +178,15 @@ function normalizeAddress(address: string): string {
 }
 
 function fuzzyCompanyMatch(name1: string, name2: string): boolean {
-  const n1 = normalizeCompanyName(name1);
-  const n2 = normalizeCompanyName(name2);
+  // Use suffix-stripped names for better matching
+  const n1 = normalizeCompanyNameForMatching(name1);
+  const n2 = normalizeCompanyNameForMatching(name2);
   
   if (n1 === n2) return true;
   
   const similarity = stringSimilarity(n1, n2);
-  return similarity >= 85;
+  // Lower threshold to 75 for suffix-stripped names since core name should match closely
+  return similarity >= 75;
 }
 
 function addressSimilarity(
@@ -218,7 +257,12 @@ export function findCompanyDuplicates(
       normalizeCompanyName(targetName),
       normalizeCompanyName(company.name)
     );
-    const nameScore = Math.max(rawNameScore, normalizedNameScore);
+    // Use suffix-stripped names for best matching (e.g., "ABC Corp" vs "ABC Co" -> "abc" vs "abc")
+    const strippedNameScore = stringSimilarity(
+      normalizeCompanyNameForMatching(targetName),
+      normalizeCompanyNameForMatching(company.name)
+    );
+    const nameScore = Math.max(rawNameScore, normalizedNameScore, strippedNameScore);
     const fuzzyMatch = fuzzyCompanyMatch(targetName, company.name);
     
     const addressScore = addressSimilarity(
@@ -238,8 +282,12 @@ export function findCompanyDuplicates(
     
     if (nameScore === 100) {
       matchReasons.push("Exact name match");
+    } else if (strippedNameScore === 100) {
+      matchReasons.push("Same company name (different entity suffix)");
     } else if (fuzzyMatch) {
       matchReasons.push("Same name (with abbreviations)");
+    } else if (strippedNameScore >= 85) {
+      matchReasons.push(`Very similar name (${strippedNameScore}% match after normalizing)`);
     } else if (nameScore >= 85) {
       matchReasons.push(`Very similar name (${nameScore}%)`);
     } else if (nameScore >= 70) {

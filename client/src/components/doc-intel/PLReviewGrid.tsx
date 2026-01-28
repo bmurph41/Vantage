@@ -211,14 +211,26 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
     },
   });
 
-  const { data: groupedData, isLoading: isLoadingGrouped } = useQuery<GroupedItemsResponse>({
+  const { data: groupedData, isLoading: isLoadingGrouped, error: groupedError } = useQuery<GroupedItemsResponse>({
     queryKey: ["/api/modeling/projects", projectId, "documents", uploadId, "items", "grouped"],
     queryFn: async () => {
       const res = await fetch(`/api/modeling/projects/${projectId}/documents/${uploadId}/items?grouped=true`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch grouped items");
-      return res.json();
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("GROUPED API ERROR:", res.status, errorText);
+        throw new Error("Failed to fetch grouped items");
+      }
+      const data = await res.json();
+      console.log("GROUPED DATA RESPONSE:", JSON.stringify(data, null, 2));
+      console.log("lineItems count:", data?.lineItems?.length);
+      console.log("periods:", data?.periods);
+      console.log("isMultiColumn:", data?.isMultiColumn);
+      return data;
     },
   });
+
+  // Debug: log current state
+  console.log("PLReviewGrid render - groupedData:", groupedData, "isLoadingGrouped:", isLoadingGrouped, "error:", groupedError);
 
   const toggleRowExpanded = (key: string) => {
     setExpandedRows((prev) => {
@@ -877,9 +889,18 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
           <div className="flex items-center justify-center h-48">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : groupedError ? (
+          <div className="flex flex-col items-center justify-center h-48 gap-2">
+            <AlertCircle className="h-8 w-8 text-red-500" />
+            <p className="text-red-600">Error loading grouped data</p>
+            <p className="text-sm text-muted-foreground">{String(groupedError)}</p>
+          </div>
         ) : !groupedData || !groupedData.lineItems ? (
-          <div className="flex items-center justify-center h-48">
+          <div className="flex flex-col items-center justify-center h-48 gap-2">
             <p className="text-muted-foreground">No data available.</p>
+            <p className="text-xs text-muted-foreground">
+              groupedData: {JSON.stringify(groupedData)}
+            </p>
           </div>
         ) : (
             <div className="overflow-x-auto">
