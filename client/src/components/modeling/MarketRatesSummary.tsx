@@ -29,10 +29,7 @@ export function MarketRatesSummary({ compact = false, className }: MarketRatesSu
   const hasAttemptedAutoRefresh = useRef(false);
 
   const refreshMutation = useMutation({
-    mutationFn: () => apiRequest("/api/capital-markets/rates/refresh", { 
-      method: "POST", 
-      body: JSON.stringify({ lookbackDays: 30 }) 
-    }),
+    mutationFn: () => apiRequest("POST", "/api/capital-markets/rates/refresh", { lookbackDays: 30 }),
     onSuccess: () => {
       toast({ title: "Rates Updated", description: "Market rates have been refreshed" });
       queryClient.invalidateQueries({ queryKey: ["/api/capital-markets/rates/latest"] });
