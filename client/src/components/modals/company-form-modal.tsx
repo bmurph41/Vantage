@@ -395,7 +395,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
           await linkContactMutation.mutateAsync({
             contactId: newContact.id,
             companyId: company.id,
-            role: contactRole || null,
+            role: newContact.position || null,
             isPrimary: false,
           });
           queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
@@ -404,7 +404,6 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
           toast({ title: "Contact created and linked successfully" });
           setIsCreatingContact(false);
           contactForm.reset();
-          setContactRole("");
         } catch (error: any) {
           // If linking fails, we need to clean up
           toast({
@@ -420,7 +419,6 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
         toast({ title: "Contact created successfully" });
         setIsCreatingContact(false);
         contactForm.reset();
-        setContactRole("");
       }
     },
     onError: (error: any) => {
@@ -588,11 +586,10 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
       // Existing company - create and link immediately
       createContactMutation.mutate(data);
     } else {
-      // New company - add to pending
-      setPendingContactsToCreate([...pendingContactsToCreate, { data, role: contactRole || undefined }]);
+      // New company - add to pending (use position as role)
+      setPendingContactsToCreate([...pendingContactsToCreate, { data, role: data.position || undefined }]);
       setIsCreatingContact(false);
       contactForm.reset();
-      setContactRole("");
       toast({ title: "Contact added (will be created when company is created)" });
     }
   };
@@ -1291,16 +1288,6 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                             )}
                           />
                         </div>
-                        <div>
-                          <label className="text-sm font-medium">Role in Company</label>
-                          <Input
-                            placeholder="e.g., Decision Maker, Technical Contact"
-                            value={contactRole}
-                            onChange={(e) => setContactRole(e.target.value)}
-                            className="bg-white dark:bg-slate-900"
-                            data-testid="input-new-contact-company-role"
-                          />
-                        </div>
                         <div className="flex justify-end gap-2">
                           <Button
                             type="button"
@@ -1308,7 +1295,6 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                             onClick={() => {
                               setIsCreatingContact(false);
                               contactForm.reset();
-                              setContactRole("");
                             }}
                           >
                             Cancel
