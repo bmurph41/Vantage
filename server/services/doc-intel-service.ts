@@ -35,7 +35,7 @@ import * as crypto from 'crypto';
 import path from 'path';
 import * as XLSX from 'xlsx';
 import { extractDocument } from '../utils/ocr';
-import { findAliasMatch, getMatchResult } from "./pnl-alias-matcher";
+import { findAliasMatch, getMatchResult, learnAlias, buildCoaCode } from "./pnl-alias-matcher";
 
 interface ParsedLineItem {
   rawText: string;
@@ -2160,8 +2160,19 @@ class DocIntelService {
       .returning();
     
     // Create learning rule from user confirmation
-    if (updates.status === 'confirmed' && (updates.categoryTierConfirmed || updates.revenueCogsDeptConfirmed || updates.expenseDeptConfirmed)) {
-      await this.createLearningRuleFromConfirmation(orgId, item.rawText, updates, userId);
+    // Check both updates AND existing confirmed values on the item
+    if (updates.status === 'confirmed') {
+      const categoryTier = updates.categoryTierConfirmed || updated.categoryTierConfirmed;
+      const revenueCogsDept = updates.revenueCogsDeptConfirmed || updated.revenueCogsDeptConfirmed;
+      const expenseDept = updates.expenseDeptConfirmed || updated.expenseDeptConfirmed;
+      
+      if (categoryTier || revenueCogsDept || expenseDept) {
+        await this.createLearningRuleFromConfirmation(orgId, item.rawText, {
+          categoryTierConfirmed: categoryTier,
+          revenueCogsDeptConfirmed: revenueCogsDept,
+          expenseDeptConfirmed: expenseDept,
+        }, userId);
+      }
     }
     
     // Create learning rule from user exclusion (with has_value context)
@@ -2237,6 +2248,18 @@ class DocIntelService {
         createdBy: userId,
         isActive: true,
       });
+      
+      // Also add to pnlLineItemAliases for matcher system
+      const tier = updates.categoryTierConfirmed as 'revenue' | 'cogs' | 'expense' | undefined;
+      const dept = tier === 'expense' 
+        ? updates.expenseDeptConfirmed 
+        : updates.revenueCogsDeptConfirmed;
+      
+      if (tier) {
+        const coaCode = await buildCoaCode(tier, dept);
+        const aliasResult = await learnAlias(rawText, coaCode, orgId);
+        console.log(`[DocIntel Learning] Alias ${aliasResult.created ? 'created' : 'updated'}: "${rawText.substring(0, 30)}..." -> ${coaCode}`);
+      }
       
       console.log(`[DocIntel Learning] Created rule from confirmation: "${rawText.substring(0, 30)}..."`);
     } catch (error) {

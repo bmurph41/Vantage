@@ -5,7 +5,7 @@
 
 import { db } from '../db';
 import { pnlLineItemAliases, pnlCanonicalLineItems } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 
 export interface AliasMatch {
   coaCode: string;
@@ -54,6 +54,80 @@ function subcategoryToDept(subcategory: string): string {
     'Leases': 'leases',
   };
   return mapping[subcategory] || 'miscellaneous';
+}
+
+const DEPT_TO_SUBCATEGORY: Record<string, string> = {
+  storage: 'Storage',
+  fuel: 'Fuel',
+  marina_amenities: 'Marina & Amenities',
+  ship_store_retail: 'Ship Store/Retail',
+  service: 'Service',
+  parts: 'Parts',
+  third_party_leases: 'Third-Party Leases',
+  boat_club: 'In-House Boat Club',
+  boat_rentals: 'Boat Rentals',
+  boat_sales: 'Boat Sales',
+  boat_brokerage: 'Boat Brokerage',
+  boat_finance: 'Boat Finance',
+  fb: 'F&B',
+  rv_park: 'RV Park',
+  hospitality_lodging: 'Hospitality/Lodging',
+  miscellaneous: 'Miscellaneous',
+  payroll: 'Payroll',
+  general_admin: 'General & Administrative',
+  advertising: 'Advertising',
+  repairs_maintenance: 'Repairs & Maintenance',
+  utilities: 'Utilities',
+  licenses_permits: 'Licenses & Permits',
+  security_contract_services: 'Security & Contract Services',
+  bank_cc_fees: 'Bank/Credit Card Fees',
+  professional_services: 'Professional Services',
+  insurance: 'Insurance',
+  taxes: 'Property Taxes',
+  leases: 'Leases',
+};
+
+const TIER_TO_MAJOR_GROUP: Record<string, string> = {
+  revenue: 'Revenue',
+  cogs: 'COGS',
+  expense: 'OpEx',
+};
+
+let coaCodeCache: Map<string, string> | null = null;
+
+async function loadCoaCodeCache() {
+  if (coaCodeCache) return;
+  
+  const items = await db.select({
+    majorGroup: pnlCanonicalLineItems.majorGroup,
+    subcategoryGroup: pnlCanonicalLineItems.subcategoryGroup,
+    coaCode: pnlCanonicalLineItems.coaCode,
+  }).from(pnlCanonicalLineItems).where(eq(pnlCanonicalLineItems.isActive, true));
+  
+  coaCodeCache = new Map();
+  for (const item of items) {
+    const key = `${item.majorGroup}:${item.subcategoryGroup}`;
+    coaCodeCache.set(key, item.coaCode);
+  }
+}
+
+export async function buildCoaCode(
+  categoryTier: 'revenue' | 'cogs' | 'expense',
+  dept: string | null
+): Promise<string> {
+  await loadCoaCodeCache();
+  
+  const majorGroup = TIER_TO_MAJOR_GROUP[categoryTier] || 'OpEx';
+  const subcategory = dept ? (DEPT_TO_SUBCATEGORY[dept] || 'Miscellaneous') : 'Miscellaneous';
+  
+  const key = `${majorGroup}:${subcategory}`;
+  const coaCode = coaCodeCache?.get(key);
+  
+  if (coaCode) return coaCode;
+  
+  // Fallback to miscellaneous for tier
+  const fallbackKey = `${majorGroup}:Miscellaneous`;
+  return coaCodeCache?.get(fallbackKey) || `${majorGroup === 'Revenue' ? 'REV' : majorGroup === 'COGS' ? 'COGS' : 'OPEX'}_MISCELLANEOUS`;
 }
 
 function normalizeLabel(text: string): string {
@@ -168,4 +242,68 @@ export function getMatchResult(match: AliasMatch): {
 export async function clearAliasCache() {
   aliasCache = null;
   canonicalCache = null;
+}
+
+export async function learnAlias(
+  rawLabel: string,
+  canonicalCoaCode: string,
+  orgId: string
+): Promise<{ created: boolean; updated: boolean; aliasId: string }> {
+  const normalized = normalizeLabel(rawLabel);
+  
+  // First check for org-scoped user_learned alias
+  const orgExisting = await db.select()
+    .from(pnlLineItemAliases)
+    .where(and(
+      eq(pnlLineItemAliases.normalizedLabel, normalized),
+      eq(pnlLineItemAliases.orgId, orgId),
+      eq(pnlLineItemAliases.source, 'user_learned')
+    ))
+    .limit(1);
+  
+  if (orgExisting.length > 0) {
+    const alias = orgExisting[0];
+    if (alias.canonicalCoaCode === canonicalCoaCode) {
+      // Same mapping - just update usage stats
+      await db.update(pnlLineItemAliases)
+        .set({ 
+          timesUsed: (alias.timesUsed || 0) + 1,
+          lastUsedAt: new Date(),
+          updatedAt: new Date()
+        })
+        .where(eq(pnlLineItemAliases.id, alias.id));
+      return { created: false, updated: true, aliasId: alias.id };
+    }
+    
+    // Different mapping for same label - update the alias
+    await db.update(pnlLineItemAliases)
+      .set({ 
+        canonicalCoaCode,
+        timesUsed: (alias.timesUsed || 0) + 1,
+        lastUsedAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(pnlLineItemAliases.id, alias.id));
+    
+    aliasCache = null;
+    return { created: false, updated: true, aliasId: alias.id };
+  }
+  
+  // No org-scoped alias exists - create a new one (even if system/global alias exists)
+  const newAlias = await db.insert(pnlLineItemAliases)
+    .values({
+      orgId,
+      rawLabel,
+      normalizedLabel: normalized,
+      canonicalCoaCode,
+      source: 'user_learned',
+      confidence: '0.95',
+      timesUsed: 1,
+      lastUsedAt: new Date(),
+    })
+    .returning({ id: pnlLineItemAliases.id });
+  
+  aliasCache = null;
+  
+  return { created: true, updated: false, aliasId: newAlias[0].id };
 }
