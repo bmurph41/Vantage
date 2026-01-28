@@ -877,7 +877,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling }: PLRevie
           <div className="flex items-center justify-center h-48">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
-        ) : !groupedData ? (
+        ) : !groupedData || !groupedData.lineItems ? (
           <div className="flex items-center justify-center h-48">
             <p className="text-muted-foreground">No data available.</p>
           </div>
