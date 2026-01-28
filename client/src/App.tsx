@@ -275,6 +275,7 @@ const OMExport = lazy(() => import("@/modules/om-builder/pages/om-export"));
 const OMTemplates = lazy(() => import("@/modules/om-builder/pages/om-templates"));
 const OMBrandKits = lazy(() => import("@/modules/om-builder/pages/om-brand-kits"));
 const OMCanvasEditor = lazy(() => import("@/pages/om-builder-editor"));
+const DocumentBuilderPage = lazy(() => import("@/pages/document-builder/DocumentBuilderPage"));
 
 // Onboarding Wizard (lazy loaded)
 const OnboardingWizard = lazy(() => import("@/components/onboarding/OnboardingWizard").then(m => ({ default: m.OnboardingWizard })));
@@ -1999,6 +2000,13 @@ function Router() {
         )}
       </Route>
       <Route path="/om/templates">
+      <Route path="/document-builder/:documentId?">
+        {(params: { documentId?: string }) => (
+          <UnifiedLayout>
+            <DocumentBuilderPage documentId={params.documentId} />
+          </UnifiedLayout>
+        )}
+      </Route>
         {() => (
           <UnifiedLayout>
             <OMTemplates />
