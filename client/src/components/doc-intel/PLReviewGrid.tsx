@@ -759,19 +759,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
     state: { sorting },
   });
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  const confirmedCount = items.filter((i) => i.status === "confirmed").length;
-  const excludedCount = items.filter((i) => i.status === "excluded").length;
-  const pendingCount = items.filter((i) => i.status === "pending" || i.status === "needs_review").length;
-
-  // Filter lineItems based on statusFilter prop
+  // Filter lineItems based on statusFilter prop - must be before any early returns
   const filteredLineItems = useMemo(() => {
     if (!groupedData?.lineItems) return [];
     if (statusFilter === 'all') return groupedData.lineItems;
@@ -784,6 +772,18 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
       return lineItem.status === statusFilter;
     });
   }, [groupedData?.lineItems, statusFilter]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  const confirmedCount = items.filter((i) => i.status === "confirmed").length;
+  const excludedCount = items.filter((i) => i.status === "excluded").length;
+  const pendingCount = items.filter((i) => i.status === "pending" || i.status === "needs_review").length;
 
   return (
     <div className="space-y-4">
