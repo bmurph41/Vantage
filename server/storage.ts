@@ -657,6 +657,8 @@ export interface IStorage {
   // CRM Contacts - search by name
   findContactByName(orgId: string, contactName: string): Promise<CRMContact | undefined>;
   findSimilarContacts(orgId: string, contactName: string): Promise<CRMContact[]>;
+  findContactByEmail(orgId: string, email: string): Promise<CRMContact | undefined>;
+  findContactByPhone(orgId: string, phone: string): Promise<CRMContact | undefined>;
   
   // Pending Properties - Review queue for properties created from comps
   getPendingProperties(orgId: string, status?: string): Promise<PendingProperty[]>;
@@ -5259,6 +5261,51 @@ export class DatabaseStorage implements IStorage {
       .limit(10);
     
     return contacts;
+  }
+
+  async findContactByEmail(orgId: string, email: string): Promise<CRMContact | undefined> {
+    if (!email || email.trim().length === 0) {
+      return undefined;
+    }
+    
+    const normalizedEmail = email.trim().toLowerCase();
+    
+    const [contact] = await db.select()
+      .from(crmContacts)
+      .where(and(
+        eq(crmContacts.orgId, orgId),
+        ilike(crmContacts.email, normalizedEmail)
+      ))
+      .limit(1);
+    
+    return contact || undefined;
+  }
+
+  async findContactByPhone(orgId: string, phone: string): Promise<CRMContact | undefined> {
+    if (!phone || phone.trim().length === 0) {
+      return undefined;
+    }
+    
+    // Normalize phone by removing all non-digit characters
+    const normalizedPhone = phone.replace(/\D/g, '');
+    
+    if (normalizedPhone.length === 0) {
+      return undefined;
+    }
+    
+    // Get all contacts and compare normalized phones
+    const contacts = await db.select()
+      .from(crmContacts)
+      .where(eq(crmContacts.orgId, orgId));
+    
+    // Find a contact with matching normalized phone
+    const matchingContact = contacts.find(c => {
+      if (!c.phone) return false;
+      const contactPhone = c.phone.replace(/\D/g, '');
+      return contactPhone === normalizedPhone;
+    });
+    
+    return matchingContact || undefined;
   }
 
   // ============================================================================

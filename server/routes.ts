@@ -9552,6 +9552,36 @@ Current context: Project ${req.params.projectId}`;
     try {
       const { company, companyId, ...contactData } = req.body;
       
+      // Check for duplicate email
+      if (contactData.email && contactData.email.trim()) {
+        const existingByEmail = await storage.findContactByEmail(req.user.orgId, contactData.email);
+        if (existingByEmail) {
+          return res.status(400).json({ 
+            error: "A contact with this email already exists",
+            field: "email",
+            existingContact: {
+              id: existingByEmail.id,
+              name: `${existingByEmail.firstName} ${existingByEmail.lastName || ''}`.trim()
+            }
+          });
+        }
+      }
+      
+      // Check for duplicate phone
+      if (contactData.phone && contactData.phone.trim()) {
+        const existingByPhone = await storage.findContactByPhone(req.user.orgId, contactData.phone);
+        if (existingByPhone) {
+          return res.status(400).json({ 
+            error: "A contact with this phone number already exists",
+            field: "phone",
+            existingContact: {
+              id: existingByPhone.id,
+              name: `${existingByPhone.firstName} ${existingByPhone.lastName || ''}`.trim()
+            }
+          });
+        }
+      }
+      
       let linkedCompanyId = companyId || null;
       let pendingCompanyId = null;
       
