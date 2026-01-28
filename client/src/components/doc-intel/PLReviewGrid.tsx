@@ -939,6 +939,8 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                   <TableRow>
                     <TableHead className="w-8 bg-muted/50 sticky left-0 z-20"></TableHead>
                     <TableHead className="bg-muted/50 sticky left-8 z-20 min-w-[200px]">Line Item</TableHead>
+                    <TableHead className="bg-muted/50 min-w-[110px]">Category</TableHead>
+                    <TableHead className="bg-muted/50 min-w-[120px]">Department</TableHead>
                     {groupedData.isMultiColumn ? (
                       groupedData.periods.map((period) => (
                         <TableHead key={period} className="bg-muted/50 text-center min-w-[90px]">
@@ -958,7 +960,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
               <TableBody>
                 {filteredLineItems.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={groupedData.isMultiColumn ? groupedData.periods.length + 5 : 5} className="h-24 text-center">
+                    <TableCell colSpan={groupedData.isMultiColumn ? groupedData.periods.length + 7 : 7} className="h-24 text-center">
                       {statusFilter !== 'all' ? 'No items match the selected filter.' : 'No line items found.'}
                     </TableCell>
                   </TableRow>
@@ -996,6 +998,80 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                             <span className="truncate block max-w-[250px]" title={lineItem.lineItemName}>
                               {lineItem.lineItemName}
                             </span>
+                          </TableCell>
+                          <TableCell>
+                            {(() => {
+                              const firstItem = lineItem.monthlyData[0];
+                              if (!firstItem) return "-";
+                              const currentTier = (firstItem.categoryTierConfirmed || firstItem.categoryTierSuggested) as CategoryTier | null;
+                              return (
+                                <Select
+                                  value={currentTier || ""}
+                                  onValueChange={(v) => {
+                                    const itemIds = lineItem.monthlyData.map((m) => m.id);
+                                    bulkUpdateMutation.mutate({
+                                      itemIds,
+                                      updates: { 
+                                        categoryTierConfirmed: v as CategoryTier,
+                                        revenueCogsDeptConfirmed: null,
+                                        expenseDeptConfirmed: null,
+                                      },
+                                    });
+                                  }}
+                                  disabled={bulkUpdateMutation.isPending}
+                                >
+                                  <SelectTrigger className="h-8 w-[100px]">
+                                    <SelectValue placeholder="Select..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {CATEGORY_TIER_OPTIONS.map((opt) => (
+                                      <SelectItem key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              );
+                            })()}
+                          </TableCell>
+                          <TableCell>
+                            {(() => {
+                              const firstItem = lineItem.monthlyData[0];
+                              if (!firstItem) return "-";
+                              const currentTier = (firstItem.categoryTierConfirmed || firstItem.categoryTierSuggested) as CategoryTier | null;
+                              if (!currentTier) return "-";
+                              const deptOptions = currentTier === "expense" ? EXPENSE_DEPT_OPTIONS : REVENUE_COGS_DEPT_OPTIONS;
+                              const currentDept = currentTier === "expense"
+                                ? (firstItem.expenseDeptConfirmed || firstItem.expenseDeptSuggested)
+                                : (firstItem.revenueCogsDeptConfirmed || firstItem.revenueCogsDeptSuggested);
+                              return (
+                                <Select
+                                  value={currentDept || ""}
+                                  onValueChange={(v) => {
+                                    const itemIds = lineItem.monthlyData.map((m) => m.id);
+                                    const updates = currentTier === "expense"
+                                      ? { expenseDeptConfirmed: v }
+                                      : { revenueCogsDeptConfirmed: v };
+                                    bulkUpdateMutation.mutate({
+                                      itemIds,
+                                      updates,
+                                    });
+                                  }}
+                                  disabled={bulkUpdateMutation.isPending}
+                                >
+                                  <SelectTrigger className="h-8 w-[110px]">
+                                    <SelectValue placeholder="Select..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {deptOptions.map((opt) => (
+                                      <SelectItem key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              );
+                            })()}
                           </TableCell>
                           {groupedData.isMultiColumn ? (
                             groupedData.periods.map((period) => {
@@ -1209,7 +1285,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                         </TableRow>
                         {isExpanded && (
                           <TableRow className="bg-muted/20">
-                            <TableCell colSpan={groupedData.isMultiColumn ? groupedData.periods.length + 5 : 5} className="p-4">
+                            <TableCell colSpan={groupedData.isMultiColumn ? groupedData.periods.length + 7 : 7} className="p-4">
                               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
                                 {lineItem.monthlyData.map((month) => (
                                   <div
