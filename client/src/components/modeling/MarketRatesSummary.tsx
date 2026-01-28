@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,6 +26,8 @@ export function MarketRatesSummary({ compact = false, className }: MarketRatesSu
     isLoading 
   } = useAllMarketRates();
 
+  const hasAttemptedAutoRefresh = useRef(false);
+
   const refreshMutation = useMutation({
     mutationFn: () => apiRequest("/api/capital-markets/rates/refresh", { 
       method: "POST", 
@@ -41,25 +44,40 @@ export function MarketRatesSummary({ compact = false, className }: MarketRatesSu
     },
   });
 
+  const sofrValue = getSofrOvernight();
+  const primeValue = getPrimeRate();
+  const treasury5y = getTreasury("5y");
+  const treasury10y = getTreasury("10y");
+
+  useEffect(() => {
+    if (!isLoading && !hasAttemptedAutoRefresh.current && 
+        sofrValue === null && primeValue === null && 
+        treasury5y === null && treasury10y === null &&
+        !refreshMutation.isPending) {
+      hasAttemptedAutoRefresh.current = true;
+      refreshMutation.mutate();
+    }
+  }, [isLoading, sofrValue, primeValue, treasury5y, treasury10y, refreshMutation]);
+
   const rates = [
     { 
       label: "SOFR O/N", 
-      value: getSofrOvernight(), 
+      value: sofrValue, 
       description: "Base floating rate",
     },
     { 
       label: "Prime", 
-      value: getPrimeRate(), 
+      value: primeValue, 
       description: "Bank lending benchmark",
     },
     { 
       label: "5Y Treasury", 
-      value: getTreasury("5y"), 
+      value: treasury5y, 
       description: "Mid-term risk-free",
     },
     { 
       label: "10Y Treasury", 
-      value: getTreasury("10y"), 
+      value: treasury10y, 
       description: "Long-term benchmark",
     },
   ];
