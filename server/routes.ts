@@ -7075,7 +7075,6 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: "Failed to retrieve pending contacts" });
     }
   });
-
   app.get("/api/crm/pending-contacts/:id", async (req: any, res) => {
     try {
       const pendingContact = await storage.getPendingContact(req.params.id);
@@ -7086,6 +7085,40 @@ Current context: Project ${req.params.projectId}`;
     } catch (error: any) {
       console.error("Failed to get pending contact:", error);
       res.status(500).json({ error: "Failed to retrieve pending contact" });
+    }
+  });
+
+  app.post("/api/crm/pending-contacts", async (req: any, res) => {
+    try {
+      const { firstName, lastName, email, phone, position, companyId, linkedPropertyIds } = req.body;
+      
+      if (!firstName && !lastName && !email) {
+        return res.status(400).json({ error: "At least one of firstName, lastName, or email is required" });
+      }
+
+      const pendingContact = await storage.createPendingContact({
+        orgId: req.user.orgId,
+        sourceType: 'company_form',
+        sourceId: companyId || null,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        fullName: firstName && lastName ? `${firstName} ${lastName}` : (firstName || lastName || null),
+        email: email || null,
+        phone: phone || null,
+        jobTitle: position || null,
+        companyId: companyId || null,
+        status: 'pending',
+        sourceMetadata: {
+          linkedPropertyIds: linkedPropertyIds || [],
+          createdFromCompanyForm: true,
+        },
+        createdBy: req.user.id,
+      });
+
+      res.json(pendingContact);
+    } catch (error: any) {
+      console.error("Failed to create pending contact:", error);
+      res.status(500).json({ error: "Failed to create pending contact" });
     }
   });
 
