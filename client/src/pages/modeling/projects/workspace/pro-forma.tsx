@@ -90,32 +90,19 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
 
   const isSeasonalMonth = (monthIndex: number) => seasonMonths.includes(monthIndex + 1);
 
-  const sampleAnnualData = {
+  const emptyAnnualData = {
     years,
     categories: {
-      Revenue: {
-        'Wet Slips': years.map((_, i) => Math.round(700000 * Math.pow(1.03, i))),
-        'Dry Storage': years.map((_, i) => Math.round(315000 * Math.pow(1.03, i))),
-        'Fuel Sales': years.map((_, i) => Math.round(557000 * Math.pow(1.025, i))),
-        'Ship Store': years.map((_, i) => Math.round(241000 * Math.pow(1.03, i))),
-        'Third-Party Leases': years.map((_, i) => Math.round(96000 * Math.pow(1.02, i))),
-      },
-      COGS: {
-        'Fuel COGS': years.map((_, i) => Math.round(473450 * Math.pow(1.02, i))),
-        'Ship Store COGS': years.map((_, i) => Math.round(156650 * Math.pow(1.02, i))),
-      },
-      Expenses: {
-        'Payroll & Benefits': years.map((_, i) => Math.round(514000 * Math.pow(1.025, i))),
-        'Utilities': years.map((_, i) => Math.round(77100 * Math.pow(1.03, i))),
-        'Insurance': years.map((_, i) => Math.round(102000 * Math.pow(1.04, i))),
-        'Repairs & Maintenance': years.map((_, i) => Math.round(85000 * Math.pow(1.025, i))),
-        'Property Taxes': years.map((_, i) => Math.round(65000 * Math.pow(1.02, i))),
-        'Other OpEx': years.map((_, i) => Math.round(45000 * Math.pow(1.02, i))),
-      },
+      Revenue: {},
+      COGS: {},
+      Expenses: {},
     },
   };
 
-  const data = proFormaData || sampleAnnualData;
+  const data = proFormaData || emptyAnnualData;
+  const hasData = proFormaData && Object.values(proFormaData.categories || {}).some(
+    (cat: any) => Object.keys(cat).length > 0
+  );
 
   const getCategoryTotal = (category: string, yearIndex: number) => {
     const items = data.categories[category] || {};
@@ -212,6 +199,18 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
           </Button>
         </div>
       </div>
+
+      {!hasData && (
+        <Card className="border-dashed">
+          <CardContent className="py-8 text-center">
+            <BarChart3 className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+            <h4 className="font-semibold mb-2">No Projection Data Yet</h4>
+            <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
+              Upload historical P&L data to generate pro forma projections. Financial data from Doc Intel will flow here automatically.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 md:grid-cols-4">
         <Card>

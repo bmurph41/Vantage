@@ -136,26 +136,26 @@ export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: Wo
 
   const currentScenario = scenarios[activeScenario];
 
-  const sampleMetrics = {
-    purchasePrice: project?.purchasePrice || 8500000,
-    year1NOI: 680000,
-    year1CapRate: 8.0,
-    exitNOI: 812000,
+  const hasData = summaryData && (summaryData.year1NOI > 0 || summaryData.purchasePrice > 0);
+  
+  const emptyMetrics = {
+    purchasePrice: project?.purchasePrice || 0,
+    year1NOI: 0,
+    year1CapRate: 0,
+    exitNOI: 0,
     exitCapRate: scenarios[activeScenario].exitCapRate,
-    exitValue: 812000 / (scenarios[activeScenario].exitCapRate / 100),
-    totalEquityRequired: 3400000,
-    totalDebt: 5100000,
-    ltv: 60,
-    unleveredIRR: 12.5,
-    leveredIRR: 18.2,
-    equityMultiple: 2.1,
-    cashOnCash: Array.from({ length: holdPeriod }, (_, i) => 6 + i * 0.8),
-    noiByYear: Array.from({ length: holdPeriod }, (_, i) => 
-      Math.round(680000 * Math.pow(1 + (scenarios[activeScenario].revenueGrowth - scenarios[activeScenario].expenseGrowth) / 100, i))
-    ),
+    exitValue: 0,
+    totalEquityRequired: 0,
+    totalDebt: 0,
+    ltv: 0,
+    unleveredIRR: 0,
+    leveredIRR: 0,
+    equityMultiple: 0,
+    cashOnCash: Array.from({ length: holdPeriod }, () => 0),
+    noiByYear: Array.from({ length: holdPeriod }, () => 0),
   };
 
-  const metrics = summaryData || sampleMetrics;
+  const metrics = summaryData || emptyMetrics;
 
   const updateScenario = (type: ScenarioType, field: keyof ScenarioConfig, value: string | number) => {
     setScenarios(prev => ({
@@ -303,6 +303,18 @@ export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: Wo
           </div>
         </CardContent>
       </Card>
+
+      {!hasData && (
+        <Card className="border-dashed">
+          <CardContent className="py-8 text-center">
+            <ClipboardList className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+            <h4 className="font-semibold mb-2">No Financial Data Yet</h4>
+            <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
+              Upload P&L documents or enter historical data to generate investment analysis and financial projections.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
