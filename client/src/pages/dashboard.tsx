@@ -104,7 +104,7 @@ function SortableModule({
             >
               <X className="h-3.5 w-3.5" />
             </Button>
-            <div {...listeners} className="hidden sm:block cursor-grab active:cursor-grabbing p-1 hover:bg-gray-100 rounded">
+            <div {...listeners} className="hidden sm:block cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded">
               <GripVertical className="h-4 w-4 text-gray-400" />
             </div>
           </div>
@@ -221,7 +221,7 @@ function CustomModuleContent({
         </p>
         <div className="space-y-1 max-h-48 overflow-y-auto">
           {data.slice(0, 10).map((item: any, idx: number) => (
-            <div key={idx} className="text-xs p-2 bg-gray-50 rounded">
+            <div key={idx} className="text-xs p-2 bg-muted rounded">
               {item.title || item.propertyName || item.fileName || item.unitNumber || item.name || `Record ${idx + 1}`}
             </div>
           ))}
@@ -380,7 +380,7 @@ function CustomModuleContent({
           </p>
           <div className="space-y-1 max-h-48 overflow-y-auto">
             {tableData.slice(0, 10).map((item: any, idx: number) => (
-              <div key={idx} className="text-xs p-2 bg-gray-50 rounded">
+              <div key={idx} className="text-xs p-2 bg-muted rounded">
                 {item.title || item.propertyName || item.fileName || item.unitNumber || item.name || `Record ${idx + 1}`}
               </div>
             ))}
@@ -881,7 +881,7 @@ export default function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex-1 overflow-auto bg-gray-50" data-testid="page-dashboard">
+      <div className="flex-1 overflow-auto bg-background" data-testid="page-dashboard">
         <div className="container mx-auto p-6 max-w-7xl">
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -1594,7 +1594,7 @@ export default function Dashboard() {
     .filter(m => !hiddenModules.has(m!.id)) as DashboardModule[];
 
   return (
-    <div className="flex-1 overflow-auto bg-gray-50" data-testid="page-dashboard">
+    <div className="flex-1 overflow-auto bg-background" data-testid="page-dashboard">
       <PageTour tourId={TOUR_IDS.DASHBOARD} steps={dashboardTourSteps} />
       <div className="container mx-auto p-4 sm:p-6 max-w-7xl">
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

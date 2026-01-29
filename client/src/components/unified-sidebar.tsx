@@ -358,13 +358,13 @@ export default function UnifiedSidebar() {
         href={item.href}
         onClick={handleNavClick}
         className={cn(
-          "flex items-center text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors",
+          "flex items-center text-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors",
           sidebarCollapsed ? "px-2 py-2.5 justify-center" : "px-4 py-2.5",
-          isActive && "bg-blue-50 border-r-3 border-blue-600 text-blue-600 font-medium"
+          isActive && "bg-sidebar-accent border-r-3 border-sidebar-primary text-sidebar-primary font-medium"
         )}
         data-testid={`nav-${item.name.toLowerCase().replace(/ /g, '-')}`}
       >
-        <item.icon className={cn("w-4 h-4 flex-shrink-0", !sidebarCollapsed && "mr-3", isActive && "text-blue-600")} />
+        <item.icon className={cn("w-4 h-4 flex-shrink-0", !sidebarCollapsed && "mr-3", isActive && "text-sidebar-primary")} />
         {!sidebarCollapsed && (
           <>
             <span className="truncate">{item.name}</span>
@@ -419,12 +419,12 @@ export default function UnifiedSidebar() {
           <TooltipTrigger asChild>
             <div 
               className={cn(
-                "flex items-center justify-center py-2 mx-2 border-t border-gray-200 mt-2 cursor-pointer hover:bg-gray-50",
-                isActive && "bg-blue-50"
+                "flex items-center justify-center py-2 mx-2 border-t border-sidebar-border mt-2 cursor-pointer hover:bg-sidebar-accent",
+                isActive && "bg-sidebar-accent"
               )}
               onClick={onToggle}
             >
-              {IconComponent && <IconComponent className={cn("w-4 h-4", isActive ? "text-blue-600" : "text-gray-400")} />}
+              {IconComponent && <IconComponent className={cn("w-4 h-4", isActive ? "text-sidebar-primary" : "text-sidebar-foreground/50")} />}
             </div>
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={10}>
@@ -457,11 +457,11 @@ export default function UnifiedSidebar() {
         {/* Mobile Menu Button */}
         <button
           onClick={() => setMobileMenuOpen(true)}
-          className="fixed top-4 left-4 z-50 md:hidden bg-white p-2 rounded-lg shadow-lg hover:bg-gray-50 transition-colors"
+          className="fixed top-4 left-4 z-50 md:hidden bg-sidebar p-2 rounded-lg shadow-lg hover:bg-sidebar-accent transition-colors"
           data-testid="button-mobile-menu"
           aria-label="Open menu"
         >
-          <Menu className="w-6 h-6 text-gray-700" />
+          <Menu className="w-6 h-6 text-sidebar-foreground" />
         </button>
 
         {/* Mobile Overlay */}
@@ -476,7 +476,7 @@ export default function UnifiedSidebar() {
         {/* Sidebar */}
         <div 
           className={cn(
-            "bg-white shadow-lg flex-shrink-0 flex flex-col h-screen",
+            "bg-sidebar text-sidebar-foreground shadow-lg flex-shrink-0 flex flex-col h-screen",
             "fixed md:static top-0 left-0 z-50",
             "transition-all duration-300 ease-in-out",
             "md:translate-x-0",
@@ -486,21 +486,21 @@ export default function UnifiedSidebar() {
           data-testid="unified-sidebar"
         >
           {/* Header */}
-          <div className={cn("py-4 border-b border-gray-200 flex-shrink-0", sidebarCollapsed ? "space-y-2" : "space-y-3")}>
+          <div className={cn("py-4 border-b border-sidebar-border flex-shrink-0", sidebarCollapsed ? "space-y-2" : "space-y-3")}>
             <div className={cn("flex items-center", sidebarCollapsed ? "justify-center px-2" : "justify-between px-4")}>
               <Link href="/" data-testid="sidebar-logo">
                 <div className="flex items-center space-x-2.5 cursor-pointer hover:opacity-80 transition-opacity">
                   <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded flex items-center justify-center flex-shrink-0">
                     <Anchor className="w-5 h-5 text-white" />
                   </div>
-                  {!sidebarCollapsed && <h1 className="text-lg font-bold text-gray-900 truncate">MarinaMatch</h1>}
+                  {!sidebarCollapsed && <h1 className="text-lg font-bold text-sidebar-foreground truncate">MarinaMatch</h1>}
                 </div>
               </Link>
               {/* Mobile Close Button */}
               {!sidebarCollapsed && (
                 <button
                   onClick={() => setMobileMenuOpen(false)}
-                  className="md:hidden text-gray-500 hover:text-gray-700 transition-colors"
+                  className="md:hidden text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors"
                   data-testid="button-close-mobile-menu"
                   aria-label="Close menu"
                 >
@@ -516,14 +516,14 @@ export default function UnifiedSidebar() {
                     const event = new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true });
                     document.dispatchEvent(event);
                   }}
-                  className="flex items-center justify-between w-full px-3 py-2 text-sm text-gray-500 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-md transition-colors"
+                  className="flex items-center justify-between w-full px-3 py-2 text-sm text-sidebar-foreground/70 bg-sidebar-accent hover:bg-sidebar-accent/80 border border-sidebar-border rounded-md transition-colors"
                   data-testid="command-palette-trigger"
                 >
                   <div className="flex items-center gap-2">
                     <Search className="w-4 h-4" />
                     <span>Search everything...</span>
                   </div>
-                  <kbd className="pointer-events-none hidden md:inline-flex h-5 select-none items-center gap-0.5 rounded border border-gray-300 bg-white px-1.5 font-mono text-[10px] font-medium text-gray-500">
+                  <kbd className="pointer-events-none hidden md:inline-flex h-5 select-none items-center gap-0.5 rounded border border-sidebar-border bg-sidebar px-1.5 font-mono text-[10px] font-medium text-sidebar-foreground/70">
                     <span className="text-xs">⌘</span>K
                   </kbd>
                 </button>
@@ -536,7 +536,7 @@ export default function UnifiedSidebar() {
                       const event = new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true });
                       document.dispatchEvent(event);
                     }}
-                    className="flex items-center justify-center w-full py-2 text-gray-500 hover:bg-gray-100 transition-colors"
+                    className="flex items-center justify-center w-full py-2 text-sidebar-foreground/70 hover:bg-sidebar-accent transition-colors"
                     data-testid="command-palette-trigger-collapsed"
                   >
                     <Search className="w-4 h-4" />
@@ -665,7 +665,7 @@ export default function UnifiedSidebar() {
                   "flex items-center px-4 py-2.5 text-sm font-medium transition-colors rounded-md mx-2",
                   location.startsWith('/marketing')
                     ? "bg-primary/10 text-primary"
-                    : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent"
                 )}
                 data-testid="nav-marketing"
               >
@@ -684,7 +684,7 @@ export default function UnifiedSidebar() {
                 "flex items-center px-4 py-2.5 text-sm font-medium transition-colors rounded-md mx-2",
                 location.startsWith('/marinamatch')
                   ? "bg-primary/10 text-primary"
-                  : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent"
               )}
               data-testid="nav-marinamatch"
             >
@@ -774,12 +774,12 @@ export default function UnifiedSidebar() {
                   href="/docktalk"
                   onClick={handleNavClick}
                   className={cn(
-                    "flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors",
-                    location.startsWith('/docktalk') && "bg-blue-50 border-r-3 border-blue-600 text-blue-600 font-medium"
+                    "flex items-center px-4 py-2.5 text-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors",
+                    location.startsWith('/docktalk') && "bg-sidebar-accent border-r-3 border-sidebar-primary text-sidebar-primary font-medium"
                   )}
                   data-testid="nav-docktalk"
                 >
-                  <MessageSquare className={cn("w-4 h-4 mr-3 flex-shrink-0", location.startsWith('/docktalk') && "text-blue-600")} />
+                  <MessageSquare className={cn("w-4 h-4 mr-3 flex-shrink-0", location.startsWith('/docktalk') && "text-sidebar-primary")} />
                   <span className="truncate">DockTalk</span>
                 </Link>
                 {/* Other Marinalytics Pages - Sales Comps, Rate Comps, etc. */}
@@ -799,8 +799,8 @@ export default function UnifiedSidebar() {
             <div className={cn(
               "flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg cursor-pointer transition-colors",
               location.startsWith("/settings/integrations")
-                ? "bg-blue-50 text-blue-700"
-                : "text-gray-700 hover:bg-gray-100"
+                ? "bg-sidebar-accent text-sidebar-primary"
+                : "text-sidebar-foreground hover:bg-sidebar-accent"
             )}>
               <Plug className="w-4 h-4" />
               {!sidebarCollapsed && <span>Integrations</span>}
@@ -811,14 +811,14 @@ export default function UnifiedSidebar() {
       
       {/* Collapse Toggle Button */}
       <div className={cn(
-        "border-t border-gray-200 bg-white flex-shrink-0 hidden md:flex",
+        "border-t border-sidebar-border bg-sidebar flex-shrink-0 hidden md:flex",
         sidebarCollapsed ? "justify-center p-2" : "justify-end px-4 py-2"
       )}>
         <Tooltip>
           <TooltipTrigger asChild>
             <button
               onClick={toggleSidebarCollapse}
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+              className="p-2 text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-md transition-colors"
               data-testid="button-toggle-sidebar"
               aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
@@ -836,7 +836,7 @@ export default function UnifiedSidebar() {
       </div>
       
           <div className={cn(
-            "border-t border-gray-200 bg-white flex-shrink-0",
+            "border-t border-sidebar-border bg-sidebar flex-shrink-0",
             sidebarCollapsed ? "p-2" : "p-4"
           )} data-testid="user-profile">
             {user && (
