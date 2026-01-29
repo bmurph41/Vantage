@@ -70,9 +70,6 @@ function applyTheme(theme: 'light' | 'dark' | 'system') {
   // Remove both classes first, then add the correct one
   root.classList.remove('light', 'dark');
   root.classList.add(isDark ? 'dark' : 'light');
-
-  // Also set colorScheme for native UI elements
-  root.style.colorScheme = isDark ? 'dark' : 'light';
 }
 
 // ============================================================================
