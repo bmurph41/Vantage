@@ -156,7 +156,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   locale: 'en-US',
   currency: 'USD',
   defaultLanding: 'dashboard',
-  theme: 'system',
+  theme: 'light',
   density: 'comfortable',
   reducedMotion: false,
   stickyHeaders: true,
