@@ -90,8 +90,7 @@ import {
   Container,
   Sailboat
 } from 'lucide-react';
-import {
-  Lock, format } from 'date-fns';
+import { format } from 'date-fns';
 
 function PercentInput({
   value,
