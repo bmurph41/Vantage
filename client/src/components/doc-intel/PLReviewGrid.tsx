@@ -233,16 +233,9 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
         throw new Error("Failed to fetch grouped items");
       }
       const data = await res.json();
-      console.log("GROUPED DATA RESPONSE:", JSON.stringify(data, null, 2));
-      console.log("lineItems count:", data?.lineItems?.length);
-      console.log("periods:", data?.periods);
-      console.log("isMultiColumn:", data?.isMultiColumn);
       return data;
     },
   });
-
-  // Debug: log current state
-  console.log("PLReviewGrid render - groupedData:", groupedData, "isLoadingGrouped:", isLoadingGrouped, "error:", groupedError);
 
   const toggleRowExpanded = (key: string) => {
     setExpandedRows((prev) => {

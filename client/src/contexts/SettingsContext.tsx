@@ -132,9 +132,8 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
     [mutation]
   );
 
-  // Apply theme - FIXED VERSION
+  // Apply theme
   useEffect(() => {
-    console.log('[Theme Debug] Applying theme:', settings.theme);
     applyTheme(settings.theme);
   }, [settings.theme]);
 
