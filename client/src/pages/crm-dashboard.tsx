@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { formatCurrency } from "@/lib/utils";
-import { FeatureChecklist } from "@/components/ui/feature-highlight";
+import { FeatureChecklist } from "@/components/ui/_primitives/feature-highlight";
 import { formatDistanceToNow, isToday, parseISO, isBefore, startOfDay } from "date-fns";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 

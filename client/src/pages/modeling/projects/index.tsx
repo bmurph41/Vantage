@@ -24,7 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import ModelingProjectFormDialog from './form-dialog';
 import ModelingAnalytics from './analytics';
 import { DealTemplateSelector } from '@/components/modeling/DealTemplateSelector';
-import { ModelingEmptyState } from '@/components/ui/enhanced-empty-state';
+import { ModelingEmptyState } from '@/components/ui/_primitives/enhanced-empty-state';
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 
 type ModelingProject = {
