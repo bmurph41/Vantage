@@ -22799,3 +22799,6 @@ export const upsertLearningRuleSchema = z.object({
   createdByUserId: z.string().optional(),
 });
 export type UpsertLearningRuleInput = z.infer<typeof upsertLearningRuleSchema>;
+
+// Commercial Tenants
+export * from "../db/schema-commercial-tenants";
