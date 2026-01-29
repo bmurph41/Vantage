@@ -209,6 +209,10 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
     item: null,
     reason: "",
   });
+  
+  // Optimistic state for category/department changes (per line item name)
+  const [optimisticCategories, setOptimisticCategories] = useState<Record<string, CategoryTier>>({});
+  const [optimisticDepartments, setOptimisticDepartments] = useState<Record<string, string>>({});
 
   const { data: items = [], isLoading, refetch } = useQuery<ExtractedItem[]>({
     queryKey: ["/api/modeling/projects", projectId, "documents", uploadId, "items"],
@@ -285,14 +289,30 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
   });
 
   const bulkUpdateMutation = useMutation({
-    mutationFn: async (updates: { itemIds: string[]; updates: Partial<ExtractedItem> }) => {
-      return apiRequest("PATCH", `/api/doc-intel/uploads/${uploadId}/items/bulk`, updates);
+    mutationFn: async (updates: { itemIds: string[]; updates: Partial<ExtractedItem>; lineItemKey?: string; silent?: boolean }) => {
+      return apiRequest("PATCH", `/api/doc-intel/uploads/${uploadId}/items/bulk`, { itemIds: updates.itemIds, updates: updates.updates });
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", uploadId, "items"] });
       queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", uploadId, "items", "grouped"] });
       setSelectedIds(new Set());
-      toast({ title: "Updated", description: "Selected items have been updated." });
+      // Clear optimistic state after successful save
+      if (variables.lineItemKey) {
+        setOptimisticCategories(prev => {
+          const next = { ...prev };
+          delete next[variables.lineItemKey!];
+          return next;
+        });
+        setOptimisticDepartments(prev => {
+          const next = { ...prev };
+          delete next[variables.lineItemKey!];
+          return next;
+        });
+      }
+      // Only show toast for explicit bulk operations, not individual row actions
+      if (!variables.silent && variables.itemIds.length > 1 && !variables.lineItemKey) {
+        toast({ title: "Updated", description: "Selected items have been updated." });
+      }
     },
   });
 
@@ -458,15 +478,29 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
     return base.filter((i) => i.status === "pending" || i.status === "needs_review");
   }, [items, showExcluded]);
 
+  // Calculate pending items from grouped data for accurate count
+  const pendingItemsFromGrouped = useMemo(() => {
+    if (!groupedData?.lineItems) return [];
+    const pendingLineItems = groupedData.lineItems.filter(
+      (li) => li.status === "pending" || li.status === "needs_review" || li.status === "mixed"
+    );
+    // Flatten to get all individual pending item IDs
+    return pendingLineItems.flatMap((li) => 
+      li.monthlyData.filter((m) => m.status === "pending" || m.status === "needs_review").map((m) => m.id)
+    );
+  }, [groupedData?.lineItems]);
+
   const confirmablePendingItems = useMemo(() => {
-    return visiblePendingItems.filter((i) => hasValidCategorization(i));
-  }, [visiblePendingItems]);
+    // Use grouped data for count - all pending items are confirmable in the grouped view
+    return pendingItemsFromGrouped;
+  }, [pendingItemsFromGrouped]);
 
   const handleConfirmAllPending = () => {
     if (confirmablePendingItems.length === 0) return;
     bulkUpdateMutation.mutate({
-      itemIds: confirmablePendingItems.map((i) => i.id),
+      itemIds: confirmablePendingItems, // Already an array of IDs
       updates: { status: "confirmed" },
+      silent: true, // Silent save for bulk operations from button
     });
   };
 
@@ -934,27 +968,27 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
           </div>
         ) : (
             <div className="overflow-x-auto">
-              <Table className="min-w-max">
+              <Table className="w-full table-fixed">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-8 bg-muted/50 sticky left-0 z-20"></TableHead>
-                    <TableHead className="bg-muted/50 sticky left-8 z-20 min-w-[200px]">Line Item</TableHead>
-                    <TableHead className="bg-muted/50 min-w-[110px]">Category</TableHead>
-                    <TableHead className="bg-muted/50 min-w-[120px]">Department</TableHead>
+                    <TableHead className="bg-muted/50 sticky left-8 z-20 w-[140px]">Line Item</TableHead>
+                    <TableHead className="bg-muted/50 w-[95px] px-1">Category</TableHead>
+                    <TableHead className="bg-muted/50 w-[105px] px-1">Department</TableHead>
                     {groupedData.isMultiColumn ? (
                       groupedData.periods.map((period) => (
-                        <TableHead key={period} className="bg-muted/50 text-center min-w-[90px]">
+                        <TableHead key={period} className="bg-muted/50 text-center w-[70px] px-1 text-xs">
                           {formatPeriodLabel(period)}
                         </TableHead>
                       ))
                     ) : (
-                      <TableHead className="bg-muted/50 text-right min-w-[100px]">Amount</TableHead>
+                      <TableHead className="bg-muted/50 text-right w-[80px]">Amount</TableHead>
                     )}
                     {groupedData.isMultiColumn && (
-                      <TableHead className="bg-muted/50 text-right min-w-[100px] sticky right-[180px] z-20">Total</TableHead>
+                      <TableHead className="bg-muted/50 text-right w-[75px] sticky right-[140px] z-20 px-1">Total</TableHead>
                     )}
-                    <TableHead className="bg-muted/50 text-center min-w-[90px] sticky right-[90px] z-20">Status</TableHead>
-                    <TableHead className="bg-muted/50 text-center min-w-[90px] sticky right-0 z-20">Actions</TableHead>
+                    <TableHead className="bg-muted/50 text-center w-[70px] sticky right-[70px] z-20 px-1">Status</TableHead>
+                    <TableHead className="bg-muted/50 text-center w-[70px] sticky right-0 z-20 px-1">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
               <TableBody>
@@ -994,34 +1028,49 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                               )}
                             </Button>
                           </TableCell>
-                          <TableCell className="font-medium sticky left-8 z-10 bg-background min-w-[200px]">
-                            <span className="truncate block max-w-[250px]" title={lineItem.lineItemName}>
+                          <TableCell className="font-medium sticky left-8 z-10 bg-background w-[140px] px-1">
+                            <span className="truncate block max-w-[130px] text-sm" title={lineItem.lineItemName}>
                               {lineItem.lineItemName}
                             </span>
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="px-1">
                             {(() => {
                               const firstItem = lineItem.monthlyData[0];
                               if (!firstItem) return "-";
-                              const currentTier = (firstItem.categoryTierConfirmed || firstItem.categoryTierSuggested) as CategoryTier | null;
+                              // Use optimistic state if available, otherwise fall back to server data
+                              const optimisticTier = optimisticCategories[rowKey];
+                              const serverTier = (firstItem.categoryTierConfirmed || firstItem.categoryTierSuggested) as CategoryTier | null;
+                              const currentTier = optimisticTier || serverTier;
                               return (
                                 <Select
                                   value={currentTier || ""}
                                   onValueChange={(v) => {
+                                    const newTier = v as CategoryTier;
+                                    // Optimistic update - immediately show the selected value
+                                    setOptimisticCategories(prev => ({ ...prev, [rowKey]: newTier }));
+                                    // Clear department when category changes
+                                    setOptimisticDepartments(prev => {
+                                      const next = { ...prev };
+                                      delete next[rowKey];
+                                      return next;
+                                    });
                                     const itemIds = lineItem.monthlyData.map((m) => m.id);
                                     bulkUpdateMutation.mutate({
                                       itemIds,
                                       updates: { 
-                                        categoryTierConfirmed: v as CategoryTier,
+                                        categoryTierConfirmed: newTier,
                                         revenueCogsDeptConfirmed: null,
                                         expenseDeptConfirmed: null,
                                       },
+                                      lineItemKey: rowKey,
+                                      silent: true,
                                     });
                                   }}
-                                  disabled={bulkUpdateMutation.isPending}
                                 >
-                                  <SelectTrigger className="h-8 w-[100px]">
-                                    <SelectValue placeholder="Select..." />
+                                  <SelectTrigger className="h-7 w-[90px] text-xs">
+                                    <SelectValue placeholder="Select...">
+                                      {currentTier ? CATEGORY_TIER_LABELS[currentTier] : "Select..."}
+                                    </SelectValue>
                                   </SelectTrigger>
                                   <SelectContent>
                                     {CATEGORY_TIER_OPTIONS.map((opt) => (
@@ -1034,20 +1083,28 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                               );
                             })()}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="px-1">
                             {(() => {
                               const firstItem = lineItem.monthlyData[0];
                               if (!firstItem) return "-";
-                              const currentTier = (firstItem.categoryTierConfirmed || firstItem.categoryTierSuggested) as CategoryTier | null;
-                              if (!currentTier) return "-";
+                              // Use optimistic state for category
+                              const optimisticTier = optimisticCategories[rowKey];
+                              const serverTier = (firstItem.categoryTierConfirmed || firstItem.categoryTierSuggested) as CategoryTier | null;
+                              const currentTier = optimisticTier || serverTier;
+                              if (!currentTier) return <span className="text-xs text-muted-foreground">-</span>;
                               const deptOptions = currentTier === "expense" ? EXPENSE_DEPT_OPTIONS : REVENUE_COGS_DEPT_OPTIONS;
-                              const currentDept = currentTier === "expense"
+                              // Use optimistic state for department
+                              const optimisticDept = optimisticDepartments[rowKey];
+                              const serverDept = currentTier === "expense"
                                 ? (firstItem.expenseDeptConfirmed || firstItem.expenseDeptSuggested)
                                 : (firstItem.revenueCogsDeptConfirmed || firstItem.revenueCogsDeptSuggested);
+                              const currentDept = optimisticDept || serverDept;
                               return (
                                 <Select
                                   value={currentDept || ""}
                                   onValueChange={(v) => {
+                                    // Optimistic update
+                                    setOptimisticDepartments(prev => ({ ...prev, [rowKey]: v }));
                                     const itemIds = lineItem.monthlyData.map((m) => m.id);
                                     const updates = currentTier === "expense"
                                       ? { expenseDeptConfirmed: v }
@@ -1055,12 +1112,15 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                                     bulkUpdateMutation.mutate({
                                       itemIds,
                                       updates,
+                                      lineItemKey: rowKey,
+                                      silent: true,
                                     });
                                   }}
-                                  disabled={bulkUpdateMutation.isPending}
                                 >
-                                  <SelectTrigger className="h-8 w-[110px]">
-                                    <SelectValue placeholder="Select..." />
+                                  <SelectTrigger className="h-7 w-[100px] text-xs">
+                                    <SelectValue placeholder="Select...">
+                                      {currentDept ? getDeptLabel(currentTier, currentDept) : "Select..."}
+                                    </SelectValue>
                                   </SelectTrigger>
                                   <SelectContent>
                                     {deptOptions.map((opt) => (
@@ -1208,11 +1268,11 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                             })()
                           )}
                           {groupedData.isMultiColumn && (
-                            <TableCell className="text-right font-semibold sticky right-[180px] z-10 bg-background">
+                            <TableCell className="text-right font-semibold sticky right-[140px] z-10 bg-background px-1 text-sm">
                               {formatCurrency(lineItem.totalAmount)}
                             </TableCell>
                           )}
-                          <TableCell className="text-center sticky right-[90px] z-10 bg-background">
+                          <TableCell className="text-center sticky right-[70px] z-10 bg-background px-1">
                             <Badge
                               variant={
                                 lineItem.status === "confirmed"
@@ -1223,36 +1283,37 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                                   ? "outline"
                                   : "secondary"
                               }
-                              className={
+                              className={`text-xs px-1.5 py-0.5 ${
                                 lineItem.status === "confirmed"
                                   ? "bg-green-100 text-green-800"
                                   : lineItem.status === "pending"
                                   ? "bg-yellow-100 text-yellow-800"
                                   : ""
-                              }
+                              }`}
                             >
-                              {lineItem.status}
+                              {lineItem.status === "confirmed" ? "✓" : lineItem.status === "pending" ? "..." : lineItem.status.charAt(0).toUpperCase()}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-center sticky right-0 z-10 bg-background">
-                            <div className="flex items-center justify-center gap-1">
+                          <TableCell className="text-center sticky right-0 z-10 bg-background px-1">
+                            <div className="flex items-center justify-center gap-0.5">
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                      className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
                                       onClick={() => {
                                         const itemIds = lineItem.monthlyData.map((m) => m.id);
                                         bulkUpdateMutation.mutate({
                                           itemIds,
                                           updates: { status: "confirmed" },
+                                          silent: true,
                                         });
                                       }}
                                       disabled={bulkUpdateMutation.isPending || lineItem.status === "confirmed"}
                                     >
-                                      <Check className="h-4 w-4" />
+                                      <Check className="h-3.5 w-3.5" />
                                     </Button>
                                   </TooltipTrigger>
                                   <TooltipContent>Confirm all months</TooltipContent>
@@ -1264,17 +1325,18 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                      className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
                                       onClick={() => {
                                         const itemIds = lineItem.monthlyData.map((m) => m.id);
                                         bulkUpdateMutation.mutate({
                                           itemIds,
                                           updates: { status: "excluded" },
+                                          silent: true,
                                         });
                                       }}
                                       disabled={bulkUpdateMutation.isPending || lineItem.status === "excluded"}
                                     >
-                                      <X className="h-4 w-4" />
+                                      <X className="h-3.5 w-3.5" />
                                     </Button>
                                   </TooltipTrigger>
                                   <TooltipContent>Exclude all months</TooltipContent>
@@ -1322,6 +1384,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                                             bulkUpdateMutation.mutate({
                                               itemIds: [month.id],
                                               updates: { status: "confirmed" },
+                                              silent: true,
                                             });
                                           }}
                                           disabled={bulkUpdateMutation.isPending || month.status === "confirmed"}
@@ -1336,6 +1399,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                                             bulkUpdateMutation.mutate({
                                               itemIds: [month.id],
                                               updates: { status: "excluded" },
+                                              silent: true,
                                             });
                                           }}
                                           disabled={bulkUpdateMutation.isPending || month.status === "excluded"}
