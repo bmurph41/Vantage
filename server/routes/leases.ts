@@ -9,7 +9,7 @@
 
 import { Router, Request, Response, NextFunction } from "express";
 import { z } from "zod";
-import { db } from "@/db";
+import { db } from "../db";
 import { 
   tenantLeases, 
   tenantRentTerms, 
@@ -19,9 +19,9 @@ import {
   tenantConcessions,
   tenantCapexLeasing,
   tenantRolloverAssumptions
-} from "@/db/schema";
+} from "@shared/schema";
 import { eq, and, sql, gte, lte, inArray, or, like, desc } from "drizzle-orm";
-import { calculateLeaseHealth, calculateLeaseSchedule, calculateLeaseKpis } from "@/lib/leases/leaseCashflowEngine";
+import { calculateLeaseHealth, calculateLeaseSchedule, calculateLeaseKpis } from "../lib/leases/leaseCashflowEngine";
 import { differenceInMonths, addMonths, format } from "date-fns";
 
 const router = Router({ mergeParams: true });
