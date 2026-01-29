@@ -1,9 +1,9 @@
 import {
-  Lock, useState, useEffect, useMemo, useRef, useCallback } from 'react';
+  useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
-  Lock, useQuery, useMutation } from '@tanstack/react-query';
+  useQuery, useMutation } from '@tanstack/react-query';
 import {
-  Lock, queryClient, apiRequest } from '@/lib/queryClient';
+  queryClient, apiRequest } from '@/lib/queryClient';
 import {
   Lock, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -43,7 +43,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Lock,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -52,7 +51,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  Lock,
   Select,
   SelectContent,
   SelectItem,
@@ -60,11 +58,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  Lock, ScrollArea } from '@/components/ui/scroll-area';
+  ScrollArea } from '@/components/ui/scroll-area';
 import {
-  Lock, useToast } from '@/hooks/use-toast';
+  useToast } from '@/hooks/use-toast';
 import {
-  Lock, useCaseLabels, type CaseType } from '@/hooks/useCaseLabels';
+  useCaseLabels, type CaseType } from '@/hooks/useCaseLabels';
 import type { ModelingProject } from '@shared/schema';
 import {
   Lock,
@@ -345,6 +343,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
   const { toast } = useToast();
   const [activeScenarioType, setActiveScenarioType] = useState<ScenarioType>('base');
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
+  const [compareVersions, setCompareVersions] = useState<{ base?: string; compare?: string }>({});
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve');
   const [approvalNotes, setApprovalNotes] = useState('');
@@ -798,6 +797,12 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
     enabled: !!activeScenario?.id,
   });
 
+
+  const comparisonQuery = useQuery<any>({
+    queryKey: ['/api/modeling/projects', projectId, 'scenarios', 'compare', compareVersions.base, compareVersions.compare],
+    queryFn: () => apiRequest('GET', `/api/modeling/projects/${projectId}/scenarios/compare?baseVersionId=${compareVersions.base}\&compareVersionId=${compareVersions.compare}`),
+    enabled: !!compareVersions.base && !!compareVersions.compare,
+  });
   const isScenarioLocked = activeScenario?.status === 'approved' || activeScenario?.status === 'pending_approval';
 
   const handleSave = (createNewVersion = false) => {
@@ -1052,6 +1057,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+              )}
 
               {/* Fork button for approved scenarios */}
               {activeScenario?.status === 'approved' && (
@@ -1534,6 +1540,24 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                           Restore
                         </Button>
                       )}
+                      <Checkbox
+                        checked={compareVersions.base === version.id || compareVersions.compare === version.id}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            if (!compareVersions.base) {
+                              setCompareVersions({ base: version.id });
+                            } else if (!compareVersions.compare) {
+                              setCompareVersions({ ...compareVersions, compare: version.id });
+                            }
+                          } else {
+                            if (compareVersions.base === version.id) {
+                              setCompareVersions({ compare: compareVersions.compare });
+                            } else {
+                              setCompareVersions({ base: compareVersions.base });
+                            }
+                          }
+                        }}
+                      />
                     </div>
                   </div>
                   {version.description && (
@@ -1548,6 +1572,73 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
               )}
             </div>
           </ScrollArea>
+
+          {/* Version Comparison Panel */}
+          {compareVersions.base && compareVersions.compare && (
+            <div className="mt-4 border-t pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-medium">Version Comparison</h4>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCompareVersions({})}
+                >
+                  Clear Selection
+                </Button>
+              </div>
+              {comparisonQuery.isLoading ? (
+                <div className="text-center py-4 text-muted-foreground">Loading comparison...</div>
+              ) : comparisonQuery.data ? (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="p-3 bg-muted/50 rounded">
+                      <Badge variant="outline" className="mb-2">v{comparisonQuery.data.baseVersion?.version}</Badge>
+                      <p className="font-medium">{comparisonQuery.data.baseVersion?.name}</p>
+                    </div>
+                    <div className="p-3 bg-muted/50 rounded">
+                      <Badge variant="outline" className="mb-2">v{comparisonQuery.data.compareVersion?.version}</Badge>
+                      <p className="font-medium">{comparisonQuery.data.compareVersion?.name}</p>
+                    </div>
+                  </div>
+                  {comparisonQuery.data.changes?.length > 0 && (
+                    <div>
+                      <p className="text-sm font-medium mb-2">Field Changes:</p>
+                      <div className="space-y-1">
+                        {comparisonQuery.data.changes.map((change: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between text-sm py-1 px-2 bg-muted/30 rounded">
+                            <span className="text-muted-foreground">{change.field}</span>
+                            <span>
+                              <span className="text-red-500 line-through mr-2">{change.oldValue}</span>
+                              <span className="text-green-500">{change.newValue}</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {comparisonQuery.data.assumptionsDiff?.modified?.length > 0 && (
+                    <div>
+                      <p className="text-sm font-medium mb-2">Assumption Changes ({comparisonQuery.data.assumptionsDiff.modified.length}):</p>
+                      <div className="max-h-32 overflow-y-auto space-y-1">
+                        {comparisonQuery.data.assumptionsDiff.modified.slice(0, 10).map((change: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between text-xs py-1 px-2 bg-muted/30 rounded">
+                            <span className="text-muted-foreground truncate max-w-[150px]">{change.key}</span>
+                            <span className="text-green-500 text-xs">Modified</span>
+                          </div>
+                        ))}
+                        {comparisonQuery.data.assumptionsDiff.modified.length > 10 && (
+                          <p className="text-xs text-muted-foreground">...and {comparisonQuery.data.assumptionsDiff.modified.length - 10} more</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {comparisonQuery.data.changes?.length === 0 && comparisonQuery.data.assumptionsDiff?.modified?.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-2">No differences found</p>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

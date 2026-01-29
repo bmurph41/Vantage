@@ -80,6 +80,13 @@ const EXPORT_SHEETS: ExportSheet[] = [
     icon: <Calculator className="h-4 w-4" />,
     category: 'analysis',
   },
+  {
+    id: 'debt-metrics',
+    name: 'Debt Metrics',
+    description: 'DSCR coverage, debt yield, amortization schedule',
+    icon: <Calculator className="h-4 w-4" />,
+    category: 'analysis',
+  },
 ];
 
 export default function ExportModel({ projectId, projectName, onTabChange }: ExportModelProps) {

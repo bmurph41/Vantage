@@ -148,6 +148,10 @@ export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: Wo
     totalEquityRequired: 0,
     totalDebt: 0,
     ltv: 0,
+    minDscr: 0,
+    avgDscr: 0,
+    debtYield: 0,
+    totalDebtService: 0,
     unleveredIRR: 0,
     leveredIRR: 0,
     equityMultiple: 0,
@@ -388,6 +392,36 @@ export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: Wo
             <div className="flex justify-between py-2">
               <span className="text-muted-foreground">Year 1 NOI</span>
               <span className="font-medium">{formatCurrency(metrics.year1NOI)}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Debt Metrics Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Debt Metrics</CardTitle>
+            <CardDescription>Key lending ratios and coverage</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Min DSCR</span>
+              <Badge variant={metrics.minDscr >= 1.25 ? "default" : metrics.minDscr >= 1.0 ? "secondary" : "destructive"}>
+                {metrics.minDscr ? metrics.minDscr.toFixed(2) : "-"}x
+              </Badge>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Avg DSCR</span>
+              <Badge variant={metrics.avgDscr >= 1.25 ? "default" : metrics.avgDscr >= 1.0 ? "secondary" : "destructive"}>
+                {metrics.avgDscr ? metrics.avgDscr.toFixed(2) : "-"}x
+              </Badge>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Debt Yield</span>
+              <span className="font-medium">{formatPercent(metrics.debtYield)}</span>
+            </div>
+            <div className="flex justify-between py-2">
+              <span className="text-muted-foreground">Annual Debt Service</span>
+              <span className="font-medium">{formatCurrency(metrics.totalDebtService / (holdPeriod || 5))}</span>
             </div>
           </CardContent>
         </Card>
