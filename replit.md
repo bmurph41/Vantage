@@ -156,3 +156,46 @@ Different tables use different column names for organization filtering:
 - **OAuth State**: Server-side nonce validation with single-use cryptographic nonces, 10-minute expiration, tenant-scoped
 - **Token Refresh**: Automatic token refresh with connection deactivation on failure
 - **Multi-tenancy**: All queries scoped by both userId AND orgId
+
+## UI Standards (MM-UI Design System)
+
+### Documentation
+All UI standards are documented in `/docs/ui/`:
+- `MM-UI-MODAL-001.md` - Canonical modal standard (single-step and wizard modals)
+- `MM-UI-FORM-STANDARD-001.md` - Universal form and component standards
+
+### Component Library Location
+MM-UI components are located in `client/src/components/mm-ui/`:
+- `MMModal` - Base modal with header, blue divider, pinned footer
+- `MMModalWizard` - Multi-step wizard with progress dots
+- `MMInput`, `MMEmailInput`, `MMPhoneInput`, `MMCurrencyInput` - Text inputs
+- `MMSelect`, `MMStateSelect` - Dropdown selects
+- `MMTextarea` - Multi-line text input
+- `MMComboBox` - Searchable autocomplete
+- `MMRadioCardGroup` - Visual card selection
+- `MMField` - Field wrapper with label/error
+
+### Usage
+```tsx
+import { MMModal, MMInput, MMSelect } from '@/components/mm-ui';
+
+<MMModal
+  open={isOpen}
+  onOpenChange={setIsOpen}
+  title="Modal Title"
+  subtitle="Optional subtitle"
+  icon={<SomeIcon />}
+  footerLeft={<Button variant="ghost">Cancel</Button>}
+  footerRight={<Button>Save</Button>}
+>
+  <MMInput label="Name" required />
+</MMModal>
+```
+
+### Demo Page
+Navigate to `/mm-ui-demo` to see all MM-UI components in action with:
+- 3-step project wizard demo
+- Contact form modal demo
+
+### Compliance
+All new modals MUST use MM-UI components. See the compliance checklist in `MM-UI-MODAL-001.md`.
