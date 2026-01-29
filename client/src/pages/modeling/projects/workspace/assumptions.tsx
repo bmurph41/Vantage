@@ -1056,9 +1056,9 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                     />
                   </div>
                   {storageRevenueCategories.length > 0 && (
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 opacity-50">
                       <Label className="text-sm font-medium mb-1.5 block">Storage Type Rates</Label>
-                      <p className="text-xs text-muted-foreground mb-3">Individual storage type growth rates</p>
+                      <p className="text-xs text-muted-foreground mb-3">Switch to "Per Profit Center" mode to set individual rates</p>
                       <div className="grid gap-x-10 gap-y-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
                         {storageRevenueCategories.map((category) => (
                           <div key={category.id} className="flex items-center justify-between gap-4 min-w-[260px]">
@@ -1068,9 +1068,10 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                             </div>
                             <PercentInput
                               id={`storage-type-universal-${category.id}`}
-                              value={storageGrowth.typeRates[category.id] ?? storageGrowth.universalRate}
-                              onChange={(val) => updateStorageTypeRate(category.id, val)}
-                              className="h-8 w-20 flex-shrink-0"
+                              value={storageGrowth.universalRate}
+                              onChange={() => {}}
+                              className="h-8 w-20 flex-shrink-0 cursor-not-allowed"
+                              disabled
                               data-testid={`input-storage-type-universal-${category.id}`}
                             />
                           </div>
@@ -1083,68 +1084,41 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
 
               {storageGrowth.mode === 'per_type' && (
                 <div className="space-y-6">
-                  <div className={`p-4 rounded-lg border ${isUniversalRateSynced ? 'bg-blue-50/50 border-blue-200' : 'bg-muted/30 border-dashed border-muted-foreground/30'}`}>
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`flex items-center gap-1.5 ${!isUniversalRateSynced ? 'opacity-50' : ''}`}>
-                          <Globe className="h-4 w-4" />
-                          <Label htmlFor="storage-universal-rate-inline" className="text-sm font-medium">
-                            Universal Growth Rate
-                          </Label>
-                        </div>
-                        <PercentInput
-                          id="storage-universal-rate-inline"
-                          value={storageGrowth.universalRate}
-                          onChange={(val) => updateStorageUniversalRate(val)}
-                          className={`h-8 w-20 ${!isUniversalRateSynced ? 'opacity-50' : ''}`}
-                          data-testid="input-storage-universal-rate-inline"
-                        />
-                        {!isUniversalRateSynced && (
-                          <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700 border-amber-200">
-                            Not Applied
-                          </Badge>
-                        )}
-                        {isUniversalRateSynced && (
-                          <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 border-green-200">
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Applied
-                          </Badge>
-                        )}
-                      </div>
-                      {!isUniversalRateSynced && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={reapplyUniversalRate}
-                          className="text-xs h-8 gap-1.5 bg-white hover:bg-blue-50 border-blue-200 text-blue-700"
-                        >
-                          <RotateCcw className="h-3.5 w-3.5" />
-                          Apply to All
-                        </Button>
-                      )}
+                  <div className="p-4 rounded-lg border bg-muted/30 border-muted-foreground/20">
+                    <div className="flex items-center gap-3 opacity-50">
+                      <Globe className="h-4 w-4" />
+                      <Label htmlFor="storage-universal-rate-inline" className="text-sm font-medium">
+                        Universal Growth Rate
+                      </Label>
+                      <PercentInput
+                        id="storage-universal-rate-inline"
+                        value={storageGrowth.universalRate}
+                        onChange={() => {}}
+                        className="h-8 w-20 cursor-not-allowed"
+                        disabled
+                        data-testid="input-storage-universal-rate-inline"
+                      />
                     </div>
                     <p className="text-xs text-muted-foreground mt-2">
-                      {isUniversalRateSynced 
-                        ? 'All storage types are using the universal rate' 
-                        : 'Individual rates differ from the universal rate. Click "Apply to All" to sync them.'}
+                      Switch to "Universal Rate" mode to use this rate for all storage types
                     </p>
                   </div>
 
                   <div>
                     <Label className="text-sm font-medium mb-3 block">Storage Type Growth Rates</Label>
                     <p className="text-xs text-muted-foreground mb-3">Annual percentage increase applied to trailing 12-month actuals</p>
-                    <div className="grid gap-x-6 gap-y-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                    <div className="grid gap-x-10 gap-y-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
                       {storageRevenueCategories.map((category) => (
-                        <div key={category.id} className="flex items-center gap-3">
-                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <div key={category.id} className="flex items-center justify-between gap-4 min-w-[260px]">
+                          <div className="flex items-center gap-2">
                             {category.icon}
-                            <span className="text-sm font-medium truncate">{category.name}</span>
+                            <span className="text-sm font-medium">{category.name}</span>
                           </div>
                           <PercentInput
                             id={`storage-type-${category.id}`}
                             value={storageGrowth.typeRates[category.id] ?? storageGrowth.universalRate}
                             onChange={(val) => updateStorageTypeRate(category.id, val)}
-                            className="h-8 w-20"
+                            className="h-8 w-20 flex-shrink-0"
                             data-testid={`input-storage-type-${category.id}`}
                           />
                         </div>

@@ -51,6 +51,31 @@ async function updateSettingsApi(updates: Partial<UserSettings>): Promise<void> 
 }
 
 // ============================================================================
+// THEME APPLICATION HELPER
+// ============================================================================
+function applyTheme(theme: 'light' | 'dark' | 'system') {
+  const root = document.documentElement;
+
+  // Save to localStorage for flash prevention script
+  localStorage.setItem('marinamatch-theme', theme);
+
+  // Determine if dark mode
+  let isDark: boolean;
+  if (theme === 'system') {
+    isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  } else {
+    isDark = theme === 'dark';
+  }
+
+  // Remove both classes first, then add the correct one
+  root.classList.remove('light', 'dark');
+  root.classList.add(isDark ? 'dark' : 'light');
+
+  // Also set colorScheme for native UI elements
+  root.style.colorScheme = isDark ? 'dark' : 'light';
+}
+
+// ============================================================================
 // PROVIDER
 // ============================================================================
 interface SettingsProviderProps {
@@ -106,17 +131,9 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
     [mutation]
   );
 
-  // Apply theme
+  // Apply theme - FIXED VERSION
   useEffect(() => {
-    const root = document.documentElement;
-    const theme = settings.theme;
-
-    if (theme === 'system') {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      root.classList.toggle('dark', prefersDark);
-    } else {
-      root.classList.toggle('dark', theme === 'dark');
-    }
+    applyTheme(settings.theme);
   }, [settings.theme]);
 
   // Apply density
@@ -131,13 +148,14 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
     root.classList.toggle('reduce-motion', settings.reducedMotion);
   }, [settings.reducedMotion]);
 
-  // Listen for system theme changes
+  // Listen for system theme changes when theme is 'system'
   useEffect(() => {
     if (settings.theme !== 'system') return;
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e: MediaQueryListEvent) => {
-      document.documentElement.classList.toggle('dark', e.matches);
+    const handleChange = () => {
+      // Re-apply theme when system preference changes
+      applyTheme('system');
     };
 
     mediaQuery.addEventListener('change', handleChange);
