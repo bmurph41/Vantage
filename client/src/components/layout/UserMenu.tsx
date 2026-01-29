@@ -11,7 +11,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useSettingsContext } from '@/context/SettingsContext';
+import { useSettingsContext } from '@/contexts/SettingsContext';
 import { useTheme } from '@/contexts/ThemeProvider';
 import { SettingsCenterModal } from '@/components/settings';
 import {
@@ -74,12 +74,6 @@ export function UserMenu({ user }: UserMenuProps) {
     }
   };
 
-  const toggleTheme = () => {
-    const currentTheme = settings.theme;
-    const newTheme =
-      currentTheme === 'light' ? 'dark' : currentTheme === 'dark' ? 'system' : 'light';
-    updateSettings({ theme: newTheme });
-  };
 
   return (
     <>
