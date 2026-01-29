@@ -10,6 +10,7 @@ import { CommandPalette } from "@/components/CommandPalette";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AIAssistant } from "@/components/ai-assistant";
+import { SettingsProvider } from "@/contexts/SettingsContext";
 
 // Eagerly load critical pages for instant navigation (no white screen)
 import Dashboard from "@/pages/dashboard";
@@ -2049,14 +2050,16 @@ function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Suspense fallback={<PageLoader />}>
-              <Router />
-            </Suspense>
-          </TooltipProvider>
-        </AuthProvider>
+        <SettingsProvider>
+          <AuthProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Suspense fallback={<PageLoader />}>
+                <Router />
+              </Suspense>
+            </TooltipProvider>
+          </AuthProvider>
+        </SettingsProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );

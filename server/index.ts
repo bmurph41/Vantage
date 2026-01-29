@@ -18,6 +18,7 @@ import { requestIdMiddleware, requestLoggingMiddleware } from "./middleware/logg
 import { centralizedErrorHandler, notFoundHandler } from "./middleware/error-handler";
 import { tenantContextMiddleware } from "./middleware/tenant-context";
 import { logger } from "./lib/logger";
+import settingsRoutes from './routes/settings-routes';
 
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
@@ -90,6 +91,8 @@ app.get("/health/db", (req: Request, res: Response) => {
 (async () => {
   try {
     const server = await registerRoutes(app);
+    // Then add after auth routes:
+    app.use('/api/settings', settingsRoutes);
 
     // Initialize DockTalk storage and register routes
     const dockTalkStorage = new DockTalkStorage();

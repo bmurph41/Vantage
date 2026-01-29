@@ -9,8 +9,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DetailDrawer } from "@/components/crm/detail-drawer";
-import { AppSettingsDialog } from "@/components/settings/AppSettingsDialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useAuth } from "@/contexts/AuthContext";
+import { UserMenu } from "@/components/layout/UserMenu";
 
 // CRM Navigation (Core CRM - Entity Management)
 const crmNav = [
@@ -133,6 +134,9 @@ type BootstrapData = {
 
 export default function UnifiedSidebar() {
   const [location] = useLocation();
+export default function UnifiedSidebar() {
+  const [location] = useLocation();
+  const { user } = useAuth();
   const [operationsExpanded, setOperationsExpanded] = useState(false); // Default collapsed for Operations
   const [crmExpanded, setCrmExpanded] = useState(false);
   const [pipelineExpanded, setPipelineExpanded] = useState(false); // Pipeline deals section
@@ -145,7 +149,6 @@ export default function UnifiedSidebar() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   
   // Sidebar collapse state with localStorage persistence
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -834,52 +837,21 @@ export default function UnifiedSidebar() {
         </Tooltip>
       </div>
       
-      {/* User Profile - Fixed at bottom */}
-      <div className={cn(
-        "border-t border-gray-200 bg-white flex-shrink-0",
-        sidebarCollapsed ? "p-2" : "p-4"
-      )} data-testid="user-profile">
-        {sidebarCollapsed ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => setSettingsDialogOpen(true)}
-                className="flex items-center justify-center w-full"
-              >
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0 hover:opacity-80 transition-opacity">
-                  <span className="text-white text-sm font-medium" data-testid="user-initials">U</span>
-                </div>
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right" sideOffset={10}>
-              <p>User Settings</p>
-            </TooltipContent>
-          </Tooltip>
-        ) : (
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
-              <span className="text-white text-sm font-medium" data-testid="user-initials">U</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate" data-testid="user-name">User</p>
-              <p className="text-xs text-gray-500 truncate" data-testid="user-role">Admin</p>
-            </div>
-            <button 
-              className="text-gray-400 hover:text-gray-600 flex-shrink-0" 
-              data-testid="button-user-settings"
-              onClick={() => setSettingsDialogOpen(true)}
-            >
-              <Settings className="w-4 h-4" />
-            </button>
+          <div className={cn(
+            "border-t border-gray-200 bg-white flex-shrink-0",
+            sidebarCollapsed ? "p-2" : "p-4"
+          )} data-testid="user-profile">
+            {user && (
+              <UserMenu 
+                user={{
+                  id: user.id,
+                  name: user.name || user.email?.split('@')[0] || 'User',
+                  email: user.email || '',
+                  avatarUrl: user.avatarUrl,
+                }}
+              />
+            )}
           </div>
-        )}
-      </div>
-
-        {/* App Settings Dialog */}
-        <AppSettingsDialog
-          open={settingsDialogOpen}
-          onOpenChange={setSettingsDialogOpen}
-        />
 
         {/* Global Detail Drawer for Search Results */}
         {selectedEntity && (
