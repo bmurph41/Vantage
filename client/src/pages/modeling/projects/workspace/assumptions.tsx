@@ -371,9 +371,9 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
   const years = Array.from({ length: holdPeriod }, (_, i) => 2026 + i);
 
   const revenueCategories = useMemo(() => {
-    if (!config?.departments) return allRevenueCategories;
+    if (!config?.departments) return [];
     return allRevenueCategories.filter(cat => 
-      config.departments[cat.id]?.isEnabled !== false
+      config.departments[cat.id]?.isEnabled === true
     );
   }, [config]);
 
