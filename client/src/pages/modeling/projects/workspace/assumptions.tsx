@@ -1058,19 +1058,19 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                   {storageRevenueCategories.length > 0 && (
                     <div className="flex-1 min-w-0">
                       <Label className="text-sm font-medium mb-1.5 block">Storage Type Rates</Label>
-                      <p className="text-xs text-muted-foreground mb-2">Individual storage type growth rates</p>
-                      <div className="grid gap-x-6 gap-y-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                      <p className="text-xs text-muted-foreground mb-3">Individual storage type growth rates</p>
+                      <div className="grid gap-x-8 gap-y-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         {storageRevenueCategories.map((category) => (
-                          <div key={category.id} className="flex items-center gap-2">
-                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <div key={category.id} className="flex items-center justify-between gap-3 min-w-[200px]">
+                            <div className="flex items-center gap-2 min-w-0">
                               {category.icon}
-                              <span className="text-sm truncate">{category.name}</span>
+                              <span className="text-sm whitespace-nowrap">{category.name}</span>
                             </div>
                             <PercentInput
                               id={`storage-type-universal-${category.id}`}
                               value={storageGrowth.typeRates[category.id] ?? storageGrowth.universalRate}
                               onChange={(val) => updateStorageTypeRate(category.id, val)}
-                              className="h-8 w-20"
+                              className="h-8 w-20 flex-shrink-0"
                               data-testid={`input-storage-type-universal-${category.id}`}
                             />
                           </div>
