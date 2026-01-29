@@ -67,7 +67,7 @@ import operationsSyncRoutes from "./routes/operations-sync-routes";
 import ddAutomationRoutes from "./routes/dd-automation-routes";
 import modelingValidationRoutes from "./routes/modeling-validation-routes";
 import operationsContextRoutes from "./routes/operations-context-routes";
-import { userSessions, insertProspectingEntrySchema, users, salesComps, rateComps, industryStandards } from "@shared/schema";
+import { userSessions, insertProspectingEntrySchema, users, salesComps, rateComps, industryStandards, modelingProjectConfig } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { initializeVdrForProject } from "./services/vdr-initialization-service";
 import { rentRollService } from "./services/rent-roll-service";
@@ -76,6 +76,8 @@ import { personaService } from "./services/persona-service";
 import { dashboardService } from "./services/dashboard-service";
 import { ownedAssetsService } from "./services/owned-assets-service";
 import { debtScenarioService } from "./debt-scenario-service";
+import { seasonalityProfileService } from "./services/seasonality-profile-service";
+import { scenarioGovernanceService } from "./services/scenario-governance-service";
 import { docIntelService } from "./services/doc-intel-service";
 import { jobQueueService } from "./services/job-queue-service";
 import { packService, type PackType } from "./services/pack-service";
@@ -16871,6 +16873,361 @@ Current context: Project ${req.params.projectId}`;
     } catch (error: any) {
       console.error('Failed to save project config:', error);
       res.status(500).json({ error: 'Failed to save project config' });
+    }
+  });
+  // Update timeline configuration (Phase 1 - Institutional Grade)
+  app.patch('/api/modeling/projects/:projectId/config/timeline', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const { projectionStartRule, irrDisplayPreference, stabilizedNoiMode, stabilizedNoiYear, acquisitionCloseDate, ttmEndDate } = req.body;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      // Update or create modeling_project_config record
+      const existingConfig = await db.select().from(modelingProjectConfig).where(eq(modelingProjectConfig.modelingProjectId, projectId)).limit(1);
+      
+      const timelineFields = {
+        projectionStartRule: projectionStartRule || 'acq_close_year',
+        irrDisplayPreference: irrDisplayPreference || 'monthly',
+        stabilizedNoiMode: stabilizedNoiMode || 'fixed_year',
+        stabilizedNoiYear: stabilizedNoiYear || 3,
+        acquisitionCloseDate: acquisitionCloseDate ? new Date(acquisitionCloseDate) : null,
+        ttmEndDate: ttmEndDate ? new Date(ttmEndDate) : null,
+      };
+      
+      let result;
+      if (existingConfig.length > 0) {
+        [result] = await db.update(modelingProjectConfig)
+          .set(timelineFields)
+          .where(eq(modelingProjectConfig.modelingProjectId, projectId))
+          .returning();
+      } else {
+        [result] = await db.insert(modelingProjectConfig)
+          .values({ modelingProjectId: projectId, ...timelineFields })
+          .returning();
+      }
+      
+      // Also update customMetrics.config for backward compatibility
+      const existingMetrics = (project.customMetrics as any) || {};
+      const updatedMetrics = {
+        ...existingMetrics,
+        config: { ...(existingMetrics.config || {}), ...timelineFields }
+      };
+      await storage.updateModelingProject(projectId, { customMetrics: updatedMetrics, updatedBy: userId }, orgId);
+      
+      res.json({ success: true, config: result });
+    } catch (error: any) {
+      console.error('Failed to update timeline config:', error);
+      res.status(500).json({ error: 'Failed to update timeline configuration' });
+    }
+  });
+
+  // ============================================
+  // SEASONALITY PROFILES (Phase 3)
+  // ============================================
+  
+  // Get all seasonality profiles for org
+  app.get('/api/modeling/seasonality-profiles', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const profiles = await seasonalityProfileService.getProfiles(orgId);
+      res.json(profiles);
+    } catch (error: any) {
+      console.error('Failed to fetch seasonality profiles:', error);
+      res.status(500).json({ error: 'Failed to fetch seasonality profiles' });
+    }
+  });
+  
+  // Get a specific profile
+  app.get('/api/modeling/seasonality-profiles/:profileId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { profileId } = req.params;
+      const profile = await seasonalityProfileService.getProfile(profileId, orgId);
+      if (!profile) {
+        return res.status(404).json({ error: 'Profile not found' });
+      }
+      res.json(profile);
+    } catch (error: any) {
+      console.error('Failed to fetch seasonality profile:', error);
+      res.status(500).json({ error: 'Failed to fetch seasonality profile' });
+    }
+  });
+  
+  // Create a new profile
+  app.post('/api/modeling/seasonality-profiles', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { name, months, description, isDefault } = req.body;
+      if (!name || !months || !Array.isArray(months)) {
+        return res.status(400).json({ error: 'Name and months array required' });
+      }
+      const profile = await seasonalityProfileService.createProfile(orgId, name, months, { description, isDefault });
+      res.json(profile);
+    } catch (error: any) {
+      console.error('Failed to create seasonality profile:', error);
+      res.status(500).json({ error: 'Failed to create seasonality profile' });
+    }
+  });
+  
+  // Update a profile
+  app.patch('/api/modeling/seasonality-profiles/:profileId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { profileId } = req.params;
+      const updates = req.body;
+      const profile = await seasonalityProfileService.updateProfile(profileId, orgId, updates);
+      if (!profile) {
+        return res.status(404).json({ error: 'Profile not found' });
+      }
+      res.json(profile);
+    } catch (error: any) {
+      if (error.message === 'Cannot modify system profiles') {
+        return res.status(403).json({ error: error.message });
+      }
+      console.error('Failed to update seasonality profile:', error);
+      res.status(500).json({ error: 'Failed to update seasonality profile' });
+    }
+  });
+  
+  // Delete a profile
+  app.delete('/api/modeling/seasonality-profiles/:profileId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { profileId } = req.params;
+      const deleted = await seasonalityProfileService.deleteProfile(profileId, orgId);
+      if (!deleted) {
+        return res.status(404).json({ error: 'Profile not found' });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      if (error.message === 'Cannot delete system profiles') {
+        return res.status(403).json({ error: error.message });
+      }
+      console.error('Failed to delete seasonality profile:', error);
+      res.status(500).json({ error: 'Failed to delete seasonality profile' });
+    }
+  });
+  
+  // Get project seasonality
+  app.get('/api/modeling/projects/:projectId/seasonality', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const profile = await seasonalityProfileService.getProjectSeasonality(projectId, orgId);
+      res.json(profile);
+    } catch (error: any) {
+      console.error('Failed to fetch project seasonality:', error);
+      res.status(500).json({ error: 'Failed to fetch project seasonality' });
+    }
+  });
+  
+  // Set project seasonality
+  app.patch('/api/modeling/projects/:projectId/seasonality', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { profileId } = req.body;
+      if (!profileId) {
+        return res.status(400).json({ error: 'profileId required' });
+      }
+      await seasonalityProfileService.setProjectSeasonality(projectId, profileId, orgId);
+      const profile = await seasonalityProfileService.getProjectSeasonality(projectId, orgId);
+      res.json({ success: true, profile });
+    } catch (error: any) {
+      console.error('Failed to set project seasonality:', error);
+      res.status(500).json({ error: 'Failed to set project seasonality' });
+    }
+  });
+
+
+  // ============================================
+  // SCENARIO GOVERNANCE (Phase 5)
+  // ============================================
+  
+  // Check if scenario can be modified
+  app.get('/api/modeling/projects/:projectId/scenarios/:scenarioId/can-modify', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { scenarioId } = req.params;
+      const result = await scenarioGovernanceService.canModifyScenario(scenarioId, orgId);
+      res.json(result);
+    } catch (error: any) {
+      console.error('Failed to check scenario modifiability:', error);
+      res.status(500).json({ error: 'Failed to check scenario' });
+    }
+  });
+  
+  // Fork a scenario (creates editable copy)
+  app.post('/api/modeling/projects/:projectId/scenarios/:scenarioId/fork', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { scenarioId } = req.params;
+      const { name, description } = req.body;
+      const result = await scenarioGovernanceService.forkScenario(scenarioId, orgId, userId, { name, description });
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+      res.json(result.newScenario);
+    } catch (error: any) {
+      console.error('Failed to fork scenario:', error);
+      res.status(500).json({ error: 'Failed to fork scenario' });
+    }
+  });
+  
+  // Submit scenario for approval
+  app.post('/api/modeling/projects/:projectId/scenarios/:scenarioId/submit', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { scenarioId } = req.params;
+      const { notes } = req.body;
+      const result = await scenarioGovernanceService.submitForApproval(scenarioId, orgId, userId, notes);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Failed to submit scenario:', error);
+      res.status(500).json({ error: 'Failed to submit scenario' });
+    }
+  });
+  
+  // Approve scenario (makes it IMMUTABLE)
+  app.post('/api/modeling/projects/:projectId/scenarios/:scenarioId/approve', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { scenarioId } = req.params;
+      const { notes } = req.body;
+      const result = await scenarioGovernanceService.approveScenario(scenarioId, orgId, userId, notes);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+      res.json({ success: true, message: 'Scenario approved and is now immutable' });
+    } catch (error: any) {
+      console.error('Failed to approve scenario:', error);
+      res.status(500).json({ error: 'Failed to approve scenario' });
+    }
+  });
+  
+  // Reject scenario
+  app.post('/api/modeling/projects/:projectId/scenarios/:scenarioId/reject', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { scenarioId } = req.params;
+      const { notes } = req.body;
+      if (!notes) {
+        return res.status(400).json({ error: 'Rejection reason required' });
+      }
+      const result = await scenarioGovernanceService.rejectScenario(scenarioId, orgId, userId, notes);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Failed to reject scenario:', error);
+      res.status(500).json({ error: 'Failed to reject scenario' });
+    }
+  });
+  
+  // Withdraw approval submission
+  app.post('/api/modeling/projects/:projectId/scenarios/:scenarioId/withdraw', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { scenarioId } = req.params;
+      const { reason } = req.body;
+      const result = await scenarioGovernanceService.withdrawSubmission(scenarioId, orgId, userId, reason);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Failed to withdraw submission:', error);
+      res.status(500).json({ error: 'Failed to withdraw submission' });
+    }
+  });
+  
+  // Get version history
+  app.get('/api/modeling/projects/:projectId/scenarios/:scenarioType/history', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, scenarioType } = req.params;
+      const history = await scenarioGovernanceService.getVersionHistory(projectId, scenarioType, orgId);
+      res.json(history);
+    } catch (error: any) {
+      console.error('Failed to get version history:', error);
+      res.status(500).json({ error: 'Failed to get version history' });
+    }
+  });
+  
+  // Compare two versions
+  app.get('/api/modeling/projects/:projectId/scenarios/compare', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { baseVersionId, compareVersionId } = req.query;
+      if (!baseVersionId || !compareVersionId) {
+        return res.status(400).json({ error: 'baseVersionId and compareVersionId required' });
+      }
+      const comparison = await scenarioGovernanceService.compareVersions(
+        baseVersionId as string,
+        compareVersionId as string,
+        orgId
+      );
+      if (!comparison) {
+        return res.status(404).json({ error: 'Versions not found' });
+      }
+      res.json(comparison);
+    } catch (error: any) {
+      console.error('Failed to compare versions:', error);
+      res.status(500).json({ error: 'Failed to compare versions' });
+    }
+  });
+  
+  // Rollback to previous version
+  app.post('/api/modeling/projects/:projectId/scenarios/:scenarioId/rollback', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { scenarioId } = req.params;
+      const { reason } = req.body;
+      if (!reason) {
+        return res.status(400).json({ error: 'Rollback reason required' });
+      }
+      const result = await scenarioGovernanceService.rollbackToVersion(scenarioId, orgId, userId, reason);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+      res.json(result.newScenario);
+    } catch (error: any) {
+      console.error('Failed to rollback:', error);
+      res.status(500).json({ error: 'Failed to rollback' });
+    }
+  });
+  
+  // Get audit log
+  app.get('/api/modeling/projects/:projectId/audit-log', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { scenarioVersionId, limit } = req.query;
+      const logs = await scenarioGovernanceService.getAuditLog(orgId, {
+        projectId,
+        scenarioVersionId: scenarioVersionId as string | undefined,
+        limit: limit ? parseInt(limit as string) : 100,
+      });
+      res.json(logs);
+    } catch (error: any) {
+      console.error('Failed to get audit log:', error);
+      res.status(500).json({ error: 'Failed to get audit log' });
     }
   });
 

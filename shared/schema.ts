@@ -22802,3 +22802,86 @@ export type UpsertLearningRuleInput = z.infer<typeof upsertLearningRuleSchema>;
 
 // Commercial Tenants
 export * from "../db/schema-commercial-tenants";
+
+// ============================================
+// PHASE 1: MODELING TIMELINE ENGINE
+// ============================================
+
+// Enums for timeline configuration
+export const projectionStartRuleEnum = pgEnum('projection_start_rule', [
+  'acq_close_year',
+  'next_full_calendar_year',
+  'ttm_plus_one_month'
+]);
+
+export const stabilizedNoiModeEnum = pgEnum('stabilized_noi_mode', [
+  'fixed_year',
+  'user_set',
+  'post_ramp'
+]);
+
+export const irrDisplayPreferenceEnum = pgEnum('irr_display_preference', [
+  'monthly',
+  'annualized'
+]);
+
+// Seasonality Profiles
+export const seasonalityProfiles = pgTable('seasonality_profiles', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  name: text('name').notNull(),
+  description: text('description'),
+  isDefault: boolean('is_default').default(false),
+  isSystem: boolean('is_system').default(false),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const seasonalityProfileMonths = pgTable('seasonality_profile_months', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  profileId: varchar('profile_id').notNull().references(() => seasonalityProfiles.id, { onDelete: 'cascade' }),
+  month: integer('month').notNull(),
+  occupancyMultiplier: decimal('occupancy_multiplier', { precision: 5, scale: 4 }).default('1.0'),
+  rateMultiplier: decimal('rate_multiplier', { precision: 5, scale: 4 }).default('1.0'),
+  revenueMultiplier: decimal('revenue_multiplier', { precision: 5, scale: 4 }).default('1.0'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// Scenario Assumption Payloads (versioned, validated)
+export const scenarioAssumptionPayloads = pgTable('scenario_assumption_payloads', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  projectId: varchar('project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  scenarioId: varchar('scenario_id').notNull(),
+  scenarioVersionId: varchar('scenario_version_id').notNull().references(() => modelingScenarioVersions.id, { onDelete: 'cascade' }),
+  payload: jsonb('payload').notNull(),
+  payloadSchemaVersion: integer('payload_schema_version').notNull().default(1),
+  payloadHash: text('payload_hash'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// Scenario Audit Logs (institutional compliance)
+export const scenarioAuditLogs = pgTable('scenario_audit_logs', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  projectId: varchar('project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  scenarioId: varchar('scenario_id'),
+  scenarioVersionId: varchar('scenario_version_id'),
+  userId: varchar('user_id').references(() => users.id),
+  eventType: text('event_type').notNull(),
+  summary: text('summary'),
+  diffJson: jsonb('diff_json'),
+  payloadHash: text('payload_hash'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// Types
+export type SeasonalityProfile = typeof seasonalityProfiles.$inferSelect;
+export type InsertSeasonalityProfile = typeof seasonalityProfiles.$inferInsert;
+export type SeasonalityProfileMonth = typeof seasonalityProfileMonths.$inferSelect;
+export type InsertSeasonalityProfileMonth = typeof seasonalityProfileMonths.$inferInsert;
+export type ScenarioAssumptionPayload = typeof scenarioAssumptionPayloads.$inferSelect;
+export type InsertScenarioAssumptionPayload = typeof scenarioAssumptionPayloads.$inferInsert;
+export type ScenarioAuditLog = typeof scenarioAuditLogs.$inferSelect;
+export type InsertScenarioAuditLog = typeof scenarioAuditLogs.$inferInsert;

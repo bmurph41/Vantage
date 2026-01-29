@@ -1,18 +1,32 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { queryClient, apiRequest } from '@/lib/queryClient';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AutosaveIndicator } from '@/components/ui/autosave-indicator';
-import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
-import { GrowthRatesTab } from '@/components/modeling/growth-rates/GrowthRatesTab';
-import type { AutoSaveStatus } from '@/hooks/use-local-autosave';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
+  Lock, useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import {
+  Lock, useQuery, useMutation } from '@tanstack/react-query';
+import {
+  Lock, queryClient, apiRequest } from '@/lib/queryClient';
+import {
+  Lock, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Lock, AutosaveIndicator } from '@/components/ui/autosave-indicator';
+import {
+  Lock, WorkflowNavigation } from '@/components/modeling/workflow-navigation';
+import {
+  Lock, GrowthRatesTab } from '@/components/modeling/growth-rates/GrowthRatesTab';
+import type { AutoSaveStatus } from '@/hooks/use-local-autosave';
+import {
+  Lock, Button } from '@/components/ui/button';
+import {
+  Lock, Input } from '@/components/ui/input';
+import {
+  Lock, Label } from '@/components/ui/label';
+import {
+  Lock, Badge } from '@/components/ui/badge';
+import {
+  Lock, Separator } from '@/components/ui/separator';
+import {
+  Lock, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Lock,
   Table,
   TableBody,
   TableCell,
@@ -21,6 +35,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
+  Lock,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -28,6 +43,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
+  Lock,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -36,17 +52,22 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  Lock,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { useToast } from '@/hooks/use-toast';
-import { useCaseLabels, type CaseType } from '@/hooks/useCaseLabels';
+import {
+  Lock, ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Lock, useToast } from '@/hooks/use-toast';
+import {
+  Lock, useCaseLabels, type CaseType } from '@/hooks/useCaseLabels';
 import type { ModelingProject } from '@shared/schema';
 import {
+  Lock,
   Save,
   TrendingUp,
   Percent,
@@ -83,7 +104,8 @@ import {
   Container,
   Sailboat
 } from 'lucide-react';
-import { format } from 'date-fns';
+import {
+  Lock, format } from 'date-fns';
 
 function PercentInput({
   value,
@@ -328,6 +350,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
   const [approvalNotes, setApprovalNotes] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<AutoSaveStatus>('idle');
+  const [showTimelineSettings, setShowTimelineSettings] = useState(false);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: project } = useQuery<ModelingProject>({
@@ -369,7 +392,13 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
 
   const activeScenario = scenarios.find(s => s.scenarioType === activeScenarioType && s.isCurrentVersion);
   const holdPeriod = config?.holdPeriod || 5;
-  const years = Array.from({ length: holdPeriod }, (_, i) => 2026 + i);
+  // Timeline derived from config (no hardcoded years)
+  const projectionStartYear = config?.projectionStartDate 
+    ? new Date(config.projectionStartDate).getFullYear() 
+    : (config?.acquisitionCloseDate 
+      ? new Date(config.acquisitionCloseDate).getFullYear() 
+      : new Date().getFullYear());
+  const years = Array.from({ length: holdPeriod }, (_, i) => projectionStartYear + i);
 
   const revenueCategories = useMemo(() => {
     if (!config?.departments) return [];
@@ -727,6 +756,50 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
     },
   });
 
+  // Timeline configuration mutation
+  const timelineConfigMutation = useMutation({
+    mutationFn: (updates: { projectionStartRule?: string; irrDisplayPreference?: string; stabilizedNoiMode?: string; stabilizedNoiYear?: number }) =>
+      apiRequest('PATCH', `/api/modeling/projects/${projectId}/config/timeline`, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'config'] });
+      toast({ title: 'Saved', description: 'Timeline configuration updated.' });
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to save timeline configuration.', variant: 'destructive' });
+    },
+  });
+
+  // Governance mutations (Phase 5)
+  const forkMutation = useMutation({
+    mutationFn: () => apiRequest('POST', `/api/modeling/projects/${projectId}/scenarios/${activeScenario?.id}/fork`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'scenarios'] });
+      toast({ title: 'Forked', description: 'Created editable copy of the approved scenario.' });
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to fork scenario.', variant: 'destructive' });
+    },
+  });
+
+  const withdrawMutation = useMutation({
+    mutationFn: (reason?: string) => apiRequest('POST', `/api/modeling/projects/${projectId}/scenarios/${activeScenario?.id}/withdraw`, { reason }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'scenarios'] });
+      toast({ title: 'Withdrawn', description: 'Approval submission withdrawn. You can now edit.' });
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to withdraw submission.', variant: 'destructive' });
+    },
+  });
+
+  const canModifyQuery = useQuery<{ canModify: boolean; reason?: string }>({
+    queryKey: ['/api/modeling/projects', projectId, 'scenarios', activeScenario?.id, 'can-modify'],
+    queryFn: () => apiRequest('GET', `/api/modeling/projects/${projectId}/scenarios/${activeScenario?.id}/can-modify`),
+    enabled: !!activeScenario?.id,
+  });
+
+  const isScenarioLocked = activeScenario?.status === 'approved' || activeScenario?.status === 'pending_approval';
+
   const handleSave = (createNewVersion = false) => {
     saveMutation.mutate({ createNewVersion });
   };
@@ -925,7 +998,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 
-                    disabled={saveMutation.isPending || !hasChanges}
+                    disabled={saveMutation.isPending || !hasChanges || isScenarioLocked}
                     data-testid="button-save-dropdown"
                   >
                     <Save className="h-4 w-4 mr-2" />
@@ -979,10 +1052,105 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+
+              {/* Fork button for approved scenarios */}
+              {activeScenario?.status === 'approved' && (
+                <Button
+                  variant="outline"
+                  onClick={() => forkMutation.mutate()}
+                  disabled={forkMutation.isPending}
+                  data-testid="button-fork"
+                >
+                  <GitBranch className="h-4 w-4 mr-2" />
+                  Fork to Edit
+                </Button>
+              )}
+
+              {/* Withdraw button for pending scenarios */}
+              {activeScenario?.status === 'pending_approval' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => withdrawMutation.mutate()}
+                  disabled={withdrawMutation.isPending}
+                  data-testid="button-withdraw"
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Withdraw
+                </Button>
               )}
             </div>
           </div>
         </CardHeader>
+      </Card>
+
+      {/* Timeline & Model Configuration */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base">Model Configuration</CardTitle>
+              <Badge variant="outline" className="text-xs">
+                {years[0]} - {years[years.length - 1]}
+              </Badge>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowTimelineSettings(!showTimelineSettings)}
+            >
+              {showTimelineSettings ? 'Hide' : 'Show'} Settings
+              <ChevronDown className={`h-4 w-4 ml-1 transition-transform ${showTimelineSettings ? 'rotate-180' : ''}`} />
+            </Button>
+          </div>
+        </CardHeader>
+        {showTimelineSettings && (
+          <CardContent className="pt-0">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Projection Start</Label>
+                <Select value={config?.projectionStartRule || 'acq_close_year'} onValueChange={(value) => timelineConfigMutation.mutate({ projectionStartRule: value })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="acq_close_year">Acquisition Close Year</SelectItem>
+                    <SelectItem value="next_full_calendar_year">Next Full Calendar Year</SelectItem>
+                    <SelectItem value="ttm_plus_one_month">TTM End + 1 Month</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Determines when projections begin</p>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">IRR Display</Label>
+                <Select value={config?.irrDisplayPreference || 'monthly'} onValueChange={(value) => timelineConfigMutation.mutate({ irrDisplayPreference: value })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">Monthly IRR (Default)</SelectItem>
+                    <SelectItem value="annualized">Annualized IRR</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">How IRR is displayed in reports</p>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Stabilized NOI</Label>
+                <Select value={config?.stabilizedNoiMode || 'fixed_year'} onValueChange={(value) => timelineConfigMutation.mutate({ stabilizedNoiMode: value })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="fixed_year">Year 3 (Default)</SelectItem>
+                    <SelectItem value="user_set">Custom Year/Month</SelectItem>
+                    <SelectItem value="post_ramp">Post-Ramp Stabilization</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Used in sensitivity analysis</p>
+              </div>
+            </div>
+            <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+              <div className="flex items-center gap-6 text-sm flex-wrap">
+                <div><span className="text-muted-foreground">Hold Period:</span> <span className="font-medium">{holdPeriod} years</span></div>
+                <div><span className="text-muted-foreground">Projection:</span> <span className="font-medium">{years[0]} - {years[years.length - 1]}</span></div>
+              </div>
+            </div>
+          </CardContent>
+        )}
       </Card>
 
       <Tabs defaultValue="growth" className="space-y-4">
