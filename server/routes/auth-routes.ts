@@ -9,6 +9,7 @@ import { logger } from '../lib/logger';
 import { z } from 'zod';
 import { sendEmailVerification, sendMagicLinkEmail, generateVerificationToken } from '../services/email-service';
 import { CONSENT_VERSION } from '@shared/consent-constants';
+import { getAllUserPermissions } from '../middleware/authorization';
 
 declare global {
   namespace Express {
@@ -894,5 +895,18 @@ function sanitizeUser(user: any) {
   const { passwordHash, mfaSecret, mfaBackupCodes, ...safeUser } = user;
   return safeUser;
 }
+
+// Get current user's permissions (for frontend to show/hide features)
+router.get('/permissions', requireSession, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { roles, permissions } = await getAllUserPermissions(userId);
+
+    res.json({ roles, permissions });
+  } catch (error) {
+    logger.error({ error }, 'Get permissions error');
+    res.status(500).json({ error: 'Failed to get permissions' });
+  }
+});
 
 export default router;
