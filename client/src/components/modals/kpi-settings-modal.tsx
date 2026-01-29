@@ -1,12 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ComponentType } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { StandardDialogShell } from "@/components/ui/standard-dialog-shell";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MMModal, MMInput, MMSelect } from "@/components/mm-ui";
 import { Building, Users, TrendingUp, Calendar, Globe, Briefcase, Home, BarChart3 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 import type { KpiConfigItem } from "@shared/schema";
 
 interface KpiSettingsModalProps {
@@ -17,7 +15,7 @@ interface KpiSettingsModalProps {
   availableMetrics: { value: string; label: string; icon: string; color: string }[];
 }
 
-const iconMap: Record<string, any> = {
+const iconMap: Record<string, ComponentType<{ className?: string }>> = {
   building: Building,
   users: Users,
   trendingUp: TrendingUp,
@@ -103,25 +101,46 @@ export default function KpiSettingsModal({
     );
   };
 
+  const colorOptions = [
+    { value: 'blue', label: 'Blue' },
+    { value: 'purple', label: 'Purple' },
+    { value: 'green', label: 'Green' },
+    { value: 'orange', label: 'Orange' },
+    { value: 'teal', label: 'Teal' },
+    { value: 'indigo', label: 'Indigo' },
+  ];
+
+  const iconOptions = [
+    { value: 'building', label: 'Building' },
+    { value: 'users', label: 'Users' },
+    { value: 'trendingUp', label: 'Trending Up' },
+    { value: 'briefcase', label: 'Briefcase' },
+    { value: 'calendar', label: 'Calendar' },
+    { value: 'globe', label: 'Globe' },
+    { value: 'home', label: 'Home' },
+  ];
+
   return (
-    <StandardDialogShell
+    <MMModal
       open={isOpen}
-      onOpenChange={onClose}
+      onOpenChange={(open) => { if (!open) onClose(); }}
       title="KPI Settings"
-      description="Customize your dashboard KPI cards"
-      icon={BarChart3}
-      size="lg"
-      showProgressBar={true}
-      primaryAction={{
-        label: "Save",
-        onClick: handleSave,
-        disabled: savePreferencesMutation.isPending,
-        loading: savePreferencesMutation.isPending,
-      }}
-      secondaryAction={{
-        label: "Back",
-        onClick: onClose,
-      }}
+      subtitle="Customize your dashboard KPI cards"
+      icon={<BarChart3 className="h-5 w-5" />}
+      maxWidth="lg"
+      footerLeft={
+        <Button variant="ghost" onClick={onClose}>
+          Cancel
+        </Button>
+      }
+      footerRight={
+        <Button 
+          onClick={handleSave}
+          disabled={savePreferencesMutation.isPending}
+        >
+          {savePreferencesMutation.isPending ? "Saving..." : "Save"}
+        </Button>
+      }
     >
       <div className="space-y-6">
         {config.map((kpi, index) => (
@@ -129,86 +148,43 @@ export default function KpiSettingsModal({
             {getIconPreview(kpi.icon, kpi.color)}
             
             <div className="flex-1 space-y-3">
-              <div className="space-y-1">
-                <Label htmlFor={`title-${index}`} className="text-sm text-gray-600">
-                  Card Title
-                </Label>
-                <Input
-                  id={`title-${index}`}
-                  value={kpi.title}
-                  onChange={(e) => updateKpi(index, 'title', e.target.value)}
-                  placeholder="Enter title..."
-                  className="h-9"
-                  data-testid={`input-kpi-title-${index}`}
-                />
-              </div>
+              <MMInput
+                label="Card Title"
+                value={kpi.title}
+                onChange={(e) => updateKpi(index, 'title', e.target.value)}
+                placeholder="Enter title..."
+                data-testid={`input-kpi-title-${index}`}
+              />
               
-              <div className="space-y-1">
-                <Label htmlFor={`metric-${index}`} className="text-sm text-gray-600">
-                  Metric Type
-                </Label>
-                <Select
-                  value={kpi.metricType}
-                  onValueChange={(value) => updateKpi(index, 'metricType', value)}
-                >
-                  <SelectTrigger className="h-9" data-testid={`select-kpi-metric-${index}`}>
-                    <SelectValue placeholder="Select metric" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableMetrics.map((metric) => (
-                      <SelectItem key={metric.value} value={metric.value}>
-                        {metric.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <MMSelect
+                label="Metric Type"
+                value={kpi.metricType}
+                onChange={(value) => updateKpi(index, 'metricType', value)}
+                options={availableMetrics.map(m => ({ value: m.value, label: m.label }))}
+                placeholder="Select metric"
+                data-testid={`select-kpi-metric-${index}`}
+              />
 
-              <div className="flex gap-2">
-                <div className="flex-1 space-y-1">
-                  <Label className="text-sm text-gray-600">Color</Label>
-                  <Select
-                    value={kpi.color || 'blue'}
-                    onValueChange={(value) => updateKpi(index, 'color', value)}
-                  >
-                    <SelectTrigger className="h-9" data-testid={`select-kpi-color-${index}`}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="blue">Blue</SelectItem>
-                      <SelectItem value="purple">Purple</SelectItem>
-                      <SelectItem value="green">Green</SelectItem>
-                      <SelectItem value="orange">Orange</SelectItem>
-                      <SelectItem value="teal">Teal</SelectItem>
-                      <SelectItem value="indigo">Indigo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex-1 space-y-1">
-                  <Label className="text-sm text-gray-600">Icon</Label>
-                  <Select
-                    value={kpi.icon || 'building'}
-                    onValueChange={(value) => updateKpi(index, 'icon', value)}
-                  >
-                    <SelectTrigger className="h-9" data-testid={`select-kpi-icon-${index}`}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="building">Building</SelectItem>
-                      <SelectItem value="users">Users</SelectItem>
-                      <SelectItem value="trendingUp">Trending Up</SelectItem>
-                      <SelectItem value="briefcase">Briefcase</SelectItem>
-                      <SelectItem value="calendar">Calendar</SelectItem>
-                      <SelectItem value="globe">Globe</SelectItem>
-                      <SelectItem value="home">Home</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="grid grid-cols-2 gap-3">
+                <MMSelect
+                  label="Color"
+                  value={kpi.color || 'blue'}
+                  onChange={(value) => updateKpi(index, 'color', value)}
+                  options={colorOptions}
+                  data-testid={`select-kpi-color-${index}`}
+                />
+                <MMSelect
+                  label="Icon"
+                  value={kpi.icon || 'building'}
+                  onChange={(value) => updateKpi(index, 'icon', value)}
+                  options={iconOptions}
+                  data-testid={`select-kpi-icon-${index}`}
+                />
               </div>
             </div>
           </div>
         ))}
       </div>
-    </StandardDialogShell>
+    </MMModal>
   );
 }
