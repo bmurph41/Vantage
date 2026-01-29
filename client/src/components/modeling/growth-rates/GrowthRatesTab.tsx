@@ -416,8 +416,8 @@ export function GrowthRatesTab({
                 key={cat.id}
                 label={cat.label}
                 icon={cat.icon}
-                value={expenseGrowth[cat.id] ?? DEFAULT_RATES.departmental}
-                defaultValue={DEFAULT_RATES.departmental}
+                value={expenseGrowth[cat.id] ?? defaultExpenseRate}
+                defaultValue={defaultExpenseRate}
                 onChange={(val) => {
                   updateExpenseGrowth(cat.id, String(val));
                   triggerAutosave();
