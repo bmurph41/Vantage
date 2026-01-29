@@ -4,6 +4,7 @@ import { queryClient, apiRequest } from '@/lib/queryClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AutosaveIndicator } from '@/components/ui/autosave-indicator';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
+import { GrowthRatesTab } from '@/components/modeling/growth-rates/GrowthRatesTab';
 import type { AutoSaveStatus } from '@/hooks/use-local-autosave';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -1001,220 +1002,48 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
         </TabsList>
 
         <TabsContent value="growth" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Warehouse className="h-5 w-5" />
-                    Storage Revenue Growth
-                  </CardTitle>
-                  <CardDescription>
-                    Annual percentage increase for marina storage revenue by type or location
-                  </CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Select value={storageGrowth.mode} onValueChange={(v) => updateStorageGrowthMode(v as StorageGrowthMode)}>
-                    <SelectTrigger className="w-[180px]" data-testid="select-storage-growth-mode">
-                      <SelectValue placeholder="Select mode" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="universal">
-                        <div className="flex items-center gap-2">
-                          <Globe className="h-4 w-4" />
-                          Universal Rate
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="per_type">
-                        <div className="flex items-center gap-2">
-                          <Layers className="h-4 w-4" />
-                          Per Profit Center
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-4">
-              {storageGrowth.mode === 'universal' && (
-                <div className="flex flex-wrap gap-8">
-                  <div className="max-w-xs">
-                    <Label htmlFor="storage-universal-rate" className="flex items-center gap-1.5 text-sm mb-1.5">
-                      <Globe className="h-4 w-4" />
-                      Universal Growth Rate
-                    </Label>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      Apply this rate to all storage types
-                    </p>
-                    <PercentInput
-                      id="storage-universal-rate"
-                      value={storageGrowth.universalRate}
-                      onChange={(val) => updateStorageUniversalRate(val)}
-                      className="h-9 w-24"
-                      data-testid="input-storage-universal-rate"
-                    />
-                  </div>
-                  {storageRevenueCategories.length > 0 && (
-                    <div className="flex-1 min-w-0 opacity-50">
-                      <Label className="text-sm font-medium mb-1.5 block">Storage Type Rates</Label>
-                      <p className="text-xs text-muted-foreground mb-3">Switch to "Per Profit Center" mode to set individual rates</p>
-                      <div className="grid gap-x-10 gap-y-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
-                        {storageRevenueCategories.map((category) => (
-                          <div key={category.id} className="flex items-center justify-between gap-4 min-w-[260px]">
-                            <div className="flex items-center gap-2">
-                              {category.icon}
-                              <span className="text-sm">{category.name}</span>
-                            </div>
-                            <PercentInput
-                              id={`storage-type-universal-${category.id}`}
-                              value={storageGrowth.universalRate}
-                              onChange={() => {}}
-                              className="h-8 w-20 flex-shrink-0 cursor-not-allowed"
-                              disabled
-                              data-testid={`input-storage-type-universal-${category.id}`}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {storageGrowth.mode === 'per_type' && (
-                <div className="space-y-6">
-                  <div className="p-4 rounded-lg border bg-muted/30 border-muted-foreground/20">
-                    <div className="flex items-center gap-3 opacity-50">
-                      <Globe className="h-4 w-4" />
-                      <Label htmlFor="storage-universal-rate-inline" className="text-sm font-medium">
-                        Universal Growth Rate
-                      </Label>
-                      <PercentInput
-                        id="storage-universal-rate-inline"
-                        value={storageGrowth.universalRate}
-                        onChange={() => {}}
-                        className="h-8 w-20 cursor-not-allowed"
-                        disabled
-                        data-testid="input-storage-universal-rate-inline"
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Switch to "Universal Rate" mode to use this rate for all storage types
-                    </p>
-                  </div>
-
-                  <div>
-                    <Label className="text-sm font-medium mb-3 block">Storage Type Growth Rates</Label>
-                    <p className="text-xs text-muted-foreground mb-3">Annual percentage increase applied to trailing 12-month actuals</p>
-                    <div className="grid gap-x-10 gap-y-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
-                      {storageRevenueCategories.map((category) => (
-                        <div key={category.id} className="flex items-center justify-between gap-4 min-w-[260px]">
-                          <div className="flex items-center gap-2">
-                            {category.icon}
-                            <span className="text-sm font-medium">{category.name}</span>
-                          </div>
-                          <PercentInput
-                            id={`storage-type-${category.id}`}
-                            value={storageGrowth.typeRates[category.id] ?? storageGrowth.universalRate}
-                            onChange={(val) => updateStorageTypeRate(category.id, val)}
-                            className="h-8 w-20 flex-shrink-0"
-                            data-testid={`input-storage-type-${category.id}`}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  {storageRevenueCategories.length === 0 && (
-                    <p className="text-sm text-muted-foreground">
-                      No storage types enabled. Enable them in Department Configuration.
-                    </p>
-                  )}
-                </div>
-              )}
-
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Revenue Growth Rates</CardTitle>
-              <CardDescription className="text-xs">
-                Annual percentage increase for non-storage revenue (storage types are configured above)
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="grid gap-x-3 gap-y-2 grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                {nonStorageRevenueCategories.map((category) => (
-                  <div key={category.id} className="flex items-center gap-2">
-                    <Label htmlFor={`growth-${category.id}`} className="flex items-center gap-1 text-xs whitespace-nowrap min-w-0 flex-1">
-                      {category.icon}
-                      <span className="truncate">{category.name}</span>
-                    </Label>
-                    <PercentInput
-                      id={`growth-${category.id}`}
-                      value={growthRates[category.id] ?? 3}
-                      onChange={(val) => updateGrowthRate(category.id, val)}
-                      className="h-7 text-xs w-16 px-2"
-                      data-testid={`input-growth-${category.id}`}
-                    />
-                  </div>
-                ))}
-              </div>
-              {nonStorageRevenueCategories.length === 0 && (
-                <p className="text-sm text-muted-foreground py-2">
-                  No non-storage revenue categories enabled.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Expense Growth Rates</CardTitle>
-              <CardDescription className="text-xs">
-                Annual percentage increase for operating expenses
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-0 space-y-4">
-              <div className="grid gap-x-3 gap-y-2 grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                {expenseCategories.map((category) => (
-                  <div key={category.id} className="flex items-center gap-2">
-                    <Label htmlFor={`expense-${category.id}`} className="text-xs whitespace-nowrap min-w-0 flex-1 truncate">
-                      {category.name}
-                    </Label>
-                    <PercentInput
-                      id={`expense-${category.id}`}
-                      value={expenseGrowth[category.id] ?? 2}
-                      onChange={(val) => updateExpenseGrowth(category.id, val)}
-                      className="h-7 text-xs w-16 px-2"
-                      data-testid={`input-expense-${category.id}`}
-                    />
-                  </div>
-                ))}
-              </div>
-              <Separator />
-              <div>
-                <p className="text-xs text-muted-foreground mb-2">Segment Expenses (for departmental NOI)</p>
-                <div className="grid gap-x-3 gap-y-2 grid-cols-3 lg:grid-cols-5">
-                  {segmentExpenseCategories.map((category) => (
-                    <div key={category.id} className="flex items-center gap-2">
-                      <Label htmlFor={`expense-${category.id}`} className="text-xs whitespace-nowrap min-w-0 flex-1 truncate">
-                        {category.name}
-                      </Label>
-                      <PercentInput
-                        id={`expense-${category.id}`}
-                        value={expenseGrowth[category.id] ?? 2}
-                        onChange={(val) => updateExpenseGrowth(category.id, val)}
-                        className="h-7 text-xs w-16 px-2"
-                        data-testid={`input-expense-${category.id}`}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <GrowthRatesTab
+            growthRates={growthRates}
+            expenseGrowth={expenseGrowth}
+            storageGrowth={storageGrowth}
+            updateGrowthRate={updateGrowthRate}
+            updateExpenseGrowth={updateExpenseGrowth}
+            updateStorageGrowthMode={updateStorageGrowthMode}
+            updateStorageUniversalRate={updateStorageUniversalRate}
+            updateStorageTypeRate={updateStorageTypeRate}
+            storageRevenueCategories={storageRevenueCategories}
+            nonStorageRevenueCategories={nonStorageRevenueCategories}
+            expenseCategories={expenseCategories}
+            segmentExpenseCategories={segmentExpenseCategories}
+            getDefaultGrowthRate={() => {
+              const baseRates: Record<ScenarioType, number> = {
+                base: 3,
+                aggressive: 5,
+                conservative: 1.5,
+                custom: 3,
+              };
+              return baseRates[activeScenarioType];
+            }}
+            getDefaultExpenseRate={() => {
+              const baseRates: Record<ScenarioType, number> = {
+                base: 2.5,
+                aggressive: 2,
+                conservative: 3,
+                custom: 2.5,
+              };
+              return baseRates[activeScenarioType];
+            }}
+            getDefaultStorageRate={() => {
+              const baseRates: Record<ScenarioType, number> = {
+                base: 3,
+                aggressive: 5,
+                conservative: 1.5,
+                custom: 3,
+              };
+              return baseRates[activeScenarioType];
+            }}
+            triggerAutosave={triggerAutosave}
+          />
         </TabsContent>
 
         <TabsContent value="occupancy" className="space-y-6">

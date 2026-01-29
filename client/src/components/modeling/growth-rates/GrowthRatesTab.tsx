@@ -44,16 +44,9 @@ interface GrowthRatesTabProps {
   segmentExpenseCategories: Array<{ id: string; name: string; segment: boolean }>;
   getDefaultGrowthRate: () => number;
   getDefaultExpenseRate: () => number;
+  getDefaultStorageRate: () => number;
   triggerAutosave: () => void;
 }
-
-const DEFAULT_RATES = {
-  storage: 3.0,
-  revenue: 3.0,
-  payroll: 4.0,
-  expense: 2.0,
-  departmental: 2.0,
-};
 
 export function GrowthRatesTab({
   growthRates,
@@ -70,16 +63,18 @@ export function GrowthRatesTab({
   segmentExpenseCategories,
   getDefaultGrowthRate,
   getDefaultExpenseRate,
+  getDefaultStorageRate,
   triggerAutosave,
 }: GrowthRatesTabProps) {
   const defaultRevenueRate = getDefaultGrowthRate();
   const defaultExpenseRate = getDefaultExpenseRate();
+  const defaultStorageRate = getDefaultStorageRate();
 
   const modifiedCount = useMemo(() => {
     let count = 0;
-    if (Math.abs(storageGrowth.universalRate - DEFAULT_RATES.storage) > 0.001) count++;
+    if (Math.abs(storageGrowth.universalRate - defaultStorageRate) > 0.001) count++;
     Object.entries(storageGrowth.typeRates).forEach(([_, rate]) => {
-      if (Math.abs(rate - DEFAULT_RATES.storage) > 0.001) count++;
+      if (Math.abs(rate - defaultStorageRate) > 0.001) count++;
     });
     Object.entries(growthRates).forEach(([_, rate]) => {
       if (Math.abs(rate - defaultRevenueRate) > 0.001) count++;
@@ -88,7 +83,7 @@ export function GrowthRatesTab({
       if (Math.abs(rate - defaultExpenseRate) > 0.001) count++;
     });
     return count;
-  }, [storageGrowth, growthRates, expenseGrowth, defaultRevenueRate, defaultExpenseRate]);
+  }, [storageGrowth, growthRates, expenseGrowth, defaultRevenueRate, defaultExpenseRate, defaultStorageRate]);
 
   const totalCount = useMemo(() => {
     return (
@@ -114,7 +109,7 @@ export function GrowthRatesTab({
   }, [nonStorageRevenueCategories, expenseCategories, segmentExpenseCategories, updateStorageUniversalRate, updateGrowthRate, updateExpenseGrowth, triggerAutosave]);
 
   const handleReset = useCallback(() => {
-    updateStorageUniversalRate(String(DEFAULT_RATES.storage));
+    updateStorageUniversalRate(String(defaultStorageRate));
     nonStorageRevenueCategories.forEach(cat => {
       updateGrowthRate(cat.id, String(defaultRevenueRate));
     });
@@ -125,7 +120,7 @@ export function GrowthRatesTab({
       updateExpenseGrowth(cat.id, String(defaultExpenseRate));
     });
     triggerAutosave();
-  }, [nonStorageRevenueCategories, expenseCategories, segmentExpenseCategories, updateStorageUniversalRate, updateGrowthRate, updateExpenseGrowth, defaultRevenueRate, defaultExpenseRate, triggerAutosave]);
+  }, [nonStorageRevenueCategories, expenseCategories, segmentExpenseCategories, updateStorageUniversalRate, updateGrowthRate, updateExpenseGrowth, defaultRevenueRate, defaultExpenseRate, defaultStorageRate, triggerAutosave]);
 
   const handleSetAllRevenue = useCallback((value: number) => {
     nonStorageRevenueCategories.forEach(cat => {
@@ -148,7 +143,7 @@ export function GrowthRatesTab({
     triggerAutosave();
   }, [segmentExpenseCategories, updateExpenseGrowth, triggerAutosave]);
 
-  const storageMode = storageGrowth.mode === 'per_type' ? 'perProfitCenter' : 'universal';
+  const storageMode = (storageGrowth.mode === 'per_type' || storageGrowth.mode === 'granular') ? 'perProfitCenter' : 'universal';
 
   const handleStorageModeChange = useCallback((mode: 'universal' | 'perProfitCenter') => {
     updateStorageGrowthMode(mode === 'universal' ? 'universal' : 'per_type');
@@ -182,7 +177,7 @@ export function GrowthRatesTab({
               label="Universal Growth Rate"
               icon={Globe}
               value={storageGrowth.universalRate}
-              defaultValue={DEFAULT_RATES.storage}
+              defaultValue={defaultStorageRate}
               onChange={(val) => {
                 updateStorageUniversalRate(String(val));
                 triggerAutosave();
@@ -204,7 +199,7 @@ export function GrowthRatesTab({
                   label={category.name}
                   icon={IconComponent}
                   value={storageGrowth.typeRates[category.id] ?? storageGrowth.universalRate}
-                  defaultValue={DEFAULT_RATES.storage}
+                  defaultValue={defaultStorageRate}
                   onChange={(val) => {
                     updateStorageTypeRate(category.id, String(val));
                     triggerAutosave();

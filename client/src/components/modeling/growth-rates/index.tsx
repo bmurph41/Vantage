@@ -55,9 +55,9 @@ export function RateInput({
           step={step}
           value={value}
           onChange={(e) => onChange(parseFloat(e.target.value))}
-          className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+          className="w-full h-1.5 rounded-full appearance-none cursor-pointer range-slider"
           style={{
-            background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${percentage}%, #e2e8f0 ${percentage}%, #e2e8f0 100%)`
+            background: `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${percentage}%, hsl(var(--border)) ${percentage}%, hsl(var(--border)) 100%)`
           }}
         />
       </div>
