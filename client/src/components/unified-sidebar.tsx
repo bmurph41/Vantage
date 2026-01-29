@@ -134,8 +134,6 @@ type BootstrapData = {
 
 export default function UnifiedSidebar() {
   const [location] = useLocation();
-export default function UnifiedSidebar() {
-  const [location] = useLocation();
   const { user } = useAuth();
   const [operationsExpanded, setOperationsExpanded] = useState(false); // Default collapsed for Operations
   const [crmExpanded, setCrmExpanded] = useState(false);

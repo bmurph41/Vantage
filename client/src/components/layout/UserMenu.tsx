@@ -11,7 +11,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useSettingsContext } from '@/context/SettingsContext';
+import { useSettingsContext } from '@/contexts/SettingsContext';
 import { SettingsCenterModal } from '@/components/settings';
 import {
   User,
