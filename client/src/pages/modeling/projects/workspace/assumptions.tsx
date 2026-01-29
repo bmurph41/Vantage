@@ -377,6 +377,19 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
     );
   }, [config]);
 
+  // Storage type IDs for filtering
+  const storageTypeIds = useMemo(() => storageTypeCategories.map(s => s.id), []);
+
+  // Non-storage revenue categories (excludes storage types like Wet Slips, Dry Racks, etc.)
+  const nonStorageRevenueCategories = useMemo(() => {
+    return revenueCategories.filter(cat => !storageTypeIds.includes(cat.id));
+  }, [revenueCategories, storageTypeIds]);
+
+  // Storage revenue categories only
+  const storageRevenueCategories = useMemo(() => {
+    return revenueCategories.filter(cat => storageTypeIds.includes(cat.id));
+  }, [revenueCategories, storageTypeIds]);
+
   const enabledProfitCenters = useMemo(() => {
     if (!config?.departments) return [];
     return Object.entries(config.departments)
@@ -404,11 +417,11 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
   const [expandedOccupancyTypes, setExpandedOccupancyTypes] = useState<Record<string, boolean>>({});
 
   const isUniversalRateSynced = useMemo(() => {
-    if (enabledProfitCenters.length === 0) return true;
-    return enabledProfitCenters.every(
-      pc => (storageGrowth.typeRates[pc.id] ?? storageGrowth.universalRate) === storageGrowth.universalRate
+    if (storageRevenueCategories.length === 0) return true;
+    return storageRevenueCategories.every(
+      cat => (storageGrowth.typeRates[cat.id] ?? storageGrowth.universalRate) === storageGrowth.universalRate
     );
-  }, [enabledProfitCenters, storageGrowth.typeRates, storageGrowth.universalRate]);
+  }, [storageRevenueCategories, storageGrowth.typeRates, storageGrowth.universalRate]);
   const [occupancyViewMode, setOccupancyViewMode] = useState<'annualized' | 'monthly'>('annualized');
 
   const enabledStorageTypes = useMemo(() => {
@@ -1025,21 +1038,46 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
             </CardHeader>
             <CardContent className="pt-4">
               {storageGrowth.mode === 'universal' && (
-                <div className="max-w-xs">
-                  <Label htmlFor="storage-universal-rate" className="flex items-center gap-1.5 text-sm mb-1.5">
-                    <Globe className="h-4 w-4" />
-                    Universal Growth Rate
-                  </Label>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    Apply this rate to all storage types and locations
-                  </p>
-                  <PercentInput
-                    id="storage-universal-rate"
-                    value={storageGrowth.universalRate}
-                    onChange={(val) => updateStorageUniversalRate(val)}
-                    className="h-9 w-24"
-                    data-testid="input-storage-universal-rate"
-                  />
+                <div className="flex flex-wrap gap-8">
+                  <div className="max-w-xs">
+                    <Label htmlFor="storage-universal-rate" className="flex items-center gap-1.5 text-sm mb-1.5">
+                      <Globe className="h-4 w-4" />
+                      Universal Growth Rate
+                    </Label>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Apply this rate to all storage types
+                    </p>
+                    <PercentInput
+                      id="storage-universal-rate"
+                      value={storageGrowth.universalRate}
+                      onChange={(val) => updateStorageUniversalRate(val)}
+                      className="h-9 w-24"
+                      data-testid="input-storage-universal-rate"
+                    />
+                  </div>
+                  {storageRevenueCategories.length > 0 && (
+                    <div className="flex-1 min-w-0">
+                      <Label className="text-sm font-medium mb-1.5 block">Storage Type Rates</Label>
+                      <p className="text-xs text-muted-foreground mb-2">Individual storage type growth rates</p>
+                      <div className="grid gap-x-6 gap-y-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                        {storageRevenueCategories.map((category) => (
+                          <div key={category.id} className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                              {category.icon}
+                              <span className="text-sm truncate">{category.name}</span>
+                            </div>
+                            <PercentInput
+                              id={`storage-type-universal-${category.id}`}
+                              value={storageGrowth.typeRates[category.id] ?? storageGrowth.universalRate}
+                              onChange={(val) => updateStorageTypeRate(category.id, val)}
+                              className="h-8 w-20"
+                              data-testid={`input-storage-type-universal-${category.id}`}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1093,29 +1131,29 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                   </div>
 
                   <div>
-                    <Label className="text-sm font-medium mb-3 block">Revenue Growth Rates</Label>
+                    <Label className="text-sm font-medium mb-3 block">Storage Type Growth Rates</Label>
                     <p className="text-xs text-muted-foreground mb-3">Annual percentage increase applied to trailing 12-month actuals</p>
                     <div className="grid gap-x-6 gap-y-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                      {enabledProfitCenters.map((profitCenter) => (
-                        <div key={profitCenter.id} className="flex items-center gap-3">
+                      {storageRevenueCategories.map((category) => (
+                        <div key={category.id} className="flex items-center gap-3">
                           <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                            {profitCenter.icon}
-                            <span className="text-sm font-medium truncate">{profitCenter.name}</span>
+                            {category.icon}
+                            <span className="text-sm font-medium truncate">{category.name}</span>
                           </div>
                           <PercentInput
-                            id={`storage-type-${profitCenter.id}`}
-                            value={storageGrowth.typeRates[profitCenter.id] ?? 3}
-                            onChange={(val) => updateStorageTypeRate(profitCenter.id, val)}
+                            id={`storage-type-${category.id}`}
+                            value={storageGrowth.typeRates[category.id] ?? storageGrowth.universalRate}
+                            onChange={(val) => updateStorageTypeRate(category.id, val)}
                             className="h-8 w-20"
-                            data-testid={`input-storage-type-${profitCenter.id}`}
+                            data-testid={`input-storage-type-${category.id}`}
                           />
                         </div>
                       ))}
                     </div>
                   </div>
-                  {enabledProfitCenters.length === 0 && (
+                  {storageRevenueCategories.length === 0 && (
                     <p className="text-sm text-muted-foreground">
-                      No profit centers enabled. Enable them in Department Configuration.
+                      No storage types enabled. Enable them in Department Configuration.
                     </p>
                   )}
                 </div>
@@ -1128,12 +1166,12 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Revenue Growth Rates</CardTitle>
               <CardDescription className="text-xs">
-                Annual percentage increase applied to trailing 12-month actuals
+                Annual percentage increase for non-storage revenue (storage types are configured above)
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
               <div className="grid gap-x-3 gap-y-2 grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                {revenueCategories.map((category) => (
+                {nonStorageRevenueCategories.map((category) => (
                   <div key={category.id} className="flex items-center gap-2">
                     <Label htmlFor={`growth-${category.id}`} className="flex items-center gap-1 text-xs whitespace-nowrap min-w-0 flex-1">
                       {category.icon}
@@ -1149,6 +1187,11 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                   </div>
                 ))}
               </div>
+              {nonStorageRevenueCategories.length === 0 && (
+                <p className="text-sm text-muted-foreground py-2">
+                  No non-storage revenue categories enabled.
+                </p>
+              )}
             </CardContent>
           </Card>
 
