@@ -390,13 +390,6 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
       }));
   }, [config]);
 
-  const isUniversalRateSynced = useMemo(() => {
-    if (enabledProfitCenters.length === 0) return true;
-    return enabledProfitCenters.every(
-      pc => (storageGrowth.typeRates[pc.id] ?? storageGrowth.universalRate) === storageGrowth.universalRate
-    );
-  }, [enabledProfitCenters, storageGrowth.typeRates, storageGrowth.universalRate]);
-
   const [growthRates, setGrowthRates] = useState<GrowthRates>({});
   const [expenseGrowth, setExpenseGrowth] = useState<GrowthRates>({});
   const [occupancy, setOccupancy] = useState<OccupancyData>({});
@@ -409,6 +402,13 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
   });
   const [expandedStorageTypes, setExpandedStorageTypes] = useState<Record<string, boolean>>({});
   const [expandedOccupancyTypes, setExpandedOccupancyTypes] = useState<Record<string, boolean>>({});
+
+  const isUniversalRateSynced = useMemo(() => {
+    if (enabledProfitCenters.length === 0) return true;
+    return enabledProfitCenters.every(
+      pc => (storageGrowth.typeRates[pc.id] ?? storageGrowth.universalRate) === storageGrowth.universalRate
+    );
+  }, [enabledProfitCenters, storageGrowth.typeRates, storageGrowth.universalRate]);
   const [occupancyViewMode, setOccupancyViewMode] = useState<'annualized' | 'monthly'>('annualized');
 
   const enabledStorageTypes = useMemo(() => {
