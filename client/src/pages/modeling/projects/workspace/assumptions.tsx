@@ -1059,12 +1059,12 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                     <div className="flex-1 min-w-0">
                       <Label className="text-sm font-medium mb-1.5 block">Storage Type Rates</Label>
                       <p className="text-xs text-muted-foreground mb-3">Individual storage type growth rates</p>
-                      <div className="grid gap-x-8 gap-y-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                      <div className="grid gap-x-10 gap-y-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
                         {storageRevenueCategories.map((category) => (
-                          <div key={category.id} className="flex items-center justify-between gap-3 min-w-[200px]">
-                            <div className="flex items-center gap-2 min-w-0">
+                          <div key={category.id} className="flex items-center justify-between gap-4 min-w-[260px]">
+                            <div className="flex items-center gap-2">
                               {category.icon}
-                              <span className="text-sm whitespace-nowrap">{category.name}</span>
+                              <span className="text-sm">{category.name}</span>
                             </div>
                             <PercentInput
                               id={`storage-type-universal-${category.id}`}
