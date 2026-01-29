@@ -119,6 +119,7 @@ const MagicLinkPage = lazy(() => import("@/pages/auth/magic-link"));
 const MagicLinkVerifyPage = lazy(() => import("@/pages/auth/magic-link-verify"));
 const VerifyEmailPage = lazy(() => import("@/pages/auth/verify-email"));
 const DesignPreview = lazy(() => import("@/pages/design-preview"));
+const MMUIDemo = lazy(() => import("@/pages/mm-ui-demo"));
 const PacksSettings = lazy(() => import("@/pages/packs-settings"));
 const IntegrationsMarketplace = lazy(() => import("@/pages/integrations/IntegrationsMarketplace"));
 const IntegrationDetail = lazy(() => import("@/pages/integrations/IntegrationDetail"));
@@ -429,6 +430,14 @@ function Router() {
         {() => (
           <Suspense fallback={<PageLoader />}>
             <DesignPreview />
+          </Suspense>
+        )}
+      </Route>
+      {/* MM-UI Design System Demo */}
+      <Route path="/mm-ui-demo">
+        {() => (
+          <Suspense fallback={<PageLoader />}>
+            <MMUIDemo />
           </Suspense>
         )}
       </Route>

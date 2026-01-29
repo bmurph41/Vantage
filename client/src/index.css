@@ -1033,4 +1033,343 @@
     width: 100%;
     text-align: center;
   }
+}/**
+ * MarinaMatch UI Design System
+ * Design Tokens & CSS Variables
+ * 
+ * These tokens enforce the consistent MarinaMatch Modal Standard
+ * across all modal and form components.
+ */
+
+:root {
+  /* Primary Brand Colors */
+  --mm-primary: #2563eb;
+  --mm-primary-hover: #1d4ed8;
+  --mm-primary-light: #3b82f6;
+  --mm-primary-dark: #1e40af;
+  
+  /* Surface & Background */
+  --mm-surface: #ffffff;
+  --mm-surface-muted: #f8fafc;
+  --mm-bg: #f1f5f9;
+  --mm-bg-input: #f8fafc;
+  --mm-overlay: rgba(0, 0, 0, 0.6);
+  
+  /* Text Colors */
+  --mm-text: #0f172a;
+  --mm-text-secondary: #475569;
+  --mm-text-muted: #94a3b8;
+  --mm-text-placeholder: #9ca3af;
+  
+  /* Border Colors */
+  --mm-border: #e2e8f0;
+  --mm-border-input: #cbd5e1;
+  --mm-border-focus: var(--mm-primary);
+  
+  /* Ring (Focus) */
+  --mm-ring: var(--mm-primary);
+  --mm-ring-width: 3px;
+  --mm-ring-offset: 2px;
+  
+  /* Error States */
+  --mm-error: #dc2626;
+  --mm-error-light: #fef2f2;
+  --mm-error-border: #f87171;
+  --mm-error-ring: rgba(220, 38, 38, 0.3);
+  
+  /* Success States */
+  --mm-success: #16a34a;
+  --mm-success-light: #f0fdf4;
+  
+  /* Radius */
+  --mm-radius-sm: 6px;
+  --mm-radius: 10px;
+  --mm-radius-lg: 12px;
+  --mm-radius-xl: 16px;
+  
+  /* Spacing */
+  --mm-spacing-xs: 4px;
+  --mm-spacing-sm: 8px;
+  --mm-spacing-md: 12px;
+  --mm-spacing-lg: 16px;
+  --mm-spacing-xl: 24px;
+  --mm-spacing-2xl: 32px;
+  
+  /* Field Dimensions */
+  --mm-field-height: 44px;
+  --mm-field-height-sm: 36px;
+  --mm-field-height-lg: 52px;
+  
+  /* Modal Dimensions */
+  --mm-modal-width-sm: 480px;
+  --mm-modal-width-md: 640px;
+  --mm-modal-width-lg: 860px;
+  --mm-modal-width-xl: 960px;
+  --mm-modal-max-height: 90vh;
+  
+  /* Shadows */
+  --mm-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --mm-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --mm-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --mm-shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --mm-shadow-modal: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  
+  /* Transitions */
+  --mm-transition-fast: 150ms ease;
+  --mm-transition: 200ms ease;
+  --mm-transition-slow: 300ms ease;
+  
+  /* Typography */
+  --mm-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mm-font-size-xs: 0.75rem;
+  --mm-font-size-sm: 0.875rem;
+  --mm-font-size-base: 1rem;
+  --mm-font-size-lg: 1.125rem;
+  --mm-font-size-xl: 1.25rem;
+  --mm-font-size-2xl: 1.5rem;
+  
+  /* Brand Divider */
+  --mm-divider-height: 3px;
+  --mm-divider-color: var(--mm-primary);
+}
+
+/* Dark mode support (optional) */
+.dark {
+  --mm-surface: #1e293b;
+  --mm-surface-muted: #334155;
+  --mm-bg: #0f172a;
+  --mm-bg-input: #1e293b;
+  --mm-text: #f1f5f9;
+  --mm-text-secondary: #cbd5e1;
+  --mm-text-muted: #64748b;
+  --mm-text-placeholder: #64748b;
+  --mm-border: #334155;
+  --mm-border-input: #475569;
+  --mm-overlay: rgba(0, 0, 0, 0.8);
+}
+
+/* ============================================
+   MM-UI Component Base Styles
+   ============================================ */
+
+/* Modal Overlay Animation */
+@keyframes mm-overlay-show {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes mm-overlay-hide {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* Modal Content Animation */
+@keyframes mm-content-show {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -48%) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes mm-content-hide {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -48%) scale(0.96);
+  }
+}
+
+/* Spinner Animation */
+@keyframes mm-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.mm-spinner {
+  animation: mm-spin 0.6s linear infinite;
+}
+
+/* Focus Ring Utility */
+.mm-focus-ring {
+  outline: none;
+  box-shadow: 0 0 0 var(--mm-ring-offset) var(--mm-surface),
+              0 0 0 calc(var(--mm-ring-offset) + var(--mm-ring-width)) var(--mm-ring);
+  border-color: var(--mm-border-focus);
+}
+
+/* Input Base Styles */
+.mm-input-base {
+  width: 100%;
+  height: var(--mm-field-height);
+  padding: 0 var(--mm-spacing-lg);
+  font-size: var(--mm-font-size-base);
+  font-family: var(--mm-font-sans);
+  color: var(--mm-text);
+  background-color: var(--mm-bg-input);
+  border: 1px solid var(--mm-border-input);
+  border-radius: var(--mm-radius);
+  transition: border-color var(--mm-transition), 
+              box-shadow var(--mm-transition),
+              background-color var(--mm-transition);
+}
+
+.mm-input-base::placeholder {
+  color: var(--mm-text-placeholder);
+}
+
+.mm-input-base:focus {
+  outline: none;
+  border-color: var(--mm-border-focus);
+  box-shadow: 0 0 0 var(--mm-ring-offset) var(--mm-surface),
+              0 0 0 calc(var(--mm-ring-offset) + var(--mm-ring-width)) rgba(37, 99, 235, 0.25);
+}
+
+.mm-input-base:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: var(--mm-bg);
+}
+
+.mm-input-base.mm-input-error {
+  border-color: var(--mm-error-border);
+}
+
+.mm-input-base.mm-input-error:focus {
+  border-color: var(--mm-error);
+  box-shadow: 0 0 0 var(--mm-ring-offset) var(--mm-surface),
+              0 0 0 calc(var(--mm-ring-offset) + var(--mm-ring-width)) var(--mm-error-ring);
+}
+
+/* Radio Card Styles */
+.mm-radio-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--mm-spacing-md);
+  padding: var(--mm-spacing-lg);
+  background-color: var(--mm-surface);
+  border: 2px solid var(--mm-border);
+  border-radius: var(--mm-radius-lg);
+  cursor: pointer;
+  transition: border-color var(--mm-transition), 
+              background-color var(--mm-transition),
+              box-shadow var(--mm-transition);
+}
+
+.mm-radio-card:hover {
+  border-color: var(--mm-border-input);
+  background-color: var(--mm-surface-muted);
+}
+
+.mm-radio-card.mm-radio-card-selected {
+  border-color: var(--mm-primary);
+  background-color: rgba(37, 99, 235, 0.04);
+  box-shadow: 0 0 0 1px var(--mm-primary);
+}
+
+.mm-radio-card:focus-within {
+  outline: none;
+  box-shadow: 0 0 0 var(--mm-ring-offset) var(--mm-surface),
+              0 0 0 calc(var(--mm-ring-offset) + var(--mm-ring-width)) rgba(37, 99, 235, 0.25);
+}
+
+/* Progress Dots */
+.mm-progress-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: var(--mm-border);
+  transition: background-color var(--mm-transition), transform var(--mm-transition);
+}
+
+.mm-progress-dot.mm-progress-dot-active {
+  background-color: var(--mm-primary);
+  transform: scale(1.1);
+}
+
+.mm-progress-dot.mm-progress-dot-completed {
+  background-color: var(--mm-primary);
+}
+
+/* Button Base */
+.mm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--mm-spacing-sm);
+  padding: 0 var(--mm-spacing-xl);
+  height: var(--mm-field-height);
+  font-size: var(--mm-font-size-base);
+  font-weight: 500;
+  font-family: var(--mm-font-sans);
+  border-radius: var(--mm-radius);
+  border: none;
+  cursor: pointer;
+  transition: background-color var(--mm-transition), 
+              transform var(--mm-transition-fast),
+              box-shadow var(--mm-transition);
+}
+
+.mm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mm-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.mm-btn-primary {
+  background-color: var(--mm-primary);
+  color: white;
+}
+
+.mm-btn-primary:hover:not(:disabled) {
+  background-color: var(--mm-primary-hover);
+}
+
+.mm-btn-primary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 var(--mm-ring-offset) var(--mm-surface),
+              0 0 0 calc(var(--mm-ring-offset) + var(--mm-ring-width)) rgba(37, 99, 235, 0.5);
+}
+
+.mm-btn-ghost {
+  background-color: transparent;
+  color: var(--mm-text-secondary);
+}
+
+.mm-btn-ghost:hover:not(:disabled) {
+  background-color: var(--mm-bg);
+  color: var(--mm-text);
+}
+
+/* Scrollbar Styling */
+.mm-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--mm-border) transparent;
+}
+
+.mm-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.mm-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.mm-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--mm-border);
+  border-radius: 3px;
+}
+
+.mm-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: var(--mm-border-input);
 }
