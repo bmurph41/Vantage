@@ -4,29 +4,18 @@ import {
   useQuery, useMutation } from '@tanstack/react-query';
 import {
   queryClient, apiRequest } from '@/lib/queryClient';
-import {
-  Lock, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Lock, AutosaveIndicator } from '@/components/ui/autosave-indicator';
-import {
-  Lock, WorkflowNavigation } from '@/components/modeling/workflow-navigation';
-import {
-  Lock, GrowthRatesTab } from '@/components/modeling/growth-rates/GrowthRatesTab';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { AutosaveIndicator } from '@/components/ui/autosave-indicator';
+import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
+import { GrowthRatesTab } from '@/components/modeling/growth-rates/GrowthRatesTab';
 import type { AutoSaveStatus } from '@/hooks/use-local-autosave';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Lock, Button } from '@/components/ui/button';
-import {
-  Lock, Input } from '@/components/ui/input';
-import {
-  Lock, Label } from '@/components/ui/label';
-import {
-  Lock, Badge } from '@/components/ui/badge';
-import {
-  Lock, Separator } from '@/components/ui/separator';
-import {
-  Lock, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Lock,
   Table,
   TableBody,
   TableCell,
@@ -35,7 +24,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Lock,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
