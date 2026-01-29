@@ -1048,7 +1048,7 @@ export function Breadcrumb() {
   return (
     <nav 
       aria-label="Breadcrumb" 
-      className="flex items-center text-sm px-6 py-2 border-b border-gray-100 bg-white/50"
+      className="flex items-center text-sm px-6 py-2 border-b border-border bg-card/50"
       data-testid="breadcrumb-nav"
     >
       <ol className="flex items-center gap-1.5">
@@ -1059,7 +1059,7 @@ export function Breadcrumb() {
           return (
             <li key={index} className="flex items-center gap-1.5">
               {index > 0 && (
-                <ChevronRight className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
               )}
               {item.isDynamic ? (
                 <DynamicBreadcrumbItem item={item} isLast={isLast} />
@@ -1077,7 +1077,7 @@ export function Breadcrumb() {
                 <Link
                   href={item.href}
                   className={cn(
-                    'flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors',
+                    'flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors',
                     Icon && 'gap-1'
                   )}
                   data-testid={`breadcrumb-link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
@@ -1088,7 +1088,7 @@ export function Breadcrumb() {
               ) : (
                 <span
                   className={cn(
-                    'flex items-center gap-1.5 text-gray-500',
+                    'flex items-center gap-1.5 text-muted-foreground',
                     Icon && 'gap-1'
                   )}
                 >

@@ -330,7 +330,7 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
   }
   
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-background">
       <Suspense fallback={<SidebarLoader />}>
         <UnifiedSidebar />
       </Suspense>
