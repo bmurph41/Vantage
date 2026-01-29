@@ -15,7 +15,6 @@ import {
   Palette,
   Sun,
   Moon,
-  Monitor,
   Maximize2,
   Minimize2,
   Hash,
@@ -44,59 +43,28 @@ export function DisplaySettings({
             <Palette className="h-5 w-5" />
             Theme
           </CardTitle>
-          <CardDescription>Choose your preferred color scheme</CardDescription>
+          <CardDescription>Toggle between light and dark mode</CardDescription>
         </CardHeader>
         <CardContent>
-          <RadioGroup
-            value={settings.theme}
-            onValueChange={(value: 'light' | 'dark' | 'system') =>
-              onChange({ theme: value })
-            }
-            className="grid grid-cols-3 gap-4"
-          >
-            <div>
-              <RadioGroupItem
-                value="light"
-                id="theme-light"
-                className="peer sr-only"
-              />
-              <Label
-                htmlFor="theme-light"
-                className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
-              >
-                <Sun className="mb-3 h-6 w-6" />
-                <span className="text-sm font-medium">Light</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {settings.theme === 'dark' ? (
+                <Moon className="h-5 w-5 text-muted-foreground" />
+              ) : (
+                <Sun className="h-5 w-5 text-muted-foreground" />
+              )}
+              <Label htmlFor="dark-mode-toggle" className="text-sm font-medium">
+                Dark Mode
               </Label>
             </div>
-            <div>
-              <RadioGroupItem
-                value="dark"
-                id="theme-dark"
-                className="peer sr-only"
-              />
-              <Label
-                htmlFor="theme-dark"
-                className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
-              >
-                <Moon className="mb-3 h-6 w-6" />
-                <span className="text-sm font-medium">Dark</span>
-              </Label>
-            </div>
-            <div>
-              <RadioGroupItem
-                value="system"
-                id="theme-system"
-                className="peer sr-only"
-              />
-              <Label
-                htmlFor="theme-system"
-                className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
-              >
-                <Monitor className="mb-3 h-6 w-6" />
-                <span className="text-sm font-medium">System</span>
-              </Label>
-            </div>
-          </RadioGroup>
+            <Switch
+              id="dark-mode-toggle"
+              checked={settings.theme === 'dark'}
+              onCheckedChange={(checked) =>
+                onChange({ theme: checked ? 'dark' : 'light' })
+              }
+            />
+          </div>
         </CardContent>
       </Card>
 
