@@ -50,6 +50,7 @@ export function ThemeProvider({
     }
 
     root.classList.add(resolved);
+    root.style.colorScheme = resolved;
     setResolvedTheme(resolved);
   }, [theme]);
 
@@ -62,6 +63,7 @@ export function ThemeProvider({
       root.classList.remove('light', 'dark');
       const resolved = mediaQuery.matches ? 'dark' : 'light';
       root.classList.add(resolved);
+      root.style.colorScheme = resolved;
       setResolvedTheme(resolved);
     };
 
