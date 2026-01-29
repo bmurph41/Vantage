@@ -11,6 +11,8 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AIAssistant } from "@/components/ai-assistant";
 import { SettingsProvider } from "@/contexts/SettingsContext";
+import { ThemeProvider } from '@/contexts/ThemeProvider';
+
 
 // Eagerly load critical pages for instant navigation (no white screen)
 import Dashboard from "@/pages/dashboard";
@@ -2049,18 +2051,20 @@ function Router() {
 function App() {
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <SettingsProvider>
-          <AuthProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Suspense fallback={<PageLoader />}>
-                <Router />
-              </Suspense>
-            </TooltipProvider>
-          </AuthProvider>
-        </SettingsProvider>
-      </QueryClientProvider>
+      <ThemeProvider defaultTheme="system">
+        <QueryClientProvider client={queryClient}>
+          <SettingsProvider>
+            <AuthProvider>
+              <TooltipProvider>
+                <Toaster />
+                <Suspense fallback={<PageLoader />}>
+                  <Router />
+                </Suspense>
+              </TooltipProvider>
+            </AuthProvider>
+          </SettingsProvider>
+        </QueryClientProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }

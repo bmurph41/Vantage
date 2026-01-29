@@ -11,7 +11,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useSettingsContext } from '@/contexts/SettingsContext';
+import { useSettingsContext } from '@/context/SettingsContext';
+import { useTheme } from '@/contexts/ThemeProvider';
 import { SettingsCenterModal } from '@/components/settings';
 import {
   User,
@@ -39,6 +40,7 @@ export function UserMenu({ user }: UserMenuProps) {
   const { toast } = useToast();
   const { settings, updateSettings, openSettingsModal, isSettingsModalOpen, closeSettingsModal } =
     useSettingsContext();
+  const { theme, resolvedTheme, toggleTheme } = useTheme();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   const initials = user.name
@@ -113,14 +115,14 @@ export function UserMenu({ user }: UserMenuProps) {
               <span className="ml-auto text-xs text-muted-foreground">⌘,</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={toggleTheme}>
-              {settings.theme === 'dark' ? (
+              {resolvedTheme === 'dark' ? (
                 <Sun className="mr-2 h-4 w-4" />
               ) : (
                 <Moon className="mr-2 h-4 w-4" />
               )}
-              {settings.theme === 'light'
+              {theme === 'light'
                 ? 'Dark Mode'
-                : settings.theme === 'dark'
+                : theme === 'dark'
                 ? 'System Theme'
                 : 'Light Mode'}
             </DropdownMenuItem>

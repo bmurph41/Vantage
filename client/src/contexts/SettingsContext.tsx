@@ -126,6 +126,10 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
 
   const updateSettings = useCallback(
     (updates: Partial<UserSettings>) => {
+      // Apply theme immediately when changed
+      if (updates.theme) {
+        applyTheme(updates.theme);
+      }
       mutation.mutate(updates);
     },
     [mutation]
@@ -133,6 +137,7 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
 
   // Apply theme - FIXED VERSION
   useEffect(() => {
+    console.log('[Theme Debug] Applying theme:', settings.theme);
     applyTheme(settings.theme);
   }, [settings.theme]);
 

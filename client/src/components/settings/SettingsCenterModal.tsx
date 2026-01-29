@@ -84,11 +84,22 @@ export function SettingsCenterModal({ open, onOpenChange }: SettingsCenterModalP
   }, [open, settings]);
 
   // Handle setting changes
-  const handleChange = useCallback(
-    (updates: Partial<UserSettings>) => {
-      if (autoSave) {
-        // Immediate save with optimistic update
-        updateSettings.mutate(updates, {
+          const handleChange = useCallback(
+            (updates: Partial<UserSettings>) => {
+              // Apply theme immediately if it's being changed
+              if (updates.theme) {
+                const root = document.documentElement;
+                localStorage.setItem('marinamatch-theme', updates.theme);
+                let isDark = updates.theme === 'dark' || 
+                  (updates.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                root.classList.remove('light', 'dark');
+                root.classList.add(isDark ? 'dark' : 'light');
+                root.style.colorScheme = isDark ? 'dark' : 'light';
+              }
+
+              if (autoSave) {
+                // Immediate save with optimistic update
+                updateSettings.mutate(updates, {
           onError: (error) => {
             toast({
               title: 'Failed to save',
