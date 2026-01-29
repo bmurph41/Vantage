@@ -7,6 +7,7 @@ import {
   docIntelLearningRules,
   docIntelTrainingExamples,
   pnlLines,
+  modelingActuals,
   rentRolls,
   rentRollEntries,
   marinaCustomers,
@@ -25,6 +26,7 @@ import {
   type InsertDocIntelLearningRule,
   type PnlLine,
   type InsertPnlLine,
+  type ModelingActuals,
   type RentRoll,
   type RentRollEntry,
   type MarinaCustomer
@@ -1572,7 +1574,7 @@ class DocIntelService {
     return confirmedCount;
   }
 
-  async importConfirmedItems(orgId: string, uploadId: string, projectId: string, userId: string, fiscalYear?: number): Promise<PnlLine[]> {
+  async importConfirmedItems(orgId: string, uploadId: string, projectId: string, userId: string, fiscalYear?: number): Promise<ModelingActuals[]> {
     const items = await db
       .select()
       .from(docIntelExtractedItems)
@@ -1582,37 +1584,94 @@ class DocIntelService {
         eq(docIntelExtractedItems.status, 'confirmed')
       ));
 
-    const importedLines: PnlLine[] = [];
+    // Fetch all categories for lookups
+    const allCategories = await this.getCategories(orgId);
+    const categoryMap = new Map(allCategories.map(c => [c.id, c]));
+
+    const importedActuals: ModelingActuals[] = [];
 
     for (const item of items) {
       if (!item.categoryConfirmed) continue;
 
-      const [pnlLine] = await db
-        .insert(pnlLines)
+      // Look up category details
+      const category = categoryMap.get(item.categoryConfirmed);
+      if (!category) continue;
+
+      // Determine the P&L tier (Revenue, COGS, Expenses) from category tier
+      const tierMapping: Record<string, string> = {
+        'revenue': 'Revenue',
+        'cogs': 'COGS',
+        'cost_of_goods_sold': 'COGS',
+        'expenses': 'Expenses',
+        'expense': 'Expenses',
+        'operating_expenses': 'Expenses'
+      };
+      const plCategory = tierMapping[category.tier?.toLowerCase() || ''] || 'Expenses';
+
+      // Parse periodKey (YYYY-MM) or use fiscalYear
+      let year = fiscalYear || new Date().getFullYear();
+      let month = 1;
+      
+      if (item.periodKey) {
+        const parts = item.periodKey.split('-');
+        if (parts.length >= 2) {
+          year = parseInt(parts[0]) || year;
+          month = parseInt(parts[1]) || 1;
+        }
+      } else if (item.extractedDate) {
+        const dateMatch = item.extractedDate.match(/(\d{4})-(\d{2})/);
+        if (dateMatch) {
+          year = parseInt(dateMatch[1]);
+          month = parseInt(dateMatch[2]);
+        }
+      }
+
+      const amount = parseFloat(item.amountConfirmed || item.amount || '0');
+
+      // Insert into modelingActuals
+      const [actualRecord] = await db
+        .insert(modelingActuals)
         .values({
           orgId,
           modelingProjectId: projectId,
-          categoryId: item.categoryConfirmed,
-          lineDescription: item.rawText,
-          amount: item.amountConfirmed || item.amount || '0',
-          fiscalYear,
-          sourceUploadId: uploadId,
-          sourceItemId: item.id,
-          isManualEntry: false,
+          year,
+          month,
+          category: plCategory,
+          subcategory: category.name || 'Uncategorized',
+          lineItemDescription: item.rawText,
+          amount: String(amount),
+          dataSource: 'doc_intel',
+          sourceRecordId: item.id,
+          sourceRecordType: 'doc_intel_extracted_item',
           createdBy: userId,
+        })
+        .onConflictDoUpdate({
+          target: [
+            modelingActuals.modelingProjectId,
+            modelingActuals.year,
+            modelingActuals.month,
+            modelingActuals.category,
+            modelingActuals.subcategory,
+            modelingActuals.lineItemDescription
+          ],
+          set: {
+            amount: String(amount),
+            updatedAt: new Date(),
+          }
         })
         .returning();
 
+      // Update extracted item with target reference
       await db
         .update(docIntelExtractedItems)
         .set({
-          targetTable: 'pnl_lines',
-          targetRecordId: pnlLine.id,
+          targetTable: 'modeling_actuals',
+          targetRecordId: actualRecord.id,
           updatedAt: new Date(),
         })
         .where(eq(docIntelExtractedItems.id, item.id));
 
-      importedLines.push(pnlLine);
+      importedActuals.push(actualRecord);
     }
 
     await this.updateUpload(orgId, uploadId, {
@@ -1620,7 +1679,7 @@ class DocIntelService {
       reviewCompletedAt: new Date(),
     });
 
-    return importedLines;
+    return importedActuals;
   }
 
   async getProjectPnlLines(orgId: string, projectId: string): Promise<(PnlLine & { category?: PnlCategory })[]> {

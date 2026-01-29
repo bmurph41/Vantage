@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -716,9 +716,8 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
               </TableHeader>
               <TableBody>
                 {['Revenue', 'COGS', 'Expenses'].map((category) => (
-                  <>
+                  <Fragment key={category}>
                     <TableRow 
-                      key={category}
                       className="bg-muted/50 cursor-pointer hover:bg-muted"
                       onClick={() => toggleCategory(category)}
                     >
@@ -774,7 +773,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                         </TableRow>
                       );
                     })}
-                  </>
+                  </Fragment>
                 ))}
 
                 <TableRow className="bg-muted font-bold border-t-2">

@@ -151,12 +151,16 @@ export default function DocumentIntelligence() {
 
   /**
    * Called when all documents have been applied to the model
+   * Navigates to the Historical P&L page to view imported data
    */
   const handleReviewComplete = () => {
     setReviewingDocumentIds([]);
     setIsMultiReviewMode(false);
     queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents"] });
-    toast({ title: "Import complete", description: "All documents have been imported to your model." });
+    queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "actuals"] });
+    toast({ title: "Import complete", description: "All documents have been imported. Redirecting to Historical P&L..." });
+    // Navigate to the Historical P&L tab in the modeling project workspace
+    navigate(`/modeling/projects/${projectId}?tab=historical`);
   };
 
   const getStatusBadge = (status: string) => {
