@@ -64,6 +64,7 @@ import ProfitCentersPage from './workspace/profit-centers';
 import DCFCalculatorPage from './workspace/dcf-calculator';
 import MonteCarloPage from './workspace/monte-carlo';
 import RentRollDataTab from './workspace/rent-roll-data';
+import LeasesCombined from './workspace/leases-combined';
 import ModelingProjectIntegrationPanel from '@/components/modeling/ModelingProjectIntegrationPanel';
 import WorkspaceProFormaCharts from './workspace/pro-forma-charts';
 import ScenarioComparisonCharts from './workspace/scenario-comparison-charts';
@@ -294,10 +295,6 @@ export default function ProjectWorkspace() {
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Leases</span>
             </TabsTrigger>
-            <TabsTrigger value="rentroll" className="gap-2" data-testid="tab-rentroll">
-              <Anchor className="h-4 w-4" />
-              <span className="hidden sm:inline">Rent Roll</span>
-            </TabsTrigger>
             <TabsTrigger value="profit" className="gap-2" data-testid="tab-profit">
               <Store className="h-4 w-4" />
               <span className="hidden sm:inline">Profit Ctrs</span>
@@ -394,11 +391,7 @@ export default function ProjectWorkspace() {
         </TabsContent>
 
         <TabsContent value="leases" className="space-y-6">
-          <LeaseCashFlowPage />
-        </TabsContent>
-
-        <TabsContent value="rentroll" className="space-y-6">
-          <RentRollDataTab projectId={projectId!} projectName={project.marinaName} />
+          <LeasesCombined projectId={projectId!} projectName={project.marinaName} />
         </TabsContent>
 
         <TabsContent value="profit" className="space-y-6">
