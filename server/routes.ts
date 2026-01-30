@@ -8610,6 +8610,7 @@ Current context: Project ${req.params.projectId}`;
                 if (contactData.company) {
                   const companyResult = await CompanyLinkingService.linkCompany(
                     contactData.company,
+        orgId: req.user.orgId,
                     req.user.id
                   );
                   if (companyResult.companyId) {
@@ -9652,6 +9653,7 @@ Current context: Project ${req.params.projectId}`;
             sourceType: 'contact_form',
             sourceId: null,
             name: company,
+        orgId: req.user.orgId,
             status: 'pending',
             suggestedDuplicates: similarCompanies.length > 0 ? similarCompanies.map(c => c.id) : null,
             createdBy: req.user.id,
@@ -9664,6 +9666,7 @@ Current context: Project ${req.params.projectId}`;
       const contact = await storage.createCrmContact({
         ...contactData,
         company,
+        orgId: req.user.orgId,
         ownerId: req.user.id,
       });
       
@@ -12052,6 +12055,7 @@ Current context: Project ${req.params.projectId}`;
         owner: compData.sellerPrincipal || compData.owner,
         // Map buyerCompany -> company (Buyer Company in the form)
         company: compData.buyerCompany || compData.company,
+        orgId: req.user.orgId,
         // Map buyerPrincipal -> buyer (Buyer Principal in the form)
         buyer: compData.buyerPrincipal || compData.buyer,
       };
@@ -12146,6 +12150,7 @@ Current context: Project ${req.params.projectId}`;
         owner: updates.sellerPrincipal || updates.owner,
         // Map buyerCompany -> company (Buyer Company in the form)
         company: updates.buyerCompany || updates.company,
+        orgId: req.user.orgId,
         // Map buyerPrincipal -> buyer (Buyer Principal in the form)
         buyer: updates.buyerPrincipal || updates.buyer,
       };
@@ -13952,6 +13957,7 @@ Current context: Project ${req.params.projectId}`;
       // Format for frontend compatibility
       const similarityScores = duplicates.map(match => ({
         company: match.company,
+        orgId: req.user.orgId,
         score: match.similarityScore,
         matchReasons: match.matchReasons,
         matchDetails: match.matchDetails

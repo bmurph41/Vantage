@@ -199,11 +199,16 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
   });
 
   // Form for creating new contacts
+  const contactFormSchema = z.object({
+    firstName: z.string().min(1, "First name is required"),
+    lastName: z.string().min(1, "Last name is required"),
+    email: z.string().email("Invalid email").min(1, "Email is required"),
+    phone: z.string().optional(),
+    position: z.string().optional(),
+  });
+  
   const contactForm = useForm({
-    resolver: zodResolver(insertContactSchema.extend({
-      phone: insertContactSchema.shape.phone.optional(),
-      position: insertContactSchema.shape.position.optional(),
-    })),
+    resolver: zodResolver(contactFormSchema),
     defaultValues: {
       firstName: "",
       lastName: "",
