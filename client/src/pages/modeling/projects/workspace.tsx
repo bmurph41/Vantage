@@ -274,10 +274,6 @@ export default function ProjectWorkspace() {
               <Layers className="h-4 w-4" />
               <span className="hidden sm:inline">Scenario Analysis</span>
             </TabsTrigger>
-            <TabsTrigger value="debt" className="gap-2" data-testid="tab-debt">
-              <Calculator className="h-4 w-4" />
-              <span className="hidden sm:inline">Debt</span>
-            </TabsTrigger>
             <TabsTrigger value="capital" className="gap-2" data-testid="tab-capital">
               <Building2 className="h-4 w-4" />
               <span className="hidden sm:inline">Capital</span>
@@ -375,10 +371,6 @@ export default function ProjectWorkspace() {
 
         <TabsContent value="summary" className="space-y-6" data-tour="valuator-export">
           <WorkspaceExecutiveSummary projectId={projectId!} onTabChange={setActiveTab} />
-        </TabsContent>
-
-        <TabsContent value="debt" className="space-y-6">
-          <WorkspaceDebtScenarios projectId={projectId!} onTabChange={setActiveTab} />
         </TabsContent>
 
         <TabsContent value="capital" className="space-y-6">

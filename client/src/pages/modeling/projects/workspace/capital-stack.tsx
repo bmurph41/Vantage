@@ -51,6 +51,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { CapitalStack, DebtTranche, EquityLayer, CapitalStackProjection, Fund, FundDealAllocation, FundCapitalStackTemplate } from '@shared/schema';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { MarketRatePicker } from '@/components/modeling/MarketRatePicker';
+import WorkspaceDebtScenarios from './debt-scenarios';
 
 interface CapitalStackWorkspaceProps {
   projectId: string;
@@ -1412,6 +1413,10 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                     <TabsTrigger value="projections" className="gap-1.5 text-xs">
                       <Calculator className="h-3.5 w-3.5" />
                       Projections
+                    </TabsTrigger>
+                    <TabsTrigger value="scenarios" className="gap-1.5 text-xs">
+                      <BarChart3 className="h-3.5 w-3.5" />
+                      Debt Scenarios
                     </TabsTrigger>
                   </TabsList>
 
@@ -2864,6 +2869,11 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                         </div>
                       </CardContent>
                     </Card>
+                  </TabsContent>
+
+                  {/* DEBT SCENARIOS TAB */}
+                  <TabsContent value="scenarios" className="space-y-4">
+                    <WorkspaceDebtScenarios projectId={projectId} onTabChange={onTabChange} />
                   </TabsContent>
                 </Tabs>
 
