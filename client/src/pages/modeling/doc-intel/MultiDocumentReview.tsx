@@ -105,9 +105,6 @@ class CategorySelectErrorBoundary extends React.Component<
   }
 }
 
-// Need to import React for the error boundary class
-import React from "react";
-
 export function MultiDocumentReview({ 
   projectId, 
   uploads, 
