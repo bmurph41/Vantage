@@ -318,6 +318,23 @@ export function MultiDocumentReview({
         title: "Applied to Model", 
         description: `${totalImported} confirmed line items imported from ${uploads.length} documents.` 
       });
+      
+      // Invalidate Historical tab caches so fresh data loads
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'historical-pl'] });
+      // Invalidate all actuals queries for this project (includes year param variations)
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === 'string' && key.startsWith(`/api/modeling/projects/${projectId}/actuals`);
+        }
+      });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === 'string' && key.startsWith(`/api/modeling/projects/${projectId}/data-sources`);
+        }
+      });
+      
       // Navigate to Historical tab (Requirement I)
       if (onTabChange) {
         onTabChange('historical');

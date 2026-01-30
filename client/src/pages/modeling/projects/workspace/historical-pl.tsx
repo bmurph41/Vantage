@@ -33,6 +33,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   FileSpreadsheet,
   TrendingUp,
@@ -339,15 +340,24 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
             </div>
           )}
           
-          <Button
-            variant={showAnalytics ? "default" : "outline"}
-            size="sm"
-            onClick={() => setShowAnalytics(!showAnalytics)}
-            className="h-9"
-          >
-            <BarChart3 className="h-4 w-4 mr-2" />
-            Analytics
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={showAnalytics ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowAnalytics(!showAnalytics)}
+                  className="h-9"
+                >
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  {showAnalytics ? "Hide Analytics" : "Analytics"}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{showAnalytics ? "Click to return to P&L view" : "Show analytics and insights"}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
 
           <Button
             variant="outline"
