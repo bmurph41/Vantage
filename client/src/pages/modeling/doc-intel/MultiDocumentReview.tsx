@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQueries, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { 
@@ -21,7 +21,8 @@ import {
   FileText,
   LayoutGrid,
   List,
-  Table2
+  Table2,
+  StopCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -78,6 +79,35 @@ function sanitizeDisplayText(text: string | null): string {
   return text.replace(/[\u0000-\u001F\u007F-\u009F]/g, '').trim();
 }
 
+// Error Boundary component for category dropdown (Requirement H)
+class CategorySelectErrorBoundary extends React.Component<
+  { children: React.ReactNode; fallback: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode; fallback: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Category Select Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+    return this.props.children;
+  }
+}
+
+// Need to import React for the error boundary class
+import React from "react";
+
 export function MultiDocumentReview({ 
   projectId, 
   uploads, 
@@ -94,10 +124,14 @@ export function MultiDocumentReview({
   const [searchText, setSearchText] = useState("");
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [isApplying, setIsApplying] = useState(false);
-  // View mode: 'matrix' shows P&L grid with periods, 'list' shows simple line item list
   const [viewMode, setViewMode] = useState<'matrix' | 'list'>('matrix');
 
-  // Fetch items for each document using useQueries to avoid hooks ordering issues
+  // NEW: Confirm All state (Requirement G)
+  const [isConfirmingAll, setIsConfirmingAll] = useState(false);
+  const [confirmProgress, setConfirmProgress] = useState({ current: 0, total: 0, skipped: 0 });
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Fetch items for each document using useQueries (Requirement F - ensures all docs are fetched)
   const itemQueries = useQueries({
     queries: uploads.map(upload => ({
       queryKey: ["/api/modeling/projects", projectId, "documents", upload.id, "items"] as const,
@@ -106,7 +140,7 @@ export function MultiDocumentReview({
     })),
   });
 
-  // Build reactive document items from query data (not state)
+  // Build reactive document items from query data
   const queryDataMap = useMemo(() => {
     const map: DocumentItemsState = {};
     uploads.forEach((upload, index) => {
@@ -123,7 +157,7 @@ export function MultiDocumentReview({
     setDocumentItems(queryDataMap);
   }, [queryDataMap]);
 
-  // Calculate totals across all documents - use query data directly for reactivity
+  // Calculate totals across all documents
   const allItems = useMemo(() => {
     return Object.values(queryDataMap).flat();
   }, [queryDataMap]);
@@ -135,6 +169,8 @@ export function MultiDocumentReview({
 
   // Check if all items are processed (no pending items)
   const allItemsProcessed = totalPending === 0 && totalItems > 0;
+
+  // Check if ALL items are fully classified with both category AND department (Requirement I)
   const allItemsClassified = useMemo(() => {
     if (totalItems === 0) return false;
     return allItems.every(item => 
@@ -143,6 +179,7 @@ export function MultiDocumentReview({
     );
   }, [allItems, totalItems]);
 
+  // Apply button enabled only when ALL items classified AND at least one confirmed (Requirement I)
   const canApplyToModel = allItemsClassified && totalConfirmed > 0;
 
   // Current document items
@@ -209,6 +246,34 @@ export function MultiDocumentReview({
     },
   });
 
+  // NEW: Mutation to persist category/department immediately (Requirement H)
+  const updateItemMutation = useMutation({
+    mutationFn: async ({ uploadId, itemId, categoryId, department }: { 
+      uploadId: string; 
+      itemId: string; 
+      categoryId?: string; 
+      department?: string 
+    }) => {
+      return apiRequest("PATCH", `/api/modeling/projects/${projectId}/documents/${uploadId}/items/${itemId}`, { 
+        categoryId, 
+        department 
+      });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/modeling/projects", projectId, "documents", variables.uploadId, "items"] 
+      });
+    },
+    onError: (error) => {
+      console.error('Failed to update item:', error);
+      toast({ 
+        title: "Update failed", 
+        description: "Could not save category/department. Please try again.",
+        variant: "destructive" 
+      });
+    },
+  });
+
   const importMutation = useMutation({
     mutationFn: async (uploadId: string) => {
       return apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${uploadId}/import`, { 
@@ -223,9 +288,9 @@ export function MultiDocumentReview({
     },
   });
 
-  // Apply all documents to model
+  // Apply all documents to model - only writes CONFIRMED items (Requirement I)
   const handleApplyToModel = async () => {
-    if (!allItemsProcessed) return;
+    if (!canApplyToModel) return;
 
     setIsApplying(true);
     let totalImported = 0;
@@ -233,8 +298,9 @@ export function MultiDocumentReview({
 
     for (const upload of uploads) {
       const items = documentItems[upload.id] || [];
+      // Only import CONFIRMED items (Requirement I)
       const confirmedCount = items.filter(i => i.status === "confirmed").length;
-      
+
       if (confirmedCount > 0) {
         try {
           const result = await importMutation.mutateAsync(upload.id);
@@ -250,15 +316,110 @@ export function MultiDocumentReview({
     if (errors === 0) {
       toast({ 
         title: "Applied to Model", 
-        description: `${totalImported} line items imported from ${uploads.length} documents.` 
+        description: `${totalImported} confirmed line items imported from ${uploads.length} documents.` 
       });
-      onComplete();
+      // Navigate to Historical tab (Requirement I)
+      if (onTabChange) {
+        onTabChange('historical');
+      } else {
+        navigate(`/modeling/projects/${projectId}?tab=historical`);
+      }
     } else {
       toast({ 
         title: "Partial Success", 
         description: `${totalImported} items imported. ${errors} document(s) had errors.`,
         variant: "destructive"
       });
+    }
+  };
+
+  // NEW: Confirm All with cancellation, validation, and partial confirm (Requirement G)
+  const handleConfirmAll = async () => {
+    // Get all pending items across all documents
+    const pendingItemsByDoc: { uploadId: string; item: ExtractedItemWithCategory }[] = [];
+
+    for (const upload of uploads) {
+      const items = queryDataMap[upload.id] || [];
+      items
+        .filter(i => i.status === "pending")
+        .forEach(item => pendingItemsByDoc.push({ uploadId: upload.id, item }));
+    }
+
+    if (pendingItemsByDoc.length === 0) {
+      toast({ title: "No pending items", description: "All items have already been reviewed." });
+      return;
+    }
+
+    // Validate: items need both category AND department (Requirement G)
+    const validItems = pendingItemsByDoc.filter(({ item }) => 
+      (item.categoryConfirmed || item.categorySuggested) && 
+      (item.departmentConfirmed || item.departmentSuggested)
+    );
+    const invalidItems = pendingItemsByDoc.filter(({ item }) => 
+      !(item.categoryConfirmed || item.categorySuggested) || 
+      !(item.departmentConfirmed || item.departmentSuggested)
+    );
+
+    if (validItems.length === 0) {
+      toast({ 
+        title: "Cannot confirm", 
+        description: `${invalidItems.length} items are missing Category or Department. Please classify all items first.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Setup abort controller for cancellation
+    abortControllerRef.current = new AbortController();
+    setIsConfirmingAll(true);
+    setConfirmProgress({ current: 0, total: validItems.length, skipped: invalidItems.length });
+
+    let confirmed = 0;
+    let errors = 0;
+
+    for (const { uploadId, item } of validItems) {
+      // Check if cancelled
+      if (abortControllerRef.current.signal.aborted) {
+        break;
+      }
+
+      try {
+        await confirmItemMutation.mutateAsync({
+          uploadId,
+          itemId: item.id,
+          categoryId: item.categoryConfirmed || item.categorySuggested!,
+          department: item.departmentConfirmed || item.departmentSuggested || undefined,
+        });
+        confirmed++;
+        setConfirmProgress(p => ({ ...p, current: confirmed }));
+      } catch (e) {
+        errors++;
+        // Continue on error
+      }
+    }
+
+    setIsConfirmingAll(false);
+    abortControllerRef.current = null;
+
+    // Show summary (Requirement G)
+    const wasAborted = confirmed < validItems.length && errors === 0;
+    toast({
+      title: wasAborted ? "Confirm All Cancelled" : "Confirm All Complete",
+      description: `Confirmed ${confirmed} items.${invalidItems.length > 0 ? ` ${invalidItems.length} items skipped (missing Category/Department).` : ''}${errors > 0 ? ` ${errors} errors.` : ''}`,
+    });
+
+    // Refresh all queries
+    for (const upload of uploads) {
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/modeling/projects", projectId, "documents", upload.id, "items"] 
+      });
+    }
+  };
+
+  // Cancel Confirm All (Requirement G)
+  const handleCancelConfirmAll = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
   };
 
@@ -292,7 +453,7 @@ export function MultiDocumentReview({
     return categories.find(c => c.id === categoryId)?.name || "Unknown";
   };
 
-  // Get per-document stats - uses queryDataMap for real-time reactivity
+  // Get per-document stats
   const getDocumentStats = (uploadId: string) => {
     const items = queryDataMap[uploadId] || [];
     return {
@@ -302,6 +463,45 @@ export function MultiDocumentReview({
       rejected: items.filter(i => i.status === "rejected").length,
       excluded: items.filter(i => i.status === "excluded").length,
     };
+  };
+
+  // Safe category select handler with error handling (Requirement H)
+  const handleCategoryChange = (uploadId: string, itemId: string, categoryId: string, currentDepartment?: string) => {
+    try {
+      // Persist immediately (Requirement H)
+      updateItemMutation.mutate({
+        uploadId,
+        itemId,
+        categoryId,
+        department: currentDepartment,
+      });
+    } catch (error) {
+      console.error('Category change error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update category. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Safe department select handler (Requirement H)
+  const handleDepartmentChange = (uploadId: string, itemId: string, department: string, currentCategoryId?: string) => {
+    try {
+      updateItemMutation.mutate({
+        uploadId,
+        itemId,
+        categoryId: currentCategoryId,
+        department,
+      });
+    } catch (error) {
+      console.error('Department change error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update department. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -323,11 +523,11 @@ export function MultiDocumentReview({
             <ChevronLeft className="h-4 w-4" />
             Previous: Uploads
           </Button>
-          
+
           <div className="text-sm text-muted-foreground">
             Review Documents
           </div>
-          
+
           <Button
             onClick={() => {
               if (onTabChange) {
@@ -361,6 +561,37 @@ export function MultiDocumentReview({
         </div>
       )}
 
+      {/* NEW: Confirm All Progress Overlay (Requirement G) */}
+      {isConfirmingAll && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-4 p-8 rounded-lg bg-card border shadow-lg max-w-md w-full">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <div className="text-center w-full">
+              <p className="text-lg font-semibold">Confirming All Items</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {confirmProgress.current} of {confirmProgress.total} items confirmed
+                {confirmProgress.skipped > 0 && (
+                  <span className="text-amber-600"> • {confirmProgress.skipped} skipped</span>
+                )}
+              </p>
+              <Progress 
+                value={(confirmProgress.current / Math.max(confirmProgress.total, 1)) * 100} 
+                className="h-2 mt-3"
+              />
+            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleCancelConfirmAll}
+              className="mt-2"
+            >
+              <StopCircle className="h-4 w-4 mr-2" />
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -387,6 +618,16 @@ export function MultiDocumentReview({
               </p>
             </div>
             <div className="flex items-center gap-3">
+              {/* NEW: Confirm All button (Requirement G) */}
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleConfirmAll}
+                disabled={isConfirmingAll || totalPending === 0}
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Confirm All
+              </Button>
               <Button 
                 variant="outline" 
                 size="sm"
@@ -398,8 +639,9 @@ export function MultiDocumentReview({
               </Button>
               <Button
                 onClick={handleApplyToModel}
-                disabled={!canApplyToModel || isApplying ||
-                className={allItemsProcessed ? "" : "opacity-50"}
+                disabled={!canApplyToModel || isApplying}
+                className={canApplyToModel ? "" : "opacity-50"}
+                title={!allItemsClassified ? "Classify all items (Category + Department) before applying" : undefined}
               >
                 {isApplying ? (
                   <>
@@ -419,13 +661,19 @@ export function MultiDocumentReview({
             value={totalItems > 0 ? ((totalConfirmed + totalRejected) / totalItems) * 100 : 0} 
             className="h-3"
           />
-          {!allItemsProcessed && totalPending > 0 && (
+          {!allItemsClassified && totalItems > 0 && (
             <p className="text-sm text-amber-600 dark:text-amber-400 mt-2 flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" />
-              {totalPending} items still pending review. Confirm or reject all items to enable "Apply to Model".
+              All items must have Category AND Department selected to enable "Apply to Model".
             </p>
           )}
-          {allItemsProcessed && totalConfirmed > 0 && (
+          {allItemsClassified && !allItemsProcessed && totalPending > 0 && (
+            <p className="text-sm text-amber-600 dark:text-amber-400 mt-2 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              {totalPending} items still pending. Confirm or reject all items before applying.
+            </p>
+          )}
+          {canApplyToModel && (
             <p className="text-sm text-green-600 dark:text-green-400 mt-2 flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4" />
               All items reviewed! Ready to apply {totalConfirmed} confirmed items to the model.
@@ -434,7 +682,7 @@ export function MultiDocumentReview({
         </CardContent>
       </Card>
 
-      {/* Document Tabs */}
+      {/* Document Tabs (Requirement F - shows ALL uploaded documents) */}
       <Tabs value={activeDocumentId} onValueChange={setActiveDocumentId}>
         <TabsList className="w-full justify-start overflow-x-auto">
           {uploads.map((upload) => {
@@ -521,7 +769,7 @@ export function MultiDocumentReview({
                   Auto-Confirm
                 </Button>
               </div>
-              
+
               {/* View Mode Toggle */}
               <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as 'matrix' | 'list')}>
                 <ToggleGroupItem value="matrix" aria-label="Matrix view" title="P&L Matrix View (shows periods)">
@@ -545,7 +793,7 @@ export function MultiDocumentReview({
                 }}
               />
             ) : (
-              /* Fallback List View */
+              /* Fallback List View with error boundary (Requirement H) */
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Line Items</CardTitle>
@@ -593,31 +841,71 @@ export function MultiDocumentReview({
                                   )}
                                 </div>
                               </div>
-                              
+
                               {item.status === "pending" && (
                                 <div className="flex items-center gap-2 flex-shrink-0">
+                                  {/* Category Select with Error Boundary (Requirement H) */}
+                                  <CategorySelectErrorBoundary
+                                    fallback={
+                                      <Button variant="outline" size="sm" disabled>
+                                        Error loading categories
+                                      </Button>
+                                    }
+                                  >
+                                    {categories && categories.length > 0 ? (
+                                      <Select
+                                        value={item.categoryConfirmed || item.categorySuggested || ""}
+                                        onValueChange={(categoryId) => {
+                                          handleCategoryChange(
+                                            upload.id, 
+                                            item.id, 
+                                            categoryId, 
+                                            item.departmentConfirmed || item.departmentSuggested || undefined
+                                          );
+                                        }}
+                                      >
+                                        <SelectTrigger className="w-[180px]">
+                                          <SelectValue placeholder="Select category" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {categories.map((cat) => (
+                                            <SelectItem key={cat.id} value={cat.id}>
+                                              {cat.name}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    ) : (
+                                      <Button variant="outline" size="sm" disabled>
+                                        Loading categories...
+                                      </Button>
+                                    )}
+                                  </CategorySelectErrorBoundary>
+
+                                  {/* Department Select (Requirement H - persists immediately) */}
                                   <Select
-                                    value={item.categoryConfirmed || item.categorySuggested || ""}
-                                    onValueChange={(categoryId) => {
-                                      confirmItemMutation.mutate({
-                                        uploadId: upload.id,
-                                        itemId: item.id,
-                                        categoryId,
-                                        department: item.departmentConfirmed || item.departmentSuggested || undefined,
-                                      });
+                                    value={item.departmentConfirmed || item.departmentSuggested || ""}
+                                    onValueChange={(department) => {
+                                      handleDepartmentChange(
+                                        upload.id,
+                                        item.id,
+                                        department,
+                                        item.categoryConfirmed || item.categorySuggested || undefined
+                                      );
                                     }}
                                   >
-                                    <SelectTrigger className="w-[180px]">
-                                      <SelectValue placeholder="Select category" />
+                                    <SelectTrigger className="w-[150px]">
+                                      <SelectValue placeholder="Department" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {categories.map((cat) => (
-                                        <SelectItem key={cat.id} value={cat.id}>
-                                          {cat.name}
+                                      {DEPARTMENTS.map((dept) => (
+                                        <SelectItem key={dept.value} value={dept.value}>
+                                          {dept.label}
                                         </SelectItem>
                                       ))}
                                     </SelectContent>
                                   </Select>
+
                                   <Button
                                     size="icon"
                                     variant="outline"
