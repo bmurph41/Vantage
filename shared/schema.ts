@@ -368,6 +368,7 @@ export const calendarSettings = pgTable("calendar_settings", {
   syncActivities: boolean("sync_activities").default(true),
   syncTasks: boolean("sync_tasks").default(true),
   reminderMinutes: integer("reminder_minutes").default(15),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -2260,6 +2261,7 @@ export const crmCompanies = pgTable("crm_companies", {
   // Created By
   createdBy: varchar("created_by").references(() => users.id),
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -2313,6 +2315,7 @@ export const crmContacts = pgTable("crm_contacts", {
   integrationSource: text("integration_source"),
   lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -2328,6 +2331,7 @@ export const crmContactCompanies = pgTable("crm_contact_companies", {
   companyId: varchar("company_id").references(() => crmCompanies.id).notNull(),
   role: text("role"), // Optional role of contact in this company (e.g., "CEO", "Manager", "Employee")
   isPrimary: boolean("is_primary").default(false), // Indicates if this is the primary company for the contact
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -2339,6 +2343,7 @@ export const crmCompanyProperties = pgTable("crm_company_properties", {
   propertyId: varchar("property_id").references(() => crmProperties.id).notNull(),
   relationship: text("relationship"), // Optional relationship type (e.g., "Owner", "Tenant", "Buyer", "Seller")
   notes: text("notes"), // Optional notes about the relationship
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -2350,6 +2355,7 @@ export const crmContactProperties = pgTable("crm_contact_properties", {
   propertyId: varchar("property_id").references(() => crmProperties.id).notNull(),
   relationship: text("relationship"), // Optional relationship type (e.g., "Buyer", "Seller", "Agent", "Interested Party")
   notes: text("notes"), // Optional notes about the relationship
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -2362,6 +2368,7 @@ export const crmContactsLabels = pgTable("crm_contacts_labels", {
   color: text("color").notNull().default('#6366f1'), // Hex color code for UI display
   scope: text("scope").notNull().default('both'), // 'person', 'organization', 'both'
   createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -2426,6 +2433,7 @@ export const crmProperties = pgTable("crm_properties", {
   lastSalePrice: decimal("last_sale_price", { precision: 14, scale: 2 }),
   linkedSalesCompId: varchar("linked_sales_comp_id"),
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -2439,6 +2447,7 @@ export const crmStorageTypes = pgTable("crm_storage_types", {
   name: text("name").notNull(),
   isDefault: boolean("is_default").default(false).notNull(), // Predefined types
   createdBy: varchar("created_by").references(() => users.id),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("crm_storage_types_org_idx").on(table.orgId),
@@ -2457,6 +2466,7 @@ export const crmPropertyStorageEntries = pgTable("crm_property_storage_entries",
   rateType: text("rate_type").default('monthly'), // monthly, annual, daily, per_foot
   notes: text("notes"),
   sortOrder: integer("sort_order").default(0),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -2910,6 +2920,7 @@ export const rraMarinaLocations = pgTable("rra_marina_locations", {
   budgetYear: integer("budget_year"),
   seasonalStorageTypes: text("seasonal_storage_types").array(),
   storageMix: jsonb("storage_mix"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -2929,6 +2940,7 @@ export const rraStorageLocations = pgTable("rra_storage_locations", {
   postedRate: numeric("posted_rate", { precision: 14, scale: 2 }),
   postedRateType: text("posted_rate_type"),
   isActive: boolean("is_active").default(true).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -2953,6 +2965,7 @@ export const rraTenants = pgTable("rra_tenants", {
   zip: text("zip"),
   crmContactId: varchar("crm_contact_id").references(() => crmContacts.id),
   crmCompanyId: varchar("crm_company_id").references(() => crmCompanies.id),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -2998,6 +3011,7 @@ export const rraLeases = pgTable("rra_leases", {
   isActive: boolean("is_active").default(true).notNull(),
   isIncomplete: boolean("is_incomplete").default(false).notNull(),
   usesDefaultDates: boolean("uses_default_dates").default(false).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -3022,6 +3036,7 @@ export const rraRenewalReminders = pgTable("rra_renewal_reminders", {
   notificationMethod: text("notification_method").default("email"),
   recipientEmail: text("recipient_email"),
   notes: text("notes"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   createdBy: varchar("created_by").references(() => users.id),
@@ -3051,6 +3066,7 @@ export const rraLeaseLineItems = pgTable("rra_lease_line_items", {
   startDate: date("start_date"),
   endDate: date("end_date"),
   notes: text("notes"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -3075,6 +3091,7 @@ export const rraContractCharges = pgTable("rra_contract_charges", {
   isActive: boolean("is_active").default(true).notNull(),
   notes: text("notes"),
   metadata: jsonb("metadata"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -3094,6 +3111,7 @@ export const rraLeaseTerms = pgTable("rra_lease_terms", {
   dayCountConvention: rraDayCountConventionEnum("day_count_convention").notNull().default("actual_30"),
   currency: text("currency").notNull().default("USD"),
   status: rraTermStatusEnum("status").notNull().default("active"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -3110,6 +3128,7 @@ export const rraLeaseRentSteps = pgTable("rra_lease_rent_steps", {
   baseRentAmount: numeric("base_rent_amount", { precision: 14, scale: 2 }).notNull(),
   baseRentPeriod: rraRentPeriodEnum("base_rent_period").notNull().default("month"),
   notes: text("notes"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -3129,6 +3148,7 @@ export const rraLeaseEscalations = pgTable("rra_lease_escalations", {
   capRate: numeric("cap_rate", { precision: 5, scale: 2 }),
   floorRate: numeric("floor_rate", { precision: 5, scale: 2 }),
   notes: text("notes"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -3146,6 +3166,7 @@ export const rraLeaseConcessions = pgTable("rra_lease_concessions", {
   endDate: date("end_date"),
   amortizationMonths: integer("amortization_months"),
   notes: text("notes"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -3167,6 +3188,7 @@ export const rraLeaseCashFlows = pgTable("rra_lease_cash_flows", {
   isProjected: boolean("is_projected").default(false).notNull(),
   sourceChargeId: varchar("source_charge_id"),
   notes: text("notes"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -3185,6 +3207,7 @@ export const rraMoveEvents = pgTable("rra_move_events", {
   eventDate: date("event_date").notNull(),
   reason: text("reason"),
   notes: text("notes"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   leaseIdx: index("rra_move_events_lease_idx").on(table.leaseId),
@@ -3200,6 +3223,7 @@ export const rraPeriods = pgTable("rra_periods", {
   label: text("label"),
   year: integer("year").notNull(),
   month: integer("month").notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   locationIdx: index("rra_periods_location_idx").on(table.locationId),
@@ -3218,6 +3242,7 @@ export const rraProjectDetailsConfig = pgTable("rra_project_details_config", {
   winterEndDate: date("winter_end_date"),
   defaultContractTerm: text("default_contract_term"),
   config: jsonb("config"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -3231,6 +3256,7 @@ export const rraPnlRackRevenue = pgTable("rra_pnl_rack_revenue", {
   locationId: varchar("location_id").notNull(),
   periodId: varchar("period_id").notNull(),
   amount: numeric("amount", { precision: 14, scale: 2 }),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   locationIdx: index("rra_pnl_rack_revenue_location_idx").on(table.locationId),
@@ -3254,6 +3280,7 @@ export const rraSnapshotVersions = pgTable("rra_snapshot_versions", {
   totalLeases: integer("total_leases"),
   occupancyRate: numeric("occupancy_rate", { precision: 5, scale: 2 }),
   metadata: jsonb("metadata"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -3267,6 +3294,7 @@ export const rraLeaseSnapshots = pgTable("rra_lease_snapshots", {
   snapshotVersionId: varchar("snapshot_version_id").notNull().references(() => rraSnapshotVersions.id, { onDelete: "cascade" }),
   leaseId: varchar("lease_id").notNull().references(() => rraLeases.id, { onDelete: "cascade" }),
   leaseData: jsonb("lease_data").notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   snapshotIdx: index("rra_lease_snapshots_snapshot_idx").on(table.snapshotVersionId),
@@ -3286,6 +3314,7 @@ export const rraModelingProjectLinks = pgTable("rra_modeling_project_links", {
   isPrimary: boolean("is_primary").default(false).notNull(),
   syncEnabled: boolean("sync_enabled").default(true).notNull(),
   lastSyncAt: timestamp("last_sync_at"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -3301,6 +3330,7 @@ export const rraDealLinks = pgTable("rra_deal_links", {
   rraLocationId: varchar("rra_location_id").notNull().references(() => rraMarinaLocations.id, { onDelete: "cascade" }),
   dealId: varchar("deal_id").notNull().references(() => crmDeals.id, { onDelete: "cascade" }),
   isPrimary: boolean("is_primary").default(false).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   rraLocationIdx: index("rra_deal_links_rra_idx").on(table.rraLocationId),
@@ -3316,6 +3346,7 @@ export const rraBudgetCashFlowMap = pgTable("rra_budget_cashflow_map", {
   budgetLineItemId: varchar("budget_line_item_id").notNull().references(() => marinaBudgetLineItems.id, { onDelete: "cascade" }),
   syncType: text("sync_type").default("auto").notNull(),
   lastSyncAt: timestamp("last_sync_at"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   cashFlowIdx: index("rra_budget_cashflow_map_cf_idx").on(table.rraCashFlowId),
@@ -3330,6 +3361,7 @@ export const rraLeaseDocumentBindings = pgTable("rra_lease_document_bindings", {
   documentId: varchar("document_id").notNull().references(() => vdrDocuments.id, { onDelete: "cascade" }),
   documentType: text("document_type").default("lease").notNull(),
   isPrimaryLease: boolean("is_primary_lease").default(false).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   leaseIdx: index("rra_lease_doc_bindings_lease_idx").on(table.leaseId),
@@ -3573,6 +3605,7 @@ export const pendingProperties = pgTable("pending_properties", {
   createdBy: varchar("created_by").notNull().references(() => users.id),
   reviewedBy: varchar("reviewed_by").references(() => users.id),
   reviewedAt: timestamp("reviewed_at"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -3607,6 +3640,7 @@ export const pendingContacts = pgTable("pending_contacts", {
   createdBy: varchar("created_by").notNull().references(() => users.id),
   reviewedBy: varchar("reviewed_by").references(() => users.id),
   reviewedAt: timestamp("reviewed_at"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -3642,6 +3676,7 @@ export const pendingCompanies = pgTable("pending_companies", {
   createdBy: varchar("created_by").notNull().references(() => users.id),
   reviewedBy: varchar("reviewed_by").references(() => users.id),
   reviewedAt: timestamp("reviewed_at"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -3680,6 +3715,7 @@ export const propertyOwnershipHistory = pgTable("property_ownership_history", {
   
   // Audit fields
   createdBy: varchar("created_by").notNull().references(() => users.id),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -3721,6 +3757,7 @@ export const crmMatchResults = pgTable("crm_match_results", {
   resolvedBy: varchar("resolved_by").references(() => users.id),
   resolvedAt: timestamp("resolved_at"),
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgPendingIdx: index("crm_match_org_pending_idx").on(table.orgId, table.pendingType, table.pendingId),
@@ -3791,6 +3828,7 @@ export const crmLeads = pgTable("crm_leads", {
   convertedContactId: varchar("converted_contact_id").references(() => crmContacts.id),
   convertedDate: timestamp("converted_date"),
   assignedToId: varchar("assigned_to_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -3810,6 +3848,7 @@ export const crmCampaigns = pgTable("crm_campaigns", {
   targetAudience: jsonb("target_audience").default({}),
   metrics: jsonb("metrics").default({}), // opens, clicks, conversions, etc.
   createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -3825,6 +3864,7 @@ export const crmEmailSequences = pgTable("crm_email_sequences", {
   delayDays: integer("delay_days").default(0),
   emailTemplateId: varchar("email_template_id").references(() => crmEmailTemplates.id),
   createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -3837,6 +3877,7 @@ export const crmEmailTemplates = pgTable("crm_email_templates", {
   type: text("type").notNull().default('nurture'), // nurture, follow_up, welcome, promotional
   isActive: boolean("is_active").default(true),
   createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -3851,6 +3892,7 @@ export const crmTerritories = pgTable("crm_territories", {
   managerId: varchar("manager_id").references(() => users.id).notNull(),
   members: jsonb("members").default([]), // user IDs
   isActive: boolean("is_active").default(true),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -3875,6 +3917,7 @@ export const crmAccounts = pgTable("crm_accounts", {
   accountScore: integer("account_score").default(0),
   territoryId: varchar("territory_id").references(() => crmTerritories.id),
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -3995,6 +4038,7 @@ export const crmDeals = pgTable("crm_deals", {
   // Closed Deal Tracking
   isClosed: boolean("is_closed").default(false),
   closedAt: timestamp("closed_at"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -4018,6 +4062,7 @@ export const crmDealStageHistory = pgTable("crm_deal_stage_history", {
   transitionReason: text("transition_reason"), // Optional note for why stage changed
   transitionedBy: varchar("transitioned_by").references(() => users.id),
   isCurrentStage: boolean("is_current_stage").default(true).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   dealIdx: index("crm_deal_stage_history_deal_idx").on(table.dealId),
@@ -4066,6 +4111,7 @@ export const crmTimelineEvents = pgTable("crm_timeline_events", {
   metadata: jsonb("metadata").default({}).notNull(), // Flexible payload for event-specific data
   occurredAt: timestamp("occurred_at").notNull().defaultNow(),
   createdBy: varchar("created_by").references(() => users.id),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("crm_timeline_events_org_idx").on(table.orgId),
@@ -4088,6 +4134,7 @@ export const crmDealEngagementScores = pgTable("crm_deal_engagement_scores", {
   winProbability: integer("win_probability").default(10), // 0-100 calculated probability
   factors: jsonb("factors").default({}).notNull(), // Detailed breakdown of score factors
   lastCalculatedAt: timestamp("last_calculated_at").defaultNow().notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -4120,6 +4167,7 @@ export const crmContactEngagementScores = pgTable("crm_contact_engagement_scores
   lastInteraction: timestamp("last_interaction"),
   factors: jsonb("factors").default({}).notNull(), // Detailed breakdown of score factors
   lastCalculatedAt: timestamp("last_calculated_at").defaultNow().notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -4140,6 +4188,7 @@ export const crmProducts = pgTable("crm_products", {
   category: text("category"), // Service, Product, License, etc.
   isActive: boolean("is_active").default(true),
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -4159,6 +4208,7 @@ export const crmDealProducts = pgTable("crm_deal_products", {
   startDate: timestamp("start_date"),
   endDate: timestamp("end_date"),
   notes: text("notes"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -4170,9 +4220,11 @@ export const crmNotes = pgTable("crm_notes", {
   content: text("content").notNull(),
   isPinned: boolean("is_pinned").default(false),
   entityType: text("entity_type").notNull(), // deal, contact, company, property, lead, etc.
+  orgId: varchar("org_id").references(() => organizations.id),
   entityId: varchar("entity_id").notNull(),
   createdById: varchar("created_by_id").references(() => users.id).notNull(),
   ownerId: varchar("owner_id").references(() => users.id).notNull(), // for multi-tenant access control
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -4190,6 +4242,7 @@ export const crmFiles = pgTable("crm_files", {
   entityId: varchar("entity_id").notNull(),
   uploadedById: varchar("uploaded_by_id").references(() => users.id).notNull(),
   ownerId: varchar("owner_id").references(() => users.id).notNull(), // for multi-tenant access control
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -4217,6 +4270,7 @@ export const prospectingActivities = pgTable("prospecting_activities", {
   weekId: varchar("week_id"), // Links to prospecting week for weekly tracking
   createdById: varchar("created_by_id").references(() => users.id).notNull(),
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -4249,6 +4303,7 @@ export const prospectingWeeks = pgTable("prospecting_weeks", {
   dealsCreated: integer("deals_created").default(0),
   notes: text("notes"),
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -4276,6 +4331,7 @@ export const outreachCampaigns = pgTable("outreach_campaigns", {
   startDate: date("start_date"),
   endDate: date("end_date"),
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -4295,6 +4351,7 @@ export const outreachTemplates = pgTable("outreach_templates", {
   lastUsedAt: timestamp("last_used_at"),
   isActive: boolean("is_active").default(true),
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -4318,6 +4375,7 @@ export const marketTargets = pgTable("market_targets", {
   researchNotes: jsonb("research_notes").default({}), // Structured research data
   assignedToId: varchar("assigned_to_id").references(() => users.id),
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -4332,6 +4390,7 @@ export const crmDealContacts = pgTable("crm_deal_contacts", {
   role: text("role"), // seller, buyer, broker, attorney, lender, etc.
   isPrimary: boolean("is_primary").default(false),
   notes: text("notes"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   uniqueDealContact: unique().on(table.dealId, table.contactId),
@@ -4345,6 +4404,7 @@ export const crmDealCompanies = pgTable("crm_deal_companies", {
   role: text("role"), // seller, buyer, broker_firm, lender, title_company, etc.
   isPrimary: boolean("is_primary").default(false),
   notes: text("notes"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   uniqueDealCompany: unique().on(table.dealId, table.companyId),
@@ -4752,6 +4812,7 @@ export const crmContactRoles = pgTable("crm_contact_roles", {
   contactId: varchar("contact_id").references(() => crmContacts.id).notNull(),
   role: text("role").notNull().default('buyer'), // buyer, seller, listing_agent, buyer_agent, co_buyer, decision_maker
   isPrimary: boolean("is_primary").default(false),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 // Tasks table - action items and to-dos
@@ -4770,6 +4831,7 @@ export const crmTasks = pgTable("crm_tasks", {
   companyId: varchar("company_id").references(() => crmCompanies.id),
   propertyId: varchar("property_id").references(() => crmProperties.id),
   assigneeId: varchar("assignee_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -4796,6 +4858,7 @@ export const crmActivities = pgTable("crm_activities", {
   score: integer("score").default(0), // activity scoring for lead qualification
   calendarEventId: text("calendar_event_id"), // Google Calendar event ID
   syncedToCalendar: boolean("synced_to_calendar").default(false),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -4811,6 +4874,7 @@ export const crmActivityTemplates = pgTable("crm_activity_templates", {
   defaultDirection: text("default_direction"), // inbound, outbound
   isGlobal: boolean("is_global").default(false), // true for system templates, false for user templates
   userId: varchar("user_id").references(() => users.id), // null for global templates
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -4844,6 +4908,7 @@ export const crmProspectingEntries = pgTable("crm_prospecting_entries", {
   // Reflection notes
   notes: text("notes"),
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -4879,6 +4944,7 @@ export const crmProspectingActivities = pgTable("crm_prospecting_activities", {
   linkedinProfile: text("linkedin_profile"), // for linkedin activities
   subject: text("subject"), // for emails/messages
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -4895,6 +4961,7 @@ export const crmProspectingUserSettings = pgTable("crm_prospecting_user_settings
   // Future settings can be added here
   // e.g., timezone preference, notification preferences, etc.
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -4919,6 +4986,7 @@ export const crmProspectingGoalTemplates = pgTable("crm_prospecting_goal_templat
   // Status
   isActive: boolean("is_active").default(true),
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -4960,6 +5028,7 @@ export const crmScoringRules = pgTable("crm_scoring_rules", {
   points: integer("points").notNull(),
   isActive: boolean("is_active").default(true),
   createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -5014,6 +5083,7 @@ export const crmLeadScoringEvents = pgTable("crm_lead_scoring_events", {
   priceRange: text("price_range"), // under_50k, 50k_100k, 100k_250k, 250k_500k, over_500k
   location: text("location"), // marina or boat location
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -5045,6 +5115,7 @@ export const crmLeadScoringHistory = pgTable("crm_lead_scoring_history", {
   // Metadata
   notes: text("notes"),
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -5104,6 +5175,7 @@ export const crmLeadEngagementMetrics = pgTable("crm_lead_engagement_metrics", {
   calculatedAt: timestamp("calculated_at").defaultNow().notNull(),
   calculationPeriod: integer("calculation_period").default(30), // days
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -5155,6 +5227,7 @@ export const crmMarinaLeadData = pgTable("crm_marina_lead_data", {
   seasonalityMultiplier: decimal("seasonality_multiplier", { precision: 3, scale: 2 }).default('1.0'),
   budgetQualificationScore: integer("budget_qualification_score").default(0),
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -5170,6 +5243,7 @@ export const crmPipelines = pgTable("crm_pipelines", {
   color: text("color").default('#3B82F6'),
   type: text("type").notNull().default('sales'), // sales, marketing, service, marina_sales, boat_sales
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -5194,6 +5268,7 @@ export const crmPipelineStages = pgTable("crm_pipeline_stages", {
   requiredFields: jsonb("required_fields").default([]), // fields required to enter stage
   taskTemplates: jsonb("task_templates").default([]), // auto-create tasks on entry
   automations: jsonb("automations").default([]), // workflow automations for this stage
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -5211,6 +5286,7 @@ export const crmPlaybooks = pgTable("crm_playbooks", {
   isDefault: boolean("is_default").default(false),
   sortOrder: integer("sort_order").default(0),
   createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -5237,6 +5313,7 @@ export const crmPlaybookItems = pgTable("crm_playbook_items", {
   documentType: text("document_type"), // for document items: psa, loi, insurance, environmental, etc.
   approvalRequiredBy: text("approval_required_by").array(), // role names that can approve
   metadata: jsonb("metadata").default({}),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -5258,6 +5335,7 @@ export const crmDealPlaybookProgress = pgTable("crm_deal_playbook_progress", {
   documentUrl: text("document_url"), // for document items
   approvedById: varchar("approved_by_id").references(() => users.id),
   approvedAt: timestamp("approved_at"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -5286,6 +5364,7 @@ export const crmPhaseGateApprovals = pgTable("crm_phase_gate_approvals", {
   gateConditions: jsonb("gate_conditions").default([]), // snapshot of conditions at request time
   conditionsMetAt: timestamp("conditions_met_at"),
   metadata: jsonb("metadata").default({}),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -5325,6 +5404,7 @@ export const crmRedFlags = pgTable("crm_red_flags", {
   dueDate: timestamp("due_date"),
   autoEscalateAfterDays: integer("auto_escalate_after_days"),
   metadata: jsonb("metadata").default({}),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -5347,6 +5427,7 @@ export const crmRedFlagEscalations = pgTable("crm_red_flag_escalations", {
   responseStatus: text("response_status").default("pending"), // pending, viewed, responded
   respondedAt: timestamp("responded_at"),
   responseNotes: text("response_notes"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   redFlagIdx: index("crm_red_flag_escalations_red_flag_idx").on(table.redFlagId),
@@ -5367,6 +5448,7 @@ export const crmRedFlagRules = pgTable("crm_red_flag_rules", {
   escalationChain: jsonb("escalation_chain").default([]),
   autoEscalateAfterDays: integer("auto_escalate_after_days").default(3),
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -5420,6 +5502,7 @@ export const crmWorkflows = pgTable("crm_workflows", {
   isActive: boolean("is_active").default(true),
   triggerCount: integer("trigger_count").default(0),
   lastTriggeredAt: timestamp("last_triggered_at"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -5453,6 +5536,7 @@ export const crmWebhooks = pgTable("crm_webhooks", {
   lastCalledAt: timestamp("last_called_at"),
   lastStatus: integer("last_status"), // HTTP status code
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -5476,6 +5560,7 @@ export const crmWebhookLogs = pgTable("crm_webhook_logs", {
   
   success: boolean("success").notNull(),
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -5501,6 +5586,7 @@ export const crmAiConversations = pgTable("crm_ai_conversations", {
   isActive: boolean("is_active").default(true),
   lastMessageAt: timestamp("last_message_at"),
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -5526,6 +5612,7 @@ export const crmAiMessages = pgTable("crm_ai_messages", {
   model: text("model"), // Model used for this message
   finishReason: text("finish_reason"), // 'stop', 'length', 'function_call', 'tool_calls'
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -5546,6 +5633,7 @@ export const aiAssistantFeedback = pgTable("ai_assistant_feedback", {
   messageContent: text("message_content"), // The AI response content (for analysis)
   userQuery: text("user_query"), // What the user asked
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("ai_assistant_feedback_org_idx").on(table.orgId),
@@ -5574,6 +5662,7 @@ export const crmDedupeRules = pgTable("crm_dedupe_rules", {
   isActive: boolean("is_active").default(true),
 
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -5664,6 +5753,7 @@ export const crmForms = pgTable("crm_forms", {
   targetBudgetRange: jsonb("target_budget_range").default({}), // { min: number, max: number }
   
   createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -5708,6 +5798,7 @@ export const crmFormFields = pgTable("crm_form_fields", {
   boatSpecField: text("boat_spec_field"), // length, type, year, make, model, price_range
   marinaSpecField: text("marina_spec_field"), // slip_size, amenities, location_preference
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -5757,6 +5848,7 @@ export const crmFormSubmissions = pgTable("crm_form_submissions", {
   status: text("status").default('pending'), // pending, processed, error
   processingErrors: jsonb("processing_errors").default([]),
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -5812,6 +5904,7 @@ export const crmLandingPages = pgTable("crm_landing_pages", {
   theme: jsonb("theme").default({}), // Color scheme and styling preferences
   
   createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -5851,6 +5944,7 @@ export const crmFormAnalytics = pgTable("crm_form_analytics", {
   qualifiedLeads: integer("qualified_leads").default(0),
   averageLeadScore: decimal("average_lead_score", { precision: 5, scale: 2 }).default('0'),
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -5874,6 +5968,7 @@ export const crmFormVersions = pgTable("crm_form_versions", {
   submissions: integer("submissions").default(0),
   
   createdById: varchar("created_by_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -5911,6 +6006,7 @@ export const crmImportJobs = pgTable("crm_import_jobs", {
   rolledBackBy: varchar("rolled_back_by").references(() => users.id),
   
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   completedAt: timestamp("completed_at"),
 });
@@ -5930,6 +6026,7 @@ export const crmImportedRecords = pgTable("crm_imported_records", {
   matchedBy: text("matched_by"),
   validationIssues: jsonb("validation_issues").default(sql`'[]'::jsonb`),
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -5946,6 +6043,7 @@ export const crmEmailSequenceSteps = pgTable("crm_email_sequence_steps", {
   content: text("content").notNull(),
   sendTime: text("send_time"),
   skipWeekends: boolean("skip_weekends").default(true),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -5963,6 +6061,7 @@ export const crmEmailSequenceEnrollments = pgTable("crm_email_sequence_enrollmen
   cancelledAt: timestamp("cancelled_at"),
   exitReason: text("exit_reason"),
   enrolledById: varchar("enrolled_by_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -5980,6 +6079,7 @@ export const crmEmailSequenceStepExecutions = pgTable("crm_email_sequence_step_e
   bouncedAt: timestamp("bounced_at"),
   errorMessage: text("error_message"),
   emailCommunicationId: varchar("email_communication_id").references(() => crmEmailCommunications.id),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -6139,6 +6239,7 @@ export const archivedContacts = pgTable("archived_contacts", {
   originalCreatedAt: timestamp("original_created_at"),
   originalUpdatedAt: timestamp("original_updated_at"),
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("archived_contacts_org_idx").on(table.orgId),
@@ -6183,6 +6284,7 @@ export const archivedCompanies = pgTable("archived_companies", {
   originalUpdatedAt: timestamp("original_updated_at"),
   originalOwnerId: varchar("original_owner_id"),
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("archived_companies_org_idx").on(table.orgId),
@@ -6215,6 +6317,7 @@ export const archivePropertyAssociations = pgTable("archive_property_association
   ownershipStartDate: timestamp("ownership_start_date"),
   ownershipEndDate: timestamp("ownership_end_date"), // Sale date
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("archive_property_assoc_org_idx").on(table.orgId),
@@ -19707,6 +19810,7 @@ export const modelingScenarioTemplates = pgTable("modeling_scenario_templates", 
   isSystem: boolean("is_system").notNull().default(false), // System-provided templates
   usageCount: integer("usage_count").notNull().default(0), // Track popularity
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -19740,6 +19844,7 @@ export const modelingCases = pgTable("modeling_cases", {
   leaseUpSchedule: jsonb("lease_up_schedule").default(sql`'[]'`), // Array of { month: number, occupancy: number }
   
   createdBy: varchar("created_by").notNull().references(() => users.id),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -19765,6 +19870,7 @@ export const modelingCaseAssumptions = pgTable("modeling_case_assumptions", {
   month: integer("month"), // 1-12 if monthly
   year: integer("year"), // Year number if yearly
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -19794,6 +19900,7 @@ export const modelingAddbacks = pgTable("modeling_addbacks", {
   notes: text("notes"),
   
   createdBy: varchar("created_by").notNull().references(() => users.id),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -19812,6 +19919,7 @@ export const modelingAddbackValues = pgTable("modeling_addback_values", {
   month: integer("month"), // 1-12 for monthly, null for yearly
   amount: decimal("amount", { precision: 18, scale: 2 }).notNull().default("0"),
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -19860,6 +19968,7 @@ export const ddFees = pgTable("dd_fees", {
   phase: text("phase"), // e.g., "Initial DD", "Extended DD", "Closing"
   
   createdBy: varchar("created_by").notNull().references(() => users.id),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -19933,6 +20042,7 @@ export const crmLists = pgTable("crm_lists", {
   
   isArchived: boolean("is_archived").notNull().default(false),
   
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -21079,6 +21189,7 @@ export const opssosConversations = pgTable("opssos_conversations", {
   status: opssosConversationStatusEnum("status").default("open").notNull(),
   assignedUserId: varchar("assigned_user_id").references(() => users.id),
   lastMessageAt: timestamp("last_message_at"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("opssos_conversations_org_idx").on(table.orgId),
@@ -21098,6 +21209,7 @@ export const opssosMessages = pgTable("opssos_messages", {
   scheduledFor: timestamp("scheduled_for"),
   sentAt: timestamp("sent_at"),
   status: opssosMessageStatusEnum("status").default("sent").notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   conversationIdx: index("opssos_messages_conversation_idx").on(table.conversationId),
@@ -21111,6 +21223,7 @@ export const opssosMessageTemplates = pgTable("opssos_message_templates", {
   groupName: text("group_name").notNull(),
   title: text("title").notNull(),
   body: text("body").notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("opssos_message_templates_org_idx").on(table.orgId),
@@ -21125,6 +21238,7 @@ export const opssosAutomationRules = pgTable("opssos_automation_rules", {
   triggerType: text("trigger_type").notNull(),
   conditions: jsonb("conditions").default([]),
   actions: jsonb("actions").default([]),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("opssos_automation_rules_org_idx").on(table.orgId),
@@ -21141,6 +21255,7 @@ export const opssosAutomationRuns = pgTable("opssos_automation_runs", {
   finishedAt: timestamp("finished_at"),
   log: jsonb("log").default([]),
   errorText: text("error_text"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   ruleIdx: index("opssos_automation_runs_rule_idx").on(table.ruleId),
@@ -21156,6 +21271,7 @@ export const opssosScheduledJobs = pgTable("opssos_scheduled_jobs", {
   runAt: timestamp("run_at").notNull(),
   status: opssosScheduledJobStatusEnum("status").default("queued").notNull(),
   attempts: integer("attempts").default(0).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("opssos_scheduled_jobs_org_idx").on(table.orgId),
@@ -21174,6 +21290,7 @@ export const opssosTasks = pgTable("opssos_tasks", {
   status: opssosTaskStatusEnum("status").default("todo").notNull(),
   dueAt: timestamp("due_at"),
   costCents: integer("cost_cents"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("opssos_tasks_org_idx").on(table.orgId),
@@ -21188,6 +21305,7 @@ export const opssosChecklistTemplates = pgTable("opssos_checklist_templates", {
   orgId: varchar("org_id").notNull().references(() => organizations.id),
   name: text("name").notNull(),
   items: jsonb("items").default([]),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("opssos_checklist_templates_org_idx").on(table.orgId),
@@ -21199,6 +21317,7 @@ export const opssosTaskChecklists = pgTable("opssos_task_checklists", {
   orgId: varchar("org_id").notNull().references(() => organizations.id),
   taskId: varchar("task_id").notNull().references(() => opssosTasks.id, { onDelete: "cascade" }),
   items: jsonb("items").default([]),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   taskIdx: index("opssos_task_checklists_task_idx").on(table.taskId),
@@ -21213,6 +21332,7 @@ export const opssosStatementTemplates = pgTable("opssos_statement_templates", {
   filters: jsonb("filters").default({}),
   columns: jsonb("columns").default([]),
   totals: jsonb("totals").default({}),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("opssos_statement_templates_org_idx").on(table.orgId),
@@ -21228,6 +21348,7 @@ export const opssosStatements = pgTable("opssos_statements", {
   status: opssosStatementStatusEnum("status").default("draft").notNull(),
   generatedAt: timestamp("generated_at").defaultNow().notNull(),
   publishedAt: timestamp("published_at"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("opssos_statements_org_idx").on(table.orgId),
@@ -21241,6 +21362,7 @@ export const opssosStatementExports = pgTable("opssos_statement_exports", {
   statementId: varchar("statement_id").notNull().references(() => opssosStatements.id, { onDelete: "cascade" }),
   format: opssosExportFormatEnum("format").notNull(),
   fileUrl: text("file_url").notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   statementIdx: index("opssos_statement_exports_statement_idx").on(table.statementId),
@@ -21254,6 +21376,7 @@ export const opssosIntegrations = pgTable("opssos_integrations", {
   status: text("status").default("inactive").notNull(),
   credentialsEncrypted: text("credentials_encrypted"),
   settings: jsonb("settings").default({}),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("opssos_integrations_org_idx").on(table.orgId),
@@ -21268,6 +21391,7 @@ export const opssosWebhooks = pgTable("opssos_webhooks", {
   secret: text("secret"),
   enabled: boolean("enabled").default(true).notNull(),
   eventTypes: jsonb("event_types").default([]),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("opssos_webhooks_org_idx").on(table.orgId),
@@ -21283,6 +21407,7 @@ export const opssosWebhookDeliveries = pgTable("opssos_webhook_deliveries", {
   payload: jsonb("payload").default({}),
   status: opssosWebhookDeliveryStatusEnum("status").default("pending").notNull(),
   responseCode: integer("response_code"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   webhookIdx: index("opssos_webhook_deliveries_webhook_idx").on(table.webhookId),
@@ -21364,6 +21489,7 @@ export const industryStandards = pgTable("industry_standards", {
   // Audit fields
   createdBy: varchar("created_by").references(() => users.id),
   updatedBy: varchar("updated_by").references(() => users.id),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -21431,6 +21557,7 @@ export const integrations = pgTable("integrations", {
     estimatedMigrationDays: number;
   } | null>().default(null),
   isActive: boolean("is_active").default(true).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -21454,6 +21581,7 @@ export const userIntegrations = pgTable("user_integrations", {
   oauthState: text("oauth_state"),
   lastSyncAt: timestamp("last_sync_at"),
   errorMessage: text("error_message"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -21532,6 +21660,7 @@ export const integrationSyncMetrics = pgTable("integration_sync_metrics", {
   nextScheduledSync: timestamp("next_scheduled_sync"),
   healthScore: integer("health_score").default(100).notNull(),
   averageSyncDurationMs: integer("average_sync_duration_ms").default(0).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -22001,6 +22130,7 @@ export const opsPortfolios = pgTable("ops_portfolios", {
   description: text("description"),
   currency: varchar("currency", { length: 3 }).default("USD"),
   timezone: varchar("timezone", { length: 50 }).default("America/New_York"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22033,6 +22163,7 @@ export const opsMarinas = pgTable("ops_marinas", {
   lastSyncAt: timestamp("last_sync_at"),
   isActive: boolean("is_active").default(true),
   notes: text("notes"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22058,6 +22189,7 @@ export const opsFuelTransactions = pgTable("ops_fuel_transactions", {
   source: opsDataSourceEnum("source").default("MANUAL"),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => users.id),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22082,6 +22214,7 @@ export const opsShipStoreSales = pgTable("ops_ship_store_sales", {
   source: opsDataSourceEnum("source").default("MANUAL"),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => users.id),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22107,6 +22240,7 @@ export const opsServiceWorkOrders = pgTable("ops_service_work_orders", {
   source: opsDataSourceEnum("source").default("MANUAL"),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => users.id),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22129,6 +22263,7 @@ export const opsBoatRentals = pgTable("ops_boat_rentals", {
   source: opsDataSourceEnum("source").default("MANUAL"),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => users.id),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22154,6 +22289,7 @@ export const opsBoatClubMemberships = pgTable("ops_boat_club_memberships", {
   source: opsDataSourceEnum("source").default("MANUAL"),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => users.id),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22175,6 +22311,7 @@ export const opsBoatSales = pgTable("ops_boat_sales", {
   source: opsDataSourceEnum("source").default("MANUAL"),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => users.id),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22201,6 +22338,7 @@ export const opsCommercialLeases = pgTable("ops_commercial_leases", {
   source: opsDataSourceEnum("source").default("MANUAL"),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => users.id),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22223,6 +22361,7 @@ export const opsBookkeepingGl = pgTable("ops_bookkeeping_gl", {
   source: opsDataSourceEnum("source").default("MANUAL"),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => users.id),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22252,6 +22391,7 @@ export const asmpFuel = pgTable("asmp_fuel", {
   importedAt: timestamp("imported_at"),
   importSource: varchar("import_source", { length: 20 }), // ACTUALS, TEMPLATE, MANUAL
   notes: text("notes"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22279,6 +22419,7 @@ export const asmpShipStore = pgTable("asmp_ship_store", {
   importedAt: timestamp("imported_at"),
   importSource: varchar("import_source", { length: 20 }),
   notes: text("notes"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22306,6 +22447,7 @@ export const asmpService = pgTable("asmp_service", {
   importedAt: timestamp("imported_at"),
   importSource: varchar("import_source", { length: 20 }),
   notes: text("notes"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22335,6 +22477,7 @@ export const asmpCommercialTenants = pgTable("asmp_commercial_tenants", {
   importedAt: timestamp("imported_at"),
   importSource: varchar("import_source", { length: 20 }),
   notes: text("notes"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22359,6 +22502,7 @@ export const asmpBoatRentals = pgTable("asmp_boat_rentals", {
   importedAt: timestamp("imported_at"),
   importSource: varchar("import_source", { length: 20 }),
   notes: text("notes"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22383,6 +22527,7 @@ export const asmpBoatClub = pgTable("asmp_boat_club", {
   importedAt: timestamp("imported_at"),
   importSource: varchar("import_source", { length: 20 }),
   notes: text("notes"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22409,6 +22554,7 @@ export const asmpBoatSales = pgTable("asmp_boat_sales", {
   importedAt: timestamp("imported_at"),
   importSource: varchar("import_source", { length: 20 }),
   notes: text("notes"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22430,6 +22576,7 @@ export const asmpBookkeeping = pgTable("asmp_bookkeeping", {
   importedAt: timestamp("imported_at"),
   importSource: varchar("import_source", { length: 20 }),
   notes: text("notes"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22455,6 +22602,7 @@ export const opsImportEvents = pgTable("ops_import_events", {
   status: varchar("status", { length: 20 }).default("completed"), // pending, completed, failed
   errorMessage: text("error_message"),
   createdBy: varchar("created_by").notNull().references(() => users.id),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   projectIdx: index("ops_import_events_project_idx").on(table.projectId),
@@ -22473,6 +22621,7 @@ export const valuatorProjectContext = pgTable("valuator_project_context", {
   defaultDataSource: varchar("default_data_source", { length: 20 }).default("ASSUMPTIONS"), // ACTUALS or ASSUMPTIONS
   lastImportAt: timestamp("last_import_at"),
   assumptionsCoverageMonths: integer("assumptions_coverage_months").default(0),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22665,6 +22814,7 @@ export const docktalkKeywordBank = pgTable('docktalk_keyword_bank', {
   isActive: boolean("is_active").notNull().default(true),
   isRequired: boolean("is_required").notNull().default(false), // If true, article must match at least one required keyword
   createdBy: varchar("created_by").references(() => users.id),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22687,6 +22837,7 @@ export const docktalkScoringConfig = pgTable('docktalk_scoring_config', {
   operationsWeight: integer("operations_weight").notNull().default(4),
   macroWeight: integer("macro_weight").notNull().default(3),
   regulatoryWeight: integer("regulatory_weight").notNull().default(3),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22725,6 +22876,7 @@ export const aiUsageTracking = pgTable('ai_usage_tracking', {
   outputTokens: integer("output_tokens").notNull().default(0),
   estimatedCostCents: integer("estimated_cost_cents").notNull(),
   metadata: jsonb("metadata").default({}),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgDateIdx: index('ai_usage_tracking_org_date_idx').on(table.orgId, table.createdAt),
@@ -22741,6 +22893,7 @@ export const aiSpendingLimits = pgTable('ai_spending_limits', {
   currentMonthSpendCents: integer("current_month_spend_cents").notNull().default(0),
   lastResetAt: timestamp("last_reset_at").defaultNow().notNull(),
   hardLimitReachedAt: timestamp("hard_limit_reached_at"),
+  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

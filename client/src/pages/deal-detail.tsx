@@ -36,6 +36,7 @@ import type { Deal, Contact, Company } from "@shared/schema";
 import ConvertToProjectModal from "@/components/modals/convert-to-project-modal";
 import CompSetSelector from "@/components/comp-set-selector";
 import { formatCurrency } from "@/lib/utils";
+import { FocusHistoryTimeline } from "@/components/crm/FocusHistoryTimeline";
 
 interface WorkspaceData {
   deal: Deal;
@@ -757,6 +758,13 @@ export default function DealDetail() {
               )}
             </CardContent>
           </Card>
+
+          {/* Activities & Timeline */}
+          <FocusHistoryTimeline 
+            entityType="deal"
+            entityId={dealId!}
+            entityName={deal.name}
+          />
         </div>
       </div>
     </div>

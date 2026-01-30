@@ -136,6 +136,7 @@ const OpsIntegrationsPage = lazy(() => import("@/pages/ops/IntegrationsPage"));
 const FeatureGate = lazy(() => import("@/components/FeatureGate").then(m => ({ default: m.FeatureGate })));
 const CrmTasks = lazy(() => import("@/pages/crm-tasks"));
 const MarketingAutomation = lazy(() => import("@/pages/marketing-automation"));
+const CrmActivitiesPage = lazy(() => import("@/pages/crm-activities"));
 const CalendarSettings = lazy(() => import("@/pages/calendar-settings"));
 const CustomerAnalytics = lazy(() => import("@/pages/operations/CustomerAnalytics"));
 const OwnedMarinas = lazy(() => import("@/pages/operations/OwnedMarinas"));
@@ -1474,6 +1475,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <ImportHistory />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/crm/activities">
+        {() => (
+          <UnifiedLayout>
+            <CrmActivitiesPage />
           </UnifiedLayout>
         )}
       </Route>
