@@ -1,4 +1,5 @@
 import { db } from '../db';
+import OpenAI from 'openai';
 import { 
   pnlCategories, 
   docIntelUploads, 
@@ -31,6 +32,11 @@ import {
   type RentRollEntry,
   type MarinaCustomer
 } from '@shared/schema';
+
+const openai = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || undefined,
+});
 import { eq, and, sql, desc, asc } from 'drizzle-orm';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
@@ -1087,7 +1093,9 @@ class DocIntelService {
     const categorizationRules = learningRules.filter(r => r.ruleType !== 'learned_exclusion');
 
     const categorizedItems: DocIntelExtractedItem[] = [];
+    const uncategorizedItems: DocIntelExtractedItem[] = [];
 
+    // First pass: pattern matching and exclusion rules
     for (const item of items) {
       const amountNum = parseFloat(item.amount || '0');
       const itemHasValue = !isNaN(amountNum) && amountNum !== 0;
@@ -1139,7 +1147,48 @@ class DocIntelService {
         
         categorizedItems.push(updated);
       } else {
-        categorizedItems.push(item);
+        uncategorizedItems.push(item);
+      }
+    }
+
+    // Second pass: AI categorization for items without pattern matches
+    if (uncategorizedItems.length > 0) {
+      console.log(`[Doc Intel] Running AI categorization for ${uncategorizedItems.length} uncategorized items`);
+      
+      const allCategories = await this.getCategories(orgId);
+      const aiResults = await this.aiCategorizeItems(
+        uncategorizedItems.map(i => ({ id: i.id, rawText: i.rawText, amount: i.amount })),
+        allCategories
+      );
+
+      for (const item of uncategorizedItems) {
+        const aiResult = aiResults.get(item.id);
+        
+        if (aiResult) {
+          const updateData: Record<string, any> = {
+            categorySuggested: aiResult.categoryId,
+            categoryTierSuggested: aiResult.tier,
+            confidenceScore: aiResult.confidence.toString(),
+            updatedAt: new Date(),
+          };
+
+          // Set department based on tier
+          if (aiResult.tier === 'expense') {
+            updateData.expenseDeptSuggested = aiResult.department;
+          } else {
+            updateData.revenueCogsDeptSuggested = aiResult.department;
+          }
+
+          const [updated] = await db
+            .update(docIntelExtractedItems)
+            .set(updateData)
+            .where(eq(docIntelExtractedItems.id, item.id))
+            .returning();
+          
+          categorizedItems.push(updated);
+        } else {
+          categorizedItems.push(item);
+        }
       }
     }
 
@@ -1174,6 +1223,76 @@ class DocIntelService {
     }
     
     return null;
+  }
+
+  private async aiCategorizeItems(
+    items: { id: string; rawText: string; amount: string | null }[],
+    categories: PnlCategory[]
+  ): Promise<Map<string, { categoryId: string; tier: string; department: string; confidence: number }>> {
+    const results = new Map<string, { categoryId: string; tier: string; department: string; confidence: number }>();
+    
+    if (items.length === 0 || !process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
+      return results;
+    }
+
+    const categoryList = categories.map(c => ({
+      id: c.id,
+      name: c.name,
+      tier: c.tier,
+      code: c.code,
+    }));
+
+    const prompt = `You are a marina/boat storage financial analyst. Categorize these P&L line items.
+
+Categories available (tier indicates Revenue, COGS, or Expense):
+${JSON.stringify(categoryList.slice(0, 50), null, 2)}
+
+Line items to categorize:
+${JSON.stringify(items.map(i => ({ id: i.id, text: i.rawText, amount: i.amount })), null, 2)}
+
+For each item, determine:
+1. categoryId: The best matching category ID from the list
+2. tier: "revenue", "cogs", or "expense"
+3. department: For revenue/cogs use marina_ops/fuel/ship_store/other. For expenses use: admin/payroll/insurance/utilities/maintenance/marketing/other
+4. confidence: 0.0 to 1.0
+
+Respond with JSON only:
+{
+  "categorizations": [
+    { "itemId": "...", "categoryId": "...", "tier": "...", "department": "...", "confidence": 0.85 }
+  ]
+}`;
+
+    try {
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: 'You are a marina financial analyst. Respond with valid JSON only.' },
+          { role: 'user', content: prompt }
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.1,
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (content) {
+        const parsed = JSON.parse(content);
+        for (const cat of parsed.categorizations || []) {
+          if (cat.itemId && cat.categoryId) {
+            results.set(cat.itemId, {
+              categoryId: cat.categoryId,
+              tier: cat.tier || 'expense',
+              department: cat.department || 'other',
+              confidence: cat.confidence || 0.7,
+            });
+          }
+        }
+      }
+    } catch (error: any) {
+      console.error('[Doc Intel] AI categorization failed:', error?.message || error);
+    }
+
+    return results;
   }
 
   private findBestMatch(
@@ -1706,6 +1825,14 @@ class DocIntelService {
         eq(docIntelExtractedItems.uploadId, uploadId),
         eq(docIntelExtractedItems.orgId, orgId)
       ));
+    
+    // Re-run categorization to apply AI suggestions to items missing categories
+    try {
+      await this.categorizeItems(orgId, uploadId);
+      console.log(`[Doc Intel] Re-categorization completed for upload ${uploadId}`);
+    } catch (error: any) {
+      console.error('[Doc Intel] Re-categorization failed:', error?.message || error);
+    }
     
     return { success: true, message: 'Document reset for reprocessing' };
   }
