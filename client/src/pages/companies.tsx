@@ -599,7 +599,16 @@ export default function Companies() {
         <CrmDetailField label="Website" value={selectedCompany.website ? (
           <a href={selectedCompany.website.startsWith('http') ? selectedCompany.website : `https://${selectedCompany.website}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{selectedCompany.website}</a>
         ) : null} />
-        <CrmDetailField label="Address" value={selectedCompany.address} />
+        <CrmDetailField label="Address" value={
+          (() => {
+            const parts = [
+              selectedCompany.address,
+              [selectedCompany.city, selectedCompany.state].filter(Boolean).join(', '),
+              selectedCompany.zipCode
+            ].filter(Boolean);
+            return parts.length > 0 ? parts.join(', ') : null;
+          })()
+        } />
         <CrmDetailField label="Industry" value={selectedCompany.industry ? (
           <Badge className={industryColors[selectedCompany.industry] || 'bg-gray-100 text-gray-800'}>{formatRole(selectedCompany.industry)}</Badge>
         ) : null} />
