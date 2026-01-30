@@ -170,6 +170,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
   const [showFundInheritance, setShowFundInheritance] = useState(false);
   const [selectedFundId, setSelectedFundId] = useState<string | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [mainTab, setMainTab] = useState("capital-stack");
   
   const [stackPartners, setStackPartners] = useState<{
     id: string;
@@ -688,8 +689,6 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
   const annualDebtService = debtTranches.reduce((sum, t) => sum + parseNumber(t.annualDebtService), 0);
 
   const layerType = equityForm.watch('layerType');
-
-  const [mainTab, setMainTab] = useState("capital-stack");
 
   return (
     <div className="space-y-6">
