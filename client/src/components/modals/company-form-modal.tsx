@@ -410,23 +410,44 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
       Object.keys(cleanData).forEach(key => {
         if (cleanData[key] === "") delete cleanData[key];
       });
+      // Set companyId if creating from within a company context
+      if (company?.id) {
+        cleanData.companyId = company.id;
+      }
       const response = await apiRequest('POST', '/api/contacts', cleanData);
       return await response.json();
     },
     onSuccess: async (newContact) => {
       if (company?.id) {
         try {
+          // Check if this is the first contact for the company
+          const isFirstContact = !linkedContacts || linkedContacts.length === 0;
+          
           // Link the new contact to the company
           await linkContactMutation.mutateAsync({
             contactId: newContact.id,
             companyId: company.id,
             role: newContact.position || null,
-            isPrimary: false,
+            isPrimary: isFirstContact, // Set as primary if first contact
           });
+          
+          // If first contact, also update company's primaryContactId
+          if (isFirstContact) {
+            try {
+              await apiRequest('PATCH', `/api/companies/${company.id}`, {
+                primaryContactId: newContact.id
+              });
+              queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
+              queryClient.invalidateQueries({ queryKey: ['/api/companies', company.id] });
+            } catch (err) {
+              console.error('Failed to set primary contact on company:', err);
+            }
+          }
+          
           queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
           queryClient.invalidateQueries({ queryKey: ['/api/companies', company.id, 'contacts'] });
           refetchLinkedContacts();
-          toast({ title: "Contact created and linked successfully" });
+          toast({ title: isFirstContact ? "Contact created and set as primary" : "Contact created and linked successfully" });
           setIsCreatingContact(false);
           contactForm.reset();
         } catch (error: any) {

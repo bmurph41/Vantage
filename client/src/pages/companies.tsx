@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Building, Plus, Edit, Trash2, Upload, Search, Globe, Users, MapPin, TrendingUp, Download, Phone, Settings, Calendar, Briefcase, Home, Loader2, User, ChevronRight, Anchor, DollarSign, Merge, AlertTriangle, Star, ExternalLink } from "lucide-react";
+import { Building, Plus, Edit, Trash2, Upload, Search, Globe, Users, MapPin, TrendingUp, Download, Phone, Settings, Calendar, Briefcase, Home, Loader2, User, ChevronRight, Anchor, DollarSign, Merge, AlertTriangle, Star, ExternalLink, Mail } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import CompanyFormModal from "@/components/modals/company-form-modal";
@@ -173,6 +173,11 @@ export default function Companies() {
       return 0;
     });
     return sorted.slice(0, 3);
+  }, [companyContacts]);
+
+  const primaryContact = useMemo(() => {
+    const primary = companyContacts.find(c => c.isPrimary);
+    return primary?.contact || null;
   }, [companyContacts]);
   
   useEffect(() => {
@@ -612,6 +617,46 @@ export default function Companies() {
             ) : null
           )
         } />
+      </CrmDetailSection>
+
+      <CrmDetailSection title="Primary Contact">
+        {primaryContact ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-gray-400" />
+              <span className="font-medium text-gray-900">
+                {primaryContact.firstName} {primaryContact.lastName}
+              </span>
+            </div>
+            
+            {primaryContact.position && (
+              <div className="flex items-center gap-2">
+                <Briefcase className="h-4 w-4 text-gray-400" />
+                <span className="text-sm text-gray-600">{primaryContact.position}</span>
+              </div>
+            )}
+            
+            {primaryContact.email && (
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-gray-400" />
+                <a href={`mailto:${primaryContact.email}`} className="text-sm text-blue-600 hover:underline">
+                  {primaryContact.email}
+                </a>
+              </div>
+            )}
+            
+            {primaryContact.phone && (
+              <div className="flex items-center gap-2">
+                <Phone className="h-4 w-4 text-gray-400" />
+                <a href={`tel:${primaryContact.phone}`} className="text-sm text-blue-600 hover:underline">
+                  {primaryContact.phone}
+                </a>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-sm text-gray-500">No primary contact assigned</div>
+        )}
       </CrmDetailSection>
 
       <CrmDetailSection title="Portfolio">
