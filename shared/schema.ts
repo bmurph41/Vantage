@@ -4247,7 +4247,35 @@ export const crmFiles = pgTable("crm_files", {
 });
 
 // ============================================================================
+// CRM ASSOCIATIONS - Entity linking graph for relationships
+// ============================================================================
+
+export const associationTypeEnum = pgEnum("association_type", [
+  "company_contact",
+  "company_property",
+  "company_deal",
+  "contact_deal",
+  "contact_property",
+  "property_deal",
+  "deal_project",
+]);
+
+export const crmAssociations = pgTable("crm_associations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  associationType: associationTypeEnum("association_type").notNull(),
+  sourceEntityType: text("source_entity_type").notNull(),
+  sourceEntityId: varchar("source_entity_id").notNull(),
+  targetEntityType: text("target_entity_type").notNull(),
+  targetEntityId: varchar("target_entity_id").notNull(),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ============================================================================
 // PROSPECTING & OUTREACH MODULE - Deal sourcing and activity tracking
+// ============================================================================ - Deal sourcing and activity tracking
 // ============================================================================
 
 // Prospecting Activities - Tracks all outreach touches (calls, emails, meetings, etc.)
@@ -20784,6 +20812,13 @@ export const insertCrmNoteSchema = createInsertSchema(crmNotes).omit({
   updatedAt: true,
 });
 export type InsertCrmNote = z.infer<typeof insertCrmNoteSchema>;
+
+export type CrmAssociation = typeof crmAssociations.$inferSelect;
+export const insertCrmAssociationSchema = createInsertSchema(crmAssociations).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertCrmAssociation = z.infer<typeof insertCrmAssociationSchema>;
 
 // ================================================================================
 // RENT ROLL ANALYSIS V2 TYPES (Aliases for module compatibility)

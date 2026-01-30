@@ -51,6 +51,8 @@ import crmActivitiesRoutes from "./routes/crm-activities-routes";
 import crmTimelineRoutes from "./routes/crm-timeline-routes";
 import crmPreviewRoutes from "./routes/crm-preview-routes";
 import crmNotesRoutes from "./routes/crm-notes-routes";
+import crmSummaryRoutes from "./routes/crm-summary-routes";
+import crmAssociationsRoutes from "./routes/crm-associations-routes";
 import { getSlaRouter } from "./routes/sla-routes";
 import opssosRouter from "./routes/opssos";
 import adminRouter from "./routes/admin";
@@ -391,6 +393,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/crm/timeline", crmTimelineRoutes);
   app.use("/api/crm", crmPreviewRoutes);
   app.use("/api/crm/notes", crmNotesRoutes);
+  app.use("/api/crm/summary", crmSummaryRoutes);
+  app.use("/api/crm/associations", crmAssociationsRoutes);
   app.use("/api", authenticateUser, dealAnalyticsRoutes);
   app.use("/api/prospecting", authenticateUser, requireProspecting());
   app.use("/api/sla", getSlaRouter());
