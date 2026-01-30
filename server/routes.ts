@@ -7257,6 +7257,52 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  app.post("/api/crm/pending-properties", async (req: any, res) => {
+    try {
+      const { marinaName, city, state, address, companyId, ...rest } = req.body;
+      
+      if (!marinaName) {
+        return res.status(400).json({ error: "Marina name is required" });
+      }
+      
+      // Find potential duplicate properties
+      const existingProperties = await storage.getCrmPropertiesForOrg(req.user.orgId);
+      const suggestedDuplicates: string[] = [];
+      
+      for (const prop of existingProperties) {
+        const nameMatch = prop.title?.toLowerCase().includes(marinaName.toLowerCase()) ||
+                          marinaName.toLowerCase().includes(prop.title?.toLowerCase() || '');
+        const cityMatch = !city || !prop.city || prop.city.toLowerCase() === city.toLowerCase();
+        const stateMatch = !state || !prop.state || prop.state.toLowerCase() === state.toLowerCase();
+        
+        if (nameMatch && cityMatch && stateMatch) {
+          suggestedDuplicates.push(prop.id);
+        }
+      }
+      
+      const pendingProperty = await storage.createPendingProperty({
+        orgId: req.user.orgId,
+        marinaName,
+        city: city || null,
+        state: state || null,
+        address: address || null,
+        sourceType: 'manual',
+        status: 'pending',
+        suggestedDuplicates,
+        compMetadata: {
+          ...rest,
+          companyId: companyId || null,
+          createdBy: req.user.id,
+        },
+      });
+      
+      res.json(pendingProperty);
+    } catch (error: any) {
+      console.error("Failed to create pending property:", error);
+      res.status(500).json({ error: "Failed to create pending property" });
+    }
+  });
+
   // ============================================================================
   // CRM LISTS - User-defined lists for contacts, companies, properties
   // ============================================================================

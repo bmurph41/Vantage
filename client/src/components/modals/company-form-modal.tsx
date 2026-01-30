@@ -106,6 +106,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
   const [selectedContactId, setSelectedContactId] = useState("");
   const [contactRole, setContactRole] = useState("");
   const [isLinkingProperty, setIsLinkingProperty] = useState(false);
+  const [isCreatingProperty, setIsCreatingProperty] = useState(false);
   const [selectedPropertyId, setSelectedPropertyId] = useState("");
   
   // Address fields state
@@ -215,6 +216,24 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
       email: "",
       phone: "",
       position: "",
+    },
+  });
+
+  // Form for creating new properties
+  const propertyFormSchema = z.object({
+    marinaName: z.string().min(1, "Marina name is required"),
+    address: z.string().optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
+  });
+  
+  const propertyForm = useForm({
+    resolver: zodResolver(propertyFormSchema),
+    defaultValues: {
+      marinaName: "",
+      address: "",
+      city: "",
+      state: "",
     },
   });
 
@@ -510,6 +529,33 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
     onError: (error: any) => {
       toast({
         title: "Failed to create pending contact",
+        description: error.message,
+        variant: "destructive"
+      });
+    },
+  });
+
+
+  const createPendingPropertyMutation = useMutation<any, Error, any>({
+    mutationFn: async (propertyData: any) => {
+      const response = await apiRequest('POST', '/api/crm/pending-properties', {
+        marinaName: propertyData.marinaName,
+        address: propertyData.address || null,
+        city: propertyData.city || null,
+        state: propertyData.state || null,
+        companyId: company?.id || null,
+      });
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-properties'] });
+      toast({ title: "Property added to pending queue for duplicate review" });
+      setIsCreatingProperty(false);
+      propertyForm.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to create pending property",
         description: error.message,
         variant: "destructive"
       });
@@ -1451,6 +1497,17 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-medium">{company ? 'Linked Properties' : 'Properties to Add'}</h3>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsCreatingProperty(true)}
+                    data-testid="button-add-property"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Property
+                  </Button>
                 <Button
                   type="button"
                   variant="outline"
@@ -1559,6 +1616,82 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
               )}
             </div>
 
+
+            {/* Create New Property Section */}
+            {isCreatingProperty && (
+              <div className="border rounded-lg p-4 bg-muted/50">
+                <h4 className="font-medium mb-3">Create New Property</h4>
+                <Form {...propertyForm}>
+                  <form onSubmit={propertyForm.handleSubmit((data) => createPendingPropertyMutation.mutate(data))} className="space-y-4">
+                    <FormField
+                      control={propertyForm.control}
+                      name="marinaName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Marina Name *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Marina name" className="bg-white dark:bg-slate-900" {...field} data-testid="input-new-property-name" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={propertyForm.control}
+                      name="address"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Address</FormLabel>
+                          <FormControl>
+                            <Input placeholder="123 Marina Dr" className="bg-white dark:bg-slate-900" {...field} data-testid="input-new-property-address" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={propertyForm.control}
+                        name="city"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>City</FormLabel>
+                            <FormControl>
+                              <Input placeholder="City" className="bg-white dark:bg-slate-900" {...field} data-testid="input-new-property-city" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={propertyForm.control}
+                        name="state"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>State</FormLabel>
+                            <FormControl>
+                              <Input placeholder="FL" className="bg-white dark:bg-slate-900" {...field} data-testid="input-new-property-state" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button type="button" variant="outline" onClick={() => { setIsCreatingProperty(false); propertyForm.reset(); }}>
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={createPendingPropertyMutation.isPending} data-testid="button-submit-new-property">
+                        {createPendingPropertyMutation.isPending ? "Creating..." : "Add Property"}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Property will be added to the pending queue for duplicate review.
+                </p>
+              </div>
+            )}
             {/* Link Property Section */}
             {isLinkingProperty && (
                   <div className="border rounded-lg p-4 bg-muted/50">
