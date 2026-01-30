@@ -1,10 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -14,6 +13,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useLocalAutosave } from '@/hooks/use-local-autosave';
 import { AutosaveIndicator } from '@/components/ui/autosave-indicator';
 import {
@@ -40,7 +45,9 @@ import {
   Container,
   Sailboat,
   Plus,
-  CircleDot
+  CircleDot,
+  Check,
+  Loader2
 } from 'lucide-react';
 import {
   Dialog,
@@ -51,47 +58,52 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
+import { useToast } from '@/hooks/use-toast';
 
 interface WorkspaceInputsProps {
   projectId: string;
   onTabChange?: (tab: string) => void;
 }
 
+// NEW: Seasonality types - 'annual' = year-round, 'seasonal' = in-season, 'winter' = winter season
+type SeasonalityOption = 'annual' | 'seasonal' | 'winter';
+
 type StorageTypeConfig = {
   id: string;
   name: string;
   section: 'storage' | 'designated';
-  isYearRound: boolean;
+  // NEW: Multi-select seasonality - can have multiple seasons (hybrid = 2+ seasons)
+  seasons: SeasonalityOption[];
   isEnabled: boolean;
   icon: React.ReactNode;
 };
 
 const defaultStorageTypes: StorageTypeConfig[] = [
-  { id: 'wet_slips', name: 'Wet Slips', section: 'storage', isYearRound: false, isEnabled: true, icon: <Anchor className="h-4 w-4" /> },
-  { id: 'lift_slips', name: 'Lift Slips', section: 'storage', isYearRound: false, isEnabled: false, icon: <Waves className="h-4 w-4" /> },
-  { id: 'moorings', name: 'Moorings', section: 'storage', isYearRound: false, isEnabled: false, icon: <Anchor className="h-4 w-4" /> },
-  { id: 'dinghies', name: 'Dinghies', section: 'storage', isYearRound: false, isEnabled: false, icon: <Sailboat className="h-4 w-4" /> },
-  { id: 'jet_skis', name: 'Jet Skis', section: 'storage', isYearRound: false, isEnabled: false, icon: <Waves className="h-4 w-4" /> },
-  { id: 'dry_racks_indoor', name: 'Dry Racks – Indoor', section: 'storage', isYearRound: true, isEnabled: true, icon: <Warehouse className="h-4 w-4" /> },
-  { id: 'dry_racks_outdoor', name: 'Dry Racks – Outdoor', section: 'storage', isYearRound: false, isEnabled: false, icon: <Container className="h-4 w-4" /> },
-  { id: 'land_storage', name: 'Land Storage', section: 'storage', isYearRound: true, isEnabled: false, icon: <MapPin className="h-4 w-4" /> },
-  { id: 'boats_on_trailers', name: 'Boats on Trailers', section: 'storage', isYearRound: false, isEnabled: false, icon: <Ship className="h-4 w-4" /> },
-  { id: 'trailers', name: 'Trailers', section: 'storage', isYearRound: true, isEnabled: false, icon: <Car className="h-4 w-4" /> },
-  { id: 'carports', name: 'Carports', section: 'storage', isYearRound: true, isEnabled: false, icon: <Home className="h-4 w-4" /> },
-  { id: 'houseboats', name: 'Houseboats', section: 'storage', isYearRound: false, isEnabled: false, icon: <Home className="h-4 w-4" /> },
-  { id: 'rv_sites', name: 'RV Sites', section: 'storage', isYearRound: false, isEnabled: false, icon: <Car className="h-4 w-4" /> },
+  { id: 'wet_slips', name: 'Wet Slips', section: 'storage', seasons: ['seasonal'], isEnabled: true, icon: <Anchor className="h-4 w-4" /> },
+  { id: 'lift_slips', name: 'Lift Slips', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Waves className="h-4 w-4" /> },
+  { id: 'moorings', name: 'Moorings', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Anchor className="h-4 w-4" /> },
+  { id: 'dinghies', name: 'Dinghies', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Sailboat className="h-4 w-4" /> },
+  { id: 'jet_skis', name: 'Jet Skis', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Waves className="h-4 w-4" /> },
+  { id: 'dry_racks_indoor', name: 'Dry Racks – Indoor', section: 'storage', seasons: ['annual'], isEnabled: true, icon: <Warehouse className="h-4 w-4" /> },
+  { id: 'dry_racks_outdoor', name: 'Dry Racks – Outdoor', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Container className="h-4 w-4" /> },
+  { id: 'land_storage', name: 'Land Storage', section: 'storage', seasons: ['annual'], isEnabled: false, icon: <MapPin className="h-4 w-4" /> },
+  { id: 'boats_on_trailers', name: 'Boats on Trailers', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Ship className="h-4 w-4" /> },
+  { id: 'trailers', name: 'Trailers', section: 'storage', seasons: ['annual'], isEnabled: false, icon: <Car className="h-4 w-4" /> },
+  { id: 'carports', name: 'Carports', section: 'storage', seasons: ['annual'], isEnabled: false, icon: <Home className="h-4 w-4" /> },
+  { id: 'houseboats', name: 'Houseboats', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Home className="h-4 w-4" /> },
+  { id: 'rv_sites', name: 'RV Sites', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Car className="h-4 w-4" /> },
 ];
 
 const defaultDesignatedSpaces: StorageTypeConfig[] = [
-  { id: 'boat_sales', name: 'Boat Sales', section: 'designated', isYearRound: false, isEnabled: false, icon: <Store className="h-4 w-4" /> },
-  { id: 'service', name: 'Service', section: 'designated', isYearRound: false, isEnabled: false, icon: <Wrench className="h-4 w-4" /> },
-  { id: 'commercial_tenants', name: 'Commercial Tenants', section: 'designated', isYearRound: true, isEnabled: false, icon: <Building2 className="h-4 w-4" /> },
-  { id: 'rental_boats', name: 'Rental Boats', section: 'designated', isYearRound: false, isEnabled: false, icon: <Ship className="h-4 w-4" /> },
-  { id: 'boat_club', name: 'Boat Club', section: 'designated', isYearRound: false, isEnabled: false, icon: <Users className="h-4 w-4" /> },
-  { id: 'fuel_dock', name: 'Fuel Dock', section: 'designated', isYearRound: false, isEnabled: true, icon: <Fuel className="h-4 w-4" /> },
-  { id: 'transient', name: 'Transient', section: 'designated', isYearRound: false, isEnabled: false, icon: <Anchor className="h-4 w-4" /> },
-  { id: 'restaurant', name: 'Restaurant', section: 'designated', isYearRound: false, isEnabled: false, icon: <Utensils className="h-4 w-4" /> },
-  { id: 'ship_store', name: 'Ship Store', section: 'designated', isYearRound: false, isEnabled: true, icon: <ShoppingCart className="h-4 w-4" /> },
+  { id: 'boat_sales', name: 'Boat Sales', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Store className="h-4 w-4" /> },
+  { id: 'service', name: 'Service', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Wrench className="h-4 w-4" /> },
+  { id: 'commercial_tenants', name: 'Commercial Tenants', section: 'designated', seasons: ['annual'], isEnabled: false, icon: <Building2 className="h-4 w-4" /> },
+  { id: 'rental_boats', name: 'Rental Boats', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Ship className="h-4 w-4" /> },
+  { id: 'boat_club', name: 'Boat Club', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Users className="h-4 w-4" /> },
+  { id: 'fuel_dock', name: 'Fuel Dock', section: 'designated', seasons: ['seasonal'], isEnabled: true, icon: <Fuel className="h-4 w-4" /> },
+  { id: 'transient', name: 'Transient', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Anchor className="h-4 w-4" /> },
+  { id: 'restaurant', name: 'Restaurant', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Utensils className="h-4 w-4" /> },
+  { id: 'ship_store', name: 'Ship Store', section: 'designated', seasons: ['seasonal'], isEnabled: true, icon: <ShoppingCart className="h-4 w-4" /> },
 ];
 
 type ProfitCenterConfig = {
@@ -132,7 +144,23 @@ const months = [
   { value: 12, label: 'December', short: 'Dec' },
 ];
 
+// Helper to get seasonality label
+function getSeasonalityLabel(seasons: SeasonalityOption[]): string {
+  if (seasons.length === 0) return 'None';
+  if (seasons.includes('annual')) return 'Year-Round';
+  if (seasons.length === 1) {
+    if (seasons[0] === 'seasonal') return 'Seasonal';
+    if (seasons[0] === 'winter') return 'Winter';
+  }
+  // Hybrid: multiple seasons
+  const labels: string[] = [];
+  if (seasons.includes('seasonal')) labels.push('Seasonal');
+  if (seasons.includes('winter')) labels.push('Winter');
+  return labels.join(' + ') || 'Hybrid';
+}
+
 export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInputsProps) {
+  const { toast } = useToast();
   const { data: config, isLoading } = useQuery<any>({
     queryKey: ['/api/modeling/projects', projectId, 'config'],
   });
@@ -141,12 +169,18 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
   const [startDate, setStartDate] = useState<string>('2026-01-31');
   const [cashFlowGranularity, setCashFlowGranularity] = useState<string>('annual');
   const [seasonMonths, setSeasonMonths] = useState<number[]>([4, 5, 6, 7, 8, 9, 10]);
+  // NEW: Winter months state
+  const [winterMonths, setWinterMonths] = useState<number[]>([11, 12, 1, 2, 3]);
   const [storageTypes, setStorageTypes] = useState<StorageTypeConfig[]>(defaultStorageTypes);
   const [designatedSpaces, setDesignatedSpaces] = useState<StorageTypeConfig[]>(defaultDesignatedSpaces);
   const [profitCenters, setProfitCenters] = useState<ProfitCenterConfig[]>(defaultProfitCenters);
   const [showAddProfitCenterDialog, setShowAddProfitCenterDialog] = useState(false);
   const [newProfitCenterName, setNewProfitCenterName] = useState('');
   const [newProfitCenterSection, setNewProfitCenterSection] = useState<'storage' | 'designated'>('designated');
+
+  // NEW: Save Now button state
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const { status, triggerAutosave, forceSave } = useLocalAutosave({
     entityId: projectId,
@@ -158,19 +192,27 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
   });
 
   const getCurrentData = () => {
-    const storageSettings: Record<string, { isYearRound: boolean; isEnabled: boolean; section: string }> = {};
+    const storageSettings: Record<string, { seasons: SeasonalityOption[]; isEnabled: boolean; section: string }> = {};
     storageTypes.forEach(item => {
-      storageSettings[item.id] = { isYearRound: item.isYearRound, isEnabled: item.isEnabled, section: 'storage' };
+      storageSettings[item.id] = { seasons: item.seasons, isEnabled: item.isEnabled, section: 'storage' };
     });
     designatedSpaces.forEach(item => {
-      storageSettings[item.id] = { isYearRound: item.isYearRound, isEnabled: item.isEnabled, section: 'designated' };
+      storageSettings[item.id] = { seasons: item.seasons, isEnabled: item.isEnabled, section: 'designated' };
     });
+
+    const profitCenterSettings: Record<string, { isEnabled: boolean }> = {};
+    profitCenters.forEach(item => {
+      profitCenterSettings[item.id] = { isEnabled: item.isEnabled };
+    });
+
     return {
       holdPeriod,
       startDate,
       cashFlowGranularity,
       seasonMonths,
+      winterMonths,
       departments: storageSettings,
+      profitCenters: profitCenterSettings,
     };
   };
 
@@ -180,16 +222,40 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
       setStartDate(config.startDate || '2026-01-31');
       setCashFlowGranularity(config.cashFlowGranularity || 'annual');
       setSeasonMonths(config.seasonMonths || [4, 5, 6, 7, 8, 9, 10]);
+      setWinterMonths(config.winterMonths || [11, 12, 1, 2, 3]);
       if (config.departments) {
-        setStorageTypes(prev => prev.map(item => ({
+        setStorageTypes(prev => prev.map(item => {
+          const dept = config.departments[item.id];
+          if (!dept) return item;
+          // Support legacy isYearRound field migration
+          let seasons = dept.seasons;
+          if (!seasons && typeof dept.isYearRound === 'boolean') {
+            seasons = dept.isYearRound ? ['annual'] : ['seasonal'];
+          }
+          return {
+            ...item,
+            seasons: seasons ?? item.seasons,
+            isEnabled: dept.isEnabled ?? item.isEnabled
+          };
+        }));
+        setDesignatedSpaces(prev => prev.map(item => {
+          const dept = config.departments[item.id];
+          if (!dept) return item;
+          let seasons = dept.seasons;
+          if (!seasons && typeof dept.isYearRound === 'boolean') {
+            seasons = dept.isYearRound ? ['annual'] : ['seasonal'];
+          }
+          return {
+            ...item,
+            seasons: seasons ?? item.seasons,
+            isEnabled: dept.isEnabled ?? item.isEnabled
+          };
+        }));
+      }
+      if (config.profitCenters) {
+        setProfitCenters(prev => prev.map(item => ({
           ...item,
-          isYearRound: config.departments[item.id]?.isYearRound ?? item.isYearRound,
-          isEnabled: config.departments[item.id]?.isEnabled ?? item.isEnabled
-        })));
-        setDesignatedSpaces(prev => prev.map(item => ({
-          ...item,
-          isYearRound: config.departments[item.id]?.isYearRound ?? item.isYearRound,
-          isEnabled: config.departments[item.id]?.isEnabled ?? item.isEnabled
+          isEnabled: config.profitCenters[item.id]?.isEnabled ?? item.isEnabled
         })));
       }
     }
@@ -199,7 +265,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
     if (config) {
       triggerAutosave(getCurrentData());
     }
-  }, [holdPeriod, startDate, cashFlowGranularity, seasonMonths, storageTypes, designatedSpaces]);
+  }, [holdPeriod, startDate, cashFlowGranularity, seasonMonths, winterMonths, storageTypes, designatedSpaces, profitCenters]);
 
   const toggleSeasonMonth = (month: number) => {
     setSeasonMonths(prev => 
@@ -209,15 +275,49 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
     );
   };
 
-  const toggleItemYearRound = (itemId: string, section: 'storage' | 'designated') => {
+  const toggleWinterMonth = (month: number) => {
+    setWinterMonths(prev => 
+      prev.includes(month) 
+        ? prev.filter(m => m !== month)
+        : [...prev, month].sort((a, b) => a - b)
+    );
+  };
+
+  // NEW: Toggle season for storage type (multi-select)
+  const toggleItemSeason = (itemId: string, section: 'storage' | 'designated', season: SeasonalityOption) => {
+    const updateFn = (prev: StorageTypeConfig[]) => prev.map(item => {
+      if (item.id !== itemId) return item;
+
+      let newSeasons = [...item.seasons];
+
+      if (season === 'annual') {
+        // Annual is exclusive - can't be annual AND seasonal/winter
+        if (newSeasons.includes('annual')) {
+          newSeasons = ['seasonal']; // Default to seasonal when deselecting annual
+        } else {
+          newSeasons = ['annual'];
+        }
+      } else {
+        // For seasonal/winter, toggle and remove annual if present
+        newSeasons = newSeasons.filter(s => s !== 'annual');
+
+        if (newSeasons.includes(season)) {
+          newSeasons = newSeasons.filter(s => s !== season);
+          if (newSeasons.length === 0) {
+            newSeasons = ['seasonal']; // Default if nothing left
+          }
+        } else {
+          newSeasons.push(season);
+        }
+      }
+
+      return { ...item, seasons: newSeasons };
+    });
+
     if (section === 'storage') {
-      setStorageTypes(prev => prev.map(item => 
-        item.id === itemId ? { ...item, isYearRound: !item.isYearRound } : item
-      ));
+      setStorageTypes(updateFn);
     } else {
-      setDesignatedSpaces(prev => prev.map(item => 
-        item.id === itemId ? { ...item, isYearRound: !item.isYearRound } : item
-      ));
+      setDesignatedSpaces(updateFn);
     }
   };
 
@@ -239,35 +339,51 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
     ));
   };
 
-  const handleSave = () => {
-    forceSave(getCurrentData());
+  // NEW: Save Now with green check feedback
+  const handleSave = async () => {
+    setIsSaving(true);
+    setSaveSuccess(false);
+
+    try {
+      await forceSave(getCurrentData());
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
+    } catch (error) {
+      toast({
+        title: 'Save Failed',
+        description: 'Failed to save configuration. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleAddProfitCenter = () => {
     if (!newProfitCenterName.trim()) return;
-    
+
     const id = newProfitCenterName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
-    
+
     const allItems = [...storageTypes, ...designatedSpaces];
     if (allItems.some(item => item.id === id || item.name.toLowerCase() === newProfitCenterName.toLowerCase())) {
       return;
     }
-    
+
     const newItem: StorageTypeConfig = {
       id,
       name: newProfitCenterName.trim(),
       section: newProfitCenterSection,
-      isYearRound: false,
+      seasons: ['seasonal'],
       isEnabled: true,
       icon: <CircleDot className="h-4 w-4" />,
     };
-    
+
     if (newProfitCenterSection === 'storage') {
       setStorageTypes(prev => [...prev, newItem]);
     } else {
       setDesignatedSpaces(prev => [...prev, newItem]);
     }
-    
+
     setNewProfitCenterName('');
     setShowAddProfitCenterDialog(false);
     triggerAutosave(getCurrentData());
@@ -276,10 +392,85 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
   const getSeasonLabel = () => {
     if (seasonMonths.length === 0) return 'No season selected';
     if (seasonMonths.length === 12) return 'Year-round';
-    
+
     const startMonth = months.find(m => m.value === Math.min(...seasonMonths));
     const endMonth = months.find(m => m.value === Math.max(...seasonMonths));
     return `${startMonth?.short} - ${endMonth?.short} (${seasonMonths.length} months)`;
+  };
+
+  const getWinterSeasonLabel = () => {
+    if (winterMonths.length === 0) return 'No winter season';
+    const startMonth = months.find(m => m.value === winterMonths[0]);
+    const endMonth = months.find(m => m.value === winterMonths[winterMonths.length - 1]);
+    return `${startMonth?.short} - ${endMonth?.short} (${winterMonths.length} months)`;
+  };
+
+  // NEW: Render seasonality selector
+  const renderSeasonalitySelector = (item: StorageTypeConfig, section: 'storage' | 'designated') => {
+    const isAnnual = item.seasons.includes('annual');
+    const isSeasonal = item.seasons.includes('seasonal');
+    const isWinter = item.seasons.includes('winter');
+    const isHybrid = item.seasons.length > 1 && !isAnnual;
+
+    return (
+      <TooltipProvider>
+        <div className="flex items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => toggleItemSeason(item.id, section, 'annual')}
+                className={`p-1.5 rounded transition-colors ${
+                  isAnnual 
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' 
+                    : 'hover:bg-muted text-muted-foreground'
+                }`}
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Year-Round</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => toggleItemSeason(item.id, section, 'seasonal')}
+                className={`p-1.5 rounded transition-colors ${
+                  isSeasonal && !isAnnual
+                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300' 
+                    : 'hover:bg-muted text-muted-foreground'
+                }`}
+              >
+                <Sun className="h-3.5 w-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Seasonal (In-Season)</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => toggleItemSeason(item.id, section, 'winter')}
+                className={`p-1.5 rounded transition-colors ${
+                  isWinter && !isAnnual
+                    ? 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300' 
+                    : 'hover:bg-muted text-muted-foreground'
+                }`}
+              >
+                <Snowflake className="h-3.5 w-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Winter Season</TooltipContent>
+          </Tooltip>
+
+          {isHybrid && (
+            <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
+              Hybrid
+            </Badge>
+          )}
+        </div>
+      </TooltipProvider>
+    );
   };
 
   return (
@@ -287,7 +478,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
       {onTabChange && (
         <WorkflowNavigation currentTab="inputs" onNavigate={onTabChange} />
       )}
-      
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold">Project Inputs</h2>
@@ -297,15 +488,31 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
         </div>
         <div className="flex items-center gap-3">
           <AutosaveIndicator status={status} showText size="sm" />
+          {/* UPDATED: Save Now button with green check */}
           <Button 
             onClick={handleSave} 
-            disabled={status === 'saving'}
-            variant="outline"
+            disabled={isSaving}
+            variant={saveSuccess ? 'default' : 'outline'}
             size="sm"
+            className={saveSuccess ? 'bg-green-600 hover:bg-green-600 text-white' : ''}
             data-testid="button-save-inputs"
           >
-            <Save className="h-4 w-4 mr-2" />
-            Save Now
+            {isSaving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : saveSuccess ? (
+              <>
+                <Check className="h-4 w-4 mr-2" />
+                Saved
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Save Now
+              </>
+            )}
           </Button>
         </div>
       </div>
@@ -332,9 +539,11 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="3">3 Years</SelectItem>
                   <SelectItem value="5">5 Years</SelectItem>
                   <SelectItem value="7">7 Years</SelectItem>
                   <SelectItem value="10">10 Years</SelectItem>
+                  <SelectItem value="15">15 Years</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -364,7 +573,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Monthly uses XIRR for precise return calculations based on actual dates
+                Monthly uses XIRR for precise return calculations
               </p>
             </div>
           </CardContent>
@@ -377,7 +586,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
               In-Season Months
             </CardTitle>
             <CardDescription>
-              Select the months when seasonal operations are active
+              Select months when seasonal operations are active
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -390,7 +599,6 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                 variant="outline"
                 size="sm"
                 onClick={() => setSeasonMonths([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])}
-                data-testid="button-year-round"
               >
                 <Calendar className="h-3 w-3 mr-1" />
                 Year-Round
@@ -404,7 +612,6 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                   size="sm"
                   onClick={() => toggleSeasonMonth(month.value)}
                   className="w-full"
-                  data-testid={`button-month-${month.value}`}
                 >
                   {seasonMonths.includes(month.value) ? (
                     <Sun className="h-3 w-3 mr-1" />
@@ -415,12 +622,59 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                 </Button>
               ))}
             </div>
-            <p className="text-xs text-muted-foreground">
-              Off-season months will show $0 for seasonal departments in Pro Forma
-            </p>
           </CardContent>
         </Card>
       </div>
+
+      {/* NEW: Winter Season Configuration */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Snowflake className="h-5 w-5" />
+            Winter Season Months
+          </CardTitle>
+          <CardDescription>
+            Select months for winter storage contracts (e.g., winter wet slips)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Badge variant="outline" className="gap-1">
+              <Snowflake className="h-3 w-3" />
+              {getWinterSeasonLabel()}
+            </Badge>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setWinterMonths([11, 12, 1, 2, 3])}
+            >
+              <Snowflake className="h-3 w-3 mr-1" />
+              Typical (Nov-Mar)
+            </Button>
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {months.map((month) => (
+              <Button
+                key={month.value}
+                variant={winterMonths.includes(month.value) ? 'secondary' : 'outline'}
+                size="sm"
+                onClick={() => toggleWinterMonth(month.value)}
+                className={`w-full ${winterMonths.includes(month.value) ? 'bg-cyan-100 hover:bg-cyan-200 dark:bg-cyan-900' : ''}`}
+              >
+                {winterMonths.includes(month.value) ? (
+                  <Snowflake className="h-3 w-3 mr-1 text-cyan-700 dark:text-cyan-300" />
+                ) : (
+                  <Sun className="h-3 w-3 mr-1" />
+                )}
+                {month.short}
+              </Button>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Storage types marked as "Winter" will only show revenue during these months
+          </p>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -431,14 +685,13 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                 Storage Configuration
               </CardTitle>
               <CardDescription>
-                Enable storage types that apply to this property. Only enabled items will appear in Growth Rates and Pro Forma.
+                Enable storage types and set seasonality: Year-Round, Seasonal, Winter, or Hybrid
               </CardDescription>
             </div>
             <Button 
               variant="outline" 
               size="sm"
               onClick={() => setShowAddProfitCenterDialog(true)}
-              data-testid="button-add-profit-center"
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Profit Center
@@ -455,22 +708,20 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
               {storageTypes.map((item) => (
                 <div
                   key={item.id}
-                  className={`flex items-center justify-between p-3 rounded-lg border ${
+                  className={`flex flex-col p-3 rounded-lg border ${
                     item.isEnabled 
                       ? 'bg-muted/30 border-border' 
                       : 'bg-muted/10 border-dashed opacity-60'
                   }`}
-                  data-testid={`storage-${item.id}`}
                 >
-                  <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0 mb-2">
                     <input
                       type="checkbox"
                       checked={item.isEnabled}
                       onChange={() => toggleItemEnabled(item.id, 'storage')}
-                      className="h-4 w-4 rounded border-muted-foreground/50 text-primary focus:ring-primary cursor-pointer"
-                      data-testid={`checkbox-${item.id}-enabled`}
+                      className="h-4 w-4 rounded border-muted-foreground/50 cursor-pointer"
                     />
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
                       item.isEnabled ? 'bg-background' : 'bg-muted/30'
                     }`}>
                       {item.icon}
@@ -480,16 +731,11 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                     </span>
                   </div>
                   {item.isEnabled && (
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <div className="flex items-center justify-between mt-auto pt-2 border-t border-border/50">
                       <span className="text-xs text-muted-foreground">
-                        {item.isYearRound ? 'Year-Round' : 'Seasonal'}
+                        {getSeasonalityLabel(item.seasons)}
                       </span>
-                      <Switch
-                        checked={item.isYearRound}
-                        onCheckedChange={() => toggleItemYearRound(item.id, 'storage')}
-                        className="scale-75"
-                        data-testid={`switch-${item.id}-year-round`}
-                      />
+                      {renderSeasonalitySelector(item, 'storage')}
                     </div>
                   )}
                 </div>
@@ -508,22 +754,20 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
               {designatedSpaces.map((item) => (
                 <div
                   key={item.id}
-                  className={`flex items-center justify-between p-3 rounded-lg border ${
+                  className={`flex flex-col p-3 rounded-lg border ${
                     item.isEnabled 
                       ? 'bg-muted/30 border-border' 
                       : 'bg-muted/10 border-dashed opacity-60'
                   }`}
-                  data-testid={`designated-${item.id}`}
                 >
-                  <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0 mb-2">
                     <input
                       type="checkbox"
                       checked={item.isEnabled}
                       onChange={() => toggleItemEnabled(item.id, 'designated')}
-                      className="h-4 w-4 rounded border-muted-foreground/50 text-primary focus:ring-primary cursor-pointer"
-                      data-testid={`checkbox-${item.id}-enabled`}
+                      className="h-4 w-4 rounded border-muted-foreground/50 cursor-pointer"
                     />
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
                       item.isEnabled ? 'bg-background' : 'bg-muted/30'
                     }`}>
                       {item.icon}
@@ -533,16 +777,11 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                     </span>
                   </div>
                   {item.isEnabled && (
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <div className="flex items-center justify-between mt-auto pt-2 border-t border-border/50">
                       <span className="text-xs text-muted-foreground">
-                        {item.isYearRound ? 'Year-Round' : 'Seasonal'}
+                        {getSeasonalityLabel(item.seasons)}
                       </span>
-                      <Switch
-                        checked={item.isYearRound}
-                        onCheckedChange={() => toggleItemYearRound(item.id, 'designated')}
-                        className="scale-75"
-                        data-testid={`switch-${item.id}-year-round`}
-                      />
+                      {renderSeasonalitySelector(item, 'designated')}
                     </div>
                   )}
                 </div>
@@ -554,17 +793,13 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Store className="h-5 w-5" />
-                Profit Center Configuration
-              </CardTitle>
-              <CardDescription>
-                Enable profit centers that apply to this property. Only enabled items will appear in Pro Forma revenue categories.
-              </CardDescription>
-            </div>
-          </div>
+          <CardTitle className="flex items-center gap-2">
+            <Store className="h-5 w-5" />
+            Profit Center Configuration
+          </CardTitle>
+          <CardDescription>
+            Enable profit centers for Pro Forma revenue categories
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -576,17 +811,15 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                     ? 'bg-muted/30 border-border' 
                     : 'bg-muted/10 border-dashed opacity-60'
                 }`}
-                data-testid={`profit-center-${item.id}`}
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <input
                     type="checkbox"
                     checked={item.isEnabled}
                     onChange={() => toggleProfitCenterEnabled(item.id)}
-                    className="h-4 w-4 rounded border-muted-foreground/50 text-primary focus:ring-primary cursor-pointer"
-                    data-testid={`checkbox-${item.id}-enabled`}
+                    className="h-4 w-4 rounded border-muted-foreground/50 cursor-pointer"
                   />
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
                     item.isEnabled ? 'bg-background' : 'bg-muted/30'
                   }`}>
                     {item.icon}
@@ -606,7 +839,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
           <DialogHeader>
             <DialogTitle>Add Profit Center</DialogTitle>
             <DialogDescription>
-              Add a custom profit center to track revenue and expenses for this project.
+              Add a custom profit center to track revenue and expenses.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -616,8 +849,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                 id="profit-center-name"
                 value={newProfitCenterName}
                 onChange={(e) => setNewProfitCenterName(e.target.value)}
-                placeholder="e.g., Charter Services, Boat Wash, Fishing Licenses"
-                data-testid="input-profit-center-name"
+                placeholder="e.g., Charter Services, Boat Wash"
               />
             </div>
             <div className="space-y-2">
@@ -626,7 +858,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                 value={newProfitCenterSection} 
                 onValueChange={(v) => setNewProfitCenterSection(v as 'storage' | 'designated')}
               >
-                <SelectTrigger id="profit-center-section" data-testid="select-profit-center-section">
+                <SelectTrigger id="profit-center-section">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -634,9 +866,6 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                   <SelectItem value="designated">Designated Space</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Storage Types are for boat storage options. Designated Spaces are for ancillary services and amenities.
-              </p>
             </div>
           </div>
           <DialogFooter>
@@ -646,7 +875,6 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
             <Button 
               onClick={handleAddProfitCenter}
               disabled={!newProfitCenterName.trim()}
-              data-testid="button-confirm-add-profit-center"
             >
               Add Profit Center
             </Button>

@@ -1,5 +1,6 @@
 import { useState, useMemo, Fragment } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { queryClient } from '@/lib/queryClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -90,7 +91,7 @@ const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 function generatePeriodLabel(period: DocumentPeriod): { label: string; shortLabel: string } {
   const endDate = new Date(period.endDate);
   const startDate = new Date(period.startDate);
-  
+
   if (period.periodType === 'trailing_12' || period.isT12) {
     const monthName = months[endDate.getMonth()];
     const yearShort = endDate.getFullYear().toString().slice(-2);
@@ -99,14 +100,14 @@ function generatePeriodLabel(period: DocumentPeriod): { label: string; shortLabe
       shortLabel: `T12 ${monthName}'${yearShort}`
     };
   }
-  
+
   if (period.periodType === 'fiscal_year') {
     return {
       label: `FY ${period.year || endDate.getFullYear()} Actual`,
       shortLabel: `FY${period.year || endDate.getFullYear()}`
     };
   }
-  
+
   // Calendar year or default
   const year = period.year || endDate.getFullYear();
   return {
@@ -121,12 +122,12 @@ function generatePeriodLabel(period: DocumentPeriod): { label: string; shortLabe
 function isTrailing12(startDate: string, endDate: string): boolean {
   const start = new Date(startDate);
   const end = new Date(endDate);
-  
+
   // Check if it spans ~12 months but doesn't align with calendar year
   const monthsDiff = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
   const isFullYear = monthsDiff >= 11 && monthsDiff <= 12;
   const isCalendarYear = start.getMonth() === 0 && end.getMonth() === 11;
-  
+
   return isFullYear && !isCalendarYear;
 }
 
@@ -140,6 +141,28 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
   // Fetch project configuration
   const { data: config } = useQuery<any>({
     queryKey: ['/api/modeling/projects', projectId, 'config'],
+  });
+
+  // Mutation to update hold period (syncs everywhere) - Requirement J
+  const updateHoldPeriodMutation = useMutation({
+    mutationFn: async (newHoldPeriod: number) => {
+      const response = await fetch(`/api/modeling/projects/${projectId}/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ holdPeriod: newHoldPeriod }),
+      });
+      if (!response.ok) throw new Error('Failed to update hold period');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'config'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'pro-forma'] });
+      toast({ title: 'Updated', description: 'Hold period updated and synced.' });
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to update hold period.', variant: 'destructive' });
+    },
   });
 
   // Fetch assumptions/growth rates
@@ -182,7 +205,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
 
     // Group documents by their fiscal period
     const periodsMap = new Map<string, DocumentPeriod>();
-    
+
     documents
       .filter((doc: any) => doc.status === 'completed')
       .forEach((doc: any) => {
@@ -190,13 +213,13 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
         const fiscalYear = doc.fiscalYear || doc.metadata?.fiscalYear;
         const periodStart = doc.periodStart || doc.metadata?.periodStart;
         const periodEnd = doc.periodEnd || doc.metadata?.periodEnd;
-        
+
         if (fiscalYear || (periodStart && periodEnd)) {
           const isT12 = periodStart && periodEnd ? isTrailing12(periodStart, periodEnd) : false;
           const periodKey = isT12 
             ? `t12-${periodEnd}` 
             : fiscalYear?.toString() || new Date(periodEnd).getFullYear().toString();
-          
+
           if (!periodsMap.has(periodKey)) {
             const endDate = periodEnd || `${fiscalYear}-12-31`;
             const startDateCalc = periodStart || `${fiscalYear}-01-01`;
@@ -370,7 +393,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
   // Export functionality
   const exportProForma = () => {
     const csvRows: string[] = [];
-    
+
     // Build header row
     const headerCells = ['Category', 'Line Item'];
     if (showHistorical) {
@@ -382,7 +405,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
     years.forEach((year, i) => headerCells.push(`Year ${i + 1} (${year})`));
     headerCells.push('CAGR');
     csvRows.push(headerCells.join(','));
-    
+
     // Add data rows
     Object.entries(tableData).forEach(([category, items]) => {
       Object.entries(items).forEach(([itemName, values]) => {
@@ -398,7 +421,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
         csvRows.push(row.join(','));
       });
     });
-    
+
     const csvContent = csvRows.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -407,7 +430,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
     link.download = `pro-forma-${projectId}-${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     window.URL.revokeObjectURL(url);
-    
+
     toast({
       title: "Export Complete",
       description: "Pro forma data exported to CSV",
@@ -433,7 +456,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
       {onTabChange && (
         <WorkflowNavigation currentTab="proforma" onNavigate={onTabChange} />
       )}
-      
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -446,6 +469,24 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Hold Period Selector - Requirement J */}
+          <Select 
+            value={holdPeriod.toString()} 
+            onValueChange={(v) => updateHoldPeriodMutation.mutate(parseInt(v))}
+            disabled={updateHoldPeriodMutation.isPending}
+          >
+            <SelectTrigger className="w-[130px]" data-testid="select-hold-period-proforma">
+              <Calendar className="h-4 w-4 mr-2" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="3">3 Years</SelectItem>
+              <SelectItem value="5">5 Years</SelectItem>
+              <SelectItem value="7">7 Years</SelectItem>
+              <SelectItem value="10">10 Years</SelectItem>
+              <SelectItem value="15">15 Years</SelectItem>
+            </SelectContent>
+          </Select>
           {priorPeriods.length > 0 && (
             <Button
               variant={showHistorical ? "default" : "outline"}
@@ -622,7 +663,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-64 sticky left-0 bg-background z-10">Category / Line Item</TableHead>
-                  
+
                   {/* Historical Period Columns (excluding baseline) */}
                   {showHistorical && priorPeriods.map(period => (
                     <TableHead key={period.id} className="text-right w-28 bg-slate-50 dark:bg-slate-900/50">
@@ -644,7 +685,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                       </TooltipProvider>
                     </TableHead>
                   ))}
-                  
+
                   {/* Baseline/Actuals Column */}
                   <TableHead className="text-right w-32 bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">
                     <TooltipProvider>
@@ -676,7 +717,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                       </Tooltip>
                     </TooltipProvider>
                   </TableHead>
-                  
+
                   {/* Projected Year Columns */}
                   {years.map((year, i) => (
                     <TableHead key={year} className="text-right w-28">
@@ -684,16 +725,16 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                       <div className="text-xs text-muted-foreground font-normal">{year}</div>
                     </TableHead>
                   ))}
-                  
+
                   <TableHead className="text-right w-24">CAGR</TableHead>
                 </TableRow>
               </TableHeader>
-              
+
               <TableBody>
                 {(['Revenue', 'COGS', 'Expenses'] as const).map((category) => {
                   const items = tableData[category] || {};
                   const baselineTotal = baselinePeriod ? getCategoryTotal(category, baselinePeriod.id) : 0;
-                  
+
                   return (
                     <Fragment key={category}>
                       {/* Category Header Row */}
@@ -712,26 +753,26 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                             {category}
                           </div>
                         </TableCell>
-                        
+
                         {/* Historical totals */}
                         {showHistorical && priorPeriods.map(period => (
                           <TableCell key={period.id} className="text-right font-semibold bg-slate-50 dark:bg-slate-900/50">
                             {formatCurrency(getCategoryTotal(category, period.id))}
                           </TableCell>
                         ))}
-                        
+
                         {/* Baseline total */}
                         <TableCell className="text-right font-semibold bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">
                           {formatCurrency(baselineTotal)}
                         </TableCell>
-                        
+
                         {/* Projected totals */}
                         {years.map((_, i) => (
                           <TableCell key={i} className="text-right font-semibold">
                             {formatCurrency(getCategoryProjectedTotal(category, i))}
                           </TableCell>
                         ))}
-                        
+
                         {/* CAGR */}
                         <TableCell className="text-right text-muted-foreground">
                           {formatPercent(calculateCAGR(
@@ -750,26 +791,26 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                             <TableCell className="pl-10 sticky left-0 bg-background z-10">
                               {itemName}
                             </TableCell>
-                            
+
                             {/* Historical values */}
                             {showHistorical && priorPeriods.map(period => (
                               <TableCell key={period.id} className="text-right bg-slate-50 dark:bg-slate-900/50">
                                 {formatCurrency(values.historical[period.id])}
                               </TableCell>
                             ))}
-                            
+
                             {/* Baseline value */}
                             <TableCell className="text-right bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">
                               {formatCurrency(baselineValue)}
                             </TableCell>
-                            
+
                             {/* Projected values */}
                             {values.projected.map((value: number, i: number) => (
                               <TableCell key={i} className="text-right">
                                 {formatCurrency(value)}
                               </TableCell>
                             ))}
-                            
+
                             {/* Line item CAGR */}
                             <TableCell className="text-right text-xs text-muted-foreground">
                               {formatPercent(calculateCAGR(
@@ -788,7 +829,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                 {/* Gross Profit Row */}
                 <TableRow className="bg-muted font-bold border-t-2">
                   <TableCell className="sticky left-0 bg-muted z-10">Gross Profit</TableCell>
-                  
+
                   {showHistorical && priorPeriods.map(period => {
                     const summary = calculatePeriodSummary(period.id);
                     return (
@@ -797,18 +838,18 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                       </TableCell>
                     );
                   })}
-                  
+
                   <TableCell className="text-right bg-blue-100 dark:bg-blue-900/30 border-x border-blue-200 dark:border-blue-800">
                     {formatCurrency(baselineSummary?.grossProfit)}
                   </TableCell>
-                  
+
                   {years.map((_, i) => {
                     const summary = calculateYearSummary(i);
                     return (
                       <TableCell key={i} className="text-right">{formatCurrency(summary.grossProfit)}</TableCell>
                     );
                   })}
-                  
+
                   <TableCell className="text-right text-muted-foreground">
                     {formatPercent(calculateCAGR(
                       calculateYearSummary(0).grossProfit,
@@ -821,7 +862,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                 {/* Net Operating Income Row */}
                 <TableRow className="bg-primary/10 font-bold">
                   <TableCell className="sticky left-0 bg-primary/10 z-10">Net Operating Income</TableCell>
-                  
+
                   {showHistorical && priorPeriods.map(period => {
                     const summary = calculatePeriodSummary(period.id);
                     return (
@@ -833,11 +874,11 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                       </TableCell>
                     );
                   })}
-                  
+
                   <TableCell className={`text-right bg-blue-100 dark:bg-blue-900/30 border-x border-blue-200 dark:border-blue-800 ${(baselineSummary?.noi || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                     {formatCurrency(baselineSummary?.noi)}
                   </TableCell>
-                  
+
                   {years.map((_, i) => {
                     const summary = calculateYearSummary(i);
                     return (
@@ -849,7 +890,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                       </TableCell>
                     );
                   })}
-                  
+
                   <TableCell className="text-right text-green-600">
                     {formatPercent(calculateCAGR(
                       calculateYearSummary(0).noi,
@@ -862,7 +903,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                 {/* NOI Margin Row */}
                 <TableRow className="border-t-2">
                   <TableCell className="sticky left-0 bg-background text-muted-foreground z-10">NOI Margin</TableCell>
-                  
+
                   {showHistorical && priorPeriods.map(period => {
                     const summary = calculatePeriodSummary(period.id);
                     return (
@@ -871,11 +912,11 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                       </TableCell>
                     );
                   })}
-                  
+
                   <TableCell className="text-right text-muted-foreground bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">
                     {formatPercentSimple(baselineSummary?.noiMargin)}
                   </TableCell>
-                  
+
                   {years.map((_, i) => {
                     const summary = calculateYearSummary(i);
                     return (
@@ -884,7 +925,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                       </TableCell>
                     );
                   })}
-                  
+
                   <TableCell className="text-right text-muted-foreground">-</TableCell>
                 </TableRow>
               </TableBody>

@@ -91,6 +91,7 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
   const { toast } = useToast();
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  // NEW: Processing message state for overlay
   const [processingMessage, setProcessingMessage] = useState("");
 
   const { data: customTypes = [], refetch: refetchCustomTypes } = useQuery<CustomDocumentType[]>({
@@ -173,15 +174,15 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
           updateStagedFile(staged.id, { customTypeId: newId });
         }
       }
-      
+
       updateStagedFile(staged.id, { progress: 40 });
-      
+
       const csrfToken = await ensureCsrfToken();
       const formData = new FormData();
       formData.append("file", staged.file);
       formData.append("docType", staged.docType);
       formData.append("year", staged.year);
-      
+
       if (staged.customTypeId) {
         const customType = customTypes.find((ct) => ct.id.toString() === staged.customTypeId);
         if (customType) {
@@ -223,17 +224,21 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
     }
   };
 
+  // UPDATED: uploadAllFiles with processing feedback
   const uploadAllFiles = async () => {
     if (isUploading) return;
-    
+
     const pendingFiles = stagedFiles.filter((f) => f.status === "pending");
     if (pendingFiles.length === 0) return;
 
     setIsUploading(true);
+    setProcessingMessage("Uploading documents...");
     let successCount = 0;
     let errorCount = 0;
 
-    for (const staged of pendingFiles) {
+    for (let i = 0; i < pendingFiles.length; i++) {
+      const staged = pendingFiles[i];
+      setProcessingMessage(`Processing document ${i + 1} of ${pendingFiles.length}...`);
       const upload = await uploadSingleFile(staged);
       if (upload) {
         onUploadComplete(upload);
@@ -243,16 +248,23 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
       }
     }
 
+    if (successCount > 0) {
+      setProcessingMessage("Queued for AI processing...");
+      // Brief delay to show the queued message
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
     setIsUploading(false);
+    setProcessingMessage("");
 
     setTimeout(() => {
       setStagedFiles((prev) => prev.filter((f) => f.status !== "complete"));
     }, 2000);
-    
+
     if (successCount > 0) {
       toast({ 
         title: "Upload complete", 
-        description: `${successCount} document${successCount > 1 ? 's' : ''} uploaded successfully.` 
+        description: `${successCount} document${successCount > 1 ? 's' : ''} uploaded and queued for AI processing.` 
       });
     }
     if (errorCount > 0) {
@@ -265,7 +277,6 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
   };
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    // Stage files - user clicks Upload to start processing
     const newStagedFiles: StagedFile[] = acceptedFiles.map((file) => ({
       id: crypto.randomUUID(),
       file,
@@ -277,7 +288,7 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
       progress: 0,
     }));
     setStagedFiles((prev) => [...prev, ...newStagedFiles]);
-  }, [uploadSingleFile, onUploadComplete]);
+  }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -296,18 +307,18 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
 
   const handleSaveCustomType = async (stagedId: string, typeName: string) => {
     if (!typeName.trim()) return;
-    
+
     const normalizedName = typeName.trim();
     const existingCustom = customTypes.find(
       (ct) => ct.name.toLowerCase() === normalizedName.toLowerCase()
     );
-    
+
     if (existingCustom) {
       updateStagedFile(stagedId, { customTypeId: existingCustom.id.toString(), customTypeName: "" });
       toast({ title: "Type already exists", description: `Using existing "${existingCustom.name}" type.` });
       return;
     }
-    
+
     try {
       const newType = await createCustomTypeMutation.mutateAsync(normalizedName);
       await refetchCustomTypes();
@@ -320,6 +331,19 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
 
   return (
     <div className="space-y-4">
+      {/* NEW: Processing Overlay */}
+      {isUploading && processingMessage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-4 p-8 rounded-lg bg-card border shadow-lg max-w-sm">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <div className="text-center">
+              <p className="text-lg font-semibold">Processing Documents</p>
+              <p className="text-sm text-muted-foreground mt-1">{processingMessage}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div
         {...getRootProps()}
         className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${

@@ -304,6 +304,7 @@ export default function Portfolio() {
           value={String(summary.totalMarinas)}
           icon={Building2}
           color="blue"
+          onClick={() => handleTabChange("overview")}
         />
         <KPICard
           label="Portfolio Value"
@@ -324,6 +325,7 @@ export default function Portfolio() {
           value={String(summary.totalSlips)}
           icon={Anchor}
           color="blue"
+          onClick={() => handleTabChange("overview")}
         />
         <KPICard
           label="Avg Occupancy"
