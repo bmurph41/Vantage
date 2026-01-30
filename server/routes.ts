@@ -20570,6 +20570,20 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   });
 
+
+  // Reprocess a completed document - reset to review state
+  app.post('/api/modeling/projects/:projectId/documents/:uploadId/reprocess', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, uploadId } = req.params;
+      
+      const result = await docIntelService.reprocessUpload(orgId, uploadId);
+      res.json(result);
+    } catch (error: any) {
+      console.error('Failed to reprocess document:', error);
+      res.status(500).json({ error: 'Failed to reprocess document' });
+    }
+  });
   // Import Rent Roll document to Rent Roll module with customer creation and CRM linking
   app.post('/api/modeling/projects/:projectId/documents/:uploadId/import-rent-roll', authenticateUser, async (req: any, res) => {
     try {

@@ -29,7 +29,8 @@ import {
   ArrowRight,
   BookKey,
   Settings,
-  Loader2
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { UploadDropzone } from '@/pages/modeling/doc-intel/UploadDropzone';
@@ -111,6 +112,19 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
       setDeleteConfirmId(null);
       setDeleteConfirmName("");
       toast({ title: 'Error', description: 'Failed to delete document.', variant: 'destructive' });
+    },
+  });
+
+  const reprocessMutation = useMutation({
+    mutationFn: (uploadId: string) => apiRequest('POST', `/api/modeling/projects/${projectId}/documents/${uploadId}/reprocess`),
+    onSuccess: (_, uploadId) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'documents'] });
+      toast({ title: 'Reprocessing', description: 'Document is being reprocessed. You will be redirected to review.' });
+      // Navigate to doc-intel review
+      navigate(`/modeling/projects/${projectId}/doc-intel?upload=${uploadId}`);
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to reprocess document.', variant: 'destructive' });
     },
   });
 
@@ -284,14 +298,26 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
                       </div>
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDeleteClick(upload)}
-                    disabled={deleteMutation.isPending}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => reprocessMutation.mutate(upload.id)}
+                      disabled={reprocessMutation.isPending}
+                      className="gap-1"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${reprocessMutation.isPending ? 'animate-spin' : ''}`} />
+                      Reprocess
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteClick(upload)}
+                      disabled={deleteMutation.isPending}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

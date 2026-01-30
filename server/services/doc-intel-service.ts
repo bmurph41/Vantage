@@ -1682,6 +1682,34 @@ class DocIntelService {
     return importedActuals;
   }
 
+  async reprocessUpload(orgId: string, uploadId: string): Promise<{ success: boolean; message: string }> {
+    // Reset upload status back to reviewing
+    await db.update(docIntelUploads)
+      .set({ 
+        status: 'reviewing',
+        reviewCompletedAt: null,
+        reviewNotes: null,
+      })
+      .where(and(
+        eq(docIntelUploads.id, uploadId),
+        eq(docIntelUploads.orgId, orgId)
+      ));
+    
+    // Reset all extracted items back to pending (keep their suggested categories)
+    await db.update(docIntelExtractedItems)
+      .set({ 
+        status: 'pending',
+        confirmedBy: null,
+        confirmedAt: null,
+      })
+      .where(and(
+        eq(docIntelExtractedItems.uploadId, uploadId),
+        eq(docIntelExtractedItems.orgId, orgId)
+      ));
+    
+    return { success: true, message: 'Document reset for reprocessing' };
+  }
+
   async getProjectPnlLines(orgId: string, projectId: string): Promise<(PnlLine & { category?: PnlCategory })[]> {
     const lines = await db
       .select()
