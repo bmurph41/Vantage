@@ -242,25 +242,17 @@ export default function ProjectWorkspace() {
               <Settings2 className="h-4 w-4" />
               <span className="hidden sm:inline">Inputs</span>
             </TabsTrigger>
-            <TabsTrigger value="cases" className="gap-2" data-testid="tab-scenarios">
-              <Layers className="h-4 w-4" />
-              <span className="hidden sm:inline">Scenario Analysis</span>
+            <TabsTrigger value="assumptions" className="gap-2" data-testid="tab-assumptions">
+              <TrendingUp className="h-4 w-4" />
+              <span className="hidden sm:inline">Assumptions</span>
             </TabsTrigger>
             <TabsTrigger value="uploads" className="gap-2" data-testid="tab-uploads">
               <Upload className="h-4 w-4" />
               <span className="hidden sm:inline">Uploads</span>
             </TabsTrigger>
-            <TabsTrigger value="assumptions" className="gap-2" data-testid="tab-assumptions">
-              <TrendingUp className="h-4 w-4" />
-              <span className="hidden sm:inline">Assumptions</span>
-            </TabsTrigger>
             <TabsTrigger value="historical" className="gap-2" data-testid="tab-historical">
               <FileSpreadsheet className="h-4 w-4" />
               <span className="hidden sm:inline">Historical</span>
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="gap-2" data-testid="tab-analytics">
-              <SlidersHorizontal className="h-4 w-4" />
-              <span className="hidden sm:inline">Analytics</span>
             </TabsTrigger>
             <TabsTrigger value="proforma" className="gap-2" data-testid="tab-proforma">
               <BarChart3 className="h-4 w-4" />
@@ -273,6 +265,14 @@ export default function ProjectWorkspace() {
             <TabsTrigger value="summary" className="gap-2" data-testid="tab-summary">
               <ClipboardList className="h-4 w-4" />
               <span className="hidden sm:inline">Summary</span>
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="gap-2" data-testid="tab-analytics">
+              <SlidersHorizontal className="h-4 w-4" />
+              <span className="hidden sm:inline">Analytics</span>
+            </TabsTrigger>
+            <TabsTrigger value="cases" className="gap-2" data-testid="tab-scenarios">
+              <Layers className="h-4 w-4" />
+              <span className="hidden sm:inline">Scenario Analysis</span>
             </TabsTrigger>
             <TabsTrigger value="debt" className="gap-2" data-testid="tab-debt">
               <Calculator className="h-4 w-4" />
