@@ -1254,7 +1254,15 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
         </CardContent>
       </Card>
 
-      {(!stacks || stacks.length === 0) ? (
+      {stacksLoading ? (
+        <Card className="p-8">
+          <div className="space-y-4">
+            <Skeleton className="h-8 w-48 mx-auto" />
+            <Skeleton className="h-4 w-64 mx-auto" />
+            <Skeleton className="h-10 w-40 mx-auto" />
+          </div>
+        </Card>
+      ) : (!stacks || stacks.length === 0) ? (
         <Card className="p-8 text-center">
           <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">No Capital Stacks</h3>

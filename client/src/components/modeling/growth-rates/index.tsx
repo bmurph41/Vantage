@@ -26,8 +26,8 @@ export function RateInput({
   value, 
   defaultValue, 
   onChange,
-  min = 0,
-  max = 10,
+  min = -100,
+  max = 100,
   step = 0.5,
   size = 'default'
 }: RateInputProps) {
@@ -273,11 +273,6 @@ export function QuickActionsBar({ modifiedCount, totalCount, onReset, onPreset }
       </div>
       
       <div className="flex items-center gap-4">
-        {modifiedCount > 0 && (
-          <span className="text-sm bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 px-3 py-1.5 rounded-full font-medium">
-            {modifiedCount} of {totalCount} modified
-          </span>
-        )}
         <button
           onClick={onReset}
           className="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors"

@@ -91,6 +91,7 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
   const { toast } = useToast();
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [processingMessage, setProcessingMessage] = useState("");
 
   const { data: customTypes = [], refetch: refetchCustomTypes } = useQuery<CustomDocumentType[]>({
     queryKey: ['/api/doc-intel/custom-document-types'],

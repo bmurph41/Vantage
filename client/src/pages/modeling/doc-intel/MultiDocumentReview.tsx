@@ -135,6 +135,15 @@ export function MultiDocumentReview({
 
   // Check if all items are processed (no pending items)
   const allItemsProcessed = totalPending === 0 && totalItems > 0;
+  const allItemsClassified = useMemo(() => {
+    if (totalItems === 0) return false;
+    return allItems.every(item => 
+      (item.categoryConfirmed || item.categorySuggested) &&
+      (item.departmentConfirmed || item.departmentSuggested)
+    );
+  }, [allItems, totalItems]);
+
+  const canApplyToModel = allItemsClassified && totalConfirmed > 0;
 
   // Current document items
   const currentItems = documentItems[activeDocumentId] || [];
@@ -389,7 +398,7 @@ export function MultiDocumentReview({
               </Button>
               <Button
                 onClick={handleApplyToModel}
-                disabled={!allItemsProcessed || isApplying || totalConfirmed === 0}
+                disabled={!canApplyToModel || isApplying ||
                 className={allItemsProcessed ? "" : "opacity-50"}
               >
                 {isApplying ? (
