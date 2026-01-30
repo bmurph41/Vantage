@@ -317,7 +317,7 @@ export default function CompanyDetailModal({
               address: prop.address,
               type: prop.type || 'marina',
               ownerCompanyId: company.id,
-              salesCompId: selectedSalesComp || undefined,
+              salesCompId: selectedSalesComp && selectedSalesComp !== 'none' ? selectedSalesComp : undefined,
               slips: prop.slips,
               isPortfolio: true,
               portfolioName: portfolioName || `${company.name} Portfolio`,
@@ -362,7 +362,7 @@ export default function CompanyDetailModal({
           address: prop.address,
           type: prop.type || 'marina',
           ownerCompanyId: company.id,
-          salesCompId: selectedSalesComp || undefined,
+          salesCompId: selectedSalesComp && selectedSalesComp !== 'none' ? selectedSalesComp : undefined,
           slips: prop.slips,
         });
         toast({ title: "Property created successfully" });
@@ -1727,7 +1727,7 @@ export default function CompanyDetailModal({
                   <SelectValue placeholder="Select a sale transaction..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {salesComps.map((comp: SalesComp) => (
                     <SelectItem key={comp.id} value={comp.id}>
                       {comp.marinaName || comp.propertyName} - ${Number(comp.salePrice || 0).toLocaleString()}

@@ -8610,7 +8610,6 @@ Current context: Project ${req.params.projectId}`;
                 if (contactData.company) {
                   const companyResult = await CompanyLinkingService.linkCompany(
                     contactData.company,
-        orgId: req.user.orgId,
                     req.user.id
                   );
                   if (companyResult.companyId) {
@@ -9653,7 +9652,6 @@ Current context: Project ${req.params.projectId}`;
             sourceType: 'contact_form',
             sourceId: null,
             name: company,
-        orgId: req.user.orgId,
             status: 'pending',
             suggestedDuplicates: similarCompanies.length > 0 ? similarCompanies.map(c => c.id) : null,
             createdBy: req.user.id,
