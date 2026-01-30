@@ -77,6 +77,26 @@ const companyTypes = [
   { value: "other", label: "Other" },
 ];
 
+const contactPositionOptions = [
+  { value: "owner", label: "Owner" },
+  { value: "investor", label: "Investor" },
+  { value: "broker", label: "Broker" },
+  { value: "lender", label: "Lender" },
+  { value: "attorney", label: "Attorney" },
+  { value: "appraiser", label: "Appraiser" },
+  { value: "ceo", label: "CEO" },
+  { value: "cfo", label: "CFO" },
+  { value: "general_manager", label: "General Manager" },
+  { value: "marina_manager", label: "Marina Manager" },
+  { value: "dockmaster", label: "Dockmaster" },
+  { value: "accountant", label: "Accountant" },
+  { value: "operations", label: "Operations" },
+  { value: "sales", label: "Sales" },
+  { value: "marketing", label: "Marketing" },
+  { value: "consultant", label: "Consultant" },
+  { value: "other", label: "Other" },
+];
+
 export default function CompanyFormModal({ isOpen, onClose, company, pendingCompanyId, onSuccess }: CompanyFormModalProps) {
   const { toast} = useToast();
   const queryClient = useQueryClient();
@@ -623,8 +643,8 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
 
   const handleCreateNewContact = (data: any) => {
     if (company?.id) {
-      // Existing company - create pending contact linked to company
-      createPendingContactMutation.mutate(data);
+      // Existing company - create real contact and link it immediately
+      createContactMutation.mutate(data);
     } else {
       // New company - add to pending (use position as role)
       setPendingContactsToCreate([...pendingContactsToCreate, { data, role: data.position || undefined }]);
@@ -1356,9 +1376,20 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>Position</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="CEO, Manager, etc." className="bg-white dark:bg-slate-900" {...field} data-testid="input-new-contact-position" />
-                                </FormControl>
+                                <Select onValueChange={field.onChange} value={field.value || ""}>
+                                  <FormControl>
+                                    <SelectTrigger className="bg-white dark:bg-slate-900" data-testid="select-new-contact-position">
+                                      <SelectValue placeholder="Select position" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {contactPositionOptions.map((option) => (
+                                      <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                                 <FormMessage />
                               </FormItem>
                             )}

@@ -8,11 +8,12 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Building, Plus, Edit, Trash2, Upload, Search, Globe, Users, MapPin, TrendingUp, Download, Phone, Settings, Calendar, Briefcase, Home, Loader2, User, ChevronRight, Anchor, DollarSign, Merge, AlertTriangle } from "lucide-react";
+import { Building, Plus, Edit, Trash2, Upload, Search, Globe, Users, MapPin, TrendingUp, Download, Phone, Settings, Calendar, Briefcase, Home, Loader2, User, ChevronRight, Anchor, DollarSign, Merge, AlertTriangle, Star, ExternalLink } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import CompanyFormModal from "@/components/modals/company-form-modal";
 import { CreateCompanyWizardModal } from "@/components/modals/create-company-wizard-modal";
+import CompanyDetailModal from "@/components/modals/company-detail-modal";
 import { FileUpload } from "@/components/file-upload";
 import KpiSettingsModal from "@/components/modals/kpi-settings-modal";
 import { CrmPageShell } from "@/components/crm/CrmPageShell";
@@ -110,6 +111,7 @@ export default function Companies() {
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
   const [showMergeDialog, setShowMergeDialog] = useState(false);
   const [mergeMode, setMergeMode] = useState(false);
+  const [showFullPageModal, setShowFullPageModal] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -117,7 +119,9 @@ export default function Companies() {
     queryKey: ['/api/companies'],
   });
   
-  const { data: companyContacts = [] } = useQuery<Contact[]>({
+  type CompanyContactLink = { id: string; contactId: string; companyId: string; role?: string | null; isPrimary: boolean; contact: Contact };
+  
+  const { data: companyContacts = [] } = useQuery<CompanyContactLink[]>({
     queryKey: ['/api/companies', selectedCompany?.id, 'contacts'],
     queryFn: async () => {
       if (!selectedCompany?.id) return [];
@@ -162,7 +166,13 @@ export default function Companies() {
   }, [companySalesComps]);
   
   const topContacts = useMemo(() => {
-    return companyContacts.slice(0, 3);
+    // Sort to put primary contacts first, then take top 3
+    const sorted = [...companyContacts].sort((a, b) => {
+      if (a.isPrimary && !b.isPrimary) return -1;
+      if (!a.isPrimary && b.isPrimary) return 1;
+      return 0;
+    });
+    return sorted.slice(0, 3);
   }, [companyContacts]);
   
   useEffect(() => {
@@ -566,6 +576,17 @@ export default function Companies() {
       subtitle={selectedCompany.industry ? formatRole(selectedCompany.industry) : undefined}
       onEdit={() => handleEdit(selectedCompany)}
       onDelete={() => handleDelete(selectedCompany.id)}
+      actions={
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => setShowFullPageModal(true)} 
+          className="h-8 px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+          title="Open full page"
+        >
+          <ExternalLink className="h-4 w-4" />
+        </Button>
+      }
     >
       <CrmDetailSection title="Company Information">
         <CrmDetailField label="Phone" value={selectedCompany.phone} />
@@ -616,21 +637,30 @@ export default function Companies() {
       {topContacts.length > 0 && (
         <CrmDetailSection title="Key Contacts">
           <div className="space-y-2">
-            {topContacts.map((contact: Contact) => (
+            {topContacts.map((contactLink) => (
               <div 
-                key={contact.id}
-                onClick={() => setLocation(`/crm/contacts?selected=${contact.id}`)}
-                className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                key={contactLink.id}
+                onClick={() => setLocation(`/crm/contacts?selected=${contactLink.contact.id}`)}
+                className={`flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors ${contactLink.isPrimary ? 'bg-amber-50 border border-amber-200' : ''}`}
               >
-                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <User className="w-4 h-4 text-blue-600" />
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${contactLink.isPrimary ? 'bg-amber-100' : 'bg-blue-100'}`}>
+                  {contactLink.isPrimary ? (
+                    <Star className="w-4 h-4 text-amber-600" />
+                  ) : (
+                    <User className="w-4 h-4 text-blue-600" />
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium text-gray-900 truncate">
-                    {contact.firstName} {contact.lastName}
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-900 truncate">
+                      {contactLink.contact.firstName} {contactLink.contact.lastName}
+                    </span>
+                    {contactLink.isPrimary && (
+                      <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800 border-amber-300">Primary</Badge>
+                    )}
                   </div>
-                  {contact.position && (
-                    <div className="text-xs text-gray-500 truncate">{contact.position}</div>
+                  {contactLink.contact.position && (
+                    <div className="text-xs text-gray-500 truncate">{contactLink.contact.position}</div>
                   )}
                 </div>
                 <ChevronRight className="w-4 h-4 text-gray-400" />
@@ -823,6 +853,12 @@ export default function Companies() {
       <CreateCompanyWizardModal
         open={isCreateWizardOpen}
         onOpenChange={setIsCreateWizardOpen}
+      />
+
+      <CompanyDetailModal
+        isOpen={showFullPageModal}
+        onClose={() => setShowFullPageModal(false)}
+        company={selectedCompany}
       />
     </CrmPageShell>
   );
