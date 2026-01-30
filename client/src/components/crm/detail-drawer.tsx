@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Sheet,
@@ -29,6 +30,7 @@ import {
   X,
   Trash2,
   ExternalLink,
+  Maximize2,
   FileText,
   Users,
   MapPin,
@@ -61,6 +63,7 @@ export function DetailDrawer({
   entityId,
   onDelete,
 }: DetailDrawerProps) {
+  const [, setLocation] = useLocation();
   const [isEditing, setIsEditing] = useState(false);
   const [noteModalOpen, setNoteModalOpen] = useState(false);
   const [taskModalOpen, setTaskModalOpen] = useState(false);
@@ -332,6 +335,22 @@ export function DetailDrawer({
                   >
                     <Edit className="h-4 w-4 mr-1" />
                     Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const basePath = entityType === 'property' ? 'properties' : 
+                                       entityType === 'company' ? 'companies' : 
+                                       entityType === 'contact' ? 'contacts' : 'deals';
+                      setLocation(`/crm/${basePath}/${entityId}`);
+                      onOpenChange(false);
+                    }}
+                    title="Open full page"
+                    data-testid="button-open-full-page"
+                  >
+                    <Maximize2 className="h-4 w-4 mr-1" />
+                    Full Page
                   </Button>
                   <Button
                     size="sm"

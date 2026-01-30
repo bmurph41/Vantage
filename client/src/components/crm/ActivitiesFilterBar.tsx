@@ -9,6 +9,12 @@ interface FilterCounts {
   overdue: number;
   today: number;
   upcoming: number;
+  total?: number;
+}
+
+interface TeamMember {
+  id: string;
+  name: string;
 }
 
 interface ActivitiesFilterBarProps {
@@ -20,6 +26,9 @@ interface ActivitiesFilterBarProps {
   onTypeChange: (value: string) => void;
   search: string;
   onSearchChange: (value: string) => void;
+  ownerId?: string;
+  onOwnerChange?: (value: string) => void;
+  teamMembers?: TeamMember[];
   counts?: FilterCounts;
   onAddClick?: () => void;
 }
@@ -53,6 +62,9 @@ export function ActivitiesFilterBar({
   onTypeChange,
   search,
   onSearchChange,
+  ownerId,
+  onOwnerChange,
+  teamMembers,
   counts,
   onAddClick,
 }: ActivitiesFilterBarProps) {
@@ -125,6 +137,23 @@ export function ActivitiesFilterBar({
             ))}
           </SelectContent>
         </Select>
+        
+        {onOwnerChange && teamMembers && teamMembers.length > 0 && (
+          <Select value={ownerId || 'all'} onValueChange={onOwnerChange}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Owner" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Owners</SelectItem>
+              <SelectItem value="me">Assigned to Me</SelectItem>
+              {teamMembers.map((member) => (
+                <SelectItem key={member.id} value={member.id}>
+                  {member.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         
         {onAddClick && (
           <Button onClick={onAddClick} className="ml-auto">
