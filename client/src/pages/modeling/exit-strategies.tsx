@@ -1,11 +1,17 @@
 import { useState, useCallback } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Calculator, 
   TrendingUp, 
@@ -22,10 +28,15 @@ import {
   Settings2,
   ChevronDown,
   ChevronUp,
-  RotateCcw
+  RotateCcw,
+  Link,
+  Search,
+  Building2,
+  MapPin
 } from "lucide-react";
 import { formatCurrency, formatPercent } from "@/lib/utils";
 import { useExitStrategiesStore, type MasterInputs } from "@/stores/exitStrategiesStore";
+import type { ModelingProject } from "@shared/schema";
 
 const parseCurrency = (value: string): string => {
   const num = value.replace(/[^0-9.-]/g, '');
@@ -345,6 +356,34 @@ const exitTools = [
 export default function ExitStrategiesPage() {
   const [activeTab, setActiveTab] = useState("tax");
   const [, navigate] = useLocation();
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [projectSearch, setProjectSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  const { data: projects = [], isLoading: projectsLoading } = useQuery<ModelingProject[]>({
+    queryKey: ['/api/modeling/projects'],
+    enabled: isLinkModalOpen,
+  });
+
+  const filteredProjects = projects.filter((project) => {
+    const matchesSearch = projectSearch === "" || 
+      project.marinaName.toLowerCase().includes(projectSearch.toLowerCase()) ||
+      project.city?.toLowerCase().includes(projectSearch.toLowerCase()) ||
+      project.state?.toLowerCase().includes(projectSearch.toLowerCase());
+    
+    const matchesStatus = statusFilter === "all" || 
+      (statusFilter === "active" && project.dealOutcome === "active") ||
+      (statusFilter === "archived" && project.dealOutcome === "archived") ||
+      (statusFilter === "under_review" && project.dealOutcome === "under_review") ||
+      (statusFilter === "closed" && (project.dealOutcome === "closed_won" || project.dealOutcome === "closed_lost"));
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  const handleLinkToProject = (projectId: string) => {
+    navigate(`/modeling/projects/${projectId}?tab=exit`);
+    setIsLinkModalOpen(false);
+  };
 
   return (
     <div className="flex-1 overflow-auto p-6">
@@ -361,12 +400,108 @@ export default function ExitStrategiesPage() {
           </div>
           <Button
             variant="outline"
-            onClick={() => navigate("/modeling/projects")}
-            data-testid="button-back-to-projects"
+            onClick={() => setIsLinkModalOpen(true)}
+            data-testid="button-link-to-project"
           >
-            View Projects
+            <Link className="h-4 w-4 mr-2" />
+            Link to Project
           </Button>
         </div>
+
+        <Dialog open={isLinkModalOpen} onOpenChange={setIsLinkModalOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Link className="h-5 w-5 text-primary" />
+                Link to Modeling Project
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div className="flex gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search projects..."
+                    value={projectSearch}
+                    onChange={(e) => setProjectSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Filter" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Projects</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="under_review">Under Review</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                    <SelectItem value="archived">Archived</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <ScrollArea className="h-[400px] pr-4">
+                {projectsLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3, 4].map((i) => (
+                      <Skeleton key={i} className="h-20 w-full" />
+                    ))}
+                  </div>
+                ) : filteredProjects.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Building2 className="h-12 w-12 text-muted-foreground/50 mb-3" />
+                    <p className="text-muted-foreground">No projects found</p>
+                    <p className="text-sm text-muted-foreground/70">Try adjusting your search or filter</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredProjects.map((project) => (
+                      <Card 
+                        key={project.id} 
+                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => handleLinkToProject(project.id)}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <Building2 className="h-4 w-4 text-primary flex-shrink-0" />
+                                <span className="font-medium truncate">{project.marinaName}</span>
+                              </div>
+                              {(project.city || project.state) && (
+                                <div className="flex items-center gap-1 mt-1 text-sm text-muted-foreground">
+                                  <MapPin className="h-3 w-3" />
+                                  <span>{[project.city, project.state].filter(Boolean).join(", ")}</span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 ml-3">
+                              {project.dealOutcome && (
+                                <Badge variant={
+                                  project.dealOutcome === "active" ? "default" :
+                                  project.dealOutcome === "archived" ? "secondary" :
+                                  project.dealOutcome === "under_review" ? "outline" :
+                                  "secondary"
+                                }>
+                                  {project.dealOutcome.replace(/_/g, " ")}
+                                </Badge>
+                              )}
+                              <Button size="sm" variant="ghost">
+                                <Link className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <Card className="bg-blue-50 border-blue-200">
           <CardContent className="py-4">
