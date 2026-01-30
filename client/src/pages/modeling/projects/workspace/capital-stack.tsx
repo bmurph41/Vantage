@@ -689,11 +689,31 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
 
   const layerType = equityForm.watch('layerType');
 
+  const [mainTab, setMainTab] = useState("capital-stack");
+
   return (
     <div className="space-y-6">
       {onTabChange && (
         <WorkflowNavigation currentTab="capital" onNavigate={onTabChange} />
       )}
+
+      <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsTrigger value="capital-stack" className="gap-2">
+            <Building2 className="h-4 w-4" />
+            Capital Stack
+          </TabsTrigger>
+          <TabsTrigger value="debt-scenarios" className="gap-2">
+            <Calculator className="h-4 w-4" />
+            Debt Scenarios
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="debt-scenarios" className="space-y-6">
+          <WorkspaceDebtScenarios projectId={projectId} onTabChange={onTabChange} />
+        </TabsContent>
+
+        <TabsContent value="capital-stack" className="space-y-6">
       
       <div className="flex items-center justify-between">
         <div>
@@ -1413,10 +1433,6 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                     <TabsTrigger value="projections" className="gap-1.5 text-xs">
                       <Calculator className="h-3.5 w-3.5" />
                       Projections
-                    </TabsTrigger>
-                    <TabsTrigger value="scenarios" className="gap-1.5 text-xs">
-                      <BarChart3 className="h-3.5 w-3.5" />
-                      Debt Scenarios
                     </TabsTrigger>
                   </TabsList>
 
@@ -2871,10 +2887,6 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                     </Card>
                   </TabsContent>
 
-                  {/* DEBT SCENARIOS TAB */}
-                  <TabsContent value="scenarios" className="space-y-4">
-                    <WorkspaceDebtScenarios projectId={projectId} onTabChange={onTabChange} />
-                  </TabsContent>
                 </Tabs>
 
                 <div className="flex justify-end">
@@ -2897,6 +2909,8 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
         </div>
       )}
 
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
