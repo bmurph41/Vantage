@@ -594,6 +594,7 @@ export default function Companies() {
       }
     >
       <CrmDetailSection title="Company Information">
+        <CrmDetailField label="Primary Contact" value={primaryContact ? `${primaryContact.firstName} ${primaryContact.lastName}` : null} />
         <CrmDetailField label="Phone" value={selectedCompany.phone} />
         <CrmDetailField label="Website" value={selectedCompany.website ? (
           <a href={selectedCompany.website.startsWith('http') ? selectedCompany.website : `https://${selectedCompany.website}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{selectedCompany.website}</a>
@@ -617,46 +618,6 @@ export default function Companies() {
             ) : null
           )
         } />
-      </CrmDetailSection>
-
-      <CrmDetailSection title="Primary Contact">
-        {primaryContact ? (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-gray-400" />
-              <span className="font-medium text-gray-900">
-                {primaryContact.firstName} {primaryContact.lastName}
-              </span>
-            </div>
-            
-            {primaryContact.position && (
-              <div className="flex items-center gap-2">
-                <Briefcase className="h-4 w-4 text-gray-400" />
-                <span className="text-sm text-gray-600">{primaryContact.position}</span>
-              </div>
-            )}
-            
-            {primaryContact.email && (
-              <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-gray-400" />
-                <a href={`mailto:${primaryContact.email}`} className="text-sm text-blue-600 hover:underline">
-                  {primaryContact.email}
-                </a>
-              </div>
-            )}
-            
-            {primaryContact.phone && (
-              <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-gray-400" />
-                <a href={`tel:${primaryContact.phone}`} className="text-sm text-blue-600 hover:underline">
-                  {primaryContact.phone}
-                </a>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="text-sm text-gray-500">No primary contact assigned</div>
-        )}
       </CrmDetailSection>
 
       <CrmDetailSection title="Portfolio">
