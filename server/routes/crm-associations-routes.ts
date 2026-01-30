@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../db';
-import { crmAssociations, companies, contacts, properties, crmDeals, projects, users } from '@shared/schema';
+import { crmAssociations, crmCompanies, crmContacts, crmProperties, crmDeals, projects, users } from '@shared/schema';
 import { eq, and, or, desc, sql } from 'drizzle-orm';
 import { createTimelineEvent } from '../services/timeline-event-service';
 
@@ -121,22 +121,22 @@ router.get('/:entityType/:entityId/linked', async (req, res) => {
       switch (linkedType) {
         case 'company':
           const [company] = await db
-            .select({ id: companies.id, name: companies.name, industry: companies.industry })
-            .from(companies)
-            .where(eq(companies.id, linkedId))
+            .select({ id: crmCompanies.id, name: crmCompanies.name, industry: crmCompanies.industry })
+            .from(crmCompanies)
+            .where(eq(crmCompanies.id, linkedId))
             .limit(1);
           entity = company ? { ...company, entityType: 'company' } : null;
           break;
         case 'contact':
           const [contact] = await db
             .select({ 
-              id: contacts.id, 
-              firstName: contacts.firstName, 
-              lastName: contacts.lastName,
-              email: contacts.email 
+              id: crmContacts.id, 
+              firstName: crmContacts.firstName, 
+              lastName: crmContacts.lastName,
+              email: crmContacts.email 
             })
-            .from(contacts)
-            .where(eq(contacts.id, linkedId))
+            .from(crmContacts)
+            .where(eq(crmContacts.id, linkedId))
             .limit(1);
           entity = contact ? { 
             ...contact, 
@@ -146,9 +146,9 @@ router.get('/:entityType/:entityId/linked', async (req, res) => {
           break;
         case 'property':
           const [property] = await db
-            .select({ id: properties.id, name: properties.name, address: properties.address })
-            .from(properties)
-            .where(eq(properties.id, linkedId))
+            .select({ id: crmProperties.id, name: crmProperties.name, address: crmProperties.address })
+            .from(crmProperties)
+            .where(eq(crmProperties.id, linkedId))
             .limit(1);
           entity = property ? { ...property, entityType: 'property' } : null;
           break;

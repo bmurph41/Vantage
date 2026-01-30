@@ -87,6 +87,9 @@ const Pipeline = lazy(() => import("@/pages/pipeline"));
 const Leads = lazy(() => import("@/pages/leads"));
 const Contacts = lazy(() => import("@/pages/contacts"));
 const Companies = lazy(() => import("@/pages/companies"));
+const CompanyRecordPage = lazy(() => import("@/pages/company-record"));
+const ContactRecordPage = lazy(() => import("@/pages/contact-record"));
+const PropertyRecordPage = lazy(() => import("@/pages/property-record"));
 const Deals = lazy(() => import("@/pages/deals"));
 const DealWorkspace = lazy(() => import("@/pages/deal-workspace"));
 const DealDetail = lazy(() => import("@/pages/deal-detail"));
@@ -1305,6 +1308,9 @@ function Router() {
           </UnifiedLayout>
         )}
       </Route>
+      <Route path="/crm/contacts/:id">
+        {() => <ContactRecordPage />}
+      </Route>
       <Route path="/crm/companies">
         {() => (
           <UnifiedLayout>
@@ -1312,12 +1318,18 @@ function Router() {
           </UnifiedLayout>
         )}
       </Route>
+      <Route path="/crm/companies/:id">
+        {() => <CompanyRecordPage />}
+      </Route>
       <Route path="/crm/properties">
         {() => (
           <UnifiedLayout>
             <Properties />
           </UnifiedLayout>
         )}
+      </Route>
+      <Route path="/crm/properties/:id">
+        {() => <PropertyRecordPage />}
       </Route>
       <Route path="/crm/pending-properties">
         {() => (

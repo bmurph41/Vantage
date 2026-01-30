@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { 
-  companies, contacts, properties, crmDeals, 
-  crmActivities, crmTimelineEvents, users, crmNotes
+  crmCompanies, crmContacts, crmProperties, crmDeals, 
+  crmActivities, crmTimelineEvents, users, crmNotes, projects
 } from '@shared/schema';
 import { eq, and, or, desc, asc, sql, gte, lt, inArray } from 'drizzle-orm';
 
@@ -150,11 +150,11 @@ router.get('/companies/:id/summary', async (req, res) => {
           email: users.email,
         }
       })
-      .from(companies)
-      .leftJoin(users, eq(companies.ownerId, users.id))
+      .from(crmCompanies)
+      .leftJoin(users, eq(crmCompanies.ownerId, users.id))
       .where(and(
-        eq(companies.id, id),
-        eq(companies.orgId, orgId)
+        eq(crmCompanies.id, id),
+        eq(crmCompanies.orgId, orgId)
       ))
       .limit(1);
     
@@ -169,10 +169,10 @@ router.get('/companies/:id/summary', async (req, res) => {
     
     const [contactsCount] = await db
       .select({ count: sql<number>`count(*)::int` })
-      .from(contacts)
+      .from(crmContacts)
       .where(and(
-        eq(contacts.orgId, orgId),
-        eq(contacts.companyId, id)
+        eq(crmContacts.orgId, orgId),
+        eq(crmContacts.companyId, id)
       ));
     
     const [dealsCount] = await db
@@ -222,16 +222,16 @@ router.get('/contacts/:id/summary', async (req, res) => {
           email: users.email,
         },
         company: {
-          id: companies.id,
-          name: companies.name,
+          id: crmCompanies.id,
+          name: crmCompanies.name,
         }
       })
-      .from(contacts)
-      .leftJoin(users, eq(contacts.ownerId, users.id))
-      .leftJoin(companies, eq(contacts.companyId, companies.id))
+      .from(crmContacts)
+      .leftJoin(users, eq(crmContacts.ownerId, users.id))
+      .leftJoin(companies, eq(crmContacts.companyId, crmCompanies.id))
       .where(and(
-        eq(contacts.id, id),
-        eq(contacts.orgId, orgId)
+        eq(crmContacts.id, id),
+        eq(crmContacts.orgId, orgId)
       ))
       .limit(1);
     
@@ -291,11 +291,11 @@ router.get('/properties/:id/summary', async (req, res) => {
           email: users.email,
         }
       })
-      .from(properties)
-      .leftJoin(users, eq(properties.ownerId, users.id))
+      .from(crmProperties)
+      .leftJoin(users, eq(crmProperties.ownerId, users.id))
       .where(and(
-        eq(properties.id, id),
-        eq(properties.orgId, orgId)
+        eq(crmProperties.id, id),
+        eq(crmProperties.orgId, orgId)
       ))
       .limit(1);
     
@@ -376,9 +376,9 @@ router.get('/deals/:id/summary', async (req, res) => {
     let company = null;
     if (deal.deal.companyId) {
       const [companyData] = await db
-        .select({ id: companies.id, name: companies.name })
-        .from(companies)
-        .where(eq(companies.id, deal.deal.companyId))
+        .select({ id: crmCompanies.id, name: crmCompanies.name })
+        .from(crmCompanies)
+        .where(eq(crmCompanies.id, deal.deal.companyId))
         .limit(1);
       company = companyData || null;
     }
@@ -387,12 +387,12 @@ router.get('/deals/:id/summary', async (req, res) => {
     if (deal.deal.contactId) {
       const [contactData] = await db
         .select({ 
-          id: contacts.id, 
-          firstName: contacts.firstName,
-          lastName: contacts.lastName,
+          id: crmContacts.id, 
+          firstName: crmContacts.firstName,
+          lastName: crmContacts.lastName,
         })
-        .from(contacts)
-        .where(eq(contacts.id, deal.deal.contactId))
+        .from(crmContacts)
+        .where(eq(crmContacts.id, deal.deal.contactId))
         .limit(1);
       contact = contactData || null;
     }
@@ -400,9 +400,9 @@ router.get('/deals/:id/summary', async (req, res) => {
     let property = null;
     if (deal.deal.propertyId) {
       const [propertyData] = await db
-        .select({ id: properties.id, name: properties.name })
-        .from(properties)
-        .where(eq(properties.id, deal.deal.propertyId))
+        .select({ id: crmProperties.id, name: crmProperties.name })
+        .from(crmProperties)
+        .where(eq(crmProperties.id, deal.deal.propertyId))
         .limit(1);
       property = propertyData || null;
     }
