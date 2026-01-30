@@ -159,7 +159,12 @@ export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: Wo
     noiByYear: Array.from({ length: holdPeriod }, () => 0),
   };
 
-  const metrics = summaryData || emptyMetrics;
+  const metrics = {
+    ...emptyMetrics,
+    ...summaryData,
+    noiByYear: summaryData?.noiByYear || emptyMetrics.noiByYear,
+    cashOnCash: summaryData?.cashOnCash || emptyMetrics.cashOnCash,
+  };
 
   const updateScenario = (type: ScenarioType, field: keyof ScenarioConfig, value: string | number) => {
     setScenarios(prev => ({
