@@ -9800,6 +9800,79 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+
+  // Get companies KPI stats (for computed metrics) - Must be before :id routes
+  app.get('/api/companies/kpi-stats', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      
+      // Portfolio companies count
+      const portfolioCompaniesResult = await db.execute(sql`
+        SELECT COUNT(*) as count
+        FROM crm_companies
+        WHERE org_id = ${orgId}
+          AND is_portfolio_company = true
+      `);
+      const portfolioCompanies = parseInt(portfolioCompaniesResult.rows[0]?.count as string || '0');
+
+      // Companies with active deals
+      let companiesWithActiveDeals = 0;
+      try {
+        const activeDealsResult = await db.execute(sql`
+          SELECT COUNT(DISTINCT c.id) as count
+          FROM crm_companies c
+          JOIN crm_deals d ON (d.buyer_company_id = c.id OR d.seller_company_id = c.id)
+          WHERE c.org_id = ${orgId}
+            AND d.org_id = ${orgId}
+            AND d.status NOT IN ('closed_won', 'closed_lost', 'dead')
+        `);
+        companiesWithActiveDeals = parseInt(activeDealsResult.rows[0]?.count as string || '0');
+      } catch (e) {
+        // Table might not exist or columns missing
+      }
+
+      // New this month
+      const newThisMonthResult = await db.execute(sql`
+        SELECT COUNT(*) as count
+        FROM crm_companies
+        WHERE org_id = ${orgId}
+          AND created_at >= date_trunc('month', CURRENT_DATE)
+      `);
+      
+      // Companies with contacts
+      let withContacts = 0;
+      try {
+        const withContactsResult = await db.execute(sql`
+          SELECT COUNT(DISTINCT c.id) as count
+          FROM crm_companies c
+          JOIN crm_contacts ct ON ct.company_id = c.id
+          WHERE c.org_id = ${orgId}
+        `);
+        withContacts = parseInt(withContactsResult.rows[0]?.count as string || '0');
+      } catch (e) {
+        // Column might not exist
+      }
+      
+      // Total companies count
+      const totalResult = await db.execute(sql`
+        SELECT COUNT(*) as count
+        FROM crm_companies
+        WHERE org_id = ${orgId}
+      `);
+      
+      res.json({
+        portfolioCompanies,
+        companiesWithActiveDeals,
+        newThisMonth: parseInt(newThisMonthResult.rows[0]?.count as string || '0'),
+        withProperties: 0,
+        withContacts,
+        totalCompanies: parseInt(totalResult.rows[0]?.count as string || '0'),
+      });
+    } catch (error: any) {
+      console.error('Failed to fetch company KPI stats:', error);
+      res.status(500).json({ error: 'Failed to fetch company KPI stats' });
+    }
+  });
   app.get("/api/companies/:id", async (req: any, res) => {
     try {
       const company = await storage.getCrmCompany(req.params.id);
@@ -23313,7 +23386,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         headerData = {
           personaType: personaType,
           title: 'Marina Portfolio',
-          subtitle: totalOwnedCount > 0 ? `\${totalOwnedCount} owned \${totalOwnedCount === 1 ? 'marina' : 'marinas'}` : 'Track your marina investments',
+          subtitle: totalOwnedCount > 0 ? `${totalOwnedCount} owned ${totalOwnedCount === 1 ? 'marina' : 'marinas'}` : 'Track your marina investments',
           metrics: [
             { label: 'Owned Marinas', value: String(totalOwnedCount), icon: 'Building2', color: 'blue' },
             { label: 'Portfolio Value', value: formatCurrency(ownedProjectsResult[0]?.totalValue || 0), icon: 'DollarSign', color: 'green' },
@@ -23976,72 +24049,6 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       res.status(500).json({ error: 'Failed to save KPI preferences' });
     }
   });
-
-  // Get companies KPI stats (for computed metrics)
-  app.get('/api/companies/kpi-stats', authenticateUser, async (req: any, res) => {
-    try {
-      const orgId = req.user.orgId;
-      
-      // Companies with active deals (use crm_deals if it exists)
-      let companiesWithActiveDeals = 0;
-      try {
-        const activeDealsResult = await db.execute(sql`
-          SELECT COUNT(DISTINCT c.id) as count
-          FROM crm_companies c
-          JOIN crm_deals d ON (d.buyer_company_id = c.id OR d.seller_company_id = c.id)
-          WHERE c.org_id = ${orgId}
-            AND d.org_id = ${orgId}
-            AND d.status NOT IN ('closed_won', 'closed_lost', 'dead')
-        `);
-        companiesWithActiveDeals = parseInt(activeDealsResult.rows[0]?.count as string || '0');
-      } catch (e) {
-        // Table might not exist or columns missing
-      }
-      
-      // New this month
-      const newThisMonthResult = await db.execute(sql`
-        SELECT COUNT(*) as count
-        FROM crm_companies
-        WHERE org_id = ${orgId}
-          AND created_at >= date_trunc('month', CURRENT_DATE)
-      `);
-      
-      // Companies with contacts
-      let withContacts = 0;
-      try {
-        const withContactsResult = await db.execute(sql`
-          SELECT COUNT(DISTINCT c.id) as count
-          FROM crm_companies c
-          JOIN crm_contacts ct ON ct.company_id = c.id
-          WHERE c.org_id = ${orgId}
-        `);
-        withContacts = parseInt(withContactsResult.rows[0]?.count as string || '0');
-      } catch (e) {
-        // Column might not exist
-      }
-      
-      // Total companies count
-      const totalResult = await db.execute(sql`
-        SELECT COUNT(*) as count
-        FROM crm_companies
-        WHERE org_id = ${orgId}
-      `);
-      
-      res.json({
-        portfolioCompanies: 0, // crm_properties doesn't have company_id column
-        companiesWithActiveDeals,
-        newThisMonth: parseInt(newThisMonthResult.rows[0]?.count as string || '0'),
-        withProperties: 0, // crm_properties doesn't have company_id column
-        withContacts,
-        totalCompanies: parseInt(totalResult.rows[0]?.count as string || '0'),
-      });
-    } catch (error: any) {
-      console.error('Failed to fetch company KPI stats:', error);
-      res.status(500).json({ error: 'Failed to fetch company KPI stats' });
-    }
-  });
-
-  // Get aggregated dashboard data
   app.get('/api/dashboards/data', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;

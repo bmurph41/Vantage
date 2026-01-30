@@ -1518,6 +1518,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                   <Plus className="h-4 w-4 mr-2" />
                   Link Property
                 </Button>
+                </div>
               </div>
 
               {company ? (
