@@ -9976,7 +9976,8 @@ Current context: Project ${req.params.projectId}`;
       const propertyData = {
         ...req.body,
         title: req.body.title || req.body.name || '',
-        type: req.body.type || 'marina',
+        type: req.body.type || req.body.propertyType || 'marina',
+        listingPrice: req.body.askingPrice || req.body.listingPrice,
         status: req.body.status || 'available',
         ownerId: req.user.id
       };
