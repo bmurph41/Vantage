@@ -6797,6 +6797,34 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // CRM Contacts
+  
+  // Check for duplicate email or phone (must be before /api/crm/contacts/:id)
+  app.get("/api/crm/contacts/check-duplicate-field", async (req: any, res) => {
+    try {
+      const { field, value, excludeId } = req.query;
+      
+      if (!field || !value) {
+        return res.status(400).json({ error: "field and value are required" });
+      }
+      
+      if (field !== 'email' && field !== 'phone') {
+        return res.status(400).json({ error: "field must be 'email' or 'phone'" });
+      }
+      
+      const result = await storage.checkCrmContactDuplicateField(
+        req.user.orgId,
+        field as 'email' | 'phone',
+        value as string,
+        excludeId as string | undefined
+      );
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Failed to check duplicate field:", error);
+      res.status(500).json({ error: "Failed to check duplicate" });
+    }
+  });
+
   app.get("/api/crm/contacts", async (req: any, res) => {
     try {
       let page = parseInt(req.query.page as string) || 1;

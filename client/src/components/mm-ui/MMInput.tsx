@@ -186,17 +186,40 @@ export const MMPhoneInput = forwardRef<HTMLInputElement, MMPhoneInputProps>(
 
 MMPhoneInput.displayName = 'MMPhoneInput';
 
-interface MMCurrencyInputProps extends Omit<MMInputProps, 'type'> {
+interface MMCurrencyInputProps extends Omit<MMInputProps, 'type' | 'onChange'> {
   currency?: string;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
+const formatCurrency = (value: string): string => {
+  const digits = value.replace(/[^0-9]/g, '');
+  if (!digits) return '';
+  return Number(digits).toLocaleString('en-US');
+};
+
 export const MMCurrencyInput = forwardRef<HTMLInputElement, MMCurrencyInputProps>(
-  ({ currency = '$', ...props }, ref) => {
+  ({ currency = '$', value, onChange, ...props }, ref) => {
+    const displayValue = value ? formatCurrency(String(value)) : '';
+    
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const rawValue = e.target.value.replace(/[^0-9]/g, '');
+      const syntheticEvent = {
+        ...e,
+        target: {
+          ...e.target,
+          value: rawValue,
+        },
+      } as React.ChangeEvent<HTMLInputElement>;
+      onChange?.(syntheticEvent);
+    };
+
     return (
       <MMInput
         ref={ref}
         type="text"
-        inputMode="decimal"
+        inputMode="numeric"
+        value={displayValue}
+        onChange={handleChange}
         leftIcon={<span className="text-sm font-medium">{currency}</span>}
         {...props}
       />
