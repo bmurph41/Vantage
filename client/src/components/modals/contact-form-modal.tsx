@@ -391,7 +391,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
       icon={User}
       size="lg"
       showProgressBar={true}
-      className="max-w-5xl max-h-[92vh] p-0 overflow-hidden"
+      className="max-w-2xl max-h-[90vh] p-0 overflow-hidden"
       primaryAction={{
         label: isEdit ? "Save" : "Create",
         onClick: handleSave,
@@ -405,26 +405,26 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
       }}
     >
         {/* Body */}
-        <div className="px-8 py-6 overflow-y-auto max-h-[calc(92vh-200px)] space-y-6">
+        <div className="px-6 py-5 overflow-y-auto max-h-[calc(90vh-180px)] space-y-5">
           {/* Photo + Basic Info Card */}
-          <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="text-lg font-medium">Basic Information</CardTitle>
+          <Card className="border-muted">
+            <CardHeader className="pb-3 pt-4 px-5">
+              <CardTitle className="text-base font-semibold">Basic Information</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-8 items-start">
-                {/* Photo Upload */}
-                <div className="flex flex-col items-center gap-4">
-                  <div className="relative h-32 w-32 rounded-2xl bg-gradient-to-br from-muted to-muted/50 overflow-hidden flex items-center justify-center border-2 border-dashed border-muted-foreground/20 hover:border-muted-foreground/40 transition-colors">
+            <CardContent className="px-5 pb-5">
+              <div className="flex gap-5 items-start">
+                {/* Photo Upload - Compact */}
+                <div className="flex flex-col items-center gap-2 shrink-0">
+                  <div className="relative h-20 w-20 rounded-xl bg-gradient-to-br from-muted to-muted/50 overflow-hidden flex items-center justify-center border border-dashed border-muted-foreground/20 hover:border-muted-foreground/40 transition-colors">
                     {photoDataUrl ? (
                       <img alt="Contact avatar" src={photoDataUrl} className="h-full w-full object-cover" data-testid="contact-photo" />
                     ) : (
-                      <User className="h-12 w-12 text-muted-foreground/40" />
+                      <User className="h-8 w-8 text-muted-foreground/40" />
                     )}
                   </div>
-                  <label className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 cursor-pointer font-medium transition-colors">
-                    <Upload className="h-4 w-4" />
-                    <span>Upload photo</span>
+                  <label className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 cursor-pointer font-medium transition-colors">
+                    <Upload className="h-3.5 w-3.5" />
+                    <span>Upload</span>
                     <input
                       type="file"
                       accept="image/*"
@@ -436,30 +436,30 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                 </div>
 
                 {/* Form Fields */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">First name *</Label>
+                <div className="flex-1 grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="firstName" className="text-sm">First name *</Label>
                 <Input
                   id="firstName"
                   ref={firstNameRef}
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   placeholder="Jane"
-                  className={classNames("bg-white dark:bg-slate-900", touched && errors.firstName && "border-destructive focus-visible:ring-destructive")}
+                  className={classNames("h-9 bg-white dark:bg-slate-900", touched && errors.firstName && "border-destructive focus-visible:ring-destructive")}
                   data-testid="input-first-name"
                 />
                 {touched && errors.firstName && (
                   <p className="text-xs text-destructive">{errors.firstName}</p>
                 )}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Last name *</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="lastName" className="text-sm">Last name *</Label>
                 <Input 
                   id="lastName" 
                   value={lastName} 
                   onChange={(e) => setLastName(e.target.value)} 
                   placeholder="Doe" 
-                  className={classNames("bg-white dark:bg-slate-900", touched && errors.lastName && "border-destructive focus-visible:ring-destructive")}
+                  className={classNames("h-9 bg-white dark:bg-slate-900", touched && errors.lastName && "border-destructive focus-visible:ring-destructive")}
                   data-testid="input-last-name"
                 />
                 {touched && errors.lastName && (
@@ -493,46 +493,46 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                 </div>
               )}
               
-              <div className="space-y-2">
-                <Label htmlFor="email">Email *</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="email" className="text-sm">Email *</Label>
                 <Input 
                   id="email" 
                   type="email"
                   value={email} 
                   onChange={(e) => setEmail(e.target.value)} 
                   placeholder="jane.doe@example.com"
-                  className={classNames("bg-white dark:bg-slate-900", touched && errors.email && "border-destructive focus-visible:ring-destructive")}
+                  className={classNames("h-9 bg-white dark:bg-slate-900", touched && errors.email && "border-destructive focus-visible:ring-destructive")}
                   data-testid="input-email"
                 />
                 {touched && errors.email && (
                   <p className="text-xs text-destructive">{errors.email}</p>
                 )}
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label className="flex items-center gap-2">
-                    <Phone className="h-4 w-4"/> Phone Numbers *
+                  <Label className="flex items-center gap-1.5 text-sm">
+                    <Phone className="h-3.5 w-3.5"/> Phone *
                   </Label>
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     onClick={addPhone}
-                    className="h-7 text-xs"
+                    className="h-6 text-xs text-primary hover:text-primary/80"
                     data-testid="button-add-phone"
                   >
-                    <Plus className="h-3 w-3 mr-1" />
-                    Add Phone
+                    <Plus className="h-3 w-3 mr-0.5" />
+                    Add
                   </Button>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {phones.map((phone, index) => (
-                    <div key={index} className="flex items-start gap-2">
+                    <div key={index} className="flex items-center gap-1.5">
                       <Select 
                         value={phone.type} 
                         onValueChange={(value) => updatePhone(index, 'type', value)}
                       >
-                        <SelectTrigger className="w-28 bg-white dark:bg-slate-900" data-testid={`select-phone-type-${index}`}>
+                        <SelectTrigger className="w-20 h-9 text-xs bg-white dark:bg-slate-900" data-testid={`select-phone-type-${index}`}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -546,7 +546,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                         value={phone.number}
                         onChange={(e) => updatePhone(index, 'number', formatPhone(e.target.value))}
                         placeholder="(555) 555-1234"
-                        className="flex-1 bg-white dark:bg-slate-900"
+                        className="flex-1 h-9 bg-white dark:bg-slate-900"
                         data-testid={`input-phone-${index}`}
                       />
                       {phones.length > 1 && (
@@ -555,10 +555,10 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                           variant="ghost"
                           size="sm"
                           onClick={() => removePhone(index)}
-                          className="h-10 w-10 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          className="h-9 w-9 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                           data-testid={`button-remove-phone-${index}`}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       )}
                     </div>
@@ -568,8 +568,8 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                   <p className="text-xs text-destructive">{errors.phones}</p>
                 )}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="company">Company *</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="company" className="text-sm">Company *</Label>
                 <Popover open={companyPopoverOpen} onOpenChange={setCompanyPopoverOpen}>
                   <PopoverTrigger asChild>
                     <div className="relative">
@@ -590,8 +590,8 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                         onFocus={() => {
                           if (company.length >= 2) setCompanyPopoverOpen(true);
                         }}
-                        placeholder="Search or enter company name..." 
-                        className={classNames("bg-white dark:bg-slate-900", touched && errors.company && "border-destructive focus-visible:ring-destructive")}
+                        placeholder="Search or enter company" 
+                        className={classNames("h-9 bg-white dark:bg-slate-900", touched && errors.company && "border-destructive focus-visible:ring-destructive")}
                         data-testid="input-company"
                         autoComplete="off"
                       />
@@ -665,26 +665,26 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                   </p>
                 )}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="role">Role/Title *</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="role" className="text-sm">Role/Title *</Label>
                 <Input 
                   id="role" 
                   value={role} 
                   onChange={(e) => setRole(e.target.value)} 
                   placeholder="VP of Acquisitions" 
-                  className={classNames("bg-white dark:bg-slate-900", touched && errors.role && "border-destructive focus-visible:ring-destructive")}
+                  className={classNames("h-9 bg-white dark:bg-slate-900", touched && errors.role && "border-destructive focus-visible:ring-destructive")}
                   data-testid="input-role"
                 />
                 {touched && errors.role && (
                   <p className="text-xs text-destructive">{errors.role}</p>
                 )}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="contactTag">Contact Tag *</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="contactTag" className="text-sm">Contact Tag *</Label>
                 <Select value={contactTag} onValueChange={setContactTag}>
                   <SelectTrigger 
                     data-testid="select-contact-tag"
-                    className={classNames("bg-white dark:bg-slate-900", touched && errors.contactTag && "border-destructive focus-visible:ring-destructive")}
+                    className={classNames("h-9 bg-white dark:bg-slate-900", touched && errors.contactTag && "border-destructive focus-visible:ring-destructive")}
                   >
                     <SelectValue placeholder="Select contact tag" />
                   </SelectTrigger>
@@ -708,14 +708,14 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                 )}
               </div>
               {contactTag === 'lead' && (
-                <div className="space-y-2">
-                  <Label htmlFor="leadStatus" className="flex items-center gap-2">
-                    <Thermometer className="h-4 w-4"/> Lead Status *
+                <div className="space-y-1.5">
+                  <Label htmlFor="leadStatus" className="flex items-center gap-1.5 text-sm">
+                    <Thermometer className="h-3.5 w-3.5"/> Lead Status *
                   </Label>
                   <Select value={leadStatus} onValueChange={setLeadStatus}>
                     <SelectTrigger 
                       data-testid="select-lead-status"
-                      className={classNames("bg-white dark:bg-slate-900", touched && errors.leadStatus && "border-destructive focus-visible:ring-destructive")}
+                      className={classNames("h-9 bg-white dark:bg-slate-900", touched && errors.leadStatus && "border-destructive focus-visible:ring-destructive")}
                     >
                       <SelectValue placeholder="Select lead status" />
                     </SelectTrigger>
@@ -738,17 +738,17 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
           </Card>
 
           {/* Address Card */}
-          <Card>
-            <CardHeader className="pb-4">
+          <Card className="border-muted">
+            <CardHeader className="pb-3 pt-4 px-5">
               <div className="flex items-center gap-2">
-                <MapPin className="h-5 w-5 text-primary" />
-                <CardTitle className="text-lg font-medium">Address *</CardTitle>
+                <MapPin className="h-4 w-4 text-primary" />
+                <CardTitle className="text-base font-semibold">Address *</CardTitle>
               </div>
             </CardHeader>
-            <CardContent>
-            <div className="space-y-4">
-              <div className="space-y-4">
-                <div className="space-y-2">
+            <CardContent className="px-5 pb-5">
+            <div className="space-y-3">
+              <div className="space-y-3">
+                <div className="space-y-1.5">
                   <AddressInput
                     value={address}
                     onChange={(value) => setAddress(value)}
@@ -768,58 +768,60 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                     <p className="text-xs text-destructive">{errors.address}</p>
                   )}
                 </div>
-                <div>
-                  <Label htmlFor="unit" className="text-sm">Unit/Suite/Apt</Label>
-                  <Input 
-                    id="unit" 
-                    value={unit} 
-                    onChange={(e) => setUnit(e.target.value)} 
-                    placeholder="Unit 5A" 
-                    className="bg-white dark:bg-slate-900"
-                    data-testid="input-unit"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-2 space-y-1.5">
                     <Label htmlFor="city" className="text-sm">City *</Label>
                     <Input 
                       id="city" 
                       value={city} 
                       onChange={(e) => setCity(e.target.value)} 
                       placeholder="Key West"
-                      className={classNames("bg-white dark:bg-slate-900", touched && errors.city && "border-destructive focus-visible:ring-destructive")}
+                      className={classNames("h-9 bg-white dark:bg-slate-900", touched && errors.city && "border-destructive focus-visible:ring-destructive")}
                       data-testid="input-city"
                     />
                     {touched && errors.city && (
                       <p className="text-xs text-destructive">{errors.city}</p>
                     )}
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <Label htmlFor="state" className="text-sm">State *</Label>
                     <StateSelect
                       value={state}
                       onValueChange={setState}
-                      placeholder="Select state"
-                      className="bg-white dark:bg-slate-900"
+                      placeholder="State"
+                      className="h-9 bg-white dark:bg-slate-900"
                     />
                     {touched && errors.state && (
                       <p className="text-xs text-destructive">{errors.state}</p>
                     )}
                   </div>
                 </div>
-                <div className="w-full max-w-[200px] space-y-2">
-                  <Label htmlFor="zipCode" className="text-sm">Zip Code *</Label>
-                  <Input 
-                    id="zipCode" 
-                    value={zipCode} 
-                    onChange={(e) => setZipCode(e.target.value)} 
-                    placeholder="33040"
-                    className={classNames("bg-white dark:bg-slate-900", touched && errors.zipCode && "border-destructive focus-visible:ring-destructive")}
-                    data-testid="input-zip-code"
-                  />
-                  {touched && errors.zipCode && (
-                    <p className="text-xs text-destructive">{errors.zipCode}</p>
-                  )}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="zipCode" className="text-sm">Zip *</Label>
+                    <Input 
+                      id="zipCode" 
+                      value={zipCode} 
+                      onChange={(e) => setZipCode(e.target.value)} 
+                      placeholder="33040"
+                      className={classNames("h-9 bg-white dark:bg-slate-900", touched && errors.zipCode && "border-destructive focus-visible:ring-destructive")}
+                      data-testid="input-zip-code"
+                    />
+                    {touched && errors.zipCode && (
+                      <p className="text-xs text-destructive">{errors.zipCode}</p>
+                    )}
+                  </div>
+                  <div className="col-span-2 space-y-1.5">
+                    <Label htmlFor="unit" className="text-sm">Unit/Suite</Label>
+                    <Input 
+                      id="unit" 
+                      value={unit} 
+                      onChange={(e) => setUnit(e.target.value)} 
+                      placeholder="Unit 5A" 
+                      className="h-9 bg-white dark:bg-slate-900"
+                      data-testid="input-unit"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -827,12 +829,12 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
           </Card>
 
           {/* Deal Team Card */}
-          <Card>
-            <CardHeader className="pb-4">
+          <Card className="border-muted">
+            <CardHeader className="pb-3 pt-4 px-5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-lg font-medium">Deal Team</CardTitle>
+                  <Building2 className="h-4 w-4 text-primary" />
+                  <CardTitle className="text-base font-semibold">Deal Team</CardTitle>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <Switch 
@@ -840,17 +842,17 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                     onCheckedChange={setOnDealTeam} 
                     data-testid="switch-deal-team"
                   />
-                  <span className="text-sm text-muted-foreground">On team</span>
+                  <span className="text-xs text-muted-foreground">On team</span>
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-5 pb-5">
               
               {onDealTeam ? (
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label className="text-sm">Assign to Deal</Label>
                   <Select value={dealAssignment} onValueChange={setDealAssignment}>
-                    <SelectTrigger className="bg-white dark:bg-slate-900" data-testid="select-deal-assignment">
+                    <SelectTrigger className="h-9 bg-white dark:bg-slate-900" data-testid="select-deal-assignment">
                       <SelectValue placeholder="Select a deal to assign" />
                     </SelectTrigger>
                     <SelectContent>
