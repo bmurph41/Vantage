@@ -1301,24 +1301,36 @@ function Router() {
           return null;
         }}
       </Route>
+      {/* CRM Record Pages - must be before list routes */}
       <Route path="/crm/contacts/:id">
-        <ContactRecordPage />
+        {() => (
+          <UnifiedLayout>
+            <ContactRecordPage />
+          </UnifiedLayout>
+        )}
       </Route>
       <Route path="/crm/companies/:id">
-        <CompanyRecordPage />
+        {() => (
+          <UnifiedLayout>
+            <CompanyRecordPage />
+          </UnifiedLayout>
+        )}
       </Route>
       <Route path="/crm/properties/:id">
-        <PropertyRecordPage />
+        {() => (
+          <UnifiedLayout>
+            <PropertyRecordPage />
+          </UnifiedLayout>
+        )}
       </Route>
+
+      {/* CRM List Pages */}
       <Route path="/crm/contacts">
         {() => (
           <UnifiedLayout>
             <Contacts />
           </UnifiedLayout>
         )}
-      </Route>
-      <Route path="/crm/contacts/:id">
-        {() => <ContactRecordPage />}
       </Route>
       <Route path="/crm/companies">
         {() => (
@@ -1327,18 +1339,12 @@ function Router() {
           </UnifiedLayout>
         )}
       </Route>
-      <Route path="/crm/companies/:id">
-        {() => <CompanyRecordPage />}
-      </Route>
       <Route path="/crm/properties">
         {() => (
           <UnifiedLayout>
             <Properties />
           </UnifiedLayout>
         )}
-      </Route>
-      <Route path="/crm/properties/:id">
-        {() => <PropertyRecordPage />}
       </Route>
       <Route path="/crm/pending-properties">
         {() => (
