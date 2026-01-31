@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertContactSchema, type Contact, type Deal, type Phone as PhoneType } from "@shared/schema";
+import { CONTACT_POSITION_OPTIONS, getPositionLabel, normalizePosition } from "@shared/crm-constants";
 
 export type ContactPayload = {
   id?: string;
@@ -89,7 +90,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [companySearchQuery, setCompanySearchQuery] = useState("");
   const [companyPopoverOpen, setCompanyPopoverOpen] = useState(false);
-  const [role, setRole] = useState(contact?.role ?? contact?.position ?? "");
+  const [role, setRole] = useState(normalizePosition(contact?.role ?? contact?.position) ?? "");
   const [onDealTeam, setOnDealTeam] = useState(Boolean(contact?.onDealTeam));
   const [dealTeamNotes, setDealTeamNotes] = useState(contact?.dealTeamNotes ?? "");
   const [dealAssignment, setDealAssignment] = useState<string>("");
@@ -151,7 +152,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
     setSelectedCompanyId(contact?.companyId ?? null);
     setCompanySearchQuery("");
     setCompanyPopoverOpen(false);
-    setRole(contact?.role ?? contact?.position ?? "");
+    setRole(normalizePosition(contact?.role ?? contact?.position) ?? "");
     setOnDealTeam(Boolean(contact?.onDealTeam));
     setDealTeamNotes(contact?.dealTeamNotes ?? "");
     setDealAssignment(contact?.dealAssignment ?? "");
@@ -665,19 +666,26 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                   </p>
                 )}
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="role" className="text-sm">Role/Title *</Label>
-                <Input 
-                  id="role" 
-                  value={role} 
-                  onChange={(e) => setRole(e.target.value)} 
-                  placeholder="VP of Acquisitions" 
-                  className={classNames("h-9 bg-white dark:bg-slate-900", touched && errors.role && "border-destructive focus-visible:ring-destructive")}
-                  data-testid="input-role"
-                />
-                {touched && errors.role && (
-                  <p className="text-xs text-destructive">{errors.role}</p>
-                )}
+                <div className="space-y-1.5">
+                  <Label htmlFor="role" className="text-sm">Role/Title</Label>
+                  <Select 
+                    value={role} 
+                    onValueChange={(value) => setRole(value)}
+                  >
+                    <SelectTrigger className="h-9 bg-white dark:bg-slate-900" data-testid="select-role">
+                      <SelectValue placeholder="Select role/title" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CONTACT_POSITION_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {touched && errors.role && (
+                    <p className="text-xs text-destructive">{errors.role}</p>
+                  )}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="contactTag" className="text-sm">Contact Tag *</Label>

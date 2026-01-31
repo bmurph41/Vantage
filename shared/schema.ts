@@ -2359,6 +2359,22 @@ export const crmContactProperties = pgTable("crm_contact_properties", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Junction table for linking CRM entities (contacts, companies, properties) to DD Projects
+export const crmEntityDDProjectLinks = pgTable("crm_entity_dd_project_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entityType: text("entity_type").notNull(), // 'contact' | 'company' | 'property'
+  entityId: varchar("entity_id").notNull(),
+  ddProjectId: varchar("dd_project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  relationship: text("relationship"), // 'team_member', 'deal_team', 'consultant', 'stakeholder', 'legal_counsel', 'other'
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  orgId: varchar("org_id").references(() => organizations.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  entityIdx: index("crm_entity_dd_links_entity_idx").on(table.entityType, table.entityId),
+  projectIdx: index("crm_entity_dd_links_project_idx").on(table.ddProjectId),
+}));
+
 // Labels table for categorizing contacts and organizations
 
 export const crmContactsLabels = pgTable("crm_contacts_labels", {
@@ -6655,6 +6671,8 @@ export type Task = typeof crmTasks.$inferSelect;
 export type Property = typeof crmProperties.$inferSelect;
 export type ContactCompany = typeof crmContactCompanies.$inferSelect;
 export type CompanyProperty = typeof crmCompanyProperties.$inferSelect;
+export type EntityDDProjectLink = typeof crmEntityDDProjectLinks.$inferSelect;
+export type InsertEntityDDProjectLink = typeof crmEntityDDProjectLinks.$inferInsert;
 
 // Email Sequence Types
 export type EmailSequence = typeof crmEmailSequences.$inferSelect;

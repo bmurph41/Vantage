@@ -10409,6 +10409,60 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // DD Project Links for CRM Entities (contacts, companies, properties)
+  app.get("/api/crm/:entityType/:entityId/dd-projects", async (req: any, res) => {
+    try {
+      const { entityType, entityId } = req.params;
+      if (!['contact', 'company', 'property'].includes(entityType)) {
+        return res.status(400).json({ error: "Invalid entity type" });
+      }
+      const links = await storage.getEntityDDProjectLinks(entityType, entityId);
+      res.json(links);
+    } catch (error: any) {
+      console.error("Failed to get DD project links:", error);
+      res.status(500).json({ error: "Failed to retrieve DD project links" });
+    }
+  });
+
+  app.post("/api/crm/:entityType/:entityId/link-dd-project", async (req: any, res) => {
+    try {
+      const { entityType, entityId } = req.params;
+      const { ddProjectId, relationship, notes } = req.body;
+
+      if (!['contact', 'company', 'property'].includes(entityType)) {
+        return res.status(400).json({ error: "Invalid entity type" });
+      }
+      if (!ddProjectId) {
+        return res.status(400).json({ error: "ddProjectId is required" });
+      }
+
+      const link = await storage.linkEntityToDDProject({
+        entityType,
+        entityId,
+        ddProjectId,
+        relationship: relationship || null,
+        notes: notes || null,
+        createdBy: req.user?.id,
+        orgId: req.user?.orgId,
+      });
+      res.json(link);
+    } catch (error: any) {
+      console.error("Failed to link entity to DD project:", error);
+      res.status(500).json({ error: "Failed to link entity to DD project" });
+    }
+  });
+
+  app.delete("/api/crm/:entityType/:entityId/dd-projects/:linkId", async (req: any, res) => {
+    try {
+      const { linkId } = req.params;
+      await storage.unlinkEntityFromDDProject(linkId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Failed to unlink entity from DD project:", error);
+      res.status(500).json({ error: "Failed to unlink entity from DD project" });
+    }
+  });
+
   // Company-Contact Links
   app.get("/api/companies/:id/contacts", async (req: any, res) => {
     try {

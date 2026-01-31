@@ -31,6 +31,7 @@ import { format, formatDistanceToNow, differenceInDays } from "date-fns";
 import { AddressInput, type AddressComponents } from "@/components/address-input";
 import { ContactEngagementCard } from "@/components/crm/ContactEngagementCard";
 import type { Contact, Company, Deal, Property, Activity as ActivityType, Note, CrmTask, CrmFile } from "@shared/schema";
+import { getPositionLabel, CONTACT_POSITION_OPTIONS } from "@shared/crm-constants";
 
 interface ContactDetailModalProps {
   isOpen: boolean;
@@ -522,7 +523,7 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
 
                 <div className="flex items-center gap-2 mt-1 text-muted-foreground">
                   {form.watch('position') && (
-                    <span className="text-sm">{capitalizeFirst(form.watch('position'))}</span>
+                    <span className="text-sm">{getPositionLabel(form.watch('position'))}</span>
                   )}
                   {form.watch('position') && form.watch('company') && <span>•</span>}
                   {form.watch('company') && (
@@ -787,9 +788,23 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
                             <Briefcase className="w-3 h-3" /> Position
                           </Label>
                           {isEditing ? (
-                            <Input {...form.register('position')} className="h-9" />
+                            <Select 
+                              value={form.watch('position') || ''} 
+                              onValueChange={(value) => form.setValue('position', value, { shouldDirty: true })}
+                            >
+                              <SelectTrigger className="h-9">
+                                <SelectValue placeholder="Select position" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {CONTACT_POSITION_OPTIONS.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           ) : (
-                            <p className="font-medium">{capitalizeFirst(form.watch('position')) || '-'}</p>
+                            <p className="font-medium">{getPositionLabel(form.watch('position')) || '-'}</p>
                           )}
                         </div>
                       </div>

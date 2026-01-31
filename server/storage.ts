@@ -4,7 +4,7 @@ import {
   contacts, projectContacts, projectPendingContacts, notificationSubscriptions, notificationsLog, calendarEvents,
   documentRequirements, projectIntegrations, taskDependencies, taskFiles, userEmails, calendarGuests,
   cddDocuments, docPages, kpis, findings, recommendations, vectorChunks, cddReports, comps, checklistItems,
-  crmDeals, crmLeads, crmContacts, crmCompanies, crmProperties, crmStorageTypes, crmPropertyStorageEntries, crmContactProperties, crmCompanyProperties, crmContactCompanies, pendingProperties, pendingContacts, pendingCompanies, crmPipelines, crmPipelineStages, crmActivities, crmNotes, crmDealContacts, crmDealCompanies,
+  crmDeals, crmLeads, crmContacts, crmCompanies, crmProperties, crmStorageTypes, crmPropertyStorageEntries, crmContactProperties, crmCompanyProperties, crmContactCompanies, crmEntityDDProjectLinks, pendingProperties, pendingContacts, pendingCompanies, crmPipelines, crmPipelineStages, crmActivities, crmNotes, crmDealContacts, crmDealCompanies,
   crmImportJobs, crmImportedRecords, crmProspectingEntries, crmProspectingUserSettings, crmProspectingGoalTemplates,
   crmEmailSequences, crmEmailTemplates, crmEmailSequenceSteps, crmEmailSequenceEnrollments, crmEmailSequenceStepExecutions,
   calendarSettings,
@@ -415,6 +415,10 @@ export interface IStorage {
   getContactCompanies(contactId: string): Promise<Array<{ id: string; contactId: string; companyId: string; role?: string | null; isPrimary: boolean; company?: any }>>;
   getContactProperties(contactId: string): Promise<Array<{ id: string; contactId: string; propertyId: string; relationship?: string | null; property?: any }>>;
   unlinkContactFromProperty(linkId: string): Promise<void>;
+  // CRM - DD Project Links
+  getEntityDDProjectLinks(entityType: string, entityId: string): Promise<Array<{ id: string; entityType: string; entityId: string; ddProjectId: string; relationship?: string | null; notes?: string | null; project?: any }>>;
+  linkEntityToDDProject(data: { entityType: string; entityId: string; ddProjectId: string; relationship?: string | null; notes?: string | null; createdBy?: string; orgId?: string }): Promise<{ id: string }>;
+  unlinkEntityFromDDProject(linkId: string): Promise<void>;
 
   // CRM - Company Links
   getCompanyContacts(companyId: string): Promise<Array<{ id: string; contactId: string; companyId: string; role?: string | null; isPrimary: boolean; contact?: any }>>;
@@ -3423,6 +3427,45 @@ export class DatabaseStorage implements IStorage {
 
   async unlinkContactFromProperty(linkId: string): Promise<void> {
     await db.delete(crmContactProperties).where(eq(crmContactProperties.id, linkId));
+  }
+
+  // CRM - DD Project Links
+  async getEntityDDProjectLinks(entityType: string, entityId: string): Promise<Array<{ id: string; entityType: string; entityId: string; ddProjectId: string; relationship?: string | null; notes?: string | null; project?: any }>> {
+    const links = await db.select({
+      id: crmEntityDDProjectLinks.id,
+      entityType: crmEntityDDProjectLinks.entityType,
+      entityId: crmEntityDDProjectLinks.entityId,
+      ddProjectId: crmEntityDDProjectLinks.ddProjectId,
+      relationship: crmEntityDDProjectLinks.relationship,
+      notes: crmEntityDDProjectLinks.notes,
+      project: projects
+    })
+    .from(crmEntityDDProjectLinks)
+    .leftJoin(projects, eq(crmEntityDDProjectLinks.ddProjectId, projects.id))
+    .where(
+      and(
+        eq(crmEntityDDProjectLinks.entityType, entityType),
+        eq(crmEntityDDProjectLinks.entityId, entityId)
+      )
+    );
+    return links;
+  }
+
+  async linkEntityToDDProject(data: { entityType: string; entityId: string; ddProjectId: string; relationship?: string | null; notes?: string | null; createdBy?: string; orgId?: string }): Promise<{ id: string }> {
+    const [link] = await db.insert(crmEntityDDProjectLinks).values({
+      entityType: data.entityType,
+      entityId: data.entityId,
+      ddProjectId: data.ddProjectId,
+      relationship: data.relationship || null,
+      notes: data.notes || null,
+      createdBy: data.createdBy || null,
+      orgId: data.orgId || null,
+    }).returning({ id: crmEntityDDProjectLinks.id });
+    return link;
+  }
+
+  async unlinkEntityFromDDProject(linkId: string): Promise<void> {
+    await db.delete(crmEntityDDProjectLinks).where(eq(crmEntityDDProjectLinks.id, linkId));
   }
 
   // CRM - Company Links

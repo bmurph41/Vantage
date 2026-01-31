@@ -209,7 +209,7 @@ export function CreatePropertyWizardModal({ open, onOpenChange, onPropertyCreate
               <MMStateSelect
                 label="State"
                 value={state.state}
-                onValueChange={(v) => setState(s => ({ ...s, state: v }))}
+                onChange={(e) => setState(s => ({ ...s, state: e.target.value }))}
               />
               <MMInput
                 label="Zip"
