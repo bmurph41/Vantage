@@ -126,13 +126,39 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
     enabled: isOpen && showCompanySearch,
   });
 
-  // Link contact mutation
+  // Link contact mutation - also links the contact's company automatically
   const linkContactMutation = useMutation({
     mutationFn: async ({ contactId, relationship }: { contactId: string; relationship: string }) => {
-      return await apiRequest('POST', `/api/properties/${property!.id}/contacts`, { contactId, relationship });
+      const result = await apiRequest('POST', `/api/properties/${property!.id}/contacts`, { contactId, relationship });
+      
+      // Auto-link the contact's company if they have one
+      try {
+        const contactCompaniesRes = await fetch(`/api/contacts/${contactId}/companies`);
+        if (contactCompaniesRes.ok) {
+          const contactCompanies = await contactCompaniesRes.json();
+          if (contactCompanies.length > 0) {
+            const primaryCompany = contactCompanies.find((cc: any) => cc.isPrimary) || contactCompanies[0];
+            if (primaryCompany?.companyId) {
+              // Check if company is not already linked
+              const alreadyLinked = linkedCompanies.some(lc => lc.companyId === primaryCompany.companyId);
+              if (!alreadyLinked) {
+                await apiRequest('POST', `/api/properties/${property!.id}/companies`, { 
+                  companyId: primaryCompany.companyId, 
+                  relationship 
+                });
+              }
+            }
+          }
+        }
+      } catch (e) {
+        // Silently ignore auto-link failure - contact was still linked
+      }
+      
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/properties/${property!.id}/contacts`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${property!.id}/companies`] });
       setShowContactSearch(false);
       setContactSearch("");
       toast({ title: "Contact linked successfully" });
@@ -142,13 +168,39 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
     },
   });
 
-  // Link company mutation
+  // Link company mutation - also links the company's primary contact automatically
   const linkCompanyMutation = useMutation({
     mutationFn: async ({ companyId, relationship }: { companyId: string; relationship: string }) => {
-      return await apiRequest('POST', `/api/properties/${property!.id}/companies`, { companyId, relationship });
+      const result = await apiRequest('POST', `/api/properties/${property!.id}/companies`, { companyId, relationship });
+      
+      // Auto-link the company's primary contact if they have one
+      try {
+        const companyContactsRes = await fetch(`/api/companies/${companyId}/contacts`);
+        if (companyContactsRes.ok) {
+          const companyContacts = await companyContactsRes.json();
+          if (companyContacts.length > 0) {
+            const primaryContact = companyContacts.find((cc: any) => cc.isPrimary) || companyContacts[0];
+            if (primaryContact?.contactId) {
+              // Check if contact is not already linked
+              const alreadyLinked = linkedContacts.some(lc => lc.contactId === primaryContact.contactId);
+              if (!alreadyLinked) {
+                await apiRequest('POST', `/api/properties/${property!.id}/contacts`, { 
+                  contactId: primaryContact.contactId, 
+                  relationship 
+                });
+              }
+            }
+          }
+        }
+      } catch (e) {
+        // Silently ignore auto-link failure - company was still linked
+      }
+      
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/properties/${property!.id}/companies`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${property!.id}/contacts`] });
       setShowCompanySearch(false);
       setCompanySearch("");
       toast({ title: "Company linked successfully" });
