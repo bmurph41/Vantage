@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { StandardDialogShell } from "@/components/ui/standard-dialog-shell";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -122,6 +123,16 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const isAutosaveRef = useRef(false);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  // Linking state
+  const [showLinkContactDialog, setShowLinkContactDialog] = useState(false);
+  const [showLinkCompanyDialog, setShowLinkCompanyDialog] = useState(false);
+  const [selectedContactToLink, setSelectedContactToLink] = useState<string>("");
+  const [selectedCompanyToLink, setSelectedCompanyToLink] = useState<string>("");
+  const [contactRelationship, setContactRelationship] = useState<string>("owner");
+  const [companyRelationship, setCompanyRelationship] = useState<string>("owner");
+  const [contactSearchQuery, setContactSearchQuery] = useState("");
+  const [companySearchQuery, setCompanySearchQuery] = useState("");
 
   const form = useForm<PropertyFormData>({
     resolver: zodResolver(propertyFormSchema),
@@ -146,6 +157,18 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
   const { data: linkedCompanies = [] } = useQuery<CompanyPropertyWithCompany[]>({
     queryKey: ['/api/properties', property?.id, 'companies'],
     enabled: isOpen && !!property?.id,
+  });
+
+  // Fetch all contacts for linking
+  const { data: allContacts = [] } = useQuery<Contact[]>({
+    queryKey: ['/api/contacts'],
+    enabled: isOpen && showLinkContactDialog,
+  });
+
+  // Fetch all companies for linking
+  const { data: allCompanies = [] } = useQuery<Company[]>({
+    queryKey: ['/api/companies'],
+    enabled: isOpen && showLinkCompanyDialog,
   });
 
   // Fetch deals associated with this property
@@ -248,6 +271,68 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
     },
     onError: () => {
       toast({ title: "Failed to unlink company", variant: "destructive" });
+    },
+  });
+
+  // Link contact to property mutation
+  const linkContactMutation = useMutation({
+    mutationFn: async ({ contactId, relationship }: { contactId: string; relationship?: string }) => {
+      if (!property?.id) {
+        throw new Error("Property ID is required");
+      }
+      const response = await apiRequest('POST', `/api/properties/${property.id}/contacts`, { 
+        contactId, 
+        relationship 
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/properties', property?.id, 'contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
+      setShowLinkContactDialog(false);
+      setSelectedContactToLink("");
+      setContactRelationship("owner");
+      setContactSearchQuery("");
+      toast({ title: "Contact linked successfully" });
+    },
+    onError: (error: any) => {
+      console.error("Link contact error:", error);
+      toast({ 
+        title: "Failed to link contact", 
+        description: error?.message || "An error occurred",
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // Link company to property mutation
+  const linkCompanyMutation = useMutation({
+    mutationFn: async ({ companyId, relationship }: { companyId: string; relationship?: string }) => {
+      if (!property?.id) {
+        throw new Error("Property ID is required");
+      }
+      const response = await apiRequest('POST', `/api/properties/${property.id}/companies`, { 
+        companyId, 
+        relationship 
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/properties', property?.id, 'companies'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
+      setShowLinkCompanyDialog(false);
+      setSelectedCompanyToLink("");
+      setCompanyRelationship("owner");
+      setCompanySearchQuery("");
+      toast({ title: "Company linked successfully" });
+    },
+    onError: (error: any) => {
+      console.error("Link company error:", error);
+      toast({ 
+        title: "Failed to link company", 
+        description: error?.message || "An error occurred",
+        variant: "destructive" 
+      });
     },
   });
 
@@ -882,7 +967,7 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
 
             <TabsContent value="contacts" className="mt-0 space-y-4">
               <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <User className="w-5 h-5" />
                     Linked Contacts
@@ -890,6 +975,9 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
                       <Badge variant="secondary" className="ml-2">{linkedContacts.length}</Badge>
                     )}
                   </CardTitle>
+                  <Button variant="outline" size="sm" onClick={() => setShowLinkContactDialog(true)}>
+                    <Link2 className="w-4 h-4 mr-2" /> Link Contact
+                  </Button>
                 </CardHeader>
                 <CardContent>
                   {linkedContacts.length === 0 ? (
@@ -962,7 +1050,7 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
 
             <TabsContent value="companies" className="mt-0 space-y-4">
               <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Building className="w-5 h-5" />
                     Linked Companies
@@ -970,6 +1058,9 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
                       <Badge variant="secondary" className="ml-2">{linkedCompanies.length}</Badge>
                     )}
                   </CardTitle>
+                  <Button variant="outline" size="sm" onClick={() => setShowLinkCompanyDialog(true)}>
+                    <Link2 className="w-4 h-4 mr-2" /> Link Company
+                  </Button>
                 </CardHeader>
                 <CardContent>
                   {linkedCompanies.length === 0 ? (
@@ -1127,6 +1218,176 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
           </div>
         </Tabs>
       </div>
+
+      {/* Link Contact Dialog */}
+      <Dialog open={showLinkContactDialog} onOpenChange={setShowLinkContactDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <User className="w-5 h-5" />
+              Link Contact to Property
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Search Contacts</Label>
+              <Input
+                placeholder="Search by name or email..."
+                value={contactSearchQuery}
+                onChange={(e) => setContactSearchQuery(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Select Contact</Label>
+              <Select value={selectedContactToLink} onValueChange={setSelectedContactToLink}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose contact" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allContacts
+                    .filter(c => !linkedContacts.some(lc => lc.contactId === c.id))
+                    .filter(c => 
+                      !contactSearchQuery || 
+                      `${c.firstName} ${c.lastName}`.toLowerCase().includes(contactSearchQuery.toLowerCase()) ||
+                      c.email?.toLowerCase().includes(contactSearchQuery.toLowerCase())
+                    )
+                    .map(contact => (
+                      <SelectItem key={contact.id} value={contact.id}>
+                        {contact.firstName} {contact.lastName} {contact.email && `- ${contact.email}`}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              {allContacts.filter(c => !linkedContacts.some(lc => lc.contactId === c.id)).length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-2">
+                  No available contacts to link
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Relationship</Label>
+              <Select value={contactRelationship} onValueChange={setContactRelationship}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="owner">Owner</SelectItem>
+                  <SelectItem value="seller">Seller</SelectItem>
+                  <SelectItem value="buyer">Buyer</SelectItem>
+                  <SelectItem value="broker">Broker</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="tenant">Tenant</SelectItem>
+                  <SelectItem value="investor">Investor</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowLinkContactDialog(false);
+              setSelectedContactToLink("");
+              setContactRelationship("owner");
+              setContactSearchQuery("");
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => linkContactMutation.mutate({ 
+                contactId: selectedContactToLink, 
+                relationship: contactRelationship
+              })}
+              disabled={!selectedContactToLink || linkContactMutation.isPending}
+            >
+              {linkContactMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Link Contact
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Link Company Dialog */}
+      <Dialog open={showLinkCompanyDialog} onOpenChange={setShowLinkCompanyDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building className="w-5 h-5" />
+              Link Company to Property
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Search Companies</Label>
+              <Input
+                placeholder="Search by company name..."
+                value={companySearchQuery}
+                onChange={(e) => setCompanySearchQuery(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Select Company</Label>
+              <Select value={selectedCompanyToLink} onValueChange={setSelectedCompanyToLink}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose company" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allCompanies
+                    .filter(c => !linkedCompanies.some(lc => lc.companyId === c.id))
+                    .filter(c => 
+                      !companySearchQuery || 
+                      c.name.toLowerCase().includes(companySearchQuery.toLowerCase())
+                    )
+                    .map(company => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name} {company.industry && `- ${company.industry}`}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              {allCompanies.filter(c => !linkedCompanies.some(lc => lc.companyId === c.id)).length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-2">
+                  No available companies to link
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Relationship</Label>
+              <Select value={companyRelationship} onValueChange={setCompanyRelationship}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="owner">Owner</SelectItem>
+                  <SelectItem value="seller">Seller</SelectItem>
+                  <SelectItem value="buyer">Buyer</SelectItem>
+                  <SelectItem value="broker">Broker</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="investor">Investor</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowLinkCompanyDialog(false);
+              setSelectedCompanyToLink("");
+              setCompanyRelationship("owner");
+              setCompanySearchQuery("");
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => linkCompanyMutation.mutate({ 
+                companyId: selectedCompanyToLink, 
+                relationship: companyRelationship
+              })}
+              disabled={!selectedCompanyToLink || linkCompanyMutation.isPending}
+            >
+              {linkCompanyMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Link Company
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </StandardDialogShell>
   );
 }

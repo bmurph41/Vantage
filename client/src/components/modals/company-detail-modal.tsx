@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/enhanced-card";
 import { 
   Building, Building2, Globe, MapPin, Phone, Mail, Users, Edit2, Save, X, FileText, 
-  DollarSign, TrendingUp, Activity, Calendar, Clock, Check, Loader2,
+  DollarSign, TrendingUp, Activity, Calendar, Clock, Check, Loader2, User,
   Plus, ExternalLink, Anchor, MessageSquare, CheckSquare, FolderOpen,
   MoreVertical, Send, Filter, ArrowUpRight, Briefcase, Target, AlertCircle,
   Link2, FolderPlus, ChevronDown, Trash2, BarChart3
@@ -143,6 +143,12 @@ export default function CompanyDetailModal({
   const [selectedPropertyRelationship, setSelectedPropertyRelationship] = useState("owner");
   const [selectedSalesComp, setSelectedSalesComp] = useState<string>("");
   
+  // Contact linking state
+  const [showLinkContactDialog, setShowLinkContactDialog] = useState(false);
+  const [selectedContactToLink, setSelectedContactToLink] = useState<string>("");
+  const [selectedContactRole, setSelectedContactRole] = useState<string>("");
+  const [contactSearchQuery, setContactSearchQuery] = useState("");
+  
   // Multi-property (portfolio) state
   const [portfolioProperties, setPortfolioProperties] = useState<Array<{
     title: string;
@@ -234,6 +240,38 @@ export default function CompanyDetailModal({
   const { data: salesComps = [] } = useQuery<SalesComp[]>({
     queryKey: ['/api/sales-comps'],
     enabled: isOpen && (showAddPropertyModal || showLinkPropertyDialog),
+  });
+
+  // Link contact to company mutation
+  const linkContactMutation = useMutation({
+    mutationFn: async ({ contactId, role }: { contactId: string; role?: string }) => {
+      if (!company?.id) {
+        throw new Error("Company ID is required");
+      }
+      const response = await apiRequest('POST', `/api/contacts/${contactId}/companies`, { 
+        companyId: company.id, 
+        role: role || null,
+        isPrimary: linkedContacts.length === 0
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/companies', company?.id, 'contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
+      setShowLinkContactDialog(false);
+      setSelectedContactToLink("");
+      setSelectedContactRole("");
+      setContactSearchQuery("");
+      toast({ title: "Contact linked successfully" });
+    },
+    onError: (error: any) => {
+      console.error("Link contact error:", error);
+      toast({ 
+        title: "Failed to link contact", 
+        description: error?.message || "An error occurred",
+        variant: "destructive" 
+      });
+    },
   });
 
   // Link property to company mutation
@@ -1234,11 +1272,8 @@ export default function CompanyDetailModal({
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Contacts at {company.name}</h3>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" onClick={() => setShowLinkContactDialog(true)}>
                     <Link2 className="w-4 h-4 mr-2" /> Link Existing
-                  </Button>
-                  <Button size="sm">
-                    <Plus className="w-4 h-4 mr-2" /> Create New
                   </Button>
                 </div>
               </div>
@@ -1619,6 +1654,83 @@ export default function CompanyDetailModal({
           </ScrollArea>
         </Tabs>
       </div>
+
+      {/* Link Contact Dialog */}
+      <Dialog open={showLinkContactDialog} onOpenChange={setShowLinkContactDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <User className="w-5 h-5" />
+              Link Contact
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Search Contacts</Label>
+              <Input
+                placeholder="Search by name or email..."
+                value={contactSearchQuery}
+                onChange={(e) => setContactSearchQuery(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Select Contact</Label>
+              <Select value={selectedContactToLink} onValueChange={setSelectedContactToLink}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose contact" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allContacts
+                    .filter(c => !linkedContacts.some(lc => lc.contactId === c.id))
+                    .filter(c => 
+                      !contactSearchQuery || 
+                      `${c.firstName} ${c.lastName}`.toLowerCase().includes(contactSearchQuery.toLowerCase()) ||
+                      c.email?.toLowerCase().includes(contactSearchQuery.toLowerCase())
+                    )
+                    .map(contact => (
+                      <SelectItem key={contact.id} value={contact.id}>
+                        {contact.firstName} {contact.lastName} {contact.email && `- ${contact.email}`}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              {allContacts.filter(c => !linkedContacts.some(lc => lc.contactId === c.id)).length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-2">
+                  No available contacts to link
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Role (optional)</Label>
+              <Input
+                placeholder="e.g., CEO, Manager, Representative"
+                value={selectedContactRole}
+                onChange={(e) => setSelectedContactRole(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => {
+              setShowLinkContactDialog(false);
+              setSelectedContactToLink("");
+              setSelectedContactRole("");
+              setContactSearchQuery("");
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => linkContactMutation.mutate({ 
+                contactId: selectedContactToLink, 
+                role: selectedContactRole || undefined
+              })}
+              disabled={!selectedContactToLink || linkContactMutation.isPending}
+            >
+              {linkContactMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Link Contact
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Link Property Dialog */}
       <Dialog open={showLinkPropertyDialog} onOpenChange={setShowLinkPropertyDialog}>
