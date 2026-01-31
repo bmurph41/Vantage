@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Plus, Search, Edit, Trash2, MapPin, Anchor, Building, DollarSign, Home, TrendingUp, FolderPlus } from "lucide-react";
+import { Upload, Plus, Search, Edit, Trash2, MapPin, Anchor, Building, DollarSign, Home, TrendingUp, FolderPlus, ExternalLink } from "lucide-react";
 import { FileUpload } from "@/components/file-upload";
 import PropertyFormModal from "@/components/modals/property-form-modal";
 import { CreatePropertyWizardModal } from "@/components/modals/create-property-wizard-modal";
@@ -54,6 +54,17 @@ type Property = {
   lastSaleMonth?: number;
   lastSaleYear?: number;
   lastSalePrice?: number;
+  acreage?: number;
+  ownershipType?: string;
+};
+
+type StorageEntry = {
+  id: string;
+  storageType: string;
+  capacity: number;
+  occupied: number;
+  rate: string;
+  rateType: string;
 };
 
 const propertyTypeColors: Record<string, string> = {
@@ -87,6 +98,17 @@ export default function Properties() {
 
   const { data: properties = [], isLoading } = useQuery<Property[]>({
     queryKey: ['/api/properties'],
+  });
+
+  // Fetch storage entries for selected property
+  const { data: storageEntries = [] } = useQuery<StorageEntry[]>({
+    queryKey: ['/api/properties', selectedProperty?.id, 'storage-entries'],
+    queryFn: async () => {
+      const res = await fetch(`/api/properties/${selectedProperty!.id}/storage-entries`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!selectedProperty?.id,
   });
   
   useEffect(() => {
@@ -363,6 +385,12 @@ export default function Properties() {
         } />
         <CrmDetailField label="Est. Price" value={formatPrice(selectedProperty.listingPrice)} />
         <CrmDetailField label="Address" value={selectedProperty.address} />
+        {selectedProperty.acreage && (
+          <CrmDetailField label="Acreage" value={`${selectedProperty.acreage} acres`} />
+        )}
+        {selectedProperty.ownershipType && (
+          <CrmDetailField label="Ownership Type" value={toTitleCase(selectedProperty.ownershipType)} />
+        )}
         {(selectedProperty.lastSaleMonth || selectedProperty.lastSaleYear) && (
           <CrmDetailField 
             label="Last Sale" 
@@ -378,29 +406,51 @@ export default function Properties() {
         )}
       </CrmDetailSection>
 
-      {(selectedProperty.specifications || selectedProperty.wetSlips || selectedProperty.drySlips || selectedProperty.moorings) && (
+      <CrmDetailSection title="Storage & Capacity">
+        {storageEntries.length > 0 ? (
+          <>
+            {storageEntries.map((entry) => (
+              <CrmDetailField 
+                key={entry.id} 
+                label={toTitleCase(entry.storageType)} 
+                value={
+                  <span>
+                    {entry.capacity} capacity
+                    {entry.occupied > 0 && ` (${entry.occupied} occupied)`}
+                    {entry.rate && ` - ${entry.rate}/${entry.rateType === 'annual' ? 'yr' : 'mo'}`}
+                  </span>
+                } 
+              />
+            ))}
+          </>
+        ) : (
+          <>
+            {selectedProperty.wetSlips && selectedProperty.wetSlips > 0 && (
+              <CrmDetailField label="Wet Slips" value={selectedProperty.wetSlips} />
+            )}
+            {selectedProperty.drySlips && selectedProperty.drySlips > 0 && (
+              <CrmDetailField label="Dry Racks" value={selectedProperty.drySlips} />
+            )}
+            {selectedProperty.moorings && selectedProperty.moorings > 0 && (
+              <CrmDetailField label="Moorings" value={selectedProperty.moorings} />
+            )}
+            {selectedProperty.totalCapacity && selectedProperty.totalCapacity > 0 && (
+              <CrmDetailField label="Total Capacity" value={selectedProperty.totalCapacity} />
+            )}
+            {!selectedProperty.wetSlips && !selectedProperty.drySlips && !selectedProperty.moorings && selectedProperty.specifications?.slipCount && (
+              <CrmDetailField label="Slip Count" value={selectedProperty.specifications.slipCount} />
+            )}
+            {!selectedProperty.wetSlips && !selectedProperty.drySlips && !selectedProperty.moorings && !selectedProperty.specifications?.slipCount && (
+              <p className="text-sm text-muted-foreground">No storage data available</p>
+            )}
+          </>
+        )}
+      </CrmDetailSection>
+
+      {(selectedProperty.specifications?.maxBoatLength || selectedProperty.specifications?.dockType || selectedProperty.specifications?.amenities?.length) && (
         <CrmDetailSection title="Specifications">
-          {selectedProperty.type === 'marina' && (
-            <>
-              {selectedProperty.wetSlips && selectedProperty.wetSlips > 0 && (
-                <CrmDetailField label="Wet Slips" value={selectedProperty.wetSlips} />
-              )}
-              {selectedProperty.drySlips && selectedProperty.drySlips > 0 && (
-                <CrmDetailField label="Dry Racks" value={selectedProperty.drySlips} />
-              )}
-              {selectedProperty.moorings && selectedProperty.moorings > 0 && (
-                <CrmDetailField label="Moorings" value={selectedProperty.moorings} />
-              )}
-              {selectedProperty.totalCapacity && selectedProperty.totalCapacity > 0 && (
-                <CrmDetailField label="Total Capacity" value={selectedProperty.totalCapacity} />
-              )}
-              {!selectedProperty.wetSlips && !selectedProperty.drySlips && !selectedProperty.moorings && selectedProperty.specifications?.slipCount && (
-                <CrmDetailField label="Slip Count" value={selectedProperty.specifications.slipCount} />
-              )}
-              <CrmDetailField label="Max Boat Length" value={selectedProperty.specifications?.maxBoatLength ? `${selectedProperty.specifications.maxBoatLength}ft` : null} />
-              <CrmDetailField label="Dock Type" value={selectedProperty.specifications?.dockType} />
-            </>
-          )}
+          <CrmDetailField label="Max Boat Length" value={selectedProperty.specifications?.maxBoatLength ? `${selectedProperty.specifications.maxBoatLength}ft` : null} />
+          <CrmDetailField label="Dock Type" value={selectedProperty.specifications?.dockType} />
           {selectedProperty.type === 'boat' && selectedProperty.specifications && (
             <>
               <CrmDetailField label="Make" value={selectedProperty.specifications?.make} />
@@ -426,6 +476,17 @@ export default function Properties() {
           <p className="text-sm text-gray-700">{selectedProperty.description}</p>
         </CrmDetailSection>
       )}
+
+      <div className="pt-4 border-t">
+        <Button 
+          variant="outline" 
+          className="w-full" 
+          onClick={() => setLocation(`/crm/properties/${selectedProperty.id}`)}
+        >
+          <ExternalLink className="w-4 h-4 mr-2" />
+          View Full Property Page
+        </Button>
+      </div>
     </CrmDetailsPanel>
   ) : null;
 
