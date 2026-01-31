@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { 
   MMModalWizard, 
   MMFormGrid, 
-  MMFormRow,
   MMInput,
   MMPhoneInput,
   MMEmailInput,
@@ -12,6 +11,8 @@ import {
   MMRadioCardGroup,
   MMStateSelect
 } from "@/components/mm-ui";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { 
   User, 
   Briefcase,
@@ -22,7 +23,12 @@ import {
   Truck,
   Shield,
   Landmark,
-  MoreHorizontal
+  MoreHorizontal,
+  Plus,
+  X,
+  Link as LinkIcon,
+  MapPin,
+  Anchor
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
@@ -53,10 +59,26 @@ interface WizardState {
   leadStatus: string | null;
 }
 
+interface LinkedCompany {
+  id: string;
+  name: string;
+  role?: string;
+  isNew?: boolean;
+}
+
+interface LinkedProperty {
+  id: string;
+  name: string;
+  city?: string;
+  state?: string;
+  isNew?: boolean;
+}
+
 const steps = [
   { id: "type", label: "Type", title: "What type of contact is this?", subtitle: "Choose a category that best describes this contact" },
   { id: "basic", label: "Basic Info", title: "Basic Information", subtitle: "Enter the contact's name and contact details" },
-  { id: "details", label: "Details", title: "Additional Details", subtitle: "Company affiliation and address (optional)" },
+  { id: "relationships", label: "Relationships", title: "Company & Properties", subtitle: "Associate with a company and create related properties" },
+  { id: "details", label: "Details", title: "Additional Details", subtitle: "Address and notes (optional)" },
 ];
 
 const contactTagOptions = [
@@ -77,11 +99,6 @@ const leadStatusOptions = [
   { value: "qualified", label: "Qualified" },
   { value: "unqualified", label: "Unqualified" },
   { value: "converted", label: "Converted" },
-];
-
-const companyModeOptions = [
-  { value: "new", label: "New Company" },
-  { value: "existing", label: "Search existing" },
 ];
 
 export function CreateContactWizardModal({ open, onOpenChange, onContactCreated }: CreateContactWizardModalProps) {
@@ -105,13 +122,27 @@ export function CreateContactWizardModal({ open, onOpenChange, onContactCreated 
     leadStatus: "new",
   });
 
-  const [companyMode, setCompanyMode] = useState<"new" | "existing">("new");
+  const [linkedCompany, setLinkedCompany] = useState<LinkedCompany | null>(null);
+  const [linkedProperties, setLinkedProperties] = useState<LinkedProperty[]>([]);
+  
+  const [showCompanySection, setShowCompanySection] = useState<"none" | "link" | "create">("none");
+  const [showPropertySection, setShowPropertySection] = useState<"none" | "link" | "create">("none");
+  
   const [companySearch, setCompanySearch] = useState("");
   const [showCompanyDropdown, setShowCompanyDropdown] = useState(false);
+  const [selectedCompanyRole, setSelectedCompanyRole] = useState("");
+  
+  
+  const [newCompanyName, setNewCompanyName] = useState("");
+  const [newCompanyRole, setNewCompanyRole] = useState("");
+  
+  const [newPropertyName, setNewPropertyName] = useState("");
+  const [newPropertyCity, setNewPropertyCity] = useState("");
+  const [newPropertyState, setNewPropertyState] = useState("");
 
   const { data: companiesData } = useQuery<Company[]>({
     queryKey: ["/api/companies"],
-    enabled: open && currentStep === 2 && companyMode === "existing" && companySearch.length >= 1,
+    enabled: open && currentStep === 2,
   });
   
   const filteredCompanies = (companiesData || []).filter(c => 
@@ -137,22 +168,65 @@ export function CreateContactWizardModal({ open, onOpenChange, onContactCreated 
         notes: "",
         leadStatus: "new",
       });
-      setCompanyMode("new");
+      setLinkedCompany(null);
+      setLinkedProperties([]);
+      setShowCompanySection("none");
+      setShowPropertySection("none");
       setCompanySearch("");
       setShowCompanyDropdown(false);
+      setNewCompanyName("");
+      setNewCompanyRole("");
+      setNewPropertyName("");
+      setNewPropertyCity("");
+      setNewPropertyState("");
+      setSelectedCompanyRole("");
     }
   }, [open]);
 
   const createContactMutation = useMutation({
     mutationFn: async (data: WizardState) => {
+      let primaryCompanyId: string | undefined = undefined;
+      
+      if (linkedCompany) {
+        if (linkedCompany.isNew) {
+          try {
+            const companyRes = await apiRequest('POST', '/api/companies', {
+              name: linkedCompany.name,
+            });
+            const companyData = await companyRes.json();
+            if (companyData.company?.id) {
+              primaryCompanyId = companyData.company.id;
+            }
+          } catch (err) {
+            console.error('Failed to create company:', linkedCompany.name, err);
+          }
+        } else {
+          primaryCompanyId = linkedCompany.id;
+        }
+      }
+      
+      for (const property of linkedProperties) {
+        if (property.isNew) {
+          try {
+            await apiRequest('POST', '/api/properties', {
+              name: property.name,
+              city: property.city,
+              state: property.state,
+            });
+          } catch (err) {
+            console.error('Failed to create property:', property.name, err);
+          }
+        }
+      }
+      
       const res = await apiRequest('POST', '/api/contacts', {
         firstName: data.firstName,
         lastName: data.lastName || undefined,
         email: data.email || undefined,
         phone: data.phone || undefined,
-        company: data.company || undefined,
-        companyId: data.companyId || undefined,
-        role: data.role || undefined,
+        company: linkedCompany?.name || data.company || undefined,
+        companyId: primaryCompanyId || data.companyId || undefined,
+        role: linkedCompany?.role || data.role || undefined,
         address: data.address || undefined,
         city: data.city || undefined,
         state: data.state || undefined,
@@ -165,6 +239,8 @@ export function CreateContactWizardModal({ open, onOpenChange, onContactCreated 
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
       toast({ 
         title: "Contact Created", 
         description: `${state.firstName} ${state.lastName || ''} has been added.` 
@@ -201,6 +277,63 @@ export function CreateContactWizardModal({ open, onOpenChange, onContactCreated 
     if (currentStep === steps.length - 1) {
       createContactMutation.mutate(state);
     }
+  };
+
+  const handleLinkCompany = (company: Company) => {
+    setLinkedCompany({
+      id: company.id,
+      name: company.name || "",
+      role: selectedCompanyRole,
+      isNew: false
+    });
+    setCompanySearch("");
+    setSelectedCompanyRole("");
+    setShowCompanyDropdown(false);
+    setShowCompanySection("none");
+  };
+
+  const handleCreateNewCompany = () => {
+    if (!newCompanyName.trim()) {
+      toast({ title: "Company name required", variant: "destructive" });
+      return;
+    }
+    const tempId = `new-${Date.now()}`;
+    setLinkedCompany({
+      id: tempId,
+      name: newCompanyName.trim(),
+      role: newCompanyRole,
+      isNew: true
+    });
+    setNewCompanyName("");
+    setNewCompanyRole("");
+    setShowCompanySection("none");
+  };
+
+  const handleRemoveCompany = () => {
+    setLinkedCompany(null);
+  };
+
+  const handleCreateNewProperty = () => {
+    if (!newPropertyName.trim()) {
+      toast({ title: "Property name required", variant: "destructive" });
+      return;
+    }
+    const tempId = `new-${Date.now()}`;
+    setLinkedProperties(prev => [...prev, {
+      id: tempId,
+      name: newPropertyName.trim(),
+      city: newPropertyCity.trim() || undefined,
+      state: newPropertyState || undefined,
+      isNew: true
+    }]);
+    setNewPropertyName("");
+    setNewPropertyCity("");
+    setNewPropertyState("");
+    setShowPropertySection("none");
+  };
+
+  const handleRemoveProperty = (id: string) => {
+    setLinkedProperties(prev => prev.filter(p => p.id !== id));
   };
 
   const renderStep = (stepIndex: number) => {
@@ -260,84 +393,214 @@ export function CreateContactWizardModal({ open, onOpenChange, onContactCreated 
       
       case 2:
         return (
-          <div className="space-y-4">
-            <MMFormGrid columns={2}>
-              <MMSelect
-                label="Company"
-                value={companyMode}
-                onValueChange={(v: string) => {
-                  const mode = v as "new" | "existing";
-                  setCompanyMode(mode);
-                  if (mode === "new") {
-                    setState(s => ({ ...s, companyId: null }));
-                    setCompanySearch("");
-                    setShowCompanyDropdown(false);
-                  } else {
-                    setState(s => ({ ...s, company: "" }));
-                  }
-                }}
-                options={companyModeOptions}
-              />
-              <MMInput
-                label="Role / Title"
-                placeholder="e.g. Owner, Manager"
-                value={state.role}
-                onChange={(e) => setState(s => ({ ...s, role: e.target.value }))}
-              />
-            </MMFormGrid>
-            
-            {companyMode === "new" ? (
-              <MMInput
-                label="Company Name"
-                placeholder="Enter company name"
-                value={state.company}
-                onChange={(e) => setState(s => ({ ...s, company: e.target.value }))}
-              />
-            ) : (
-              <div className="relative">
-                <MMInput
-                  label="Search Company"
-                  placeholder="Type to search companies..."
-                  value={state.companyId ? (companiesData?.find(c => c.id === state.companyId)?.name || companySearch) : companySearch}
-                  onChange={(e) => {
-                    setCompanySearch(e.target.value);
-                    setState(s => ({ ...s, companyId: null, company: "" }));
-                    setShowCompanyDropdown(e.target.value.length >= 1);
-                  }}
-                  onFocus={() => {
-                    if (companySearch.length >= 1) {
-                      setShowCompanyDropdown(true);
-                    }
-                  }}
-                  onBlur={() => {
-                    setTimeout(() => setShowCompanyDropdown(false), 200);
-                  }}
-                />
-                {showCompanyDropdown && filteredCompanies.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                    {filteredCompanies.map((c) => (
-                      <div
-                        key={c.id}
-                        className="px-4 py-3 cursor-pointer hover:bg-blue-50 text-sm text-gray-900 border-b border-gray-100 last:border-b-0"
-                        onMouseDown={() => {
-                          setState(s => ({ ...s, companyId: c.id, company: c.name || "" }));
-                          setCompanySearch(c.name || "");
-                          setShowCompanyDropdown(false);
-                        }}
-                      >
-                        {c.name}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {showCompanyDropdown && companySearch.length >= 1 && filteredCompanies.length === 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-sm text-gray-500">
-                    No companies found. Select "New Company" to create one.
+          <div className="space-y-6 max-h-[400px] overflow-y-auto pr-1">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-[#1E4FAB]" />
+                  <span className="font-medium text-gray-900">Company</span>
+                  <span className="text-xs text-gray-500">(Primary association)</span>
+                </div>
+                {!linkedCompany && (
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowCompanySection(showCompanySection === "link" ? "none" : "link")}
+                      className="text-xs"
+                    >
+                      <LinkIcon className="h-3 w-3 mr-1" />
+                      Link Existing
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowCompanySection(showCompanySection === "create" ? "none" : "create")}
+                      className="text-xs"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add New
+                    </Button>
                   </div>
                 )}
               </div>
+
+              {linkedCompany && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="flex items-center gap-1 px-3 py-1.5">
+                    <Building2 className="h-3 w-3" />
+                    {linkedCompany.name}
+                    {linkedCompany.role && <span className="text-xs opacity-70">({linkedCompany.role})</span>}
+                    {linkedCompany.isNew && <span className="text-xs text-blue-600">(new)</span>}
+                    <button
+                      type="button"
+                      onClick={handleRemoveCompany}
+                      className="ml-1 hover:text-red-500"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                </div>
+              )}
+
+              {showCompanySection === "link" && (
+                <div className="p-4 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
+                  <div className="relative">
+                    <MMInput
+                      label="Search Company"
+                      placeholder="Type to search..."
+                      value={companySearch}
+                      onChange={(e) => {
+                        setCompanySearch(e.target.value);
+                        setShowCompanyDropdown(e.target.value.length >= 1);
+                      }}
+                      onFocus={() => companySearch.length >= 1 && setShowCompanyDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowCompanyDropdown(false), 200)}
+                    />
+                    {showCompanyDropdown && filteredCompanies.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                        {filteredCompanies.map((c) => (
+                          <div
+                            key={c.id}
+                            className="px-4 py-2 cursor-pointer hover:bg-blue-50 text-sm"
+                            onMouseDown={() => handleLinkCompany(c)}
+                          >
+                            {c.name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <MMInput
+                    label="Role at Company"
+                    placeholder="e.g. Owner, Manager"
+                    value={selectedCompanyRole}
+                    onChange={(e) => setSelectedCompanyRole(e.target.value)}
+                  />
+                </div>
+              )}
+
+              {showCompanySection === "create" && (
+                <div className="p-4 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
+                  <MMInput
+                    label="Company Name"
+                    required
+                    placeholder="Enter company name"
+                    value={newCompanyName}
+                    onChange={(e) => setNewCompanyName(e.target.value)}
+                  />
+                  <MMInput
+                    label="Role at Company"
+                    placeholder="e.g. Owner, Manager"
+                    value={newCompanyRole}
+                    onChange={(e) => setNewCompanyRole(e.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleCreateNewCompany}
+                    className="bg-[#1E4FAB] hover:bg-[#1a4294]"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Company
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t pt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-[#1E4FAB]" />
+                  <span className="font-medium text-gray-900">Related Properties</span>
+                  <span className="text-xs text-gray-500">(Optional - creates new properties)</span>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowPropertySection(showPropertySection === "create" ? "none" : "create")}
+                    className="text-xs"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add New Property
+                  </Button>
+                </div>
+              </div>
+
+              {linkedProperties.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {linkedProperties.map((property) => (
+                    <Badge key={property.id} variant="secondary" className="flex items-center gap-1 px-3 py-1.5">
+                      <Anchor className="h-3 w-3" />
+                      {property.name}
+                      {property.isNew && <span className="text-xs text-blue-600">(new)</span>}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveProperty(property.id)}
+                        className="ml-1 hover:text-red-500"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
+              <p className="text-xs text-gray-500">
+                Properties created here will be added to your system. Link to contact from the contact detail page.
+              </p>
+
+              {showPropertySection === "create" && (
+                <div className="p-4 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
+                  <MMInput
+                    label="Property Name"
+                    required
+                    placeholder="Enter property name"
+                    value={newPropertyName}
+                    onChange={(e) => setNewPropertyName(e.target.value)}
+                  />
+                  <MMFormGrid columns={2}>
+                    <MMInput
+                      label="City"
+                      placeholder="City"
+                      value={newPropertyCity}
+                      onChange={(e) => setNewPropertyCity(e.target.value)}
+                    />
+                    <MMStateSelect
+                      label="State"
+                      value={newPropertyState}
+                      onValueChange={setNewPropertyState}
+                    />
+                  </MMFormGrid>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleCreateNewProperty}
+                    className="bg-[#1E4FAB] hover:bg-[#1a4294]"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Property
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {!linkedCompany && linkedProperties.length === 0 && showCompanySection === "none" && showPropertySection === "none" && (
+              <div className="text-center py-6 text-gray-500 text-sm">
+                <p>No relationships added yet.</p>
+                <p className="text-xs mt-1">Click the buttons above to link or create companies and properties.</p>
+              </div>
             )}
-            
+          </div>
+        );
+      
+      case 3:
+        return (
+          <div className="space-y-4">
             <MMInput
               label="Street Address"
               placeholder="123 Main St"
@@ -370,7 +633,7 @@ export function CreateContactWizardModal({ open, onOpenChange, onContactCreated 
               placeholder="Any additional notes..."
               value={state.notes}
               onChange={(e) => setState(s => ({ ...s, notes: e.target.value }))}
-              rows={2}
+              rows={3}
             />
           </div>
         );
@@ -395,7 +658,7 @@ export function CreateContactWizardModal({ open, onOpenChange, onContactCreated 
       nextLabel="Continue"
       submitLabel="Create Contact"
       renderStep={renderStep}
-      size="md"
+      size="lg"
     />
   );
 }
