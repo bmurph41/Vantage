@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { StandardDialogShell } from "@/components/ui/standard-dialog-shell";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -110,6 +111,16 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
   const isAutosaveRef = useRef(false);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Link Company/Property state
+  const [showLinkCompanyDialog, setShowLinkCompanyDialog] = useState(false);
+  const [showLinkPropertyDialog, setShowLinkPropertyDialog] = useState(false);
+  const [companySearch, setCompanySearch] = useState("");
+  const [propertySearch, setPropertySearch] = useState("");
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
+  const [linkRole, setLinkRole] = useState("");
+  const [linkRelationship, setLinkRelationship] = useState("");
+
   const form = useForm<ContactFormData>({
     resolver: zodResolver(contactFormSchema),
     mode: 'onChange',
@@ -179,6 +190,75 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
   const { data: ddProjects = [] } = useQuery<any[]>({
     queryKey: ['/api/dd/projects', { contactId: contact?.id }],
     enabled: isOpen && !!contact?.id,
+  });
+
+  // Fetch all companies for linking
+  const { data: allCompanies = [] } = useQuery<Company[]>({
+    queryKey: ['/api/companies'],
+    enabled: isOpen && showLinkCompanyDialog,
+  });
+
+  // Fetch all properties for linking
+  const { data: allProperties = [] } = useQuery<Property[]>({
+    queryKey: ['/api/properties'],
+    enabled: isOpen && showLinkPropertyDialog,
+  });
+
+  // Filter companies for search
+  const filteredCompanies = allCompanies.filter(c => 
+    c.name?.toLowerCase().includes(companySearch.toLowerCase()) &&
+    !linkedCompanies.some(lc => lc.companyId === c.id)
+  );
+
+  // Filter properties for search
+  const filteredProperties = allProperties.filter(p => 
+    p.name?.toLowerCase().includes(propertySearch.toLowerCase()) &&
+    !linkedProperties.some(lp => lp.propertyId === p.id)
+  );
+
+  // Link company mutation
+  const linkCompanyMutation = useMutation({
+    mutationFn: async (data: { companyId: string; role?: string }) => {
+      const res = await apiRequest('POST', `/api/contacts/${contact?.id}/companies`, {
+        companyId: data.companyId,
+        role: data.role,
+        isPrimary: linkedCompanies.length === 0,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/contacts/${contact?.id}/companies`] });
+      setShowLinkCompanyDialog(false);
+      setSelectedCompanyId(null);
+      setCompanySearch("");
+      setLinkRole("");
+      toast({ title: "Company linked", description: "Company has been linked to this contact." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to link company", variant: "destructive" });
+    },
+  });
+
+  // Link property mutation
+  const linkPropertyMutation = useMutation({
+    mutationFn: async (data: { propertyId: string; relationship?: string }) => {
+      const res = await apiRequest('POST', `/api/contacts/${contact?.id}/properties`, {
+        propertyId: data.propertyId,
+        relationship: data.relationship,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/contacts/${contact?.id}/properties`] });
+      setShowLinkPropertyDialog(false);
+      setSelectedPropertyId(null);
+      setPropertySearch("");
+      setLinkRelationship("");
+      toast({ title: "Property linked", description: "Property has been linked to this contact." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to link property", variant: "destructive" });
+    },
   });
 
   // Fetch related contacts (same company)
@@ -1151,7 +1231,7 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
                       <Building className="w-4 h-4" />
                       Linked Companies
                     </CardTitle>
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" onClick={() => setShowLinkCompanyDialog(true)}>
                       <Plus className="w-4 h-4 mr-2" /> Link Company
                     </Button>
                   </div>
@@ -1191,7 +1271,7 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
                       <Anchor className="w-4 h-4" />
                       Linked Properties
                     </CardTitle>
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" onClick={() => setShowLinkPropertyDialog(true)}>
                       <Plus className="w-4 h-4 mr-2" /> Link Property
                     </Button>
                   </div>
@@ -1255,6 +1335,144 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
           </ScrollArea>
         </Tabs>
       </div>
+
+      {/* Link Company Dialog */}
+      <Dialog open={showLinkCompanyDialog} onOpenChange={setShowLinkCompanyDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building className="w-5 h-5" />
+              Link Company
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>Search Company</Label>
+              <Input
+                placeholder="Type to search..."
+                value={companySearch}
+                onChange={(e) => setCompanySearch(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            {companySearch && (
+              <div className="border rounded-lg max-h-40 overflow-y-auto">
+                {filteredCompanies.length > 0 ? (
+                  filteredCompanies.slice(0, 10).map((company) => (
+                    <div
+                      key={company.id}
+                      className={`px-3 py-2 cursor-pointer hover:bg-muted ${selectedCompanyId === company.id ? 'bg-blue-100 dark:bg-blue-900 border-l-2 border-blue-500' : ''}`}
+                      onClick={() => setSelectedCompanyId(company.id)}
+                    >
+                      <p className="font-medium">{company.name}</p>
+                      {company.city && <p className="text-xs text-muted-foreground">{company.city}, {company.state}</p>}
+                    </div>
+                  ))
+                ) : (
+                  <p className="px-3 py-4 text-center text-sm text-muted-foreground">No matching companies found</p>
+                )}
+              </div>
+            )}
+            {selectedCompanyId && (
+              <div>
+                <Label>Role at Company (optional)</Label>
+                <Input
+                  placeholder="e.g. Owner, Manager"
+                  value={linkRole}
+                  onChange={(e) => setLinkRole(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowLinkCompanyDialog(false);
+              setSelectedCompanyId(null);
+              setCompanySearch("");
+              setLinkRole("");
+            }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => selectedCompanyId && linkCompanyMutation.mutate({ companyId: selectedCompanyId, role: linkRole || undefined })}
+              disabled={!selectedCompanyId || linkCompanyMutation.isPending}
+            >
+              {linkCompanyMutation.isPending ? "Linking..." : "Link Company"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Link Property Dialog */}
+      <Dialog open={showLinkPropertyDialog} onOpenChange={setShowLinkPropertyDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Anchor className="w-5 h-5" />
+              Link Property
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>Search Property</Label>
+              <Input
+                placeholder="Type to search..."
+                value={propertySearch}
+                onChange={(e) => setPropertySearch(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            {propertySearch && (
+              <div className="border rounded-lg max-h-40 overflow-y-auto">
+                {filteredProperties.length > 0 ? (
+                  filteredProperties.slice(0, 10).map((property) => (
+                    <div
+                      key={property.id}
+                      className={`px-3 py-2 cursor-pointer hover:bg-muted ${selectedPropertyId === property.id ? 'bg-blue-100 dark:bg-blue-900 border-l-2 border-blue-500' : ''}`}
+                      onClick={() => setSelectedPropertyId(property.id)}
+                    >
+                      <p className="font-medium">{property.name}</p>
+                      {(property.city || property.state) && (
+                        <p className="text-xs text-muted-foreground">{[property.city, property.state].filter(Boolean).join(", ")}</p>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <p className="px-3 py-4 text-center text-sm text-muted-foreground">No matching properties found</p>
+                )}
+              </div>
+            )}
+            {selectedPropertyId && (
+              <div>
+                <Label>Relationship (optional)</Label>
+                <Input
+                  placeholder="e.g. Owner, Interested Buyer"
+                  value={linkRelationship}
+                  onChange={(e) => setLinkRelationship(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowLinkPropertyDialog(false);
+              setSelectedPropertyId(null);
+              setPropertySearch("");
+              setLinkRelationship("");
+            }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => selectedPropertyId && linkPropertyMutation.mutate({ propertyId: selectedPropertyId, relationship: linkRelationship || undefined })}
+              disabled={!selectedPropertyId || linkPropertyMutation.isPending}
+            >
+              {linkPropertyMutation.isPending ? "Linking..." : "Link Property"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </StandardDialogShell>
   );
 }

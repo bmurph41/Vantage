@@ -10377,6 +10377,38 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // POST to link contact to company
+  app.post("/api/contacts/:id/companies", async (req: any, res) => {
+    try {
+      const contactId = req.params.id;
+      const { companyId, role, isPrimary } = req.body;
+      if (!companyId) {
+        return res.status(400).json({ error: "companyId is required" });
+      }
+      await storage.linkContactToCompany(contactId, companyId, role || null, isPrimary || false);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Failed to link contact to company:", error);
+      res.status(500).json({ error: "Failed to link contact to company" });
+    }
+  });
+
+  // POST to link contact to property
+  app.post("/api/contacts/:id/properties", async (req: any, res) => {
+    try {
+      const contactId = req.params.id;
+      const { propertyId, relationship, notes } = req.body;
+      if (!propertyId) {
+        return res.status(400).json({ error: "propertyId is required" });
+      }
+      const link = await storage.linkPropertyToContact(propertyId, contactId, relationship, notes);
+      res.json(link);
+    } catch (error: any) {
+      console.error("Failed to link contact to property:", error);
+      res.status(500).json({ error: "Failed to link contact to property" });
+    }
+  });
+
   // Company-Contact Links
   app.get("/api/companies/:id/contacts", async (req: any, res) => {
     try {
