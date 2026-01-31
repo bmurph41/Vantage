@@ -1,12 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useLocation } from 'wouter';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { 
   User, Building2, Mail, Phone, Briefcase, MapPin, 
-  Link2, DollarSign, Calendar
+  Link2, DollarSign, Calendar, Target
 } from 'lucide-react';
 import { CrmRecordPage, RecordFieldGroup, RecordField, AssociationCard } from '@/components/crm/CrmRecordPage';
 import { apiRequest } from '@/lib/queryClient';
+import { useProspectingActivity } from '@/contexts/ProspectingActivityContext';
 
 interface ContactData {
   id: string;
@@ -34,6 +36,20 @@ interface ContactData {
 export default function ContactRecordPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
+  const { setPendingActivity } = useProspectingActivity();
+
+  const handleAddToProspecting = () => {
+    if (!contact) return;
+    
+    const fullName = `${contact.firstName} ${contact.lastName}`;
+    setPendingActivity({
+      contactId: id || '',
+      contactName: fullName,
+      companyId: contact.company?.id,
+      companyName: contact.company?.name,
+    });
+    setLocation('/prospecting');
+  };
 
   const { data: contact, isLoading } = useQuery<ContactData>({
     queryKey: ['/api/contacts', id],
@@ -67,6 +83,17 @@ export default function ContactRecordPage() {
       entityName={fullName}
       entitySubtitle={contact.title || undefined}
       owner={contact.owner}
+      headerActions={
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleAddToProspecting}
+          className="gap-2"
+        >
+          <Target className="h-4 w-4" />
+          Add to Prospecting
+        </Button>
+      }
       overviewLeft={
         <>
           <RecordFieldGroup title="Contact Information">

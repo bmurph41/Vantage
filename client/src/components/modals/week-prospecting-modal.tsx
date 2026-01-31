@@ -44,6 +44,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { DailyActivitiesModal } from "./daily-activities-modal";
 import type { ProspectingEntry, ProspectingActivity, Contact, Deal } from "@shared/schema";
+import type { PendingProspectingActivity } from "@/contexts/ProspectingActivityContext";
 
 interface WeekProspectingModalProps {
   open: boolean;
@@ -54,6 +55,8 @@ interface WeekProspectingModalProps {
   year: number;
   quarter: number;
   entry?: ProspectingEntry | null;
+  pendingActivity?: PendingProspectingActivity | null;
+  onActivityAdded?: () => void;
 }
 
 interface ActivityType {
@@ -175,7 +178,9 @@ export default function WeekProspectingModal({
   weekEnd,
   year,
   quarter,
-  entry
+  entry,
+  pendingActivity,
+  onActivityAdded
 }: WeekProspectingModalProps) {
   
   const [weeklyGoals, setWeeklyGoals] = useState<Goal[]>([]);
@@ -413,6 +418,88 @@ export default function WeekProspectingModal({
 
   // Mock prospecting activities for now - will be replaced with real data
   const [activities, setActivities] = useState<ProspectingActivity[]>([]);
+
+  // Track if pending activity has been processed
+  const pendingActivityProcessedRef = useRef(false);
+  const pendingActivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Handle pending activity from Contact/Company page
+  useEffect(() => {
+    // Cleanup timeout on unmount or when dependencies change
+    return () => {
+      if (pendingActivityTimeoutRef.current) {
+        clearTimeout(pendingActivityTimeoutRef.current);
+        pendingActivityTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (open && pendingActivity && !pendingActivityProcessedRef.current) {
+      pendingActivityProcessedRef.current = true;
+      
+      // Get current day of week
+      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const today = new Date();
+      const currentDayName = dayNames[today.getDay()];
+      
+      // Use current day if it's a weekday, otherwise default to monday
+      const targetDay = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].includes(currentDayName) 
+        ? currentDayName 
+        : 'monday';
+      
+      // Wait a moment for the modal to fully render, then open the activity box modal
+      pendingActivityTimeoutRef.current = setTimeout(() => {
+        // Guard: don't proceed if modal was closed
+        if (!open) return;
+        
+        // Find the first available (incomplete) activity box for today
+        const boxes = dailyData[targetDay]?.activityBoxes || [];
+        const firstAvailableBox = boxes.find(box => !box.completed);
+        
+        if (firstAvailableBox) {
+          // Pre-fill the form with the contact info
+          setBoxActivityForm({
+            type: pendingActivity.activityType || '',
+            outcome: '',
+            notes: pendingActivity.notes || `Activity with ${pendingActivity.contactName}${pendingActivity.companyName ? ` from ${pendingActivity.companyName}` : ''}`,
+            contactId: pendingActivity.contactId,
+            dealId: pendingActivity.dealId,
+            callbackDay: ''
+          });
+          
+          // Open the activity box modal
+          setActivityBoxModal({
+            open: true,
+            day: targetDay,
+            boxId: firstAvailableBox.id,
+            boxData: firstAvailableBox
+          });
+        } else {
+          // No available boxes - notify user
+          toast({
+            title: "No Available Activity Slots",
+            description: `All activity slots for ${targetDay} are filled. Please select a different day or clear some slots.`,
+            variant: "destructive"
+          });
+          // Clear pending activity since we can't auto-fill
+          if (onActivityAdded) {
+            onActivityAdded();
+          }
+        }
+        pendingActivityTimeoutRef.current = null;
+      }, 300);
+    }
+    
+    // Reset when modal closes
+    if (!open) {
+      pendingActivityProcessedRef.current = false;
+      if (pendingActivityTimeoutRef.current) {
+        clearTimeout(pendingActivityTimeoutRef.current);
+        pendingActivityTimeoutRef.current = null;
+      }
+    }
+  }, [open, pendingActivity, dailyData, toast, onActivityAdded]);
 
   // Track save status for visual feedback
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -1077,6 +1164,11 @@ export default function WeekProspectingModal({
     
     setActivityBoxModal({ open: false, day: '', boxId: '' });
     setBoxActivityForm({ type: '', outcome: '', notes: '', callbackDay: '' });
+    
+    // Notify parent that activity was added (clears pending activity)
+    if (onActivityAdded) {
+      onActivityAdded();
+    }
   };
   
   const getCompletedBoxCount = (day: string) => {

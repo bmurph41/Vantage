@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Edit, Trash2, Target, Calendar, TrendingUp, BarChart3, ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import WeekProspectingModal from "@/components/modals/week-prospecting-modal";
 import { ProspectingSettingsDialog } from "@/components/modals/prospecting-settings-dialog";
 import { useProspectingEntries, useProspectingRealTime, useWeeklyProspectingMetrics } from "@/hooks/use-prospecting";
+import { useProspectingActivity } from "@/contexts/ProspectingActivityContext";
 import type { ProspectingEntry } from "@shared/schema";
 import { format } from "date-fns";
 
@@ -166,12 +167,42 @@ export default function ProspectingPage() {
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { pendingActivity, clearPendingActivity, hasPendingActivity } = useProspectingActivity();
 
   // Fetch prospecting entries from database
   const { data: prospectingEntries = [], isLoading } = useProspectingEntries(selectedYear);
   
   // Enable real-time updates
   useProspectingRealTime();
+
+  // Auto-open modal when there's a pending activity from Contact/Company page
+  useEffect(() => {
+    if (hasPendingActivity && !weekModalOpen) {
+      // Get current week info
+      const { weekStart, weekEnd, weekNumber } = currentISOInfo;
+      const currentYear = currentDate.getFullYear();
+      
+      // Sync to current period to avoid period mismatch
+      setSelectedYear(currentYear);
+      setSelectedQuarter(currentQuarter);
+      
+      // Find existing entry for current week
+      const existingEntry = prospectingEntries.find(
+        e => e.year === currentYear && 
+             e.quarter === currentQuarter && 
+             e.weekNumber === currentWeek
+      );
+      
+      // Open modal for current week with pending activity
+      setSelectedWeekData({
+        weekNumber,
+        weekStart,
+        weekEnd,
+        entry: existingEntry
+      });
+      setWeekModalOpen(true);
+    }
+  }, [hasPendingActivity, prospectingEntries]);
 
   // Check if we're viewing the current period
   const isCurrentPeriod = selectedYear === currentDate.getFullYear() && selectedQuarter === currentQuarter;
@@ -589,13 +620,20 @@ export default function ProspectingPage() {
       {selectedWeekData && (
         <WeekProspectingModal
           open={weekModalOpen}
-          onOpenChange={setWeekModalOpen}
+          onOpenChange={(open) => {
+            setWeekModalOpen(open);
+            if (!open) {
+              clearPendingActivity();
+            }
+          }}
           weekNumber={selectedWeekData.weekNumber}
           weekStart={selectedWeekData.weekStart}
           weekEnd={selectedWeekData.weekEnd}
           year={selectedYear}
           quarter={selectedQuarter}
           entry={selectedWeekData.entry}
+          pendingActivity={pendingActivity}
+          onActivityAdded={clearPendingActivity}
         />
       )}
     </div>
