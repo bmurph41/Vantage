@@ -37,10 +37,10 @@ interface CrmRecordPageProps {
 }
 
 const entityTypeConfig = {
-  company: { icon: Building2, label: 'Company', backLabel: 'Companies', backUrl: '/companies' },
-  contact: { icon: User, label: 'Contact', backLabel: 'Contacts', backUrl: '/contacts' },
-  property: { icon: MapPin, label: 'Property', backLabel: 'Properties', backUrl: '/properties' },
-  deal: { icon: DollarSign, label: 'Deal', backLabel: 'Deals', backUrl: '/deals' },
+  company: { icon: Building2, label: 'Company', backLabel: 'Companies', backUrl: '/crm/companies' },
+  contact: { icon: User, label: 'Contact', backLabel: 'Contacts', backUrl: '/crm/contacts' },
+  property: { icon: MapPin, label: 'Property', backLabel: 'Properties', backUrl: '/crm/properties' },
+  deal: { icon: DollarSign, label: 'Deal', backLabel: 'Deals', backUrl: '/crm/deals' },
 };
 
 export function CrmRecordPage({
