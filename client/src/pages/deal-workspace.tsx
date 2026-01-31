@@ -9,7 +9,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Search, Plus, LayoutGrid, List, Users, DollarSign, TrendingUp, 
-  Target, Clock, Flame, Filter, Settings2
+  Target, Clock, Flame, Filter, Settings2, BarChart3
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -177,6 +177,14 @@ export default function DealWorkspace() {
                 />
               </div>
               
+              <Button 
+                variant="outline"
+                onClick={() => setLocation('/crm/deals/compare')}
+                className="h-9"
+              >
+                <BarChart3 className="w-4 h-4 mr-2" />
+                Compare
+              </Button>
               <Button 
                 onClick={handleAddNew}
                 className="h-9"

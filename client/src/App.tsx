@@ -94,6 +94,7 @@ const PropertyRecordPage = lazy(() => import("@/pages/property-record"));
 const Deals = lazy(() => import("@/pages/deals"));
 const DealWorkspace = lazy(() => import("@/pages/deal-workspace"));
 const DealDetail = lazy(() => import("@/pages/deal-detail"));
+const DealComparison = lazy(() => import("@/pages/deal-comparison"));
 const Properties = lazy(() => import("@/pages/properties"));
 const PendingProperties = lazy(() => import("@/pages/pending-properties"));
 const PendingContacts = lazy(() => import("@/pages/pending-contacts"));
@@ -1373,6 +1374,13 @@ function Router() {
           window.location.replace('/deal-workspace?view=list');
           return null;
         }}
+      </Route>
+      <Route path="/crm/deals/compare">
+        {() => (
+          <UnifiedLayout>
+            <DealComparison />
+          </UnifiedLayout>
+        )}
       </Route>
       <Route path="/crm/deals/:dealId">
         {() => (
