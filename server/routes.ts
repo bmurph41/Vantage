@@ -7761,11 +7761,81 @@ Current context: Project ${req.params.projectId}`;
 
   app.post("/api/crm/tasks", async (req: any, res) => {
     try {
+      const { 
+        addToCalendar, 
+        linkToProspecting,
+        ...taskFields 
+      } = req.body;
+
       const taskData = insertCrmTaskSchema.parse({
-        ...req.body,
+        ...taskFields,
         assigneeId: req.user.id,
+        orgId: req.user.orgId,
       });
+
       const [task] = await db.insert(crmTasks).values(taskData).returning();
+
+      // Auto-add to calendar if requested and due date exists
+      if (addToCalendar && task.dueDate) {
+        try {
+          await db.insert(calendarEvents).values({
+            title: task.title,
+            description: task.description,
+            startTime: task.dueDate,
+            endTime: new Date(new Date(task.dueDate).getTime() + 30 * 60000), // 30 min duration
+            eventType: 'task',
+            entityType: task.entityType,
+            entityId: task.entityId,
+            relatedTaskId: task.id,
+            userId: req.user.id,
+            orgId: req.user.orgId,
+          }).onConflictDoNothing();
+          console.log(`Task ${task.id} added to calendar`);
+        } catch (calError) {
+          console.error("Failed to add task to calendar (non-fatal):", calError);
+        }
+      }
+
+      // Log to activity timeline
+      if (task.dueDate) {
+        try {
+          await db.insert(crmActivities).values({
+            type: 'task_created',
+            subject: `Task scheduled: ${task.title}`,
+            description: `${task.taskType || 'Task'} due on ${new Date(task.dueDate).toLocaleDateString()}`,
+            entityType: task.entityType,
+            entityId: task.entityId,
+            userId: req.user.id,
+            orgId: req.user.orgId,
+            metadata: {
+              taskId: task.id,
+              taskType: task.taskType,
+              priority: task.priority,
+              linkedToProspecting: linkToProspecting,
+              addedToCalendar: addToCalendar,
+            },
+          }).onConflictDoNothing();
+        } catch (actError) {
+          console.error("Failed to log task activity (non-fatal):", actError);
+        }
+      }
+
+      // Sync to prospecting if requested
+      if (linkToProspecting && task.entityId) {
+        try {
+          await db.insert(prospectingTasks).values({
+            taskId: task.id,
+            entityType: task.entityType,
+            entityId: task.entityId,
+            status: 'pending',
+            userId: req.user.id,
+            orgId: req.user.orgId,
+          }).onConflictDoNothing();
+        } catch (prospError) {
+          console.error("Failed to sync to prospecting (non-fatal):", prospError);
+        }
+      }
+
       res.json(task);
     } catch (error: any) {
       console.error("Failed to create task:", error);

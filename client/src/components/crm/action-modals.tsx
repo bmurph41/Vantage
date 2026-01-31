@@ -181,35 +181,103 @@ export function TaskModal({
   linkedCompanyName,
 }: TaskModalProps) {
   const [title, setTitle] = useState("");
+  const [taskType, setTaskType] = useState<string>("follow_up");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<string>("medium");
   const [dueDate, setDueDate] = useState<Date | undefined>();
-  const [linkToProspecting, setLinkToProspecting] = useState(false);
+  const [dueTime, setDueTime] = useState<string>("09:00");
+  const [linkToProspecting, setLinkToProspecting] = useState(true);
+  const [addToCalendar, setAddToCalendar] = useState(true);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Task types for marina/CRM workflows
+  const taskTypes = [
+    { value: "follow_up", label: "Follow Up" },
+    { value: "call", label: "Call" },
+    { value: "email", label: "Email" },
+    { value: "meeting", label: "Meeting" },
+    { value: "site_visit", label: "Site Visit" },
+    { value: "due_diligence", label: "Due Diligence" },
+    { value: "document_review", label: "Document Review" },
+    { value: "proposal", label: "Send Proposal" },
+    { value: "contract", label: "Contract/Agreement" },
+    { value: "closing", label: "Closing Task" },
+    { value: "research", label: "Research" },
+    { value: "outreach", label: "Outreach" },
+    { value: "reminder", label: "Reminder" },
+    { value: "other", label: "Other" },
+  ];
+
   const createTaskMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", "/api/crm/tasks", {
+      // Combine date and time for the due date
+      let fullDueDate: string | undefined;
+      if (dueDate) {
+        const [hours, minutes] = dueTime.split(':').map(Number);
+        const combinedDate = new Date(dueDate);
+        combinedDate.setHours(hours, minutes, 0, 0);
+        fullDueDate = combinedDate.toISOString();
+      }
+
+      // Create the task
+      const task = await apiRequest("POST", "/api/crm/tasks", {
         title,
+        taskType,
         description,
         priority,
-        dueDate: dueDate?.toISOString(),
+        dueDate: fullDueDate,
         entityType,
         entityId,
         linkedCompanyId,
         linkToProspecting,
+        addToCalendar,
       });
+
+      // If due date is set, also create activity log entry
+      if (fullDueDate) {
+        await apiRequest("POST", "/api/crm/activities", {
+          type: "task_created",
+          subject: `Task scheduled: ${title}`,
+          description: `${taskTypes.find(t => t.value === taskType)?.label || 'Task'} scheduled for ${format(new Date(fullDueDate), "PPP 'at' p")}`,
+          entityType,
+          entityId,
+          metadata: {
+            taskType,
+            priority,
+            dueDate: fullDueDate,
+            linkedToProspecting: linkToProspecting,
+            addedToCalendar: addToCalendar,
+          },
+        });
+      }
+
+      return task;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/tasks"] });
       queryClient.invalidateQueries({ queryKey: [`/api/crm/timeline/${entityType}/${entityId}`] });
-      toast({ title: "Task created successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/activities"] });
+      if (linkToProspecting) {
+        queryClient.invalidateQueries({ queryKey: ["/api/prospecting"] });
+      }
+      if (addToCalendar) {
+        queryClient.invalidateQueries({ queryKey: ["/api/calendar"] });
+      }
+
+      const successMessage = dueDate 
+        ? `Task created and ${addToCalendar ? 'added to calendar' : 'scheduled'}` 
+        : "Task created successfully";
+      toast({ title: successMessage });
+
+      // Reset form
       setTitle("");
+      setTaskType("follow_up");
       setDescription("");
       setPriority("medium");
       setDueDate(undefined);
+      setDueTime("09:00");
       onOpenChange(false);
     },
     onError: () => {
@@ -222,11 +290,16 @@ export function TaskModal({
 
   const handleGoToProspecting = () => {
     onOpenChange(false);
+    // Navigate to prospecting with context
+    const params = new URLSearchParams();
     if (entityType === "contact") {
-      setLocation(`/crm/prospecting?contactId=${entityId}`);
+      params.set("contactId", entityId);
     } else if (entityType === "company") {
-      setLocation(`/crm/prospecting?companyId=${entityId}`);
+      params.set("companyId", entityId);
+    } else if (entityType === "property") {
+      params.set("propertyId", entityId);
     }
+    setLocation(`/prospecting?${params.toString()}`);
   };
 
   return (
@@ -249,6 +322,7 @@ export function TaskModal({
       }}
     >
       <div className="space-y-4">
+        {/* Task Title */}
         <div className="space-y-2">
           <Label htmlFor="task-title">Task Title</Label>
           <Input
@@ -260,6 +334,24 @@ export function TaskModal({
           />
         </div>
 
+        {/* Task Type - NEW */}
+        <div className="space-y-2">
+          <Label>Task Type</Label>
+          <Select value={taskType} onValueChange={setTaskType}>
+            <SelectTrigger data-testid="select-task-type">
+              <SelectValue placeholder="Select task type" />
+            </SelectTrigger>
+            <SelectContent>
+              {taskTypes.map((type) => (
+                <SelectItem key={type.value} value={type.value}>
+                  {type.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Description */}
         <div className="space-y-2">
           <Label htmlFor="task-description">Description (optional)</Label>
           <Textarea
@@ -272,6 +364,7 @@ export function TaskModal({
           />
         </div>
 
+        {/* Priority and Due Date */}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Priority</Label>
@@ -313,6 +406,60 @@ export function TaskModal({
           </div>
         </div>
 
+        {/* Time selector - shows when due date is selected */}
+        {dueDate && (
+          <div className="space-y-2">
+            <Label>Time</Label>
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <Input
+                type="time"
+                value={dueTime}
+                onChange={(e) => setDueTime(e.target.value)}
+                className="w-32"
+                data-testid="input-due-time"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Sync Options - show when due date is selected */}
+        {dueDate && (
+          <div className="space-y-3 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
+              Auto-sync options
+            </p>
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="add-to-calendar"
+                  checked={addToCalendar}
+                  onCheckedChange={(checked) => setAddToCalendar(checked as boolean)}
+                />
+                <Label htmlFor="add-to-calendar" className="text-sm font-normal cursor-pointer flex items-center gap-2">
+                  <CalendarIcon className="h-4 w-4" />
+                  Add to Calendar
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="link-to-prospecting"
+                  checked={linkToProspecting}
+                  onCheckedChange={(checked) => setLinkToProspecting(checked as boolean)}
+                />
+                <Label htmlFor="link-to-prospecting" className="text-sm font-normal cursor-pointer flex items-center gap-2">
+                  <ExternalLink className="h-4 w-4" />
+                  Sync to Prospecting
+                </Label>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Task will also be logged to Activity Timeline
+            </p>
+          </div>
+        )}
+
+        {/* Linked Entities */}
         <div className="space-y-2">
           <Label className="text-sm text-muted-foreground">Linked Entities</Label>
           <div className="flex flex-wrap gap-2">
@@ -329,18 +476,16 @@ export function TaskModal({
           </div>
         </div>
 
-        <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-          <div className="flex items-center gap-2">
-            <ExternalLink className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm">Go to Prospecting</span>
-          </div>
+        {/* Go to Prospecting - Centered Button */}
+        <div className="flex justify-center pt-2">
           <Button
             variant="outline"
-            size="sm"
             onClick={handleGoToProspecting}
+            className="flex items-center gap-2"
             data-testid="button-go-prospecting"
           >
-            Open
+            <ExternalLink className="h-4 w-4" />
+            Go to Prospecting
           </Button>
         </div>
       </div>
