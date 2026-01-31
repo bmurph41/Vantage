@@ -69,6 +69,30 @@ export default function Contacts() {
   const { data: contacts = [], isLoading } = useQuery<ContactWithCompany[]>({
     queryKey: ['/api/contacts'],
   });
+
+  const { data: allActivities = [] } = useQuery<any[]>({
+    queryKey: ['/api/activities'],
+    enabled: !!selectedContact?.id,
+  });
+
+  const capitalizeFirst = (str: string | null | undefined) => {
+    if (!str) return null;
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  };
+
+  const getMostRecentActivity = () => {
+    if (!selectedContact?.id || !allActivities || allActivities.length === 0) return null;
+    const contactActivities = allActivities.filter(a => a.contactId === selectedContact.id);
+    if (contactActivities.length === 0) return null;
+    const sorted = [...contactActivities].sort((a, b) => 
+      new Date(b.createdAt || b.dueDate).getTime() - new Date(a.createdAt || a.dueDate).getTime()
+    );
+    const recent = sorted[0];
+    if (!recent) return null;
+    const date = new Date(recent.createdAt || recent.dueDate);
+    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `${recent.type || 'Note'}: ${recent.title || recent.notes || 'Activity'} (${dateStr})`;
+  };
   
   useEffect(() => {
     if (contacts.length > 0 && searchString) {
@@ -274,7 +298,7 @@ export default function Contacts() {
               {contact.firstName} {contact.lastName}
             </div>
             <div className="text-xs text-gray-500 truncate">
-              {contact.position || contact.role || '—'}
+              {capitalizeFirst(contact.position || contact.role) || '—'}
             </div>
           </div>
         </div>
@@ -470,7 +494,7 @@ export default function Contacts() {
   const detailsContent = selectedContact ? (
     <CrmDetailsPanel
       title={`${selectedContact.firstName} ${selectedContact.lastName}`}
-      subtitle={selectedContact.position || selectedContact.role || undefined}
+      subtitle={capitalizeFirst(selectedContact.position || selectedContact.role) || undefined}
       onEdit={() => handleEdit(selectedContact)}
       onDelete={() => handleDelete(selectedContact.id)}
       actions={
@@ -488,7 +512,7 @@ export default function Contacts() {
       <CrmDetailSection title="Contact Information">
         <CrmDetailField label="Email" value={selectedContact.email} />
         <CrmDetailField label="Phone" value={formatPhoneDisplay(selectedContact.phone)} />
-        <CrmDetailField label="Position" value={selectedContact.position || selectedContact.role} />
+        <CrmDetailField label="Position" value={capitalizeFirst(selectedContact.position || selectedContact.role)} />
         <CrmDetailField label="Type" value={
           selectedContact.contactTag && (
             <Badge className={`text-xs ${contactTagColors[selectedContact.contactTag as keyof typeof contactTagColors] || 'bg-gray-500 text-white'}`}>
@@ -526,7 +550,7 @@ export default function Contacts() {
 
       <CrmDetailSection title="Additional Details">
         <CrmDetailField label="Source" value={selectedContact.source} />
-        <CrmDetailField label="Notes" value={selectedContact.notes} />
+        <CrmDetailField label="Notes" value={getMostRecentActivity() || selectedContact.notes} />
       </CrmDetailSection>
     </CrmDetailsPanel>
   ) : null;

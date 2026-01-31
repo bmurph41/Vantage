@@ -53,6 +53,11 @@ const contactTagColors = {
   other: 'bg-gray-500 text-white'
 };
 
+const capitalizeFirst = (str: string | null | undefined) => {
+  if (!str) return null;
+  return str.charAt(0).toUpperCase() + str.slice(1);
+};
+
 const leadStatusColors = {
   none: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
   new: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
@@ -517,7 +522,7 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
 
                 <div className="flex items-center gap-2 mt-1 text-muted-foreground">
                   {form.watch('position') && (
-                    <span className="text-sm">{form.watch('position')}</span>
+                    <span className="text-sm">{capitalizeFirst(form.watch('position'))}</span>
                   )}
                   {form.watch('position') && form.watch('company') && <span>•</span>}
                   {form.watch('company') && (
@@ -784,7 +789,7 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
                           {isEditing ? (
                             <Input {...form.register('position')} className="h-9" />
                           ) : (
-                            <p className="font-medium">{form.watch('position') || '-'}</p>
+                            <p className="font-medium">{capitalizeFirst(form.watch('position')) || '-'}</p>
                           )}
                         </div>
                       </div>
