@@ -1177,32 +1177,49 @@ export function DetailDrawer({
                           <div className="space-y-2">
                             <Label>Type</Label>
                             {isEditing ? (
-                              <Input
+                              <Select
                                 value={editData.type || "marina"}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, type: e.target.value })
+                                onValueChange={(value) =>
+                                  setEditData({ ...editData, type: value })
                                 }
-                                data-testid="input-type"
-                              />
+                              >
+                                <SelectTrigger data-testid="select-type">
+                                  <SelectValue placeholder="Select type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="marina">Marina</SelectItem>
+                                  <SelectItem value="boat_yard">Boat Yard</SelectItem>
+                                  <SelectItem value="marina_yard">Marina & Yard</SelectItem>
+                                </SelectContent>
+                              </Select>
                             ) : (
                               <div className="text-sm capitalize" data-testid="text-type">
-                                {entity?.type || "Marina"}
+                                {entity?.type?.replace('_', ' ') || "Marina"}
                               </div>
                             )}
                           </div>
                           <div className="space-y-2">
                             <Label>Status</Label>
                             {isEditing ? (
-                              <Input
-                                value={editData.status || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, status: e.target.value })
+                              <Select
+                                value={editData.status || "target"}
+                                onValueChange={(value) =>
+                                  setEditData({ ...editData, status: value })
                                 }
-                                data-testid="input-status"
-                              />
+                              >
+                                <SelectTrigger data-testid="select-status">
+                                  <SelectValue placeholder="Select status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="target">Target</SelectItem>
+                                  <SelectItem value="for_sale">For Sale</SelectItem>
+                                  <SelectItem value="under_loi">Under LOI</SelectItem>
+                                  <SelectItem value="under_contract">Under Contract</SelectItem>
+                                </SelectContent>
+                              </Select>
                             ) : (
                               <Badge variant="secondary" data-testid="badge-status">
-                                {entity?.status || "Available"}
+                                {entity?.status?.replace('_', ' ') || "Available"}
                               </Badge>
                             )}
                           </div>
