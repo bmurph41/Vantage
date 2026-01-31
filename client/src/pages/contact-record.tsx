@@ -36,13 +36,12 @@ export default function ContactRecordPage() {
   const [, setLocation] = useLocation();
 
   const { data: contact, isLoading } = useQuery<ContactData>({
-    queryKey: ['/api/crm/summary/contacts', id, 'summary'],
-    queryFn: () => apiRequest(`/api/crm/summary/contacts/${id}/summary`),
+    queryKey: ['/api/contacts', id],
     enabled: !!id,
   });
 
   const { data: linkedDeals } = useQuery({
-    queryKey: ['/api/crm/associations', id, 'deals'],
+    queryKey: ['/api/contacts', id, 'deals'],
     queryFn: () => apiRequest(`/api/crm/associations/contact/${id}/linked?targetType=deal`),
     enabled: !!id,
   });
