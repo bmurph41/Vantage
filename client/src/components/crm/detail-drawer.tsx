@@ -228,6 +228,30 @@ export function DetailDrawer({
     enabled: entityType === 'contact' && !!entityId,
   });
 
+  // Fetch contacts linked to property
+  const { data: propertyContacts = [] } = useQuery<any[]>({
+    queryKey: ['/api/properties', entityId, 'contacts'],
+    queryFn: async () => {
+      if (!entityId) return [];
+      const response = await fetch(`/api/properties/${entityId}/contacts`);
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: entityType === 'property' && !!entityId,
+  });
+
+  // Fetch companies linked to property
+  const { data: propertyCompanies = [] } = useQuery<any[]>({
+    queryKey: ['/api/properties', entityId, 'companies'],
+    queryFn: async () => {
+      if (!entityId) return [];
+      const response = await fetch(`/api/properties/${entityId}/companies`);
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: entityType === 'property' && !!entityId,
+  });
+
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -1171,6 +1195,52 @@ export function DetailDrawer({
                               {entity?.title || "-"}
                             </div>
                           )}
+                        </div>
+
+                        {/* Owner & Company Section */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Owner (Primary Contact)</Label>
+                            {propertyContacts.length > 0 ? (
+                              <div 
+                                className="text-sm text-primary hover:underline cursor-pointer flex items-center gap-2"
+                                onClick={() => {
+                                  const ownerContact = propertyContacts[0]?.contact;
+                                  if (ownerContact) {
+                                    setLocation(`/crm/contacts/${ownerContact.id}`);
+                                    onClose();
+                                  }
+                                }}
+                                data-testid="link-owner-contact"
+                              >
+                                <User className="h-4 w-4" />
+                                {propertyContacts[0]?.contact?.firstName} {propertyContacts[0]?.contact?.lastName}
+                              </div>
+                            ) : (
+                              <div className="text-sm text-muted-foreground">No owner assigned</div>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Company</Label>
+                            {propertyCompanies.length > 0 ? (
+                              <div 
+                                className="text-sm text-primary hover:underline cursor-pointer flex items-center gap-2"
+                                onClick={() => {
+                                  const linkedCompany = propertyCompanies[0]?.company;
+                                  if (linkedCompany) {
+                                    setLocation(`/crm/companies/${linkedCompany.id}`);
+                                    onClose();
+                                  }
+                                }}
+                                data-testid="link-owner-company"
+                              >
+                                <Building className="h-4 w-4" />
+                                {propertyCompanies[0]?.company?.name}
+                              </div>
+                            ) : (
+                              <div className="text-sm text-muted-foreground">No company assigned</div>
+                            )}
+                          </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
