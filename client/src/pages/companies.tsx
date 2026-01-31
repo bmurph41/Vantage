@@ -8,19 +8,17 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Building, Plus, Edit, Trash2, Upload, Search, Globe, Users, MapPin, TrendingUp, Download, Phone, Settings, Calendar, Briefcase, Home, Loader2, User, ChevronRight, Anchor, DollarSign, Merge, AlertTriangle, Star, ExternalLink, Mail } from "lucide-react";
+import { Building, Plus, Edit, Trash2, Upload, Search, Globe, Users, MapPin, TrendingUp, Download, Phone, Settings, Calendar, Briefcase, Home, Loader2, User, ChevronRight, Anchor, DollarSign, Merge, AlertTriangle } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import CompanyFormModal from "@/components/modals/company-form-modal";
 import { CreateCompanyWizardModal } from "@/components/modals/create-company-wizard-modal";
-import CompanyDetailModal from "@/components/modals/company-detail-modal";
 import { FileUpload } from "@/components/file-upload";
 import KpiSettingsModal from "@/components/modals/kpi-settings-modal";
 import { CrmPageShell } from "@/components/crm/CrmPageShell";
 import { CrmTopBar } from "@/components/crm/CrmTopBar";
-import { CrmSplitView } from "@/components/crm/CrmSplitView";
 import { CrmDataTable, type CrmColumn } from "@/components/crm/CrmDataTable";
-import { CrmDetailsPanel, CrmDetailSection, CrmDetailField } from "@/components/crm/CrmDetailsPanel";
+import { DetailDrawer } from "@/components/crm/detail-drawer";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { formatNumber } from "@/lib/utils";
@@ -104,82 +102,45 @@ export default function Companies() {
   const [isCreateWizardOpen, setIsCreateWizardOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [showFileUpload, setShowFileUpload] = useState(false);
-  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isKpiSettingsOpen, setIsKpiSettingsOpen] = useState(false);
   const [showPropertiesModal, setShowPropertiesModal] = useState(false);
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
   const [showMergeDialog, setShowMergeDialog] = useState(false);
   const [mergeMode, setMergeMode] = useState(false);
-  const [showFullPageModal, setShowFullPageModal] = useState(false);
+
+  // HubSpot-style: Drawer state
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerCompanyId, setDrawerCompanyId] = useState<string | null>(null);
+
+  // For properties modal - need to track which company
+  const [propertiesCompanyId, setPropertiesCompanyId] = useState<string | null>(null);
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: companies, isLoading } = useQuery<Company[]>({
     queryKey: ['/api/companies'],
   });
-  
-  type CompanyContactLink = { id: string; contactId: string; companyId: string; role?: string | null; isPrimary: boolean; contact: Contact };
-  
-  const { data: companyContacts = [] } = useQuery<CompanyContactLink[]>({
-    queryKey: ['/api/companies', selectedCompany?.id, 'contacts'],
-    queryFn: async () => {
-      if (!selectedCompany?.id) return [];
-      const response = await fetch(`/api/companies/${selectedCompany.id}/contacts`);
-      if (!response.ok) return [];
-      return response.json();
-    },
-    enabled: !!selectedCompany?.id,
-  });
-  
-  const { data: companyProperties = [] } = useQuery<Property[]>({
-    queryKey: ['/api/companies', selectedCompany?.id, 'properties'],
-    queryFn: async () => {
-      if (!selectedCompany?.id) return [];
-      const response = await fetch(`/api/companies/${selectedCompany.id}/properties`);
-      if (!response.ok) return [];
-      return response.json();
-    },
-    enabled: !!selectedCompany?.id,
-  });
-  
-  const { data: companySalesComps = [] } = useQuery<any[]>({
-    queryKey: ['/api/companies', selectedCompany?.id, 'acquisitions'],
-    queryFn: async () => {
-      if (!selectedCompany?.id) return [];
-      const response = await fetch(`/api/sales-comps?buyerCompanyId=${selectedCompany.id}`);
-      if (!response.ok) return [];
-      const data = await response.json();
-      return Array.isArray(data) ? data : data.comps || [];
-    },
-    enabled: !!selectedCompany?.id,
-  });
-  
-  const lastAcquisition = useMemo(() => {
-    if (!companySalesComps?.length) return null;
-    const sorted = [...companySalesComps].sort((a, b) => {
-      const dateA = new Date(a.saleDate || a.closingDate || 0);
-      const dateB = new Date(b.saleDate || b.closingDate || 0);
-      return dateB.getTime() - dateA.getTime();
-    });
-    return sorted[0];
-  }, [companySalesComps]);
-  
-  const topContacts = useMemo(() => {
-    // Sort to put primary contacts first, then take top 3
-    const sorted = [...companyContacts].sort((a, b) => {
-      if (a.isPrimary && !b.isPrimary) return -1;
-      if (!a.isPrimary && b.isPrimary) return 1;
-      return 0;
-    });
-    return sorted.slice(0, 3);
-  }, [companyContacts]);
 
-  const primaryContact = useMemo(() => {
-    const primary = companyContacts.find(c => c.isPrimary);
-    return primary?.contact || null;
-  }, [companyContacts]);
-  
+  // Fetch properties for the properties modal
+  const { data: companyProperties = [] } = useQuery<Property[]>({
+    queryKey: ['/api/companies', propertiesCompanyId, 'properties'],
+    queryFn: async () => {
+      if (!propertiesCompanyId) return [];
+      const response = await fetch(`/api/companies/${propertiesCompanyId}/properties`);
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: !!propertiesCompanyId,
+  });
+
+  // Get the selected company for properties modal title
+  const propertiesCompany = useMemo(() => {
+    if (!propertiesCompanyId || !companies) return null;
+    return companies.find(c => c.id === propertiesCompanyId);
+  }, [propertiesCompanyId, companies]);
+
   useEffect(() => {
     if (companies && searchString) {
       const params = new URLSearchParams(searchString);
@@ -187,7 +148,8 @@ export default function Companies() {
       if (selectedId) {
         const company = companies.find(c => c.id === selectedId);
         if (company) {
-          setSelectedCompany(company);
+          setDrawerCompanyId(selectedId);
+          setDrawerOpen(true);
           setLocation('/crm/companies', { replace: true });
         }
       }
@@ -233,7 +195,8 @@ export default function Companies() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
       toast({ title: "Company deleted successfully" });
-      setSelectedCompany(null);
+      setDrawerOpen(false);
+      setDrawerCompanyId(null);
     },
     onError: (error: any) => {
       toast({ title: "Failed to delete company", description: error.message, variant: "destructive" });
@@ -267,11 +230,7 @@ export default function Companies() {
       setMergeMode(false);
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Failed to merge companies", 
-        description: error.message,
-        variant: "destructive" 
-      });
+      toast({ title: "Failed to merge companies", description: error.message, variant: "destructive" });
     },
   });
 
@@ -291,12 +250,16 @@ export default function Companies() {
     setIsCreateWizardOpen(true);
   };
 
+  // HubSpot-style: Row click opens drawer
   const handleRowClick = (company: Company) => {
-    setSelectedCompany(company);
+    setDrawerCompanyId(company.id);
+    setDrawerOpen(true);
   };
 
-  const handleCloseDetail = () => {
-    setSelectedCompany(null);
+  // HubSpot-style: Name click navigates to full record page
+  const handleNameClick = (e: React.MouseEvent, company: Company) => {
+    e.stopPropagation();
+    setLocation(`/crm/companies/${company.id}`);
   };
 
   const handleFileUpload = async (files: File[]) => {
@@ -325,12 +288,12 @@ export default function Companies() {
 
   const handleBulkExport = () => {
     if (selectedIds.size === 0) return;
-    const selectedCompanies = companies?.filter(c => selectedIds.has(c.id)) || [];
+    const selectedCompaniesList = companies?.filter(c => selectedIds.has(c.id)) || [];
     const csv = [
       ['Name', 'Industry', 'Size', 'Phone', 'Website', 'Address'].join(','),
-      ...selectedCompanies.map(c => [c.name, c.industry || '', c.size || '', c.phone || '', c.website || '', c.address || ''].map(f => `"${f}"`).join(','))
+      ...selectedCompaniesList.map(c => [c.name, c.industry || '', c.size || '', c.phone || '', c.website || '', c.address || ''].map(f => `"${f}"`).join(','))
     ].join('\n');
-    
+
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -355,11 +318,7 @@ export default function Companies() {
 
   const handleMerge = () => {
     if (selectedCompanies.size !== 2) {
-      toast({ 
-        title: "Select exactly 2 companies", 
-        description: "Please select exactly 2 companies to merge",
-        variant: "destructive" 
-      });
+      toast({ title: "Select exactly 2 companies", description: "Please select exactly 2 companies to merge", variant: "destructive" });
       return;
     }
     setShowMergeDialog(true);
@@ -436,7 +395,12 @@ export default function Companies() {
             <Building className="w-4 h-4 text-white" />
           </div>
           <div className="min-w-0">
-            <div className="text-sm font-medium text-gray-900 truncate">{company.name}</div>
+            <button
+              onClick={(e) => handleNameClick(e, company)}
+              className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline truncate block text-left"
+            >
+              {company.name}
+            </button>
             {company.address && (
               <div className="text-xs text-gray-500 truncate flex items-center gap-1">
                 <MapPin className="w-3 h-3" />
@@ -499,208 +463,6 @@ export default function Companies() {
     }
   ];
 
-  const listContent = (
-    <div className="flex flex-col h-full">
-      {showFileUpload && (
-        <div className="bg-white border-b border-gray-200 p-4">
-          <FileUpload onUpload={handleFileUpload} title="Import Companies" description="Upload CSV, TXT, or PDF files with company information" acceptedFileTypes={['.txt', '.csv', '.pdf', '.docx']} maxFiles={5} />
-        </div>
-      )}
-
-      <div className="bg-white border-b border-gray-200 p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Key Metrics</h2>
-          <Button variant="ghost" size="sm" onClick={() => setIsKpiSettingsOpen(true)} className="h-7 px-2 text-gray-500 hover:text-gray-700">
-            <Settings className="w-3.5 h-3.5 mr-1" />
-            Customize
-          </Button>
-        </div>
-        <div className="grid grid-cols-4 gap-3">
-          {kpiConfig.map((kpi, index) => {
-            const IconComponent = iconMap[kpi.icon || 'building'] || Building;
-            const colors = colorMap[kpi.color || 'blue'] || colorMap.blue;
-            const value = getKpiValue(kpi.metricType);
-            const isKpiLoading = value === null && isLoadingStats;
-            return (
-              <Card key={index} className="p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-500">{kpi.title}</p>
-                    {isKpiLoading ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-gray-400 mt-1" />
-                    ) : (
-                      <p className="text-xl font-bold text-gray-900">{formatNumber(value)}</p>
-                    )}
-                  </div>
-                  <div className={`w-9 h-9 ${colors.bg} rounded-lg flex items-center justify-center`}>
-                    <IconComponent className={`w-4 h-4 ${colors.text}`} />
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      </div>
-
-      {selectedIds.size > 0 && (
-        <div className="bg-blue-50 border-b border-blue-200 px-4 py-3 flex items-center justify-between">
-          <span className="text-sm font-medium text-blue-900">{selectedIds.size} company(ies) selected</span>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleBulkExport}><Download className="w-3.5 h-3.5 mr-1.5" />Export</Button>
-            <Button variant="outline" size="sm" onClick={handleBulkDelete} disabled={bulkDeleteMutation.isPending}><Trash2 className="w-3.5 h-3.5 mr-1.5" />Delete</Button>
-            <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>Clear</Button>
-          </div>
-        </div>
-      )}
-
-      <div className="flex-1 overflow-auto">
-        <CrmDataTable
-          data={filteredCompanies}
-          columns={columns}
-          isLoading={isLoading}
-          selectedId={selectedCompany?.id}
-          onRowClick={handleRowClick}
-          getRowId={(c) => c.id}
-          selectedIds={selectedIds}
-          onSelectionChange={setSelectedIds}
-          emptyState={{
-            title: searchTerm || industryFilter !== 'all' || sizeFilter !== 'all' ? 'No companies found' : 'No companies yet',
-            description: searchTerm || industryFilter !== 'all' || sizeFilter !== 'all' 
-              ? 'Try adjusting your search or filter criteria.'
-              : 'Start by adding your first company to build your network.',
-            action: !searchTerm && industryFilter === 'all' && sizeFilter === 'all' ? { label: 'Add Company', onClick: handleAdd } : undefined
-          }}
-        />
-      </div>
-    </div>
-  );
-
-  const detailsContent = selectedCompany ? (
-    <CrmDetailsPanel
-      title={selectedCompany.name}
-      subtitle={selectedCompany.industry ? formatRole(selectedCompany.industry) : undefined}
-      onEdit={() => handleEdit(selectedCompany)}
-      onDelete={() => handleDelete(selectedCompany.id)}
-      actions={
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={() => setShowFullPageModal(true)} 
-          className="h-8 px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-          title="Open full page"
-        >
-          <ExternalLink className="h-4 w-4" />
-        </Button>
-      }
-    >
-      <CrmDetailSection title="Company Information">
-        <CrmDetailField label="Primary Contact" value={primaryContact ? `${primaryContact.firstName} ${primaryContact.lastName}` : null} />
-        <CrmDetailField label="Phone" value={selectedCompany.phone} />
-        <CrmDetailField label="Website" value={selectedCompany.website ? (
-          <a href={selectedCompany.website.startsWith('http') ? selectedCompany.website : `https://${selectedCompany.website}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{selectedCompany.website}</a>
-        ) : null} />
-        <CrmDetailField label="Address" value={
-          (() => {
-            const parts = [
-              selectedCompany.address,
-              [selectedCompany.city, selectedCompany.state].filter(Boolean).join(', '),
-              selectedCompany.zipCode
-            ].filter(Boolean);
-            return parts.length > 0 ? parts.join(', ') : null;
-          })()
-        } />
-        <CrmDetailField label="Industry" value={selectedCompany.industry ? (
-          <Badge className={industryColors[selectedCompany.industry] || 'bg-gray-100 text-gray-800'}>{formatRole(selectedCompany.industry)}</Badge>
-        ) : null} />
-        <CrmDetailField label="Size" value={
-          companyProperties.length > 0 ? (
-            <button 
-              onClick={() => setShowPropertiesModal(true)}
-              className="flex items-center gap-1 text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
-            >
-              <span>{companyProperties.length} {companyProperties.length === 1 ? 'Property' : 'Properties'}</span>
-              <ChevronRight className="w-3 h-3" />
-            </button>
-          ) : (
-            selectedCompany.size ? (
-              <Badge className={sizeColors[getSizeCategory(selectedCompany.size)] || 'bg-gray-100 text-gray-800'}>{selectedCompany.size}</Badge>
-            ) : null
-          )
-        } />
-      </CrmDetailSection>
-
-      <CrmDetailSection title="Portfolio">
-        <CrmDetailField label="# of Marinas" value={selectedCompany.portfolioCount || companyProperties.length || 0} />
-        <CrmDetailField label="Portfolio Company" value={selectedCompany.isPortfolioCompany ? 'Yes' : 'No'} />
-        {selectedCompany.isPortfolioCompany && selectedCompany.capitalPartner && (
-          <CrmDetailField label="Capital Partner" value={selectedCompany.capitalPartner} />
-        )}
-        {lastAcquisition && (
-          <CrmDetailField label="Last Acquisition" value={
-            <div className="flex items-center gap-2">
-              <DollarSign className="w-3.5 h-3.5 text-green-600" />
-              <span className="text-sm">
-                {lastAcquisition.propertyName || lastAcquisition.name || 'Marina'} 
-                {' - '}
-                {new Date(lastAcquisition.saleDate || lastAcquisition.closingDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-              </span>
-            </div>
-          } />
-        )}
-      </CrmDetailSection>
-
-      {topContacts.length > 0 && (
-        <CrmDetailSection title="Key Contacts">
-          <div className="space-y-2">
-            {topContacts.map((contactLink) => (
-              <div 
-                key={contactLink.id}
-                onClick={() => setLocation(`/crm/contacts?selected=${contactLink.contact.id}`)}
-                className={`flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors ${contactLink.isPrimary ? 'bg-amber-50 border border-amber-200' : ''}`}
-              >
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${contactLink.isPrimary ? 'bg-amber-100' : 'bg-blue-100'}`}>
-                  {contactLink.isPrimary ? (
-                    <Star className="w-4 h-4 text-amber-600" />
-                  ) : (
-                    <User className="w-4 h-4 text-blue-600" />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-900 truncate">
-                      {contactLink.contact.firstName} {contactLink.contact.lastName}
-                    </span>
-                    {contactLink.isPrimary && (
-                      <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800 border-amber-300">Primary</Badge>
-                    )}
-                  </div>
-                  {contactLink.contact.position && (
-                    <div className="text-xs text-gray-500 truncate">{contactLink.contact.position}</div>
-                  )}
-                </div>
-                <ChevronRight className="w-4 h-4 text-gray-400" />
-              </div>
-            ))}
-            {companyContacts.length > 3 && (
-              <button 
-                onClick={() => setLocation(`/crm/contacts?company=${selectedCompany.id}`)}
-                className="text-xs text-blue-600 hover:underline pl-2"
-              >
-                View all {companyContacts.length} contacts
-              </button>
-            )}
-          </div>
-        </CrmDetailSection>
-      )}
-
-      {selectedCompany.description && (
-        <CrmDetailSection title="Description">
-          <p className="text-sm text-gray-700">{selectedCompany.description}</p>
-        </CrmDetailSection>
-      )}
-    </CrmDetailsPanel>
-  ) : null;
-
   return (
     <CrmPageShell>
       <CrmTopBar
@@ -713,20 +475,14 @@ export default function Companies() {
               size="sm"
               onClick={() => {
                 setMergeMode(!mergeMode);
-                if (mergeMode) {
-                  setSelectedCompanies(new Set());
-                }
+                if (mergeMode) setSelectedCompanies(new Set());
               }}
             >
               <Merge className="h-4 w-4 mr-2" />
               {mergeMode ? "Cancel Merge" : "Merge Duplicates"}
             </Button>
             {mergeMode && selectedCompanies.size > 0 && (
-              <Button
-                size="sm"
-                onClick={handleMerge}
-                disabled={selectedCompanies.size !== 2}
-              >
+              <Button size="sm" onClick={handleMerge} disabled={selectedCompanies.size !== 2}>
                 Merge Selected ({selectedCompanies.size}/2)
               </Button>
             )}
@@ -772,17 +528,97 @@ export default function Companies() {
         }
       />
 
-      <CrmSplitView list={listContent} details={detailsContent} isDetailOpen={!!selectedCompany} onCloseDetail={handleCloseDetail} />
+      <div className="flex flex-col flex-1 overflow-hidden">
+        {showFileUpload && (
+          <div className="bg-white border-b border-gray-200 p-4">
+            <FileUpload onUpload={handleFileUpload} title="Import Companies" description="Upload CSV, TXT, or PDF files with company information" acceptedFileTypes={['.txt', '.csv', '.pdf', '.docx']} maxFiles={5} />
+          </div>
+        )}
+
+        <div className="bg-white border-b border-gray-200 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Key Metrics</h2>
+            <Button variant="ghost" size="sm" onClick={() => setIsKpiSettingsOpen(true)} className="h-7 px-2 text-gray-500 hover:text-gray-700">
+              <Settings className="w-3.5 h-3.5 mr-1" />Customize
+            </Button>
+          </div>
+          <div className="grid grid-cols-4 gap-3">
+            {kpiConfig.map((kpi, index) => {
+              const IconComponent = iconMap[kpi.icon || 'building'] || Building;
+              const colors = colorMap[kpi.color || 'blue'] || colorMap.blue;
+              const value = getKpiValue(kpi.metricType);
+              const isKpiLoading = value === null && isLoadingStats;
+              return (
+                <Card key={index} className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-gray-500">{kpi.title}</p>
+                      {isKpiLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-gray-400 mt-1" />
+                      ) : (
+                        <p className="text-xl font-bold text-gray-900">{formatNumber(value)}</p>
+                      )}
+                    </div>
+                    <div className={`w-9 h-9 ${colors.bg} rounded-lg flex items-center justify-center`}>
+                      <IconComponent className={`w-4 h-4 ${colors.text}`} />
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+
+        {selectedIds.size > 0 && (
+          <div className="bg-blue-50 border-b border-blue-200 px-4 py-3 flex items-center justify-between">
+            <span className="text-sm font-medium text-blue-900">{selectedIds.size} company(ies) selected</span>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={handleBulkExport}><Download className="w-3.5 h-3.5 mr-1.5" />Export</Button>
+              <Button variant="outline" size="sm" onClick={handleBulkDelete} disabled={bulkDeleteMutation.isPending}><Trash2 className="w-3.5 h-3.5 mr-1.5" />Delete</Button>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>Clear</Button>
+            </div>
+          </div>
+        )}
+
+        <div className="flex-1 overflow-auto">
+          <CrmDataTable
+            data={filteredCompanies}
+            columns={columns}
+            isLoading={isLoading}
+            selectedId={drawerCompanyId}
+            onRowClick={handleRowClick}
+            getRowId={(c) => c.id}
+            selectedIds={selectedIds}
+            onSelectionChange={setSelectedIds}
+            emptyState={{
+              title: searchTerm || industryFilter !== 'all' || sizeFilter !== 'all' ? 'No companies found' : 'No companies yet',
+              description: searchTerm || industryFilter !== 'all' || sizeFilter !== 'all' 
+                ? 'Try adjusting your search or filter criteria.'
+                : 'Start by adding your first company to build your network.',
+              action: !searchTerm && industryFilter === 'all' && sizeFilter === 'all' ? { label: 'Add Company', onClick: handleAdd } : undefined
+            }}
+          />
+        </div>
+      </div>
+
+      {/* HubSpot-style Detail Drawer */}
+      <DetailDrawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        entityType="company"
+        entityId={drawerCompanyId}
+        onDelete={() => { setDrawerOpen(false); setDrawerCompanyId(null); }}
+      />
 
       <CompanyFormModal isOpen={isFormOpen} onClose={() => { setIsFormOpen(false); setEditingCompany(null); }} company={editingCompany} />
       <KpiSettingsModal isOpen={isKpiSettingsOpen} onClose={() => setIsKpiSettingsOpen(false)} pageKey={PAGE_KEY} currentConfig={kpiConfig} availableMetrics={AVAILABLE_METRICS} />
-      
+
       <Dialog open={showPropertiesModal} onOpenChange={setShowPropertiesModal}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Building className="w-5 h-5 text-blue-600" />
-              Properties Owned by {selectedCompany?.name}
+              Properties Owned by {propertiesCompany?.name}
             </DialogTitle>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
@@ -793,7 +629,7 @@ export default function Companies() {
                     key={property.id}
                     onClick={() => {
                       setShowPropertiesModal(false);
-                      setLocation(`/crm/properties?selected=${property.id}`);
+                      setLocation(`/crm/properties/${property.id}`);
                     }}
                     className="flex items-center gap-4 p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
                   >
@@ -804,13 +640,7 @@ export default function Companies() {
                       <div className="text-sm font-medium text-gray-900">{property.name || property.propertyName}</div>
                       {property.address && (
                         <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                          <MapPin className="w-3 h-3" />
-                          {property.address}
-                        </div>
-                      )}
-                      {(property.city || property.state) && (
-                        <div className="text-xs text-gray-400 mt-0.5">
-                          {[property.city, property.state].filter(Boolean).join(', ')}
+                          <MapPin className="w-3 h-3" />{property.address}
                         </div>
                       )}
                     </div>
@@ -850,9 +680,6 @@ export default function Companies() {
                     </div>
                   </div>
                 )}
-                <p className="text-sm text-muted-foreground">
-                  All linked contacts and properties from the deleted company will be transferred to the kept company.
-                </p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -865,16 +692,7 @@ export default function Companies() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <CreateCompanyWizardModal
-        open={isCreateWizardOpen}
-        onOpenChange={setIsCreateWizardOpen}
-      />
-
-      <CompanyDetailModal
-        isOpen={showFullPageModal}
-        onClose={() => setShowFullPageModal(false)}
-        company={selectedCompany}
-      />
+      <CreateCompanyWizardModal open={isCreateWizardOpen} onOpenChange={setIsCreateWizardOpen} />
     </CrmPageShell>
   );
 }

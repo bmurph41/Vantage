@@ -9976,8 +9976,7 @@ Current context: Project ${req.params.projectId}`;
       const propertyData = {
         ...req.body,
         title: req.body.title || req.body.name || '',
-        type: req.body.type || req.body.propertyType || 'marina',
-        listingPrice: req.body.askingPrice || req.body.listingPrice,
+        type: req.body.type || 'marina',
         status: req.body.status || 'available',
         ownerId: req.user.id
       };
@@ -10414,7 +10413,34 @@ Current context: Project ${req.params.projectId}`;
       if (!companyId) {
         return res.status(400).json({ error: "companyId is required" });
       }
+
+      // Link contact to company
       await storage.linkContactToCompany(contactId, companyId, role || null, isPrimary || false);
+
+      // AUTO-CASCADE: Link contact's properties to this company
+      try {
+        const contactProperties = await storage.getContactProperties(contactId);
+        const existingCompanyProperties = await storage.getCompanyProperties(companyId);
+        const existingPropertyIds = new Set(existingCompanyProperties.map((cp: any) => cp.propertyId || cp.property?.id));
+
+        for (const cp of contactProperties) {
+          const propertyId = cp.propertyId || cp.property?.id;
+          if (propertyId && !existingPropertyIds.has(propertyId)) {
+            try {
+              await storage.linkPropertyToCompany(propertyId, companyId, cp.relationship || 'associated', null);
+              console.log(`Auto-linked property ${propertyId} to company ${companyId} via contact ${contactId}`);
+            } catch (linkError: any) {
+              // Ignore duplicate key errors - property may already be linked
+              if (!linkError.message?.includes('duplicate') && !linkError.code?.includes('23505')) {
+                console.error(`Failed to auto-link property ${propertyId} to company:`, linkError.message);
+              }
+            }
+          }
+        }
+      } catch (cascadeError) {
+        console.error("Auto-cascade to company properties failed (non-fatal):", cascadeError);
+      }
+
       res.json({ success: true });
     } catch (error: any) {
       console.error("Failed to link contact to company:", error);
@@ -10430,7 +10456,40 @@ Current context: Project ${req.params.projectId}`;
       if (!propertyId) {
         return res.status(400).json({ error: "propertyId is required" });
       }
+
+      // Link property to contact
       const link = await storage.linkPropertyToContact(propertyId, contactId, relationship, notes);
+
+      // AUTO-CASCADE: Link this property to contact's companies
+      try {
+        const contactCompanies = await storage.getContactCompanies(contactId);
+
+        for (const cc of contactCompanies) {
+          const companyId = cc.companyId || cc.company?.id;
+          if (companyId) {
+            try {
+              // Check if already linked
+              const existingCompanyProperties = await storage.getCompanyProperties(companyId);
+              const alreadyLinked = existingCompanyProperties.some((cp: any) => 
+                (cp.propertyId || cp.property?.id) === propertyId
+              );
+
+              if (!alreadyLinked) {
+                await storage.linkPropertyToCompany(propertyId, companyId, relationship || 'associated', null);
+                console.log(`Auto-linked property ${propertyId} to company ${companyId} via contact ${contactId}`);
+              }
+            } catch (linkError: any) {
+              // Ignore duplicate key errors
+              if (!linkError.message?.includes('duplicate') && !linkError.code?.includes('23505')) {
+                console.error(`Failed to auto-link property to company ${companyId}:`, linkError.message);
+              }
+            }
+          }
+        }
+      } catch (cascadeError) {
+        console.error("Auto-cascade to companies failed (non-fatal):", cascadeError);
+      }
+
       res.json(link);
     } catch (error: any) {
       console.error("Failed to link contact to property:", error);
@@ -10526,6 +10585,55 @@ Current context: Project ${req.params.projectId}`;
     } catch (error: any) {
       console.error("Failed to get company properties:", error);
       res.status(500).json({ error: "Failed to retrieve company properties" });
+    }
+  });
+
+  // POST to link property to company (ADD THIS NEW ENDPOINT HERE)
+  app.post("/api/companies/:id/properties", async (req: any, res) => {
+    try {
+      const companyId = req.params.id;
+      const { propertyId, relationship, notes } = req.body;
+      if (!propertyId) {
+        return res.status(400).json({ error: "propertyId is required" });
+      }
+
+      // Link property to company
+      const link = await storage.linkPropertyToCompany(propertyId, companyId, relationship || 'owner', notes);
+
+      // AUTO-CASCADE: Link this property to company's contacts
+      try {
+        const companyContacts = await storage.getCompanyContacts(companyId);
+
+        for (const cc of companyContacts) {
+          const contactId = cc.contactId || cc.contact?.id;
+          if (contactId) {
+            try {
+              // Check if already linked
+              const existingContactProperties = await storage.getContactProperties(contactId);
+              const alreadyLinked = existingContactProperties.some((cp: any) => 
+                (cp.propertyId || cp.property?.id) === propertyId
+              );
+
+              if (!alreadyLinked) {
+                await storage.linkPropertyToContact(propertyId, contactId, relationship || 'associated', null);
+                console.log(`Auto-linked property ${propertyId} to contact ${contactId} via company ${companyId}`);
+              }
+            } catch (linkError: any) {
+              // Ignore duplicate key errors
+              if (!linkError.message?.includes('duplicate') && !linkError.code?.includes('23505')) {
+                console.error(`Failed to auto-link property to contact ${contactId}:`, linkError.message);
+              }
+            }
+          }
+        }
+      } catch (cascadeError) {
+        console.error("Auto-cascade to contacts failed (non-fatal):", cascadeError);
+      }
+
+      res.json(link);
+    } catch (error: any) {
+      console.error("Failed to link property to company:", error);
+      res.status(500).json({ error: "Failed to link property to company" });
     }
   });
 

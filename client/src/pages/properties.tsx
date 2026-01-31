@@ -6,16 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Plus, Search, Edit, Trash2, MapPin, Anchor, Building, DollarSign, Home, TrendingUp, FolderPlus, ExternalLink } from "lucide-react";
+import { Upload, Plus, Search, Edit, Trash2, MapPin, Anchor, Building, DollarSign, Home, TrendingUp, FolderPlus } from "lucide-react";
 import { FileUpload } from "@/components/file-upload";
 import PropertyFormModal from "@/components/modals/property-form-modal";
 import { CreatePropertyWizardModal } from "@/components/modals/create-property-wizard-modal";
 import PortfolioWizard from "@/components/salescomps/sales-comps/PortfolioWizard";
 import { CrmPageShell } from "@/components/crm/CrmPageShell";
 import { CrmTopBar } from "@/components/crm/CrmTopBar";
-import { CrmSplitView } from "@/components/crm/CrmSplitView";
 import { CrmDataTable, type CrmColumn } from "@/components/crm/CrmDataTable";
-import { CrmDetailsPanel, CrmDetailSection, CrmDetailField } from "@/components/crm/CrmDetailsPanel";
+import { DetailDrawer } from "@/components/crm/detail-drawer";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -54,17 +53,6 @@ type Property = {
   lastSaleMonth?: number;
   lastSaleYear?: number;
   lastSalePrice?: number;
-  acreage?: number;
-  ownershipType?: string;
-};
-
-type StorageEntry = {
-  id: string;
-  storageType: string;
-  capacity: number;
-  occupied: number;
-  rate: string;
-  rateType: string;
 };
 
 const propertyTypeColors: Record<string, string> = {
@@ -91,8 +79,12 @@ export default function Properties() {
   const [isCreateWizardOpen, setIsCreateWizardOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [showFileUpload, setShowFileUpload] = useState(false);
-  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [showPortfolioWizard, setShowPortfolioWizard] = useState(false);
+
+  // HubSpot-style: Drawer state
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerPropertyId, setDrawerPropertyId] = useState<string | null>(null);
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -100,17 +92,6 @@ export default function Properties() {
     queryKey: ['/api/properties'],
   });
 
-  // Fetch storage entries for selected property
-  const { data: storageEntries = [] } = useQuery<StorageEntry[]>({
-    queryKey: ['/api/properties', selectedProperty?.id, 'storage-entries'],
-    queryFn: async () => {
-      const res = await fetch(`/api/properties/${selectedProperty!.id}/storage-entries`);
-      if (!res.ok) return [];
-      return res.json();
-    },
-    enabled: !!selectedProperty?.id,
-  });
-  
   useEffect(() => {
     if (properties.length > 0 && searchString) {
       const params = new URLSearchParams(searchString);
@@ -118,7 +99,8 @@ export default function Properties() {
       if (selectedId) {
         const property = properties.find(p => p.id === selectedId);
         if (property) {
-          setSelectedProperty(property);
+          setDrawerPropertyId(selectedId);
+          setDrawerOpen(true);
           setLocation('/crm/properties', { replace: true });
         }
       }
@@ -130,19 +112,24 @@ export default function Properties() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
       toast({ title: "Property deleted successfully" });
-      setSelectedProperty(null);
+      setDrawerOpen(false);
+      setDrawerPropertyId(null);
     },
     onError: () => {
       toast({ title: "Failed to delete property", variant: "destructive" });
     },
   });
 
+  // HubSpot-style: Row click opens drawer
   const handleRowClick = (property: Property) => {
-    setSelectedProperty(property);
+    setDrawerPropertyId(property.id);
+    setDrawerOpen(true);
   };
 
-  const handleCloseDetail = () => {
-    setSelectedProperty(null);
+  // HubSpot-style: Name click navigates to full record page
+  const handleNameClick = (e: React.MouseEvent, property: Property) => {
+    e.stopPropagation();
+    setLocation(`/crm/properties/${property.id}`);
   };
 
   const handleEdit = (property: Property) => {
@@ -229,7 +216,12 @@ export default function Properties() {
             {getPropertyIcon(property.type)}
           </div>
           <div className="min-w-0">
-            <div className="text-sm font-medium text-gray-900 truncate">{property.title}</div>
+            <button
+              onClick={(e) => handleNameClick(e, property)}
+              className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline truncate block text-left"
+            >
+              {property.title}
+            </button>
             <div className="text-xs text-gray-500 truncate">{getSpecificationSummary(property)}</div>
           </div>
         </div>
@@ -290,206 +282,6 @@ export default function Properties() {
     }
   ];
 
-  const listContent = (
-    <div className="flex flex-col h-full">
-      {showFileUpload && (
-        <div className="bg-white border-b border-gray-200 p-4">
-          <FileUpload onUpload={handleFileUpload} title="Import Properties" description="Upload CSV, TXT, or PDF files with property information" acceptedFileTypes={['.txt', '.csv', '.pdf', '.docx']} maxFiles={5} />
-        </div>
-      )}
-
-      <div className="grid grid-cols-4 gap-4 p-4 bg-white border-b border-gray-200">
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Total Properties</p>
-              <p className="text-2xl font-bold text-gray-900">{totalProperties}</p>
-            </div>
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Home className="w-5 h-5 text-blue-600" />
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Marinas</p>
-              <p className="text-2xl font-bold text-gray-900">{marinas}</p>
-            </div>
-            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-              <Anchor className="w-5 h-5 text-purple-600" />
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Available</p>
-              <p className="text-2xl font-bold text-gray-900">{available}</p>
-            </div>
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-green-600" />
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Under Contract</p>
-              <p className="text-2xl font-bold text-gray-900">{underContract}</p>
-            </div>
-            <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-yellow-600" />
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      <div className="flex-1 overflow-auto">
-        <CrmDataTable
-          data={filteredProperties}
-          columns={columns}
-          isLoading={isLoading}
-          selectedId={selectedProperty?.id}
-          onRowClick={handleRowClick}
-          getRowId={(p) => p.id}
-          emptyState={{
-            title: searchTerm || typeFilter !== 'all' || statusFilter !== 'all' ? 'No properties found' : 'No properties yet',
-            description: searchTerm || typeFilter !== 'all' || statusFilter !== 'all'
-              ? 'Try adjusting your search or filter criteria.'
-              : 'Start by adding your first property listing.',
-            action: !searchTerm && typeFilter === 'all' && statusFilter === 'all' ? { label: 'Add Property', onClick: handleAdd } : undefined
-          }}
-        />
-      </div>
-    </div>
-  );
-
-  const detailsContent = selectedProperty ? (
-    <CrmDetailsPanel
-      title={selectedProperty.title}
-      subtitle={getSpecificationSummary(selectedProperty)}
-      onEdit={() => handleEdit(selectedProperty)}
-      onDelete={() => handleDelete(selectedProperty.id)}
-    >
-      <CrmDetailSection title="Property Information">
-        <CrmDetailField label="Type" value={
-          <Badge className={propertyTypeColors[selectedProperty.type] || 'bg-gray-100 text-gray-800'}>
-            {toTitleCase(selectedProperty.type)}
-          </Badge>
-        } />
-        <CrmDetailField label="Status" value={
-          <Badge className={statusColors[selectedProperty.status] || 'bg-gray-100 text-gray-800'}>
-            {toTitleCase(selectedProperty.status)}
-          </Badge>
-        } />
-        <CrmDetailField label="Est. Price" value={formatPrice(selectedProperty.listingPrice)} />
-        <CrmDetailField label="Address" value={selectedProperty.address} />
-        {selectedProperty.acreage && (
-          <CrmDetailField label="Acreage" value={`${selectedProperty.acreage} acres`} />
-        )}
-        {selectedProperty.ownershipType && (
-          <CrmDetailField label="Ownership Type" value={toTitleCase(selectedProperty.ownershipType)} />
-        )}
-        {(selectedProperty.lastSaleMonth || selectedProperty.lastSaleYear) && (
-          <CrmDetailField 
-            label="Last Sale" 
-            value={
-              selectedProperty.lastSaleMonth && selectedProperty.lastSaleYear
-                ? `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][selectedProperty.lastSaleMonth - 1]} ${selectedProperty.lastSaleYear}`
-                : selectedProperty.lastSaleYear?.toString() || null
-            } 
-          />
-        )}
-        {selectedProperty.lastSalePrice && (
-          <CrmDetailField label="Sale Price" value={formatPrice(selectedProperty.lastSalePrice?.toString())} />
-        )}
-      </CrmDetailSection>
-
-      <CrmDetailSection title="Storage & Capacity">
-        {storageEntries.length > 0 ? (
-          <>
-            {storageEntries.map((entry) => (
-              <CrmDetailField 
-                key={entry.id} 
-                label={toTitleCase(entry.storageType)} 
-                value={
-                  <span>
-                    {entry.capacity} capacity
-                    {entry.occupied > 0 && ` (${entry.occupied} occupied)`}
-                    {entry.rate && ` - ${entry.rate}/${entry.rateType === 'annual' ? 'yr' : 'mo'}`}
-                  </span>
-                } 
-              />
-            ))}
-          </>
-        ) : (
-          <>
-            {selectedProperty.wetSlips && selectedProperty.wetSlips > 0 && (
-              <CrmDetailField label="Wet Slips" value={selectedProperty.wetSlips} />
-            )}
-            {selectedProperty.drySlips && selectedProperty.drySlips > 0 && (
-              <CrmDetailField label="Dry Racks" value={selectedProperty.drySlips} />
-            )}
-            {selectedProperty.moorings && selectedProperty.moorings > 0 && (
-              <CrmDetailField label="Moorings" value={selectedProperty.moorings} />
-            )}
-            {selectedProperty.totalCapacity && selectedProperty.totalCapacity > 0 && (
-              <CrmDetailField label="Total Capacity" value={selectedProperty.totalCapacity} />
-            )}
-            {!selectedProperty.wetSlips && !selectedProperty.drySlips && !selectedProperty.moorings && selectedProperty.specifications?.slipCount && (
-              <CrmDetailField label="Slip Count" value={selectedProperty.specifications.slipCount} />
-            )}
-            {!selectedProperty.wetSlips && !selectedProperty.drySlips && !selectedProperty.moorings && !selectedProperty.specifications?.slipCount && (
-              <p className="text-sm text-muted-foreground">No storage data available</p>
-            )}
-          </>
-        )}
-      </CrmDetailSection>
-
-      {(selectedProperty.specifications?.maxBoatLength || selectedProperty.specifications?.dockType || selectedProperty.specifications?.amenities?.length) && (
-        <CrmDetailSection title="Specifications">
-          <CrmDetailField label="Max Boat Length" value={selectedProperty.specifications?.maxBoatLength ? `${selectedProperty.specifications.maxBoatLength}ft` : null} />
-          <CrmDetailField label="Dock Type" value={selectedProperty.specifications?.dockType} />
-          {selectedProperty.type === 'boat' && selectedProperty.specifications && (
-            <>
-              <CrmDetailField label="Make" value={selectedProperty.specifications?.make} />
-              <CrmDetailField label="Model" value={selectedProperty.specifications?.model} />
-              <CrmDetailField label="Year" value={selectedProperty.specifications?.year} />
-              <CrmDetailField label="Length" value={selectedProperty.specifications?.length ? `${selectedProperty.specifications.length}ft` : null} />
-            </>
-          )}
-          {selectedProperty.specifications?.amenities && selectedProperty.specifications.amenities.length > 0 && (
-            <CrmDetailField label="Amenities" value={
-              <div className="flex flex-wrap gap-1">
-                {selectedProperty.specifications.amenities.map((amenity, i) => (
-                  <Badge key={i} variant="outline" className="text-xs">{amenity}</Badge>
-                ))}
-              </div>
-            } />
-          )}
-        </CrmDetailSection>
-      )}
-
-      {selectedProperty.description && (
-        <CrmDetailSection title="Description">
-          <p className="text-sm text-gray-700">{selectedProperty.description}</p>
-        </CrmDetailSection>
-      )}
-
-      <div className="pt-4 border-t">
-        <Button 
-          variant="outline" 
-          className="w-full" 
-          onClick={() => setLocation(`/crm/properties/${selectedProperty.id}`)}
-        >
-          <ExternalLink className="w-4 h-4 mr-2" />
-          View Full Property Page
-        </Button>
-      </div>
-    </CrmDetailsPanel>
-  ) : null;
-
   return (
     <CrmPageShell>
       <CrmTopBar
@@ -538,11 +330,91 @@ export default function Properties() {
         }
       />
 
-      <CrmSplitView list={listContent} details={detailsContent} isDetailOpen={!!selectedProperty} onCloseDetail={handleCloseDetail} />
+      <div className="flex flex-col flex-1 overflow-hidden">
+        {showFileUpload && (
+          <div className="bg-white border-b border-gray-200 p-4">
+            <FileUpload onUpload={handleFileUpload} title="Import Properties" description="Upload CSV, TXT, or PDF files with property information" acceptedFileTypes={['.txt', '.csv', '.pdf', '.docx']} maxFiles={5} />
+          </div>
+        )}
+
+        <div className="grid grid-cols-4 gap-4 p-4 bg-white border-b border-gray-200">
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Total Properties</p>
+                <p className="text-2xl font-bold text-gray-900">{totalProperties}</p>
+              </div>
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Home className="w-5 h-5 text-blue-600" />
+              </div>
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Marinas</p>
+                <p className="text-2xl font-bold text-gray-900">{marinas}</p>
+              </div>
+              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                <Anchor className="w-5 h-5 text-purple-600" />
+              </div>
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Available</p>
+                <p className="text-2xl font-bold text-gray-900">{available}</p>
+              </div>
+              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <TrendingUp className="w-5 h-5 text-green-600" />
+              </div>
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Under Contract</p>
+                <p className="text-2xl font-bold text-gray-900">{underContract}</p>
+              </div>
+              <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-yellow-600" />
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        <div className="flex-1 overflow-auto">
+          <CrmDataTable
+            data={filteredProperties}
+            columns={columns}
+            isLoading={isLoading}
+            selectedId={drawerPropertyId}
+            onRowClick={handleRowClick}
+            getRowId={(p) => p.id}
+            emptyState={{
+              title: searchTerm || typeFilter !== 'all' || statusFilter !== 'all' ? 'No properties found' : 'No properties yet',
+              description: searchTerm || typeFilter !== 'all' || statusFilter !== 'all' 
+                ? 'Try adjusting your search or filter criteria.'
+                : 'Start by adding your first property.',
+              action: !searchTerm && typeFilter === 'all' && statusFilter === 'all' ? { label: 'Add Property', onClick: handleAdd } : undefined
+            }}
+          />
+        </div>
+      </div>
+
+      {/* HubSpot-style Detail Drawer */}
+      <DetailDrawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        entityType="property"
+        entityId={drawerPropertyId}
+        onDelete={() => { setDrawerOpen(false); setDrawerPropertyId(null); }}
+      />
 
       <PropertyFormModal isOpen={isPropertyFormOpen} onClose={() => { setIsPropertyFormOpen(false); setEditingProperty(null); }} property={editingProperty} />
       <PortfolioWizard open={showPortfolioWizard} onClose={() => setShowPortfolioWizard(false)} />
-      
+
       <CreatePropertyWizardModal
         open={isCreateWizardOpen}
         onOpenChange={setIsCreateWizardOpen}

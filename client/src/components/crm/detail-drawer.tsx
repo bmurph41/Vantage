@@ -8,6 +8,20 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,7 +49,9 @@ import {
   Users,
   MapPin,
   Anchor,
-  Clock,
+Clock,
+  Link2,
+  Loader2,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -70,6 +86,13 @@ export function DetailDrawer({
   const [callModalOpen, setCallModalOpen] = useState(false);
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [editData, setEditData] = useState<any>({});
+  const [showLinkCompanyDialog, setShowLinkCompanyDialog] = useState(false);
+  const [showLinkPropertyDialog, setShowLinkPropertyDialog] = useState(false);
+  const [selectedCompanyToLink, setSelectedCompanyToLink] = useState("");
+  const [selectedPropertyToLink, setSelectedPropertyToLink] = useState("");
+  const [companySearchQuery, setCompanySearchQuery] = useState("");
+  const [propertySearchQuery, setPropertySearchQuery] = useState("");
+  const [linkRole, setLinkRole] = useState("owner");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -181,6 +204,18 @@ export function DetailDrawer({
     enabled: entityType === 'contact' && !!entityId,
   });
 
+  // Fetch all companies for linking dialog
+  const { data: allCompanies = [] } = useQuery<any[]>({
+    queryKey: ['/api/companies'],
+    enabled: showLinkCompanyDialog && entityType === 'contact',
+  });
+
+  // Fetch all properties for linking dialog  
+  const { data: allProperties = [] } = useQuery<any[]>({
+    queryKey: ['/api/properties'],
+    enabled: showLinkPropertyDialog && (entityType === 'contact' || entityType === 'company'),
+  });
+  
   // Fetch properties linked to contact
   const { data: contactProperties = [] } = useQuery<any[]>({
     queryKey: ['/api/contacts', entityId, 'properties'],
@@ -213,6 +248,72 @@ export function DetailDrawer({
     },
   });
 
+  // Link company to contact mutation
+  const linkCompanyMutation = useMutation({
+    mutationFn: async ({ companyId, role }: { companyId: string; role: string }) => {
+      const response = await apiRequest('POST', `/api/contacts/${entityId}/companies`, {
+        companyId,
+        role,
+        isPrimary: contactCompanies.length === 0
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/contacts', entityId, 'companies'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
+      toast({ title: "Company linked successfully" });
+      setShowLinkCompanyDialog(false);
+      setSelectedCompanyToLink("");
+      setCompanySearchQuery("");
+      setLinkRole("owner");
+    },
+    onError: () => {
+      toast({ title: "Failed to link company", variant: "destructive" });
+    },
+  });
+
+  // Link property to contact mutation
+  const linkPropertyToContactMutation = useMutation({
+    mutationFn: async ({ propertyId, relationship }: { propertyId: string; relationship: string }) => {
+      const response = await apiRequest('POST', `/api/contacts/${entityId}/properties`, {
+        propertyId,
+        relationship
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/contacts', entityId, 'properties'] });
+      toast({ title: "Property linked successfully" });
+      setShowLinkPropertyDialog(false);
+      setSelectedPropertyToLink("");
+      setLinkRole("owner");
+    },
+    onError: () => {
+      toast({ title: "Failed to link property", variant: "destructive" });
+    },
+  });
+
+  // Link property to company mutation
+  const linkPropertyToCompanyMutation = useMutation({
+    mutationFn: async ({ propertyId, relationship }: { propertyId: string; relationship: string }) => {
+      const response = await apiRequest('POST', `/api/companies/${entityId}/properties`, {
+        propertyId,
+        relationship
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/companies', entityId, 'properties'] });
+      toast({ title: "Property linked successfully" });
+      setShowLinkPropertyDialog(false);
+      setSelectedPropertyToLink("");
+      setLinkRole("owner");
+    },
+    onError: () => {
+      toast({ title: "Failed to link property", variant: "destructive" });
+    },
+  });
+  
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async () => {
@@ -1468,8 +1569,17 @@ export function DetailDrawer({
               {entityType === "company" && (
                 <TabsContent value="properties" className="mt-4">
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between mb-4">
                       <h3 className="text-sm font-medium">Properties ({companyProperties.length})</h3>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowLinkPropertyDialog(true)}
+                        className="gap-2"
+                      >
+                        <Link2 className="h-4 w-4" />
+                        Link Property
+                      </Button>
                     </div>
                     {companyProperties.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground">
@@ -1507,11 +1617,20 @@ export function DetailDrawer({
               {entityType === "contact" && (
                 <TabsContent value="company" className="mt-4">
                   <div className="space-y-4">
-                    {contactCompanies.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <Building2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                        <p>No companies linked to this contact</p>
-                      </div>
+                  {contactCompanies.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Building2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="mb-4">No companies linked to this contact</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowLinkCompanyDialog(true)}
+                        className="gap-2"
+                      >
+                        <Link2 className="h-4 w-4" />
+                        Link Company
+                      </Button>
+                    </div>
                     ) : (
                       <div className="space-y-6">
                         {contactCompanies.map((link: any) => {
@@ -1537,11 +1656,7 @@ export function DetailDrawer({
                                   size="sm"
                                   onClick={() => {
                                     onOpenChange(false);
-                                    setTimeout(() => {
-                                      window.dispatchEvent(new CustomEvent('open-detail-drawer', {
-                                        detail: { entityType: 'company', entityId: company.id }
-                                      }));
-                                    }, 100);
+                                    setLocation(`/crm/companies/${company.id}`);
                                   }}
                                   data-testid={`button-view-company-${company.id}`}
                                 >
@@ -1656,11 +1771,22 @@ export function DetailDrawer({
                 </TabsContent>
               )}
 
-              {/* Properties Tab - only for contacts */}
-              {entityType === "contact" && (
-                <TabsContent value="contact-properties" className="mt-4">
-                  <div className="space-y-4">
-                    {contactProperties.length === 0 ? (
+                  {/* Properties Tab - only for contacts */}
+                  {entityType === "contact" && (
+                    <TabsContent value="contact-properties" className="mt-4">
+                      <div className="space-y-4">
+                        <div className="flex justify-end">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowLinkPropertyDialog(true)}
+                            className="gap-2"
+                          >
+                            <Link2 className="h-4 w-4" />
+                            Link Property
+                          </Button>
+                        </div>
+                        {contactProperties.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground">
                         <Anchor className="h-8 w-8 mx-auto mb-2 opacity-50" />
                         <p>No properties linked to this contact</p>
@@ -1697,11 +1823,7 @@ export function DetailDrawer({
                                   size="sm"
                                   onClick={() => {
                                     onOpenChange(false);
-                                    setTimeout(() => {
-                                      window.dispatchEvent(new CustomEvent('open-detail-drawer', {
-                                        detail: { entityType: 'property', entityId: property.id }
-                                      }));
-                                    }, 100);
+                                    setLocation(`/crm/properties/${property.id}`);
                                   }}
                                   data-testid={`button-view-property-${property.id}`}
                                 >
@@ -1861,6 +1983,167 @@ export function DetailDrawer({
           />
         </>
       )}
+      {/* Link Company Dialog */}
+      <Dialog open={showLinkCompanyDialog} onOpenChange={setShowLinkCompanyDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building2 className="w-5 h-5" />
+              Link Company to Contact
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Search Companies</Label>
+              <Input
+                placeholder="Search by company name..."
+                value={companySearchQuery}
+                onChange={(e) => setCompanySearchQuery(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Select Company</Label>
+              <Select value={selectedCompanyToLink} onValueChange={setSelectedCompanyToLink}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose company" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allCompanies
+                    .filter((c: any) => !contactCompanies.some((cc: any) => cc.companyId === c.id || cc.company?.id === c.id))
+                    .filter((c: any) => !companySearchQuery || c.name?.toLowerCase().includes(companySearchQuery.toLowerCase()))
+                    .map((company: any) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name} {company.industry && `- ${company.industry}`}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Role at Company</Label>
+              <Select value={linkRole} onValueChange={setLinkRole}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="owner">Owner</SelectItem>
+                  <SelectItem value="executive">Executive</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="employee">Employee</SelectItem>
+                  <SelectItem value="broker">Broker</SelectItem>
+                  <SelectItem value="investor">Investor</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowLinkCompanyDialog(false);
+              setSelectedCompanyToLink("");
+              setCompanySearchQuery("");
+              setLinkRole("owner");
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => linkCompanyMutation.mutate({ companyId: selectedCompanyToLink, role: linkRole })}
+              disabled={!selectedCompanyToLink || linkCompanyMutation.isPending}
+            >
+              {linkCompanyMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Link Company
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Link Property Dialog */}
+      <Dialog open={showLinkPropertyDialog} onOpenChange={setShowLinkPropertyDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Anchor className="w-5 h-5" />
+              Link Property to {entityType === 'contact' ? 'Contact' : 'Company'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Search Properties</Label>
+              <Input
+                placeholder="Search by name or address..."
+                value={propertySearchQuery}
+                onChange={(e) => setPropertySearchQuery(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Select Property</Label>
+              <Select value={selectedPropertyToLink} onValueChange={setSelectedPropertyToLink}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose property" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allProperties
+                    .filter((p: any) => {
+                      const linked = entityType === 'contact' ? contactProperties : companyProperties;
+                      return !linked.some((lp: any) => lp.propertyId === p.id || lp.property?.id === p.id);
+                    })
+                    .filter((p: any) => !propertySearchQuery || 
+                      p.title?.toLowerCase().includes(propertySearchQuery.toLowerCase()) ||
+                      p.name?.toLowerCase().includes(propertySearchQuery.toLowerCase()) ||
+                      p.address?.toLowerCase().includes(propertySearchQuery.toLowerCase())
+                    )
+                    .map((property: any) => (
+                      <SelectItem key={property.id} value={property.id}>
+                        {property.title || property.name || property.address || 'Unnamed Property'}
+                        {property.city && ` - ${property.city}`}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Relationship</Label>
+              <Select value={linkRole} onValueChange={setLinkRole}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="owner">Owner</SelectItem>
+                  <SelectItem value="seller">Seller</SelectItem>
+                  <SelectItem value="buyer">Buyer</SelectItem>
+                  <SelectItem value="broker">Broker</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="investor">Investor</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowLinkPropertyDialog(false);
+              setSelectedPropertyToLink("");
+              setPropertySearchQuery("");
+              setLinkRole("owner");
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                if (entityType === 'contact') {
+                  linkPropertyToContactMutation.mutate({ propertyId: selectedPropertyToLink, relationship: linkRole });
+                } else {
+                  linkPropertyToCompanyMutation.mutate({ propertyId: selectedPropertyToLink, relationship: linkRole });
+                }
+              }}
+              disabled={!selectedPropertyToLink || linkPropertyToContactMutation.isPending || linkPropertyToCompanyMutation.isPending}
+            >
+              {(linkPropertyToContactMutation.isPending || linkPropertyToCompanyMutation.isPending) && (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              )}
+              Link Property
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Sheet>
   );
 }

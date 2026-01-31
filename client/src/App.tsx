@@ -1301,6 +1301,15 @@ function Router() {
           return null;
         }}
       </Route>
+      <Route path="/crm/contacts/:id">
+        <ContactRecordPage />
+      </Route>
+      <Route path="/crm/companies/:id">
+        <CompanyRecordPage />
+      </Route>
+      <Route path="/crm/properties/:id">
+        <PropertyRecordPage />
+      </Route>
       <Route path="/crm/contacts">
         {() => (
           <UnifiedLayout>
