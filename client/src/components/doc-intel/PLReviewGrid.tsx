@@ -67,6 +67,8 @@ import {
   getDeptOptionsForTier,
   getDeptLabel,
   CATEGORY_TIER_LABELS,
+  EXPENSE_DEPT_OPTIONS,
+  REVENUE_COGS_DEPT_OPTIONS,
 } from "@/lib/pnl-categories";
 import { AutoConfirmedBadge } from "./AutoConfirmedBadge";
 
