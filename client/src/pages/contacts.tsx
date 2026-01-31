@@ -1,3 +1,17 @@
+# Replit Copy-Paste Guide: HubSpot-Style CRM Upgrade
+
+## Overview
+This upgrades your CRM from inline split-panels to HubSpot-style drawers:
+- Row click → Opens drawer
+- Name click → Navigates to full record page
+
+---
+
+## FILE 1: contacts.tsx
+
+Open `client/src/pages/contacts.tsx` in Replit and replace the ENTIRE file with this:
+
+```tsx
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
@@ -6,20 +20,18 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Edit, Trash2, Mail, Phone, Building, Upload, Users, User, Star, Download, Thermometer, Filter, ExternalLink } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Mail, Phone, Building, Upload, Users, User, Star, Download, Thermometer } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import ContactFormModal from "@/components/modals/contact-form-modal";
 import { CreateContactWizardModal } from "@/components/modals/create-contact-wizard-modal";
-import ContactDetailModal from "@/components/modals/contact-detail-modal";
 import { formatPhoneDisplay } from "@/components/ui/enhanced-card";
 import { FileUpload } from "@/components/file-upload";
 import { ImportResultsModal, type ImportResult } from "@/components/import-results-modal";
 import { CrmPageShell } from "@/components/crm/CrmPageShell";
 import { CrmTopBar } from "@/components/crm/CrmTopBar";
-import { CrmSplitView } from "@/components/crm/CrmSplitView";
 import { CrmDataTable, type CrmColumn } from "@/components/crm/CrmDataTable";
-import { CrmDetailsPanel, CrmDetailSection, CrmDetailField } from "@/components/crm/CrmDetailsPanel";
+import { DetailDrawer } from "@/components/crm/detail-drawer";
 import type { Contact, Company, Deal } from "@shared/schema";
 
 type ContactWithCompany = Contact & { 
@@ -49,7 +61,7 @@ const leadStatusColors = {
 };
 
 export default function Contacts() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const searchString = typeof window !== 'undefined' ? window.location.search : '';
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -57,12 +69,15 @@ export default function Contacts() {
   const [isContactFormOpen, setIsContactFormOpen] = useState(false);
   const [isCreateWizardOpen, setIsCreateWizardOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
-  const [selectedContact, setSelectedContact] = useState<ContactWithCompany | null>(null);
+
+  // HubSpot-style: Drawer state
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerContactId, setDrawerContactId] = useState<string | null>(null);
+
   const [showFileUpload, setShowFileUpload] = useState(false);
   const [importResults, setImportResults] = useState<ImportResult[]>([]);
   const [showImportResults, setShowImportResults] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [showFullPageModal, setShowFullPageModal] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -70,30 +85,11 @@ export default function Contacts() {
     queryKey: ['/api/contacts'],
   });
 
-  const { data: allActivities = [] } = useQuery<any[]>({
-    queryKey: ['/api/activities'],
-    enabled: !!selectedContact?.id,
-  });
-
   const capitalizeFirst = (str: string | null | undefined) => {
     if (!str) return null;
     return str.charAt(0).toUpperCase() + str.slice(1);
   };
 
-  const getMostRecentActivity = () => {
-    if (!selectedContact?.id || !allActivities || allActivities.length === 0) return null;
-    const contactActivities = allActivities.filter(a => a.contactId === selectedContact.id);
-    if (contactActivities.length === 0) return null;
-    const sorted = [...contactActivities].sort((a, b) => 
-      new Date(b.createdAt || b.dueDate).getTime() - new Date(a.createdAt || a.dueDate).getTime()
-    );
-    const recent = sorted[0];
-    if (!recent) return null;
-    const date = new Date(recent.createdAt || recent.dueDate);
-    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    return `${recent.type || 'Note'}: ${recent.title || recent.notes || 'Activity'} (${dateStr})`;
-  };
-  
   useEffect(() => {
     if (contacts.length > 0 && searchString) {
       const params = new URLSearchParams(searchString);
@@ -101,7 +97,8 @@ export default function Contacts() {
       if (selectedId) {
         const contact = contacts.find(c => c.id === selectedId);
         if (contact) {
-          setSelectedContact(contact);
+          setDrawerContactId(selectedId);
+          setDrawerOpen(true);
           setLocation('/crm/contacts', { replace: true });
         }
       }
@@ -115,7 +112,8 @@ export default function Contacts() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
       toast({ title: "Contact deleted successfully" });
-      setSelectedContact(null);
+      setDrawerOpen(false);
+      setDrawerContactId(null);
     },
     onError: () => {
       toast({ title: "Failed to delete contact", variant: "destructive" });
@@ -152,12 +150,16 @@ export default function Contacts() {
     setIsCreateWizardOpen(true);
   };
 
+  // HubSpot-style: Row click opens drawer
   const handleRowClick = (contact: ContactWithCompany) => {
-    setSelectedContact(contact);
+    setDrawerContactId(contact.id);
+    setDrawerOpen(true);
   };
 
-  const handleCloseDetail = () => {
-    setSelectedContact(null);
+  // HubSpot-style: Name click navigates to full record page
+  const handleNameClick = (e: React.MouseEvent, contact: ContactWithCompany) => {
+    e.stopPropagation();
+    setLocation(`/crm/contacts/${contact.id}`);
   };
 
   const handleFileUpload = async (files: File[]) => {
@@ -172,12 +174,9 @@ export default function Contacts() {
         body: formData,
       });
 
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
+      if (!response.ok) throw new Error('Upload failed');
 
       const result = await response.json();
-      
       const transformedResults: ImportResult[] = result.results.map((r: any) => ({
         filename: r.filename,
         processed: r.processed || 0,
@@ -186,28 +185,20 @@ export default function Contacts() {
         skipped: r.skipped || 0,
         rowErrors: r.rowErrors || []
       }));
-      
+
       queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
-      
       const totalCreated = transformedResults.reduce((sum: number, r) => sum + r.created, 0);
       const totalErrors = transformedResults.reduce((sum: number, r) => sum + (r.rowErrors?.length || 0), 0);
-      
+
       setImportResults(transformedResults);
       setShowImportResults(true);
       setShowFileUpload(false);
-      
-      if (totalErrors > 0) {
-        toast({
-          title: "Import completed with errors",
-          description: `Created ${totalCreated} contacts, ${totalErrors} errors found`,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Import successful",
-          description: `Created ${totalCreated} new contacts from ${files.length} file(s)`,
-        });
-      }
+
+      toast({
+        title: totalErrors > 0 ? "Import completed with errors" : "Import successful",
+        description: `Created ${totalCreated} contacts${totalErrors > 0 ? `, ${totalErrors} errors` : ''}`,
+        variant: totalErrors > 0 ? "destructive" : "default",
+      });
     } catch (error) {
       toast({
         title: "Upload failed",
@@ -235,21 +226,15 @@ export default function Contacts() {
 
   const handleBulkExport = () => {
     if (selectedIds.size === 0) return;
-    
     const selectedContacts = contacts.filter(c => selectedIds.has(c.id));
     const csv = [
       ['First Name', 'Last Name', 'Email', 'Phone', 'Company', 'Title', 'Type'].join(','),
       ...selectedContacts.map(c => [
-        c.firstName,
-        c.lastName,
-        c.email || '',
-        c.phone || '',
-        c.company?.name || '',
-        c.position || c.role || '',
-        c.contactType || ''
+        c.firstName, c.lastName, c.email || '', c.phone || '',
+        c.company?.name || '', c.position || c.role || '', c.contactType || ''
       ].map(field => `"${field}"`).join(','))
     ].join('\n');
-    
+
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -259,7 +244,6 @@ export default function Contacts() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
     toast({ title: `Exported ${selectedIds.size} contact(s)` });
   };
 
@@ -269,12 +253,9 @@ export default function Contacts() {
         `${contact.firstName} ${contact.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
         contact.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         contact.company?.name?.toLowerCase().includes(searchTerm.toLowerCase());
-      
       const contactStatus = getContactStatus(contact);
       const matchesStatus = statusFilter === 'all' || contactStatus === statusFilter;
-      
       const matchesContactTag = contactTagFilter === 'all' || contact.contactTag === contactTagFilter;
-      
       return matchesSearch && matchesStatus && matchesContactTag;
     });
   }, [contacts, searchTerm, statusFilter, contactTagFilter]);
@@ -294,9 +275,12 @@ export default function Contacts() {
             {getInitials(contact.firstName, contact.lastName)}
           </div>
           <div className="min-w-0">
-            <div className="text-sm font-medium text-gray-900 truncate">
+            <button
+              onClick={(e) => handleNameClick(e, contact)}
+              className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline truncate block text-left"
+            >
               {contact.firstName} {contact.lastName}
-            </div>
+            </button>
             <div className="text-xs text-gray-500 truncate">
               {capitalizeFirst(contact.position || contact.role) || '—'}
             </div>
@@ -331,10 +315,16 @@ export default function Contacts() {
       header: 'Company',
       render: (contact) => (
         contact.company ? (
-          <div className="flex items-center gap-1.5 text-sm text-gray-600">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setLocation(`/crm/companies/${contact.company!.id}`);
+            }}
+            className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 hover:underline"
+          >
             <Building className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
             <span className="truncate">{contact.company.name}</span>
-          </div>
+          </button>
         ) : <span className="text-gray-400">—</span>
       )
     },
@@ -363,20 +353,10 @@ export default function Contacts() {
       width: 'w-20',
       render: (contact) => (
         <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleEdit(contact)}
-            className="h-7 w-7 p-0"
-          >
+          <Button variant="ghost" size="sm" onClick={() => handleEdit(contact)} className="h-7 w-7 p-0">
             <Edit className="h-3.5 w-3.5" />
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleDelete(contact.id)}
-            className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-          >
+          <Button variant="ghost" size="sm" onClick={() => handleDelete(contact.id)} className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50">
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -384,199 +364,18 @@ export default function Contacts() {
     }
   ];
 
-  const listContent = (
-    <div className="flex flex-col h-full">
-      {showFileUpload && (
-        <div className="bg-white border-b border-gray-200 p-4">
-          <FileUpload
-            onUpload={handleFileUpload}
-            title="Import Contacts"
-            description="Upload CSV, TXT, PDF, DOCX, or XLSX files with contact information"
-            acceptedFileTypes={['.txt', '.csv', '.pdf', '.docx', '.xlsx']}
-            maxFiles={5}
-          />
-        </div>
-      )}
-
-      <div className="grid grid-cols-4 gap-4 p-4 bg-white border-b border-gray-200">
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Total Contacts</p>
-              <p className="text-2xl font-bold text-gray-900">{totalContacts}</p>
-            </div>
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Users className="w-5 h-5 text-blue-600" />
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Prospects</p>
-              <p className="text-2xl font-bold text-gray-900">{prospects}</p>
-            </div>
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <User className="w-5 h-5 text-blue-600" />
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Clients</p>
-              <p className="text-2xl font-bold text-gray-900">{clients}</p>
-            </div>
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <Building className="w-5 h-5 text-green-600" />
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Hot Leads</p>
-              <p className="text-2xl font-bold text-gray-900">{hotLeads}</p>
-            </div>
-            <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-              <Star className="w-5 h-5 text-red-600" />
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {selectedIds.size > 0 && (
-        <div className="bg-blue-50 border-b border-blue-200 px-4 py-3 flex items-center justify-between">
-          <span className="text-sm font-medium text-blue-900">
-            {selectedIds.size} contact(s) selected
-          </span>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleBulkExport}>
-              <Download className="w-3.5 h-3.5 mr-1.5" />
-              Export
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleBulkDelete} disabled={bulkDeleteMutation.isPending}>
-              <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-              Delete
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
-              Clear
-            </Button>
-          </div>
-        </div>
-      )}
-
-      <div className="flex-1 overflow-auto">
-        <CrmDataTable
-          data={filteredContacts}
-          columns={columns}
-          isLoading={isLoading}
-          selectedId={selectedContact?.id}
-          onRowClick={handleRowClick}
-          getRowId={(c) => c.id}
-          selectedIds={selectedIds}
-          onSelectionChange={setSelectedIds}
-          emptyState={{
-            title: searchTerm || statusFilter !== 'all' ? 'No contacts found' : 'No contacts yet',
-            description: searchTerm || statusFilter !== 'all' 
-              ? 'Try adjusting your search or filter criteria.'
-              : 'Start by adding your first contact to build your network.',
-            action: !searchTerm && statusFilter === 'all' ? {
-              label: 'Add Contact',
-              onClick: handleAdd
-            } : undefined
-          }}
-        />
-      </div>
-    </div>
-  );
-
-  const detailsContent = selectedContact ? (
-    <CrmDetailsPanel
-      title={`${selectedContact.firstName} ${selectedContact.lastName}`}
-      subtitle={capitalizeFirst(selectedContact.position || selectedContact.role) || undefined}
-      onEdit={() => handleEdit(selectedContact)}
-      onDelete={() => handleDelete(selectedContact.id)}
-      actions={
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={() => setShowFullPageModal(true)} 
-          className="h-8 px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-          title="Open full page"
-        >
-          <ExternalLink className="h-4 w-4" />
-        </Button>
-      }
-    >
-      <CrmDetailSection title="Contact Information">
-        <CrmDetailField label="Email" value={selectedContact.email} />
-        <CrmDetailField label="Phone" value={formatPhoneDisplay(selectedContact.phone)} />
-        <CrmDetailField label="Position" value={capitalizeFirst(selectedContact.position || selectedContact.role)} />
-        <CrmDetailField label="Type" value={
-          selectedContact.contactTag && (
-            <Badge className={`text-xs ${contactTagColors[selectedContact.contactTag as keyof typeof contactTagColors] || 'bg-gray-500 text-white'}`}>
-              {selectedContact.contactTag.charAt(0).toUpperCase() + selectedContact.contactTag.slice(1)}
-            </Badge>
-          )
-        } />
-        {selectedContact.contactTag === 'lead' && selectedContact.leadStatus && (
-          <CrmDetailField label="Lead Status" value={
-            <Badge className={`text-xs ${leadStatusColors[selectedContact.leadStatus as keyof typeof leadStatusColors] || 'bg-gray-100 text-gray-800'}`}>
-              {selectedContact.leadStatus.charAt(0).toUpperCase() + selectedContact.leadStatus.slice(1)}
-            </Badge>
-          } />
-        )}
-      </CrmDetailSection>
-
-      {selectedContact.company && (
-        <CrmDetailSection title="Company">
-          <div 
-            className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
-            onClick={() => setLocation(`/crm/companies?selected=${selectedContact.company?.id}`)}
-          >
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Building className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <div className="text-sm font-medium text-blue-600 hover:text-blue-700">{selectedContact.company.name}</div>
-              {selectedContact.company.industry && (
-                <div className="text-xs text-gray-500">{selectedContact.company.industry}</div>
-              )}
-            </div>
-          </div>
-        </CrmDetailSection>
-      )}
-
-      <CrmDetailSection title="Additional Details">
-        <CrmDetailField label="Source" value={selectedContact.source} />
-        <CrmDetailField label="Notes" value={getMostRecentActivity() || selectedContact.notes} />
-      </CrmDetailSection>
-    </CrmDetailsPanel>
-  ) : null;
-
   return (
     <CrmPageShell>
       <CrmTopBar
         title="Contacts"
-        subtitle={`${totalContacts} total contacts`}
+        subtitle={`${filteredContacts.length} contacts`}
         actions={
           <>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setShowFileUpload(!showFileUpload)}
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Import
+            <Button variant="outline" size="sm" onClick={() => setShowFileUpload(!showFileUpload)}>
+              <Upload className="w-4 h-4 mr-1.5" />Import
             </Button>
-            <Button 
-              className="bg-blue-600 hover:bg-blue-700" 
-              size="sm" 
-              onClick={handleAdd}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Contact
+            <Button size="sm" onClick={handleAdd}>
+              <Plus className="w-4 h-4 mr-1.5" />Add Contact
             </Button>
           </>
         }
@@ -584,29 +383,18 @@ export default function Contacts() {
           <>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input 
-                placeholder="Search contacts..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 w-60 h-9"
-              />
+              <Input placeholder="Search contacts..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 w-60 h-9" />
             </div>
-            
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-32 h-9">
-                <SelectValue placeholder="All Status" />
-              </SelectTrigger>
+              <SelectTrigger className="w-32 h-9"><SelectValue placeholder="All Status" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="prospect">Prospect</SelectItem>
                 <SelectItem value="customer">Customer</SelectItem>
               </SelectContent>
             </Select>
-            
             <Select value={contactTagFilter} onValueChange={setContactTagFilter}>
-              <SelectTrigger className="w-32 h-9">
-                <SelectValue placeholder="All Tags" />
-              </SelectTrigger>
+              <SelectTrigger className="w-32 h-9"><SelectValue placeholder="All Tags" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Tags</SelectItem>
                 <SelectItem value="lead">Lead</SelectItem>
@@ -624,39 +412,102 @@ export default function Contacts() {
         }
       />
 
-      <CrmSplitView
-        list={listContent}
-        details={detailsContent}
-        isDetailOpen={!!selectedContact}
-        onCloseDetail={handleCloseDetail}
-      />
-        
-      <ContactFormModal
-        isOpen={isContactFormOpen}
-        onClose={() => {
-          setIsContactFormOpen(false);
-          setEditingContact(null);
-        }}
-        contact={editingContact}
+      <div className="flex flex-col flex-1 overflow-hidden">
+        {showFileUpload && (
+          <div className="bg-white border-b border-gray-200 p-4">
+            <FileUpload onUpload={handleFileUpload} title="Import Contacts" description="Upload CSV, TXT, PDF, DOCX, or XLSX files" acceptedFileTypes={['.txt', '.csv', '.pdf', '.docx', '.xlsx']} maxFiles={5} />
+          </div>
+        )}
+
+        <div className="grid grid-cols-4 gap-4 p-4 bg-white border-b border-gray-200">
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Total Contacts</p>
+                <p className="text-2xl font-bold text-gray-900">{totalContacts}</p>
+              </div>
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Users className="w-5 h-5 text-blue-600" />
+              </div>
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Prospects</p>
+                <p className="text-2xl font-bold text-gray-900">{prospects}</p>
+              </div>
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <User className="w-5 h-5 text-blue-600" />
+              </div>
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Clients</p>
+                <p className="text-2xl font-bold text-gray-900">{clients}</p>
+              </div>
+              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <Building className="w-5 h-5 text-green-600" />
+              </div>
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Hot Leads</p>
+                <p className="text-2xl font-bold text-gray-900">{hotLeads}</p>
+              </div>
+              <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                <Star className="w-5 h-5 text-red-600" />
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {selectedIds.size > 0 && (
+          <div className="bg-blue-50 border-b border-blue-200 px-4 py-3 flex items-center justify-between">
+            <span className="text-sm font-medium text-blue-900">{selectedIds.size} contact(s) selected</span>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={handleBulkExport}><Download className="w-3.5 h-3.5 mr-1.5" />Export</Button>
+              <Button variant="outline" size="sm" onClick={handleBulkDelete} disabled={bulkDeleteMutation.isPending}><Trash2 className="w-3.5 h-3.5 mr-1.5" />Delete</Button>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>Clear</Button>
+            </div>
+          </div>
+        )}
+
+        <div className="flex-1 overflow-auto">
+          <CrmDataTable
+            data={filteredContacts}
+            columns={columns}
+            isLoading={isLoading}
+            selectedId={drawerContactId}
+            onRowClick={handleRowClick}
+            getRowId={(c) => c.id}
+            selectedIds={selectedIds}
+            onSelectionChange={setSelectedIds}
+            emptyState={{
+              title: searchTerm || statusFilter !== 'all' ? 'No contacts found' : 'No contacts yet',
+              description: searchTerm || statusFilter !== 'all' ? 'Try adjusting your search or filter criteria.' : 'Start by adding your first contact.',
+              action: !searchTerm && statusFilter === 'all' ? { label: 'Add Contact', onClick: handleAdd } : undefined
+            }}
+          />
+        </div>
+      </div>
+
+      <DetailDrawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        entityType="contact"
+        entityId={drawerContactId}
+        onDelete={() => { setDrawerOpen(false); setDrawerContactId(null); }}
       />
 
-      <ImportResultsModal 
-        isOpen={showImportResults}
-        onClose={() => setShowImportResults(false)}
-        results={importResults}
-        entityType="contacts"
-      />
-
-      <CreateContactWizardModal
-        open={isCreateWizardOpen}
-        onOpenChange={setIsCreateWizardOpen}
-      />
-
-      <ContactDetailModal
-        isOpen={showFullPageModal}
-        onClose={() => setShowFullPageModal(false)}
-        contact={selectedContact}
-      />
+      <ContactFormModal isOpen={isContactFormOpen} onClose={() => { setIsContactFormOpen(false); setEditingContact(null); }} contact={editingContact} />
+      <ImportResultsModal isOpen={showImportResults} onClose={() => setShowImportResults(false)} results={importResults} entityType="contacts" />
+      <CreateContactWizardModal open={isCreateWizardOpen} onOpenChange={setIsCreateWizardOpen} />
     </CrmPageShell>
   );
 }
+``''
