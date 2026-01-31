@@ -12,6 +12,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AIAssistant } from "@/components/ai-assistant";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 import { ThemeProvider } from '@/contexts/ThemeProvider';
+import { ProspectingActivityProvider } from "@/contexts/ProspectingActivityContext";
 
 
 // Eagerly load critical pages for instant navigation (no white screen)
@@ -2099,12 +2100,14 @@ function App() {
         <QueryClientProvider client={queryClient}>
           <SettingsProvider>
             <AuthProvider>
-              <TooltipProvider>
-                <Toaster />
-                <Suspense fallback={<PageLoader />}>
-                  <Router />
-                </Suspense>
-              </TooltipProvider>
+              <ProspectingActivityProvider>
+                <TooltipProvider>
+                  <Toaster />
+                  <Suspense fallback={<PageLoader />}>
+                    <Router />
+                  </Suspense>
+                </TooltipProvider>
+              </ProspectingActivityProvider>
             </AuthProvider>
           </SettingsProvider>
         </QueryClientProvider>
