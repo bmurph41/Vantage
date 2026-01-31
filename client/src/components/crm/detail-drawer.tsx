@@ -1234,7 +1234,7 @@ export function DetailDrawer({
                                 }}
                                 data-testid="link-owner-company"
                               >
-                                <Building className="h-4 w-4" />
+                                <Building2 className="h-4 w-4" />
                                 {propertyCompanies[0]?.company?.name}
                               </div>
                             ) : (
