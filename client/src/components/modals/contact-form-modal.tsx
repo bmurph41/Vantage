@@ -169,7 +169,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
     if (contactTag !== 'lead') {
       setLeadStatus(undefined);
     } else if (contactTag === 'lead' && !leadStatus) {
-      setLeadStatus('hot'); // Default to 'hot' when switching to lead tag
+      setLeadStatus('new'); // Default to 'new' when switching to lead tag
     }
   }, [contactTag, leadStatus]);
 
@@ -720,10 +720,11 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                       <SelectValue placeholder="Select lead status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="hot">Hot</SelectItem>
-                      <SelectItem value="warm">Warm</SelectItem>
-                      <SelectItem value="cold">Cold</SelectItem>
-                      <SelectItem value="long-term">Long-Term</SelectItem>
+                      <SelectItem value="new">New</SelectItem>
+                      <SelectItem value="contacted">Contacted</SelectItem>
+                      <SelectItem value="qualified">Qualified</SelectItem>
+                      <SelectItem value="unqualified">Unqualified</SelectItem>
+                      <SelectItem value="converted">Converted</SelectItem>
                     </SelectContent>
                   </Select>
                   {touched && errors.leadStatus && (

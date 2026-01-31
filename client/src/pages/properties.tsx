@@ -401,15 +401,15 @@ export default function Properties() {
               <CrmDetailField label="Dock Type" value={selectedProperty.specifications?.dockType} />
             </>
           )}
-          {selectedProperty.type === 'boat' && (
+          {selectedProperty.type === 'boat' && selectedProperty.specifications && (
             <>
-              <CrmDetailField label="Make" value={selectedProperty.specifications.make} />
-              <CrmDetailField label="Model" value={selectedProperty.specifications.model} />
-              <CrmDetailField label="Year" value={selectedProperty.specifications.year} />
-              <CrmDetailField label="Length" value={selectedProperty.specifications.length ? `${selectedProperty.specifications.length}ft` : null} />
+              <CrmDetailField label="Make" value={selectedProperty.specifications?.make} />
+              <CrmDetailField label="Model" value={selectedProperty.specifications?.model} />
+              <CrmDetailField label="Year" value={selectedProperty.specifications?.year} />
+              <CrmDetailField label="Length" value={selectedProperty.specifications?.length ? `${selectedProperty.specifications.length}ft` : null} />
             </>
           )}
-          {selectedProperty.specifications.amenities && selectedProperty.specifications.amenities.length > 0 && (
+          {selectedProperty.specifications?.amenities && selectedProperty.specifications.amenities.length > 0 && (
             <CrmDetailField label="Amenities" value={
               <div className="flex flex-wrap gap-1">
                 {selectedProperty.specifications.amenities.map((amenity, i) => (

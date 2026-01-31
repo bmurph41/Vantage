@@ -6,11 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Edit, Trash2, Mail, Phone, Building, Upload, Users, User, Star, Download, Thermometer, Filter } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Mail, Phone, Building, Upload, Users, User, Star, Download, Thermometer, Filter, ExternalLink } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import ContactFormModal from "@/components/modals/contact-form-modal";
 import { CreateContactWizardModal } from "@/components/modals/create-contact-wizard-modal";
+import ContactDetailModal from "@/components/modals/contact-detail-modal";
+import { formatPhoneDisplay } from "@/components/ui/enhanced-card";
 import { FileUpload } from "@/components/file-upload";
 import { ImportResultsModal, type ImportResult } from "@/components/import-results-modal";
 import { CrmPageShell } from "@/components/crm/CrmPageShell";
@@ -60,6 +62,7 @@ export default function Contacts() {
   const [importResults, setImportResults] = useState<ImportResult[]>([]);
   const [showImportResults, setShowImportResults] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showFullPageModal, setShowFullPageModal] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -255,7 +258,7 @@ export default function Contacts() {
   const totalContacts = contacts.length;
   const prospects = contacts.filter(c => c.contactTag === 'lead').length;
   const clients = contacts.filter(c => c.dealAssignment).length;
-  const hotLeads = contacts.filter(c => c.contactTag === 'lead' && c.leadScore === 'hot').length;
+  const hotLeads = contacts.filter(c => c.contactTag === 'lead' && c.leadStatus === 'qualified').length;
 
   const columns: CrmColumn<ContactWithCompany>[] = [
     {
@@ -294,7 +297,7 @@ export default function Contacts() {
         contact.phone ? (
           <div className="flex items-center gap-1.5 text-sm text-gray-600">
             <Phone className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-            <span>{contact.phone}</span>
+            <span>{formatPhoneDisplay(contact.phone)}</span>
           </div>
         ) : <span className="text-gray-400">—</span>
       )
@@ -470,10 +473,21 @@ export default function Contacts() {
       subtitle={selectedContact.position || selectedContact.role || undefined}
       onEdit={() => handleEdit(selectedContact)}
       onDelete={() => handleDelete(selectedContact.id)}
+      actions={
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => setShowFullPageModal(true)} 
+          className="h-8 px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+          title="Open full page"
+        >
+          <ExternalLink className="h-4 w-4" />
+        </Button>
+      }
     >
       <CrmDetailSection title="Contact Information">
         <CrmDetailField label="Email" value={selectedContact.email} />
-        <CrmDetailField label="Phone" value={selectedContact.phone} />
+        <CrmDetailField label="Phone" value={formatPhoneDisplay(selectedContact.phone)} />
         <CrmDetailField label="Position" value={selectedContact.position || selectedContact.role} />
         <CrmDetailField label="Type" value={
           selectedContact.contactTag && (
@@ -612,6 +626,12 @@ export default function Contacts() {
       <CreateContactWizardModal
         open={isCreateWizardOpen}
         onOpenChange={setIsCreateWizardOpen}
+      />
+
+      <ContactDetailModal
+        isOpen={showFullPageModal}
+        onClose={() => setShowFullPageModal(false)}
+        contact={selectedContact}
       />
     </CrmPageShell>
   );
