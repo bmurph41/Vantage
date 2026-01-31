@@ -1208,7 +1208,7 @@ export function DetailDrawer({
                                   const ownerContact = propertyContacts[0]?.contact;
                                   if (ownerContact) {
                                     setLocation(`/crm/contacts/${ownerContact.id}`);
-                                    onClose();
+                                    onOpenChange(false);
                                   }
                                 }}
                                 data-testid="link-owner-contact"
@@ -1229,7 +1229,7 @@ export function DetailDrawer({
                                   const linkedCompany = propertyCompanies[0]?.company;
                                   if (linkedCompany) {
                                     setLocation(`/crm/companies/${linkedCompany.id}`);
-                                    onClose();
+                                    onOpenChange(false);
                                   }
                                 }}
                                 data-testid="link-owner-company"
