@@ -19,7 +19,7 @@ const CATEGORIES = {
   DEAL_MANAGEMENT: { label: 'Deal Management', href: '/deal-workspace', icon: Briefcase },
   PROSPECTING: { label: 'Prospecting', href: '/prospecting', icon: Target },
   OPERATIONS: { label: 'Operations', icon: SettingsIcon },
-  DUE_DILIGENCE: { label: 'Due Diligence', href: '/projects', icon: FolderKanban },
+  DUE_DILIGENCE: { label: 'Due Diligence', href: '/dd/projects', icon: FolderKanban },
   VDR: { label: 'VDR', href: '/vdr', icon: FolderLock },
   MODELING: { label: 'Valuator', href: '/modeling/projects', icon: TrendingUp },
   DOCKTALK: { label: 'DockTalk', href: '/docktalk', icon: MessageSquare },
@@ -764,7 +764,7 @@ function getBreadcrumbsForPath(path: string): BreadcrumbItem[] {
     
     items = [
       CATEGORIES.DUE_DILIGENCE,
-      { label: 'Projects', href: '/projects' },
+      { label: 'DD Projects', href: '/dd/projects' },
       { label: projectId, isDynamic: true, dynamicType: 'dd-project', dynamicId: projectId },
     ];
     
