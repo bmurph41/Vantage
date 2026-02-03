@@ -1032,7 +1032,7 @@ export const contacts = pgTable("contacts", {
 export const projectContacts = pgTable("project_contacts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: varchar("project_id").notNull().references(() => projects.id),
-  contactId: varchar("contact_id").notNull().references(() => contacts.id),
+  contactId: varchar("contact_id").notNull().references(() => crmContacts.id),
   role: contactRoleEnum("role").notNull(), // Role for this specific project
   customRole: text("custom_role"), // Custom role/position when role is "other"
   projectNotes: text("project_notes"), // Project-specific notes about this contact
@@ -10325,7 +10325,7 @@ export const marinaTenants = pgTable('marina_tenants', {
   boatBeam: decimal('boat_beam', { precision: 6, scale: 2 }),
   boatDraft: decimal('boat_draft', { precision: 6, scale: 2 }),
   registrationNumber: varchar('registration_number', { length: 50 }),
-  linkedCrmContactId: varchar('linked_crm_contact_id').references(() => contacts.id),
+  linkedCrmContactId: varchar('linked_crm_contact_id').references(() => crmContacts.id),
   isActive: boolean('is_active').default(true),
   notes: text('notes'),
   externalId: text('external_id'),
@@ -23040,9 +23040,9 @@ export const scenarioAuditLogs = pgTable('scenario_audit_logs', {
 export const contactDealRoles = pgTable("contact_deal_roles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar("org_id").references(() => organizations.id, { onDelete: "cascade" }),
-  contactId: varchar("contact_id").notNull().references(() => contacts.id, { onDelete: "cascade" }),
-  companyId: varchar("company_id").references(() => companies.id, { onDelete: "set null" }),
-  dealId: varchar("deal_id").notNull().references(() => deals.id, { onDelete: "cascade" }),
+  contactId: varchar("contact_id").notNull().references(() => crmContacts.id, { onDelete: "cascade" }),
+  companyId: varchar("company_id").references(() => crmCompanies.id, { onDelete: "set null" }),
+  dealId: varchar("deal_id").notNull().references(() => crmDeals.id, { onDelete: "cascade" }),
   roleOnDeal: contactRoleEnum("role_on_deal"),
   dealSide: dealSideEnum("deal_side"),
   isPrimaryForDeal: boolean("is_primary_for_deal").default(false).notNull(),
@@ -23060,13 +23060,13 @@ export const contactDealRoles = pgTable("contact_deal_roles", {
 export const dealFinancialEvents = pgTable("deal_financial_events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar("org_id").references(() => organizations.id, { onDelete: "cascade" }),
-  dealId: varchar("deal_id").notNull().references(() => deals.id, { onDelete: "cascade" }),
+  dealId: varchar("deal_id").notNull().references(() => crmDeals.id, { onDelete: "cascade" }),
   eventType: financialEventTypeEnum("event_type").notNull(),
   amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
   currency: varchar("currency", { length: 3 }).default("USD").notNull(),
   direction: financialEventDirectionEnum("direction").notNull(),
-  appliesToContactId: varchar("applies_to_contact_id").references(() => contacts.id, { onDelete: "set null" }),
-  appliesToCompanyId: varchar("applies_to_company_id").references(() => companies.id, { onDelete: "set null" }),
+  appliesToContactId: varchar("applies_to_contact_id").references(() => crmContacts.id, { onDelete: "set null" }),
+  appliesToCompanyId: varchar("applies_to_company_id").references(() => crmCompanies.id, { onDelete: "set null" }),
   notes: text("notes"),
   eventDate: date("event_date").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -23080,7 +23080,7 @@ export const dealFinancialEvents = pgTable("deal_financial_events", {
 export const contactMetricsSnapshot = pgTable("contact_metrics_snapshot", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar("org_id").references(() => organizations.id, { onDelete: "cascade" }),
-  contactId: varchar("contact_id").notNull().references(() => contacts.id, { onDelete: "cascade" }),
+  contactId: varchar("contact_id").notNull().references(() => crmContacts.id, { onDelete: "cascade" }),
   timeframeKey: varchar("timeframe_key", { length: 20 }).notNull(),
   metrics: jsonb("metrics").notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -23095,3 +23095,162 @@ export type ScenarioAssumptionPayload = typeof scenarioAssumptionPayloads.$infer
 export type InsertScenarioAssumptionPayload = typeof scenarioAssumptionPayloads.$inferInsert;
 export type ScenarioAuditLog = typeof scenarioAuditLogs.$inferSelect;
 export type InsertScenarioAuditLog = typeof scenarioAuditLogs.$inferInsert;
+// ============================================================================
+// MODELING STANDALONE RENT ROLL - For prospective property evaluation
+// ============================================================================
+
+// Storage type enum for modeling rent roll (mirrors RRA)
+export const modelingStorageTypeEnum = pgEnum("modeling_storage_type", [
+  "Wet Slip",
+  "Dry Storage",
+  "Dry Rack",
+  "Dry Stack",
+  "Mooring",
+  "Trailer Storage",
+  "Lift Storage",
+  "Other"
+]);
+
+// Status enum for modeling rent roll units
+export const modelingUnitStatusEnum = pgEnum("modeling_unit_status", [
+  "occupied",
+  "vacant",
+  "reserved",
+  "maintenance"
+]);
+
+// Modeling Rent Roll Units - Standalone storage units for prospective properties
+export const modelingRentRollUnits = pgTable("modeling_rent_roll_units", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  modelingProjectId: varchar("modeling_project_id").notNull().references(() => modelingProjects.id, { onDelete: "cascade" }),
+  
+  // Unit identification
+  unitNumber: text("unit_number").notNull(),
+  storageType: modelingStorageTypeEnum("storage_type").notNull().default("Wet Slip"),
+  status: modelingUnitStatusEnum("status").notNull().default("occupied"),
+  
+  // Physical dimensions
+  length: numeric("length", { precision: 10, scale: 2 }),
+  width: numeric("width", { precision: 10, scale: 2 }),
+  squareFeet: numeric("square_feet", { precision: 10, scale: 2 }),
+  
+  // Location within marina
+  dock: text("dock"),
+  section: text("section"),
+  
+  // Pricing
+  monthlyRent: numeric("monthly_rent", { precision: 14, scale: 2 }).notNull().default("0"),
+  annualRent: numeric("annual_rent", { precision: 14, scale: 2 }),
+  
+  // Tenant info (if occupied)
+  tenantName: text("tenant_name"),
+  boatName: text("boat_name"),
+  boatLength: numeric("boat_length", { precision: 10, scale: 2 }),
+  boatType: text("boat_type"),
+  
+  // Lease terms
+  leaseStartDate: date("lease_start_date"),
+  leaseEndDate: date("lease_end_date"),
+  isMonthToMonth: boolean("is_month_to_month").default(false),
+  
+  // Additional charges
+  electricCharge: numeric("electric_charge", { precision: 14, scale: 2 }).default("0"),
+  waterCharge: numeric("water_charge", { precision: 14, scale: 2 }).default("0"),
+  otherCharges: numeric("other_charges", { precision: 14, scale: 2 }).default("0"),
+  
+  // Notes
+  notes: text("notes"),
+  
+  // Metadata
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdBy: varchar("created_by").references(() => users.id),
+}, (table) => ({
+  orgIdx: index("modeling_rent_roll_units_org_idx").on(table.orgId),
+  projectIdx: index("modeling_rent_roll_units_project_idx").on(table.modelingProjectId),
+  storageTypeIdx: index("modeling_rent_roll_units_storage_type_idx").on(table.storageType),
+  statusIdx: index("modeling_rent_roll_units_status_idx").on(table.status),
+  uniqueUnit: unique("modeling_rent_roll_units_unique").on(table.modelingProjectId, table.unitNumber),
+}));
+
+// Modeling Rent Roll Project Configuration
+export const modelingRentRollConfig = pgTable("modeling_rent_roll_config", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  modelingProjectId: varchar("modeling_project_id").notNull().references(() => modelingProjects.id, { onDelete: "cascade" }).unique(),
+  
+  // Data source mode
+  dataSourceMode: text("data_source_mode").notNull().default("standalone"), // "standalone" | "linked" | "hybrid"
+  
+  // If linked, reference to Operations RRA location
+  linkedRraLocationId: varchar("linked_rra_location_id").references(() => rraMarinaLocations.id, { onDelete: "set null" }),
+  
+  // Sync settings (for linked mode)
+  autoSyncEnabled: boolean("auto_sync_enabled").default(false),
+  lastSyncAt: timestamp("last_sync_at"),
+  
+  // Occupancy assumptions (for pro forma)
+  assumedOccupancyRate: numeric("assumed_occupancy_rate", { precision: 5, scale: 2 }).default("90.00"),
+  assumedAnnualRentGrowth: numeric("assumed_annual_rent_growth", { precision: 5, scale: 2 }).default("3.00"),
+  
+  // Unit type rate assumptions (JSON for flexibility)
+  rateAssumptions: jsonb("rate_assumptions").default(sql`'{}'`),
+  
+  // Metadata
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("modeling_rent_roll_config_org_idx").on(table.orgId),
+  projectIdx: index("modeling_rent_roll_config_project_idx").on(table.modelingProjectId),
+}));
+
+// Insert schemas and types
+export const insertModelingRentRollUnitSchema = createInsertSchema(modelingRentRollUnits).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateModelingRentRollUnitSchema = insertModelingRentRollUnitSchema.partial().omit({ orgId: true, modelingProjectId: true });
+export type ModelingRentRollUnit = typeof modelingRentRollUnits.$inferSelect;
+export type InsertModelingRentRollUnit = typeof modelingRentRollUnits.$inferInsert;
+
+export const insertModelingRentRollConfigSchema = createInsertSchema(modelingRentRollConfig).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateModelingRentRollConfigSchema = insertModelingRentRollConfigSchema.partial().omit({ orgId: true, modelingProjectId: true });
+export type ModelingRentRollConfig = typeof modelingRentRollConfig.$inferSelect;
+export type InsertModelingRentRollConfig = typeof modelingRentRollConfig.$inferInsert;
+
+// Relations for modeling rent roll
+export const modelingRentRollUnitsRelations = relations(modelingRentRollUnits, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [modelingRentRollUnits.orgId],
+    references: [organizations.id],
+  }),
+  modelingProject: one(modelingProjects, {
+    fields: [modelingRentRollUnits.modelingProjectId],
+    references: [modelingProjects.id],
+  }),
+  createdByUser: one(users, {
+    fields: [modelingRentRollUnits.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const modelingRentRollConfigRelations = relations(modelingRentRollConfig, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [modelingRentRollConfig.orgId],
+    references: [organizations.id],
+  }),
+  modelingProject: one(modelingProjects, {
+    fields: [modelingRentRollConfig.modelingProjectId],
+    references: [modelingProjects.id],
+  }),
+  linkedRraLocation: one(rraMarinaLocations, {
+    fields: [modelingRentRollConfig.linkedRraLocationId],
+    references: [rraMarinaLocations.id],
+  }),
+}));
