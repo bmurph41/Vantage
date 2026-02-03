@@ -69,7 +69,7 @@ const operationsModulesNav = [
 
 // Deal Workspace Navigation - Consolidated DD, VDR, and Modeling
 const dealWorkspaceNav = [
-  { name: "Projects", href: "/projects", icon: ClipboardList },
+  { name: "DD Projects", href: "/dd/projects", icon: ClipboardList },
   { name: "Data Room", href: "/vdr", icon: FolderLock },
 ];
 

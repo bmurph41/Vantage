@@ -450,19 +450,12 @@ function Router() {
         )}
       </Route>
       {/* Protected routes - authentication handled by UnifiedLayout */}
+      {/* Legacy redirects - Projects now lives under DD Projects */}
       <Route path="/projects">
-        {() => (
-          <UnifiedLayout>
-            <AllProjectsSummaryPage />
-          </UnifiedLayout>
-        )}
+        {() => <Redirect to="/dd/projects" />}
       </Route>
       <Route path="/projects/summary">
-        {() => (
-          <UnifiedLayout>
-            <AllProjectsSummaryPage />
-          </UnifiedLayout>
-        )}
+        {() => <Redirect to="/dd/projects" />}
       </Route>
       <Route path="/dd/projects">
         {() => (
