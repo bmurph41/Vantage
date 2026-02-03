@@ -216,6 +216,7 @@ import {
   insertClosingCostLineSchema,
   insertTransitionCostLineSchema,
   insertNwcLineSchema,
+  insertRateCompSchema,
   targetDemographics,
   insertTargetDemographicsSchema
 } from "@shared/schema";
@@ -27445,7 +27446,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const userId = req.user.id;
       const orgId = req.user.orgId;
 
-      const compData = salesCompCreateSchema.parse(req.body);
+      const compData = insertRateCompSchema.parse(req.body);
 
       const comp = await rcCompService.createComp({
         ...compData,
