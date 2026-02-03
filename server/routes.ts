@@ -41,6 +41,7 @@ import pnlRouter from "./services/pnl/routes";
 import capitalMarketsRouter from "./services/capital-markets/routes";
 import rraRoutes from "./routes/rra-routes";
 import modelingRentRollRoutes from "./routes/modeling-rent-roll-routes";
+import marinaIntegrationsRoutes from "./routes/marina-integrations-routes";
 import authRoutes from "./routes/auth-routes";
 import analyticsRoutes from "./routes/analytics-routes";
 import { registerEntityLinkingRoutes, registerEventMonitoringRoutes } from "./routes/entity-linking";
@@ -440,6 +441,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/pnl", authenticateUser, enforceTenant, pnlRouter);
   app.use("/api/rent-roll", authenticateUser, enforceTenant, requireRentRoll(), rraRoutes);
   app.use("/api/modeling-rent-roll", authenticateUser, enforceTenant, modelingRentRollRoutes);
+  app.use("/api/marina-integrations", authenticateUser, enforceTenant, marinaIntegrationsRoutes);
   app.use("/api/executive-dashboard", authenticateUser, enforceTenant, requireRentRoll(), executiveDashboardRoutes);
   app.use("/api/capital-markets", authenticateUser, enforceTenant, capitalMarketsRouter);
   app.use("/api/listings/v2", authenticateUser, enforceTenant, liv2Routes);

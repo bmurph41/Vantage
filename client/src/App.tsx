@@ -189,6 +189,7 @@ const RentRollV2InteractiveAnalytics = lazy(() => import("@/modules/rent-roll-v2
 // Operations - Tabbed Module Pages
 const FuelSalesTabbed = lazy(() => import("@/pages/operations/FuelSalesTabbed"));
 const ShipStoreTabbed = lazy(() => import("@/pages/operations/ShipStoreTabbed"));
+const OperationsIntegrations = lazy(() => import("@/pages/operations/integrations"));
 const DockitTabbed = lazy(() => import("@/pages/operations/DockitTabbed"));
 const WorkspacesList = lazy(() => import("@/pages/workspaces/index"));
 const WorkspaceDetail = lazy(() => import("@/pages/workspaces/[workspaceId]"));
@@ -1009,6 +1010,11 @@ function Router() {
             <FuelSalesTabbed />
           </UnifiedLayout>
         )}
+      </Route>
+      <Route path="/operations/integrations">
+        <Suspense fallback={<PageLoader />}>
+          <OperationsIntegrations />
+        </Suspense>
       </Route>
       <Route path="/operations/ship-store">
         {() => (

@@ -402,6 +402,14 @@ export const sidebarConfig: SidebarGroup[] = [
         href: '/operations/ship-store',
         icon: ShoppingBag,
         matchRoutes: ['/operations/ship-store', '/ship-store'],
+        requiredModules: [FEATURE_MODULES.OPS_SHIP_STORE],
+      },
+      {
+        id: 'marina-integrations',
+        label: 'Integrations',
+        href: '/operations/integrations',
+        icon: Plug,
+        matchRoutes: ['/operations/integrations'],
         requiredModules: [FEATURE_MODULES.OPS_RETAIL],
       },
       {

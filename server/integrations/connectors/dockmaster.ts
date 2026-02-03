@@ -1,4 +1,7 @@
 import { BaseConnector, ConnectorConfig, EntitySyncConfig } from './base';
+import { db } from '../../db';
+import { storageLocations, marinaTenants, marinaLeases, marinaProjects, crmContacts } from '@shared/schema';
+import { eq, and } from 'drizzle-orm';
 
 interface DockMasterTenant {
   tenant_id: string;
@@ -393,23 +396,233 @@ export class DockMasterConnector extends BaseConnector {
   }
 
   private async saveTenant(data: any): Promise<{ created: boolean; updated: boolean; id?: string }> {
-    return { created: true, updated: false, id: `tenant_${data.externalId}` };
+    const existing = await db.query.marinaTenants.findFirst({
+      where: and(
+        eq(marinaTenants.orgId, this.config.orgId),
+        eq(marinaTenants.externalId, data.externalId),
+        eq(marinaTenants.integrationSource, 'dockmaster')
+      )
+    });
+
+    if (existing) {
+      await db.update(marinaTenants)
+        .set({
+          firstName: data.firstName || existing.firstName,
+          lastName: data.lastName || existing.lastName,
+          companyName: data.companyName,
+          email: data.email,
+          phone: data.phone,
+          address: data.address?.line1,
+          city: data.address?.city,
+          state: data.address?.state,
+          zipCode: data.address?.postalCode,
+          lastSyncedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(marinaTenants.id, existing.id));
+      return { created: false, updated: true, id: existing.id };
+    }
+
+    const [inserted] = await db.insert(marinaTenants).values({
+      orgId: this.config.orgId,
+      firstName: data.firstName || 'Unknown',
+      lastName: data.lastName || 'Tenant',
+      companyName: data.companyName,
+      email: data.email,
+      phone: data.phone,
+      address: data.address?.line1,
+      city: data.address?.city,
+      state: data.address?.state,
+      zipCode: data.address?.postalCode,
+      externalId: data.externalId,
+      integrationSource: 'dockmaster',
+      lastSyncedAt: new Date(),
+    }).returning({ id: marinaTenants.id });
+
+    return { created: true, updated: false, id: inserted.id };
   }
 
   private async saveStorageLocation(data: any): Promise<{ created: boolean; updated: boolean; id?: string }> {
-    return { created: true, updated: false, id: `loc_${data.externalId}` };
+    const [marinaProject] = await db.select()
+      .from(marinaProjects)
+      .where(eq(marinaProjects.orgId, this.config.orgId))
+      .limit(1);
+
+    if (!marinaProject) {
+      throw new Error('No marina project found for this organization');
+    }
+
+    const existing = await db.query.storageLocations.findFirst({
+      where: and(
+        eq(storageLocations.orgId, this.config.orgId),
+        eq(storageLocations.externalId, data.externalId),
+        eq(storageLocations.integrationSource, 'dockmaster')
+      )
+    });
+
+    if (existing) {
+      await db.update(storageLocations)
+        .set({
+          name: data.name || data.code,
+          code: data.code,
+          locationType: data.storageType || 'wet_slip',
+          length: data.lengthFeet?.toString(),
+          width: data.widthFeet?.toString(),
+          depth: data.depthFeet?.toString(),
+          hasElectric: !!data.powerAmps,
+          electricAmps: data.powerAmps,
+          hasWater: data.hasWater,
+          monthlyRate: data.monthlyRate?.toString(),
+          annualRate: data.annualRate?.toString(),
+          isAvailable: data.status === 'available',
+          lastSyncedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(storageLocations.id, existing.id));
+      return { created: false, updated: true, id: existing.id };
+    }
+
+    const [inserted] = await db.insert(storageLocations).values({
+      orgId: this.config.orgId,
+      marinaProjectId: marinaProject.id,
+      name: data.name || data.code,
+      code: data.code || data.externalId,
+      locationType: data.storageType || 'wet_slip',
+      length: data.lengthFeet?.toString(),
+      width: data.widthFeet?.toString(),
+      depth: data.depthFeet?.toString(),
+      hasElectric: !!data.powerAmps,
+      electricAmps: data.powerAmps,
+      hasWater: data.hasWater,
+      monthlyRate: data.monthlyRate?.toString(),
+      annualRate: data.annualRate?.toString(),
+      isAvailable: data.status === 'available',
+      externalId: data.externalId,
+      integrationSource: 'dockmaster',
+      lastSyncedAt: new Date(),
+    }).returning({ id: storageLocations.id });
+
+    return { created: true, updated: false, id: inserted.id };
   }
 
   private async saveLease(data: any): Promise<{ created: boolean; updated: boolean; id?: string }> {
-    return { created: true, updated: false, id: `lease_${data.externalId}` };
+    const [marinaProject] = await db.select()
+      .from(marinaProjects)
+      .where(eq(marinaProjects.orgId, this.config.orgId))
+      .limit(1);
+
+    if (!marinaProject) {
+      throw new Error('No marina project found for this organization');
+    }
+
+    const tenant = await db.query.marinaTenants.findFirst({
+      where: and(
+        eq(marinaTenants.orgId, this.config.orgId),
+        eq(marinaTenants.externalId, data.tenantExternalId),
+        eq(marinaTenants.integrationSource, 'dockmaster')
+      )
+    });
+
+    if (!tenant) {
+      console.log(`[DockMaster] Tenant not found for lease: ${data.externalId}`);
+      return { created: false, updated: false };
+    }
+
+    const location = await db.query.storageLocations.findFirst({
+      where: and(
+        eq(storageLocations.orgId, this.config.orgId),
+        eq(storageLocations.externalId, data.locationExternalId),
+        eq(storageLocations.integrationSource, 'dockmaster')
+      )
+    });
+
+    const existing = await db.query.marinaLeases.findFirst({
+      where: and(
+        eq(marinaLeases.orgId, this.config.orgId),
+        eq(marinaLeases.externalId, data.externalId),
+        eq(marinaLeases.integrationSource, 'dockmaster')
+      )
+    });
+
+    const leaseData = {
+      orgId: this.config.orgId,
+      marinaProjectId: marinaProject.id,
+      tenantId: tenant.id,
+      storageLocationId: location?.id || null,
+      leaseNumber: data.externalId,
+      status: data.status === 'active' ? 'active' : 'expired',
+      contractTermGroup: this.mapLeaseTypeToTermGroup(data.leaseType),
+      startDate: data.startDate ? new Date(data.startDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      endDate: data.endDate ? new Date(data.endDate).toISOString().split('T')[0] : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      monthlyRent: data.rentAmount?.toString() || '0',
+      isAutoRenew: data.autoRenew || false,
+      externalId: data.externalId,
+      integrationSource: 'dockmaster',
+      lastSyncedAt: new Date(),
+    };
+
+    if (existing) {
+      await db.update(marinaLeases)
+        .set({
+          ...leaseData,
+          updatedAt: new Date(),
+        })
+        .where(eq(marinaLeases.id, existing.id));
+      return { created: false, updated: true, id: existing.id };
+    }
+
+    const [inserted] = await db.insert(marinaLeases).values(leaseData as any).returning({ id: marinaLeases.id });
+    return { created: true, updated: false, id: inserted.id };
+  }
+
+  private mapLeaseTypeToTermGroup(leaseType: string): 'annual' | 'seasonal' | 'winter' | 'short_term' {
+    const map: Record<string, 'annual' | 'seasonal' | 'winter' | 'short_term'> = {
+      'annual': 'annual',
+      'liveaboard': 'annual',
+      'seasonal': 'seasonal',
+      'transient': 'short_term',
+      'short_term': 'short_term',
+    };
+    return map[leaseType] || 'annual';
   }
 
   private async saveContact(data: any): Promise<{ created: boolean; updated: boolean; id?: string }> {
-    return { created: true, updated: false, id: `contact_${data.externalId}` };
+    const existing = await db.query.crmContacts.findFirst({
+      where: and(
+        eq(crmContacts.orgId, this.config.orgId),
+        eq(crmContacts.externalId, data.externalId),
+        eq(crmContacts.integrationSource, 'dockmaster')
+      )
+    });
+
+    if (existing) {
+      await db.update(crmContacts)
+        .set({
+          firstName: data.firstName,
+          lastName: data.lastName,
+          email: data.email,
+          phone: data.phone,
+          updatedAt: new Date(),
+        })
+        .where(eq(crmContacts.id, existing.id));
+      return { created: false, updated: true, id: existing.id };
+    }
+
+    const [inserted] = await db.insert(crmContacts).values({
+      orgId: this.config.orgId,
+      firstName: data.firstName || 'Unknown',
+      lastName: data.lastName || 'Contact',
+      email: data.email,
+      phone: data.phone,
+      externalId: data.externalId,
+      integrationSource: 'dockmaster',
+    }).returning({ id: crmContacts.id });
+
+    return { created: true, updated: false, id: inserted.id };
   }
 
   private async saveReceivable(data: any): Promise<{ created: boolean; updated: boolean; id?: string }> {
-    return { created: true, updated: false, id: `recv_${data.externalId}` };
+    return { created: false, updated: false, id: data.externalId };
   }
 
   private async makeAuthenticatedRequest<T>(
