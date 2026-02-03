@@ -24,6 +24,7 @@ import AllProjectsSummaryPage from "@/pages/all-projects-summary";
 const UnifiedSidebar = lazy(() => import("@/components/unified-sidebar"));
 const PendingNotificationsBanner = lazy(() => import("@/components/pending-notifications-banner"));
 const DockTalkRouter = lazy(() => import("@/docktalk/DockTalkRouter"));
+const PreferredNetworkPage = lazy(() => import("./pages/PreferredNetworkPage"));
 
 // Loading fallback component - simple spinner (no fake content)
 function PageLoader() {
@@ -559,6 +560,15 @@ function Router() {
         {(params) => (
           <UnifiedLayout>
             <ProjectPage {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/network">
+        {() => (
+          <UnifiedLayout>
+            <Suspense fallback={<PageLoader />}>
+              <PreferredNetworkPage />
+            </Suspense>
           </UnifiedLayout>
         )}
       </Route>

@@ -43,6 +43,7 @@ import rraRoutes from "./routes/rra-routes";
 import authRoutes from "./routes/auth-routes";
 import analyticsRoutes from "./routes/analytics-routes";
 import { registerEntityLinkingRoutes, registerEventMonitoringRoutes } from "./routes/entity-linking";
+import contactIntelligenceRoutes from "./routes/contact-intelligence";
 import playbookRoutes from "./routes/playbook-routes";
 import forecastingRoutes from "./routes/forecasting-routes";
 import phaseGatesRoutes from "./routes/phase-gates-routes";
@@ -382,7 +383,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register auth routes (no authentication required for login/register)
   app.use("/api/auth", authRoutes);
-  
   app.use("/api/dd", authenticateUser, enforceTenant);
   app.use("/api/crm", authenticateUser, enforceTenant);
   app.use("/api/crm", playbookRoutes);
@@ -391,6 +391,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/crm/red-flags", redFlagRoutes);
   app.use("/api/crm/activities", crmActivitiesRoutes);
   app.use("/api/crm/timeline", crmTimelineRoutes);
+  app.use("/api/crm", contactIntelligenceRoutes);
   app.use("/api/crm", crmPreviewRoutes);
   app.use("/api/crm/notes", crmNotesRoutes);
   app.use("/api/crm/summary", crmSummaryRoutes);

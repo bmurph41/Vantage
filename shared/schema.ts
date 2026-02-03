@@ -86,6 +86,33 @@ export const contactTagEnum = pgEnum("contact_tag", ["lead", "seller", "competit
 export const phoneTypeEnum = pgEnum("phone_type", ["office", "mobile", "home"]);
 export const dealOutcomeEnum = pgEnum("deal_outcome", ["won", "lost", "passed", "under_review", "active"]);
 export const dealSourceEnum = pgEnum("deal_source", ["direct_to_seller", "broker", "owned_marina"]);
+// Add these enum definitions (after your existing enums)
+export const primaryRoleEnum = pgEnum('primary_role', [
+  'banker', 'lender', 'accountant', 'attorney', 'insurance_broker',
+  'appraiser', 'broker', 'title_escrow', 'contractor', 'property_manager',
+  'equity_partner', 'lender_broker', 'consultant', 'other',
+]);
+export const relationshipStatusEnum = pgEnum('relationship_status', [
+  'preferred', 'approved', 'neutral', 'do_not_track', 'hidden',
+]);
+export const visibilityScopeEnum = pgEnum('visibility_scope', [
+  'private', 'team', 'public',
+]);
+export const dealSideEnum = pgEnum('deal_side', [
+  'buy', 'sell', 'refi', 'raise_equity', 'other',
+]);
+export const volumeAttributionModeEnum = pgEnum('volume_attribution_mode', [
+  'all_linked', 'primary_only',
+]);
+export const feeCreditingModeEnum = pgEnum('fee_crediting_mode', [
+  'contact', 'company', 'split',
+]);
+export const financialEventTypeEnum = pgEnum('financial_event_type', [
+  'fee', 'commission', 'lender_fee', 'legal', 'accounting', 'insurance', 'title', 'other',
+]);
+export const financialEventDirectionEnum = pgEnum('financial_event_direction', [
+  'paid', 'received', 'waived', 'credited', 'burned_off',
+]);
 
 // Data scope enum for global vs org-specific data
 export const dataScopeEnum = pgEnum("data_scope", ["global", "org", "user"]);
@@ -525,32 +552,32 @@ export const dashboardModuleMetrics = pgTable("dashboard_module_metrics", {
   aggregationType: text("aggregation_type").notNull(), // 'count', 'sum', 'avg', 'median', 'min', 'max', 'latest'
   valueType: text("value_type").notNull(), // 'number', 'currency', 'percentage', 'date'
   icon: text("icon"), // Lucide icon name
-  
+
   // Available filter dimensions for this metric
   filterDimensions: jsonb("filter_dimensions").default(sql`'[]'`), // ['year', 'state', 'region', 'water_type', 'profit_center', 'status']
-  
+
   // Groupable dimensions for breakdowns
   groupableDimensions: jsonb("groupable_dimensions").default(sql`'[]'`), // ['year', 'quarter', 'month', 'state', 'region']
-  
+
   // Comparison periods available
   comparisonOptions: jsonb("comparison_options").default(sql`'["yoy", "mom", "qoq", "prior_period"]'`),
-  
+
   // Default widget configuration
   defaultConfig: jsonb("default_config").default(sql`'{}'`),
-  
+
   // Display settings
   defaultSize: jsonb("default_size").default(sql`'{"cols": 1, "rows": 1}'`),
   minSize: jsonb("min_size").default(sql`'{"cols": 1, "rows": 1}'`),
   maxSize: jsonb("max_size").default(sql`'{"cols": 4, "rows": 4}'`),
-  
+
   // Ordering and grouping
   displayOrder: integer("display_order").default(0),
   metricGroup: text("metric_group"), // 'pricing', 'volume', 'performance', 'activity', 'trends'
-  
+
   // Feature flags
   isActive: boolean("is_active").notNull().default(true),
   isPremium: boolean("is_premium").notNull().default(false),
-  
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   moduleMetricIdx: index("dashboard_module_metrics_module_idx").on(table.moduleKey),
@@ -562,45 +589,45 @@ export const dashboardCustomWidgets = pgTable("dashboard_custom_widgets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
-  
+
   // Widget identity
   widgetName: text("widget_name").notNull(), // User-defined name
   moduleKey: text("module_key").notNull(),
   metricKey: text("metric_key").notNull(),
-  
+
   // Filter configuration
   filters: jsonb("filters").default(sql`'{}'`), // { year: 2024, state: ['FL', 'TX'], region: 'Southeast' }
-  
+
   // Time range settings
   timeRangeType: text("time_range_type").default('all_time'), // 'all_time', 'current_year', 'last_n_years', 'custom_range', 'ytd', 'rolling_12m'
   timeRangeValue: jsonb("time_range_value").default(sql`'{}'`), // { years: 3 } or { startYear: 2020, endYear: 2024 }
-  
+
   // Comparison settings
   enableComparison: boolean("enable_comparison").default(false),
   comparisonType: text("comparison_type"), // 'yoy', 'mom', 'qoq', 'prior_period', 'custom'
   comparisonPeriod: jsonb("comparison_period").default(sql`'{}'`), // { offset: -1, unit: 'year' }
-  
+
   // Grouping/breakdown settings
   groupBy: text("group_by"), // 'year', 'quarter', 'month', 'state', 'region', null for no grouping
-  
+
   // Display settings
   displaySize: jsonb("display_size").default(sql`'{"cols": 1, "rows": 1}'`),
   displayStyle: text("display_style").default('card'), // 'card', 'chart', 'table', 'sparkline'
   chartType: text("chart_type"), // 'bar', 'line', 'pie', 'area'
   showTrend: boolean("show_trend").default(true),
   showSparkline: boolean("show_sparkline").default(false),
-  
+
   // Card appearance
   accentColor: text("accent_color"), // hex color for card accent
   icon: text("icon"), // Override default metric icon
-  
+
   // Visibility and ordering
   isVisible: boolean("is_visible").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
-  
+
   // Template reference (if created from template)
   templateId: varchar("template_id"),
-  
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -613,32 +640,32 @@ export const dashboardSavedLayouts = pgTable("dashboard_saved_layouts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
-  
+
   // Layout identity
   layoutName: text("layout_name").notNull(),
   description: text("description"),
   icon: text("icon"), // Lucide icon for layout selector
-  
+
   // Layout configuration
   widgetOrder: jsonb("widget_order").default(sql`'[]'`), // Array of widget IDs in display order
   gridConfig: jsonb("grid_config").default(sql`'{}'`), // { cols: 4, gap: 16, rowHeight: 'auto' }
-  
+
   // Widget positions (for grid layout)
   widgetPositions: jsonb("widget_positions").default(sql`'{}'`), // { widgetId: { x: 0, y: 0, cols: 2, rows: 1 } }
-  
+
   // Included standard modules (from fixed module cards)
   enabledModules: jsonb("enabled_modules").default(sql`'[]'`), // ['sales_comps', 'modeling', 'vdr']
   moduleOrder: jsonb("module_order").default(sql`'[]'`), // Order of module cards
-  
+
   // Layout settings
   showQuickAccess: boolean("show_quick_access").default(true),
   showActivityFeed: boolean("show_activity_feed").default(true),
   compactMode: boolean("compact_mode").default(false),
-  
+
   // Status flags
   isDefault: boolean("is_default").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
-  
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -649,13 +676,13 @@ export const dashboardSavedLayouts = pgTable("dashboard_saved_layouts", {
 // Dashboard Widget Templates - Pre-built widget configurations for quick add
 export const dashboardWidgetTemplates = pgTable("dashboard_widget_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  
+
   // Template identity
   templateName: text("template_name").notNull(),
   description: text("description"),
   moduleKey: text("module_key").notNull(),
   metricKey: text("metric_key").notNull(),
-  
+
   // Pre-configured settings (same structure as custom widgets)
   filters: jsonb("filters").default(sql`'{}'`),
   timeRangeType: text("time_range_type").default('current_year'),
@@ -669,17 +696,17 @@ export const dashboardWidgetTemplates = pgTable("dashboard_widget_templates", {
   showTrend: boolean("show_trend").default(true),
   accentColor: text("accent_color"),
   icon: text("icon"),
-  
+
   // Template metadata
   category: text("category"), // 'acquisition', 'portfolio', 'market', 'operations'
   tags: text("tags").array().default(sql`'{}'`),
   popularityScore: integer("popularity_score").default(0),
-  
+
   // Visibility
   isGlobal: boolean("is_global").notNull().default(true), // Available to all users
   createdBy: varchar("created_by").references(() => users.id), // For org-specific templates
   orgId: varchar("org_id").references(() => organizations.id), // For org-specific templates
-  
+
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
@@ -926,48 +953,48 @@ export const risks = pgTable("risks", {
   category: riskCategoryEnum("category").notNull().default("operational"),
   owner: text("owner").notNull(), // Risk owner name
   ownerId: varchar("owner_id").references(() => users.id), // Optional: link to system user
-  
+
   // Quantitative Risk Assessment
   likelihood: likelihoodEnum("likelihood").notNull().default("3"), // 1-5 scale
   impact: impactEnum("impact").notNull().default("3"), // 1-5 scale
   riskScore: integer("risk_score").notNull().default(9), // Auto-calculated: likelihood × impact
-  
+
   // Financial Impact Analysis
   impactCostUSD: integer("impact_cost_usd").default(0), // Financial impact in USD
   impactScheduleDays: integer("impact_schedule_days").default(0), // Schedule impact in days
-  
+
   // Mitigation Planning
   mitigationPlan: text("mitigation_plan"),
   mitigationOwner: text("mitigation_owner"),
   targetDate: date("target_date"), // Mitigation completion target
   mitigationCostUSD: integer("mitigation_cost_usd").default(0), // Cost to mitigate
-  
+
   // Residual Risk (Post-Mitigation)
   residualLikelihood: likelihoodEnum("residual_likelihood"), // Expected likelihood after mitigation
   residualImpact: impactEnum("residual_impact"), // Expected impact after mitigation
   residualScore: integer("residual_score"), // Auto-calculated residual risk score
-  
+
   // Status and Tracking
   status: riskStatusEnum("status").notNull().default("identified"),
   identifiedDate: date("identified_date").notNull().default(sql`CURRENT_DATE`),
   lastReviewDate: date("last_review_date"),
   nextReviewDate: date("next_review_date"),
-  
+
   // Materialization Tracking
   materialized: boolean("materialized").notNull().default(false),
   materializedDate: date("materialized_date"),
   actualCostUSD: integer("actual_cost_usd"), // Actual cost if materialized
   actualScheduleDays: integer("actual_schedule_days"), // Actual schedule impact if materialized
-  
+
   // Additional Analysis Fields
   probability: integer("probability"), // Percentage probability (0-100)
   confidenceLevel: integer("confidence_level").default(50), // Confidence in assessment (0-100)
   riskVelocity: text("risk_velocity").default("stable"), // increasing, stable, decreasing
-  
+
   // Metadata
   tags: text("tags").array().default(sql`'{}'`), // For categorization and filtering
   metadata: jsonb("metadata").default(sql`'{}'`), // For additional custom fields
-  
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -987,6 +1014,18 @@ export const contacts = pgTable("contacts", {
   dealTeamNotes: text("deal_team_notes"), // Notes about this contact's role on the deal team
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  // Relationship Intelligence fields
+  primaryRole: contactRoleEnum("primary_role"),
+  roleTags: text("role_tags").array(),
+  relationshipStatus: relationshipStatusEnum("relationship_status").default("neutral"),
+  includeInMetrics: boolean("include_in_metrics").default(true),
+  isPublicShowcase: boolean("is_public_showcase").default(false),
+  publicProfileSlug: varchar("public_profile_slug", { length: 100 }),
+  headline: text("headline"),
+  specialties: text("specialties").array(),
+  serviceRegions: text("service_regions").array(),
+  visibilityScope: visibilityScopeEnum("visibility_scope").default("private"),
+  badgeOverrides: jsonb("badge_overrides"),
 });
 
 // Project Contacts (Join table for associating contacts with projects)
@@ -1077,18 +1116,18 @@ export const notificationsLog = pgTable("notifications_log", {
   taskId: varchar("task_id").references(() => tasks.id), // Optional: specific task notification
   event: subscriptionEventEnum("event").notNull(),
   channel: notificationChannelEnum("channel").notNull(),
-  
+
   // Recipient identification (for cleaner resolution)
   recipientType: recipientTypeEnum("recipient_type").notNull(),
   recipientId: varchar("recipient_id").notNull(), // References users.id OR contacts.id
   recipientEmail: text("recipient_email"), // Cached for delivery
   recipientPhone: text("recipient_phone"), // Cached for delivery
-  
+
   // Timing and de-duplication
   leadOffsetDays: integer("lead_offset_days").notNull(), // Lead time used (renamed from thresholdDays)
   scheduledFor: timestamp("scheduled_for").notNull(), // When notification should be sent
   sentAt: timestamp("sent_at"), // When actually sent (null if not sent yet)
-  
+
   // Delivery tracking
   providerMessageId: text("provider_message_id"), // ID from email/SMS provider
   status: notificationStatusEnum("status").notNull().default("pending"),
@@ -1195,28 +1234,28 @@ export const calendarEvents = pgTable("calendar_events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: varchar("project_id").notNull().references(() => projects.id),
   taskId: varchar("task_id").references(() => tasks.id), // Optional: link to specific task
-  
+
   // Event details
   eventType: calendarEventTypeEnum("event_type").notNull(),
   title: text("title").notNull(),
   description: text("description"),
-  
+
   // Date/time information
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date"), // Optional for all-day events
   isAllDay: boolean("is_all_day").notNull().default(false),
   timezone: text("timezone").notNull().default("America/New_York"),
-  
+
   // Event metadata
   priority: priorityEnum("priority").notNull().default("med"),
   status: statusEnum("status").notNull().default("not_started"),
   location: text("location"),
-  
+
   // Calendar integration metadata
   icalUid: text("ical_uid"), // For ICS generation
   lastSynced: timestamp("last_synced"),
   isGenerated: boolean("is_generated").notNull().default(true), // Auto-generated vs manual
-  
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => {
@@ -1863,27 +1902,27 @@ export interface ChartConfig {
   marinaIds?: string[]; // Specific marinas to include
   timeframe?: TimeframeConfig;
   comparisonTimeframe?: TimeframeConfig; // For comparison charts
-  
+
   // Axes Configuration (for charts)
   xAxis?: ChartAxisConfig;
   yAxis?: ChartAxisConfig;
-  
+
   // Metrics Configuration
   metrics: ChartMetric[];
-  
+
   // Visualization Options
   chartType?: 'line' | 'area' | 'bar'; // For combo charts
   showGrid?: boolean;
   showLegend?: boolean;
   showDataLabels?: boolean;
-  
+
   // Colors
   colorScheme?: string[]; // Hex colors
-  
+
   // Goal Tracker Specific
   goalValue?: number;
   currentValue?: number;
-  
+
   // Stat Grid Specific
   layout?: 'row' | 'grid';
   columns?: number;
@@ -2228,40 +2267,39 @@ export const crmCompanies = pgTable("crm_companies", {
   description: text("description"),
   labels: text("labels").array().default(sql`ARRAY[]::text[]`),
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
-  
+
   // Financial & Business Info
   annualRevenue: decimal("annual_revenue", { precision: 14, scale: 2 }),
   annualMarinaSpend: decimal("annual_marina_spend", { precision: 14, scale: 2 }),
-  
+
   // Acquisition & Pipeline
   acquisitionInterest: text("acquisition_interest"), // hot, warm, cold, none, unknown
   portfolioCount: integer("portfolio_count").default(0), // Number of marinas/properties owned
-  
+
   // Portfolio Company Fields
   isPortfolioCompany: boolean("is_portfolio_company").default(false),
   capitalPartner: text("capital_partner"), // Name of capital partner (only relevant if isPortfolioCompany is true)
-  
+
   // Extended Address Fields
   city: text("city"),
   state: text("state"),
   zipCode: text("zip_code"),
   country: text("country"),
-  
+
   // Social Profiles
   linkedInUrl: text("linkedin_url"),
   twitterHandle: text("twitter_handle"),
-  
+
   // Employee Info
   employeeCount: integer("employee_count"),
-  
+
   // Tags and Metadata
   tags: text("tags").array().default(sql`ARRAY[]::text[]`),
   metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
-  
+
   // Created By
   createdBy: varchar("created_by").references(() => users.id),
-  
-  orgId: varchar("org_id").references(() => organizations.id),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -2297,25 +2335,24 @@ export const crmContacts = pgTable("crm_contacts", {
   labels: text("labels").array().default(sql`ARRAY[]::text[]`),
   companyId: varchar("company_id").references(() => crmCompanies.id), // Legacy field for backward compatibility
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
-  
+
   // Lead Source & Communication
   leadSource: text("lead_source"), // website, referral, trade_show, cold_call, linkedin, other
   communicationPreference: text("communication_preference").default('email'), // email, phone, text
-  
+
   // Social Profiles
   linkedinUrl: text("linkedin_url"),
   twitterHandle: text("twitter_handle"),
-  
+
   // Personal Details
   birthday: date("birthday"),
   anniversary: date("anniversary"),
-  
+
   // Integration sync fields
   externalId: text("external_id"),
   integrationSource: text("integration_source"),
   lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
-  
-  orgId: varchar("org_id").references(() => organizations.id),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -2408,29 +2445,29 @@ export const crmProperties = pgTable("crm_properties", {
   images: jsonb("images").default([]),
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
   listingAgentId: varchar("listing_agent_id").references(() => crmContacts.id),
-  
+
   // Marina Capacity
   wetSlips: integer("wet_slips"),
   drySlips: integer("dry_slips"),
   moorings: integer("moorings"),
   totalCapacity: integer("total_capacity"),
-  
+
   // Amenities (stored as JSON array of strings)
   amenities: jsonb("amenities").default(sql`'[]'`), // ['fuel', 'restaurant', 'pool', 'ship_store', 'repairs', 'wifi', 'laundry', 'showers', 'pumpout']
-  
+
   // Occupancy & Financials
   occupancyRate: decimal("occupancy_rate", { precision: 5, scale: 2 }), // percentage 0-100
   annualRevenue: decimal("annual_revenue", { precision: 14, scale: 2 }),
   noiEstimate: decimal("noi_estimate", { precision: 14, scale: 2 }),
-  
+
   // Price History (stored as JSON array of {date, price, notes})
   askingPriceHistory: jsonb("asking_price_history").default(sql`'[]'`),
-  
+
   // Property Status Toggles (Upgrade G)
   isSelling: boolean("is_selling").default(false),
   isOnMarket: boolean("is_on_market").default(false),
   pipelineStage: text("pipeline_stage").default('lead'), // lead, deal, under_contract, owned
-  
+
   // Listing Fields (when selling/on market)
   brokerContactId: varchar("broker_contact_id").references(() => crmContacts.id),
   brokerName: text("broker_name"), // Free text fallback if no CRM contact
@@ -2439,17 +2476,16 @@ export const crmProperties = pgTable("crm_properties", {
   listingDate: date("listing_date"),
   listingUrl: text("listing_url"),
   listingNotes: text("listing_notes"),
-  
+
   // Owner Company link
   ownerCompanyId: varchar("owner_company_id").references(() => crmCompanies.id),
-  
+
   // Sale History (for bi-directional sync with Sales Comps)
   lastSaleMonth: integer("last_sale_month"), // 1-12
   lastSaleYear: integer("last_sale_year"),
   lastSalePrice: decimal("last_sale_price", { precision: 14, scale: 2 }),
   linkedSalesCompId: varchar("linked_sales_comp_id"),
-  
-  orgId: varchar("org_id").references(() => organizations.id),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -2463,7 +2499,6 @@ export const crmStorageTypes = pgTable("crm_storage_types", {
   name: text("name").notNull(),
   isDefault: boolean("is_default").default(false).notNull(), // Predefined types
   createdBy: varchar("created_by").references(() => users.id),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("crm_storage_types_org_idx").on(table.orgId),
@@ -2482,7 +2517,6 @@ export const crmPropertyStorageEntries = pgTable("crm_property_storage_entries",
   rateType: text("rate_type").default('monthly'), // monthly, annual, daily, per_foot
   notes: text("notes"),
   sortOrder: integer("sort_order").default(0),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -2658,19 +2692,19 @@ export const rentRollSnapshots = pgTable("rent_roll_snapshots", {
   ownedAssetId: varchar("owned_asset_id").references(() => ownedAssets.id),
   snapshotMonth: integer("snapshot_month").notNull(),
   snapshotYear: integer("snapshot_year").notNull(),
-  
+
   totalUnits: integer("total_units").notNull().default(0),
   occupiedUnits: integer("occupied_units").notNull().default(0),
   vacantUnits: integer("vacant_units").notNull().default(0),
   occupancyRate: decimal("occupancy_rate", { precision: 5, scale: 2 }),
-  
+
   grossPotentialRevenue: decimal("gross_potential_revenue", { precision: 15, scale: 2 }).notNull().default("0"),
   occupiedRevenue: decimal("occupied_revenue", { precision: 15, scale: 2 }).notNull().default("0"),
   vacancyLoss: decimal("vacancy_loss", { precision: 15, scale: 2 }).notNull().default("0"),
-  
+
   averageMonthlyRate: decimal("average_monthly_rate", { precision: 10, scale: 2 }),
   revenuePerUnit: decimal("revenue_per_unit", { precision: 10, scale: 2 }),
-  
+
   snapshotMetadata: jsonb("snapshot_metadata").default({}),
   isAutoGenerated: boolean("is_auto_generated").default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -2689,13 +2723,13 @@ export const rentRollSnapshotDetails = pgTable("rent_roll_snapshot_details", {
   snapshotId: varchar("snapshot_id").notNull().references(() => rentRollSnapshots.id, { onDelete: 'cascade' }),
   categoryType: text("category_type").notNull(),
   categoryValue: text("category_value").notNull(),
-  
+
   unitCount: integer("unit_count").notNull().default(0),
   occupiedCount: integer("occupied_count").notNull().default(0),
   grossRevenue: decimal("gross_revenue", { precision: 15, scale: 2 }).notNull().default("0"),
   actualRevenue: decimal("actual_revenue", { precision: 15, scale: 2 }).notNull().default("0"),
   averageRate: decimal("average_rate", { precision: 10, scale: 2 }),
-  
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   snapshotIdx: index("rent_roll_snapshot_details_snapshot_idx").on(table.snapshotId),
@@ -2708,15 +2742,15 @@ export const budgetRentRollBindings = pgTable("budget_rent_roll_bindings", {
   budgetId: varchar("budget_id").notNull().references(() => marinaBudgets.id, { onDelete: 'cascade' }),
   lineItemId: varchar("line_item_id").notNull().references(() => marinaBudgetLineItems.id, { onDelete: 'cascade' }),
   rentRollId: varchar("rent_roll_id").notNull().references(() => rentRolls.id),
-  
+
   bindingScope: text("binding_scope").notNull().default("overall_storage"),
   bindingKey: text("binding_key"),
   isPrimary: boolean("is_primary").default(true),
-  
+
   syncEnabled: boolean("sync_enabled").default(true),
   lastSyncedAt: timestamp("last_synced_at"),
   syncStatus: text("sync_status").default("pending"),
-  
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -2936,7 +2970,6 @@ export const rraMarinaLocations = pgTable("rra_marina_locations", {
   budgetYear: integer("budget_year"),
   seasonalStorageTypes: text("seasonal_storage_types").array(),
   storageMix: jsonb("storage_mix"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -2981,7 +3014,6 @@ export const rraTenants = pgTable("rra_tenants", {
   zip: text("zip"),
   crmContactId: varchar("crm_contact_id").references(() => crmContacts.id),
   crmCompanyId: varchar("crm_company_id").references(() => crmCompanies.id),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -3027,7 +3059,6 @@ export const rraLeases = pgTable("rra_leases", {
   isActive: boolean("is_active").default(true).notNull(),
   isIncomplete: boolean("is_incomplete").default(false).notNull(),
   usesDefaultDates: boolean("uses_default_dates").default(false).notNull(),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -3052,7 +3083,6 @@ export const rraRenewalReminders = pgTable("rra_renewal_reminders", {
   notificationMethod: text("notification_method").default("email"),
   recipientEmail: text("recipient_email"),
   notes: text("notes"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   createdBy: varchar("created_by").references(() => users.id),
@@ -3127,7 +3157,6 @@ export const rraLeaseTerms = pgTable("rra_lease_terms", {
   dayCountConvention: rraDayCountConventionEnum("day_count_convention").notNull().default("actual_30"),
   currency: text("currency").notNull().default("USD"),
   status: rraTermStatusEnum("status").notNull().default("active"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -3144,7 +3173,6 @@ export const rraLeaseRentSteps = pgTable("rra_lease_rent_steps", {
   baseRentAmount: numeric("base_rent_amount", { precision: 14, scale: 2 }).notNull(),
   baseRentPeriod: rraRentPeriodEnum("base_rent_period").notNull().default("month"),
   notes: text("notes"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -3164,7 +3192,6 @@ export const rraLeaseEscalations = pgTable("rra_lease_escalations", {
   capRate: numeric("cap_rate", { precision: 5, scale: 2 }),
   floorRate: numeric("floor_rate", { precision: 5, scale: 2 }),
   notes: text("notes"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -3182,7 +3209,6 @@ export const rraLeaseConcessions = pgTable("rra_lease_concessions", {
   endDate: date("end_date"),
   amortizationMonths: integer("amortization_months"),
   notes: text("notes"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -3204,7 +3230,6 @@ export const rraLeaseCashFlows = pgTable("rra_lease_cash_flows", {
   isProjected: boolean("is_projected").default(false).notNull(),
   sourceChargeId: varchar("source_charge_id"),
   notes: text("notes"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -3223,7 +3248,6 @@ export const rraMoveEvents = pgTable("rra_move_events", {
   eventDate: date("event_date").notNull(),
   reason: text("reason"),
   notes: text("notes"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   leaseIdx: index("rra_move_events_lease_idx").on(table.leaseId),
@@ -3239,7 +3263,6 @@ export const rraPeriods = pgTable("rra_periods", {
   label: text("label"),
   year: integer("year").notNull(),
   month: integer("month").notNull(),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   locationIdx: index("rra_periods_location_idx").on(table.locationId),
@@ -3258,7 +3281,6 @@ export const rraProjectDetailsConfig = pgTable("rra_project_details_config", {
   winterEndDate: date("winter_end_date"),
   defaultContractTerm: text("default_contract_term"),
   config: jsonb("config"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -3272,7 +3294,6 @@ export const rraPnlRackRevenue = pgTable("rra_pnl_rack_revenue", {
   locationId: varchar("location_id").notNull(),
   periodId: varchar("period_id").notNull(),
   amount: numeric("amount", { precision: 14, scale: 2 }),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   locationIdx: index("rra_pnl_rack_revenue_location_idx").on(table.locationId),
@@ -3296,7 +3317,6 @@ export const rraSnapshotVersions = pgTable("rra_snapshot_versions", {
   totalLeases: integer("total_leases"),
   occupancyRate: numeric("occupancy_rate", { precision: 5, scale: 2 }),
   metadata: jsonb("metadata"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -3330,7 +3350,6 @@ export const rraModelingProjectLinks = pgTable("rra_modeling_project_links", {
   isPrimary: boolean("is_primary").default(false).notNull(),
   syncEnabled: boolean("sync_enabled").default(true).notNull(),
   lastSyncAt: timestamp("last_sync_at"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -3346,7 +3365,6 @@ export const rraDealLinks = pgTable("rra_deal_links", {
   rraLocationId: varchar("rra_location_id").notNull().references(() => rraMarinaLocations.id, { onDelete: "cascade" }),
   dealId: varchar("deal_id").notNull().references(() => crmDeals.id, { onDelete: "cascade" }),
   isPrimary: boolean("is_primary").default(false).notNull(),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   rraLocationIdx: index("rra_deal_links_rra_idx").on(table.rraLocationId),
@@ -3362,7 +3380,6 @@ export const rraBudgetCashFlowMap = pgTable("rra_budget_cashflow_map", {
   budgetLineItemId: varchar("budget_line_item_id").notNull().references(() => marinaBudgetLineItems.id, { onDelete: "cascade" }),
   syncType: text("sync_type").default("auto").notNull(),
   lastSyncAt: timestamp("last_sync_at"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   cashFlowIdx: index("rra_budget_cashflow_map_cf_idx").on(table.rraCashFlowId),
@@ -3377,7 +3394,6 @@ export const rraLeaseDocumentBindings = pgTable("rra_lease_document_bindings", {
   documentId: varchar("document_id").notNull().references(() => vdrDocuments.id, { onDelete: "cascade" }),
   documentType: text("document_type").default("lease").notNull(),
   isPrimaryLease: boolean("is_primary_lease").default(false).notNull(),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   leaseIdx: index("rra_lease_doc_bindings_lease_idx").on(table.leaseId),
@@ -3593,35 +3609,34 @@ export const rraModelingProjectLinksRelations = relations(rraModelingProjectLink
 export const pendingProperties = pgTable("pending_properties", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
-  
+
   // Source tracking - supports both Sales Comps and Rate Comps
   sourceType: text("source_type").notNull().default("sales_comp"), // 'sales_comp' | 'rate_comp'
   compId: varchar("comp_id"), // For sales comps (optional, no FK for flexibility)
   rateCompId: varchar("rate_comp_id"), // For rate comps (optional, no FK for flexibility)
-  
+
   // Property data extracted from comp
   marinaName: text("marina_name").notNull(),
   city: text("city"),
   state: text("state"),
   address: text("address"),
   salePrice: integer("sale_price"),
-  
+
   // Review status
   status: pendingPropertyStatusEnum("status").notNull().default("pending"),
-  
+
   // Additional metadata from comp for review
   compMetadata: jsonb("comp_metadata").default({}), // Stores full comp details for reference
-  
+
   // Suggested duplicate matches for user review
   suggestedDuplicates: jsonb("suggested_duplicates").default([]), // Array of potential property IDs
-  
+
   // Created property ID when accepted
   createdPropertyId: varchar("created_property_id").references(() => crmProperties.id),
-  
+
   createdBy: varchar("created_by").notNull().references(() => users.id),
   reviewedBy: varchar("reviewed_by").references(() => users.id),
   reviewedAt: timestamp("reviewed_at"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -3631,7 +3646,7 @@ export const pendingContacts = pgTable("pending_contacts", {
   orgId: varchar("org_id").notNull().references(() => organizations.id),
   sourceType: text("source_type").notNull(), // 'sales_comp', 'dd_project', 'manual'
   sourceId: varchar("source_id"), // ID of the source (comp ID, project ID, etc.)
-  
+
   // Contact data extracted from source
   firstName: text("first_name"),
   lastName: text("last_name"),
@@ -3640,23 +3655,22 @@ export const pendingContacts = pgTable("pending_contacts", {
   phone: text("phone"),
   companyId: varchar("company_id").references(() => crmCompanies.id),
   jobTitle: text("job_title"),
-  
+
   // Review status
   status: pendingPropertyStatusEnum("status").notNull().default("pending"),
-  
+
   // Additional metadata from source for review
   sourceMetadata: jsonb("source_metadata").default({}),
-  
+
   // Suggested duplicate matches for user review
   suggestedDuplicates: jsonb("suggested_duplicates").default([]), // Array of potential contact IDs
-  
+
   // Created contact ID when accepted
   createdContactId: varchar("created_contact_id").references(() => crmContacts.id),
-  
+
   createdBy: varchar("created_by").notNull().references(() => users.id),
   reviewedBy: varchar("reviewed_by").references(() => users.id),
   reviewedAt: timestamp("reviewed_at"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -3666,7 +3680,7 @@ export const pendingCompanies = pgTable("pending_companies", {
   orgId: varchar("org_id").notNull().references(() => organizations.id),
   sourceType: text("source_type").notNull(), // 'sales_comp', 'dd_project', 'manual'
   sourceId: varchar("source_id"), // ID of the source (comp ID, project ID, etc.)
-  
+
   // Company data extracted from source
   name: text("name").notNull(),
   website: text("website"),
@@ -3676,23 +3690,22 @@ export const pendingCompanies = pgTable("pending_companies", {
   state: text("state"),
   zipCode: text("zip_code"),
   industry: text("industry"),
-  
+
   // Review status
   status: pendingPropertyStatusEnum("status").notNull().default("pending"),
-  
+
   // Additional metadata from source for review
   sourceMetadata: jsonb("source_metadata").default({}),
-  
+
   // Suggested duplicate matches for user review
   suggestedDuplicates: jsonb("suggested_duplicates").default([]), // Array of potential company IDs
-  
+
   // Created company ID when accepted
   createdCompanyId: varchar("created_company_id").references(() => crmCompanies.id),
-  
+
   createdBy: varchar("created_by").notNull().references(() => users.id),
   reviewedBy: varchar("reviewed_by").references(() => users.id),
   reviewedAt: timestamp("reviewed_at"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -3700,38 +3713,37 @@ export const pendingCompanies = pgTable("pending_companies", {
 export const propertyOwnershipHistory = pgTable("property_ownership_history", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
-  
+
   // Core relationships
   propertyId: varchar("property_id").notNull().references(() => crmProperties.id, { onDelete: 'cascade' }),
   salesCompId: varchar("sales_comp_id").references(() => salesComps.id, { onDelete: 'set null' }),
-  
+
   // Transaction details
   transactionDate: date("transaction_date"),
   salePrice: integer("sale_price"),
   pricePerSlip: integer("price_per_slip"),
   capRate: decimal("cap_rate", { precision: 5, scale: 2 }),
-  
+
   // Buyer information
   buyerCompanyId: varchar("buyer_company_id").references(() => crmCompanies.id, { onDelete: 'set null' }),
   buyerContactId: varchar("buyer_contact_id").references(() => crmContacts.id, { onDelete: 'set null' }),
   buyerName: text("buyer_name"), // Free-form for when not linked to CRM
-  
+
   // Seller information
   sellerCompanyId: varchar("seller_company_id").references(() => crmCompanies.id, { onDelete: 'set null' }),
   sellerContactId: varchar("seller_contact_id").references(() => crmContacts.id, { onDelete: 'set null' }),
   sellerName: text("seller_name"), // Free-form for when not linked to CRM
-  
+
   // Transaction type and source
   transactionType: text("transaction_type").default('sale'), // 'sale', 'acquisition', 'merger', 'foreclosure', 'transfer'
   source: text("source").default('sales_comp'), // 'sales_comp', 'manual', 'import', 'public_records'
-  
+
   // Additional metadata
   notes: text("notes"),
   metadata: jsonb("metadata").default({}), // Additional transaction details
-  
+
   // Audit fields
   createdBy: varchar("created_by").notNull().references(() => users.id),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -3746,34 +3758,33 @@ export const propertyOwnershipHistory = pgTable("property_ownership_history", {
 export const crmMatchResults = pgTable("crm_match_results", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
-  
+
   // Source reference (which pending item this match belongs to)
   pendingType: text("pending_type").notNull(), // 'property', 'contact', 'company'
   pendingId: varchar("pending_id").notNull(), // ID in the respective pending table
-  
+
   // Match target
   matchEntityType: text("match_entity_type").notNull(), // 'property', 'contact', 'company'
   matchEntityId: varchar("match_entity_id").notNull(), // ID in the CRM table
-  
+
   // Match quality
   confidenceScore: integer("confidence_score").notNull(), // 0-100
   confidenceLevel: text("confidence_level").notNull(), // 'high', 'medium', 'low'
   matchedFields: jsonb("matched_fields").default([]), // Array of field names that matched
   fieldScores: jsonb("field_scores").default({}), // { fieldName: score } for each compared field
-  
+
   // Match explanation
   matchReason: text("match_reason"), // Human-readable explanation
-  
+
   // DockTalk flags
   isInPortfolio: boolean("is_in_portfolio").default(false), // Company is in DockTalk Portfolio
   isOnWatchlist: boolean("is_on_watchlist").default(false), // Company is on DockTalk Watchlist
-  
+
   // Action taken
   resolution: text("resolution"), // 'accepted', 'rejected', 'merged', null if pending
   resolvedBy: varchar("resolved_by").references(() => users.id),
   resolvedAt: timestamp("resolved_at"),
-  
-  orgId: varchar("org_id").references(() => organizations.id),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgPendingIdx: index("crm_match_org_pending_idx").on(table.orgId, table.pendingType, table.pendingId),
@@ -3797,31 +3808,31 @@ export const crmLeads = pgTable("crm_leads", {
   leadScore: integer("lead_score").default(0),
   prospectStatus: text("prospect_status").notNull().default('active'), // active, target, referral, past_client, cold, nurture
   leadStatus: leadStatusEnum("lead_status").notNull().default('new'), // none, new, contacted, qualified, unqualified, converted
-  
+
   // Enhanced Source Tracking and Attribution
   leadSource: text("lead_source").notNull().default('unknown'), // google_ads, facebook_ads, email, direct, referral, organic_search, social, phone, website_form
   leadSourceDetails: text("lead_source_details"),
   originalSource: text("original_source"), // First-touch attribution source
   lastTouchSource: text("last_touch_source"), // Last-touch attribution source
-  
+
   // UTM Parameters for Campaign Tracking
   utmSource: text("utm_source"), // utm_source parameter
   utmMedium: text("utm_medium"), // utm_medium parameter
   utmCampaign: text("utm_campaign"), // utm_campaign parameter
   utmTerm: text("utm_term"), // utm_term parameter
   utmContent: text("utm_content"), // utm_content parameter
-  
+
   // Landing and Referral Tracking
   landingPageUrl: text("landing_page_url"), // First page visited
   referrerUrl: text("referrer_url"), // Where they came from
   currentPageUrl: text("current_page_url"), // Page where lead was captured
-  
+
   // Campaign and Channel Attribution
   campaignId: varchar("campaign_id").references(() => crmCampaigns.id), // Associated marketing campaign
   channelType: text("channel_type"), // organic, paid, direct, referral, social, email
   adGroupId: text("ad_group_id"), // For paid advertising
   keywordId: text("keyword_id"), // For search campaigns
-  
+
   // Session and Interaction Tracking
   sessionId: text("session_id"), // Unique session identifier
   visitCount: integer("visit_count").default(1), // Number of visits before converting
@@ -3829,14 +3840,14 @@ export const crmLeads = pgTable("crm_leads", {
   lastVisitDate: timestamp("last_visit_date"), // Most recent visit
   timeToConversion: integer("time_to_conversion"), // Minutes from first visit to lead
   touchpoints: jsonb("touchpoints").default([]), // Array of all touchpoints before conversion
-  
+
   // Geographic and Device Information
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
   deviceType: text("device_type"), // desktop, mobile, tablet
   browserInfo: text("browser_info"),
   geolocation: jsonb("geolocation").default({}), // { country, region, city, timezone }
-  
+
   tags: jsonb("tags").default([]),
   notes: text("notes"),
   customFields: jsonb("custom_fields").default({}),
@@ -4127,7 +4138,6 @@ export const crmTimelineEvents = pgTable("crm_timeline_events", {
   metadata: jsonb("metadata").default({}).notNull(), // Flexible payload for event-specific data
   occurredAt: timestamp("occurred_at").notNull().defaultNow(),
   createdBy: varchar("created_by").references(() => users.id),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("crm_timeline_events_org_idx").on(table.orgId),
@@ -4240,7 +4250,6 @@ export const crmNotes = pgTable("crm_notes", {
   entityId: varchar("entity_id").notNull(),
   createdById: varchar("created_by_id").references(() => users.id).notNull(),
   ownerId: varchar("owner_id").references(() => users.id).notNull(), // for multi-tenant access control
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -4314,7 +4323,6 @@ export const prospectingActivities = pgTable("prospecting_activities", {
   weekId: varchar("week_id"), // Links to prospecting week for weekly tracking
   createdById: varchar("created_by_id").references(() => users.id).notNull(),
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -4347,7 +4355,6 @@ export const prospectingWeeks = pgTable("prospecting_weeks", {
   dealsCreated: integer("deals_created").default(0),
   notes: text("notes"),
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -4375,7 +4382,6 @@ export const outreachCampaigns = pgTable("outreach_campaigns", {
   startDate: date("start_date"),
   endDate: date("end_date"),
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -4395,7 +4401,6 @@ export const outreachTemplates = pgTable("outreach_templates", {
   lastUsedAt: timestamp("last_used_at"),
   isActive: boolean("is_active").default(true),
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -4419,7 +4424,6 @@ export const marketTargets = pgTable("market_targets", {
   researchNotes: jsonb("research_notes").default({}), // Structured research data
   assignedToId: varchar("assigned_to_id").references(() => users.id),
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -4933,25 +4937,25 @@ export const crmProspectingEntries = pgTable("crm_prospecting_entries", {
   weekNumber: integer("week_number").notNull(), // 1-13 within quarter
   weekStartDate: timestamp("week_start_date").notNull(),
   weekEndDate: timestamp("week_end_date").notNull(),
-  
+
   // Weekly goals (up to 6 goals)
   goals: jsonb("goals").default([]), // Array of string goals
-  
+
   // Enabled days of the week for this prospecting week
   enabledDays: jsonb("enabled_days").default(['monday', 'tuesday', 'wednesday', 'thursday', 'friday']), // Array of enabled day IDs
-  
+
   // Daily activities tracking (Monday-Friday)
   dailyActivities: jsonb("daily_activities").default({}), // { monday: [], tuesday: [], etc. }
-  
+
   // Summary metrics
   totalLeadGeneration: integer("total_lead_generation").default(0),
   totalCalls: integer("total_calls").default(0),
   totalEmails: integer("total_emails").default(0),
   totalMeetings: integer("total_meetings").default(0),
-  
+
   // Reflection notes
   notes: text("notes"),
-  
+
   orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -4963,31 +4967,31 @@ export const crmProspectingActivities = pgTable("crm_prospecting_activities", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   prospectingEntryId: varchar("prospecting_entry_id").references(() => crmProspectingEntries.id).notNull(),
   userId: varchar("user_id").references(() => users.id).notNull(),
-  
+
   // Activity details
   activityType: text("activity_type").notNull(), // 'call', 'voicemail', 'no_answer', 'not_interested', 'text', 'linkedin', 'email', 'meeting'
   outcome: text("outcome").notNull(), // 'connected', 'left_voicemail', 'no_answer', 'not_interested', 'callback_requested', 'meeting_scheduled', 'sent', 'opened', 'replied'
-  
+
   // Timing
   dayOfWeek: text("day_of_week").notNull(), // 'monday', 'tuesday', 'wednesday', 'thursday', 'friday'
   activityDate: timestamp("activity_date").notNull(),
   duration: integer("duration"), // in minutes for calls/meetings
-  
+
   // Linking to CRM entities
   contactId: varchar("contact_id").references(() => crmContacts.id),
   dealId: varchar("deal_id").references(() => crmDeals.id),
-  
+
   // Activity details
   notes: text("notes"),
   followUpRequired: boolean("follow_up_required").default(false),
   followUpDate: timestamp("follow_up_date"),
-  
+
   // Tracking metadata
   phoneNumber: text("phone_number"), // for call activities
   emailAddress: text("email_address"), // for email activities
   linkedinProfile: text("linkedin_profile"), // for linkedin activities
   subject: text("subject"), // for emails/messages
-  
+
   orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -4998,14 +5002,13 @@ export const crmProspectingUserSettings = pgTable("crm_prospecting_user_settings
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id).notNull().unique(),
   orgId: varchar("org_id").references(() => organizations.id).notNull(),
-  
+
   // Week start preference
   weekStartDay: text("week_start_day").default('monday'), // 'sunday', 'monday', 'saturday'
-  
+
   // Future settings can be added here
   // e.g., timezone preference, notification preferences, etc.
-  
-  orgId: varchar("org_id").references(() => organizations.id),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -5015,22 +5018,21 @@ export const crmProspectingGoalTemplates = pgTable("crm_prospecting_goal_templat
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id).notNull(),
   orgId: varchar("org_id").references(() => organizations.id).notNull(),
-  
+
   // Template details
   name: text("name").notNull(), // e.g., "Weekly Call Goal", "Monthly Lead Goal"
   description: text("description"),
   frequency: text("frequency").notNull(), // 'weekly', 'monthly'
-  
+
   // Goal content (array of goal strings)
   goals: jsonb("goals").default([]).notNull(), // Array of string goals
-  
+
   // Auto-instantiation
   autoInstantiate: boolean("auto_instantiate").default(false), // Auto-create goals for new weeks
-  
+
   // Status
   isActive: boolean("is_active").default(true),
-  
-  orgId: varchar("org_id").references(() => organizations.id),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -5101,32 +5103,32 @@ export const crmLeadScoringEvents = pgTable("crm_lead_scoring_events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   leadId: varchar("lead_id").references(() => crmLeads.id),
   contactId: varchar("contact_id").references(() => crmContacts.id),
-  
+
   // Event Details
   eventType: text("event_type").notNull(), // page_visit, email_open, email_click, form_submit, call_made, meeting_attended, etc.
   eventCategory: text("event_category").notNull(), // behavioral, engagement, demographic, marina_specific
   eventAction: text("event_action").notNull(), // specific action taken
   eventLabel: text("event_label"), // additional context
   eventValue: integer("event_value"), // numeric value if applicable
-  
+
   // Scoring Impact
   pointsAwarded: integer("points_awarded").default(0),
   scoringRuleId: varchar("scoring_rule_id").references(() => crmScoringRules.id),
-  
+
   // Event Context
   entityType: text("entity_type"), // deal, property, campaign, form, etc.
   entityId: varchar("entity_id"),
   sessionId: text("session_id"),
-  
+
   // Event Metadata
   metadata: jsonb("metadata").default({}), // flexible JSON for event-specific data
-  
+
   // Marina/Boat Specific Context
   boatType: text("boat_type"), // sailboat, powerboat, yacht, catamaran
   marinaService: text("marina_service"), // slip_rental, maintenance, storage, fuel
   priceRange: text("price_range"), // under_50k, 50k_100k, 100k_250k, 250k_500k, over_500k
   location: text("location"), // marina or boat location
-  
+
   orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -5137,28 +5139,28 @@ export const crmLeadScoringHistory = pgTable("crm_lead_scoring_history", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   leadId: varchar("lead_id").references(() => crmLeads.id),
   contactId: varchar("contact_id").references(() => crmContacts.id),
-  
+
   // Score Change Details
   previousScore: integer("previous_score").default(0),
   newScore: integer("new_score").notNull(),
   scoreDelta: integer("score_delta").notNull(), // positive or negative change
-  
+
   // Score Temperature Classification
   previousTemperature: text("previous_temperature"), // hot, warm, cold
   newTemperature: text("new_temperature").notNull(), // hot, warm, cold
-  
+
   // Change Trigger
   triggerEventId: varchar("trigger_event_id").references(() => crmLeadScoringEvents.id),
   triggerEventType: text("trigger_event_type").notNull(),
   changeReason: text("change_reason"), // rule_triggered, manual_adjustment, decay_applied, bulk_update
-  
+
   // Scoring Context
   scoringRuleId: varchar("scoring_rule_id").references(() => crmScoringRules.id),
   userId: varchar("user_id").references(() => users.id), // if manual change
-  
+
   // Metadata
   notes: text("notes"),
-  
+
   orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -5169,56 +5171,56 @@ export const crmLeadEngagementMetrics = pgTable("crm_lead_engagement_metrics", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   leadId: varchar("lead_id").references(() => crmLeads.id).notNull(),
   contactId: varchar("contact_id").references(() => crmContacts.id),
-  
+
   // Email Engagement
   emailsSent: integer("emails_sent").default(0),
   emailsOpened: integer("emails_opened").default(0),
   emailsClicked: integer("emails_clicked").default(0),
   emailOpenRate: decimal("email_open_rate", { precision: 5, scale: 4 }).default('0'),
   emailClickRate: decimal("email_click_rate", { precision: 5, scale: 4 }).default('0'),
-  
+
   // Website Engagement
   pageVisits: integer("page_visits").default(0),
   uniquePageVisits: integer("unique_page_visits").default(0),
   totalTimeOnSite: integer("total_time_on_site").default(0), // seconds
   averageSessionDuration: integer("average_session_duration").default(0), // seconds
   bounceRate: decimal("bounce_rate", { precision: 5, scale: 4 }).default('0'),
-  
+
   // Form Engagement
   formsViewed: integer("forms_viewed").default(0),
   formsStarted: integer("forms_started").default(0),
   formsCompleted: integer("forms_completed").default(0),
   formCompletionRate: decimal("form_completion_rate", { precision: 5, scale: 4 }).default('0'),
-  
+
   // Communication Response
   callsReceived: integer("calls_received").default(0),
   callsAnswered: integer("calls_answered").default(0),
   callAnswerRate: decimal("call_answer_rate", { precision: 5, scale: 4 }).default('0'),
   averageResponseTime: integer("average_response_time").default(0), // minutes
-  
+
   // Meeting Engagement
   meetingsScheduled: integer("meetings_scheduled").default(0),
   meetingsAttended: integer("meetings_attended").default(0),
   meetingAttendanceRate: decimal("meeting_attendance_rate", { precision: 5, scale: 4 }).default('0'),
-  
+
   // Overall Engagement Score
   engagementScore: decimal("engagement_score", { precision: 5, scale: 2 }).default('0'), // 0-100
   engagementTrend: text("engagement_trend").default('stable'), // increasing, decreasing, stable
-  
+
   // Recency Metrics
   lastEmailOpen: timestamp("last_email_open"),
   lastWebsiteVisit: timestamp("last_website_visit"),
   lastFormSubmission: timestamp("last_form_submission"),
   lastCommunication: timestamp("last_communication"),
-  
+
   // Activity Level
   activityLevel: text("activity_level").default('low'), // high, medium, low
   daysSinceLastActivity: integer("days_since_last_activity").default(0),
-  
+
   // Calculation Metadata
   calculatedAt: timestamp("calculated_at").defaultNow().notNull(),
   calculationPeriod: integer("calculation_period").default(30), // days
-  
+
   orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -5230,47 +5232,47 @@ export const crmMarinaLeadData = pgTable("crm_marina_lead_data", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   leadId: varchar("lead_id").references(() => crmLeads.id).notNull(),
   contactId: varchar("contact_id").references(() => crmContacts.id),
-  
+
   // Boat Ownership & Interest
   currentBoatOwner: boolean("current_boat_owner").default(false),
   boatOwnershipExperience: text("boat_ownership_experience"), // first_time, experienced, expert
   interestedBoatTypes: jsonb("interested_boat_types").default([]), // sailboat, powerboat, yacht, etc.
   budgetRange: text("budget_range"), // under_50k, 50k_100k, 100k_250k, 250k_500k, over_500k
-  
+
   // Marina Services Interest
   servicesNeeded: jsonb("services_needed").default([]), // slip_rental, maintenance, storage, fuel, etc.
   preferredMarinaSize: text("preferred_marina_size"), // small, medium, large, megayacht
   preferredAmenities: jsonb("preferred_amenities").default([]), // restaurant, pool, security, etc.
-  
+
   // Location & Geographic Preferences
   preferredRegions: jsonb("preferred_regions").default([]), // geographic areas
   maxDistanceFromHome: integer("max_distance_from_home"), // miles
   seasonalUsage: text("seasonal_usage"), // year_round, seasonal, occasional
-  
+
   // Purchase Timeline & Intent
   purchaseTimeline: text("purchase_timeline"), // immediate, 3_months, 6_months, 1_year, exploring
   purchaseType: text("purchase_type"), // buy, lease, rent, charter
   hasFinancing: boolean("has_financing").default(false),
   tradeInVehicle: boolean("trade_in_vehicle").default(false),
-  
+
   // Industry Role & Expertise
   industryRole: text("industry_role"), // boat_owner, marina_manager, yacht_broker, boat_dealer, service_provider
   boatingExperience: text("boating_experience"), // beginner, intermediate, advanced, professional
   certifications: jsonb("certifications").default([]), // captain_license, sailing_certification, etc.
-  
+
   // Event & Show Attendance
   boatShowAttendance: jsonb("boat_show_attendance").default([]), // recent boat shows attended
   marinaEventInterest: jsonb("marina_event_interest").default([]), // types of events interested in
-  
+
   // Referral & Social Proof
   referralSource: text("referral_source"), // friend, family, broker, online, advertisement
   socialProofFactors: jsonb("social_proof_factors").default([]), // reviews_reader, brand_conscious, etc.
-  
+
   // Scoring Multipliers (Marina-specific scoring factors)
   locationScoreMultiplier: decimal("location_score_multiplier", { precision: 3, scale: 2 }).default('1.0'),
   seasonalityMultiplier: decimal("seasonality_multiplier", { precision: 3, scale: 2 }).default('1.0'),
   budgetQualificationScore: integer("budget_qualification_score").default(0),
-  
+
   orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -5330,7 +5332,6 @@ export const crmPlaybooks = pgTable("crm_playbooks", {
   isDefault: boolean("is_default").default(false),
   sortOrder: integer("sort_order").default(0),
   createdById: varchar("created_by_id").references(() => users.id).notNull(),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -5522,19 +5523,19 @@ export const crmWorkflows = pgTable("crm_workflows", {
   name: text("name").notNull(),
   description: text("description"),
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
-  
+
   // Trigger configuration - when to execute this workflow
   // Examples: { type: 'deal_stage_changed', stageId: 'uuid', pipelineId: 'uuid' }
   //           { type: 'label_added', labelId: 'uuid', entityType: 'contact' }
   //           { type: 'field_updated', entityType: 'deal', field: 'value' }
   //           { type: 'deal_created', pipelineId: 'uuid' }
   trigger: jsonb("trigger").notNull(),
-  
+
   // Conditions - when to proceed with actions (optional)
   // Examples: [{ field: 'value', operator: 'greater_than', value: 10000 }]
   //           [{ field: 'status', operator: 'equals', value: 'qualified' }]
   conditions: jsonb("conditions").default([]),
-  
+
   // Actions - what to execute when triggered and conditions pass
   // Examples: [{ type: 'send_email', templateId: 'uuid', to: 'contact_email' }]
   //           [{ type: 'create_task', title: 'Follow up', assigneeId: 'uuid' }]
@@ -5542,7 +5543,7 @@ export const crmWorkflows = pgTable("crm_workflows", {
   //           [{ type: 'update_field', field: 'priority', value: 'high' }]
   //           [{ type: 'webhook', url: 'https://...', method: 'POST' }]
   actions: jsonb("actions").notNull(),
-  
+
   isActive: boolean("is_active").default(true),
   triggerCount: integer("trigger_count").default(0),
   lastTriggeredAt: timestamp("last_triggered_at"),
@@ -5560,26 +5561,26 @@ export const crmWebhooks = pgTable("crm_webhooks", {
   url: text("url").notNull(),
   method: text("method").notNull().default('POST'), // POST, GET, PUT, PATCH, DELETE
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
-  
+
   // Events to subscribe to
   // Examples: ['deal.created', 'deal.updated', 'contact.created', 'lead.converted']
   events: jsonb("events").notNull().default([]),
-  
+
   // Headers to send with the webhook (for authentication, etc.)
   headers: jsonb("headers").default({}),
-  
+
   // Secret for signature verification (optional)
   secret: text("secret"),
-  
+
   isActive: boolean("is_active").default(true),
-  
+
   // Statistics
   totalCalls: integer("total_calls").default(0),
   successfulCalls: integer("successful_calls").default(0),
   failedCalls: integer("failed_calls").default(0),
   lastCalledAt: timestamp("last_called_at"),
   lastStatus: integer("last_status"), // HTTP status code
-  
+
   orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -5590,20 +5591,20 @@ export const crmWebhooks = pgTable("crm_webhooks", {
 export const crmWebhookLogs = pgTable("crm_webhook_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   webhookId: varchar("webhook_id").references(() => crmWebhooks.id, { onDelete: 'cascade' }).notNull(),
-  
+
   event: text("event").notNull(), // e.g., 'deal.created'
   payload: jsonb("payload").notNull(), // Data sent to the webhook
-  
+
   // Response data
   statusCode: integer("status_code"), // HTTP status code
   responseBody: text("response_body"), // Response from the webhook
   responseTime: integer("response_time"), // Time in milliseconds
-  
+
   // Error information
   errorMessage: text("error_message"),
-  
+
   success: boolean("success").notNull(),
-  
+
   orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -5613,23 +5614,23 @@ export const crmWebhookLogs = pgTable("crm_webhook_logs", {
 export const crmAiConversations = pgTable("crm_ai_conversations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
-  
+
   // Conversation metadata
   title: text("title"), // Optional title for the conversation
-  
+
   // Context - what the user was viewing when they started the conversation
   contextType: text("context_type"), // 'deal', 'contact', 'company', 'property', 'general'
   contextId: varchar("context_id"), // ID of the entity they were viewing
   contextData: jsonb("context_data"), // Snapshot of context data
-  
+
   // Settings
   provider: text("provider").notNull().default('openai'), // 'openai' or 'anthropic'
   model: text("model").default('gpt-4o'), // Model used
-  
+
   // Status
   isActive: boolean("is_active").default(true),
   lastMessageAt: timestamp("last_message_at"),
-  
+
   orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -5640,22 +5641,22 @@ export const crmAiConversations = pgTable("crm_ai_conversations", {
 export const crmAiMessages = pgTable("crm_ai_messages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   conversationId: varchar("conversation_id").references(() => crmAiConversations.id, { onDelete: 'cascade' }).notNull(),
-  
+
   // Message content
   role: text("role").notNull(), // 'user', 'assistant', 'system', 'function'
   content: text("content"), // Message text content
-  
+
   // Function calling
   functionCall: jsonb("function_call"), // { name: string, arguments: string }
   functionResult: jsonb("function_result"), // Result of function execution
   toolCalls: jsonb("tool_calls"), // Array of tool calls (for multi-tool calls)
   toolResults: jsonb("tool_results"), // Array of tool results
-  
+
   // Metadata
   tokenCount: integer("token_count"), // Approximate token count
   model: text("model"), // Model used for this message
   finishReason: text("finish_reason"), // 'stop', 'length', 'function_call', 'tool_calls'
-  
+
   orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -5666,18 +5667,17 @@ export const aiAssistantFeedback = pgTable("ai_assistant_feedback", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id).notNull(),
   orgId: varchar("org_id").notNull(),
-  
+
   // Feedback details
   messageId: varchar("message_id").notNull(), // Client-side message ID
   rating: text("rating").notNull(), // 'positive' or 'negative'
   advisoryMode: text("advisory_mode").notNull(), // The mode used for this response
   page: text("page").notNull(), // The page context where feedback was given
-  
+
   // Optional additional context
   messageContent: text("message_content"), // The AI response content (for analysis)
   userQuery: text("user_query"), // What the user asked
-  
-  orgId: varchar("org_id").references(() => organizations.id),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("ai_assistant_feedback_org_idx").on(table.orgId),
@@ -5691,12 +5691,12 @@ export const crmDedupeRules = pgTable("crm_dedupe_rules", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(), // Descriptive name for the rule
   entityType: text("entity_type").notNull(), // 'contact', 'company', 'lead'
-  
+
   // Matching configuration
   matchFields: jsonb("match_fields").notNull(), // Array of field names to match on, e.g., ['email'] or ['firstName', 'lastName']
   matchStrategy: text("match_strategy").notNull().default('exact'), // 'exact', 'fuzzy', 'contains'
   caseSensitive: boolean("case_sensitive").default(false),
-  
+
   // Merge behavior
   autoMerge: boolean("auto_merge").default(false), // Whether to automatically merge or just flag for review
   priorityField: text("priority_field"), // Field to determine which record to keep (e.g., 'createdAt', 'updatedAt', 'leadScore')
@@ -5716,25 +5716,25 @@ export const crmDedupeRules = pgTable("crm_dedupe_rules", {
 export const crmMergeHistory = pgTable("crm_merge_history", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   entityType: text("entity_type").notNull(), // 'contact', 'company', 'lead'
-  
+
   // Merge details
   primaryRecordId: varchar("primary_record_id").notNull(), // The record that was kept
   mergedRecordIds: jsonb("merged_record_ids").notNull(), // Array of UUIDs that were merged into primary
-  
+
   // Field-level merge details
   fieldsMerged: jsonb("fields_merged"), // JSON of which fields were taken from which record
   conflictResolutions: jsonb("conflict_resolutions"), // How conflicts were resolved
-  
+
   // Merge metadata
   mergedBy: varchar("merged_by").references(() => users.id).notNull(),
   mergedAt: timestamp("merged_at").defaultNow().notNull(),
   dedupeRuleId: varchar("dedupe_rule_id").references(() => crmDedupeRules.id), // Optional - if triggered by a rule
-  
+
   // Undo capability
   canUndo: boolean("can_undo").default(true),
   undoneAt: timestamp("undone_at"),
   undoneBy: varchar("undone_by").references(() => users.id),
-  
+
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
 });
 
@@ -5748,20 +5748,20 @@ export const crmForms = pgTable("crm_forms", {
   description: text("description"),
   type: text("type").notNull().default('contact'), // contact, demo, newsletter, property_inquiry, boat_inquiry, quote, download
   status: text("status").notNull().default('draft'), // draft, active, paused, archived
-  
+
   // Form Configuration
   title: text("title"), // Display title on the form
   subtitle: text("subtitle"), // Form description/subtitle
   thankYouMessage: text("thank_you_message").default('Thank you for your submission!'),
   redirectUrl: text("redirect_url"), // Redirect after submission
   submitButtonText: text("submit_button_text").default('Submit'),
-  
+
   // Form Settings
   requiresApproval: boolean("requires_approval").default(false),
   allowMultipleSubmissions: boolean("allow_multiple_submissions").default(true),
   captchaEnabled: boolean("captcha_enabled").default(false),
   progressBar: boolean("progress_bar").default(false),
-  
+
   // Styling and Layout
   theme: text("theme").default('default'), // default, marina, boat, modern, minimal
   primaryColor: text("primary_color").default('#3B82F6'),
@@ -5769,33 +5769,33 @@ export const crmForms = pgTable("crm_forms", {
   fontFamily: text("font_family").default('Inter'),
   customCss: text("custom_css"),
   layout: text("layout").default('single_column'), // single_column, two_column, wizard
-  
+
   // SEO and Meta
   metaTitle: text("meta_title"),
   metaDescription: text("meta_description"),
   socialImage: text("social_image"),
-  
+
   // Lead Routing and Automation
   autoAssignUser: varchar("auto_assign_user").references(() => users.id),
   leadScore: integer("lead_score").default(0), // Base score for form submissions
   followUpSequenceId: varchar("follow_up_sequence_id").references(() => crmEmailSequences.id),
   notificationEmails: jsonb("notification_emails").default([]), // Array of email addresses
-  
+
   // A/B Testing
   isTestVariant: boolean("is_test_variant").default(false),
   parentFormId: varchar("parent_form_id"), // Reference to original form for A/B testing
   testSplitPercentage: integer("test_split_percentage").default(50), // 0-100
-  
+
   // Analytics and Performance
   submissionCount: integer("submission_count").default(0),
   conversionRate: decimal("conversion_rate", { precision: 5, scale: 4 }).default('0'), // Percentage as decimal
   averageCompletionTime: integer("average_completion_time").default(0), // Seconds
-  
+
   // Marina/Boat Specific Settings
   propertyType: text("property_type"), // marina, boat, slip, dry_storage (for property inquiry forms)
   inquiryType: text("inquiry_type"), // buy, sell, rent, service, financing
   targetBudgetRange: jsonb("target_budget_range").default({}), // { min: number, max: number }
-  
+
   createdById: varchar("created_by_id").references(() => users.id).notNull(),
   orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -5807,7 +5807,7 @@ export const crmForms = pgTable("crm_forms", {
 export const crmFormFields = pgTable("crm_form_fields", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   formId: varchar("form_id").references(() => crmForms.id, { onDelete: 'cascade' }).notNull(),
-  
+
   // Field Configuration
   fieldType: text("field_type").notNull(), // text, email, phone, number, select, checkbox, radio, textarea, date, file, hidden
   fieldName: text("field_name").notNull(), // Field identifier/key
@@ -5815,33 +5815,33 @@ export const crmFormFields = pgTable("crm_form_fields", {
   placeholder: text("placeholder"),
   helpText: text("help_text"),
   defaultValue: text("default_value"),
-  
+
   // Validation Rules
   required: boolean("required").default(false),
   minLength: integer("min_length"),
   maxLength: integer("max_length"),
   pattern: text("pattern"), // Regex pattern for validation
   validationMessage: text("validation_message"),
-  
+
   // Field Options (for select, radio, checkbox)
   options: jsonb("options").default([]), // Array of {label: string, value: string, score?: number}
   allowOther: boolean("allow_other").default(false),
-  
+
   // Layout and Display
   fieldOrder: integer("field_order").notNull(),
   width: text("width").default('full'), // full, half, third, quarter
   cssClasses: text("css_classes"),
   isConditional: boolean("is_conditional").default(false),
   conditionalLogic: jsonb("conditional_logic").default({}), // Show/hide based on other fields
-  
+
   // Lead Scoring
   scoreWeight: integer("score_weight").default(0), // Points for completion
   optionScoring: jsonb("option_scoring").default({}), // Different scores for different options
-  
+
   // Marina/Boat Specific Fields
   boatSpecField: text("boat_spec_field"), // length, type, year, make, model, price_range
   marinaSpecField: text("marina_spec_field"), // slip_size, amenities, location_preference
-  
+
   orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -5852,19 +5852,19 @@ export const crmFormFields = pgTable("crm_form_fields", {
 export const crmFormSubmissions = pgTable("crm_form_submissions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   formId: varchar("form_id").references(() => crmForms.id).notNull(),
-  
+
   // Submission Data
   submissionData: jsonb("submission_data").notNull(), // All form field values
   leadId: varchar("lead_id").references(() => crmLeads.id), // Created lead (if applicable)
   contactId: varchar("contact_id").references(() => crmContacts.id), // Existing contact (if found)
-  
+
   // Session and Attribution Data
   sessionId: text("session_id"),
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
   deviceType: text("device_type"), // desktop, mobile, tablet
   browserInfo: text("browser_info"),
-  
+
   // UTM and Source Tracking
   utmSource: text("utm_source"),
   utmMedium: text("utm_medium"),
@@ -5873,25 +5873,25 @@ export const crmFormSubmissions = pgTable("crm_form_submissions", {
   utmContent: text("utm_content"),
   referrerUrl: text("referrer_url"),
   landingPageUrl: text("landing_page_url"),
-  
+
   // Form Analytics
   startedAt: timestamp("started_at"), // When user first interacted with form
   completionTime: integer("completion_time"), // Seconds to complete
   fieldInteractions: jsonb("field_interactions").default([]), // Array of field interaction events
   abandonedAt: timestamp("abandoned_at"), // If form was abandoned
   abandonedAtField: text("abandoned_at_field"), // Which field caused abandonment
-  
+
   // Lead Qualification
   calculatedScore: integer("calculated_score").default(0),
   qualificationStatus: text("qualification_status").default('unqualified'), // unqualified, marketing_qualified, sales_qualified
-  
+
   // Geographic Information
   geolocation: jsonb("geolocation").default({}), // { country, region, city, timezone }
-  
+
   // Processing Status
   status: text("status").default('pending'), // pending, processed, error
   processingErrors: jsonb("processing_errors").default([]),
-  
+
   orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -5904,13 +5904,13 @@ export const crmLandingPages = pgTable("crm_landing_pages", {
   slug: text("slug").notNull().unique(), // URL slug for the landing page
   title: text("title").notNull(),
   description: text("description"),
-  
+
   // Page Content
   heroTitle: text("hero_title"),
   heroSubtitle: text("hero_subtitle"),
   heroImage: text("hero_image"),
   bodyContent: text("body_content"), // HTML content
-  
+
   // SEO Configuration
   metaTitle: text("meta_title"),
   metaDescription: text("meta_description"),
@@ -5918,35 +5918,35 @@ export const crmLandingPages = pgTable("crm_landing_pages", {
   ogTitle: text("og_title"),
   ogDescription: text("og_description"),
   ogImage: text("og_image"),
-  
+
   // Page Settings
   template: text("template").notNull().default('marina'), // marina, boat, generic, minimal
   status: text("status").notNull().default('draft'), // draft, active, archived
   isPublished: boolean("is_published").default(false),
   passwordProtected: boolean("password_protected").default(false),
   password: text("password"),
-  
+
   // Form Integration
   formId: varchar("form_id").references(() => crmForms.id),
   formPlacement: text("form_placement").default('bottom'), // top, bottom, sidebar, inline, popup
-  
+
   // A/B Testing
   isTestVariant: boolean("is_test_variant").default(false),
   parentPageId: varchar("parent_page_id"),
   testSplitPercentage: integer("test_split_percentage").default(50),
-  
+
   // Analytics
   viewCount: integer("view_count").default(0),
   uniqueVisitors: integer("unique_visitors").default(0),
   conversionRate: decimal("conversion_rate", { precision: 5, scale: 4 }).default('0'),
   bounceRate: decimal("bounce_rate", { precision: 5, scale: 4 }).default('0'),
   averageTimeOnPage: integer("average_time_on_page").default(0), // Seconds
-  
+
   // Custom Styling
   customCss: text("custom_css"),
   customJs: text("custom_js"),
   theme: jsonb("theme").default({}), // Color scheme and styling preferences
-  
+
   createdById: varchar("created_by_id").references(() => users.id).notNull(),
   orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -5959,35 +5959,35 @@ export const crmFormAnalytics = pgTable("crm_form_analytics", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   formId: varchar("form_id").references(() => crmForms.id).notNull(),
   date: text("date").notNull(), // YYYY-MM-DD format for daily aggregation
-  
+
   // Traffic Metrics
   views: integer("views").default(0),
   uniqueVisitors: integer("unique_visitors").default(0),
-  
+
   // Conversion Metrics
   submissions: integer("submissions").default(0),
   completedSubmissions: integer("completed_submissions").default(0),
   conversionRate: decimal("conversion_rate", { precision: 5, scale: 4 }).default('0'),
-  
+
   // Engagement Metrics
   averageTimeOnForm: integer("average_time_on_form").default(0), // Seconds
   bounceRate: decimal("bounce_rate", { precision: 5, scale: 4 }).default('0'),
   abandonmentRate: decimal("abandonment_rate", { precision: 5, scale: 4 }).default('0'),
-  
+
   // Field-Level Analytics
   fieldDropoffRates: jsonb("field_dropoff_rates").default({}), // { fieldName: rate }
   fieldCompletionTimes: jsonb("field_completion_times").default({}), // Average time per field
   fieldErrorRates: jsonb("field_error_rates").default({}), // Validation error rates per field
-  
+
   // Source Analytics
   sourceBreakdown: jsonb("source_breakdown").default({}), // Traffic by source
   deviceBreakdown: jsonb("device_breakdown").default({}), // Desktop vs mobile
   locationBreakdown: jsonb("location_breakdown").default({}), // Geographic data
-  
+
   // Lead Quality Metrics
   qualifiedLeads: integer("qualified_leads").default(0),
   averageLeadScore: decimal("average_lead_score", { precision: 5, scale: 2 }).default('0'),
-  
+
   orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -6000,17 +6000,17 @@ export const crmFormVersions = pgTable("crm_form_versions", {
   versionNumber: integer("version_number").notNull(),
   name: text("name"), // Version name/label
   description: text("description"),
-  
+
   // Version Data (snapshot of form and fields configuration)
   formData: jsonb("form_data").notNull(), // Complete form configuration
   fieldsData: jsonb("fields_data").notNull(), // Complete fields configuration
-  
+
   // A/B Test Results
   testStatus: text("test_status").default('draft'), // draft, active, completed, winner
   trafficAllocation: integer("traffic_allocation").default(50), // Percentage of traffic
   conversionRate: decimal("conversion_rate", { precision: 5, scale: 4 }),
   submissions: integer("submissions").default(0),
-  
+
   createdById: varchar("created_by_id").references(() => users.id).notNull(),
   orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -6029,26 +6029,26 @@ export const crmImportJobs = pgTable("crm_import_jobs", {
   successfulRows: integer("successful_rows").default(0),
   failedRows: integer("failed_rows").default(0),
   duplicatesFound: integer("duplicates_found").default(0),
-  
+
   importType: text("import_type").notNull().default('contacts'),
   fieldMappings: jsonb("field_mappings").notNull(),
   duplicateStrategy: text("duplicate_strategy").default('skip'),
-  
+
   status: text("status").notNull().default('pending'),
   currentStep: text("current_step"),
   progress: integer("progress").default(0),
-  
+
   errorLog: jsonb("error_log").default(sql`'[]'::jsonb`),
   validationWarnings: jsonb("validation_warnings").default(sql`'[]'::jsonb`),
   importSummary: jsonb("import_summary").default(sql`'{}'::jsonb`),
-  
+
   csvData: jsonb("csv_data"),
   originalHeaders: jsonb("original_headers").default(sql`'[]'::jsonb`),
-  
+
   canRollback: boolean("can_rollback").default(true),
   rolledBackAt: timestamp("rolled_back_at"),
   rolledBackBy: varchar("rolled_back_by").references(() => users.id),
-  
+
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
   orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -6058,18 +6058,18 @@ export const crmImportJobs = pgTable("crm_import_jobs", {
 export const crmImportedRecords = pgTable("crm_imported_records", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   importJobId: varchar("import_job_id").references(() => crmImportJobs.id).notNull(),
-  
+
   recordType: text("record_type").notNull(),
   recordId: varchar("record_id").notNull(),
   action: text("action").notNull(),
-  
+
   rowNumber: integer("row_number").notNull(),
   originalData: jsonb("original_data").notNull(),
-  
+
   wasNew: boolean("was_new").default(true),
   matchedBy: text("matched_by"),
   validationIssues: jsonb("validation_issues").default(sql`'[]'::jsonb`),
-  
+
   orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -6247,7 +6247,7 @@ export const archivedContacts = pgTable("archived_contacts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
   originalContactId: varchar("original_contact_id").notNull(), // Original contact ID for reference
-  
+
   // Copied contact data (snapshot at time of archive)
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
@@ -6268,22 +6268,21 @@ export const archivedContacts = pgTable("archived_contacts", {
   linkedinUrl: text("linkedin_url"),
   twitterHandle: text("twitter_handle"),
   photoDataUrl: text("photo_data_url"),
-  
+
   // Archive metadata
   archiveReason: archiveReasonEnum("archive_reason").notNull().default("property_sold"),
   archiveNotes: text("archive_notes"),
   archivedBy: varchar("archived_by").notNull().references(() => users.id),
   archivedAt: timestamp("archived_at").defaultNow().notNull(),
-  
+
   // Associated sale information
   salesCompId: varchar("sales_comp_id").references(() => salesComps.id, { onDelete: 'set null' }),
   saleDate: timestamp("sale_date"),
-  
+
   // Original record timestamps
   originalCreatedAt: timestamp("original_created_at"),
   originalUpdatedAt: timestamp("original_updated_at"),
-  
-  orgId: varchar("org_id").references(() => organizations.id),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("archived_contacts_org_idx").on(table.orgId),
@@ -6297,7 +6296,7 @@ export const archivedCompanies = pgTable("archived_companies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
   originalCompanyId: varchar("original_company_id").notNull(), // Original company ID for reference
-  
+
   // Copied company data (snapshot at time of archive)
   name: text("name").notNull(),
   domain: text("domain"),
@@ -6312,23 +6311,22 @@ export const archivedCompanies = pgTable("archived_companies", {
   annualMarinaSpend: decimal("annual_marina_spend", { precision: 14, scale: 2 }),
   acquisitionInterest: text("acquisition_interest"),
   portfolioCount: integer("portfolio_count"),
-  
+
   // Archive metadata
   archiveReason: archiveReasonEnum("archive_reason").notNull().default("property_sold"),
   archiveNotes: text("archive_notes"),
   archivedBy: varchar("archived_by").notNull().references(() => users.id),
   archivedAt: timestamp("archived_at").defaultNow().notNull(),
-  
+
   // Associated sale information
   salesCompId: varchar("sales_comp_id").references(() => salesComps.id, { onDelete: 'set null' }),
   saleDate: timestamp("sale_date"),
-  
+
   // Original record timestamps
   originalCreatedAt: timestamp("original_created_at"),
   originalUpdatedAt: timestamp("original_updated_at"),
   originalOwnerId: varchar("original_owner_id"),
-  
-  orgId: varchar("org_id").references(() => organizations.id),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("archived_companies_org_idx").on(table.orgId),
@@ -6341,27 +6339,26 @@ export const archivedCompanies = pgTable("archived_companies", {
 export const archivePropertyAssociations = pgTable("archive_property_associations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
-  
+
   // Link to archived entity (one of these will be set)
   archivedContactId: varchar("archived_contact_id").references(() => archivedContacts.id, { onDelete: 'cascade' }),
   archivedCompanyId: varchar("archived_company_id").references(() => archivedCompanies.id, { onDelete: 'cascade' }),
-  
+
   // Property information (snapshot)
   propertyId: varchar("property_id"), // Original property ID (may no longer exist)
   propertyName: text("property_name").notNull(),
   propertyAddress: text("property_address"),
   propertyCity: text("property_city"),
   propertyState: text("property_state"),
-  
+
   // Sales comp reference
   salesCompId: varchar("sales_comp_id").references(() => salesComps.id, { onDelete: 'set null' }),
-  
+
   // Relationship details
   relationship: text("relationship"), // "Owner", "Seller", "Manager", etc.
   ownershipStartDate: timestamp("ownership_start_date"),
   ownershipEndDate: timestamp("ownership_end_date"), // Sale date
-  
-  orgId: varchar("org_id").references(() => organizations.id),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("archive_property_assoc_org_idx").on(table.orgId),
@@ -6838,7 +6835,7 @@ export const salesComps = pgTable('sales_comps', {
   profitCenterBoatSales: boolean('profit_center_boat_sales').default(false),
   profitCenterFnb: boolean('profit_center_fnb').default(false),
   profitCenterHospitality: boolean('profit_center_hospitality').default(false),
-  
+
   // Profit center operation types (In-House/Leased/Third-Party)
   profitCenterBoatRentalsType: varchar('profit_center_boat_rentals_type', { length: 20 }),
   profitCenterBoatBrokerageType: varchar('profit_center_boat_brokerage_type', { length: 20 }),
@@ -6850,7 +6847,7 @@ export const salesComps = pgTable('sales_comps', {
   profitCenterHospitalityType: varchar('profit_center_hospitality_type', { length: 20 }),
   profitCenterBoatClubType: varchar('profit_center_boat_club_type', { length: 20 }),
   profitCenterBoatClubCompany: text('profit_center_boat_club_company'),
-  
+
   // Legacy profit centers field (deprecated - keeping for migration compatibility)
   profitCenters: text('profit_centers').array().default(sql`'{}'`),
   coastalType: text('coastal_type'), // Legacy: now called waterType - 'Coastal'|'Lake'|'River'
@@ -6872,14 +6869,14 @@ export const salesComps = pgTable('sales_comps', {
   buyerContactId: varchar('buyer_contact_id').references(() => crmContacts.id, { onDelete: 'set null' }),
 
   // === INSTITUTIONAL DATA GOVERNANCE ===
-  
+
   // Source Attribution - Track where data came from
   dataSource: text('data_source'), // 'broker', 'costar', 'loopnet', 'direct_research', 'public_records', 'internal'
   sourceConfidence: integer('source_confidence'), // 1-100 confidence rating
   sourceUrl: text('source_url'), // Original source URL if applicable
   sourceContactId: varchar('source_contact_id').references(() => crmContacts.id, { onDelete: 'set null' }), // Who provided the data
   sourceNotes: text('source_notes'), // Additional context about the source
-  
+
   // Data Quality & Verification
   lastVerifiedAt: timestamp('last_verified_at'), // When data was last verified
   lastVerifiedBy: varchar('last_verified_by').references(() => users.id, { onDelete: 'set null' }), // User who verified
@@ -6887,7 +6884,7 @@ export const salesComps = pgTable('sales_comps', {
   dataCompleteness: integer('data_completeness'), // 0-100 completeness percentage
   verificationStatus: text('verification_status').default('unverified'), // 'unverified', 'pending', 'verified', 'stale'
   verificationNotes: text('verification_notes'), // Notes from verification process
-  
+
   // Enhanced Geocoding Metadata
   geocodedAt: timestamp('geocoded_at'), // When geocoding was performed
   geocodeAccuracy: text('geocode_accuracy'), // 'rooftop', 'range_interpolated', 'geometric_center', 'approximate'
@@ -6896,7 +6893,7 @@ export const salesComps = pgTable('sales_comps', {
   county: text('county'), // Extracted county from geocoding
   country: text('country').default('US'), // Country code
   timezone: text('timezone'), // Property timezone for analytics
-  
+
   // Import & Audit Tracking
   importBatchId: varchar('import_batch_id'), // Which import batch this came from
   importSource: text('import_source'), // 'csv_import', 'manual_entry', 'api', 'broker_submission'
@@ -6909,7 +6906,7 @@ export const salesComps = pgTable('sales_comps', {
     changedBy: string;
     changeReason?: string;
   }>>().default([]),
-  
+
   // Statistical Metadata (computed during import/update)
   pricePerSlip: integer('price_per_slip'), // Computed: salePrice / (wetSlips + dryRacks)
   pricePerAcre: integer('price_per_acre'), // Computed: salePrice / acres
@@ -6917,15 +6914,15 @@ export const salesComps = pgTable('sales_comps', {
   totalUnits: integer('total_units'), // Computed: wetSlips + dryRacks
 
   // === MARINA COMPS ENGINE FIELDS ===
-  
+
   // Land storage capacity
   landStorageSqft: integer('land_storage_sqft'),
-  
+
   // Capacity Index for similarity scoring (slips + racks * 0.75)
   capacityIndex: decimal('capacity_index', { precision: 10, scale: 2 }),
   pricePerCapacityIndex: decimal('price_per_capacity_index', { precision: 12, scale: 2 }),
   pricePerRack: integer('price_per_rack'), // Computed: salePrice / dryRacks
-  
+
   // Deal Flags for transaction classification
   dealFlags: jsonb('deal_flags').$type<{
     portfolio?: boolean;
@@ -6937,7 +6934,7 @@ export const salesComps = pgTable('sales_comps', {
     offMarket?: boolean;
     auction?: boolean;
   }>().default({}),
-  
+
   // Slip Mix (length bucket distributions for similarity scoring)
   slipMix: jsonb('slip_mix').$type<{
     slips_under_30ft?: number;
@@ -6949,7 +6946,7 @@ export const salesComps = pgTable('sales_comps', {
     power_50a?: number;
     power_100a?: number;
   }>().default({}),
-  
+
   // Operational capabilities/profile (for similarity scoring)
   capabilities: jsonb('capabilities').$type<{
     travelLiftTons?: number;
@@ -6965,7 +6962,7 @@ export const salesComps = pgTable('sales_comps', {
     bridgeClearance?: number;
     channelDepth?: number;
   }>().default({}),
-  
+
   // Quality tier for condition scoring
   qualityTier: text('quality_tier'), // 'A' | 'B' | 'C' | 'D'
 
@@ -7028,20 +7025,20 @@ export const scPendingPropertyProfiles = pgTable('sc_pending_property_profiles',
 export const scDuplicateAuditLog = pgTable('sc_duplicate_audit_log', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   entityType: text('entity_type').notNull(), // 'contact' | 'company' | 'property'
   action: text('action').notNull(), // 'auto_merged' | 'pending_created' | 'user_merged' | 'user_rejected'
-  
+
   sourceCompId: varchar('source_comp_id').references(() => salesComps.id, { onDelete: 'set null' }),
   sourceType: text('source_type'), // 'csv_import' | 'manual_entry' | 'api'
-  
+
   newEntityData: jsonb('new_entity_data').$type<Record<string, any>>(), // The data that was being imported
   existingEntityId: varchar('existing_entity_id'), // ID of the matched entity (if auto-merged)
   existingEntityData: jsonb('existing_entity_data').$type<Record<string, any>>(), // Snapshot of existing entity before merge
-  
+
   matchedBy: text('matched_by'), // 'email' | 'phone' | 'name' | 'address' | etc.
   confidence: integer('confidence'), // 0-100 confidence score
-  
+
   performedBy: varchar('performed_by').references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
@@ -7254,11 +7251,11 @@ export const scImportBatches = pgTable('sc_import_batches', {
   createdBy: varchar('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   completedAt: timestamp('completed_at'),
-  
+
   name: text('name'), // User-friendly batch name
   description: text('description'),
   status: text('status').notNull().default('pending'), // 'pending', 'processing', 'completed', 'failed'
-  
+
   // Batch statistics
   totalFiles: integer('total_files').default(0),
   totalRecords: integer('total_records').default(0),
@@ -7266,13 +7263,13 @@ export const scImportBatches = pgTable('sc_import_batches', {
   updatedCount: integer('updated_count').default(0),
   skippedCount: integer('skipped_count').default(0),
   errorCount: integer('error_count').default(0),
-  
+
   // Reconciliation tracking
   duplicatesFound: integer('duplicates_found').default(0),
   duplicatesResolved: integer('duplicates_resolved').default(0),
   conflictsFound: integer('conflicts_found').default(0),
   conflictsResolved: integer('conflicts_resolved').default(0),
-  
+
   // Sources in this batch
   sources: text('sources').array().default(sql`'{}'`), // Array of data sources
 }, (table) => ({
@@ -7288,22 +7285,22 @@ export const scValidationRules = pgTable('sc_validation_rules', {
   createdBy: varchar('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-  
+
   name: text('name').notNull(),
   description: text('description'),
   isActive: boolean('is_active').default(true),
-  
+
   // Rule configuration
   field: text('field').notNull(), // Which field this applies to
   ruleType: text('rule_type').notNull(), // 'range', 'required', 'format', 'custom'
   severity: text('severity').default('warning'), // 'warning', 'error'
-  
+
   // Rule parameters (depends on ruleType)
   minValue: decimal('min_value', { precision: 15, scale: 4 }),
   maxValue: decimal('max_value', { precision: 15, scale: 4 }),
   pattern: text('pattern'), // Regex pattern for format validation
   customLogic: text('custom_logic'), // Custom validation expression
-  
+
   // Suggested action when violated
   suggestedAction: text('suggested_action'), // 'flag', 'exclude', 'auto_fix'
   autoFixValue: text('auto_fix_value'), // Value to use for auto-fix
@@ -7318,18 +7315,18 @@ export const scCompHistory = pgTable('sc_comp_history', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   compId: varchar('comp_id').notNull().references(() => salesComps.id, { onDelete: 'cascade' }),
-  
+
   changedBy: varchar('changed_by').notNull().references(() => users.id),
   changedAt: timestamp('changed_at').defaultNow().notNull(),
-  
+
   changeType: text('change_type').notNull(), // 'create', 'update', 'merge', 'bulk_update'
   changeSource: text('change_source'), // 'manual', 'import', 'api', 'system'
   importBatchId: varchar('import_batch_id'), // If from an import
-  
+
   // Snapshot of changed fields
   previousValues: jsonb('previous_values').$type<Record<string, unknown>>().default({}),
   newValues: jsonb('new_values').$type<Record<string, unknown>>().default({}),
-  
+
   // Change metadata
   changeReason: text('change_reason'), // User-provided reason
   affectedFields: text('affected_fields').array().default(sql`'{}'`),
@@ -7347,12 +7344,12 @@ export const scCompAdjustments = pgTable('sc_comp_adjustments', {
   createdBy: varchar('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-  
+
   // Links
   compId: varchar('comp_id').notNull().references(() => salesComps.id, { onDelete: 'cascade' }),
   targetPropertyId: varchar('target_property_id').references(() => crmProperties.id, { onDelete: 'set null' }),
   projectId: varchar('project_id'), // Optional link to a modeling project
-  
+
   // Adjustment calculations
   timeAdjustment: decimal('time_adjustment', { precision: 10, scale: 4 }), // % adjustment for time since sale
   locationAdjustment: decimal('location_adjustment', { precision: 10, scale: 4 }), // % adjustment for location differences
@@ -7361,13 +7358,13 @@ export const scCompAdjustments = pgTable('sc_comp_adjustments', {
   amenitiesAdjustment: decimal('amenities_adjustment', { precision: 10, scale: 4 }), // % adjustment for amenity differences
   marketAdjustment: decimal('market_adjustment', { precision: 10, scale: 4 }), // % adjustment for market conditions
   customAdjustment: decimal('custom_adjustment', { precision: 10, scale: 4 }), // Any other adjustments
-  
+
   // Totals
   grossAdjustment: decimal('gross_adjustment', { precision: 10, scale: 4 }), // Sum of absolute adjustments
   netAdjustment: decimal('net_adjustment', { precision: 10, scale: 4 }), // Sum of signed adjustments
   adjustedPrice: integer('adjusted_price'), // Final adjusted price
   adjustedCapRate: decimal('adjusted_cap_rate', { precision: 6, scale: 4 }),
-  
+
   // Adjustment notes
   notes: text('notes'),
   adjustmentDetails: jsonb('adjustment_details').$type<{
@@ -7379,7 +7376,7 @@ export const scCompAdjustments = pgTable('sc_comp_adjustments', {
     marketNotes?: string;
     customNotes?: string;
   }>().default({}),
-  
+
   // Weight for this comp in analysis
   compWeight: decimal('comp_weight', { precision: 5, scale: 4 }).default('1'), // 0-1 weight for weighted analysis
 }, (table) => ({
@@ -7403,7 +7400,7 @@ export const scProjects = pgTable('sc_projects', {
   name: text('name').notNull(),
   description: text('description'),
   color: varchar('color', { length: 7 }), // Hex color code like #FF0000
-  
+
   // Project profile for matching
   profile: jsonb('profile').$type<{
     targetNOI?: number;
@@ -7423,7 +7420,7 @@ export const scProjects = pgTable('sc_projects', {
     mustHaveProfitCenters?: string[];
     niceToHaveProfitCenters?: string[];
   }>().default({}),
-  
+
   // User weight overrides for recommendation algorithm
   weightOverrides: jsonb('weight_overrides').$type<{
     capacity?: number;
@@ -7516,16 +7513,16 @@ export const scSavedSearches = pgTable('sc_saved_searches', {
   name: text('name').notNull(),
   description: text('description'),
   filters: jsonb('filters').$type<Record<string, any>>().default({}),
-  
+
   // Alert configuration
   emailAlertsEnabled: boolean('email_alerts_enabled').default(false),
   alertFrequency: text('alert_frequency'), // 'immediate'|'daily'|'weekly'
   lastAlertSent: timestamp('last_alert_sent'),
-  
+
   // Usage tracking
   lastUsedAt: timestamp('last_used_at'),
   useCount: integer('use_count').default(0),
-  
+
   // Organization
   isPinned: boolean('is_pinned').default(false),
   color: varchar('color', { length: 7 }), // Hex color for visual organization
@@ -7582,7 +7579,7 @@ export const scAnalyticsFilterPresets = pgTable('sc_analytics_filter_presets', {
   name: text('name').notNull(),
   description: text('description'),
   filters: jsonb('filters').$type<Record<string, any>>().default({}),
-  
+
   // Quick access
   isPinned: boolean('is_pinned').default(false),
   lastUsedAt: timestamp('last_used_at'),
@@ -7611,13 +7608,13 @@ export const docktalkDeals = pgTable('docktalk_deals', {
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
   deletedAt: timestamp('deleted_at'),
-  
+
   // Origin tracking - Primary vs AI-discovered deals
   origin: dealOriginEnum('origin').notNull().default('aiExtraction'),
   externalId: varchar('external_id'), // MarinaMatch Sales Comp UUID for sync
   sourceReference: text('source_reference'), // Link back to MarinaMatch record or news article
   articleId: integer('article_id'), // Optional link to docktalk_articles for AI-extracted deals
-  
+
   // DockTalk-specific fields
   transactionType: docktalkTransactionTypeEnum('transaction_type'), // Deal type
   dealStatus: docktalkDealStatusEnum('deal_status'), // Deal status
@@ -7628,34 +7625,34 @@ export const docktalkDeals = pgTable('docktalk_deals', {
   valuation: text('valuation'), // Property valuation
   equityStake: text('equity_stake'), // Equity stake percentage
   closingDate: timestamp('closing_date'), // Deal closing date
-  
+
   // Deal parties
   buyer: text('buyer'), // Buyer company/entity name
   seller: text('seller'), // Seller company/entity name
   buyerCompanyId: varchar('buyer_company_id').references(() => crmCompanies.id, { onDelete: 'set null' }),
   sellerCompanyId: varchar('seller_company_id').references(() => crmCompanies.id, { onDelete: 'set null' }),
-  
+
   // Transaction details
   marinaName: text('marina_name'), // Property/Marina name
   propertyId: varchar('property_id').references(() => crmProperties.id, { onDelete: 'set null' }),
   transactionSize: integer('transaction_size'), // Deal value in USD
   dealDate: date('deal_date'), // Transaction close date
   announcedDate: date('announced_date'), // Date deal was announced
-  
+
   // Location
   city: text('city'),
   state: text('state'),
   region: text('region'), // "US/Domestic" or "International"
-  
+
   // Marina details (from Sales Comps or AI extraction)
   wetSlips: integer('wet_slips'),
   dryRacks: integer('dry_racks'),
-  
+
   // Metadata
   confidence: integer('confidence'), // AI confidence score (0-100) for AI-extracted deals
   notes: text('notes'),
   articleUrls: text('article_urls').array().default(sql`'{}'`), // Source article links
-  
+
   // Flexible data storage
   custom: jsonb('custom').$type<Record<string, unknown>>().default({}),
 }, (table) => ({
@@ -8238,14 +8235,14 @@ export const scMetricSeries = pgTable('sc_metric_series', {
   createdBy: varchar('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-  
+
   name: text('name').notNull(),
   description: text('description'),
   metricType: text('metric_type').notNull(), // 'price_per_slip', 'cap_rate', 'total_price', 'noi', etc.
   aggregationType: text('aggregation_type').notNull(), // 'average', 'median', 'min', 'max', 'sum', 'count'
   filters: jsonb('filters').$type<Record<string, any>>().default({}),
   groupBy: text('group_by'), // 'state', 'year', 'water_type', 'price_range', etc.
-  
+
   isActive: boolean('is_active').default(true),
 }, (table) => ({
   orgIdx: index('sc_metric_series_org_idx').on(table.orgId),
@@ -8257,7 +8254,7 @@ export const scMetricPoints = pgTable('sc_metric_points', {
   seriesId: varchar('series_id').notNull().references(() => scMetricSeries.id, { onDelete: 'cascade' }),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   createdAt: timestamp('created_at').defaultNow(),
-  
+
   timestamp: timestamp('timestamp').notNull(),
   value: decimal('value', { precision: 20, scale: 2 }).notNull(),
   sampleSize: integer('sample_size').default(0),
@@ -8276,13 +8273,13 @@ export const scMetricAlerts = pgTable('sc_metric_alerts', {
   createdBy: varchar('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-  
+
   name: text('name').notNull(),
   condition: text('condition').notNull(), // 'above', 'below', 'between', 'outside'
   threshold: decimal('threshold', { precision: 20, scale: 2 }),
   thresholdMin: decimal('threshold_min', { precision: 20, scale: 2 }),
   thresholdMax: decimal('threshold_max', { precision: 20, scale: 2 }),
-  
+
   isActive: boolean('is_active').default(true),
   lastTriggered: timestamp('last_triggered'),
   notificationChannels: text('notification_channels').array().default(sql`ARRAY[]::text[]`), // ['email', 'in_app']
@@ -8439,7 +8436,7 @@ export const rateComps = pgTable('rate_comps', {
   profitCenterBoatSales: boolean('profit_center_boat_sales').default(false),
   profitCenterFnb: boolean('profit_center_fnb').default(false),
   profitCenterHospitality: boolean('profit_center_hospitality').default(false),
-  
+
   // Profit center operation types (In-House/Leased/Third-Party)
   profitCenterBoatRentalsType: varchar('profit_center_boat_rentals_type', { length: 20 }),
   profitCenterBoatBrokerageType: varchar('profit_center_boat_brokerage_type', { length: 20 }),
@@ -8451,7 +8448,7 @@ export const rateComps = pgTable('rate_comps', {
   profitCenterHospitalityType: varchar('profit_center_hospitality_type', { length: 20 }),
   profitCenterBoatClubType: varchar('profit_center_boat_club_type', { length: 20 }),
   profitCenterBoatClubCompany: text('profit_center_boat_club_company'),
-  
+
   // Legacy profit centers field (deprecated - keeping for migration compatibility)
   profitCenters: text('profit_centers').array().default(sql`'{}'`),
   coastalType: text('coastal_type'), // Legacy: now called waterType - 'Coastal'|'Lake'|'River'
@@ -8474,7 +8471,7 @@ export const rateComps = pgTable('rate_comps', {
   buyerContactId: varchar('buyer_contact_id').references(() => crmContacts.id, { onDelete: 'set null' }),
 
   // === MARINA COMPS ENGINE FIELDS ===
-  
+
   // Rate structure fields (for Rate Comp Engine)
   wetRateUnit: text('wet_rate_unit'), // 'PER_FT_PER_MONTH' | 'PER_SLIP_PER_MONTH' | 'PER_FT_PER_YEAR' | 'SEASONAL' | 'OTHER'
   wetRateValue: decimal('wet_rate_value', { precision: 12, scale: 2 }),
@@ -8483,11 +8480,11 @@ export const rateComps = pgTable('rate_comps', {
   landRateUnit: text('land_rate_unit'), // 'PER_SQFT_PER_MONTH' | 'PER_SQFT_PER_YEAR' | 'OTHER'
   landRateValue: decimal('land_rate_value', { precision: 12, scale: 2 }),
   landStorageSqft: integer('land_storage_sqft'),
-  
+
   // Utilization metrics
   wetOccupancyPct: integer('wet_occupancy_pct'), // 0-100
   rackUtilizationPct: integer('rack_utilization_pct'), // 0-100
-  
+
   // Slip Mix (length bucket distributions for similarity scoring)
   slipMix: jsonb('slip_mix').$type<{
     slips_under_30ft?: number;
@@ -8499,7 +8496,7 @@ export const rateComps = pgTable('rate_comps', {
     power_50a?: number;
     power_100a?: number;
   }>().default({}),
-  
+
   // Operational capabilities (for similarity scoring)
   capabilities: jsonb('capabilities').$type<{
     travelLiftTons?: number;
@@ -8515,14 +8512,14 @@ export const rateComps = pgTable('rate_comps', {
     bridgeClearance?: number;
     channelDepth?: number;
   }>().default({}),
-  
+
   // Computed capacity index (slips + racks * 0.75)
   capacityIndex: decimal('capacity_index', { precision: 10, scale: 2 }),
-  
+
   // Source type for provenance tracking
   sourceType: text('source_type'), // 'Manual' | 'BrokerQuote' | 'Website' | 'Survey' | 'Import'
   sourceConfidence: integer('source_confidence'), // 0-100
-  
+
   // Quality tier for condition scoring
   qualityTier: text('quality_tier'), // 'A' | 'B' | 'C' | 'D'
 
@@ -8624,7 +8621,7 @@ export const rcProjects = pgTable('rc_projects', {
   name: text('name').notNull(),
   description: text('description'),
   color: varchar('color', { length: 7 }), // Hex color code like #FF0000
-  
+
   // Project profile for matching
   profile: jsonb('profile').$type<{
     targetNOI?: number;
@@ -8647,7 +8644,7 @@ export const rcProjects = pgTable('rc_projects', {
     seasonStartMonth?: number; // 1-12 for January-December
     seasonEndMonth?: number; // 1-12 for January-December
   }>().default({}),
-  
+
   // User weight overrides for recommendation algorithm
   weightOverrides: jsonb('weight_overrides').$type<{
     capacity?: number;
@@ -8740,16 +8737,16 @@ export const rcSavedSearches = pgTable('rc_saved_searches', {
   name: text('name').notNull(),
   description: text('description'),
   filters: jsonb('filters').$type<Record<string, any>>().default({}),
-  
+
   // Alert configuration
   emailAlertsEnabled: boolean('email_alerts_enabled').default(false),
   alertFrequency: text('alert_frequency'), // 'immediate'|'daily'|'weekly'
   lastAlertSent: timestamp('last_alert_sent'),
-  
+
   // Usage tracking
   lastUsedAt: timestamp('last_used_at'),
   useCount: integer('use_count').default(0),
-  
+
   // Organization
   isPinned: boolean('is_pinned').default(false),
   color: varchar('color', { length: 7 }), // Hex color for visual organization
@@ -8801,14 +8798,14 @@ export const rcMetricSeries = pgTable('rc_metric_series', {
   createdBy: varchar('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-  
+
   name: text('name').notNull(),
   description: text('description'),
   metricType: text('metric_type').notNull(), // 'price_per_slip', 'cap_rate', 'total_price', 'noi', etc.
   aggregationType: text('aggregation_type').notNull(), // 'average', 'median', 'min', 'max', 'sum', 'count'
   filters: jsonb('filters').$type<Record<string, any>>().default({}),
   groupBy: text('group_by'), // 'state', 'year', 'water_type', 'price_range', etc.
-  
+
   isActive: boolean('is_active').default(true),
 }, (table) => ({
   orgIdx: index('rc_metric_series_org_idx').on(table.orgId),
@@ -8820,7 +8817,7 @@ export const rcMetricPoints = pgTable('rc_metric_points', {
   seriesId: varchar('series_id').notNull().references(() => rcMetricSeries.id, { onDelete: 'cascade' }),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   createdAt: timestamp('created_at').defaultNow(),
-  
+
   timestamp: timestamp('timestamp').notNull(),
   value: decimal('value', { precision: 20, scale: 2 }).notNull(),
   sampleSize: integer('sample_size').default(0),
@@ -8839,7 +8836,7 @@ export const rcMetricAlerts = pgTable('rc_metric_alerts', {
   createdBy: varchar('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-  
+
   name: text('name').notNull(),
   description: text('description'),
   condition: jsonb('condition').$type<{
@@ -8891,9 +8888,9 @@ export const rateTiers = pgTable('rate_tiers', {
 
   tierLabel: text('tier_label'),
   displayOrder: integer('display_order').default(0),
-  
+
   storageType: text('storage_type').notNull(),
-  
+
   sizeBasis: text('size_basis').default('loa_range'),
   loaMin: integer('loa_min'),
   loaMax: integer('loa_max'),
@@ -8901,55 +8898,55 @@ export const rateTiers = pgTable('rate_tiers', {
   beamMax: integer('beam_max'),
   draftMax: integer('draft_max'),
   categoryLabel: text('category_label'),
-  
+
   rateUnit: text('rate_unit').notNull(),
   ratePeriod: text('rate_period').notNull(),
   amountCents: integer('amount_cents').notNull(),
-  
+
   seasonality: text('seasonality').default('annual'),
   seasonStartMonth: integer('season_start_month'),
   seasonEndMonth: integer('season_end_month'),
-  
+
   effectiveDate: date('effective_date'),
   expirationDate: date('expiration_date'),
   rateYear: integer('rate_year'), // Year the rate applies (for historical tracking)
   isCurrentRate: boolean('is_current_rate').default(true),
-  
+
   minTermMonths: integer('min_term_months'),
   depositRequired: boolean('deposit_required').default(false),
   depositAmountCents: integer('deposit_amount_cents'),
-  
+
   electricIncluded: boolean('electric_included').default(false),
   electricAmps: integer('electric_amps').array().default(sql`'{}'`),
   electricAdditionalCents: integer('electric_additional_cents'),
-  
+
   waterIncluded: boolean('water_included').default(true),
   wifiIncluded: boolean('wifi_included').default(false),
   pumpOutIncluded: boolean('pump_out_included').default(false),
-  
+
   protectionLevel: text('protection_level'),
   isCovered: boolean('is_covered').default(false),
-  
+
   liveaboardAllowed: boolean('liveaboard_allowed'),
   liveaboardAdditionalCents: integer('liveaboard_additional_cents'),
-  
+
   taxesIncluded: boolean('taxes_included').default(false),
   taxRate: decimal('tax_rate', { precision: 5, scale: 3 }),
-  
+
   waitlistOnly: boolean('waitlist_only').default(false),
   availabilityNotes: text('availability_notes'),
-  
+
   normalizedUnit: text('normalized_unit').default('usd_per_ft_per_month'),
   normalizedValue: integer('normalized_value'),
   normalizedMethod: text('normalized_method'),
   normalizedAt: timestamp('normalized_at'),
-  
+
   sourceType: text('source_type'),
   sourceUrl: text('source_url'),
   sourceDate: date('source_date'),
   verifiedAt: timestamp('verified_at'),
   verifiedBy: varchar('verified_by').references(() => users.id),
-  
+
   notes: text('notes'),
   custom: jsonb('custom').$type<Record<string, unknown>>().default({}),
 }, (table) => ({
@@ -9001,25 +8998,25 @@ export const rateAnalyticsFiltersSchema = z.object({
   regions: z.array(z.string()).optional(),
   waterTypes: z.array(z.string()).optional(),
   storageTypes: z.array(z.string()).optional(),
-  
+
   loaMin: z.number().optional(),
   loaMax: z.number().optional(),
   beamMin: z.number().optional(),
   beamMax: z.number().optional(),
-  
+
   rateUnits: z.array(z.string()).optional(),
   ratePeriods: z.array(z.string()).optional(),
-  
+
   normalizedValueMin: z.number().optional(),
   normalizedValueMax: z.number().optional(),
-  
+
   effectiveDateMin: z.string().optional(),
   effectiveDateMax: z.string().optional(),
-  
+
   electricIncluded: z.boolean().optional(),
   protectionLevels: z.array(z.string()).optional(),
   isCovered: z.boolean().optional(),
-  
+
   isCurrentRate: z.boolean().optional(),
   seasonality: z.array(z.string()).optional(),
 });
@@ -9065,27 +9062,27 @@ export const marinaRateDatabase = pgTable('marina_rate_database', {
   waterType: text('water_type'), // 'Coastal' | 'Lake' | 'River'
   bodyOfWater: text('body_of_water'),
   waterBodyName: text('water_body_name'),
-  
+
   // Facility counts
   wetSlips: integer('wet_slips'),
   dryRacks: integer('dry_racks'),
   moorings: integer('moorings'),
   trailerSpaces: integer('trailer_spaces'),
   rvSpaces: integer('rv_spaces'),
-  
+
   // Contact info
   phone: text('phone'),
   email: text('email'),
   website: text('website'),
-  
+
   // Status tracking
   isActive: boolean('is_active').default(true),
   lastRateUpdate: timestamp('last_rate_update'),
   rateSource: text('rate_source'), // 'Website' | 'Phone' | 'Email' | 'Visit' | 'Broker' | 'Other'
-  
+
   // CRM linkage
   propertyId: varchar('property_id').references(() => crmProperties.id, { onDelete: 'set null' }),
-  
+
   // Additional info
   notes: text('notes'),
   custom: jsonb('custom').$type<Record<string, unknown>>().default({}),
@@ -9118,48 +9115,48 @@ export const marinaRates = pgTable('marina_rates', {
   // Rate details
   storageType: text('storage_type').notNull(), // 'wet_slip', 'dry_rack', 'mooring', etc.
   tierLabel: text('tier_label'), // e.g., 'Up to 25ft', '26-35ft', 'Premium'
-  
+
   // Size parameters
   loaMin: integer('loa_min'),
   loaMax: integer('loa_max'),
   beamMin: integer('beam_min'),
   beamMax: integer('beam_max'),
-  
+
   // Pricing
   rateUnit: text('rate_unit').notNull(), // 'per_foot', 'flat', 'per_foot_beam'
   ratePeriod: text('rate_period').notNull(), // 'daily', 'weekly', 'monthly', 'seasonal', 'annual'
   amountCents: integer('amount_cents').notNull(),
-  
+
   // Normalized for comparison
   normalizedMonthlyPerFoot: integer('normalized_monthly_per_foot'), // Cents per foot per month
-  
+
   // Seasonality
   seasonality: text('seasonality').default('annual'), // 'annual', 'seasonal', 'peak', 'off-peak'
   seasonStartMonth: integer('season_start_month'),
   seasonEndMonth: integer('season_end_month'),
-  
+
   // Amenities included
   electricIncluded: boolean('electric_included').default(false),
   electricAmps: integer('electric_amps').array().default(sql`'{}'`),
   waterIncluded: boolean('water_included').default(true),
   wifiIncluded: boolean('wifi_included').default(false),
   pumpOutIncluded: boolean('pump_out_included').default(false),
-  
+
   // Protection
   protectionLevel: text('protection_level'), // 'open', 'protected', 'covered', 'indoor'
   isCovered: boolean('is_covered').default(false),
-  
+
   // Live-aboard
   liveaboardAllowed: boolean('liveaboard_allowed'),
   liveaboardAdditionalCents: integer('liveaboard_additional_cents'),
-  
+
   // Source/verification
   sourceType: text('source_type'), // 'website', 'phone', 'email', 'visit', 'broker'
   sourceUrl: text('source_url'),
   sourceDate: date('source_date'),
   verifiedAt: timestamp('verified_at'),
   verifiedBy: varchar('verified_by').references(() => users.id),
-  
+
   notes: text('notes'),
   custom: jsonb('custom').$type<Record<string, unknown>>().default({}),
 }, (table) => ({
@@ -10738,7 +10735,7 @@ export const modelingRegions = pgTable('modeling_regions', {
 export const modelingProjects = pgTable('modeling_projects', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Core project information
   marinaName: text('marina_name').notNull(),
   purchasePrice: decimal('purchase_price', { precision: 15, scale: 2 }),
@@ -10746,11 +10743,11 @@ export const modelingProjects = pgTable('modeling_projects', {
   totalStorageUnits: integer('total_storage_units'), // Total number of storage options (wet slips + dry racks, etc.)
   ebitda: decimal('ebitda', { precision: 15, scale: 2 }),
   dealOutcome: dealOutcomeEnum('deal_outcome').notNull().default('active'),
-  
+
   // Broker/deal source
   brokerId: varchar('broker_id').references(() => crmContacts.id), // Broker who introduced the deal
   brokerCompanyId: varchar('broker_company_id').references(() => crmCompanies.id), // Broker's company
-  
+
   // Linked entities
   dealId: varchar('deal_id').references(() => crmDeals.id), // Link to CRM deal
   ddProjectId: varchar('dd_project_id').references(() => projects.id), // Link to DD project
@@ -10758,23 +10755,23 @@ export const modelingProjects = pgTable('modeling_projects', {
   rateCompId: varchar('rate_comp_id').references(() => rateComps.id), // Link to rate comp
   propertyId: varchar('property_id').references(() => crmProperties.id), // Link to CRM property
   companyId: varchar('company_id').references(() => crmCompanies.id), // Property owner/seller company
-  
+
   // Geographic/regional data
   address: text('address'), // Street address
   city: text('city'),
   state: text('state'), // Two-letter state abbreviation
   zipCode: text('zip_code'),
   region: text('region'), // e.g., "Southeast", "Great Lakes", etc.
-  
+
   // Deal source - how the deal originated
   dealSource: dealSourceEnum('deal_source'),
-  
+
   // Custom metrics - extensible field for user-defined metrics
   customMetrics: jsonb('custom_metrics').default(sql`'{}'`), // Flexible structure for additional fields
-  
+
   // Case configuration - custom labels for scenarios (base, aggressive, conservative, custom)
   caseLabels: jsonb('case_labels').default(sql`'{"base": "Base Case", "aggressive": "Aggressive Case", "conservative": "Conservative Case", "custom": "Custom Case"}'`),
-  
+
   // Metadata
   notes: text('notes'),
   createdBy: varchar('created_by').notNull().references(() => users.id),
@@ -10807,29 +10804,29 @@ export const valuationSnapshots = pgTable('valuation_snapshots', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
-  
+
   // Snapshot timing
   snapshotDate: timestamp('snapshot_date').notNull(), // Point-in-time this valuation represents
   dataAsOfDate: date('data_as_of_date').notNull(), // Latest operations data included
   createdAt: timestamp('created_at').defaultNow().notNull(),
   createdBy: varchar('created_by').references(() => users.id),
-  
+
   // Trigger info
   trigger: valuationSnapshotTriggerEnum('trigger').notNull().default('manual'),
   triggerNote: text('trigger_note'), // Optional description of why snapshot was taken
-  
+
   // Core valuation metrics
   purchasePrice: decimal('purchase_price', { precision: 18, scale: 2 }),
   indicatedValue: decimal('indicated_value', { precision: 18, scale: 2 }),
   capRate: decimal('cap_rate', { precision: 6, scale: 4 }), // e.g., 0.0725 = 7.25%
-  
+
   // Income metrics
   grossRevenue: decimal('gross_revenue', { precision: 18, scale: 2 }),
   effectiveGrossIncome: decimal('effective_gross_income', { precision: 18, scale: 2 }),
   operatingExpenses: decimal('operating_expenses', { precision: 18, scale: 2 }),
   noi: decimal('noi', { precision: 18, scale: 2 }),
   ebitda: decimal('ebitda', { precision: 18, scale: 2 }),
-  
+
   // Revenue breakdown
   rentRollRevenue: decimal('rent_roll_revenue', { precision: 18, scale: 2 }),
   fuelRevenue: decimal('fuel_revenue', { precision: 18, scale: 2 }),
@@ -10839,25 +10836,25 @@ export const valuationSnapshots = pgTable('valuation_snapshots', {
   shipStoreCogs: decimal('ship_store_cogs', { precision: 18, scale: 2 }),
   shipStoreMargin: decimal('ship_store_margin', { precision: 18, scale: 2 }),
   otherRevenue: decimal('other_revenue', { precision: 18, scale: 2 }),
-  
+
   // Investment returns
   irr: decimal('irr', { precision: 8, scale: 4 }), // e.g., 0.1525 = 15.25%
   equityMultiple: decimal('equity_multiple', { precision: 6, scale: 3 }), // e.g., 2.450
   cashOnCash: decimal('cash_on_cash', { precision: 8, scale: 4 }),
-  
+
   // Comp references (what comps were used for this valuation)
   rateCompSetId: varchar('rate_comp_set_id').references(() => compSets.id, { onDelete: 'set null' }),
   salesCompSetId: varchar('sales_comp_set_id').references(() => compSets.id, { onDelete: 'set null' }),
   rateIndication: decimal('rate_indication', { precision: 18, scale: 2 }), // Indicated rate from comp set
   salesIndication: decimal('sales_indication', { precision: 18, scale: 2 }), // Indicated value from comp set
-  
+
   // Full data snapshot (for reconstruction)
   inputData: jsonb('input_data').default(sql`'{}'`), // Complete input parameters
   computedData: jsonb('computed_data').default(sql`'{}'`), // Full computed results
-  
+
   // Version tracking
   modelVersion: text('model_version'), // Version of the model/engine used
-  
+
 }, (table) => ({
   orgIdx: index('valuation_snapshots_org_idx').on(table.orgId),
   projectIdx: index('valuation_snapshots_project_idx').on(table.modelingProjectId),
@@ -10870,16 +10867,16 @@ export const valuationSnapshots = pgTable('valuation_snapshots', {
 export const valuationSnapshotSources = pgTable('valuation_snapshot_sources', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   snapshotId: varchar('snapshot_id').notNull().references(() => valuationSnapshots.id, { onDelete: 'cascade' }),
-  
+
   sourceType: text('source_type').notNull(), // 'rent_roll' | 'fuel_sales' | 'ship_store' | 'rate_comp' | 'sales_comp'
   sourceId: varchar('source_id').notNull(), // ID of the source record/snapshot
   sourceVersion: text('source_version'), // Version/snapshot ID if applicable
   dataAsOf: date('data_as_of'), // Date of the source data
-  
+
   // Contribution to valuation
   revenueContribution: decimal('revenue_contribution', { precision: 18, scale: 2 }),
   expenseContribution: decimal('expense_contribution', { precision: 18, scale: 2 }),
-  
+
   metadata: jsonb('metadata').default(sql`'{}'`),
 }, (table) => ({
   snapshotIdx: index('valuation_snapshot_sources_snapshot_idx').on(table.snapshotId),
@@ -10891,34 +10888,34 @@ export const transactionClosingSummary = pgTable('transaction_closing_summary', 
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }).unique(),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Purchase price (can be pulled from modeling project or manually overridden)
   purchasePrice: decimal('purchase_price', { precision: 18, scale: 2 }),
-  
+
   // Closing costs
   totalClosingCosts: decimal('total_closing_costs', { precision: 18, scale: 2 }),
-  
+
   // Financing fees
   financingFeeRate: decimal('financing_fee_rate', { precision: 10, scale: 6 }), // e.g., 0.01 = 1%
   financingBaseAmount: decimal('financing_base_amount', { precision: 18, scale: 2 }), // Base amount for fee calculation
   financingFees: decimal('financing_fees', { precision: 18, scale: 2 }), // Computed: rate * base
-  
+
   // Working capital
   workingCapitalMonths: integer('working_capital_months'), // Number of months of expenses
   workingCapitalMonthlyExpenseBase: decimal('working_capital_monthly_expense_base', { precision: 18, scale: 2 }), // Annual opex / 12
   workingCapitalRequired: decimal('working_capital_required', { precision: 18, scale: 2 }), // months * monthly base
-  
+
   // Transition costs
   transitionCostsTotal: decimal('transition_costs_total', { precision: 18, scale: 2 }),
-  
+
   // CapEx (can be pulled from CapEx module or manually entered)
   capexPhase1: decimal('capex_phase1', { precision: 18, scale: 2 }),
   capexPhase2: decimal('capex_phase2', { precision: 18, scale: 2 }),
   capexPhase3: decimal('capex_phase3', { precision: 18, scale: 2 }),
-  
+
   // Total investment cost (computed)
   totalInvestmentCost: decimal('total_investment_cost', { precision: 18, scale: 2 }),
-  
+
   // Net working capital outputs
   currentAssetsTotal: decimal('current_assets_total', { precision: 18, scale: 2 }),
   currentLiabilitiesTotal: decimal('current_liabilities_total', { precision: 18, scale: 2 }),
@@ -10927,7 +10924,7 @@ export const transactionClosingSummary = pgTable('transaction_closing_summary', 
   nwcAdjustmentsTotal: decimal('nwc_adjustments_total', { precision: 18, scale: 2 }),
   workingCapitalBalance: decimal('working_capital_balance', { precision: 18, scale: 2 }), // (assets - liabilities) + adjustments
   currentRatioAsOfDate: date('current_ratio_as_of_date'),
-  
+
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -10941,13 +10938,13 @@ export const closingCostLines = pgTable('closing_cost_lines', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   category: text('category').notNull(), // e.g., "Legal Fees", "Broker Fees", "Survey", etc.
   amount: decimal('amount', { precision: 18, scale: 2 }).notNull().default('0'),
   notes: text('notes'),
   isFinancingFee: boolean('is_financing_fee').notNull().default(false), // True if this is the computed financing fee row
   sortOrder: integer('sort_order').notNull().default(0),
-  
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -10960,12 +10957,12 @@ export const transitionCostLines = pgTable('transition_cost_lines', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   category: text('category').notNull(), // e.g., "Office 365", "Software/Migration", "Hardware", etc.
   amount: decimal('amount', { precision: 18, scale: 2 }).notNull().default('0'),
   notes: text('notes'),
   sortOrder: integer('sort_order').notNull().default(0),
-  
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -10978,12 +10975,12 @@ export const nwcLines = pgTable('nwc_lines', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   bucketType: nwcBucketTypeEnum('bucket_type').notNull(), // "current_asset", "current_liability", "nwc_adjustment"
   label: text('label').notNull(), // e.g., "Cash", "Accounts Receivables", "Inventory", etc.
   amount: decimal('amount', { precision: 18, scale: 2 }).notNull().default('0'),
   sortOrder: integer('sort_order').notNull().default(0),
-  
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -11994,7 +11991,7 @@ export const marinaSubjects = pgTable('marina_subjects', {
 
   // Identity
   name: text('name').notNull(),
-  
+
   // Address
   address: text('address'),
   city: text('city'),
@@ -12003,28 +12000,28 @@ export const marinaSubjects = pgTable('marina_subjects', {
   county: text('county'),
   lat: decimal('lat', { precision: 10, scale: 7 }),
   lng: decimal('lng', { precision: 10, scale: 7 }),
-  
+
   // Capacity
   slipsTotal: integer('slips_total'),
   racksTotal: integer('racks_total'),
   landStorageSqft: integer('land_storage_sqft'),
   capacityIndex: decimal('capacity_index', { precision: 10, scale: 2 }), // slipsTotal + racksTotal * 0.75
-  
+
   // Slip Mix (length bucket distributions)
   slipMix: jsonb('slip_mix').$type<SlipMix>().default({}),
-  
+
   // Operational capabilities
   capabilities: jsonb('capabilities').$type<MarinaCapabilities>().default({}),
-  
+
   // Water context
   waterType: text('water_type'), // 'Coastal'|'Lake'|'River'
   bodyOfWater: text('body_of_water'),
   waterBodyName: text('water_body_name'),
-  
+
   // Links
   propertyId: varchar('property_id').references(() => crmProperties.id, { onDelete: 'set null' }),
   dealId: varchar('deal_id').references(() => crmDeals.id, { onDelete: 'set null' }),
-  
+
   notes: text('notes'),
 }, (table) => ({
   orgIdx: index('marina_subjects_org_idx').on(table.orgId),
@@ -12044,20 +12041,20 @@ export const compSets = pgTable('comp_sets', {
   // Identity
   name: text('name').notNull(),
   compType: text('comp_type').notNull(), // 'RATE' | 'SALE'
-  
+
   // Subject reference
   subjectId: varchar('subject_id').references(() => marinaSubjects.id, { onDelete: 'set null' }),
-  
+
   // Configuration
   filters: jsonb('filters').$type<CompSetFilters>().default({}),
   scoringConfig: jsonb('scoring_config').$type<ScoringConfig>().default({}),
   adjustmentConfig: jsonb('adjustment_config').$type<AdjustmentConfig>().default({}),
-  
+
   // Last compute result
   lastComputeResult: jsonb('last_compute_result').$type<RateSetComputeResult | SalesSetComputeResult>(),
   lastComputedAt: timestamp('last_computed_at'),
   lastComputedBy: varchar('last_computed_by').references(() => users.id, { onDelete: 'set null' }),
-  
+
   notes: text('notes'),
 }, (table) => ({
   orgIdx: index('comp_sets_org_idx').on(table.orgId),
@@ -12070,19 +12067,19 @@ export const compSetItems = pgTable('comp_set_items', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   compSetId: varchar('comp_set_id').notNull().references(() => compSets.id, { onDelete: 'cascade' }),
-  
+
   // Comp reference (one of these will be set based on compType)
   rateCompId: varchar('rate_comp_id').references(() => rateComps.id, { onDelete: 'cascade' }),
   salesCompId: varchar('sales_comp_id').references(() => salesComps.id, { onDelete: 'cascade' }),
-  
+
   // Selection status
   included: boolean('included').notNull().default(true),
-  
+
   // Scoring
   similarityScore: integer('similarity_score'), // 0-100
   normalizedWeight: decimal('normalized_weight', { precision: 5, scale: 4 }), // 0.0000 - 1.0000
   manualWeightOverride: decimal('manual_weight_override', { precision: 5, scale: 4 }),
-  
+
   // Score breakdown
   geoScore: integer('geo_score'),
   travelTimeScore: integer('travel_time_score'),
@@ -12090,11 +12087,11 @@ export const compSetItems = pgTable('comp_set_items', {
   slipMixScore: integer('slip_mix_score'),
   capabilitiesScore: integer('capabilities_score'),
   conditionScore: integer('condition_score'),
-  
+
   // Adjustments applied
   adjustedValue: decimal('adjusted_value', { precision: 15, scale: 2 }),
   adjustmentDetails: jsonb('adjustment_details').$type<Record<string, number>>(),
-  
+
   addedBy: varchar('added_by').notNull().references(() => users.id),
   addedAt: timestamp('added_at').defaultNow(),
   notes: text('notes'),
@@ -12111,22 +12108,22 @@ export const compSetItems = pgTable('comp_set_items', {
 export const marinaFieldSources = pgTable('marina_field_sources', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Entity reference
   entityType: text('entity_type').notNull(), // 'rate_comp' | 'sales_comp' | 'subject'
   entityId: varchar('entity_id').notNull(),
   fieldName: text('field_name').notNull(),
-  
+
   // Source info
   sourceType: text('source_type').notNull(), // 'manual', 'broker_quote', 'website', 'survey', 'import', 'api', 'costar', 'reonomy', 'attom'
   sourceRef: text('source_ref'), // URL, document name, or reference ID
   sourceDate: timestamp('source_date'),
   confidence: integer('confidence'), // 0-100
-  
+
   // Value tracking
   value: text('value'), // Stringified value for audit trail
   previousValue: text('previous_value'),
-  
+
   createdBy: varchar('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
 }, (table) => ({
@@ -12140,14 +12137,14 @@ export const marinaCompAuditEvents = pgTable('marina_comp_audit_events', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   userId: varchar('user_id').notNull().references(() => users.id),
-  
+
   // Event type
   eventType: text('event_type').notNull(), // 'compute', 'export_excel', 'export_pdf', 'create_set', 'update_set', 'add_comp', 'remove_comp'
-  
+
   // References
   compSetId: varchar('comp_set_id').references(() => compSets.id, { onDelete: 'set null' }),
   subjectId: varchar('subject_id').references(() => marinaSubjects.id, { onDelete: 'set null' }),
-  
+
   // Event details
   details: jsonb('details').$type<{
     compsCount?: number;
@@ -12155,7 +12152,7 @@ export const marinaCompAuditEvents = pgTable('marina_comp_audit_events', {
     exportFormat?: string;
     configSnapshot?: Record<string, unknown>;
   }>(),
-  
+
   createdAt: timestamp('created_at').defaultNow(),
 }, (table) => ({
   orgIdx: index('marina_comp_audit_events_org_idx').on(table.orgId),
@@ -13630,48 +13627,48 @@ export const exitScenarios = pgTable('exit_scenarios', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Scenario identification
   name: text('name').notNull(),
   description: text('description'),
   scenarioType: exitScenarioTypeEnum('scenario_type').notNull().default('cash_sale'),
   status: exitScenarioStatusEnum('status').notNull().default('draft'),
   isBaseCase: boolean('is_base_case').default(false),
-  
+
   // Property details (can be synced from modeling project)
   purchasePrice: decimal('purchase_price', { precision: 18, scale: 2 }),
   acquisitionDate: timestamp('acquisition_date'),
   currentBasis: decimal('current_basis', { precision: 18, scale: 2 }),
   landValue: decimal('land_value', { precision: 18, scale: 2 }),
   improvementValue: decimal('improvement_value', { precision: 18, scale: 2 }),
-  
+
   // Exit assumptions
   holdingPeriodYears: integer('holding_period_years').default(5),
   exitDate: timestamp('exit_date'),
   exitCapRate: decimal('exit_cap_rate', { precision: 5, scale: 4 }), // e.g., 0.0725 = 7.25%
   exitNoi: decimal('exit_noi', { precision: 18, scale: 2 }),
   projectedSalePrice: decimal('projected_sale_price', { precision: 18, scale: 2 }),
-  
+
   // Depreciation tracking
   depreciationSchedule: integer('depreciation_schedule').default(39), // Commercial = 39, Residential = 27.5
   annualDepreciation: decimal('annual_depreciation', { precision: 18, scale: 2 }),
   accumulatedDepreciation: decimal('accumulated_depreciation', { precision: 18, scale: 2 }),
   costSegregationBonus: decimal('cost_segregation_bonus', { precision: 18, scale: 2 }).default('0'),
-  
+
   // Closing costs at exit
   brokerCommissionRate: decimal('broker_commission_rate', { precision: 5, scale: 4 }).default('0.04'), // 4%
   sellingClosingCosts: decimal('selling_closing_costs', { precision: 18, scale: 2 }),
-  
+
   // Loan payoff (if applicable)
   outstandingLoanBalance: decimal('outstanding_loan_balance', { precision: 18, scale: 2 }),
   prepaymentPenalty: decimal('prepayment_penalty', { precision: 18, scale: 2 }),
-  
+
   // Calculated results (cached for performance)
   netProceeds: decimal('net_proceeds', { precision: 18, scale: 2 }),
   totalTaxLiability: decimal('total_tax_liability', { precision: 18, scale: 2 }),
   irr: decimal('irr', { precision: 10, scale: 6 }),
   moic: decimal('moic', { precision: 10, scale: 4 }),
-  
+
   // Metadata
   createdBy: varchar('created_by').references(() => users.id),
   updatedBy: varchar('updated_by').references(() => users.id),
@@ -13688,41 +13685,41 @@ export const exitTaxCalculations = pgTable('exit_tax_calculations', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   exitScenarioId: varchar('exit_scenario_id').notNull().references(() => exitScenarios.id, { onDelete: 'cascade' }),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Tax parameters
   salePrice: decimal('sale_price', { precision: 18, scale: 2 }).notNull(),
   adjustedBasis: decimal('adjusted_basis', { precision: 18, scale: 2 }).notNull(),
   depreciationTaken: decimal('depreciation_taken', { precision: 18, scale: 2 }).default('0'),
-  
+
   // Filer information
   filingStatus: filingStatusEnum('filing_status').notNull().default('single'),
   adjustedGrossIncome: decimal('adjusted_gross_income', { precision: 18, scale: 2 }).default('0'),
   stateOfResidence: varchar('state_of_residence', { length: 2 }).default('CA'),
   isHighIncome: boolean('is_high_income').default(false),
-  
+
   // Gain components
   totalGain: decimal('total_gain', { precision: 18, scale: 2 }),
   capitalGain: decimal('capital_gain', { precision: 18, scale: 2 }),
   depreciationRecapture: decimal('depreciation_recapture', { precision: 18, scale: 2 }),
   ordinaryIncome: decimal('ordinary_income', { precision: 18, scale: 2 }),
-  
+
   // Tax rates used
   federalCapitalGainsRate: decimal('federal_capital_gains_rate', { precision: 5, scale: 4 }).default('0.15'),
   federalDepreciationRecaptureRate: decimal('federal_depreciation_recapture_rate', { precision: 5, scale: 4 }).default('0.25'),
   niitRate: decimal('niit_rate', { precision: 5, scale: 4 }).default('0.038'),
   stateTaxRate: decimal('state_tax_rate', { precision: 5, scale: 4 }),
-  
+
   // Tax liability breakdown
   federalCapitalGainsTax: decimal('federal_capital_gains_tax', { precision: 18, scale: 2 }),
   federalDepreciationRecaptureTax: decimal('federal_depreciation_recapture_tax', { precision: 18, scale: 2 }),
   netInvestmentIncomeTax: decimal('net_investment_income_tax', { precision: 18, scale: 2 }),
   stateTax: decimal('state_tax', { precision: 18, scale: 2 }),
   totalTaxLiability: decimal('total_tax_liability', { precision: 18, scale: 2 }),
-  
+
   // Effective rates
   effectiveTaxRate: decimal('effective_tax_rate', { precision: 5, scale: 4 }),
   afterTaxProceeds: decimal('after_tax_proceeds', { precision: 18, scale: 2 }),
-  
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -13735,38 +13732,38 @@ export const exitSellerFinancing = pgTable('exit_seller_financing', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   exitScenarioId: varchar('exit_scenario_id').notNull().references(() => exitScenarios.id, { onDelete: 'cascade' }),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Sale structure
   salePrice: decimal('sale_price', { precision: 18, scale: 2 }).notNull(),
   downPaymentAmount: decimal('down_payment_amount', { precision: 18, scale: 2 }).notNull(),
   downPaymentPercent: decimal('down_payment_percent', { precision: 5, scale: 4 }),
   financedAmount: decimal('financed_amount', { precision: 18, scale: 2 }).notNull(),
-  
+
   // Loan terms
   interestRate: decimal('interest_rate', { precision: 5, scale: 4 }).notNull(),
   termYears: integer('term_years').notNull(),
   amortizationYears: integer('amortization_years'),
   balloonPaymentYear: integer('balloon_payment_year'),
-  
+
   // Payment details
   monthlyPayment: decimal('monthly_payment', { precision: 18, scale: 2 }),
   annualDebtService: decimal('annual_debt_service', { precision: 18, scale: 2 }),
   totalInterestIncome: decimal('total_interest_income', { precision: 18, scale: 2 }),
   balloonPaymentAmount: decimal('balloon_payment_amount', { precision: 18, scale: 2 }),
-  
+
   // Tax implications
   installmentSaleGrossProfit: decimal('installment_sale_gross_profit', { precision: 18, scale: 2 }),
   installmentSaleGrossProfitRatio: decimal('installment_sale_gross_profit_ratio', { precision: 5, scale: 4 }),
   taxableInterestIncome: decimal('taxable_interest_income', { precision: 18, scale: 2 }),
   deferredGain: decimal('deferred_gain', { precision: 18, scale: 2 }),
-  
+
   // NPV analysis
   discountRate: decimal('discount_rate', { precision: 5, scale: 4 }).default('0.08'),
   netPresentValue: decimal('net_present_value', { precision: 18, scale: 2 }),
-  
+
   // Amortization schedule stored as JSON
   amortizationSchedule: jsonb('amortization_schedule'),
-  
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -13779,33 +13776,33 @@ export const exitEarnouts = pgTable('exit_earnouts', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   exitScenarioId: varchar('exit_scenario_id').notNull().references(() => exitScenarios.id, { onDelete: 'cascade' }),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Earnout structure
   name: text('name').notNull(),
   milestoneName: text('milestone_name'),
   paymentYear: integer('payment_year').notNull(),
-  
+
   // Trigger conditions
   triggerMetric: text('trigger_metric'), // e.g., "NOI", "Revenue", "Occupancy"
   triggerThreshold: decimal('trigger_threshold', { precision: 18, scale: 2 }),
   triggerOperator: varchar('trigger_operator', { length: 10 }), // ">", ">=", "<", "<=", "="
-  
+
   // Payment details
   maxPaymentAmount: decimal('max_payment_amount', { precision: 18, scale: 2 }).notNull(),
   minPaymentAmount: decimal('min_payment_amount', { precision: 18, scale: 2 }).default('0'),
   paymentFormula: text('payment_formula'), // Custom formula if applicable
-  
+
   // Probability weighting
   probabilityOfAchievement: decimal('probability_of_achievement', { precision: 5, scale: 4 }).default('0.5'),
   expectedPayment: decimal('expected_payment', { precision: 18, scale: 2 }),
-  
+
   // Tax treatment
   isTaxableAsOrdinaryIncome: boolean('is_taxable_as_ordinary_income').default(true),
-  
+
   // NPV
   discountRate: decimal('discount_rate', { precision: 5, scale: 4 }).default('0.10'),
   presentValue: decimal('present_value', { precision: 18, scale: 2 }),
-  
+
   sortOrder: integer('sort_order').default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -13819,47 +13816,47 @@ export const exit1031Exchanges = pgTable('exit_1031_exchanges', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   exitScenarioId: varchar('exit_scenario_id').notNull().references(() => exitScenarios.id, { onDelete: 'cascade' }),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Relinquished property (property being sold)
   relinquishedPropertyValue: decimal('relinquished_property_value', { precision: 18, scale: 2 }).notNull(),
   relinquishedPropertyBasis: decimal('relinquished_property_basis', { precision: 18, scale: 2 }),
   relinquishedMortgage: decimal('relinquished_mortgage', { precision: 18, scale: 2 }),
-  
+
   // Exchange timeline
   saleDate: timestamp('sale_date'),
   identificationDeadline: timestamp('identification_deadline'), // +45 days
   exchangeDeadline: timestamp('exchange_deadline'), // +180 days
-  
+
   // Replacement property targets
   targetReplacementValue: decimal('target_replacement_value', { precision: 18, scale: 2 }),
   targetReplacementMortgage: decimal('target_replacement_mortgage', { precision: 18, scale: 2 }),
-  
+
   // Boot calculation (taxable portion)
   cashBootReceived: decimal('cash_boot_received', { precision: 18, scale: 2 }).default('0'),
   mortgageBootReceived: decimal('mortgage_boot_received', { precision: 18, scale: 2 }).default('0'),
   totalBoot: decimal('total_boot', { precision: 18, scale: 2 }).default('0'),
   bootTaxLiability: decimal('boot_tax_liability', { precision: 18, scale: 2 }).default('0'),
-  
+
   // Deferred gain
   realizedGain: decimal('realized_gain', { precision: 18, scale: 2 }),
   recognizedGain: decimal('recognized_gain', { precision: 18, scale: 2 }),
   deferredGain: decimal('deferred_gain', { precision: 18, scale: 2 }),
   deferredTax: decimal('deferred_tax', { precision: 18, scale: 2 }),
-  
+
   // Exchange percentage
   exchangePercentage: decimal('exchange_percentage', { precision: 5, scale: 4 }).default('1.0'), // 100% exchange
-  
+
   // Qualified Intermediary
   qiCompany: text('qi_company'),
   qiContact: text('qi_contact'),
   qiFees: decimal('qi_fees', { precision: 18, scale: 2 }),
-  
+
   // Identified replacement properties (up to 3)
   identifiedProperties: jsonb('identified_properties'),
-  
+
   // Notes
   notes: text('notes'),
-  
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -13872,42 +13869,42 @@ export const exitDstAnalyses = pgTable('exit_dst_analyses', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   exitScenarioId: varchar('exit_scenario_id').notNull().references(() => exitScenarios.id, { onDelete: 'cascade' }),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // DST identification
   dstName: text('dst_name').notNull(),
   sponsorName: text('sponsor_name'),
   propertyType: text('property_type'),
   propertyLocation: text('property_location'),
-  
+
   // Investment details
   investmentAmount: decimal('investment_amount', { precision: 18, scale: 2 }).notNull(),
   ownershipPercentage: decimal('ownership_percentage', { precision: 10, scale: 6 }),
   minimumInvestment: decimal('minimum_investment', { precision: 18, scale: 2 }),
-  
+
   // Projected returns
   projectedCashOnCashReturn: decimal('projected_cash_on_cash_return', { precision: 5, scale: 4 }),
   projectedAnnualDistribution: decimal('projected_annual_distribution', { precision: 18, scale: 2 }),
   projectedHoldPeriod: integer('projected_hold_period'), // years
   projectedIrr: decimal('projected_irr', { precision: 5, scale: 4 }),
-  
+
   // Depreciation benefits
   dstDepreciationPassthrough: decimal('dst_depreciation_passthrough', { precision: 18, scale: 2 }),
   annualDepreciationBenefit: decimal('annual_depreciation_benefit', { precision: 18, scale: 2 }),
-  
+
   // Risk factors
   leverageRatio: decimal('leverage_ratio', { precision: 5, scale: 4 }),
   singleTenantRisk: boolean('single_tenant_risk').default(false),
   tenantCreditRating: varchar('tenant_credit_rating', { length: 10 }),
   leaseTermRemaining: integer('lease_term_remaining'), // years
-  
+
   // Fees
   upfrontFees: decimal('upfront_fees', { precision: 18, scale: 2 }),
   ongoingAnnualFees: decimal('ongoing_annual_fees', { precision: 18, scale: 2 }),
   dispositionFees: decimal('disposition_fees', { precision: 18, scale: 2 }),
-  
+
   // Comparison flag
   isSelected: boolean('is_selected').default(false),
-  
+
   notes: text('notes'),
   sortOrder: integer('sort_order').default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -13921,24 +13918,24 @@ export const exitDstAnalyses = pgTable('exit_dst_analyses', {
 export const exitFunds = pgTable('exit_funds', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Fund identification
   name: text('name').notNull(),
   vintage: integer('vintage').notNull(), // Fund vintage year
-  
+
   // Capital structure
   targetSize: decimal('target_size', { precision: 18, scale: 2 }),
   committedCapital: decimal('committed_capital', { precision: 18, scale: 2 }).default('0'),
   calledCapital: decimal('called_capital', { precision: 18, scale: 2 }).default('0'),
   distributedCapital: decimal('distributed_capital', { precision: 18, scale: 2 }).default('0'),
-  
+
   // Fee structure
   managementFeeRate: decimal('management_fee_rate', { precision: 5, scale: 4 }).default('0.02'),
   carriedInterestRate: decimal('carried_interest_rate', { precision: 5, scale: 4 }).default('0.20'),
-  
+
   // Status
   isActive: boolean('is_active').default(true),
-  
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -13951,48 +13948,48 @@ export const exitWaterfallStructures = pgTable('exit_waterfall_structures', {
   exitScenarioId: varchar('exit_scenario_id').notNull().references(() => exitScenarios.id, { onDelete: 'cascade' }),
   fundId: varchar('fund_id').references(() => exitFunds.id),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Structure configuration
   name: text('name').notNull(),
   structureType: waterfallStructureTypeEnum('structure_type').notNull().default('american'),
-  
+
   // Capital inputs
   totalProceeds: decimal('total_proceeds', { precision: 18, scale: 2 }).notNull(),
   totalCapitalContributed: decimal('total_capital_contributed', { precision: 18, scale: 2 }).notNull(),
   holdingPeriodYears: decimal('holding_period_years', { precision: 5, scale: 2 }).default('5'),
-  
+
   // Preferred return
   preferredReturn: decimal('preferred_return', { precision: 5, scale: 4 }).default('0.08'),
   preferredReturnCompounding: compoundingTypeEnum('preferred_return_compounding').default('annual'),
-  
+
   // GP catch-up
   catchUpPercentage: decimal('catch_up_percentage', { precision: 5, scale: 4 }).default('1.0'),
   catchUpTarget: decimal('catch_up_target', { precision: 5, scale: 4 }).default('0.20'),
-  
+
   // Carried interest
   carriedInterest: decimal('carried_interest', { precision: 5, scale: 4 }).default('0.20'),
   lpSplit: decimal('lp_split', { precision: 5, scale: 4 }).default('0.80'),
   gpSplit: decimal('gp_split', { precision: 5, scale: 4 }).default('0.20'),
-  
+
   // Custom tiers (for complex structures)
   customTiers: jsonb('custom_tiers'),
-  
+
   // Calculated distributions
   lpTotalDistribution: decimal('lp_total_distribution', { precision: 18, scale: 2 }),
   gpTotalDistribution: decimal('gp_total_distribution', { precision: 18, scale: 2 }),
   preferredReturnPaid: decimal('preferred_return_paid', { precision: 18, scale: 2 }),
   catchUpPaid: decimal('catch_up_paid', { precision: 18, scale: 2 }),
   carriedInterestPaid: decimal('carried_interest_paid', { precision: 18, scale: 2 }),
-  
+
   // Metrics
   lpMoic: decimal('lp_moic', { precision: 10, scale: 4 }),
   gpMoic: decimal('gp_moic', { precision: 10, scale: 4 }),
   lpIrr: decimal('lp_irr', { precision: 10, scale: 6 }),
   gpIrr: decimal('gp_irr', { precision: 10, scale: 6 }),
-  
+
   // GP clawback (for European waterfalls)
   gpClawbackAmount: decimal('gp_clawback_amount', { precision: 18, scale: 2 }),
-  
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -14008,17 +14005,17 @@ export const exitInvestors = pgTable('exit_investors', {
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   crmContactId: varchar('crm_contact_id').references(() => crmContacts.id),
   crmCompanyId: varchar('crm_company_id').references(() => crmCompanies.id),
-  
+
   // Investor details
   name: text('name').notNull(),
   type: varchar('type', { length: 20 }).notNull().default('lp'), // 'lp', 'gp', 'co-invest'
   email: varchar('email'),
-  
+
   // Commitment
   commitmentAmount: decimal('commitment_amount', { precision: 18, scale: 2 }),
   calledAmount: decimal('called_amount', { precision: 18, scale: 2 }).default('0'),
   distributedAmount: decimal('distributed_amount', { precision: 18, scale: 2 }).default('0'),
-  
+
   isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -14032,19 +14029,19 @@ export const exitCashFlows = pgTable('exit_cash_flows', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   exitScenarioId: varchar('exit_scenario_id').notNull().references(() => exitScenarios.id, { onDelete: 'cascade' }),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   period: integer('period').notNull(), // 0 = acquisition, 1+ = operating years
   periodDate: timestamp('period_date'),
-  
+
   // Cash flow components
   cashFlowType: varchar('cash_flow_type', { length: 20 }).notNull(), // 'investment', 'distribution', 'sale'
   amount: decimal('amount', { precision: 18, scale: 2 }).notNull(),
   description: text('description'),
-  
+
   // Cumulative tracking
   cumulativeInvested: decimal('cumulative_invested', { precision: 18, scale: 2 }),
   cumulativeDistributed: decimal('cumulative_distributed', { precision: 18, scale: 2 }),
-  
+
   sortOrder: integer('sort_order').default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
@@ -14059,11 +14056,11 @@ export const exitActivities = pgTable('exit_activities', {
   modelingProjectId: varchar('modeling_project_id').references(() => modelingProjects.id, { onDelete: 'cascade' }),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   userId: varchar('user_id').references(() => users.id),
-  
+
   activityType: varchar('activity_type', { length: 50 }).notNull(), // 'scenario_created', 'tax_calculated', 'waterfall_run', etc.
   description: text('description').notNull(),
   metadata: jsonb('metadata'),
-  
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   exitScenarioIdx: index('exit_activities_scenario_idx').on(table.exitScenarioId),
@@ -14110,34 +14107,34 @@ export const exitCashflowCategoryEnum = pgEnum("exit_cashflow_category", [
 // Exit Scenario Templates - Defines input schemas and calculation rules for each scenario type
 export const exitScenarioTemplates = pgTable('exit_scenario_templates', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
-  
+
   // Template identification
   code: varchar('code', { length: 50 }).notNull().unique(), // e.g., 'cash_sale_standard', '1031_full', 'dst_fractional'
   name: text('name').notNull(),
   description: text('description'),
   category: exitScenarioCategoryEnum('category').notNull(),
-  
+
   // Template configuration (JSON schemas)
   inputSchema: jsonb('input_schema').notNull(), // Zod-compatible schema for required inputs
   outputSchema: jsonb('output_schema'), // Expected output structure
   uiConfig: jsonb('ui_config'), // Form layout, field groups, validation hints
-  
+
   // Calculation engine references
   calculatorId: varchar('calculator_id', { length: 100 }), // Which engine to use
   ccimWorksheetType: varchar('ccim_worksheet_type', { length: 20 }), // 'ACSW', 'CFAW', 'both', null
-  
+
   // Template metadata
   version: integer('version').default(1),
   isSystemTemplate: boolean('is_system_template').default(true),
   isActive: boolean('is_active').default(true),
-  
+
   // Feature flags for template capabilities
   supportsMultiYear: boolean('supports_multi_year').default(true),
   supportsMortgageTracking: boolean('supports_mortgage_tracking').default(true),
   supportsBasisLedger: boolean('supports_basis_ledger').default(true),
   supportsTaxDeferral: boolean('supports_tax_deferral').default(false),
   supportsWaterfall: boolean('supports_waterfall').default(false),
-  
+
   sortOrder: integer('sort_order').default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -14151,12 +14148,12 @@ export const exitScenarioLoans = pgTable('exit_scenario_loans', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   exitScenarioId: varchar('exit_scenario_id').notNull().references(() => exitScenarios.id, { onDelete: 'cascade' }),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Loan identification
   name: text('name').notNull(),
   loanType: exitLoanTypeEnum('loan_type').notNull().default('permanent'),
   lenderName: text('lender_name'),
-  
+
   // Original loan terms (CCIM CFAW fields)
   originalAmount: decimal('original_amount', { precision: 18, scale: 2 }).notNull(),
   interestRate: decimal('interest_rate', { precision: 8, scale: 6 }).notNull(), // e.g., 0.0525 = 5.25%
@@ -14164,33 +14161,33 @@ export const exitScenarioLoans = pgTable('exit_scenario_loans', {
   loanTermMonths: integer('loan_term_months').notNull(),
   originationDate: timestamp('origination_date'),
   maturityDate: timestamp('maturity_date'),
-  
+
   // Payment structure
   isInterestOnly: boolean('is_interest_only').default(false),
   interestOnlyMonths: integer('interest_only_months').default(0),
   monthlyPayment: decimal('monthly_payment', { precision: 18, scale: 2 }),
   annualDebtService: decimal('annual_debt_service', { precision: 18, scale: 2 }),
-  
+
   // Fees and costs (CCIM fields)
   loanFees: decimal('loan_fees', { precision: 18, scale: 2 }).default('0'), // Points, origination
   loanCosts: decimal('loan_costs', { precision: 18, scale: 2 }).default('0'), // Legal, appraisal
   prepaymentPenaltyType: varchar('prepayment_penalty_type', { length: 30 }), // 'defeasance', 'yield_maintenance', 'step_down', 'none'
   prepaymentPenaltySchedule: jsonb('prepayment_penalty_schedule'), // Year-by-year penalties
-  
+
   // Balloon/refi assumptions
   hasBalloon: boolean('has_balloon').default(false),
   balloonAmount: decimal('balloon_amount', { precision: 18, scale: 2 }),
   balloonYear: integer('balloon_year'),
   assumedRefiRate: decimal('assumed_refi_rate', { precision: 8, scale: 6 }),
-  
+
   // Multi-year principal balance tracking (CCIM CFAW)
   principalBalancesByYear: jsonb('principal_balances_by_year'), // {1: 4850000, 2: 4695000, ...}
   interestPaidByYear: jsonb('interest_paid_by_year'),
   principalPaidByYear: jsonb('principal_paid_by_year'),
-  
+
   // Full amortization schedule
   amortizationSchedule: jsonb('amortization_schedule'), // Monthly breakdown
-  
+
   priority: integer('priority').default(1), // 1 = senior
   isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -14205,49 +14202,49 @@ export const exitScenarioBasisLedger = pgTable('exit_scenario_basis_ledger', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   exitScenarioId: varchar('exit_scenario_id').notNull().references(() => exitScenarios.id, { onDelete: 'cascade' }),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Original acquisition (CCIM ACSW Line 1-3)
   originalPurchasePrice: decimal('original_purchase_price', { precision: 18, scale: 2 }).notNull(),
   acquisitionCosts: decimal('acquisition_costs', { precision: 18, scale: 2 }).default('0'), // Closing, legal, etc.
   initialBasis: decimal('initial_basis', { precision: 18, scale: 2 }).notNull(),
-  
+
   // Land vs improvements allocation
   landValueAtAcquisition: decimal('land_value_at_acquisition', { precision: 18, scale: 2 }),
   improvementValueAtAcquisition: decimal('improvement_value_at_acquisition', { precision: 18, scale: 2 }),
   personalPropertyValue: decimal('personal_property_value', { precision: 18, scale: 2 }).default('0'),
-  
+
   // Capital additions over hold period (CCIM ACSW Line 4)
   capitalAdditions: decimal('capital_additions', { precision: 18, scale: 2 }).default('0'),
   capitalAdditionsByYear: jsonb('capital_additions_by_year'), // {1: 50000, 2: 75000, ...}
   capitalAdditionsDetail: jsonb('capital_additions_detail'), // [{year: 1, description: "Dock replacement", amount: 50000}]
-  
+
   // Depreciation tracking (CCIM ACSW Line 5-6)
   depreciationScheduleYears: integer('depreciation_schedule_years').default(39), // 39 commercial, 27.5 residential
   costRecoveryTaken: decimal('cost_recovery_taken', { precision: 18, scale: 2 }).default('0'),
   costRecoveryByYear: jsonb('cost_recovery_by_year'),
   straightLineRecapture: decimal('straight_line_recapture', { precision: 18, scale: 2 }).default('0'),
-  
+
   // Cost segregation study
   hasCostSegregation: boolean('has_cost_segregation').default(false),
   costSegregationBonus: decimal('cost_segregation_bonus', { precision: 18, scale: 2 }).default('0'),
   costSegregationYear: integer('cost_segregation_year'),
   acceleratedDepreciation: decimal('accelerated_depreciation', { precision: 18, scale: 2 }).default('0'),
-  
+
   // Partial sales adjustments (CCIM ACSW Line 7)
   partialSalesProceeds: decimal('partial_sales_proceeds', { precision: 18, scale: 2 }).default('0'),
   partialSalesDetail: jsonb('partial_sales_detail'),
-  
+
   // Adjusted basis calculation
   adjustedBasis: decimal('adjusted_basis', { precision: 18, scale: 2 }).notNull(),
-  
+
   // Prior 1031 exchange deferred gain (if applicable)
   prior1031DeferredGain: decimal('prior_1031_deferred_gain', { precision: 18, scale: 2 }).default('0'),
   prior1031CarryoverBasis: decimal('prior_1031_carryover_basis', { precision: 18, scale: 2 }),
-  
+
   // Suspended passive losses (CCIM ACSW)
   suspendedPassiveLosses: decimal('suspended_passive_losses', { precision: 18, scale: 2 }).default('0'),
   suspendedLossesByYear: jsonb('suspended_losses_by_year'),
-  
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -14260,12 +14257,12 @@ export const exitScenarioMultiYearCashflows = pgTable('exit_scenario_multi_year_
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   exitScenarioId: varchar('exit_scenario_id').notNull().references(() => exitScenarios.id, { onDelete: 'cascade' }),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Period identification
   year: integer('year').notNull(), // 1, 2, 3, 4, 5...
   periodStart: timestamp('period_start'),
   periodEnd: timestamp('period_end'),
-  
+
   // Revenue (CCIM CFAW Operating Statement)
   potentialRentalIncome: decimal('potential_rental_income', { precision: 18, scale: 2 }),
   vacancyLoss: decimal('vacancy_loss', { precision: 18, scale: 2 }),
@@ -14273,7 +14270,7 @@ export const exitScenarioMultiYearCashflows = pgTable('exit_scenario_multi_year_
   effectiveGrossIncome: decimal('effective_gross_income', { precision: 18, scale: 2 }),
   otherIncome: decimal('other_income', { precision: 18, scale: 2 }).default('0'),
   totalGrossIncome: decimal('total_gross_income', { precision: 18, scale: 2 }),
-  
+
   // Operating expenses (CCIM CFAW)
   operatingExpenses: decimal('operating_expenses', { precision: 18, scale: 2 }),
   operatingExpenseRatio: decimal('operating_expense_ratio', { precision: 8, scale: 6 }),
@@ -14283,40 +14280,40 @@ export const exitScenarioMultiYearCashflows = pgTable('exit_scenario_multi_year_
   repairs: decimal('repairs', { precision: 18, scale: 2 }),
   managementFee: decimal('management_fee', { precision: 18, scale: 2 }),
   managementFeeRate: decimal('management_fee_rate', { precision: 8, scale: 6 }),
-  
+
   // Net Operating Income
   noi: decimal('noi', { precision: 18, scale: 2 }).notNull(),
   noiGrowthRate: decimal('noi_growth_rate', { precision: 8, scale: 6 }),
-  
+
   // Debt Service (CCIM CFAW)
   annualDebtService: decimal('annual_debt_service', { precision: 18, scale: 2 }),
   debtServiceByLoan: jsonb('debt_service_by_loan'), // {loanId: amount, ...}
-  
+
   // Below-the-line items (CCIM CFAW)
   leasingCommissions: decimal('leasing_commissions', { precision: 18, scale: 2 }).default('0'),
   tenantImprovements: decimal('tenant_improvements', { precision: 18, scale: 2 }).default('0'),
   capitalExpenditures: decimal('capital_expenditures', { precision: 18, scale: 2 }).default('0'),
   fundedReserves: decimal('funded_reserves', { precision: 18, scale: 2 }).default('0'),
-  
+
   // Cash flow calculations
   cashFlowBeforeDebt: decimal('cash_flow_before_debt', { precision: 18, scale: 2 }),
   cashFlowAfterDebt: decimal('cash_flow_after_debt', { precision: 18, scale: 2 }),
   cashFlowAfterCapex: decimal('cash_flow_after_capex', { precision: 18, scale: 2 }),
-  
+
   // Key ratios (CCIM)
   dscr: decimal('dscr', { precision: 8, scale: 4 }),
   capRate: decimal('cap_rate', { precision: 8, scale: 6 }),
   cashOnCashReturn: decimal('cash_on_cash_return', { precision: 8, scale: 6 }),
-  
+
   // Cumulative tracking
   cumulativeNoi: decimal('cumulative_noi', { precision: 18, scale: 2 }),
   cumulativeCashFlow: decimal('cumulative_cash_flow', { precision: 18, scale: 2 }),
-  
+
   // Sync source tracking
   syncedFromRentRoll: boolean('synced_from_rent_roll').default(false),
   syncedFromModeling: boolean('synced_from_modeling').default(false),
   lastSyncAt: timestamp('last_sync_at'),
-  
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -14330,14 +14327,14 @@ export const exitScenarioTaxProfiles = pgTable('exit_scenario_tax_profiles', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   exitScenarioId: varchar('exit_scenario_id').notNull().references(() => exitScenarios.id, { onDelete: 'cascade' }),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Filer profile
   filingStatus: filingStatusEnum('filing_status').notNull().default('single'),
   adjustedGrossIncome: decimal('adjusted_gross_income', { precision: 18, scale: 2 }),
   stateOfResidence: varchar('state_of_residence', { length: 2 }).default('CA'),
   isQualifiedOpportunityZone: boolean('is_qualified_opportunity_zone').default(false),
   isRealEstateProfessional: boolean('is_real_estate_professional').default(false),
-  
+
   // Sale proceeds (CCIM ACSW Line 8-11)
   grossSalePrice: decimal('gross_sale_price', { precision: 18, scale: 2 }).notNull(),
   costsOfSale: decimal('costs_of_sale', { precision: 18, scale: 2 }).default('0'),
@@ -14345,31 +14342,31 @@ export const exitScenarioTaxProfiles = pgTable('exit_scenario_tax_profiles', {
   legalAndClosing: decimal('legal_and_closing', { precision: 18, scale: 2 }),
   transferTaxes: decimal('transfer_taxes', { precision: 18, scale: 2 }),
   netSalePrice: decimal('net_sale_price', { precision: 18, scale: 2 }),
-  
+
   // Participation payments / earnouts (CCIM ACSW Line 12)
   participationPayments: decimal('participation_payments', { precision: 18, scale: 2 }).default('0'),
   earnoutPayments: decimal('earnout_payments', { precision: 18, scale: 2 }).default('0'),
-  
+
   // Gain calculation (CCIM ACSW)
   totalGain: decimal('total_gain', { precision: 18, scale: 2 }),
-  
+
   // Suspended losses utilized (CCIM ACSW Line 14)
   suspendedLossesUtilized: decimal('suspended_losses_utilized', { precision: 18, scale: 2 }).default('0'),
   netGainAfterSuspendedLosses: decimal('net_gain_after_suspended_losses', { precision: 18, scale: 2 }),
-  
+
   // Capital gain breakdown (CCIM ACSW)
   longTermCapitalGain: decimal('long_term_capital_gain', { precision: 18, scale: 2 }),
   shortTermCapitalGain: decimal('short_term_capital_gain', { precision: 18, scale: 2 }).default('0'),
   unrecapturedSection1250: decimal('unrecaptured_section_1250', { precision: 18, scale: 2 }), // 25% bucket
   section1245Recapture: decimal('section_1245_recapture', { precision: 18, scale: 2 }).default('0'), // Ordinary income
-  
+
   // Tax rates applied
   federalLongTermRate: decimal('federal_long_term_rate', { precision: 8, scale: 6 }).default('0.20'),
   federalShortTermRate: decimal('federal_short_term_rate', { precision: 8, scale: 6 }).default('0.37'),
   section1250Rate: decimal('section_1250_rate', { precision: 8, scale: 6 }).default('0.25'),
   niitRate: decimal('niit_rate', { precision: 8, scale: 6 }).default('0.038'),
   stateTaxRate: decimal('state_tax_rate', { precision: 8, scale: 6 }),
-  
+
   // Tax liability breakdown
   federalLongTermTax: decimal('federal_long_term_tax', { precision: 18, scale: 2 }),
   federalShortTermTax: decimal('federal_short_term_tax', { precision: 18, scale: 2 }),
@@ -14379,16 +14376,16 @@ export const exitScenarioTaxProfiles = pgTable('exit_scenario_tax_profiles', {
   stateTax: decimal('state_tax', { precision: 18, scale: 2 }),
   totalTaxLiability: decimal('total_tax_liability', { precision: 18, scale: 2 }),
   effectiveTaxRate: decimal('effective_tax_rate', { precision: 8, scale: 6 }),
-  
+
   // After-tax results
   afterTaxProceeds: decimal('after_tax_proceeds', { precision: 18, scale: 2 }),
-  
+
   // Installment sale deferral (if applicable)
   isInstallmentSale: boolean('is_installment_sale').default(false),
   grossProfitRatio: decimal('gross_profit_ratio', { precision: 8, scale: 6 }),
   yearlyTaxableGain: jsonb('yearly_taxable_gain'),
   yearlyTaxLiability: jsonb('yearly_tax_liability'),
-  
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -14401,30 +14398,30 @@ export const exit1031ReplacementProperties = pgTable('exit_1031_replacement_prop
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   exchange1031Id: varchar('exchange_1031_id').notNull().references(() => exit1031Exchanges.id, { onDelete: 'cascade' }),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Property identification
   propertyName: text('property_name').notNull(),
   propertyAddress: text('property_address'),
   propertyType: text('property_type'),
-  
+
   // Values
   estimatedValue: decimal('estimated_value', { precision: 18, scale: 2 }),
   estimatedMortgage: decimal('estimated_mortgage', { precision: 18, scale: 2 }),
   estimatedEquity: decimal('estimated_equity', { precision: 18, scale: 2 }),
-  
+
   // Property metrics
   noi: decimal('noi', { precision: 18, scale: 2 }),
   capRate: decimal('cap_rate', { precision: 8, scale: 6 }),
-  
+
   // Status
   identificationDate: timestamp('identification_date'),
   isSelected: boolean('is_selected').default(false),
   closingDate: timestamp('closing_date'),
   status: varchar('status', { length: 30 }).default('identified'), // 'identified', 'under_contract', 'closed', 'rejected'
-  
+
   // Link to sales comp if available
   salesCompId: varchar('sales_comp_id'),
-  
+
   notes: text('notes'),
   sortOrder: integer('sort_order').default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -14439,45 +14436,45 @@ export const exitDstInterests = pgTable('exit_dst_interests', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   exitScenarioId: varchar('exit_scenario_id').notNull().references(() => exitScenarios.id, { onDelete: 'cascade' }),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // DST identification
   dstName: text('dst_name').notNull(),
   sponsorName: text('sponsor_name'),
-  
+
   // Investment structure
   fractionalInterest: decimal('fractional_interest', { precision: 10, scale: 8 }), // e.g., 0.0125 = 1.25%
   investmentAmount: decimal('investment_amount', { precision: 18, scale: 2 }).notNull(),
   minimumInvestment: decimal('minimum_investment', { precision: 18, scale: 2 }),
-  
+
   // Underlying property
   propertyType: text('property_type'),
   propertyLocation: text('property_location'),
   propertyValue: decimal('property_value', { precision: 18, scale: 2 }),
   leverageRatio: decimal('leverage_ratio', { precision: 8, scale: 6 }),
-  
+
   // Projected returns
   projectedDistributionRate: decimal('projected_distribution_rate', { precision: 8, scale: 6 }),
   projectedAnnualDistribution: decimal('projected_annual_distribution', { precision: 18, scale: 2 }),
   projectedHoldYears: integer('projected_hold_years'),
   projectedIrr: decimal('projected_irr', { precision: 8, scale: 6 }),
   projectedEquityMultiple: decimal('projected_equity_multiple', { precision: 8, scale: 4 }),
-  
+
   // Fee structure
   sponsorAcquisitionFee: decimal('sponsor_acquisition_fee', { precision: 8, scale: 6 }),
   sponsorAssetManagementFee: decimal('sponsor_asset_management_fee', { precision: 8, scale: 6 }),
   sponsorDispositionFee: decimal('sponsor_disposition_fee', { precision: 8, scale: 6 }),
   sellingCommission: decimal('selling_commission', { precision: 8, scale: 6 }),
   totalLoadedFees: decimal('total_loaded_fees', { precision: 18, scale: 2 }),
-  
+
   // Depreciation passthrough
   depreciationPassthrough: decimal('depreciation_passthrough', { precision: 18, scale: 2 }),
   annualK1Depreciation: decimal('annual_k1_depreciation', { precision: 18, scale: 2 }),
-  
+
   // Risk assessment
   riskScore: integer('risk_score'), // 1-10
   tenantCreditRating: varchar('tenant_credit_rating', { length: 10 }),
   leaseTermRemaining: decimal('lease_term_remaining', { precision: 8, scale: 2 }),
-  
+
   isSelected: boolean('is_selected').default(false),
   notes: text('notes'),
   sortOrder: integer('sort_order').default(0),
@@ -14493,29 +14490,29 @@ export const exitWaterfallTiers = pgTable('exit_waterfall_tiers', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   waterfallStructureId: varchar('waterfall_structure_id').notNull().references(() => exitWaterfallStructures.id, { onDelete: 'cascade' }),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Tier identification
   name: text('name').notNull(),
   tierNumber: integer('tier_number').notNull(),
-  
+
   // Hurdle definition
   hurdleType: varchar('hurdle_type', { length: 20 }).notNull().default('irr'), // 'irr', 'moic', 'pref_return'
   hurdleRate: decimal('hurdle_rate', { precision: 8, scale: 6 }).notNull(),
-  
+
   // Split structure
   lpSplit: decimal('lp_split', { precision: 8, scale: 6 }).notNull(),
   gpSplit: decimal('gp_split', { precision: 8, scale: 6 }).notNull(),
-  
+
   // Catch-up provision (if applicable)
   hasCatchUp: boolean('has_catch_up').default(false),
   catchUpPercentage: decimal('catch_up_percentage', { precision: 8, scale: 6 }),
   catchUpTarget: decimal('catch_up_target', { precision: 8, scale: 6 }),
-  
+
   // Calculated distributions
   tierAmount: decimal('tier_amount', { precision: 18, scale: 2 }),
   lpDistribution: decimal('lp_distribution', { precision: 18, scale: 2 }),
   gpDistribution: decimal('gp_distribution', { precision: 18, scale: 2 }),
-  
+
   sortOrder: integer('sort_order').default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -14530,23 +14527,23 @@ export const exitCapitalCalls = pgTable('exit_capital_calls', {
   waterfallStructureId: varchar('waterfall_structure_id').notNull().references(() => exitWaterfallStructures.id, { onDelete: 'cascade' }),
   fundId: varchar('fund_id').references(() => exitFunds.id),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Call details
   callNumber: integer('call_number').notNull(),
   callDate: timestamp('call_date'),
   dueDate: timestamp('due_date'),
-  
+
   // Amounts
   callAmount: decimal('call_amount', { precision: 18, scale: 2 }).notNull(),
   callPercentage: decimal('call_percentage', { precision: 8, scale: 6 }), // % of commitment
-  
+
   // Purpose
   purpose: text('purpose'), // 'acquisition', 'capex', 'working_capital', 'fees'
-  
+
   // Tracking
   amountReceived: decimal('amount_received', { precision: 18, scale: 2 }).default('0'),
   status: varchar('status', { length: 20 }).default('scheduled'), // 'scheduled', 'called', 'funded', 'defaulted'
-  
+
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -14561,23 +14558,23 @@ export const exitScenarioComparisons = pgTable('exit_scenario_comparisons', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   name: text('name').notNull(),
   description: text('description'),
-  
+
   // Scenarios included in comparison
   scenarioIds: jsonb('scenario_ids').notNull(), // Array of exit scenario IDs
-  
+
   // Comparison configuration
   metricsToCompare: jsonb('metrics_to_compare'), // ['irr', 'moic', 'netProceeds', 'taxLiability']
-  
+
   // Cached comparison results
   comparisonResults: jsonb('comparison_results'),
-  
+
   // Recommendation
   recommendedScenarioId: varchar('recommended_scenario_id'),
   recommendationReason: text('recommendation_reason'),
-  
+
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -14959,30 +14956,30 @@ export const capitalStacks = pgTable('capital_stacks', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
-  
+
   name: text('name').notNull(),
   description: text('description'),
   status: capitalStackStatusEnum('status').notNull().default('draft'),
-  
+
   // Total deal metrics
   purchasePrice: decimal('purchase_price', { precision: 18, scale: 2 }).notNull(),
   closingCosts: decimal('closing_costs', { precision: 18, scale: 2 }).default('0'),
   capexReserves: decimal('capex_reserves', { precision: 18, scale: 2 }).default('0'),
   workingCapital: decimal('working_capital', { precision: 18, scale: 2 }).default('0'),
   totalCapitalization: decimal('total_capitalization', { precision: 18, scale: 2 }).notNull(),
-  
+
   // Calculated metrics (denormalized for performance)
   totalDebt: decimal('total_debt', { precision: 18, scale: 2 }).default('0'),
   totalEquity: decimal('total_equity', { precision: 18, scale: 2 }).default('0'),
   blendedDebtRate: decimal('blended_debt_rate', { precision: 8, scale: 4 }),
   ltv: decimal('ltv', { precision: 8, scale: 4 }),
   debtYield: decimal('debt_yield', { precision: 8, scale: 4 }),
-  
+
   // Assumptions
   holdPeriodYears: integer('hold_period_years').default(5),
   exitCapRate: decimal('exit_cap_rate', { precision: 8, scale: 4 }),
   noiGrowthRate: decimal('noi_growth_rate', { precision: 8, scale: 4 }).default('0.02'),
-  
+
   isActive: boolean('is_active').default(true).notNull(),
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -14998,40 +14995,40 @@ export const debtTranches = pgTable('debt_tranches', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   capitalStackId: varchar('capital_stack_id').notNull().references(() => capitalStacks.id, { onDelete: 'cascade' }),
-  
+
   name: text('name').notNull(),
   trancheType: debtTrancheTypeEnum('tranche_type').notNull(),
   lenderName: text('lender_name'),
-  
+
   // Loan terms
   principal: decimal('principal', { precision: 18, scale: 2 }).notNull(),
   interestRate: decimal('interest_rate', { precision: 8, scale: 4 }).notNull(),
   spreadBps: integer('spread_bps').default(0), // Spread over index
   indexRate: text('index_rate'), // e.g., "SOFR", "Prime"
   floorRate: decimal('floor_rate', { precision: 8, scale: 4 }),
-  
+
   // Structure
   amortizationYears: integer('amortization_years'),
   termYears: integer('term_years').notNull(),
   interestOnlyMonths: integer('interest_only_months').default(0),
-  
+
   // Fees
   originationFeePct: decimal('origination_fee_pct', { precision: 8, scale: 4 }).default('0.01'),
   exitFeePct: decimal('exit_fee_pct', { precision: 8, scale: 4 }).default('0'),
   prepaymentPenalty: text('prepayment_penalty'), // Description of prepayment terms
-  
+
   // Covenants
   minDscr: decimal('min_dscr', { precision: 8, scale: 4 }),
   maxLtv: decimal('max_ltv', { precision: 8, scale: 4 }),
   minDebtYield: decimal('min_debt_yield', { precision: 8, scale: 4 }),
-  
+
   // Priority
   priority: integer('priority').notNull().default(1), // 1 = most senior
-  
+
   // Calculated fields
   annualDebtService: decimal('annual_debt_service', { precision: 18, scale: 2 }),
   monthlyPayment: decimal('monthly_payment', { precision: 18, scale: 2 }),
-  
+
   sortOrder: integer('sort_order').default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -15046,35 +15043,35 @@ export const equityLayers = pgTable('equity_layers', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   capitalStackId: varchar('capital_stack_id').notNull().references(() => capitalStacks.id, { onDelete: 'cascade' }),
-  
+
   name: text('name').notNull(),
   layerType: equityLayerTypeEnum('layer_type').notNull(),
-  
+
   // Contribution
   commitmentAmount: decimal('commitment_amount', { precision: 18, scale: 2 }).notNull(),
   fundedAmount: decimal('funded_amount', { precision: 18, scale: 2 }).default('0'),
   ownershipPct: decimal('ownership_pct', { precision: 8, scale: 4 }).notNull(),
-  
+
   // Returns
   preferredReturn: decimal('preferred_return', { precision: 8, scale: 4 }), // Annual pref rate
   preferredReturnType: text('preferred_return_type'), // 'cumulative', 'non_cumulative', 'compounding'
   isParticipating: boolean('is_participating').default(true), // Participates after pref
-  
+
   // Waterfall position
   waterfallPriority: integer('waterfall_priority').notNull().default(1),
   catchUpPct: decimal('catch_up_pct', { precision: 8, scale: 4 }), // GP catch-up percentage
-  
+
   // Promote structure (for GP layers)
   promoteTiers: jsonb('promote_tiers').$type<{
     irrHurdle: number;
     gpSplit: number;
     lpSplit: number;
   }[]>(),
-  
+
   // Investor info
   investorName: text('investor_name'),
   investorType: text('investor_type'), // 'gp', 'lp', 'co_invest', 'fundOfFunds'
-  
+
   sortOrder: integer('sort_order').default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -15089,45 +15086,45 @@ export const capitalStackProjections = pgTable('capital_stack_projections', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   capitalStackId: varchar('capital_stack_id').notNull().references(() => capitalStacks.id, { onDelete: 'cascade' }),
-  
+
   year: integer('year').notNull(), // 0 = acquisition, 1+ = operating years
-  
+
   // Operating metrics
   grossRevenue: decimal('gross_revenue', { precision: 18, scale: 2 }),
   operatingExpenses: decimal('operating_expenses', { precision: 18, scale: 2 }),
   noi: decimal('noi', { precision: 18, scale: 2 }),
   capex: decimal('capex', { precision: 18, scale: 2 }).default('0'),
   ncf: decimal('ncf', { precision: 18, scale: 2 }), // Net cash flow after capex
-  
+
   // Debt service
   totalDebtService: decimal('total_debt_service', { precision: 18, scale: 2 }),
   principalPaydown: decimal('principal_paydown', { precision: 18, scale: 2 }),
   interestExpense: decimal('interest_expense', { precision: 18, scale: 2 }),
-  
+
   // Cash available
   cashFlowBeforeDebt: decimal('cash_flow_before_debt', { precision: 18, scale: 2 }),
   cashFlowAfterDebt: decimal('cash_flow_after_debt', { precision: 18, scale: 2 }),
-  
+
   // Distributions
   lpDistribution: decimal('lp_distribution', { precision: 18, scale: 2 }),
   gpDistribution: decimal('gp_distribution', { precision: 18, scale: 2 }),
   totalDistribution: decimal('total_distribution', { precision: 18, scale: 2 }),
-  
+
   // Coverage ratios
   dscr: decimal('dscr', { precision: 8, scale: 4 }),
   debtYield: decimal('debt_yield', { precision: 8, scale: 4 }),
-  
+
   // Valuations (for exit year)
   exitValue: decimal('exit_value', { precision: 18, scale: 2 }),
   loanPayoff: decimal('loan_payoff', { precision: 18, scale: 2 }),
   netSaleProceeds: decimal('net_sale_proceeds', { precision: 18, scale: 2 }),
-  
+
   // Returns
   cumulativeCashFlow: decimal('cumulative_cash_flow', { precision: 18, scale: 2 }),
   equityMultiple: decimal('equity_multiple', { precision: 8, scale: 4 }),
   irr: decimal('irr', { precision: 8, scale: 4 }),
   cashOnCash: decimal('cash_on_cash', { precision: 8, scale: 4 }),
-  
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -15146,12 +15143,12 @@ export const icCommitteeMembers = pgTable('ic_committee_members', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   userId: varchar('user_id').notNull().references(() => users.id),
-  
+
   role: text('role').notNull(), // 'chair', 'voting_member', 'observer', 'advisor'
   title: text('title'), // e.g., "Managing Partner", "CIO"
   votingWeight: decimal('voting_weight', { precision: 5, scale: 2 }).default('1.0'),
   isRequired: boolean('is_required').default(false), // Must vote for quorum
-  
+
   isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -15167,13 +15164,13 @@ export const icMemos = pgTable('ic_memos', {
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
   capitalStackId: varchar('capital_stack_id').references(() => capitalStacks.id),
-  
+
   // Memo info
   title: text('title').notNull(),
   memoNumber: text('memo_number'), // Auto-generated IC-2024-001 format
   version: integer('version').notNull().default(1),
   status: icMemoStatusEnum('status').notNull().default('draft'),
-  
+
   // Content sections (structured for PDF generation)
   executiveSummary: text('executive_summary'),
   investmentThesis: text('investment_thesis'),
@@ -15187,7 +15184,7 @@ export const icMemos = pgTable('ic_memos', {
     targetIrr: number;
     targetEquityMultiple: number;
   }>(),
-  
+
   // Auto-populated sections
   rentRollSummary: jsonb('rent_roll_summary').$type<{
     totalUnits: number;
@@ -15200,23 +15197,23 @@ export const icMemos = pgTable('ic_memos', {
     completedTasks: number;
     criticalIssues: string[];
   }>(),
-  
+
   riskFactors: text('risk_factors').array(),
   mitigationStrategies: text('mitigation_strategies'),
   recommendation: text('recommendation'), // 'proceed', 'pass', 'conditional'
   conditions: text('conditions').array(), // Conditions for approval
-  
+
   // Voting requirements
   quorumRequired: integer('quorum_required').default(3),
   approvalsRequired: integer('approvals_required').default(2),
-  
+
   // Approval tracking
   submittedAt: timestamp('submitted_at'),
   submittedBy: varchar('submitted_by').references(() => users.id),
   reviewDeadline: timestamp('review_deadline'),
   approvedAt: timestamp('approved_at'),
   rejectedAt: timestamp('rejected_at'),
-  
+
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -15234,11 +15231,11 @@ export const icVotes = pgTable('ic_votes', {
   memoId: varchar('memo_id').notNull().references(() => icMemos.id, { onDelete: 'cascade' }),
   memberId: varchar('member_id').notNull().references(() => icCommitteeMembers.id),
   userId: varchar('user_id').notNull().references(() => users.id),
-  
+
   vote: icVoteTypeEnum('vote').notNull(),
   comments: text('comments'),
   conditions: text('conditions').array(), // For conditional approvals
-  
+
   votedAt: timestamp('voted_at').defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index('ic_votes_org_idx').on(table.orgId),
@@ -15253,18 +15250,18 @@ export const icComments = pgTable('ic_comments', {
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   memoId: varchar('memo_id').notNull().references(() => icMemos.id, { onDelete: 'cascade' }),
   parentId: varchar('parent_id'), // For threaded replies
-  
+
   userId: varchar('user_id').notNull().references(() => users.id),
   content: text('content').notNull(),
-  
+
   // Mentions and references
   mentions: text('mentions').array(), // User IDs mentioned
   section: text('section'), // Which memo section this relates to
-  
+
   isResolved: boolean('is_resolved').default(false),
   resolvedBy: varchar('resolved_by').references(() => users.id),
   resolvedAt: timestamp('resolved_at'),
-  
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -15285,38 +15282,38 @@ export const underwritingAssumptions = pgTable('underwriting_assumptions', {
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
   capitalStackId: varchar('capital_stack_id').references(() => capitalStacks.id),
-  
+
   // Assumption period
   year: integer('year').notNull(),
   month: integer('month'), // Optional for monthly tracking
   period: text('period'), // 'annual', 'quarterly', 'monthly'
-  
+
   // Revenue assumptions
   grossPotentialRevenue: decimal('gross_potential_revenue', { precision: 18, scale: 2 }),
   occupancyRate: decimal('occupancy_rate', { precision: 8, scale: 4 }),
   effectiveGrossRevenue: decimal('effective_gross_revenue', { precision: 18, scale: 2 }),
-  
+
   // Expense assumptions
   operatingExpenses: decimal('operating_expenses', { precision: 18, scale: 2 }),
   expenseRatio: decimal('expense_ratio', { precision: 8, scale: 4 }),
-  
+
   // NOI and below
   noi: decimal('noi', { precision: 18, scale: 2 }),
   capex: decimal('capex', { precision: 18, scale: 2 }),
   debtService: decimal('debt_service', { precision: 18, scale: 2 }),
   cashFlow: decimal('cash_flow', { precision: 18, scale: 2 }),
-  
+
   // Segment breakdown
   slipRevenue: decimal('slip_revenue', { precision: 18, scale: 2 }),
   fuelRevenue: decimal('fuel_revenue', { precision: 18, scale: 2 }),
   shipStoreRevenue: decimal('ship_store_revenue', { precision: 18, scale: 2 }),
   otherRevenue: decimal('other_revenue', { precision: 18, scale: 2 }),
-  
+
   // Lock status
   isLocked: boolean('is_locked').default(false),
   lockedAt: timestamp('locked_at'),
   lockedBy: varchar('locked_by').references(() => users.id),
-  
+
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -15332,39 +15329,39 @@ export const actualPerformance = pgTable('actual_performance', {
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
   assumptionId: varchar('assumption_id').references(() => underwritingAssumptions.id),
-  
+
   // Period
   year: integer('year').notNull(),
   month: integer('month'),
   period: text('period'),
   periodStart: date('period_start'),
   periodEnd: date('period_end'),
-  
+
   // Revenue actuals
   grossPotentialRevenue: decimal('gross_potential_revenue', { precision: 18, scale: 2 }),
   occupancyRate: decimal('occupancy_rate', { precision: 8, scale: 4 }),
   effectiveGrossRevenue: decimal('effective_gross_revenue', { precision: 18, scale: 2 }),
-  
+
   // Expense actuals
   operatingExpenses: decimal('operating_expenses', { precision: 18, scale: 2 }),
   expenseRatio: decimal('expense_ratio', { precision: 8, scale: 4 }),
-  
+
   // NOI and below
   noi: decimal('noi', { precision: 18, scale: 2 }),
   capex: decimal('capex', { precision: 18, scale: 2 }),
   debtService: decimal('debt_service', { precision: 18, scale: 2 }),
   cashFlow: decimal('cash_flow', { precision: 18, scale: 2 }),
-  
+
   // Segment breakdown
   slipRevenue: decimal('slip_revenue', { precision: 18, scale: 2 }),
   fuelRevenue: decimal('fuel_revenue', { precision: 18, scale: 2 }),
   shipStoreRevenue: decimal('ship_store_revenue', { precision: 18, scale: 2 }),
   otherRevenue: decimal('other_revenue', { precision: 18, scale: 2 }),
-  
+
   // Source tracking
   dataSource: text('data_source'), // 'manual', 'rent_roll_sync', 'fuel_sync', 'ship_store_sync'
   syncedAt: timestamp('synced_at'),
-  
+
   notes: text('notes'),
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -15382,25 +15379,25 @@ export const varianceAlerts = pgTable('variance_alerts', {
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
   actualPerformanceId: varchar('actual_performance_id').references(() => actualPerformance.id),
-  
+
   metric: text('metric').notNull(), // 'occupancy', 'noi', 'revenue', etc.
   assumedValue: decimal('assumed_value', { precision: 18, scale: 2 }),
   actualValue: decimal('actual_value', { precision: 18, scale: 2 }),
   variancePct: decimal('variance_pct', { precision: 8, scale: 4 }),
   varianceAmount: decimal('variance_amount', { precision: 18, scale: 2 }),
-  
+
   severity: varianceAlertSeverityEnum('severity').notNull(),
   thresholdPct: decimal('threshold_pct', { precision: 8, scale: 4 }), // Threshold that triggered
-  
+
   message: text('message').notNull(),
   recommendation: text('recommendation'),
-  
+
   // Resolution
   isResolved: boolean('is_resolved').default(false),
   resolvedBy: varchar('resolved_by').references(() => users.id),
   resolvedAt: timestamp('resolved_at'),
   resolutionNotes: text('resolution_notes'),
-  
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index('variance_alerts_org_idx').on(table.orgId),
@@ -15418,17 +15415,17 @@ export const varianceAlerts = pgTable('variance_alerts', {
 export const portfolios = pgTable('portfolios', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   name: text('name').notNull(),
   description: text('description'),
   fundName: text('fund_name'), // Associated fund
   vintage: integer('vintage'), // Investment year
-  
+
   // Portfolio targets
   targetIrr: decimal('target_irr', { precision: 8, scale: 4 }),
   targetEquityMultiple: decimal('target_equity_multiple', { precision: 8, scale: 4 }),
   targetHoldPeriod: integer('target_hold_period'),
-  
+
   // Aggregate metrics (denormalized, updated via triggers/sync)
   totalAssets: integer('total_assets').default(0),
   totalInvested: decimal('total_invested', { precision: 18, scale: 2 }).default('0'),
@@ -15436,7 +15433,7 @@ export const portfolios = pgTable('portfolios', {
   totalNoi: decimal('total_noi', { precision: 18, scale: 2 }).default('0'),
   weightedCapRate: decimal('weighted_cap_rate', { precision: 8, scale: 4 }),
   portfolioIrr: decimal('portfolio_irr', { precision: 8, scale: 4 }),
-  
+
   isActive: boolean('is_active').default(true).notNull(),
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -15452,31 +15449,31 @@ export const portfolioAssets = pgTable('portfolio_assets', {
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   portfolioId: varchar('portfolio_id').notNull().references(() => portfolios.id, { onDelete: 'cascade' }),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id),
-  
+
   // Acquisition info
   acquisitionDate: date('acquisition_date'),
   acquisitionPrice: decimal('acquisition_price', { precision: 18, scale: 2 }),
   equityInvested: decimal('equity_invested', { precision: 18, scale: 2 }),
-  
+
   // Current valuation
   currentValue: decimal('current_value', { precision: 18, scale: 2 }),
   currentNoi: decimal('current_noi', { precision: 18, scale: 2 }),
   impliedCapRate: decimal('implied_cap_rate', { precision: 8, scale: 4 }),
-  
+
   // Location for geographic analysis
   state: text('state'),
   region: text('region'),
   market: text('market'),
-  
+
   // Asset-level metrics
   occupancyRate: decimal('occupancy_rate', { precision: 8, scale: 4 }),
   debtBalance: decimal('debt_balance', { precision: 18, scale: 2 }),
   ltv: decimal('ltv', { precision: 8, scale: 4 }),
   dscr: decimal('dscr', { precision: 8, scale: 4 }),
-  
+
   // Status
   status: text('status').default('active'), // 'active', 'under_loi', 'sold'
-  
+
   sortOrder: integer('sort_order').default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -15494,28 +15491,28 @@ export const covenantTracking = pgTable('covenant_tracking', {
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
   debtTrancheId: varchar('debt_tranche_id').references(() => debtTranches.id),
-  
+
   covenantType: covenantTypeEnum('covenant_type').notNull(),
   covenantName: text('covenant_name').notNull(),
-  
+
   // Threshold
   requiredValue: decimal('required_value', { precision: 18, scale: 4 }).notNull(),
   comparisonOperator: text('comparison_operator').notNull(), // 'gte', 'lte', 'eq'
-  
+
   // Current status
   currentValue: decimal('current_value', { precision: 18, scale: 4 }),
   status: covenantStatusEnum('status').notNull().default('in_compliance'),
   cushionPct: decimal('cushion_pct', { precision: 8, scale: 4 }), // How far from breach
-  
+
   // Testing schedule
   testingFrequency: text('testing_frequency'), // 'monthly', 'quarterly', 'annual'
   lastTestedAt: timestamp('last_tested_at'),
   nextTestDate: date('next_test_date'),
-  
+
   // Breach history
   lastBreachDate: date('last_breach_date'),
   breachCount: integer('breach_count').default(0),
-  
+
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -15535,12 +15532,12 @@ export const covenantTracking = pgTable('covenant_tracking', {
 export const lpInvestors = pgTable('lp_investors', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Investor info
   name: text('name').notNull(),
   entityType: text('entity_type'), // 'individual', 'trust', 'llc', 'corporation', 'fund_of_funds'
   taxId: text('tax_id'), // EIN or SSN (encrypted)
-  
+
   // Contact
   contactName: text('contact_name'),
   email: text('email'),
@@ -15552,16 +15549,16 @@ export const lpInvestors = pgTable('lp_investors', {
     zip: string;
     country: string;
   }>(),
-  
+
   // Accreditation
   isAccredited: boolean('is_accredited').default(true),
   accreditationDate: date('accreditation_date'),
   accreditationExpiry: date('accreditation_expiry'),
-  
+
   // Portal access
   portalUserId: varchar('portal_user_id').references(() => users.id),
   lastLoginAt: timestamp('last_login_at'),
-  
+
   notes: text('notes'),
   isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -15580,20 +15577,20 @@ export const lpCommitments = pgTable('lp_commitments', {
   portfolioId: varchar('portfolio_id').references(() => portfolios.id),
   modelingProjectId: varchar('modeling_project_id').references(() => modelingProjects.id),
   equityLayerId: varchar('equity_layer_id').references(() => equityLayers.id),
-  
+
   // Commitment details
   commitmentAmount: decimal('commitment_amount', { precision: 18, scale: 2 }).notNull(),
   fundedAmount: decimal('funded_amount', { precision: 18, scale: 2 }).default('0'),
   unfundedCommitment: decimal('unfunded_commitment', { precision: 18, scale: 2 }),
   ownershipPct: decimal('ownership_pct', { precision: 8, scale: 6 }),
-  
+
   // Dates
   commitmentDate: date('commitment_date'),
   firstFundingDate: date('first_funding_date'),
-  
+
   // Status
   status: text('status').default('active'), // 'pending', 'active', 'fully_funded', 'redeemed'
-  
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -15609,22 +15606,22 @@ export const lpDistributions = pgTable('lp_distributions', {
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   commitmentId: varchar('commitment_id').notNull().references(() => lpCommitments.id),
   investorId: varchar('investor_id').notNull().references(() => lpInvestors.id),
-  
+
   // Distribution details
   distributionDate: date('distribution_date').notNull(),
   distributionType: text('distribution_type').notNull(), // 'operating', 'return_of_capital', 'capital_gain', 'refinance'
-  
+
   grossAmount: decimal('gross_amount', { precision: 18, scale: 2 }).notNull(),
   withholding: decimal('withholding', { precision: 18, scale: 2 }).default('0'),
   netAmount: decimal('net_amount', { precision: 18, scale: 2 }).notNull(),
-  
+
   // Waterfall tier this came from
   waterfallTier: text('waterfall_tier'),
-  
+
   // Cumulative tracking
   cumulativeDistributed: decimal('cumulative_distributed', { precision: 18, scale: 2 }),
   remainingBasis: decimal('remaining_basis', { precision: 18, scale: 2 }),
-  
+
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
@@ -15640,10 +15637,10 @@ export const lpCapitalAccounts = pgTable('lp_capital_accounts', {
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   commitmentId: varchar('commitment_id').notNull().references(() => lpCommitments.id),
   investorId: varchar('investor_id').notNull().references(() => lpInvestors.id),
-  
+
   // Period
   periodEnd: date('period_end').notNull(),
-  
+
   // Balances
   beginningBalance: decimal('beginning_balance', { precision: 18, scale: 2 }).notNull(),
   contributions: decimal('contributions', { precision: 18, scale: 2 }).default('0'),
@@ -15651,10 +15648,10 @@ export const lpCapitalAccounts = pgTable('lp_capital_accounts', {
   income: decimal('income', { precision: 18, scale: 2 }).default('0'),
   unrealizedGainLoss: decimal('unrealized_gain_loss', { precision: 18, scale: 2 }).default('0'),
   endingBalance: decimal('ending_balance', { precision: 18, scale: 2 }).notNull(),
-  
+
   // NAV per unit
   navPerUnit: decimal('nav_per_unit', { precision: 18, scale: 6 }),
-  
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index('lp_capital_accounts_org_idx').on(table.orgId),
@@ -15673,23 +15670,23 @@ export const exitReadinessAssessments = pgTable('exit_readiness_assessments', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
-  
+
   // Overall scoring
   overallScore: integer('overall_score'), // 0-100
   status: exitReadinessStatusEnum('status').notNull().default('not_ready'),
-  
+
   // Category scores
   documentationScore: integer('documentation_score'),
   financialScore: integer('financial_score'),
   operationalScore: integer('operational_score'),
   legalScore: integer('legal_score'),
   marketTimingScore: integer('market_timing_score'),
-  
+
   // Market analysis
   currentMarketCapRate: decimal('current_market_cap_rate', { precision: 8, scale: 4 }),
   suggestedListingPrice: decimal('suggested_listing_price', { precision: 18, scale: 2 }),
   optimalExitWindow: text('optimal_exit_window'), // e.g., "Q2-Q3 2025"
-  
+
   // Recommendations
   topIssues: text('top_issues').array(),
   recommendations: jsonb('recommendations').$type<{
@@ -15699,11 +15696,11 @@ export const exitReadinessAssessments = pgTable('exit_readiness_assessments', {
     priority: 'high' | 'medium' | 'low';
     estimatedDays: number;
   }[]>(),
-  
+
   // Timeline
   estimatedTimeToReady: integer('estimated_time_to_ready'), // Days
   targetExitDate: date('target_exit_date'),
-  
+
   assessedBy: varchar('assessed_by').references(() => users.id),
   assessedAt: timestamp('assessed_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -15720,23 +15717,23 @@ export const exitReadinessChecklist = pgTable('exit_readiness_checklist', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   assessmentId: varchar('assessment_id').notNull().references(() => exitReadinessAssessments.id, { onDelete: 'cascade' }),
-  
+
   category: text('category').notNull(), // 'documentation', 'financial', 'operational', 'legal', 'market'
   item: text('item').notNull(),
   description: text('description'),
-  
+
   // Status
   isComplete: boolean('is_complete').default(false),
   completedBy: varchar('completed_by').references(() => users.id),
   completedAt: timestamp('completed_at'),
-  
+
   // Scoring impact
   weight: integer('weight').default(1), // Impact on category score
-  
+
   // Notes
   notes: text('notes'),
   blockers: text('blockers'),
-  
+
   sortOrder: integer('sort_order').default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -16016,20 +16013,20 @@ export type InsertCustomDocumentType = z.infer<typeof insertCustomDocumentTypeSc
 export const pnlCategories = pgTable('pnl_categories', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Hierarchy
   parentId: varchar('parent_id'), // Self-referencing for subcategories (null = top-level)
   categoryType: pnlCategoryTypeEnum('category_type').notNull(), // revenue, cogs, opex, payroll
-  
+
   // Display
   name: text('name').notNull(), // e.g., "Wet Slip Revenue", "Fuel COGS"
   description: text('description'),
   sortOrder: integer('sort_order').default(0),
-  
+
   // Settings
   isActive: boolean('is_active').default(true).notNull(),
   isDefault: boolean('is_default').default(false).notNull(), // System-provided default categories
-  
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -16150,7 +16147,7 @@ export const docIntelUploads = pgTable('doc_intel_uploads', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
-  
+
   // File info
   filename: text('filename').notNull(),
   originalName: text('original_name').notNull(),
@@ -16158,15 +16155,15 @@ export const docIntelUploads = pgTable('doc_intel_uploads', {
   mimeType: text('mime_type').notNull(),
   fileSize: integer('file_size').notNull(),
   hashSha256: text('hash_sha256'), // For duplicate detection
-  
+
   // Classification
   docType: docIntelDocTypeEnum('doc_type'),
   year: integer('year'), // Fiscal year of document
-  
+
   // Processing status
   status: docIntelProcessingStatusEnum('status').notNull().default('uploaded'),
   errorMessage: text('error_message'),
-  
+
   // Holding Station - Staging queue before processing
   holdingStatus: holdingStationStatusEnum('holding_status').default('staging'),
   holdingTags: text('holding_tags').array(), // User-defined tags for organization
@@ -16176,19 +16173,19 @@ export const docIntelUploads = pgTable('doc_intel_uploads', {
   validationErrors: jsonb('validation_errors').$type<string[]>(), // Validation issues
   validatedAt: timestamp('validated_at'),
   validatedBy: varchar('validated_by').references(() => users.id),
-  
+
   // Review progress
   wizardStep: integer('wizard_step').default(1), // Current step in review wizard (1-5)
   reviewStartedAt: timestamp('review_started_at'),
   reviewCompletedAt: timestamp('review_completed_at'),
-  
+
   // Approval workflow
   approvalNotes: text('approval_notes'), // Notes from reviewer before applying
   approvedAt: timestamp('approved_at'),
   approvedBy: varchar('approved_by').references(() => users.id),
   appliedAt: timestamp('applied_at'), // When data was written to model
   appliedBy: varchar('applied_by').references(() => users.id),
-  
+
   // Metadata
   uploadedBy: varchar('uploaded_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -16206,34 +16203,34 @@ export const docIntelExtractedItems = pgTable('doc_intel_extracted_items', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   uploadId: varchar('upload_id').notNull().references(() => docIntelUploads.id, { onDelete: 'cascade' }),
-  
+
   // Extracted raw data
   rawText: text('raw_text').notNull(), // Original text from document
   amount: decimal('amount', { precision: 18, scale: 2 }),
   extractedDate: text('extracted_date'), // Date string found in document
   sourcePage: integer('source_page'), // Page/sheet number
   sourceRow: integer('source_row'), // Row number in spreadsheet
-  
+
   // AI suggestions
   categorySuggested: varchar('category_suggested').references(() => pnlCategories.id),
   confidenceScore: decimal('confidence_score', { precision: 5, scale: 4 }), // 0.0000 to 1.0000
   matchedRuleId: varchar('matched_rule_id'), // Which rule triggered this suggestion
-  
+
   // Department assignment (AI suggested + user confirmed)
   departmentSuggested: docIntelDepartmentEnum('department_suggested'),
   departmentConfirmed: docIntelDepartmentEnum('department_confirmed'),
-  
-  
+
+
   // Category tier (Revenue, COGS, Expense) for simplified P&L categorization
   categoryTierSuggested: pnlCategoryTierEnum('category_tier_suggested'),
   categoryTierConfirmed: pnlCategoryTierEnum('category_tier_confirmed'),
-  
+
   // Marina-specific departments (different options for Revenue/COGS vs Expense)
   revenueCogsDeptSuggested: revenueCogsDeptEnum('revenue_cogs_dept_suggested'),
   revenueCogsDeptConfirmed: revenueCogsDeptEnum('revenue_cogs_dept_confirmed'),
   expenseDeptSuggested: expenseDeptEnum('expense_dept_suggested'),
   expenseDeptConfirmed: expenseDeptEnum('expense_dept_confirmed'),
-  
+
   // Period mapping for multi-column P&L extraction
   periodKey: text('period_key'), // e.g., "2024", "Q1 2024", "Jan 2024"
   columnIndex: integer('column_index'), // Column position in source spreadsheet
@@ -16243,14 +16240,14 @@ export const docIntelExtractedItems = pgTable('doc_intel_extracted_items', {
   amountConfirmed: decimal('amount_confirmed', { precision: 18, scale: 2 }),
   confirmedBy: varchar('confirmed_by').references(() => users.id),
   confirmedAt: timestamp('confirmed_at'),
-  
+
   // Review notes
   reviewNotes: text('review_notes'),
-  
+
   // Destination mapping
   targetTable: text('target_table'), // e.g., 'pnl_lines', 'rent_roll_entries'
   targetRecordId: varchar('target_record_id'), // ID of created record after import
-  
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -16264,20 +16261,20 @@ export const docIntelExtractedItems = pgTable('doc_intel_extracted_items', {
 export const docIntelCategoryMappings = pgTable('doc_intel_category_mappings', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Rule definition
   name: text('name').notNull(), // e.g., "Dock Revenue Pattern"
   pattern: text('pattern').notNull(), // Regex pattern to match
   categoryId: varchar('category_id').notNull().references(() => pnlCategories.id),
   targetTable: text('target_table').notNull().default('pnl_lines'), // Destination table
-  
+
   // Scope
   projectId: varchar('project_id').references(() => modelingProjects.id), // null = org-wide
-  
+
   // Confidence & priority
   confidenceThreshold: decimal('confidence_threshold', { precision: 5, scale: 4 }).default('0.8'),
   priority: integer('priority').default(0), // Higher = checked first
-  
+
   isActive: boolean('is_active').default(true).notNull(),
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -16293,22 +16290,22 @@ export const docIntelCategoryMappings = pgTable('doc_intel_category_mappings', {
 export const docIntelLearningRules = pgTable('doc_intel_learning_rules', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Rule definition
   name: text('name').notNull(),
   ruleJson: jsonb('rule_json').notNull(), // Complex rule with conditions
   categoryId: varchar('category_id').notNull().references(() => pnlCategories.id),
   targetTable: text('target_table').notNull().default('pnl_lines'),
-  
+
   // Learning metrics
   timesApplied: integer('times_applied').default(0),
   timesConfirmed: integer('times_confirmed').default(0),
   timesRejected: integer('times_rejected').default(0),
   confidenceScore: decimal('confidence_score', { precision: 5, scale: 4 }).default('0.5'),
-  
+
   // Scope
   projectId: varchar('project_id').references(() => modelingProjects.id), // null = org-wide
-  
+
   isActive: boolean('is_active').default(true).notNull(),
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -16324,16 +16321,16 @@ export const docIntelTrainingExamples = pgTable('doc_intel_training_examples', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   extractedItemId: varchar('extracted_item_id').references(() => docIntelExtractedItems.id, { onDelete: 'cascade' }),
-  
+
   // Training data
   textSnippet: text('text_snippet').notNull(), // The text that was categorized
   labelCategoryId: varchar('label_category_id').notNull().references(() => pnlCategories.id),
   labelTable: text('label_table').notNull(), // Target table for this type
-  
+
   // Context
   projectId: varchar('project_id').references(() => modelingProjects.id),
   docType: docIntelDocTypeEnum('doc_type'),
-  
+
   // Tracking
   createdBy: varchar('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -16348,21 +16345,21 @@ export const pnlLines = pgTable('pnl_lines', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
-  
+
   // Category & description
   categoryId: varchar('category_id').references(() => pnlCategories.id),
   lineDescription: text('line_description').notNull(),
-  
+
   // Financial data
   amount: decimal('amount', { precision: 18, scale: 2 }).notNull(),
   fiscalYear: integer('fiscal_year'),
   fiscalMonth: integer('fiscal_month'), // 1-12, null for annual
-  
+
   // Source tracking
   sourceUploadId: varchar('source_upload_id').references(() => docIntelUploads.id),
   sourceItemId: varchar('source_item_id').references(() => docIntelExtractedItems.id),
   isManualEntry: boolean('is_manual_entry').default(false).notNull(),
-  
+
   notes: text('notes'),
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -16503,28 +16500,28 @@ export const modelingActuals = pgTable('modeling_actuals', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
-  
+
   // Period information
   year: integer('year').notNull(),
   month: integer('month').notNull(), // 1-12
-  
+
   // Category classification (matches P&L structure)
   category: text('category').notNull(), // 'Revenue', 'COGS', 'Expenses'
   subcategory: text('subcategory').notNull(), // e.g., 'Wet Slips', 'Fuel Sales', 'Payroll'
   lineItemDescription: text('line_item_description'),
-  
+
   // Amounts
   amount: decimal('amount', { precision: 15, scale: 2 }).notNull(),
-  
+
   // Data source tracking for audit
   dataSource: actualsDataSourceEnum('data_source').notNull(),
   sourceRecordId: varchar('source_record_id'), // ID from source system
   sourceRecordType: text('source_record_type'), // e.g., 'rent_roll_entry', 'fuel_sale', 'ship_store_transaction'
-  
+
   // Sync metadata
   syncedAt: timestamp('synced_at').defaultNow().notNull(),
   syncJobId: varchar('sync_job_id'),
-  
+
   // Audit
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -16553,7 +16550,7 @@ export const modelingFinancialPeriods = pgTable('modeling_financial_periods', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
-  
+
   // Period identification
   periodType: financialPeriodTypeEnum('period_type').notNull(),
   periodLabel: text('period_label').notNull(), // Display label: "2024", "T12", "Year 1", etc.
@@ -16561,7 +16558,7 @@ export const modelingFinancialPeriods = pgTable('modeling_financial_periods', {
   periodStartDate: date('period_start_date'), // Actual date range for the period
   periodEndDate: date('period_end_date'),
   sortOrder: integer('sort_order').default(0), // For ordering in dropdown
-  
+
   // Revenue metrics
   totalRevenue: decimal('total_revenue', { precision: 15, scale: 2 }),
   wetSlipRevenue: decimal('wet_slip_revenue', { precision: 15, scale: 2 }),
@@ -16569,7 +16566,7 @@ export const modelingFinancialPeriods = pgTable('modeling_financial_periods', {
   fuelRevenue: decimal('fuel_revenue', { precision: 15, scale: 2 }),
   shipStoreRevenue: decimal('ship_store_revenue', { precision: 15, scale: 2 }),
   otherRevenue: decimal('other_revenue', { precision: 15, scale: 2 }),
-  
+
   // Expense metrics
   totalExpenses: decimal('total_expenses', { precision: 15, scale: 2 }),
   operatingExpenses: decimal('operating_expenses', { precision: 15, scale: 2 }),
@@ -16579,30 +16576,30 @@ export const modelingFinancialPeriods = pgTable('modeling_financial_periods', {
   maintenanceExpenses: decimal('maintenance_expenses', { precision: 15, scale: 2 }),
   managementFees: decimal('management_fees', { precision: 15, scale: 2 }),
   otherExpenses: decimal('other_expenses', { precision: 15, scale: 2 }),
-  
+
   // Profitability metrics
   grossProfit: decimal('gross_profit', { precision: 15, scale: 2 }),
   noi: decimal('noi', { precision: 15, scale: 2 }), // Net Operating Income
   ebitda: decimal('ebitda', { precision: 15, scale: 2 }),
-  
+
   // Pricing inputs for this period
   purchasePrice: decimal('purchase_price', { precision: 15, scale: 2 }),
-  
+
   // Calculated yields based on period NOI and purchase price
   capRate: decimal('cap_rate', { precision: 5, scale: 4 }), // e.g., 0.0725 = 7.25%
   pricePerUnit: decimal('price_per_unit', { precision: 15, scale: 2 }),
   noiMargin: decimal('noi_margin', { precision: 5, scale: 4 }), // NOI / Total Revenue
-  
+
   // Occupancy metrics (if applicable)
   occupancyRate: decimal('occupancy_rate', { precision: 5, scale: 4 }),
   totalUnits: integer('total_units'),
   occupiedUnits: integer('occupied_units'),
-  
+
   // Data quality indicators
   isProjected: boolean('is_projected').default(false), // true for Year 1 or future projections
   dataCompleteness: decimal('data_completeness', { precision: 5, scale: 2 }), // 0-100% completeness score
   lastCalculatedAt: timestamp('last_calculated_at'),
-  
+
   // Audit fields
   notes: text('notes'),
   createdBy: varchar('created_by').references(() => users.id),
@@ -16638,38 +16635,38 @@ export const modelingPeriodAdjustments = pgTable('modeling_period_adjustments', 
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
-  
+
   // Period this adjustment applies to
   periodLabel: text('period_label').notNull(), // e.g., "2024", "T12", "Year 1"
-  
+
   // Scope of adjustment
   scope: adjustmentScopeEnum('scope').notNull(),
-  
+
   // Target identifier based on scope:
   // - line_item: "category|subcategory|lineItemDescription" 
   // - subcategory: "category|subcategory"
   // - category: "category"
   targetIdentifier: text('target_identifier').notNull(),
-  
+
   // Human-readable label for the target
   targetLabel: text('target_label').notNull(),
-  
+
   // Adjustment configuration
   adjustmentType: adjustmentTypeEnum('adjustment_type').notNull(),
   adjustmentValue: decimal('adjustment_value', { precision: 15, scale: 2 }).notNull(),
-  
+
   // Original value before adjustment (for reference/display)
   originalValue: decimal('original_value', { precision: 15, scale: 2 }),
-  
+
   // Calculated adjusted value
   adjustedValue: decimal('adjusted_value', { precision: 15, scale: 2 }),
-  
+
   // Reason for the adjustment (required for audit trail)
   reason: text('reason').notNull(),
-  
+
   // Whether this adjustment is currently active
   isActive: boolean('is_active').default(true).notNull(),
-  
+
   // Audit fields
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -16691,27 +16688,27 @@ export const operationsDataSyncJobs = pgTable('operations_data_sync_jobs', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
-  
+
   // Job configuration
   syncType: text('sync_type').notNull(), // 'full', 'incremental', 'manual'
   dataSources: text('data_sources').array().notNull(), // ['rent_roll', 'fuel_sales', 'ship_store']
   dateRangeStart: date('date_range_start'),
   dateRangeEnd: date('date_range_end'),
-  
+
   // Job status
   status: syncStatusEnum('status').notNull().default('pending'),
   startedAt: timestamp('started_at'),
   completedAt: timestamp('completed_at'),
-  
+
   // Results
   recordsProcessed: integer('records_processed').default(0),
   recordsImported: integer('records_imported').default(0),
   recordsSkipped: integer('records_skipped').default(0),
   recordsFailed: integer('records_failed').default(0),
-  
+
   // Error tracking
   errorLog: jsonb('error_log').default(sql`'[]'`),
-  
+
   // Metadata
   triggeredBy: varchar('triggered_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -16726,25 +16723,25 @@ export const operationsDataSyncJobs = pgTable('operations_data_sync_jobs', {
 export const operationsDataMappings = pgTable('operations_data_mappings', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Source configuration
   dataSource: actualsDataSourceEnum('data_source').notNull(),
   sourceField: text('source_field').notNull(), // e.g., 'fuel_type', 'slip_type', 'category_id'
   sourceValue: text('source_value'), // Optional filter value
-  
+
   // Target P&L mapping
   targetCategory: text('target_category').notNull(), // 'Revenue', 'COGS', 'Expenses'
   targetSubcategory: text('target_subcategory').notNull(), // e.g., 'Fuel Sales', 'Ship Store'
   targetDescription: text('target_description'), // Optional line item description
-  
+
   // Calculation rules
   amountField: text('amount_field').notNull(), // Which field to use for amount
   aggregationMethod: text('aggregation_method').notNull().default('sum'), // 'sum', 'count', 'average'
-  
+
   // Status
   isActive: boolean('is_active').notNull().default(true),
   priority: integer('priority').default(0), // For ordering when multiple mappings match
-  
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -16757,26 +16754,26 @@ export const operationsDataMappings = pgTable('operations_data_mappings', {
 export const quickbooksIntegrations = pgTable('quickbooks_integrations', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id).unique(),
-  
+
   // OAuth tokens (encrypted at rest)
   accessToken: text('access_token'),
   refreshToken: text('refresh_token'),
   realmId: text('realm_id'), // QuickBooks company ID
   tokenExpiresAt: timestamp('token_expires_at'),
-  
+
   // Connection status
   isConnected: boolean('is_connected').notNull().default(false),
   lastSyncAt: timestamp('last_sync_at'),
   syncFrequency: integer('sync_frequency').default(60), // minutes
   autoSyncEnabled: boolean('auto_sync_enabled').default(false),
-  
+
   // Chart of Accounts mapping
   chartOfAccountsMapping: jsonb('coa_mapping').default(sql`'{}'`), // Maps QB accounts to P&L categories
-  
+
   // Sync configuration
   syncStartDate: date('sync_start_date'), // How far back to sync
   excludedAccounts: text('excluded_accounts').array().default(sql`'{}'`), // Account IDs to skip
-  
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -16790,24 +16787,24 @@ export const quickbooksSyncLogs = pgTable('quickbooks_sync_logs', {
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   integrationId: varchar('integration_id').notNull().references(() => quickbooksIntegrations.id, { onDelete: 'cascade' }),
   modelingProjectId: varchar('modeling_project_id').references(() => modelingProjects.id, { onDelete: 'cascade' }),
-  
+
   // Sync details
   syncType: text('sync_type').notNull(), // 'full', 'incremental', 'manual'
   status: syncStatusEnum('status').notNull().default('pending'),
-  
+
   // Period synced
   periodStart: date('period_start'),
   periodEnd: date('period_end'),
-  
+
   // Results
   transactionsProcessed: integer('transactions_processed').default(0),
   transactionsImported: integer('transactions_imported').default(0),
   transactionsSkipped: integer('transactions_skipped').default(0),
   transactionsFailed: integer('transactions_failed').default(0),
-  
+
   // Error tracking
   errorLog: jsonb('error_log').default(sql`'[]'`),
-  
+
   // Timestamps
   startedAt: timestamp('started_at'),
   completedAt: timestamp('completed_at'),
@@ -16825,31 +16822,31 @@ export const modelingScenarioVersions = pgTable('modeling_scenario_versions', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
-  
+
   // Scenario identification
   scenarioType: text('scenario_type').notNull(), // 'base', 'aggressive', 'conservative', 'custom'
   name: text('name').notNull(),
   description: text('description'),
-  
+
   // Version tracking
   version: integer('version').notNull().default(1),
   isCurrentVersion: boolean('is_current_version').notNull().default(true),
   previousVersionId: varchar('previous_version_id').references((): any => modelingScenarioVersions.id),
-  
+
   // Scenario configuration
   revenueGrowthRate: decimal('revenue_growth_rate', { precision: 5, scale: 2 }),
   expenseGrowthRate: decimal('expense_growth_rate', { precision: 5, scale: 2 }),
   exitCapRate: decimal('exit_cap_rate', { precision: 5, scale: 2 }),
-  
+
   // Additional assumptions (flexible JSON)
   assumptions: jsonb('assumptions').default(sql`'{}'`), // Stores all granular assumptions
-  
+
   // Approval workflow
   status: text('status').notNull().default('draft'), // 'draft', 'pending_approval', 'approved', 'rejected'
   approvedBy: varchar('approved_by').references(() => users.id),
   approvedAt: timestamp('approved_at'),
   approvalNotes: text('approval_notes'),
-  
+
   // Audit trail
   createdBy: varchar('created_by').notNull().references(() => users.id),
   updatedBy: varchar('updated_by').references(() => users.id),
@@ -16871,23 +16868,23 @@ export const modelingAuditLog = pgTable('modeling_audit_log', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
-  
+
   // Event details
   eventType: text('event_type').notNull(), // 'scenario_created', 'scenario_updated', 'scenario_approved', 'data_synced', 'export_generated', etc.
   entityType: text('entity_type').notNull(), // 'scenario', 'actuals', 'assumption', 'export'
   entityId: varchar('entity_id'),
-  
+
   // Change tracking
   previousValue: jsonb('previous_value'),
   newValue: jsonb('new_value'),
   changedFields: text('changed_fields').array(),
-  
+
   // Context
   userId: varchar('user_id').notNull().references(() => users.id),
   userEmail: text('user_email'),
   ipAddress: text('ip_address'),
   userAgent: text('user_agent'),
-  
+
   // Timestamp
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
@@ -16905,22 +16902,22 @@ export const modelingApprovalRequests = pgTable('modeling_approval_requests', {
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
   scenarioVersionId: varchar('scenario_version_id').notNull().references(() => modelingScenarioVersions.id),
-  
+
   // Request details
   title: text('title').notNull(),
   description: text('description'),
   requestedBy: varchar('requested_by').notNull().references(() => users.id),
   requestedAt: timestamp('requested_at').defaultNow().notNull(),
-  
+
   // Workflow configuration
   requiredApprovers: jsonb('required_approvers').notNull(), // Array of user IDs required to approve
   quorumCount: integer('quorum_count').notNull().default(1), // Minimum approvals needed
   deadline: timestamp('deadline'),
-  
+
   // Status tracking
   status: text('status').notNull().default('pending'), // 'pending', 'approved', 'rejected', 'expired'
   completedAt: timestamp('completed_at'),
-  
+
   // Audit
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -16936,12 +16933,12 @@ export const modelingApproverDecisions = pgTable('modeling_approver_decisions', 
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   approvalRequestId: varchar('approval_request_id').notNull().references(() => modelingApprovalRequests.id, { onDelete: 'cascade' }),
   approverId: varchar('approver_id').notNull().references(() => users.id),
-  
+
   // Decision
   decision: text('decision').notNull(), // 'approved', 'rejected', 'pending'
   comments: text('comments'),
   decidedAt: timestamp('decided_at'),
-  
+
   // Audit
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
@@ -16956,17 +16953,17 @@ export const modelingCommentThreads = pgTable('modeling_comment_threads', {
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
   scenarioVersionId: varchar('scenario_version_id').references(() => modelingScenarioVersions.id),
-  
+
   // Thread context
   targetType: text('target_type').notNull(), // 'scenario', 'metric', 'assumption', 'line_item'
   targetId: text('target_id'), // ID of the specific element being discussed
   targetLabel: text('target_label'), // Human-readable label (e.g., "Revenue Growth Rate")
-  
+
   // Thread status
   status: text('status').notNull().default('open'), // 'open', 'resolved', 'archived'
   resolvedBy: varchar('resolved_by').references(() => users.id),
   resolvedAt: timestamp('resolved_at'),
-  
+
   // Metadata
   createdBy: varchar('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -16982,17 +16979,17 @@ export const modelingCommentThreads = pgTable('modeling_comment_threads', {
 export const modelingComments = pgTable('modeling_comments', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   threadId: varchar('thread_id').notNull().references(() => modelingCommentThreads.id, { onDelete: 'cascade' }),
-  
+
   // Comment content
   content: text('content').notNull(),
-  
+
   // Mentions and reactions
   mentions: jsonb('mentions'), // Array of user IDs mentioned
-  
+
   // Edit tracking
   isEdited: boolean('is_edited').default(false),
   editedAt: timestamp('edited_at'),
-  
+
   // Metadata
   createdBy: varchar('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -17007,30 +17004,30 @@ export const modelingSensitivityMatrices = pgTable('modeling_sensitivity_matrice
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
   scenarioVersionId: varchar('scenario_version_id').references(() => modelingScenarioVersions.id),
-  
+
   // Analysis configuration
   analysisType: text('analysis_type').notNull(), // 'exit_cap_vs_growth', 'revenue_vs_expenses', 'irr_sensitivity', 'custom'
   name: text('name'),
   description: text('description'),
-  
+
   // Variable configuration
   xAxisVariable: text('x_axis_variable').notNull(), // 'exit_cap_rate', 'revenue_growth', etc.
   xAxisMin: numeric('x_axis_min'),
   xAxisMax: numeric('x_axis_max'),
   xAxisStep: numeric('x_axis_step'),
-  
+
   yAxisVariable: text('y_axis_variable').notNull(),
   yAxisMin: numeric('y_axis_min'),
   yAxisMax: numeric('y_axis_max'),
   yAxisStep: numeric('y_axis_step'),
-  
+
   // Target metric being analyzed
   targetMetric: text('target_metric').notNull(), // 'irr', 'equity_multiple', 'noi', 'exit_value'
-  
+
   // Computed matrix data
   matrixData: jsonb('matrix_data').notNull(), // 2D array of computed values
   baselineValue: numeric('baseline_value'),
-  
+
   // Metadata
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -17047,15 +17044,15 @@ export const documentIntelligenceJobs = pgTable('document_intelligence_jobs', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   modelingProjectId: varchar('modeling_project_id').references(() => modelingProjects.id),
-  
+
   documentPath: text('document_path').notNull(),
   documentType: text('document_type').notNull(), // 'p&l', 'rent_roll'
   fileName: text('file_name'),
-  
+
   status: text('status').notNull().default('pending'), // 'pending', 'processing', 'completed', 'failed'
   itemsExtracted: integer('items_extracted'),
   errorMessage: text('error_message'),
-  
+
   createdBy: varchar('created_by').notNull().references(() => users.id),
   startedAt: timestamp('started_at'),
   completedAt: timestamp('completed_at'),
@@ -17070,16 +17067,16 @@ export const documentIntelligenceResults = pgTable('document_intelligence_result
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   jobId: varchar('job_id').notNull().references(() => documentIntelligenceJobs.id, { onDelete: 'cascade' }),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   resultType: text('result_type').notNull(), // 'p&l', 'rent_roll'
   extractedData: jsonb('extracted_data').notNull(), // Full extraction result
   confidence: numeric('confidence'), // Overall confidence score 0-1
-  
+
   reviewStatus: text('review_status').notNull().default('pending'), // 'pending', 'approved', 'rejected'
   reviewedBy: varchar('reviewed_by').references(() => users.id),
   reviewedAt: timestamp('reviewed_at'),
   modifications: jsonb('modifications'), // User modifications before approval
-  
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   jobIdx: index('doc_intel_result_job_idx').on(table.jobId),
@@ -17218,30 +17215,30 @@ export type InsertDocumentIntelligenceResult = z.infer<typeof insertDocumentInte
 export const demographicsCache = pgTable('demographics_cache', {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Geographic identifiers
   stateCode: varchar('state_code', { length: 2 }).notNull(),
   region: varchar('region', { length: 50 }),
   county: varchar('county', { length: 100 }),
-  
+
   // FRED API data series
   seriesId: varchar('series_id', { length: 50 }).notNull(), // e.g., 'FLFLFN', 'MEHOINUSFLA'
   seriesName: varchar('series_name', { length: 200 }).notNull(),
   category: varchar('category', { length: 50 }).notNull(), // 'population', 'income', 'employment', 'housing'
-  
+
   // Data values (array of historical data points)
   dataPoints: jsonb('data_points').notNull().default(sql`'[]'`), // [{date, value}, ...]
   latestValue: numeric('latest_value'),
   latestDate: date('latest_date'),
-  
+
   // Computed metrics
   yoyChange: numeric('yoy_change'), // Year-over-year change
   fiveYearCagr: numeric('five_year_cagr'), // 5-year compound annual growth rate
-  
+
   // Cache management
   fetchedAt: timestamp('fetched_at').notNull().defaultNow(),
   expiresAt: timestamp('expires_at').notNull(),
-  
+
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (table) => ({
@@ -17256,16 +17253,16 @@ export const demographicsCache = pgTable('demographics_cache', {
 export const regionalMarketStats = pgTable('regional_market_stats', {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Geographic identifiers
   stateCode: varchar('state_code', { length: 2 }).notNull(),
   region: varchar('region', { length: 50 }),
-  
+
   // Marina supply metrics
   totalMarinas: integer('total_marinas').notNull().default(0),
   totalWetSlips: integer('total_wet_slips').notNull().default(0),
   totalDryRacks: integer('total_dry_racks').notNull().default(0),
-  
+
   // Transaction metrics
   transactionCount: integer('transaction_count').notNull().default(0),
   avgSalePrice: numeric('avg_sale_price'),
@@ -17274,19 +17271,19 @@ export const regionalMarketStats = pgTable('regional_market_stats', {
   medianPricePerSlip: numeric('median_price_per_slip'),
   avgCapRate: numeric('avg_cap_rate'),
   medianCapRate: numeric('median_cap_rate'),
-  
+
   // Time-based trends (last 5 years)
   priceGrowth1Yr: numeric('price_growth_1yr'),
   priceGrowth3Yr: numeric('price_growth_3yr'),
   priceGrowth5Yr: numeric('price_growth_5yr'),
-  
+
   // Detailed time series
   yearlyStats: jsonb('yearly_stats').notNull().default(sql`'[]'`), // [{year, txCount, avgPrice, avgPPS}, ...]
-  
+
   // Computation metadata
   computedAt: timestamp('computed_at').notNull().defaultNow(),
   dataAsOf: date('data_as_of'), // Latest transaction date included
-  
+
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (table) => ({
@@ -17325,34 +17322,34 @@ export interface DemographicSummary {
   medianAge: number;
   medianAgeMale?: number;
   medianAgeFemale?: number;
-  
+
   // Age Analytics
   ageDistribution?: Record<string, number>;
   ageByGender?: Record<string, any>;
   generationalCohorts?: Record<string, number>;
-  
+
   // Income Analytics
   medianHouseholdIncome: number;
   meanHouseholdIncome?: number;
   perCapitaIncome?: number;
   medianFamilyIncome?: number;
   incomeDistribution?: Record<string, number>;
-  
+
   // Education Analytics
   educationLevels?: Record<string, number>;
-  
+
   // Employment Analytics
   employmentStats?: Record<string, number>;
   industryDistribution?: Record<string, number>;
-  
+
   // Housing Analytics
   housingStats?: Record<string, number>;
   householdSize?: number;
   medianHomeValue?: number;
-  
+
   // Race & Ethnicity
   raceEthnicity?: Record<string, number>;
-  
+
   // Geographic
   populationDensity?: number;
   geographicLevel?: string;
@@ -17365,7 +17362,7 @@ export interface DemographicSummary {
 export const locationDemographicsCache = pgTable('location_demographics_cache', {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Geographic identifiers
   latitude: real('latitude').notNull(),
   longitude: real('longitude').notNull(),
@@ -17373,23 +17370,23 @@ export const locationDemographicsCache = pgTable('location_demographics_cache', 
   city: varchar('city', { length: 100 }),
   stateCode: varchar('state_code', { length: 2 }),
   zipCode: varchar('zip_code', { length: 10 }),
-  
+
   // Census geography identifiers
   fipsState: varchar('fips_state', { length: 2 }),
   fipsCounty: varchar('fips_county', { length: 3 }),
   fipsTract: varchar('fips_tract', { length: 6 }),
   geographicLevel: varchar('geographic_level', { length: 20 }),
-  
+
   // Trade area configuration
   radiusMiles: real('radius_miles'), // null = point location
-  
+
   // Demographic data (full Census response)
   demographicData: jsonb('demographic_data').notNull(),
-  
+
   // Cache management
   fetchedAt: timestamp('fetched_at').notNull().defaultNow(),
   expiresAt: timestamp('expires_at').notNull(),
-  
+
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (table) => ({
@@ -17413,21 +17410,21 @@ export const demographicProjectLocations = pgTable('demographic_project_location
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
-  
+
   // Location data
   address: text('address').notNull(),
   latitude: real('latitude').notNull(),
   longitude: real('longitude').notNull(),
   label: varchar('label', { length: 100 }),
-  
+
   // Trade area configuration
   analysisMode: varchar('analysis_mode', { length: 20 }).notNull().default('distance'), // 'distance' | 'drivetime'
   distanceRings: jsonb('distance_rings').notNull().default(sql`'[1]'::jsonb`), // Array of miles: [1, 3, 5, 10]
   driveTimes: jsonb('drive_times').notNull().default(sql`'[]'::jsonb`), // Array of minutes: [5, 10, 15, 20]
-  
+
   // Display order
   sortOrder: integer('sort_order').default(0),
-  
+
   // Metadata
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -17452,25 +17449,25 @@ export type InsertDemographicProjectLocation = z.infer<typeof insertDemographicP
 // ============================================================================
 export const backgroundJobs = pgTable('background_jobs', {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  
+
   type: varchar('type', { length: 50 }).notNull(),
   status: varchar('status', { length: 20 }).notNull().default('pending'),
   priority: integer('priority').notNull().default(2),
-  
+
   payload: jsonb('payload').notNull().default(sql`'{}'`),
   result: jsonb('result'),
   error: text('error'),
-  
+
   orgId: varchar('org_id').references(() => organizations.id),
   userId: varchar('user_id').references(() => users.id),
-  
+
   scheduledFor: timestamp('scheduled_for').notNull().defaultNow(),
   startedAt: timestamp('started_at'),
   completedAt: timestamp('completed_at'),
-  
+
   maxRetries: integer('max_retries').notNull().default(3),
   retryCount: integer('retry_count').notNull().default(0),
-  
+
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (table) => ({
@@ -17501,18 +17498,18 @@ export const dealSalesComps = pgTable('deal_sales_comps', {
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   dealId: varchar('deal_id').notNull().references(() => crmDeals.id, { onDelete: 'cascade' }),
   salesCompId: varchar('sales_comp_id').notNull().references(() => salesComps.id, { onDelete: 'cascade' }),
-  
+
   // Comparison metadata
   relevanceScore: integer('relevance_score'), // 0-100 relevance scoring
   isPrimary: boolean('is_primary').default(false), // Primary comparable
   notes: text('notes'),
   comparisonType: varchar('comparison_type', { length: 50 }).default('similar'), // similar, aspirational, market_floor, market_ceiling
-  
+
   // Auto-calculated similarity metrics
   distanceMiles: real('distance_miles'), // Geographic distance
   priceDifferencePercent: real('price_difference_percent'),
   sizeDifferencePercent: real('size_difference_percent'),
-  
+
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -17538,17 +17535,17 @@ export const dealRateComps = pgTable('deal_rate_comps', {
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   dealId: varchar('deal_id').notNull().references(() => crmDeals.id, { onDelete: 'cascade' }),
   rateCompId: varchar('rate_comp_id').notNull().references(() => rateComps.id, { onDelete: 'cascade' }),
-  
+
   // Comparison metadata
   relevanceScore: integer('relevance_score'), // 0-100 relevance scoring
   isPrimary: boolean('is_primary').default(false),
   notes: text('notes'),
   comparisonType: varchar('comparison_type', { length: 50 }).default('benchmark'), // benchmark, premium, discount, market_rate
-  
+
   // Rate comparison metrics
   rateVariancePercent: real('rate_variance_percent'),
   occupancyComparison: real('occupancy_comparison'),
-  
+
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -17574,11 +17571,11 @@ export const dealVdrLinks = pgTable('deal_vdr_links', {
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   dealId: varchar('deal_id').notNull().references(() => crmDeals.id, { onDelete: 'cascade' }),
   vdrFolderId: varchar('vdr_folder_id').notNull().references(() => vdrFolders.id, { onDelete: 'cascade' }),
-  
+
   // Link metadata
   linkType: varchar('link_type', { length: 50 }).notNull().default('deal_room'), // deal_room, due_diligence, closing, archive
   isActive: boolean('is_active').notNull().default(true),
-  
+
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 }, (table) => ({
@@ -17602,28 +17599,28 @@ export const dealDdConversions = pgTable('deal_dd_conversions', {
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   dealId: varchar('deal_id').notNull().references(() => crmDeals.id),
   ddProjectId: varchar('dd_project_id').notNull().references(() => projects.id),
-  
+
   // Conversion metadata
   conversionType: varchar('conversion_type', { length: 50 }).notNull().default('manual'), // manual, automated, api
   conversionStatus: varchar('conversion_status', { length: 50 }).notNull().default('completed'), // pending, completed, failed, rolled_back
-  
+
   // What was migrated
   contactsMigrated: integer('contacts_migrated').default(0),
   documentsMigrated: integer('documents_migrated').default(0),
   taskTemplateUsed: varchar('task_template_used'),
-  
+
   // VDR auto-creation
   vdrFolderCreated: boolean('vdr_folder_created').default(false),
   vdrFolderId: varchar('vdr_folder_id').references(() => vdrFolders.id),
   vdrTemplateUsed: varchar('vdr_template_used'),
-  
+
   // Audit trail
   convertedBy: varchar('converted_by').notNull().references(() => users.id),
   convertedAt: timestamp('converted_at').notNull().defaultNow(),
   rollbackAt: timestamp('rollback_at'),
   rollbackBy: varchar('rollback_by').references(() => users.id),
   rollbackReason: text('rollback_reason'),
-  
+
   notes: text('notes'),
   metadata: jsonb('metadata').default(sql`'{}'`),
 }, (table) => ({
@@ -17648,12 +17645,12 @@ export const propertySalesComps = pgTable('property_sales_comps', {
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   propertyId: varchar('property_id').notNull().references(() => crmProperties.id, { onDelete: 'cascade' }),
   salesCompId: varchar('sales_comp_id').notNull().references(() => salesComps.id, { onDelete: 'cascade' }),
-  
+
   // Comparison metadata
   relevanceScore: integer('relevance_score'),
   isPrimary: boolean('is_primary').default(false),
   notes: text('notes'),
-  
+
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 }, (table) => ({
@@ -17677,12 +17674,12 @@ export const propertyRateComps = pgTable('property_rate_comps', {
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   propertyId: varchar('property_id').notNull().references(() => crmProperties.id, { onDelete: 'cascade' }),
   rateCompId: varchar('rate_comp_id').notNull().references(() => rateComps.id, { onDelete: 'cascade' }),
-  
+
   // Comparison metadata
   relevanceScore: integer('relevance_score'),
   isPrimary: boolean('is_primary').default(false),
   notes: text('notes'),
-  
+
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 }, (table) => ({
@@ -17705,11 +17702,11 @@ export const modelingProjectComps = pgTable('modeling_project_comps', {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
-  
+
   // Can reference either sales comp or rate comp
   salesCompId: varchar('sales_comp_id').references(() => salesComps.id, { onDelete: 'cascade' }),
   rateCompId: varchar('rate_comp_id').references(() => rateComps.id, { onDelete: 'cascade' }),
-  
+
   // Comparison metadata
   compType: varchar('comp_type', { length: 20 }).notNull(), // 'sales' or 'rate'
   relevanceScore: integer('relevance_score'),
@@ -17717,7 +17714,7 @@ export const modelingProjectComps = pgTable('modeling_project_comps', {
   usedInValuation: boolean('used_in_valuation').default(false), // Whether used in cap rate or valuation calc
   weight: real('weight').default(1.0), // Weighting for blended analysis
   notes: text('notes'),
-  
+
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 }, (table) => ({
@@ -17766,27 +17763,27 @@ export const crossModuleAuditLog = pgTable('cross_module_audit_log', {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   userId: varchar('user_id').notNull().references(() => users.id),
-  
+
   // Source and target modules
   sourceModule: varchar('source_module', { length: 50 }).notNull(), // crm, sales_comps, rate_comps, dd, vdr, modeling
   targetModule: varchar('target_module', { length: 50 }).notNull(),
-  
+
   // Entity references
   sourceEntityType: varchar('source_entity_type', { length: 50 }).notNull(), // deal, property, project, folder, etc.
   sourceEntityId: varchar('source_entity_id').notNull(),
   targetEntityType: varchar('target_entity_type', { length: 50 }).notNull(),
   targetEntityId: varchar('target_entity_id').notNull(),
-  
+
   // Action details
   action: varchar('action', { length: 50 }).notNull(), // link, unlink, convert, sync, import, export
   actionStatus: varchar('action_status', { length: 20 }).notNull().default('completed'), // pending, completed, failed
-  
+
   // Context
   ipAddress: text('ip_address'),
   userAgent: text('user_agent'),
   metadata: jsonb('metadata').default(sql`'{}'`),
   errorMessage: text('error_message'),
-  
+
   createdAt: timestamp('created_at').notNull().defaultNow(),
 }, (table) => ({
   orgIdx: index('cross_module_audit_org_idx').on(table.orgId),
@@ -17811,10 +17808,10 @@ export const targetDemographics = pgTable('target_demographics', {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   userId: varchar('user_id').notNull().references(() => users.id),
-  
+
   // Optional project-specific override (null = organization-wide default)
   projectId: varchar('project_id').references(() => modelingProjects.id, { onDelete: 'cascade' }),
-  
+
   // Target ranges for demographic criteria (null = not considered in scoring)
   medianAgeMin: real('median_age_min'),
   medianAgeMax: real('median_age_max'),
@@ -17830,15 +17827,15 @@ export const targetDemographics = pgTable('target_demographics', {
   employmentRateMax: real('employment_rate_max'),
   homeValueMin: real('home_value_min'),
   homeValueMax: real('home_value_max'),
-  
+
   // Criterion weights (0-1 scale, null = equal weighting)
   weights: jsonb('weights').default(sql`'{}'`),
-  
+
   // Metadata
   name: varchar('name', { length: 100 }), // Optional name for this target profile
   description: text('description'),
   isDefault: boolean('is_default').default(false), // Whether this is the user's default profile
-  
+
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (table) => ({
@@ -17872,14 +17869,14 @@ export const waterfallStyleEnum = pgEnum("waterfall_style", ["european", "americ
 export const funds = pgTable('funds', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Fund identity
   name: text('name').notNull(),
   shortName: varchar('short_name', { length: 50 }),
   description: text('description'),
   fundNumber: integer('fund_number'), // e.g., "Fund III"
   status: fundStatusEnum('status').notNull().default('raising'),
-  
+
   // Fund sizing
   targetSize: decimal('target_size', { precision: 18, scale: 2 }),
   hardCap: decimal('hard_cap', { precision: 18, scale: 2 }),
@@ -17887,7 +17884,7 @@ export const funds = pgTable('funds', {
   calledCapital: decimal('called_capital', { precision: 18, scale: 2 }).default('0'),
   distributedCapital: decimal('distributed_capital', { precision: 18, scale: 2 }).default('0'),
   recycledCapital: decimal('recycled_capital', { precision: 18, scale: 2 }).default('0'),
-  
+
   // Fund timeline
   vintage: integer('vintage').notNull(), // Year of first close
   firstCloseDate: timestamp('first_close_date'),
@@ -17895,17 +17892,17 @@ export const funds = pgTable('funds', {
   investmentPeriodYears: integer('investment_period_years').default(4),
   fundLifeYears: integer('fund_life_years').default(10),
   extensionYears: integer('extension_years').default(2),
-  
+
   // Fees
   managementFeePct: decimal('management_fee_pct', { precision: 6, scale: 4 }).default('0.02'),
   managementFeeBase: text('management_fee_base').default('committed'), // 'committed', 'called', 'invested', 'nav'
   carriedInterestPct: decimal('carried_interest_pct', { precision: 6, scale: 4 }).default('0.20'),
-  
+
   // Waterfall configuration (fund-level defaults)
   waterfallStyle: waterfallStyleEnum('waterfall_style').default('european'),
   preferredReturn: decimal('preferred_return', { precision: 8, scale: 4 }).default('0.08'),
   gpCatchUpPct: decimal('gp_catch_up_pct', { precision: 6, scale: 4 }).default('1.00'), // 100% catch-up until GP at promote %
-  
+
   // Multi-tier promote structure (fund-level)
   promoteTiers: jsonb('promote_tiers').$type<{
     irrHurdle: number;
@@ -17916,19 +17913,19 @@ export const funds = pgTable('funds', {
     { irrHurdle: 0.12, gpSplit: 0.25, lpSplit: 0.75 },
     { irrHurdle: 0.18, gpSplit: 0.30, lpSplit: 0.70 },
   ]),
-  
+
   // Recycling provisions
   recyclingAllowed: boolean('recycling_allowed').default(true),
   recyclingLimitPct: decimal('recycling_limit_pct', { precision: 6, scale: 4 }).default('0.25'), // % of committed
   recyclingPeriodMonths: integer('recycling_period_months').default(48),
-  
+
   // Investment guidelines
   maxSingleInvestmentPct: decimal('max_single_investment_pct', { precision: 6, scale: 4 }).default('0.20'),
   minInvestmentSize: decimal('min_investment_size', { precision: 18, scale: 2 }),
   maxInvestmentSize: decimal('max_investment_size', { precision: 18, scale: 2 }),
   geographicFocus: text('geographic_focus'),
   sectorFocus: text('sector_focus'),
-  
+
   // Performance metrics (denormalized for dashboard)
   grossIrr: decimal('gross_irr', { precision: 8, scale: 4 }),
   netIrr: decimal('net_irr', { precision: 8, scale: 4 }),
@@ -17938,7 +17935,7 @@ export const funds = pgTable('funds', {
   dpi: decimal('dpi', { precision: 8, scale: 4 }), // Distributions to Paid-In
   rvpi: decimal('rvpi', { precision: 8, scale: 4 }), // Residual Value to Paid-In
   pme: decimal('pme', { precision: 8, scale: 4 }), // Public Market Equivalent
-  
+
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -17953,22 +17950,22 @@ export const fundInvestors = pgTable('fund_investors', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   fundId: varchar('fund_id').notNull().references(() => funds.id, { onDelete: 'cascade' }),
-  
+
   // Investor identity
   investorName: text('investor_name').notNull(),
   investorType: fundInvestorTypeEnum('investor_type').notNull(),
   legalEntityName: text('legal_entity_name'),
   taxId: varchar('tax_id', { length: 50 }),
-  
+
   // CRM integration
   crmContactId: varchar('crm_contact_id').references(() => crmContacts.id),
   crmCompanyId: varchar('crm_company_id').references(() => crmCompanies.id),
-  
+
   // Commitment
   commitmentAmount: decimal('commitment_amount', { precision: 18, scale: 2 }).notNull(),
   commitmentDate: timestamp('commitment_date'),
   commitmentPct: decimal('commitment_pct', { precision: 8, scale: 6 }), // % of total fund
-  
+
   // Capital account (running balances)
   calledCapital: decimal('called_capital', { precision: 18, scale: 2 }).default('0'),
   unfundedCommitment: decimal('unfunded_commitment', { precision: 18, scale: 2 }),
@@ -17977,18 +17974,18 @@ export const fundInvestors = pgTable('fund_investors', {
   preferredReturnAccrued: decimal('preferred_return_accrued', { precision: 18, scale: 2 }).default('0'),
   preferredReturnPaid: decimal('preferred_return_paid', { precision: 18, scale: 2 }).default('0'),
   capitalAccountBalance: decimal('capital_account_balance', { precision: 18, scale: 2 }).default('0'),
-  
+
   // Carried interest (for GPs)
   carriedInterestPct: decimal('carried_interest_pct', { precision: 8, scale: 4 }),
   carriedInterestEarned: decimal('carried_interest_earned', { precision: 18, scale: 2 }).default('0'),
   carriedInterestPaid: decimal('carried_interest_paid', { precision: 18, scale: 2 }).default('0'),
-  
+
   // Side letter terms
   hasReducedFees: boolean('has_reduced_fees').default(false),
   feeDiscount: decimal('fee_discount', { precision: 6, scale: 4 }),
   hasMfn: boolean('has_mfn').default(false), // Most Favored Nation
   coInvestRights: text('co_invest_rights'), // 'pro_rata', 'negotiated', 'none'
-  
+
   isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -18004,32 +18001,32 @@ export const fundDealAllocations = pgTable('fund_deal_allocations', {
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   fundId: varchar('fund_id').notNull().references(() => funds.id, { onDelete: 'cascade' }),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
-  
+
   // Allocation details
   allocationPct: decimal('allocation_pct', { precision: 8, scale: 6 }).notNull(), // Fund's share of deal
   allocatedEquity: decimal('allocated_equity', { precision: 18, scale: 2 }).notNull(),
   fundedAmount: decimal('funded_amount', { precision: 18, scale: 2 }).default('0'),
-  
+
   // Basis tracking
   costBasis: decimal('cost_basis', { precision: 18, scale: 2 }),
   currentValue: decimal('current_value', { precision: 18, scale: 2 }),
   unrealizedGain: decimal('unrealized_gain', { precision: 18, scale: 2 }),
   realizedGain: decimal('realized_gain', { precision: 18, scale: 2 }).default('0'),
-  
+
   // Deal-level returns
   dealIrr: decimal('deal_irr', { precision: 8, scale: 4 }),
   dealMoic: decimal('deal_moic', { precision: 8, scale: 4 }),
-  
+
   // Timing
   investmentDate: timestamp('investment_date'),
   expectedExitDate: timestamp('expected_exit_date'),
   actualExitDate: timestamp('actual_exit_date'),
   exitStatus: varchar('exit_status', { length: 20 }).default('active'), // active, exited, written_off
-  
+
   // Capital stack inheritance
   usesFundCapitalStack: boolean('uses_fund_capital_stack').default(true),
   capitalStackTemplateId: varchar('capital_stack_template_id').references(() => fundCapitalStackTemplates.id),
-  
+
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -18046,32 +18043,32 @@ export const fundCapitalMovements = pgTable('fund_capital_movements', {
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   fundId: varchar('fund_id').notNull().references(() => funds.id, { onDelete: 'cascade' }),
   fundInvestorId: varchar('fund_investor_id').references(() => fundInvestors.id, { onDelete: 'cascade' }),
-  
+
   // Movement details
   movementType: capitalMovementTypeEnum('movement_type').notNull(),
   movementDate: timestamp('movement_date').notNull(),
   dueDate: timestamp('due_date'),
-  
+
   // Amounts
   amount: decimal('amount', { precision: 18, scale: 2 }).notNull(),
   preferredReturn: decimal('preferred_return', { precision: 18, scale: 2 }).default('0'),
   returnOfCapital: decimal('return_of_capital', { precision: 18, scale: 2 }).default('0'),
   carriedInterest: decimal('carried_interest', { precision: 18, scale: 2 }).default('0'),
-  
+
   // Deal attribution
   dealAllocationId: varchar('deal_allocation_id').references(() => fundDealAllocations.id),
-  
+
   // Recycling tracking
   isRecyclable: boolean('is_recyclable').default(false),
   recycledAmount: decimal('recycled_amount', { precision: 18, scale: 2 }).default('0'),
-  
+
   // Call specifics
   callNumber: integer('call_number'),
   callPurpose: text('call_purpose'), // 'investment', 'fees', 'expenses'
-  
+
   // Status
   status: varchar('status', { length: 20 }).default('pending'), // pending, completed, cancelled
-  
+
   description: text('description'),
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -18089,15 +18086,15 @@ export const fundCashFlows = pgTable('fund_cash_flows', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   fundId: varchar('fund_id').notNull().references(() => funds.id, { onDelete: 'cascade' }),
-  
+
   // Cash flow details
   flowDate: timestamp('flow_date').notNull(),
   flowType: varchar('flow_type', { length: 20 }).notNull(), // 'inflow' or 'outflow'
-  
+
   // Amounts (negative = outflow from investor, positive = inflow to investor)
   grossAmount: decimal('gross_amount', { precision: 18, scale: 2 }).notNull(),
   netAmount: decimal('net_amount', { precision: 18, scale: 2 }).notNull(),
-  
+
   // Breakdowns
   investmentAmount: decimal('investment_amount', { precision: 18, scale: 2 }).default('0'),
   managementFees: decimal('management_fees', { precision: 18, scale: 2 }).default('0'),
@@ -18106,16 +18103,16 @@ export const fundCashFlows = pgTable('fund_cash_flows', {
   returnOfCapital: decimal('return_of_capital', { precision: 18, scale: 2 }).default('0'),
   gainDistribution: decimal('gain_distribution', { precision: 18, scale: 2 }).default('0'),
   carriedInterest: decimal('carried_interest', { precision: 18, scale: 2 }).default('0'),
-  
+
   // Running balances (for performance calculation)
   cumulativeContributions: decimal('cumulative_contributions', { precision: 18, scale: 2 }),
   cumulativeDistributions: decimal('cumulative_distributions', { precision: 18, scale: 2 }),
   runningNav: decimal('running_nav', { precision: 18, scale: 2 }),
-  
+
   // Attribution
   dealAllocationId: varchar('deal_allocation_id').references(() => fundDealAllocations.id),
   capitalMovementId: varchar('capital_movement_id').references(() => fundCapitalMovements.id),
-  
+
   description: text('description'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
@@ -18129,14 +18126,14 @@ export const fundCapitalStackTemplates = pgTable('fund_capital_stack_templates',
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   fundId: varchar('fund_id').references(() => funds.id, { onDelete: 'cascade' }),
-  
+
   name: text('name').notNull(),
   description: text('description'),
   isDefault: boolean('is_default').default(false),
-  
+
   // Default leverage assumptions
   targetLtv: decimal('target_ltv', { precision: 6, scale: 4 }).default('0.65'),
-  
+
   // Debt template
   debtTemplates: jsonb('debt_templates').$type<{
     name: string;
@@ -18148,7 +18145,7 @@ export const fundCapitalStackTemplates = pgTable('fund_capital_stack_templates',
     principalPct: number; // % of total debt
     priority: number;
   }[]>(),
-  
+
   // Equity template
   equityTemplates: jsonb('equity_templates').$type<{
     name: string;
@@ -18161,7 +18158,7 @@ export const fundCapitalStackTemplates = pgTable('fund_capital_stack_templates',
     waterfallPriority: number;
     promoteTiers?: { irrHurdle: number; gpSplit: number; lpSplit: number }[];
   }[]>(),
-  
+
   // Waterfall configuration
   waterfallStyle: waterfallStyleEnum('waterfall_style').default('european'),
   preferredReturn: decimal('preferred_return', { precision: 8, scale: 4 }).default('0.08'),
@@ -18171,7 +18168,7 @@ export const fundCapitalStackTemplates = pgTable('fund_capital_stack_templates',
     gpSplit: number;
     lpSplit: number;
   }[]>(),
-  
+
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -18185,21 +18182,21 @@ export const fundWaterfallCalculations = pgTable('fund_waterfall_calculations', 
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   fundId: varchar('fund_id').notNull().references(() => funds.id, { onDelete: 'cascade' }),
-  
+
   calculationDate: timestamp('calculation_date').notNull(),
   periodEnd: timestamp('period_end'),
-  
+
   // Total values
   totalContributions: decimal('total_contributions', { precision: 18, scale: 2 }),
   totalDistributions: decimal('total_distributions', { precision: 18, scale: 2 }),
   unrealizedValue: decimal('unrealized_value', { precision: 18, scale: 2 }),
   totalValue: decimal('total_value', { precision: 18, scale: 2 }),
-  
+
   // Waterfall tiers
   returnOfCapital: decimal('return_of_capital', { precision: 18, scale: 2 }),
   preferredReturnAmount: decimal('preferred_return_amount', { precision: 18, scale: 2 }),
   gpCatchUp: decimal('gp_catch_up', { precision: 18, scale: 2 }),
-  
+
   // Promote tier breakdown
   promoteTierBreakdown: jsonb('promote_tier_breakdown').$type<{
     tier: number;
@@ -18207,18 +18204,18 @@ export const fundWaterfallCalculations = pgTable('fund_waterfall_calculations', 
     lpAmount: number;
     gpAmount: number;
   }[]>(),
-  
+
   // LP/GP split
   totalLpDistribution: decimal('total_lp_distribution', { precision: 18, scale: 2 }),
   totalGpDistribution: decimal('total_gp_distribution', { precision: 18, scale: 2 }),
-  
+
   // Performance metrics
   grossIrr: decimal('gross_irr', { precision: 8, scale: 4 }),
   netIrr: decimal('net_irr', { precision: 8, scale: 4 }),
   tvpi: decimal('tvpi', { precision: 8, scale: 4 }),
   dpi: decimal('dpi', { precision: 8, scale: 4 }),
   rvpi: decimal('rvpi', { precision: 8, scale: 4 }),
-  
+
   isLatest: boolean('is_latest').default(true),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
@@ -18798,12 +18795,12 @@ export const investmentCriteriaProfiles = pgTable("investment_criteria_profiles"
   capitalWeight: integer("capital_weight").default(10),
   involvementWeight: integer("involvement_weight").default(5),
   capexWeight: integer("capex_weight").default(10),
-  
+
   // Enhanced Alert Settings (from guidance docs)
   alertEnabled: boolean("alert_enabled").default(true),
   alertFrequency: varchar("alert_frequency", { length: 20 }).default("daily"), // instant, daily, weekly
   alertMaxListingsPerEmail: integer("alert_max_listings_per_email").default(20),
-  
+
   createdBy: varchar("created_by"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -18822,11 +18819,11 @@ export const investmentCriteriaLocation = pgTable("investment_criteria_location"
   maxDistanceFromCoast: integer("max_distance_from_coast"),
   preferIcwAccess: boolean("prefer_icw_access").default(false),
   preferOceanAccess: boolean("prefer_ocean_access").default(false),
-  
+
   // Enhanced with must-have and importance (from guidance docs)
   geographyMustHave: boolean("geography_must_have").default(true),
   geographyImportance: integer("geography_importance").default(5), // 1-5 scale
-  
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -18835,52 +18832,52 @@ export const investmentCriteriaFinancial = pgTable("investment_criteria_financia
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
   profileId: varchar("profile_id").notNull().references(() => investmentCriteriaProfiles.id, { onDelete: "cascade" }),
   orgId: varchar("org_id").notNull(),
-  
+
   // Price criteria with must-have and importance
   minAskingPrice: numeric("min_asking_price", { precision: 15, scale: 2 }),
   maxAskingPrice: numeric("max_asking_price", { precision: 15, scale: 2 }),
   priceMustHave: boolean("price_must_have").default(true),
   priceImportance: integer("price_importance").default(5), // 1-5 scale
-  
+
   // Revenue criteria with metric type
   minGrossRevenue: numeric("min_gross_revenue", { precision: 15, scale: 2 }),
   maxGrossRevenue: numeric("max_gross_revenue", { precision: 15, scale: 2 }),
   revenueMetricType: varchar("revenue_metric_type", { length: 20 }).default("T12"), // T12, Average3Yr, ProFormaYear1
   revenueMustHave: boolean("revenue_must_have").default(false),
   revenueImportance: integer("revenue_importance").default(3),
-  
+
   // Cap Rate with type selection
   minCapRate: numeric("min_cap_rate", { precision: 5, scale: 2 }),
   maxCapRate: numeric("max_cap_rate", { precision: 5, scale: 2 }),
   capRateType: varchar("cap_rate_type", { length: 20 }).default("T12"), // T12, ProFormaYear1, Stabilized
   capRateMustHave: boolean("cap_rate_must_have").default(false),
   capRateImportance: integer("cap_rate_importance").default(4),
-  
+
   // EBITDA criteria
   minEbitda: numeric("min_ebitda", { precision: 15, scale: 2 }),
   maxEbitda: numeric("max_ebitda", { precision: 15, scale: 2 }),
   ebitdaMetricType: varchar("ebitda_metric_type", { length: 20 }).default("T12"),
   ebitdaMustHave: boolean("ebitda_must_have").default(false),
   ebitdaImportance: integer("ebitda_importance").default(3),
-  
+
   // NOI criteria
   minNoi: numeric("min_noi", { precision: 15, scale: 2 }),
   maxNoi: numeric("max_noi", { precision: 15, scale: 2 }),
   noiMustHave: boolean("noi_must_have").default(false),
   noiImportance: integer("noi_importance").default(3),
-  
+
   // Operating Margin (EBITDA/Revenue as decimal, e.g., 0.25 = 25%)
   minOperatingMargin: numeric("min_operating_margin", { precision: 5, scale: 4 }),
   maxOperatingMargin: numeric("max_operating_margin", { precision: 5, scale: 4 }),
   operatingMarginMustHave: boolean("operating_margin_must_have").default(false),
   operatingMarginImportance: integer("operating_margin_importance").default(4),
-  
+
   // Price per slip criteria
   minPricePerSlip: numeric("min_price_per_slip", { precision: 12, scale: 2 }),
   maxPricePerSlip: numeric("max_price_per_slip", { precision: 12, scale: 2 }),
   pricePerSlipMustHave: boolean("price_per_slip_must_have").default(false),
   pricePerSlipImportance: integer("price_per_slip_importance").default(2),
-  
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -18970,19 +18967,19 @@ export const investmentCriteriaStorageMix = pgTable("investment_criteria_storage
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
   profileId: varchar("profile_id").notNull().references(() => investmentCriteriaProfiles.id, { onDelete: "cascade" }),
   orgId: varchar("org_id").notNull(),
-  
+
   // Which departments to include in the "Storage" bucket
   // Default: Wet Slips, Lift Slips, Dry Racks, Moorings, Trailer Storage, Indoor Storage
   includedDepartments: jsonb("included_departments").default(sql`'["Wet Slips", "Lift Slips", "Dry Racks", "Moorings", "Trailer Storage", "Indoor Storage"]'::jsonb`),
-  
+
   // Min/max % of total revenue from storage departments (0-1 as decimal)
   minStorageShare: numeric("min_storage_share", { precision: 5, scale: 4 }),
   maxStorageShare: numeric("max_storage_share", { precision: 5, scale: 4 }),
-  
+
   // Hard filter or soft preference
   storageMixMustHave: boolean("storage_mix_must_have").default(true),
   storageMixImportance: integer("storage_mix_importance").default(5), // 1-5 scale
-  
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -18995,23 +18992,23 @@ export const investmentCriteriaDepartments = pgTable("investment_criteria_depart
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
   profileId: varchar("profile_id").notNull().references(() => investmentCriteriaProfiles.id, { onDelete: "cascade" }),
   orgId: varchar("org_id").notNull(),
-  
+
   // Departments to exclude entirely (hard filter)
   // Example: ["Boat Sales", "F&B"]
   excludedDepartments: jsonb("excluded_departments").default(sql`'[]'::jsonb`),
-  
+
   // Departments that increase score if present
   // Example: ["Fuel", "Ship Store"]
   preferredDepartments: jsonb("preferred_departments").default(sql`'[]'::jsonb`),
-  
+
   // Max allowed revenue share per department (soft cap with score penalty)
   // Example: { "Boat Sales": 0.10, "F&B": 0.20 }
   maxSharePerDepartment: jsonb("max_share_per_department").default(sql`'{}'::jsonb`),
-  
+
   // How strictly to enforce exclusions
   excludeMode: varchar("exclude_mode", { length: 20 }).default("reject"), // reject = hard, penalize = soft
   excludeThreshold: numeric("exclude_threshold", { precision: 5, scale: 4 }).default("0.01"), // Revenue % threshold to trigger exclusion
-  
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -19024,22 +19021,22 @@ export const investmentCriteriaStorageTypes = pgTable("investment_criteria_stora
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
   profileId: varchar("profile_id").notNull().references(() => investmentCriteriaProfiles.id, { onDelete: "cascade" }),
   orgId: varchar("org_id").notNull(),
-  
+
   // Desired storage types
   // Example: ["Wet Slips", "Lift Slips", "Dry Racks"]
   desiredTypes: jsonb("desired_types").default(sql`'["Wet Slips"]'::jsonb`),
-  
+
   // Minimum total slip/storage count across all types
   minTotalSlips: integer("min_total_slips"),
-  
+
   // Minimum rates per storage type (JSONB array of objects)
   // Example: [{ "type": "Wet Slips", "minRate": 18, "basis": "$/ft/month" }]
   storageRates: jsonb("storage_rates").default(sql`'[]'::jsonb`),
-  
+
   // Scoring settings
   storageTypesMustHave: boolean("storage_types_must_have").default(false),
   storageTypesImportance: integer("storage_types_importance").default(3),
-  
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -19091,29 +19088,29 @@ export const marinaScrapeources = pgTable("marina_scrape_sources", {
   userAgent: varchar("user_agent", { length: 255 }).default("MarinaMatchBot/1.0"),
   isActive: boolean("is_active").default(true),
   isManaged: boolean("is_managed").default(false), // True for system-created default sources
-  
+
   // Ingestion method configuration
   ingestionMethod: varchar("ingestion_method", { length: 30 }).default("scraping"), // api, feed, scraping, manual, rss
-  
+
   // Search/filter configuration for marina listings
   propertyType: varchar("property_type", { length: 50 }).default("marina"),
   keywordsInclude: text("keywords_include").array().default(sql`ARRAY['marina', 'boatyard', 'yacht club', 'boat slip', 'dock', 'waterfront marina']`),
   keywordsExclude: text("keywords_exclude").array().default(sql`ARRAY['rv storage', 'self-storage', 'warehouse', 'mini storage']`),
-  
+
   // Geography filters
   geographyStates: text("geography_states").array(), // Array of state abbreviations to filter
   geographyRegion: varchar("geography_region", { length: 100 }), // Optional region name
   geographyRadius: numeric("geography_radius", { precision: 10, scale: 2 }), // Radius in miles from center point
-  
+
   // Price and size filters
   minPrice: numeric("min_price", { precision: 15, scale: 2 }),
   maxPrice: numeric("max_price", { precision: 15, scale: 2 }),
   minSlips: integer("min_slips"),
   maxSlips: integer("max_slips"),
-  
+
   // Polling configuration
   pollingIntervalMinutes: integer("polling_interval_minutes").default(60),
-  
+
   // Multi-page crawl configuration
   seedUrls: text("seed_urls").array(), // Multiple starting URLs for crawling
   crawlMode: varchar("crawl_mode", { length: 30 }).default("single"), // single, pagination, multi_seed, sitemap
@@ -19123,22 +19120,22 @@ export const marinaScrapeources = pgTable("marina_scrape_sources", {
   maxPagesPerRun: integer("max_pages_per_run").default(10), // Limit pages crawled per run
   maxCrawlDepth: integer("max_crawl_depth").default(1), // How many link levels to follow
   tokenBudgetPerRun: numeric("token_budget_per_run", { precision: 10, scale: 4 }).default("0.50"), // Max $ to spend on AI per run
-  
+
   // Delta tracking for detecting new/updated listings
   lastSeenListingId: varchar("last_seen_listing_id", { length: 255 }),
   lastSeenContentHash: varchar("last_seen_content_hash", { length: 64 }),
   lastDeltaCheckAt: timestamp("last_delta_check_at"),
-  
+
   // Source capabilities (what methods this source supports)
   capabilities: text("capabilities").array().default(sql`ARRAY['scraping']`), // api, scraping, rss, webhook, manual
   capabilityNotes: text("capability_notes"), // Notes about API access requirements, etc.
-  
+
   // Scrape tracking
   lastScrapeAt: timestamp("last_scrape_at"),
   lastScrapeStatus: varchar("last_scrape_status", { length: 30 }),
   lastScrapeCount: integer("last_scrape_count"),
   totalListingsFound: integer("total_listings_found").default(0),
-  
+
   // Source health tracking
   successCount: integer("success_count").default(0),
   failureCount: integer("failure_count").default(0),
@@ -19147,7 +19144,7 @@ export const marinaScrapeources = pgTable("marina_scrape_sources", {
   healthStatus: varchar("health_status", { length: 20 }).default("unknown"), // unknown, healthy, warning, failing, disabled
   lastFetchMethod: varchar("last_fetch_method", { length: 20 }), // static, headless
   requiresJsRendering: boolean("requires_js_rendering").default(false), // Auto-learned preference
-  
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -19165,13 +19162,13 @@ export const marinaScrapeRuns = pgTable("marina_scrape_runs", {
   listingsUpdated: integer("listings_updated").default(0),
   listingsRemoved: integer("listings_removed").default(0),
   errorsCount: integer("errors_count").default(0),
-  
+
   // Multi-page crawl tracking
   pagesCrawled: integer("pages_crawled").default(0),
   pagesSkipped: integer("pages_skipped").default(0),
   linksDiscovered: integer("links_discovered").default(0),
   tokensCost: numeric("tokens_cost", { precision: 10, scale: 4 }).default("0"), // Estimated $ spent on AI
-  
+
   startedAt: timestamp("started_at").notNull().defaultNow(),
   completedAt: timestamp("completed_at"),
   durationMs: integer("duration_ms"),
@@ -19832,12 +19829,12 @@ export const modelingScenarioTemplates = pgTable("modeling_scenario_templates", 
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar("org_id").references(() => organizations.id), // Nullable for global templates
   createdBy: varchar("created_by").notNull().references(() => users.id),
-  
+
   name: text("name").notNull(), // e.g., "Base Case", "Aggressive Growth", "Conservative"
   description: text("description"),
   scope: scenarioTemplateScopeEnum("scope").notNull().default("org"), // global/org/user
   color: varchar("color", { length: 50 }).default("blue"),
-  
+
   // Core assumptions
   revenueGrowthRate: decimal("revenue_growth_rate", { precision: 8, scale: 4 }),
   expenseGrowthRate: decimal("expense_growth_rate", { precision: 8, scale: 4 }),
@@ -19845,18 +19842,17 @@ export const modelingScenarioTemplates = pgTable("modeling_scenario_templates", 
   occupancyRate: decimal("occupancy_rate", { precision: 8, scale: 4 }),
   discountRate: decimal("discount_rate", { precision: 8, scale: 4 }),
   holdPeriodYears: integer("hold_period_years"),
-  
+
   // Lease-up assumptions (stored as JSON for flexibility)
   leaseUpSchedule: jsonb("lease_up_schedule").default(sql`'[]'`),
-  
+
   // Additional custom assumptions as JSON
   customAssumptions: jsonb("custom_assumptions").default(sql`'{}'`),
-  
+
   // Metadata
   isSystem: boolean("is_system").notNull().default(false), // System-provided templates
   usageCount: integer("usage_count").notNull().default(0), // Track popularity
-  
-  orgId: varchar("org_id").references(() => organizations.id),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -19870,14 +19866,14 @@ export const modelingCases = pgTable("modeling_cases", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: varchar("project_id").notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
-  
+
   name: text("name").notNull(), // e.g., "Base Case", "Aggressive", "Conservative"
   description: text("description"),
   color: text("color"), // Color identifier for UI display (e.g., "blue", "green", "orange")
   sortOrder: integer("sort_order").notNull().default(0),
   isDefault: boolean("is_default").notNull().default(false), // One case per project is the default
   isEnabled: boolean("is_enabled").notNull().default(true),
-  
+
   // Core assumptions stored directly on the case for quick access
   revenueGrowthRate: decimal("revenue_growth_rate", { precision: 8, scale: 4 }), // e.g., 0.03 = 3%
   expenseGrowthRate: decimal("expense_growth_rate", { precision: 8, scale: 4 }),
@@ -19885,12 +19881,11 @@ export const modelingCases = pgTable("modeling_cases", {
   occupancyRate: decimal("occupancy_rate", { precision: 8, scale: 4 }),
   discountRate: decimal("discount_rate", { precision: 8, scale: 4 }),
   holdPeriodYears: integer("hold_period_years"),
-  
+
   // Lease-up assumptions (stored as JSON for flexibility)
   leaseUpSchedule: jsonb("lease_up_schedule").default(sql`'[]'`), // Array of { month: number, occupancy: number }
-  
+
   createdBy: varchar("created_by").notNull().references(() => users.id),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -19905,18 +19900,17 @@ export const modelingCaseAssumptions = pgTable("modeling_case_assumptions", {
   caseId: varchar("case_id").notNull().references(() => modelingCases.id, { onDelete: 'cascade' }),
   projectId: varchar("project_id").notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
-  
+
   key: text("key").notNull(), // e.g., "vacancy_rate", "expense_ratio", etc.
   value: text("value").notNull(),
   valueType: text("value_type").notNull().default("number"), // "number", "percentage", "currency", "text"
   category: text("category"), // Group assumptions by category
-  
+
   // Period-specific values (for monthly/yearly overrides)
   period: text("period"), // "monthly" or "yearly" or null for global
   month: integer("month"), // 1-12 if monthly
   year: integer("year"), // Year number if yearly
-  
-  orgId: varchar("org_id").references(() => organizations.id),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -19936,17 +19930,16 @@ export const modelingAddbacks = pgTable("modeling_addbacks", {
   projectId: varchar("project_id").notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
   caseId: varchar("case_id").references(() => modelingCases.id, { onDelete: 'cascade' }), // Nullable if applies to all cases
   orgId: varchar("org_id").notNull().references(() => organizations.id),
-  
+
   lineItemKey: text("line_item_key").notNull(), // Identifier for the P&L line item
   lineItemLabel: text("line_item_label").notNull(), // Display label for the line item
   category: text("category"), // Revenue/Expense/Other
-  
+
   periodType: addbackPeriodTypeEnum("period_type").notNull().default("yearly"), // "monthly" or "yearly"
   isActive: boolean("is_active").notNull().default(true),
   notes: text("notes"),
-  
+
   createdBy: varchar("created_by").notNull().references(() => users.id),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -19960,11 +19953,11 @@ export const modelingAddbacks = pgTable("modeling_addbacks", {
 export const modelingAddbackValues = pgTable("modeling_addback_values", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   addbackId: varchar("addback_id").notNull().references(() => modelingAddbacks.id, { onDelete: 'cascade' }),
-  
+
   year: integer("year").notNull(), // Year number (1-based for projection years, or actual year)
   month: integer("month"), // 1-12 for monthly, null for yearly
   amount: decimal("amount", { precision: 18, scale: 2 }).notNull().default("0"),
-  
+
   orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -19989,14 +19982,14 @@ export const ddFees = pgTable("dd_fees", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
-  
+
   // Link to CRM entities (at least one should be set)
   contactId: varchar("contact_id").references(() => crmContacts.id),
   companyId: varchar("company_id").references(() => crmCompanies.id),
-  
+
   // Optional link to DD task
   taskId: varchar("task_id").references(() => tasks.id, { onDelete: 'set null' }),
-  
+
   // Fee details
   category: ddFeeCategoryEnum("category").notNull().default("other"),
   description: text("description"),
@@ -20004,17 +19997,16 @@ export const ddFees = pgTable("dd_fees", {
   dateIncurred: date("date_incurred"),
   datePaid: date("date_paid"),
   isPaid: boolean("is_paid").notNull().default(false),
-  
+
   // Invoice/payment tracking
   invoiceNumber: text("invoice_number"),
   paymentMethod: text("payment_method"),
   notes: text("notes"),
-  
+
   // Allocation (optional DD phase)
   phase: text("phase"), // e.g., "Initial DD", "Extended DD", "Closing"
-  
+
   createdBy: varchar("created_by").notNull().references(() => users.id),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -20077,18 +20069,17 @@ export const crmLists = pgTable("crm_lists", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
   createdBy: varchar("created_by").notNull().references(() => users.id),
-  
+
   name: text("name").notNull(),
   description: text("description"),
   color: text("color"), // Optional color for visual identification
   icon: text("icon"), // Optional icon name
-  
+
   // Which entity types can be added to this list
   allowedEntityTypes: text("allowed_entity_types").array().default(sql`ARRAY['contact', 'company', 'property']::text[]`),
-  
+
   isArchived: boolean("is_archived").notNull().default(false),
-  
-  orgId: varchar("org_id").references(() => organizations.id),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -20102,10 +20093,10 @@ export const crmListItems = pgTable("crm_list_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   listId: varchar("list_id").notNull().references(() => crmLists.id, { onDelete: 'cascade' }),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
-  
+
   entityType: crmListEntityTypeEnum("entity_type").notNull(),
   entityId: varchar("entity_id").notNull(), // ID of the contact/company/property
-  
+
   addedBy: varchar("added_by").notNull().references(() => users.id),
   addedAt: timestamp("added_at").defaultNow().notNull(),
   notes: text("notes"),
@@ -20310,36 +20301,36 @@ export const workspaceStatusEnum = pgEnum('workspace_status', ['active', 'pendin
 export const dealWorkspaces = pgTable('deal_workspaces', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Core workspace info
   name: text('name').notNull(),
   description: text('description'),
-  
+
   // Role/persona for this workspace
   role: workspaceRoleEnum('role').notNull().default('buyer'),
   status: workspaceStatusEnum('status').notNull().default('active'),
-  
+
   // Linked entities - the unified hub
   dealId: varchar('deal_id').references(() => crmDeals.id),
   modelingProjectId: varchar('modeling_project_id').references(() => modelingProjects.id),
   ddProjectId: varchar('dd_project_id').references(() => projects.id),
   propertyId: varchar('property_id').references(() => crmProperties.id),
-  
+
   // Key metrics for dashboard display
   targetPrice: decimal('target_price', { precision: 15, scale: 2 }),
   expectedCloseDate: date('expected_close_date'),
   priority: text('priority').default('medium'),
-  
+
   // Activity tracking
   lastActivityAt: timestamp('last_activity_at'),
   lastActivityType: text('last_activity_type'),
   lastActivityDescription: text('last_activity_description'),
-  
+
   // Counters for quick reference
   openDdTasks: integer('open_dd_tasks').default(0),
   totalDdTasks: integer('total_dd_tasks').default(0),
   pendingDocuments: integer('pending_documents').default(0),
-  
+
   // Metadata
   createdBy: varchar('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -20427,7 +20418,7 @@ export const slaConfigs = pgTable('sla_configs', {
   name: text('name').notNull(),
   description: text('description'),
   targetType: slaTargetTypeEnum('target_type').notNull().default('all'),
-  
+
   // Matching criteria (JSON for flexibility)
   matchCriteria: jsonb('match_criteria').$type<{
     taskTypes?: string[];
@@ -20435,16 +20426,16 @@ export const slaConfigs = pgTable('sla_configs', {
     categories?: string[];
     dealStages?: string[];
   }>().default({}),
-  
+
   // SLA thresholds (in hours)
   warningThresholdHours: integer('warning_threshold_hours').notNull().default(24),
   criticalThresholdHours: integer('critical_threshold_hours').notNull().default(48),
   breachThresholdHours: integer('breach_threshold_hours').notNull().default(72),
-  
+
   // Escalation chain (user IDs in order)
   escalationChain: text('escalation_chain').array().default(sql`'{}'`),
   escalationDelayHours: integer('escalation_delay_hours').notNull().default(4),
-  
+
   // Auto-assignment rules
   autoAssignEnabled: boolean('auto_assign_enabled').notNull().default(false),
   autoAssignRules: jsonb('auto_assign_rules').$type<{
@@ -20453,7 +20444,7 @@ export const slaConfigs = pgTable('sla_configs', {
     assignByWorkload?: boolean;
     assignByExpertise?: string[];
   }>().default({}),
-  
+
   status: slaConfigStatusEnum('status').notNull().default('active'),
   createdBy: varchar('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -20467,36 +20458,36 @@ export const slaConfigs = pgTable('sla_configs', {
 export const slaTracking = pgTable('sla_tracking', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   slaConfigId: varchar('sla_config_id').notNull().references(() => slaConfigs.id, { onDelete: 'cascade' }),
-  
+
   // The entity being tracked
   entityType: text('entity_type').notNull(), // 'dd_task', 'crm_task', 'activity'
   entityId: varchar('entity_id').notNull(),
-  
+
   // SLA timing
   slaStartTime: timestamp('sla_start_time').notNull(),
   slaDueTime: timestamp('sla_due_time').notNull(),
   warningTime: timestamp('warning_time'),
   criticalTime: timestamp('critical_time'),
-  
+
   // Current status
   currentStatus: text('current_status').notNull().default('on_track'), // on_track, warning, critical, breached
   currentEscalationLevel: integer('current_escalation_level').notNull().default(0),
-  
+
   // Resolution
   resolvedAt: timestamp('resolved_at'),
   resolvedBy: varchar('resolved_by').references(() => users.id),
   resolutionNotes: text('resolution_notes'),
-  
+
   // Assignment
   currentAssigneeId: varchar('current_assignee_id').references(() => users.id),
   previousAssigneeId: varchar('previous_assignee_id').references(() => users.id),
-  
+
   // Metrics
   timeToFirstResponse: integer('time_to_first_response'), // minutes
   totalResolutionTime: integer('total_resolution_time'), // minutes
   escalationCount: integer('escalation_count').notNull().default(0),
   reassignmentCount: integer('reassignment_count').notNull().default(0),
-  
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -21242,7 +21233,6 @@ export const opssosConversations = pgTable("opssos_conversations", {
   status: opssosConversationStatusEnum("status").default("open").notNull(),
   assignedUserId: varchar("assigned_user_id").references(() => users.id),
   lastMessageAt: timestamp("last_message_at"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("opssos_conversations_org_idx").on(table.orgId),
@@ -21262,7 +21252,6 @@ export const opssosMessages = pgTable("opssos_messages", {
   scheduledFor: timestamp("scheduled_for"),
   sentAt: timestamp("sent_at"),
   status: opssosMessageStatusEnum("status").default("sent").notNull(),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   conversationIdx: index("opssos_messages_conversation_idx").on(table.conversationId),
@@ -21276,7 +21265,6 @@ export const opssosMessageTemplates = pgTable("opssos_message_templates", {
   groupName: text("group_name").notNull(),
   title: text("title").notNull(),
   body: text("body").notNull(),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("opssos_message_templates_org_idx").on(table.orgId),
@@ -21291,7 +21279,6 @@ export const opssosAutomationRules = pgTable("opssos_automation_rules", {
   triggerType: text("trigger_type").notNull(),
   conditions: jsonb("conditions").default([]),
   actions: jsonb("actions").default([]),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("opssos_automation_rules_org_idx").on(table.orgId),
@@ -21308,7 +21295,6 @@ export const opssosAutomationRuns = pgTable("opssos_automation_runs", {
   finishedAt: timestamp("finished_at"),
   log: jsonb("log").default([]),
   errorText: text("error_text"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   ruleIdx: index("opssos_automation_runs_rule_idx").on(table.ruleId),
@@ -21324,7 +21310,6 @@ export const opssosScheduledJobs = pgTable("opssos_scheduled_jobs", {
   runAt: timestamp("run_at").notNull(),
   status: opssosScheduledJobStatusEnum("status").default("queued").notNull(),
   attempts: integer("attempts").default(0).notNull(),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("opssos_scheduled_jobs_org_idx").on(table.orgId),
@@ -21343,7 +21328,6 @@ export const opssosTasks = pgTable("opssos_tasks", {
   status: opssosTaskStatusEnum("status").default("todo").notNull(),
   dueAt: timestamp("due_at"),
   costCents: integer("cost_cents"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("opssos_tasks_org_idx").on(table.orgId),
@@ -21358,7 +21342,6 @@ export const opssosChecklistTemplates = pgTable("opssos_checklist_templates", {
   orgId: varchar("org_id").notNull().references(() => organizations.id),
   name: text("name").notNull(),
   items: jsonb("items").default([]),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("opssos_checklist_templates_org_idx").on(table.orgId),
@@ -21370,7 +21353,6 @@ export const opssosTaskChecklists = pgTable("opssos_task_checklists", {
   orgId: varchar("org_id").notNull().references(() => organizations.id),
   taskId: varchar("task_id").notNull().references(() => opssosTasks.id, { onDelete: "cascade" }),
   items: jsonb("items").default([]),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   taskIdx: index("opssos_task_checklists_task_idx").on(table.taskId),
@@ -21385,7 +21367,6 @@ export const opssosStatementTemplates = pgTable("opssos_statement_templates", {
   filters: jsonb("filters").default({}),
   columns: jsonb("columns").default([]),
   totals: jsonb("totals").default({}),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("opssos_statement_templates_org_idx").on(table.orgId),
@@ -21401,7 +21382,6 @@ export const opssosStatements = pgTable("opssos_statements", {
   status: opssosStatementStatusEnum("status").default("draft").notNull(),
   generatedAt: timestamp("generated_at").defaultNow().notNull(),
   publishedAt: timestamp("published_at"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("opssos_statements_org_idx").on(table.orgId),
@@ -21415,7 +21395,6 @@ export const opssosStatementExports = pgTable("opssos_statement_exports", {
   statementId: varchar("statement_id").notNull().references(() => opssosStatements.id, { onDelete: "cascade" }),
   format: opssosExportFormatEnum("format").notNull(),
   fileUrl: text("file_url").notNull(),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   statementIdx: index("opssos_statement_exports_statement_idx").on(table.statementId),
@@ -21429,7 +21408,6 @@ export const opssosIntegrations = pgTable("opssos_integrations", {
   status: text("status").default("inactive").notNull(),
   credentialsEncrypted: text("credentials_encrypted"),
   settings: jsonb("settings").default({}),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("opssos_integrations_org_idx").on(table.orgId),
@@ -21444,7 +21422,6 @@ export const opssosWebhooks = pgTable("opssos_webhooks", {
   secret: text("secret"),
   enabled: boolean("enabled").default(true).notNull(),
   eventTypes: jsonb("event_types").default([]),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgIdx: index("opssos_webhooks_org_idx").on(table.orgId),
@@ -21460,7 +21437,6 @@ export const opssosWebhookDeliveries = pgTable("opssos_webhook_deliveries", {
   payload: jsonb("payload").default({}),
   status: opssosWebhookDeliveryStatusEnum("status").default("pending").notNull(),
   responseCode: integer("response_code"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   webhookIdx: index("opssos_webhook_deliveries_webhook_idx").on(table.webhookId),
@@ -21506,43 +21482,42 @@ export type InsertOpssosWebhookDelivery = typeof opssosWebhookDeliveries.$inferI
 export const industryStandards = pgTable("industry_standards", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar("org_id").references(() => organizations.id), // null for global standards
-  
+
   // Core fields
   name: text("name").notNull(),
   category: text("category").notNull(), // "occupancy", "revenue", "expenses", "cap_rates", "valuations", "rates"
   subCategory: text("sub_category"), // e.g., "wet_slip_rates", "dry_storage_rates"
-  
+
   // Geographic/Market scope
   region: text("region"), // "Northeast", "Southeast", "Gulf Coast", etc.
   state: text("state"),
   waterType: text("water_type"), // "Coastal", "Lake", "River"
   marketSize: text("market_size"), // "Major Metro", "Secondary", "Tertiary"
-  
+
   // Metric values
   metricValue: decimal("metric_value", { precision: 12, scale: 4 }),
   metricUnit: text("metric_unit"), // "percentage", "dollars", "dollars_per_foot", "dollars_per_slip"
   lowRange: decimal("low_range", { precision: 12, scale: 4 }),
   highRange: decimal("high_range", { precision: 12, scale: 4 }),
-  
+
   // Time period
   effectiveYear: integer("effective_year"),
   effectiveQuarter: integer("effective_quarter"), // 1-4
-  
+
   // Data source
   dataSource: text("data_source"), // "MarinaMatch Research", "NMMA", "Industry Survey"
   sampleSize: integer("sample_size"),
   confidenceLevel: text("confidence_level"), // "high", "medium", "low"
   sourceNotes: text("source_notes"),
-  
+
   // Access control
   scope: dataScopeEnum("scope").default("global").notNull(),
   requiredPack: text("required_pack"), // "analytics_pro", "analysis", etc.
   isCurated: boolean("is_curated").default(true).notNull(),
-  
+
   // Audit fields
   createdBy: varchar("created_by").references(() => users.id),
   updatedBy: varchar("updated_by").references(() => users.id),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -21634,7 +21609,6 @@ export const userIntegrations = pgTable("user_integrations", {
   oauthState: text("oauth_state"),
   lastSyncAt: timestamp("last_sync_at"),
   errorMessage: text("error_message"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -21713,7 +21687,6 @@ export const integrationSyncMetrics = pgTable("integration_sync_metrics", {
   nextScheduledSync: timestamp("next_scheduled_sync"),
   healthScore: integer("health_score").default(100).notNull(),
   averageSyncDurationMs: integer("average_sync_duration_ms").default(0).notNull(),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -21822,42 +21795,42 @@ export const tenantStatusEnum = pgEnum("tenant_status", ["active", "pending", "e
 export const commercialTenants = pgTable('commercial_tenants', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  
+
   // Link to marina/modeling project
   modelingProjectId: varchar('modeling_project_id').references(() => modelingProjects.id, { onDelete: 'cascade' }),
   marinaId: varchar('marina_id'), // For owned marinas
   ddProjectId: varchar('dd_project_id').references(() => projects.id), // Link to DD project for underwriting
-  
+
   // Basic Tenant Information
   tenantName: text('tenant_name').notNull(),
   tradeName: text('trade_name'), // DBA name if different
   contactName: text('contact_name'),
   contactEmail: text('contact_email'),
   contactPhone: text('contact_phone'),
-  
+
   // Space Information
   suiteNumber: text('suite_number'),
   squareFootage: decimal('square_footage', { precision: 12, scale: 2 }),
   proRataShare: decimal('pro_rata_share', { precision: 8, scale: 4 }), // Percentage (e.g., 12.5000%)
   permittedUse: text('permitted_use'),
   useRestrictions: text('use_restrictions'),
-  
+
   // Lease Dates
   leaseExecutionDate: date('lease_execution_date'),
   leaseCommencementDate: date('lease_commencement_date').notNull(),
   rentStartDate: date('rent_start_date'),
   leaseExpirationDate: date('lease_expiration_date').notNull(),
-  
+
   // Lease Structure
   leaseType: leaseTypeEnum('lease_type').notNull().default('nnn'),
   rentStructure: rentStructureEnum('rent_structure').notNull().default('base_only'),
   tenantStatus: tenantStatusEnum('tenant_status').notNull().default('active'),
-  
+
   // Base Rent
   currentBaseRent: decimal('current_base_rent', { precision: 15, scale: 2 }), // Annual amount
   baseRentPerSF: decimal('base_rent_per_sf', { precision: 10, scale: 2 }), // Per SF per year
   rentFreePeriodMonths: integer('rent_free_period_months').default(0),
-  
+
   // Rent Escalations
   escalationType: escalationTypeEnum('escalation_type').default('fixed_percent'),
   escalationRate: decimal('escalation_rate', { precision: 6, scale: 4 }), // e.g., 0.0300 = 3%
@@ -21867,13 +21840,13 @@ export const commercialTenants = pgTable('commercial_tenants', {
   cpiIndex: text('cpi_index'), // e.g., "CPI-U All Urban Consumers"
   cpiFloor: decimal('cpi_floor', { precision: 6, scale: 4 }), // Minimum CPI increase
   cpiCeiling: decimal('cpi_ceiling', { precision: 6, scale: 4 }), // Maximum CPI increase
-  
+
   // Security Deposit
   securityDeposit: decimal('security_deposit', { precision: 15, scale: 2 }),
   letterOfCreditAmount: decimal('letter_of_credit_amount', { precision: 15, scale: 2 }),
   guarantorName: text('guarantor_name'),
   guarantorType: text('guarantor_type'), // Personal, corporate, etc.
-  
+
   // Percentage Rent (Retail-specific)
   percentageRentRate: decimal('percentage_rent_rate', { precision: 6, scale: 4 }), // e.g., 0.0600 = 6%
   naturalBreakpoint: decimal('natural_breakpoint', { precision: 18, scale: 2 }), // Calculated: base rent / %
@@ -21882,7 +21855,7 @@ export const commercialTenants = pgTable('commercial_tenants', {
   lastReportedSales: decimal('last_reported_sales', { precision: 18, scale: 2 }),
   lastReportedSalesDate: date('last_reported_sales_date'),
   auditRights: boolean('audit_rights').default(false),
-  
+
   // NNN / Operating Expenses
   estimatedCamPerSF: decimal('estimated_cam_per_sf', { precision: 10, scale: 2 }),
   estimatedTaxPerSF: decimal('estimated_tax_per_sf', { precision: 10, scale: 2 }),
@@ -21894,67 +21867,67 @@ export const commercialTenants = pgTable('commercial_tenants', {
   controllableCamCap: decimal('controllable_cam_cap', { precision: 6, scale: 4 }),
   excludedCamItems: text('excluded_cam_items').array(), // Items tenant doesn't pay
   adminFeePercent: decimal('admin_fee_percent', { precision: 6, scale: 4 }), // Management fee on CAM
-  
+
   // Renewal Options
   renewalOptions: integer('renewal_options').default(0), // Number of options
   renewalTermYears: integer('renewal_term_years'), // Length of each renewal
   renewalNoticeMonths: integer('renewal_notice_months'), // Notice period required
   renewalRentTerms: text('renewal_rent_terms'), // FMV, fixed increase, etc.
-  
+
   // Termination Rights
   hasTerminationOption: boolean('has_termination_option').default(false),
   terminationOptionDate: date('termination_option_date'),
   terminationFee: decimal('termination_fee', { precision: 15, scale: 2 }),
   terminationNoticeMonths: integer('termination_notice_months'),
-  
+
   // Expansion Rights
   hasExpansionOption: boolean('has_expansion_option').default(false),
   rofrSquareFootage: decimal('rofr_square_footage', { precision: 12, scale: 2 }), // Right of first refusal SF
   expansionNoticeMonths: integer('expansion_notice_months'),
-  
+
   // Co-Tenancy (Retail-specific)
   hasOpeningCoTenancy: boolean('has_opening_co_tenancy').default(false),
   openingCoTenancyRequirements: text('opening_co_tenancy_requirements'),
   hasOperatingCoTenancy: boolean('has_operating_co_tenancy').default(false),
   operatingCoTenancyRequirements: text('operating_co_tenancy_requirements'),
   coTenancyRemedies: text('co_tenancy_remedies'), // Rent reduction, termination, etc.
-  
+
   // Operating Requirements
   requiredOperatingHours: text('required_operating_hours'),
   canGoDark: boolean('can_go_dark').default(false),
   exclusiveUseClause: text('exclusive_use_clause'),
   signageRights: text('signage_rights'),
   parkingSpaces: integer('parking_spaces'),
-  
+
   // TI Allowance
   tiAllowance: decimal('ti_allowance', { precision: 15, scale: 2 }),
   tiAllowancePerSF: decimal('ti_allowance_per_sf', { precision: 10, scale: 2 }),
   tiDeliveryCondition: text('ti_delivery_condition'), // Shell, turnkey, etc.
-  
+
   // Maintenance Responsibilities
   tenantMaintenance: text('tenant_maintenance').array(), // HVAC, interior, etc.
   landlordMaintenance: text('landlord_maintenance').array(), // Roof, structure, etc.
   hvacResponsibility: text('hvac_responsibility'), // Tenant or landlord
-  
+
   // Insurance Requirements
   requiredLiabilityLimit: decimal('required_liability_limit', { precision: 15, scale: 2 }),
   requiredPropertyLimit: decimal('required_property_limit', { precision: 15, scale: 2 }),
-  
+
   // Document references
   leaseDocumentId: varchar('lease_document_id'), // VDR document reference
   originalLeasePageRef: text('original_lease_page_ref'), // Page numbers for abstracted items
-  
+
   // Import/parse metadata
   importSource: text('import_source'), // manual, pdf_parse, excel_import
   parseConfidence: decimal('parse_confidence', { precision: 5, scale: 2 }), // AI confidence score
   needsReview: boolean('needs_review').default(false),
   reviewedAt: timestamp('reviewed_at'),
   reviewedBy: varchar('reviewed_by').references(() => users.id),
-  
+
   // Notes and custom fields
   notes: text('notes'),
   customFields: jsonb('custom_fields').default(sql`'{}'`),
-  
+
   // Audit
   createdBy: varchar('created_by').notNull().references(() => users.id),
   updatedBy: varchar('updated_by').references(() => users.id),
@@ -21973,19 +21946,19 @@ export const commercialTenants = pgTable('commercial_tenants', {
 export const commercialTenantRentSchedule = pgTable('commercial_tenant_rent_schedule', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar('tenant_id').notNull().references(() => commercialTenants.id, { onDelete: 'cascade' }),
-  
+
   periodStart: date('period_start').notNull(),
   periodEnd: date('period_end').notNull(),
   yearNumber: integer('year_number').notNull(), // 1, 2, 3, etc.
-  
+
   baseRentAnnual: decimal('base_rent_annual', { precision: 15, scale: 2 }),
   baseRentMonthly: decimal('base_rent_monthly', { precision: 15, scale: 2 }),
   baseRentPerSF: decimal('base_rent_per_sf', { precision: 10, scale: 2 }),
-  
+
   estimatedPercentageRent: decimal('estimated_percentage_rent', { precision: 15, scale: 2 }),
   estimatedNNNAnnual: decimal('estimated_nnn_annual', { precision: 15, scale: 2 }),
   totalRentAnnual: decimal('total_rent_annual', { precision: 15, scale: 2 }),
-  
+
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
@@ -21997,18 +21970,18 @@ export const commercialTenantRentSchedule = pgTable('commercial_tenant_rent_sche
 export const commercialTenantAmendments = pgTable('commercial_tenant_amendments', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar('tenant_id').notNull().references(() => commercialTenants.id, { onDelete: 'cascade' }),
-  
+
   amendmentNumber: integer('amendment_number').notNull(),
   effectiveDate: date('effective_date').notNull(),
   executionDate: date('execution_date'),
-  
+
   amendmentType: text('amendment_type'), // Extension, rent modification, space change, etc.
   summary: text('summary').notNull(),
   changedFields: jsonb('changed_fields').default(sql`'{}'`), // Field name -> old/new values
-  
+
   documentId: varchar('document_id'), // VDR reference
   notes: text('notes'),
-  
+
   createdBy: varchar('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
@@ -22021,30 +21994,30 @@ export const commercialTenantScenarios = pgTable('commercial_tenant_scenarios', 
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar('tenant_id').notNull().references(() => commercialTenants.id, { onDelete: 'cascade' }),
   modelingProjectId: varchar('modeling_project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
-  
+
   scenarioName: text('scenario_name').notNull(), // Base Case, Aggressive, Conservative, Custom
   caseType: text('case_type').notNull().default('custom'), // base, aggressive, conservative, custom
-  
+
   // Override values for this scenario (null = use base lease values)
   overrideBaseRent: decimal('override_base_rent', { precision: 15, scale: 2 }),
   overrideEscalationRate: decimal('override_escalation_rate', { precision: 6, scale: 4 }),
   overridePercentageRent: decimal('override_percentage_rent', { precision: 6, scale: 4 }),
   overrideNNNPerSF: decimal('override_nnn_per_sf', { precision: 10, scale: 2 }),
   overrideVacancyRate: decimal('override_vacancy_rate', { precision: 6, scale: 4 }),
-  
+
   // Renewal assumptions
   assumeRenewal: boolean('assume_renewal').default(true),
   renewalProbability: decimal('renewal_probability', { precision: 5, scale: 2 }), // e.g., 75%
   renewalRentBumpPercent: decimal('renewal_rent_bump_percent', { precision: 6, scale: 4 }),
-  
+
   // Downtime assumptions
   releaseDowntimeMonths: integer('release_downtime_months').default(6),
   releaseCommissionPercent: decimal('release_commission_percent', { precision: 6, scale: 4 }),
   releaseTIPerSF: decimal('release_ti_per_sf', { precision: 10, scale: 2 }),
-  
+
   notes: text('notes'),
   isActive: boolean('is_active').default(true),
-  
+
   createdBy: varchar('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -22183,7 +22156,6 @@ export const opsPortfolios = pgTable("ops_portfolios", {
   description: text("description"),
   currency: varchar("currency", { length: 3 }).default("USD"),
   timezone: varchar("timezone", { length: 50 }).default("America/New_York"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22216,7 +22188,6 @@ export const opsMarinas = pgTable("ops_marinas", {
   lastSyncAt: timestamp("last_sync_at"),
   isActive: boolean("is_active").default(true),
   notes: text("notes"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22242,7 +22213,6 @@ export const opsFuelTransactions = pgTable("ops_fuel_transactions", {
   source: opsDataSourceEnum("source").default("MANUAL"),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => users.id),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22267,7 +22237,6 @@ export const opsShipStoreSales = pgTable("ops_ship_store_sales", {
   source: opsDataSourceEnum("source").default("MANUAL"),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => users.id),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22293,7 +22262,6 @@ export const opsServiceWorkOrders = pgTable("ops_service_work_orders", {
   source: opsDataSourceEnum("source").default("MANUAL"),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => users.id),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22316,7 +22284,6 @@ export const opsBoatRentals = pgTable("ops_boat_rentals", {
   source: opsDataSourceEnum("source").default("MANUAL"),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => users.id),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22342,7 +22309,6 @@ export const opsBoatClubMemberships = pgTable("ops_boat_club_memberships", {
   source: opsDataSourceEnum("source").default("MANUAL"),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => users.id),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22364,7 +22330,6 @@ export const opsBoatSales = pgTable("ops_boat_sales", {
   source: opsDataSourceEnum("source").default("MANUAL"),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => users.id),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22391,7 +22356,6 @@ export const opsCommercialLeases = pgTable("ops_commercial_leases", {
   source: opsDataSourceEnum("source").default("MANUAL"),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => users.id),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22414,7 +22378,6 @@ export const opsBookkeepingGl = pgTable("ops_bookkeeping_gl", {
   source: opsDataSourceEnum("source").default("MANUAL"),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => users.id),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22444,7 +22407,6 @@ export const asmpFuel = pgTable("asmp_fuel", {
   importedAt: timestamp("imported_at"),
   importSource: varchar("import_source", { length: 20 }), // ACTUALS, TEMPLATE, MANUAL
   notes: text("notes"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22472,7 +22434,6 @@ export const asmpShipStore = pgTable("asmp_ship_store", {
   importedAt: timestamp("imported_at"),
   importSource: varchar("import_source", { length: 20 }),
   notes: text("notes"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22500,7 +22461,6 @@ export const asmpService = pgTable("asmp_service", {
   importedAt: timestamp("imported_at"),
   importSource: varchar("import_source", { length: 20 }),
   notes: text("notes"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22530,7 +22490,6 @@ export const asmpCommercialTenants = pgTable("asmp_commercial_tenants", {
   importedAt: timestamp("imported_at"),
   importSource: varchar("import_source", { length: 20 }),
   notes: text("notes"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22555,7 +22514,6 @@ export const asmpBoatRentals = pgTable("asmp_boat_rentals", {
   importedAt: timestamp("imported_at"),
   importSource: varchar("import_source", { length: 20 }),
   notes: text("notes"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22580,7 +22538,6 @@ export const asmpBoatClub = pgTable("asmp_boat_club", {
   importedAt: timestamp("imported_at"),
   importSource: varchar("import_source", { length: 20 }),
   notes: text("notes"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22607,7 +22564,6 @@ export const asmpBoatSales = pgTable("asmp_boat_sales", {
   importedAt: timestamp("imported_at"),
   importSource: varchar("import_source", { length: 20 }),
   notes: text("notes"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22629,7 +22585,6 @@ export const asmpBookkeeping = pgTable("asmp_bookkeeping", {
   importedAt: timestamp("imported_at"),
   importSource: varchar("import_source", { length: 20 }),
   notes: text("notes"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22655,7 +22610,6 @@ export const opsImportEvents = pgTable("ops_import_events", {
   status: varchar("status", { length: 20 }).default("completed"), // pending, completed, failed
   errorMessage: text("error_message"),
   createdBy: varchar("created_by").notNull().references(() => users.id),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   projectIdx: index("ops_import_events_project_idx").on(table.projectId),
@@ -22867,7 +22821,6 @@ export const docktalkKeywordBank = pgTable('docktalk_keyword_bank', {
   isActive: boolean("is_active").notNull().default(true),
   isRequired: boolean("is_required").notNull().default(false), // If true, article must match at least one required keyword
   createdBy: varchar("created_by").references(() => users.id),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22890,7 +22843,6 @@ export const docktalkScoringConfig = pgTable('docktalk_scoring_config', {
   operationsWeight: integer("operations_weight").notNull().default(4),
   macroWeight: integer("macro_weight").notNull().default(3),
   regulatoryWeight: integer("regulatory_weight").notNull().default(3),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -22929,7 +22881,6 @@ export const aiUsageTracking = pgTable('ai_usage_tracking', {
   outputTokens: integer("output_tokens").notNull().default(0),
   estimatedCostCents: integer("estimated_cost_cents").notNull(),
   metadata: jsonb("metadata").default({}),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orgDateIdx: index('ai_usage_tracking_org_date_idx').on(table.orgId, table.createdAt),
@@ -22946,7 +22897,6 @@ export const aiSpendingLimits = pgTable('ai_spending_limits', {
   currentMonthSpendCents: integer("current_month_spend_cents").notNull().default(0),
   lastResetAt: timestamp("last_reset_at").defaultNow().notNull(),
   hardLimitReachedAt: timestamp("hard_limit_reached_at"),
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -23080,6 +23030,60 @@ export const scenarioAuditLogs = pgTable('scenario_audit_logs', {
   diffJson: jsonb('diff_json'),
   payloadHash: text('payload_hash'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// ============================================================================
+// RELATIONSHIP INTELLIGENCE TABLES
+// ============================================================================
+
+// Contact Deal Roles - links contacts to deals with specific roles
+export const contactDealRoles = pgTable("contact_deal_roles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").references(() => organizations.id, { onDelete: "cascade" }),
+  contactId: varchar("contact_id").notNull().references(() => contacts.id, { onDelete: "cascade" }),
+  companyId: varchar("company_id").references(() => companies.id, { onDelete: "set null" }),
+  dealId: varchar("deal_id").notNull().references(() => deals.id, { onDelete: "cascade" }),
+  roleOnDeal: contactRoleEnum("role_on_deal"),
+  dealSide: dealSideEnum("deal_side"),
+  isPrimaryForDeal: boolean("is_primary_for_deal").default(false).notNull(),
+  volumeAttributionMode: volumeAttributionModeEnum("volume_attribution_mode").default("all_linked").notNull(),
+  feeCreditingMode: feeCreditingModeEnum("fee_crediting_mode").default("contact").notNull(),
+  splitPctContact: numeric("split_pct_contact", { precision: 5, scale: 2 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("contact_deal_roles_org_idx").on(table.orgId),
+  contactIdx: index("contact_deal_roles_contact_idx").on(table.contactId),
+  dealIdx: index("contact_deal_roles_deal_idx").on(table.dealId),
+}));
+
+// Deal Financial Events - tracks fees, commissions, waivers
+export const dealFinancialEvents = pgTable("deal_financial_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").references(() => organizations.id, { onDelete: "cascade" }),
+  dealId: varchar("deal_id").notNull().references(() => deals.id, { onDelete: "cascade" }),
+  eventType: financialEventTypeEnum("event_type").notNull(),
+  amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).default("USD").notNull(),
+  direction: financialEventDirectionEnum("direction").notNull(),
+  appliesToContactId: varchar("applies_to_contact_id").references(() => contacts.id, { onDelete: "set null" }),
+  appliesToCompanyId: varchar("applies_to_company_id").references(() => companies.id, { onDelete: "set null" }),
+  notes: text("notes"),
+  eventDate: date("event_date").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("deal_financial_events_org_idx").on(table.orgId),
+  dealIdx: index("deal_financial_events_deal_idx").on(table.dealId),
+  contactIdx: index("deal_financial_events_contact_idx").on(table.appliesToContactId),
+}));
+
+// Contact Metrics Snapshot - cached performance metrics
+export const contactMetricsSnapshot = pgTable("contact_metrics_snapshot", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").references(() => organizations.id, { onDelete: "cascade" }),
+  contactId: varchar("contact_id").notNull().references(() => contacts.id, { onDelete: "cascade" }),
+  timeframeKey: varchar("timeframe_key", { length: 20 }).notNull(),
+  metrics: jsonb("metrics").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // Types
