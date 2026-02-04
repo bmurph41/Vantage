@@ -1,3 +1,8 @@
+/**
+ * Contact Intelligence UI Configuration
+ * Client-side constants and types for relationship intelligence components
+ */
+
 export const RELATIONSHIP_STATUS_CONFIG = {
   preferred: { label: 'Preferred', color: 'emerald', description: 'Go-to partner for transactions' },
   approved: { label: 'Approved', color: 'blue', description: 'Vetted and approved vendor' },
