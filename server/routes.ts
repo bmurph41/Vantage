@@ -996,6 +996,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(project);
     } catch (error: any) {
       res.status(400).json({ error: "Invalid project data" });
+
+  // Portfolio Management Routes
+  
+  // Get child projects of a portfolio
+  app.get("/api/dd/projects/:id/children", async (req: any, res) => {
+    try {
+      const { db } = await import("./db");
+      const { projects } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      
+      const parentId = req.params.id;
+      
+      // Verify parent project exists and is a portfolio
+      const [parentProject] = await db.select().from(projects).where(
+        and(eq(projects.id, parentId), eq(projects.orgId, req.user.orgId))
+      );
+      
+      if (!parentProject) {
+        return res.status(404).json({ error: "Portfolio project not found" });
+      }
+      
+      if (parentProject.projectType !== "portfolio") {
+        return res.status(400).json({ error: "Project is not a portfolio" });
+      }
+      
+      // Get all child projects
+      const childProjects = await db.select().from(projects).where(
+        eq(projects.parentProjectId, parentId)
+      );
+      
+      res.json({ children: childProjects });
+    } catch (error: any) {
+      console.error("Error fetching portfolio children:", error);
+      res.status(500).json({ error: "Failed to fetch portfolio children" });
+    }
+  });
+  
+  // Add a property to a portfolio (creates child project)
+  app.post("/api/dd/projects/:id/add-property", async (req: any, res) => {
+    try {
+      const { db } = await import("./db");
+      const { projects, crmProperties } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      
+      const parentId = req.params.id;
+      const { propertyId, name, address, city, state, zipCode, coordinates, placeId } = req.body;
+      
+      // Verify parent project exists and is a portfolio
+      const [parentProject] = await db.select().from(projects).where(
+        and(eq(projects.id, parentId), eq(projects.orgId, req.user.orgId))
+      );
+      
+      if (!parentProject) {
+        return res.status(404).json({ error: "Portfolio project not found" });
+      }
+      
+      if (parentProject.projectType !== "portfolio") {
+        return res.status(400).json({ error: "Project is not a portfolio" });
+      }
+      
+      let linkedPropertyId = propertyId;
+      let projectName = name;
+      
+      // If property ID provided, get property details
+      if (propertyId) {
+        const [property] = await db.select().from(crmProperties).where(eq(crmProperties.id, propertyId));
+        if (property) {
+          projectName = projectName || property.title;
+        }
+      } else if (address) {
+        // Create new property from address
+        const newProperty = await storage.createCrmProperty({
+          orgId: req.user.orgId,
+          title: name || "New Property",
+          type: "marina",
+          status: "pending",
+          address,
+          city,
+          state,
+          zipCode,
+          coordinates,
+          ownerId: req.user.id,
+          pipelineStage: "lead",
+        });
+        linkedPropertyId = newProperty.id;
+        projectName = projectName || name || "New Property DD";
+      }
+      
+      // Create child project
+      const childProjectData = {
+        name: projectName || "Property DD",
+        projectType: "single" as const,
+        parentProjectId: parentId,
+        propertyId: linkedPropertyId,
+        address,
+        city,
+        state,
+        zipCode,
+        coordinates,
+        placeId,
+        orgId: req.user.orgId,
+        createdBy: req.user.id,
+      };
+      
+      const childProject = await storage.createProject(childProjectData);
+      
+      // Create default settings for child project
+      await storage.createProjectSettings({
+        projectId: childProject.id,
+        useBusinessDays: false,
+        holidayCalendar: "us_federal",
+        notificationsJson: {},
+        ndaRequired: false,
+      });
+      
+      // Initialize VDR for child project
+      try {
+        await initializeVdrForProject(childProject.id, req.user.orgId, req.user.id);
+      } catch (vdrError) {
+        console.error("[Portfolio] Failed to initialize VDR for child:", vdrError);
+      }
+      
+      res.json(childProject);
+    } catch (error: any) {
+      console.error("Error adding property to portfolio:", error);
+      res.status(500).json({ error: "Failed to add property to portfolio" });
+    }
+  });
     }
   });
 

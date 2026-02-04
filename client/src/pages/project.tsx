@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, FileBarChart, Plus, FolderOpen } from "lucide-react";
+import { ArrowLeft, FileBarChart, Plus, FolderOpen, Briefcase } from "lucide-react";
 import { ProjectHeader } from "@/components/project-header";
 import { ThirdPartyReports } from "@/components/third-party-reports";
 import { DocumentsWorkspace } from "@/components/vdr/DocumentsWorkspace";
@@ -16,6 +16,7 @@ import { CddAdvisor } from "@/components/cdd-advisor";
 import { FindingsManager } from "@/components/findings-manager";
 import { KpisOverview } from "@/components/kpis-overview";
 import { TemplatesView } from "@/components/templates-view";
+import { PortfolioPropertiesView } from "@/components/portfolio-properties-view";
 import NotificationSettingsPage from "@/pages/notification-settings";
 import { useProject } from "@/hooks/use-project";
 import { useQuery } from "@tanstack/react-query";
@@ -25,7 +26,7 @@ import type { DDTask, DDContact } from "@shared/schema";
 export default function ProjectPage() {
   const { id } = useParams();
   const [location] = useLocation();
-  const [activeTab, setActiveTab] = useState("reports");
+  const [activeTab, setActiveTab] = useState<string | null>(null);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<DDTask | null>(null);
   
@@ -87,7 +88,11 @@ export default function ProjectPage() {
     });
   };
 
-  const tabs = [
+  const isPortfolio = project.projectType === "portfolio";
+  
+  const effectiveActiveTab = activeTab || (isPortfolio ? "portfolio" : "reports");
+
+  const baseTabs = [
     { id: "reports", label: "Tasks & Timeline" },
     { id: "documents", label: "Documents" },
     { id: "templates", label: "Templates" },
@@ -98,6 +103,10 @@ export default function ProjectPage() {
     { id: "notifications", label: "Notifications" },
     { id: "archive", label: "Archive" },
   ];
+
+  const tabs = isPortfolio 
+    ? [{ id: "portfolio", label: "Portfolio Properties" }, ...baseTabs]
+    : baseTabs;
 
   return (
     <div className="min-h-screen bg-background" data-testid="project-page">
@@ -137,7 +146,7 @@ export default function ProjectPage() {
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
                   "px-4 py-2 rounded-md text-sm font-medium transition-colors",
-                  activeTab === tab.id
+                  effectiveActiveTab === tab.id
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:text-foreground"
                 )}
@@ -164,7 +173,10 @@ export default function ProjectPage() {
 
         {/* Tab Content */}
         <div className="tab-content">
-          {activeTab === "reports" && (
+          {effectiveActiveTab === "portfolio" && isPortfolio && (
+            <PortfolioPropertiesView portfolioId={project.id} portfolioName={project.name} />
+          )}
+          {effectiveActiveTab === "reports" && (
             <>
               {/* Timeline - Professional View (Only on Tasks & Timeline tab) */}
               <div className="mb-8">
@@ -173,7 +185,7 @@ export default function ProjectPage() {
               <ThirdPartyReports tasks={tasks} projectId={project.id} project={project} settings={settings} />
             </>
           )}
-          {activeTab === "documents" && (
+          {effectiveActiveTab === "documents" && (
             <div className="h-[calc(100vh-20rem)] border rounded-lg bg-card overflow-hidden">
               <div className="flex items-center justify-between p-4 border-b bg-muted/30">
                 <div className="flex items-center gap-2">
@@ -191,29 +203,29 @@ export default function ProjectPage() {
               </div>
             </div>
           )}
-          {activeTab === "templates" && (
+          {effectiveActiveTab === "templates" && (
             <TemplatesView projectId={project.id} />
           )}
-          {activeTab === "setup" && (
+          {effectiveActiveTab === "setup" && (
             <ProjectSetup project={project} settings={settings} tasks={tasks} />
           )}
-          {activeTab === "owners" && (
+          {effectiveActiveTab === "owners" && (
             <TaskOwnersView tasks={tasks} projectId={project.id} />
           )}
-          {activeTab === "contacts" && (
+          {effectiveActiveTab === "contacts" && (
             <ContactManagement 
               contacts={contacts} 
               isLoading={contactsLoading} 
               projectId={project.id} 
             />
           )}
-          {activeTab === "integrations" && (
+          {effectiveActiveTab === "integrations" && (
             <ProjectIntegrationSettings projectId={project.id} />
           )}
-          {activeTab === "notifications" && (
+          {effectiveActiveTab === "notifications" && (
             <NotificationSettingsPage projectId={project.id} />
           )}
-          {activeTab === "archive" && (
+          {effectiveActiveTab === "archive" && (
             <ArchiveView projectId={project.id} />
           )}
         </div>
