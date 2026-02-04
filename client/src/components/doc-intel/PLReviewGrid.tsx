@@ -212,6 +212,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
   const [pendingMonthlyEdits, setPendingMonthlyEdits] = useState<Record<string, number>>({});
   const [showExcluded, setShowExcluded] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [selectedRowKeys, setSelectedRowKeys] = useState<Set<string>>(new Set());
   const [excludeDialog, setExcludeDialog] = useState<{ open: boolean; item: ExtractedItem | null; reason: string }>({
     open: false,
     item: null,
@@ -972,14 +973,156 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
             </p>
           </div>
         ) : (
+          <>
+            {/* Bulk Action Bar - appears when rows are selected */}
+            {selectedRowKeys.size > 0 && (
+              <div className="sticky top-0 z-30 bg-primary text-primary-foreground p-3 rounded-lg mb-3 flex items-center justify-between gap-4 shadow-lg">
+                <div className="flex items-center gap-3">
+                  <span className="font-medium">{selectedRowKeys.size} row{selectedRowKeys.size !== 1 ? 's' : ''} selected</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-primary-foreground hover:bg-primary-foreground/20 h-7 px-2"
+                    onClick={() => setSelectedRowKeys(new Set())}
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Clear
+                  </Button>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">Category:</span>
+                    <Select
+                      onValueChange={(tier) => {
+                        const allItemIds: string[] = [];
+                        selectedRowKeys.forEach(key => {
+                          const lineItem = groupedData.lineItems.find(li => `${li.lineItemName}__${li.sourceRow}` === key);
+                          if (lineItem) {
+                            lineItem.monthlyData.forEach(m => allItemIds.push(m.id));
+                          }
+                        });
+                        if (allItemIds.length > 0) {
+                          bulkUpdateMutation.mutate({
+                            itemIds: allItemIds,
+                            updates: {
+                              categoryTierConfirmed: tier as CategoryTier,
+                              revenueCogsDeptConfirmed: null,
+                              expenseDeptConfirmed: null,
+                            },
+                          });
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-[120px] h-8 bg-primary-foreground text-primary">
+                        <SelectValue placeholder="Set category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CATEGORY_TIER_OPTIONS.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">Department:</span>
+                    {(() => {
+                      // Check if all selected rows have same tier
+                      const tiers = new Set<CategoryTier>();
+                      selectedRowKeys.forEach(key => {
+                        const lineItem = groupedData.lineItems.find(li => `${li.lineItemName}__${li.sourceRow}` === key);
+                        if (lineItem?.monthlyData[0]) {
+                          const tier = (lineItem.monthlyData[0].categoryTierConfirmed || lineItem.monthlyData[0].categoryTierSuggested) as CategoryTier | null;
+                          if (tier) tiers.add(tier);
+                        }
+                      });
+                      const hasMixedTiers = tiers.size > 1;
+                      const commonTier = tiers.size === 1 ? Array.from(tiers)[0] : null;
+                      
+                      if (hasMixedTiers) {
+                        return (
+                          <span className="text-xs text-primary-foreground/70 italic">
+                            Mixed categories - set individually
+                          </span>
+                        );
+                      }
+                      
+                      return (
+                        <Select
+                          onValueChange={(dept) => {
+                            if (!commonTier) return;
+                            const allItemIds: string[] = [];
+                            selectedRowKeys.forEach(key => {
+                              const lineItem = groupedData.lineItems.find(li => `${li.lineItemName}__${li.sourceRow}` === key);
+                              if (lineItem) {
+                                lineItem.monthlyData.forEach(m => allItemIds.push(m.id));
+                              }
+                            });
+                            if (allItemIds.length > 0) {
+                              const updates = commonTier === 'expense'
+                                ? { expenseDeptConfirmed: dept }
+                                : { revenueCogsDeptConfirmed: dept };
+                              bulkUpdateMutation.mutate({ itemIds: allItemIds, updates });
+                            }
+                          }}
+                          disabled={!commonTier}
+                        >
+                          <SelectTrigger className="w-[130px] h-8 bg-primary-foreground text-primary">
+                            <SelectValue placeholder={commonTier ? "Set department" : "Set category first"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(commonTier === 'expense' ? EXPENSE_DEPT_OPTIONS : REVENUE_COGS_DEPT_OPTIONS).map(opt => (
+                              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      );
+                    })()}
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="h-8"
+                    onClick={() => {
+                      const allItemIds: string[] = [];
+                      selectedRowKeys.forEach(key => {
+                        const lineItem = groupedData.lineItems.find(li => `${li.lineItemName}__${li.sourceRow}` === key);
+                        if (lineItem) {
+                          lineItem.monthlyData.forEach(m => allItemIds.push(m.id));
+                        }
+                      });
+                      if (allItemIds.length > 0) {
+                        bulkUpdateMutation.mutate({ itemIds: allItemIds, updates: { status: 'confirmed' } });
+                        setSelectedRowKeys(new Set());
+                      }
+                    }}
+                  >
+                    <Check className="h-4 w-4 mr-1" />
+                    Confirm Selected
+                  </Button>
+                </div>
+              </div>
+            )}
             <div className="overflow-x-auto">
               <Table className="w-full table-fixed">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-8 bg-muted/50 sticky left-0 z-20"></TableHead>
-                    <TableHead className="bg-muted/50 sticky left-8 z-20 w-[140px]">Line Item</TableHead>
-                    <TableHead className="bg-muted/50 w-[95px] px-1">Category</TableHead>
-                    <TableHead className="bg-muted/50 w-[105px] px-1">Department</TableHead>
+                    <TableHead className="w-8 bg-muted/50 sticky left-0 z-20">
+                      <Checkbox
+                        checked={selectedRowKeys.size > 0 && selectedRowKeys.size === filteredLineItems.length}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            const allKeys = new Set(filteredLineItems.map(li => `${li.lineItemName}__${li.sourceRow}`));
+                            setSelectedRowKeys(allKeys);
+                          } else {
+                            setSelectedRowKeys(new Set());
+                          }
+                        }}
+                        aria-label="Select all rows"
+                      />
+                    </TableHead>
+                    <TableHead className="bg-muted/50 sticky left-8 z-20 w-[160px]">Line Item</TableHead>
+                    <TableHead className="bg-muted/50 w-[130px] px-1">Category</TableHead>
+                    <TableHead className="bg-muted/50 w-[140px] px-1">Department</TableHead>
                     {groupedData.isMultiColumn ? (
                       groupedData.periods.map((period) => (
                         <TableHead key={period} className="bg-muted/50 text-center w-[70px] px-1 text-xs">
@@ -1020,21 +1163,38 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                           }
                         >
                           <TableCell className="p-2 sticky left-0 z-10 bg-background">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0"
-                              onClick={() => toggleRowExpanded(rowKey)}
-                            >
-                              {isExpanded ? (
-                                <ChevronDown className="h-4 w-4" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4" />
-                              )}
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Checkbox
+                                checked={selectedRowKeys.has(rowKey)}
+                                onCheckedChange={(checked) => {
+                                  setSelectedRowKeys(prev => {
+                                    const next = new Set(prev);
+                                    if (checked) {
+                                      next.add(rowKey);
+                                    } else {
+                                      next.delete(rowKey);
+                                    }
+                                    return next;
+                                  });
+                                }}
+                                aria-label={`Select ${lineItem.lineItemName}`}
+                              />
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={() => toggleRowExpanded(rowKey)}
+                              >
+                                {isExpanded ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
                           </TableCell>
-                          <TableCell className="font-medium sticky left-8 z-10 bg-background w-[140px] px-1">
-                            <span className="truncate block max-w-[130px] text-sm" title={lineItem.lineItemName}>
+                          <TableCell className="font-medium sticky left-8 z-10 bg-background w-[160px] px-1">
+                            <span className="truncate block max-w-[150px] text-sm" title={lineItem.lineItemName}>
                               {lineItem.lineItemName}
                             </span>
                           </TableCell>
@@ -1426,7 +1586,8 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
               </TableBody>
               </Table>
             </div>
-          )}
+          </>
+        )}
       </div>
 
       <Dialog open={excludeDialog.open} onOpenChange={(open) => !open && setExcludeDialog({ open: false, item: null, reason: "" })}>

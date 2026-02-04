@@ -170,10 +170,20 @@ export function MultiDocumentReview({
   // Check if ALL items are fully classified with both category AND department (Requirement I)
   const allItemsClassified = useMemo(() => {
     if (totalItems === 0) return false;
-    return allItems.every(item => 
-      (item.categoryConfirmed || item.categorySuggested) &&
-      (item.departmentConfirmed || item.departmentSuggested)
-    );
+    return allItems.every(item => {
+      // Check category tier (using correct field names)
+      const hasCategory = item.categoryTierConfirmed || item.categoryTierSuggested;
+      if (!hasCategory) return false;
+      
+      // Check department based on category tier
+      const tier = item.categoryTierConfirmed || item.categoryTierSuggested;
+      if (tier === 'expense') {
+        return !!(item.expenseDeptConfirmed || item.expenseDeptSuggested);
+      } else {
+        // Revenue or Cost of Goods
+        return !!(item.revenueCogsDeptConfirmed || item.revenueCogsDeptSuggested);
+      }
+    });
   }, [allItems, totalItems]);
 
   // Apply button enabled only when ALL items classified AND at least one confirmed (Requirement I)

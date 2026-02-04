@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useParams, useLocation } from 'wouter';
+import { useState, useEffect } from 'react';
+import { useParams, useLocation, useSearch } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -76,8 +76,22 @@ import ValuatorProfitCenters from './workspace/valuator-profit-centers';
 export default function ProjectWorkspace() {
   const { projectId } = useParams<{ projectId: string }>();
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState('overview');
+  const searchString = useSearch();
+  const [activeTab, setActiveTab] = useState(() => {
+    // Initialize from URL query param if present
+    const params = new URLSearchParams(searchString);
+    return params.get('tab') || 'overview';
+  });
   const queryClient = useQueryClient();
+
+  // Sync tab state with URL query parameter
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    const tabFromUrl = params.get('tab');
+    if (tabFromUrl && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [searchString, activeTab]);
 
   const { data: project, isLoading } = useQuery<ModelingProject>({
     queryKey: ['/api/modeling/projects', projectId],
