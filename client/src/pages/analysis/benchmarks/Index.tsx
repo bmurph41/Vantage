@@ -1,11 +1,14 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, RefreshCw } from "lucide-react";
 import { format, subYears, subMonths } from "date-fns";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 // FRED Series IDs
 const BENCHMARK_SERIES = {
@@ -23,7 +26,21 @@ const BENCHMARK_SERIES = {
 type TimeRange = "1M" | "3M" | "6M" | "1Y" | "2Y" | "5Y" | "ALL";
 
 export default function BenchmarksIndex() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [timeRange, setTimeRange] = useState<TimeRange>("1Y");
+
+  const refreshMutation = useMutation({
+    mutationFn: () => apiRequest("/api/capital-markets/rates/refresh", { method: "POST", body: JSON.stringify({ lookbackDays: 365 }) }),
+    onSuccess: (data: any) => {
+      toast({ title: "Rates Refreshed", description: data.message || "Market rates have been updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/benchmarks/fred"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/capital-markets"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Refresh Failed", description: error.message, variant: "destructive" });
+    },
+  });
 
   const getStartDate = (range: TimeRange): string => {
     const now = new Date();
@@ -40,11 +57,17 @@ export default function BenchmarksIndex() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold" data-testid="text-benchmarks-title">Capital Markets</h1>
-        <p className="text-muted-foreground mt-2" data-testid="text-benchmarks-description">
-          Live tracking of key interest rates and treasury yields from Federal Reserve Economic Data
-        </p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold" data-testid="text-benchmarks-title">Capital Markets</h1>
+          <p className="text-muted-foreground mt-2" data-testid="text-benchmarks-description">
+            Live tracking of key interest rates and treasury yields from Federal Reserve Economic Data
+          </p>
+        </div>
+        <Button onClick={() => refreshMutation.mutate()} disabled={refreshMutation.isPending} data-testid="btn-refresh-rates">
+          <RefreshCw className={`h-4 w-4 mr-2 ${refreshMutation.isPending ? "animate-spin" : ""}`} />
+          Refresh Rates
+        </Button>
       </div>
 
       <div className="mb-4 flex justify-end">
@@ -140,9 +163,21 @@ function BenchmarkChart({ seriesId, name, unit, startDate }: BenchmarkChartProps
     value: parseFloat(obs.value),
   }));
 
-  // Debug logging
-  if (chartData.length > 0) {
-  }
+  const getMonthTicks = (data: { date: string }[]): number[] => {
+    if (data.length === 0) return [];
+    const ticks: number[] = [];
+    let lastMonth = "";
+    data.forEach((d, index) => {
+      const monthKey = format(new Date(d.date), "yyyy-MM");
+      if (monthKey !== lastMonth) {
+        ticks.push(index);
+        lastMonth = monthKey;
+      }
+    });
+    return ticks;
+  };
+
+  const monthTicks = getMonthTicks(chartData);
 
   const currentValue = chartData.length > 0 ? chartData[chartData.length - 1].value : null;
   const previousValue = chartData.length > 1 ? chartData[chartData.length - 2].value : currentValue;
@@ -193,9 +228,10 @@ function BenchmarkChart({ seriesId, name, unit, startDate }: BenchmarkChartProps
                   <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                   <XAxis
                     dataKey="date"
+                    ticks={monthTicks.map(i => chartData[i]?.date).filter(Boolean)}
                     tickFormatter={(date) => {
                       try {
-                        return format(new Date(date), "MMM yy");
+                        return format(new Date(date), "MMM ''yy");
                       } catch {
                         return date;
                       }
@@ -204,6 +240,7 @@ function BenchmarkChart({ seriesId, name, unit, startDate }: BenchmarkChartProps
                     textAnchor="end"
                     height={80}
                     stroke="#666"
+                    interval={0}
                   />
                   <YAxis
                     domain={['dataMin - 0.1', 'dataMax + 0.1']}
