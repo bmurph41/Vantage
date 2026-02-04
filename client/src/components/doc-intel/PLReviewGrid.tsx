@@ -101,6 +101,12 @@ interface MonthlyDataItem {
   status: string;
   categoryConfirmed?: string | null;
   categorySuggested?: string | null;
+  categoryTierConfirmed?: CategoryTier | null;
+  categoryTierSuggested?: CategoryTier | null;
+  revenueCogsDeptConfirmed?: string | null;
+  revenueCogsDeptSuggested?: string | null;
+  expenseDeptConfirmed?: string | null;
+  expenseDeptSuggested?: string | null;
   confidenceScore?: string | null;
 }
 
@@ -287,11 +293,15 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
     mutationFn: async (updates: { itemIds: string[]; updates: Partial<ExtractedItem>; lineItemKey?: string; silent?: boolean }) => {
       return apiRequest("PATCH", `/api/doc-intel/uploads/${uploadId}/items/bulk`, { itemIds: updates.itemIds, updates: updates.updates });
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", uploadId, "items"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", uploadId, "items", "grouped"] });
+    onSuccess: async (_, variables) => {
+      // Wait for both queries to complete before clearing optimistic state
+      // This prevents the "disappearing selection" issue
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", uploadId, "items"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", uploadId, "items", "grouped"] }),
+      ]);
       setSelectedIds(new Set());
-      // Clear optimistic state after successful save
+      // Clear optimistic state AFTER data is refetched so selections don't disappear
       if (variables.lineItemKey) {
         setOptimisticCategories(prev => {
           const next = { ...prev };
