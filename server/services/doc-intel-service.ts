@@ -1706,6 +1706,8 @@ Respond with JSON only:
   }
 
   async importConfirmedItems(orgId: string, uploadId: string, projectId: string, userId: string, fiscalYear?: number): Promise<ModelingActuals[]> {
+    console.log('[DocIntel Import] Starting import for upload:', uploadId, 'project:', projectId, 'fiscalYear:', fiscalYear);
+    
     const items = await db
       .select()
       .from(docIntelExtractedItems)
@@ -1715,29 +1717,43 @@ Respond with JSON only:
         eq(docIntelExtractedItems.status, 'confirmed')
       ));
 
+    console.log('[DocIntel Import] Found', items.length, 'confirmed items');
+
     // Fetch all categories for lookups
     const allCategories = await this.getCategories(orgId);
     const categoryMap = new Map(allCategories.map(c => [c.id, c]));
+    console.log('[DocIntel Import] Loaded', allCategories.length, 'categories for org:', orgId);
 
     const importedActuals: ModelingActuals[] = [];
+    let skippedNoCategory = 0;
+    let skippedCategoryNotFound = 0;
 
     for (const item of items) {
-      if (!item.categoryConfirmed) continue;
+      if (!item.categoryConfirmed) {
+        skippedNoCategory++;
+        continue;
+      }
 
       // Look up category details
       const category = categoryMap.get(item.categoryConfirmed);
-      if (!category) continue;
+      if (!category) {
+        console.log('[DocIntel Import] Category not found for ID:', item.categoryConfirmed);
+        skippedCategoryNotFound++;
+        continue;
+      }
 
-      // Determine the P&L tier (Revenue, COGS, Expenses) from category tier
+      // Determine the P&L tier (Revenue, COGS, Expenses) from category categoryType
       const tierMapping: Record<string, string> = {
         'revenue': 'Revenue',
         'cogs': 'COGS',
         'cost_of_goods_sold': 'COGS',
         'expenses': 'Expenses',
         'expense': 'Expenses',
-        'operating_expenses': 'Expenses'
+        'opex': 'Expenses',
+        'operating_expenses': 'Expenses',
+        'payroll': 'Expenses'
       };
-      const plCategory = tierMapping[category.tier?.toLowerCase() || ''] || 'Expenses';
+      const plCategory = tierMapping[category.categoryType?.toLowerCase() || ''] || 'Expenses';
 
       // Parse periodKey (YYYY-MM) or use fiscalYear
       let year = fiscalYear || new Date().getFullYear();
@@ -1804,6 +1820,10 @@ Respond with JSON only:
 
       importedActuals.push(actualRecord);
     }
+
+    console.log('[DocIntel Import] Summary - imported:', importedActuals.length, 
+      'skippedNoCategory:', skippedNoCategory, 
+      'skippedCategoryNotFound:', skippedCategoryNotFound);
 
     await this.updateUpload(orgId, uploadId, {
       status: 'completed',
