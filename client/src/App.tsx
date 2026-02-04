@@ -15,10 +15,10 @@ import { ThemeProvider } from '@/contexts/ThemeProvider';
 import { ProspectingActivityProvider } from "@/contexts/ProspectingActivityContext";
 
 
-// Eagerly load critical pages for instant navigation (no white screen)
-import Dashboard from "@/pages/dashboard";
-import CRMDashboard from "@/pages/crm-dashboard";
-import AllProjectsSummaryPage from "@/pages/all-projects-summary";
+// Lazy load all pages for optimal bundle splitting
+const Dashboard = lazy(() => import("@/pages/dashboard"));
+const CRMDashboard = lazy(() => import("@/pages/crm-dashboard"));
+const AllProjectsSummaryPage = lazy(() => import("@/pages/all-projects-summary"));
 
 // Lazy load layout components
 const UnifiedSidebar = lazy(() => import("@/components/unified-sidebar"));

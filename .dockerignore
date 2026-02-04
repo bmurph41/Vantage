@@ -1,0 +1,76 @@
+# Dependencies
+node_modules/
+
+# Development files
+.git/
+.gitignore
+.env.local
+.env.development
+.env*.local
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Test files
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+__tests__/
+coverage/
+.nyc_output/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Build artifacts (we rebuild in Docker)
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+/tmp/
+
+# Development assets
+attached_assets/
+*.psd
+*.ai
+*.sketch
+
+# Optional: Large media files if not needed
+*.mp4
+*.mov
+*.avi
+*.wmv
+
+# Replit specific
+.replit
+replit.nix
+.cache/
+.upm/
+.config/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Package manager locks (keep package-lock.json for reproducible builds)
+yarn.lock
+pnpm-lock.yaml
