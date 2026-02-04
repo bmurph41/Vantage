@@ -167,10 +167,13 @@ export function MultiDocumentReview({
   // Check if all items are processed (no pending items)
   const allItemsProcessed = totalPending === 0 && totalItems > 0;
 
-  // Check if ALL items are fully classified with both category AND department (Requirement I)
+  // Check if ALL non-excluded items are fully classified with both category AND department (Requirement I)
   const allItemsClassified = useMemo(() => {
     if (totalItems === 0) return false;
-    return allItems.every(item => {
+    // Only check items that are not excluded - excluded items don't need classification
+    const nonExcludedItems = allItems.filter(item => item.status !== 'excluded');
+    if (nonExcludedItems.length === 0) return false;
+    return nonExcludedItems.every(item => {
       // Check category tier (using correct field names)
       const hasCategory = item.categoryTierConfirmed || item.categoryTierSuggested;
       if (!hasCategory) return false;
