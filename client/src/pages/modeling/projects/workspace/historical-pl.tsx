@@ -806,6 +806,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                     })}
                     <TableCell className={`text-right text-sm bg-primary/5 ${netIncome >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {formatPercent(totalRevenue !== 0 ? (netIncome / totalRevenue) * 100 : null)}
+                    </TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
