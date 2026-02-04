@@ -17,6 +17,12 @@ const CONSTANT_CONTACT_REDIRECT_URI = process.env.CONSTANT_CONTACT_REDIRECT_URI 
 const CONSTANT_CONTACT_AUTH_BASE = 'https://authz.constantcontact.com/oauth2/default/v1';
 const CONSTANT_CONTACT_API_BASE = 'https://api.cc.email/v3';
 
+const MAILCHIMP_CLIENT_ID = process.env.MAILCHIMP_CLIENT_ID;
+const MAILCHIMP_CLIENT_SECRET = process.env.MAILCHIMP_CLIENT_SECRET;
+const MAILCHIMP_REDIRECT_URI = process.env.MAILCHIMP_REDIRECT_URI || 'https://marinamatch.replit.app/api/email-marketing/mailchimp/callback';
+const MAILCHIMP_AUTH_BASE = 'https://login.mailchimp.com/oauth2';
+const MAILCHIMP_METADATA_URL = 'https://login.mailchimp.com/oauth2/metadata';
+
 const TOKEN_ENCRYPTION_KEY = process.env.EMAIL_MARKETING_ENCRYPTION_KEY || process.env.JWT_SECRET;
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
@@ -152,8 +158,7 @@ router.get('/providers', async (req: AuthenticatedRequest, res: Response) => {
         description: 'All-in-one marketing platform',
         connected: connections.some(c => c.providerSlug === 'mailchimp' && c.isActive),
         connection: connections.find(c => c.providerSlug === 'mailchimp'),
-        configured: false,
-        comingSoon: true
+        configured: !!(MAILCHIMP_CLIENT_ID && MAILCHIMP_CLIENT_SECRET)
       }
     ];
 
@@ -355,6 +360,319 @@ router.post('/constant-contact/disconnect', async (req: AuthenticatedRequest, re
   } catch (error) {
     console.error('Failed to disconnect Constant Contact:', error);
     res.status(500).json({ error: 'Failed to disconnect' });
+  }
+});
+
+router.get('/mailchimp/auth', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user?.id || 'user-1';
+    const orgId = req.tenantId || 'org-1';
+    
+    if (!MAILCHIMP_CLIENT_ID) {
+      return res.status(400).json({ 
+        error: 'MAILCHIMP_NOT_CONFIGURED',
+        message: 'Mailchimp integration is not configured. Please add API credentials.'
+      });
+    }
+
+    const state = createSecureState(userId, orgId);
+
+    const authUrl = new URL(`${MAILCHIMP_AUTH_BASE}/authorize`);
+    authUrl.searchParams.set('client_id', MAILCHIMP_CLIENT_ID);
+    authUrl.searchParams.set('redirect_uri', MAILCHIMP_REDIRECT_URI);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('state', state);
+
+    res.json({ authUrl: authUrl.toString() });
+  } catch (error) {
+    console.error('Failed to generate Mailchimp auth URL:', error);
+    res.status(500).json({ error: 'Failed to generate auth URL' });
+  }
+});
+
+router.get('/mailchimp/callback', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { code, state, error: oauthError } = req.query;
+
+    if (oauthError) {
+      return res.redirect('/operations/marketing?tab=email-campaigns&error=oauth_denied');
+    }
+
+    if (!code || !state || typeof state !== 'string') {
+      return res.redirect('/operations/marketing?tab=email-campaigns&error=invalid_callback');
+    }
+
+    const stateData = validateAndConsumeState(state);
+    if (!stateData) {
+      console.error('Invalid or expired OAuth state');
+      return res.redirect('/operations/marketing?tab=email-campaigns&error=invalid_state');
+    }
+
+    const { userId, orgId } = stateData;
+
+    if (!MAILCHIMP_CLIENT_ID || !MAILCHIMP_CLIENT_SECRET) {
+      return res.redirect('/operations/marketing?tab=email-campaigns&error=not_configured');
+    }
+
+    const tokenResponse = await fetch(`${MAILCHIMP_AUTH_BASE}/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: MAILCHIMP_CLIENT_ID,
+        client_secret: MAILCHIMP_CLIENT_SECRET,
+        code: code as string,
+        redirect_uri: MAILCHIMP_REDIRECT_URI
+      })
+    });
+
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      console.error('Mailchimp token exchange failed:', errorText);
+      return res.redirect('/operations/marketing?tab=email-campaigns&error=token_exchange_failed');
+    }
+
+    const tokens = await tokenResponse.json() as {
+      access_token: string;
+      expires_in?: number;
+      token_type: string;
+    };
+
+    const metadataResponse = await fetch(MAILCHIMP_METADATA_URL, {
+      headers: { 'Authorization': `OAuth ${tokens.access_token}` }
+    });
+
+    let apiEndpoint = '';
+    let accountLabel = 'Mailchimp Account';
+    
+    if (metadataResponse.ok) {
+      const metadata = await metadataResponse.json() as { 
+        api_endpoint: string;
+        login: { login_name?: string; email?: string };
+        accountname?: string;
+      };
+      apiEndpoint = metadata.api_endpoint;
+      accountLabel = metadata.accountname || metadata.login?.email || 'Mailchimp Account';
+    }
+
+    const encryptedAccessToken = encryptToken(tokens.access_token);
+    const expiresAt = tokens.expires_in 
+      ? new Date(Date.now() + tokens.expires_in * 1000)
+      : null;
+
+    const existingConnection = await db.select()
+      .from(emailMarketingConnections)
+      .where(and(
+        eq(emailMarketingConnections.userId, userId),
+        eq(emailMarketingConnections.orgId, orgId),
+        eq(emailMarketingConnections.providerSlug, 'mailchimp')
+      ))
+      .limit(1);
+
+    if (existingConnection.length > 0) {
+      await db.update(emailMarketingConnections)
+        .set({
+          accessToken: encryptedAccessToken,
+          refreshToken: null,
+          expiresAt,
+          accountLabel,
+          isActive: true,
+          metadata: { apiEndpoint },
+          updatedAt: new Date()
+        })
+        .where(eq(emailMarketingConnections.id, existingConnection[0].id));
+    } else {
+      await db.insert(emailMarketingConnections).values({
+        orgId,
+        userId,
+        providerSlug: 'mailchimp',
+        accessToken: encryptedAccessToken,
+        refreshToken: null,
+        expiresAt,
+        accountLabel,
+        isActive: true,
+        metadata: { apiEndpoint },
+        scopes: 'default'
+      });
+    }
+
+    res.redirect('/operations/marketing?tab=email-campaigns&connected=mailchimp');
+  } catch (error) {
+    console.error('Mailchimp OAuth callback error:', error);
+    res.redirect('/operations/marketing?tab=email-campaigns&error=callback_failed');
+  }
+});
+
+router.get('/mailchimp/status', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const orgId = req.tenantId || 'org-1';
+    const userId = req.user?.id || 'user-1';
+
+    const connection = await db.select()
+      .from(emailMarketingConnections)
+      .where(and(
+        eq(emailMarketingConnections.userId, userId),
+        eq(emailMarketingConnections.orgId, orgId),
+        eq(emailMarketingConnections.providerSlug, 'mailchimp'),
+        eq(emailMarketingConnections.isActive, true)
+      ))
+      .limit(1);
+
+    if (!connection.length) {
+      return res.json({ connected: false });
+    }
+
+    const conn = connection[0];
+    res.json({
+      connected: true,
+      accountLabel: conn.accountLabel,
+      expiresAt: conn.expiresAt,
+      lastSyncAt: conn.lastSyncAt
+    });
+  } catch (error) {
+    console.error('Failed to fetch Mailchimp status:', error);
+    res.status(500).json({ error: 'Failed to fetch connection status' });
+  }
+});
+
+router.post('/mailchimp/disconnect', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user?.id || 'user-1';
+    const orgId = req.tenantId || 'org-1';
+
+    await db.update(emailMarketingConnections)
+      .set({ 
+        isActive: false, 
+        accessToken: null,
+        refreshToken: null,
+        updatedAt: new Date() 
+      })
+      .where(and(
+        eq(emailMarketingConnections.userId, userId),
+        eq(emailMarketingConnections.orgId, orgId),
+        eq(emailMarketingConnections.providerSlug, 'mailchimp')
+      ));
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to disconnect Mailchimp:', error);
+    res.status(500).json({ error: 'Failed to disconnect' });
+  }
+});
+
+async function getMailchimpApiEndpoint(userId: string, orgId: string): Promise<{ accessToken: string; apiEndpoint: string } | null> {
+  const connection = await db.select()
+    .from(emailMarketingConnections)
+    .where(and(
+      eq(emailMarketingConnections.userId, userId),
+      eq(emailMarketingConnections.orgId, orgId),
+      eq(emailMarketingConnections.providerSlug, 'mailchimp'),
+      eq(emailMarketingConnections.isActive, true)
+    ))
+    .limit(1);
+
+  if (!connection.length || !connection[0].accessToken) return null;
+
+  const conn = connection[0];
+  const accessToken = decryptToken(conn.accessToken);
+  if (!accessToken) return null;
+
+  const metadata = conn.metadata as { apiEndpoint?: string } | null;
+  const apiEndpoint = metadata?.apiEndpoint || '';
+  
+  return { accessToken, apiEndpoint };
+}
+
+router.get('/mailchimp/lists', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user?.id || 'user-1';
+    const orgId = req.tenantId || 'org-1';
+
+    const credentials = await getMailchimpApiEndpoint(userId, orgId);
+    if (!credentials) {
+      return res.status(401).json({ error: 'Not connected to Mailchimp' });
+    }
+
+    const { accessToken, apiEndpoint } = credentials;
+
+    const listsResponse = await fetch(`${apiEndpoint}/3.0/lists?count=100`, {
+      headers: { 'Authorization': `OAuth ${accessToken}` }
+    });
+
+    if (!listsResponse.ok) {
+      const errorText = await listsResponse.text();
+      console.error('Mailchimp lists fetch failed:', errorText);
+      return res.status(500).json({ error: 'Failed to fetch lists from Mailchimp' });
+    }
+
+    const data = await listsResponse.json() as {
+      lists: Array<{
+        id: string;
+        name: string;
+        stats: { member_count: number };
+      }>;
+    };
+
+    const lists = (data.lists || []).map(list => ({
+      id: list.id,
+      name: list.name,
+      contactCount: list.stats?.member_count || 0
+    }));
+
+    res.json(lists);
+  } catch (error) {
+    console.error('Failed to fetch Mailchimp lists:', error);
+    res.status(500).json({ error: 'Failed to fetch lists' });
+  }
+});
+
+router.get('/mailchimp/campaigns', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user?.id || 'user-1';
+    const orgId = req.tenantId || 'org-1';
+
+    const credentials = await getMailchimpApiEndpoint(userId, orgId);
+    if (!credentials) {
+      return res.status(401).json({ error: 'Not connected to Mailchimp' });
+    }
+
+    const { accessToken, apiEndpoint } = credentials;
+
+    const campaignsResponse = await fetch(`${apiEndpoint}/3.0/campaigns?count=50&sort_field=send_time&sort_dir=DESC`, {
+      headers: { 'Authorization': `OAuth ${accessToken}` }
+    });
+
+    if (!campaignsResponse.ok) {
+      const errorText = await campaignsResponse.text();
+      console.error('Mailchimp campaigns fetch failed:', errorText);
+      return res.status(500).json({ error: 'Failed to fetch campaigns from Mailchimp' });
+    }
+
+    const data = await campaignsResponse.json() as {
+      campaigns: Array<{
+        id: string;
+        settings: { title: string; subject_line?: string };
+        status: string;
+        send_time?: string;
+        create_time: string;
+      }>;
+    };
+
+    const campaigns = (data.campaigns || []).map(c => ({
+      id: c.id,
+      name: c.settings?.title || 'Untitled',
+      status: c.status,
+      subject: c.settings?.subject_line,
+      sentAt: c.send_time,
+      createdAt: c.create_time
+    }));
+
+    res.json(campaigns);
+  } catch (error) {
+    console.error('Failed to fetch Mailchimp campaigns:', error);
+    res.status(500).json({ error: 'Failed to fetch campaigns' });
   }
 });
 
