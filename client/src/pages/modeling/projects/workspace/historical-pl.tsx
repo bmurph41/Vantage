@@ -144,6 +144,14 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
     queryKey: ['/api/modeling/projects', projectId, 'config'],
   });
 
+  // Get valuator project context to determine if this is an owned marina or acquisition
+  const { data: projectContext } = useQuery<{ projectType?: string; marinaId?: string }>({
+    queryKey: [`/api/operations/projects/${projectId}/context`],
+  });
+
+  // Only show Sync Operations button for owned marinas, not acquisitions/broker listings
+  const isOwnedMarina = projectContext?.projectType === 'OWNED';
+
   const syncMutation = useMutation({
     mutationFn: async (sources: string[]) => {
       return apiRequest(`/api/modeling/projects/${projectId}/sync-operations`, {
@@ -369,20 +377,22 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
             {showMonthly ? 'Monthly' : 'Annual'}
           </Button>
           
-          <Dialog open={showSyncDialog} onOpenChange={setShowSyncDialog}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9" data-testid="button-sync-operations">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Sync
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Sync Operations Data</DialogTitle>
-                <DialogDescription>
-                  Import actual financial data from your marina's operational systems into this modeling project.
-                </DialogDescription>
-              </DialogHeader>
+          {/* Sync button only shown for owned marinas, not for acquisitions/prospective deals */}
+          {isOwnedMarina && (
+            <Dialog open={showSyncDialog} onOpenChange={setShowSyncDialog}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9" data-testid="button-sync-operations">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Sync
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Sync Operations Data</DialogTitle>
+                  <DialogDescription>
+                    Import actual financial data from your marina's operational systems into this modeling project.
+                  </DialogDescription>
+                </DialogHeader>
               
               <div className="space-y-4 py-4">
                 <div className="space-y-3">
@@ -469,8 +479,9 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   )}
                 </Button>
               </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              </DialogContent>
+            </Dialog>
+          )}
 
           <Button variant="outline" size="sm" data-testid="button-export-pl">
             <Download className="h-4 w-4 mr-2" />
@@ -510,16 +521,28 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
             <FileSpreadsheet className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
             <h4 className="font-semibold mb-2">No P&L Data Yet</h4>
             <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
-              Upload financial documents via Doc Intel or sync operations data to populate your historical P&L statement.
+              {isOwnedMarina 
+                ? "Upload financial documents via Doc Intel or sync operations data to populate your historical P&L statement."
+                : "Upload financial documents via Doc Intel to populate your historical P&L statement for this prospective acquisition."}
             </p>
             <div className="flex justify-center gap-3">
-              <Button 
-                size="sm" 
+              {isOwnedMarina && (
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => setShowSyncDialog(true)}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Sync Operations Data
+                </Button>
+              )}
+              <Button
+                size="sm"
                 variant="outline"
-                onClick={() => setShowSyncDialog(true)}
+                onClick={() => onTabChange?.('uploads')}
               >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Sync Operations Data
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Upload Documents
               </Button>
             </div>
           </CardContent>
