@@ -993,67 +993,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("[DD Project] Failed to initialize VDR:", vdrError);
       }
 
-      // Create child projects for portfolio properties
-      const childProjects: any[] = [];
-      if (req.body.projectType === "portfolio" && Array.isArray(req.body.portfolioProperties)) {
-        for (const prop of req.body.portfolioProperties) {
-          if (!prop.name || !prop.address) continue;
-          try {
-            let childPropertyId = null;
-            try {
-              const newProperty = await storage.createCrmProperty({
-                orgId: req.user.orgId,
-                title: prop.name,
-                type: "marina",
-                status: "pending",
-                address: prop.address,
-                city: prop.city,
-                state: prop.state,
-                zipCode: prop.zipCode,
-                coordinates: prop.coordinates,
-                ownerId: req.user.id,
-                pipelineStage: "lead",
-              });
-              childPropertyId = newProperty.id;
-            } catch (propError) {
-              console.error("[Portfolio] Failed to auto-create property:", propError);
-            }
-            const childProjectData = insertProjectSchema.parse({
-              name: prop.name,
-              projectType: "single",
-              parentProjectId: project.id,
-              propertyId: childPropertyId,
-              address: prop.address,
-              city: prop.city,
-              state: prop.state,
-              zipCode: prop.zipCode,
-              orgId: req.user.orgId,
-              createdBy: req.user.id,
-            });
-            const childProject = await storage.createProject(childProjectData);
-            childProjects.push(childProject);
-            await storage.createProjectSettings({
-              projectId: childProject.id,
-              useBusinessDays: false,
-              holidayCalendar: "us_federal",
-              notificationsJson: {},
-              ndaRequired: false,
-            });
-            try {
-              await initializeVdrForProject(childProject.id, req.user.orgId, req.user.id);
-            } catch (vdrError) {
-              console.error("[Portfolio] Failed to init VDR:", vdrError);
-            }
-          } catch (childError) {
-            console.error("[Portfolio] Failed to create child:", childError);
-          }
-        }
-      }
-      res.json({ ...project, childProjects });
+      res.json(project);
     } catch (error: any) {
       res.status(400).json({ error: "Invalid project data" });
-    }
-  });
 
   // Portfolio Management Routes
   
@@ -1180,6 +1122,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error adding property to portfolio:", error);
       res.status(500).json({ error: "Failed to add property to portfolio" });
+    }
+  });
     }
   });
 
@@ -5076,63 +5020,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!project) {
         return res.status(404).json({ error: "DD Project not found" });
       }
-      // Create child projects for portfolio properties
-      const childProjects: any[] = [];
-      if (req.body.projectType === "portfolio" && Array.isArray(req.body.portfolioProperties)) {
-        for (const prop of req.body.portfolioProperties) {
-          if (!prop.name || !prop.address) continue;
-          try {
-            let childPropertyId = null;
-            try {
-              const newProperty = await storage.createCrmProperty({
-                orgId: req.user.orgId,
-                title: prop.name,
-                type: "marina",
-                status: "pending",
-                address: prop.address,
-                city: prop.city,
-                state: prop.state,
-                zipCode: prop.zipCode,
-                coordinates: prop.coordinates,
-                ownerId: req.user.id,
-                pipelineStage: "lead",
-              });
-              childPropertyId = newProperty.id;
-            } catch (propError) {
-              console.error("[Portfolio] Failed to auto-create property:", propError);
-            }
-            const childProjectData = insertProjectSchema.parse({
-              name: prop.name,
-              projectType: "single",
-              parentProjectId: project.id,
-              propertyId: childPropertyId,
-              address: prop.address,
-              city: prop.city,
-              state: prop.state,
-              zipCode: prop.zipCode,
-              orgId: req.user.orgId,
-              createdBy: req.user.id,
-            });
-            const childProject = await storage.createProject(childProjectData);
-            childProjects.push(childProject);
-            await storage.createProjectSettings({
-              projectId: childProject.id,
-              useBusinessDays: false,
-              holidayCalendar: "us_federal",
-              notificationsJson: {},
-              ndaRequired: false,
-            });
-            try {
-              await initializeVdrForProject(childProject.id, req.user.orgId, req.user.id);
-            } catch (vdrError) {
-              console.error("[Portfolio] Failed to init VDR:", vdrError);
-            }
-          } catch (childError) {
-            console.error("[Portfolio] Failed to create child:", childError);
-          }
-        }
-      }
-      res.json({ ...project, childProjects });
+      res.json(project);
     } catch (error: any) {
       console.error("Failed to get DD project:", error);
       res.status(500).json({ error: "Failed to retrieve DD project" });
@@ -16478,63 +16366,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Modeling project not found' });
       }
       
-      // Create child projects for portfolio properties
-      const childProjects: any[] = [];
-      if (req.body.projectType === "portfolio" && Array.isArray(req.body.portfolioProperties)) {
-        for (const prop of req.body.portfolioProperties) {
-          if (!prop.name || !prop.address) continue;
-          try {
-            let childPropertyId = null;
-            try {
-              const newProperty = await storage.createCrmProperty({
-                orgId: req.user.orgId,
-                title: prop.name,
-                type: "marina",
-                status: "pending",
-                address: prop.address,
-                city: prop.city,
-                state: prop.state,
-                zipCode: prop.zipCode,
-                coordinates: prop.coordinates,
-                ownerId: req.user.id,
-                pipelineStage: "lead",
-              });
-              childPropertyId = newProperty.id;
-            } catch (propError) {
-              console.error("[Portfolio] Failed to auto-create property:", propError);
-            }
-            const childProjectData = insertProjectSchema.parse({
-              name: prop.name,
-              projectType: "single",
-              parentProjectId: project.id,
-              propertyId: childPropertyId,
-              address: prop.address,
-              city: prop.city,
-              state: prop.state,
-              zipCode: prop.zipCode,
-              orgId: req.user.orgId,
-              createdBy: req.user.id,
-            });
-            const childProject = await storage.createProject(childProjectData);
-            childProjects.push(childProject);
-            await storage.createProjectSettings({
-              projectId: childProject.id,
-              useBusinessDays: false,
-              holidayCalendar: "us_federal",
-              notificationsJson: {},
-              ndaRequired: false,
-            });
-            try {
-              await initializeVdrForProject(childProject.id, req.user.orgId, req.user.id);
-            } catch (vdrError) {
-              console.error("[Portfolio] Failed to init VDR:", vdrError);
-            }
-          } catch (childError) {
-            console.error("[Portfolio] Failed to create child:", childError);
-          }
-        }
-      }
-      res.json({ ...project, childProjects });
+      res.json(project);
     } catch (error: any) {
       console.error('Failed to fetch modeling project:', error);
       res.status(500).json({ error: 'Failed to fetch modeling project' });
@@ -16663,63 +16495,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Modeling project not found' });
       }
       
-      // Create child projects for portfolio properties
-      const childProjects: any[] = [];
-      if (req.body.projectType === "portfolio" && Array.isArray(req.body.portfolioProperties)) {
-        for (const prop of req.body.portfolioProperties) {
-          if (!prop.name || !prop.address) continue;
-          try {
-            let childPropertyId = null;
-            try {
-              const newProperty = await storage.createCrmProperty({
-                orgId: req.user.orgId,
-                title: prop.name,
-                type: "marina",
-                status: "pending",
-                address: prop.address,
-                city: prop.city,
-                state: prop.state,
-                zipCode: prop.zipCode,
-                coordinates: prop.coordinates,
-                ownerId: req.user.id,
-                pipelineStage: "lead",
-              });
-              childPropertyId = newProperty.id;
-            } catch (propError) {
-              console.error("[Portfolio] Failed to auto-create property:", propError);
-            }
-            const childProjectData = insertProjectSchema.parse({
-              name: prop.name,
-              projectType: "single",
-              parentProjectId: project.id,
-              propertyId: childPropertyId,
-              address: prop.address,
-              city: prop.city,
-              state: prop.state,
-              zipCode: prop.zipCode,
-              orgId: req.user.orgId,
-              createdBy: req.user.id,
-            });
-            const childProject = await storage.createProject(childProjectData);
-            childProjects.push(childProject);
-            await storage.createProjectSettings({
-              projectId: childProject.id,
-              useBusinessDays: false,
-              holidayCalendar: "us_federal",
-              notificationsJson: {},
-              ndaRequired: false,
-            });
-            try {
-              await initializeVdrForProject(childProject.id, req.user.orgId, req.user.id);
-            } catch (vdrError) {
-              console.error("[Portfolio] Failed to init VDR:", vdrError);
-            }
-          } catch (childError) {
-            console.error("[Portfolio] Failed to create child:", childError);
-          }
-        }
-      }
-      res.json({ ...project, childProjects });
+      res.json(project);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
@@ -26654,63 +26430,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const project = await storage.getScProject(req.params.id, orgId);
       if (!project) return res.status(404).json({ message: "Project not found" });
 
-      // Create child projects for portfolio properties
-      const childProjects: any[] = [];
-      if (req.body.projectType === "portfolio" && Array.isArray(req.body.portfolioProperties)) {
-        for (const prop of req.body.portfolioProperties) {
-          if (!prop.name || !prop.address) continue;
-          try {
-            let childPropertyId = null;
-            try {
-              const newProperty = await storage.createCrmProperty({
-                orgId: req.user.orgId,
-                title: prop.name,
-                type: "marina",
-                status: "pending",
-                address: prop.address,
-                city: prop.city,
-                state: prop.state,
-                zipCode: prop.zipCode,
-                coordinates: prop.coordinates,
-                ownerId: req.user.id,
-                pipelineStage: "lead",
-              });
-              childPropertyId = newProperty.id;
-            } catch (propError) {
-              console.error("[Portfolio] Failed to auto-create property:", propError);
-            }
-            const childProjectData = insertProjectSchema.parse({
-              name: prop.name,
-              projectType: "single",
-              parentProjectId: project.id,
-              propertyId: childPropertyId,
-              address: prop.address,
-              city: prop.city,
-              state: prop.state,
-              zipCode: prop.zipCode,
-              orgId: req.user.orgId,
-              createdBy: req.user.id,
-            });
-            const childProject = await storage.createProject(childProjectData);
-            childProjects.push(childProject);
-            await storage.createProjectSettings({
-              projectId: childProject.id,
-              useBusinessDays: false,
-              holidayCalendar: "us_federal",
-              notificationsJson: {},
-              ndaRequired: false,
-            });
-            try {
-              await initializeVdrForProject(childProject.id, req.user.orgId, req.user.id);
-            } catch (vdrError) {
-              console.error("[Portfolio] Failed to init VDR:", vdrError);
-            }
-          } catch (childError) {
-            console.error("[Portfolio] Failed to create child:", childError);
-          }
-        }
-      }
-      res.json({ ...project, childProjects });
+      res.json(project);
     } catch (error: any) {
       console.error("Error fetching SC project:", error);
       res.status(500).json({ message: "Failed to fetch SC project" });
@@ -29285,63 +29005,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const project = await storage.getRcProject(req.params.id, orgId);
       if (!project) return res.status(404).json({ message: "Project not found" });
 
-      // Create child projects for portfolio properties
-      const childProjects: any[] = [];
-      if (req.body.projectType === "portfolio" && Array.isArray(req.body.portfolioProperties)) {
-        for (const prop of req.body.portfolioProperties) {
-          if (!prop.name || !prop.address) continue;
-          try {
-            let childPropertyId = null;
-            try {
-              const newProperty = await storage.createCrmProperty({
-                orgId: req.user.orgId,
-                title: prop.name,
-                type: "marina",
-                status: "pending",
-                address: prop.address,
-                city: prop.city,
-                state: prop.state,
-                zipCode: prop.zipCode,
-                coordinates: prop.coordinates,
-                ownerId: req.user.id,
-                pipelineStage: "lead",
-              });
-              childPropertyId = newProperty.id;
-            } catch (propError) {
-              console.error("[Portfolio] Failed to auto-create property:", propError);
-            }
-            const childProjectData = insertProjectSchema.parse({
-              name: prop.name,
-              projectType: "single",
-              parentProjectId: project.id,
-              propertyId: childPropertyId,
-              address: prop.address,
-              city: prop.city,
-              state: prop.state,
-              zipCode: prop.zipCode,
-              orgId: req.user.orgId,
-              createdBy: req.user.id,
-            });
-            const childProject = await storage.createProject(childProjectData);
-            childProjects.push(childProject);
-            await storage.createProjectSettings({
-              projectId: childProject.id,
-              useBusinessDays: false,
-              holidayCalendar: "us_federal",
-              notificationsJson: {},
-              ndaRequired: false,
-            });
-            try {
-              await initializeVdrForProject(childProject.id, req.user.orgId, req.user.id);
-            } catch (vdrError) {
-              console.error("[Portfolio] Failed to init VDR:", vdrError);
-            }
-          } catch (childError) {
-            console.error("[Portfolio] Failed to create child:", childError);
-          }
-        }
-      }
-      res.json({ ...project, childProjects });
+      res.json(project);
     } catch (error: any) {
       console.error("Error fetching RC project:", error);
       res.status(500).json({ message: "Failed to fetch RC project" });

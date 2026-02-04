@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Building2, Briefcase } from "lucide-react";
+import { Plus, Building2, Briefcase, Trash2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -36,9 +36,26 @@ import {
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { AddressAutocompleteInput, type NormalizedAddress } from "@/components/ui/address-autocomplete-input";
+import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { ddClient } from "@/lib/ddClient";
+import { apiRequest } from "@/lib/queryClient";
 import type { CrmDeal, CrmProperty } from "@shared/schema";
+
+interface PortfolioProperty {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  placeId: string;
+  lat?: number;
+  lng?: number;
+  addressInputValue: string;
+}
 
 const createProjectSchema = z.object({
   name: z.string().min(1, "Project name is required"),
@@ -67,6 +84,45 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [addressInputValue, setAddressInputValue] = useState("");
+  const [portfolioProperties, setPortfolioProperties] = useState<PortfolioProperty[]>([]);
+
+  const generatePropertyId = () => `prop_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  const addPortfolioProperty = () => {
+    setPortfolioProperties(prev => [...prev, {
+      id: generatePropertyId(),
+      name: "",
+      address: "",
+      city: "",
+      state: "",
+      zipCode: "",
+      placeId: "",
+      addressInputValue: "",
+    }]);
+  };
+
+  const removePortfolioProperty = (id: string) => {
+    setPortfolioProperties(prev => prev.filter(p => p.id !== id));
+  };
+
+  const updatePortfolioProperty = (id: string, updates: Partial<PortfolioProperty>) => {
+    setPortfolioProperties(prev => prev.map(p => 
+      p.id === id ? { ...p, ...updates } : p
+    ));
+  };
+
+  const handlePortfolioAddressSelect = (id: string, addr: NormalizedAddress) => {
+    updatePortfolioProperty(id, {
+      address: addr.line1 || addr.formattedAddress || "",
+      city: addr.city || "",
+      state: addr.state || "",
+      zipCode: addr.postalCode || "",
+      placeId: addr.placeId || "",
+      lat: addr.lat,
+      lng: addr.lng,
+      addressInputValue: addr.formattedAddress || "",
+    });
+  };
 
   const { data: dealsResponse } = useQuery<{ deals: CrmDeal[] }>({
     queryKey: ["/api/crm/deals"],
@@ -146,7 +202,19 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
         ? { lat: values.lat, lng: values.lng } 
         : undefined;
       
-      const project = await ddClient.createProject({
+      const portfolioPropertiesPayload = values.projectType === "portfolio" 
+        ? portfolioProperties.filter(p => p.name && p.address).map(p => ({
+            name: p.name,
+            address: p.address,
+            city: p.city,
+            state: p.state,
+            zipCode: p.zipCode,
+            placeId: p.placeId,
+            coordinates: (p.lat && p.lng) ? { lat: p.lat, lng: p.lng } : undefined,
+          }))
+        : undefined;
+
+      const response = await apiRequest("POST", "/api/dd/projects", {
         name: values.name,
         description: values.description || undefined,
         projectType: values.projectType as "single" | "portfolio",
@@ -158,20 +226,25 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
         zipCode: values.zipCode || undefined,
         placeId: values.placeId || undefined,
         coordinates,
+        portfolioProperties: portfolioPropertiesPayload,
       });
-      return project;
+      return response.json();
     },
     onSuccess: (project) => {
       queryClient.invalidateQueries({ queryKey: ["/api/dd/projects"] });
       queryClient.invalidateQueries({ queryKey: ["all-projects-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/properties"] });
+      const childCount = portfolioProperties.filter(p => p.name && p.address).length;
       toast({
         title: "Project created",
-        description: `"${project.name}" has been created successfully.`,
+        description: watchedProjectType === "portfolio" && childCount > 0
+          ? `"${project.name}" portfolio created with ${childCount} properties.`
+          : `"${project.name}" has been created successfully.`,
       });
       setOpen(false);
       form.reset();
       setAddressInputValue("");
+      setPortfolioProperties([]);
       navigate(`/dd/projects/${project.id}`);
     },
     onError: (error: any) => {
@@ -283,116 +356,212 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="linkedDealId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Link to Deal</FormLabel>
-                  <Select
-                    onValueChange={(value) => {
-                      field.onChange(value === "_none" ? "" : value);
-                    }}
-                    value={field.value || "_none"}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a deal (optional)" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="_none">No deal</SelectItem>
-                      {deals.map((deal) => (
-                        <SelectItem key={deal.id} value={deal.id}>
-                          {deal.title || deal.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    Link to a CRM deal to auto-populate address
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="linkedPropertyId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Link to Property</FormLabel>
-                  <Select 
-                    onValueChange={(value) => field.onChange(value === "_none" ? "" : value)} 
-                    value={field.value || "_none"}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a property (optional)" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="_none">No property</SelectItem>
-                      {properties.map((property) => (
-                        <SelectItem key={property.id} value={property.id}>
-                          {property.title} {property.city ? `- ${property.city}, ${property.state}` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    Link to a CRM property to auto-populate address
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {!hasLinkedDealOrProperty && watchedProjectType === "single" && (
-              <div className="space-y-2">
-                <Label>Property Address</Label>
-                <AddressAutocompleteInput
-                  value={addressInputValue}
-                  onChangeText={setAddressInputValue}
-                  onSelectAddress={handleAddressSelect}
-                  placeholder="Start typing an address..."
-                  searchType="establishment"
+            {watchedProjectType === "single" && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="linkedDealId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Link to Deal</FormLabel>
+                      <Select
+                        onValueChange={(value) => {
+                          field.onChange(value === "_none" ? "" : value);
+                        }}
+                        value={field.value || "_none"}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a deal (optional)" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="_none">No deal</SelectItem>
+                          {deals.map((deal) => (
+                            <SelectItem key={deal.id} value={deal.id}>
+                              {deal.title || deal.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Link to a CRM deal to auto-populate address
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-                <p className="text-sm text-muted-foreground">
-                  Search for a marina or enter an address. A new property will be created in your CRM.
-                </p>
-              </div>
+
+                <FormField
+                  control={form.control}
+                  name="linkedPropertyId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Link to Property</FormLabel>
+                      <Select 
+                        onValueChange={(value) => field.onChange(value === "_none" ? "" : value)} 
+                        value={field.value || "_none"}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a property (optional)" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="_none">No property</SelectItem>
+                          {properties.map((property) => (
+                            <SelectItem key={property.id} value={property.id}>
+                              {property.title} {property.city ? `- ${property.city}, ${property.state}` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Link to a CRM property to auto-populate address
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {!hasLinkedDealOrProperty && (
+                  <div className="space-y-2">
+                    <Label>Property Address</Label>
+                    <AddressAutocompleteInput
+                      value={addressInputValue}
+                      onChangeText={setAddressInputValue}
+                      onSelectAddress={handleAddressSelect}
+                      placeholder="Start typing an address..."
+                      searchType="establishment"
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Search for a marina or enter an address. A new property will be created in your CRM.
+                    </p>
+                  </div>
+                )}
+
+                {hasLinkedDealOrProperty && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="city"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>City</FormLabel>
+                          <FormControl>
+                            <Input placeholder="City" {...field} disabled />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="state"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>State</FormLabel>
+                          <FormControl>
+                            <Input placeholder="State" {...field} disabled />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                )}
+              </>
             )}
 
-            {hasLinkedDealOrProperty && (
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="city"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>City</FormLabel>
-                      <FormControl>
-                        <Input placeholder="City" {...field} disabled />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="state"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>State</FormLabel>
-                      <FormControl>
-                        <Input placeholder="State" {...field} disabled />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+            {watchedProjectType === "portfolio" && (
+              <div className="space-y-4">
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-base font-medium">Portfolio Properties</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Add properties to include in this portfolio. Each will become a separate DD project.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addPortfolioProperty}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Property
+                  </Button>
+                </div>
+
+                {portfolioProperties.length === 0 ? (
+                  <Card className="border-dashed">
+                    <CardContent className="py-8 text-center">
+                      <MapPin className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                      <p className="text-muted-foreground mb-3">No properties added yet</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={addPortfolioProperty}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add First Property
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <ScrollArea className="max-h-[300px]">
+                    <div className="space-y-4 pr-2">
+                      {portfolioProperties.map((prop, index) => (
+                        <Card key={prop.id} className="relative">
+                          <CardContent className="pt-4 pb-3">
+                            <div className="flex items-start justify-between mb-3">
+                              <span className="text-sm font-medium text-muted-foreground">
+                                Property {index + 1}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                onClick={() => removePortfolioProperty(prop.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <div className="space-y-3">
+                              <div>
+                                <Label className="text-sm">Property Name *</Label>
+                                <Input
+                                  placeholder="e.g. Sunset Marina"
+                                  value={prop.name}
+                                  onChange={(e) => updatePortfolioProperty(prop.id, { name: e.target.value })}
+                                  className="mt-1"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-sm">Address *</Label>
+                                <AddressAutocompleteInput
+                                  value={prop.addressInputValue}
+                                  onChangeText={(val) => updatePortfolioProperty(prop.id, { addressInputValue: val })}
+                                  onSelectAddress={(addr) => handlePortfolioAddressSelect(prop.id, addr)}
+                                  placeholder="Search for marina or address..."
+                                  searchType="establishment"
+                                  className="mt-1"
+                                />
+                                {prop.city && prop.state && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {prop.city}, {prop.state} {prop.zipCode}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
               </div>
             )}
 
