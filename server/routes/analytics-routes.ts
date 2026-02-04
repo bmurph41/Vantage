@@ -23,6 +23,7 @@ import {
   crmDeals,
   projects,
   modelingProjects,
+  modelingFinancialPeriods,
   tasks,
   rentRolls,
   rentRollEntries,
@@ -826,7 +827,7 @@ router.get('/unified/trends', async (req: Request, res: Response) => {
 
 /**
  * GET /api/analytics/financial
- * Financial analysis data with drill-down capabilities
+ * Financial analysis data aggregated from modeling projects with drill-down capabilities
  */
 router.get('/financial', async (req: Request, res: Response) => {
   try {
@@ -834,99 +835,212 @@ router.get('/financial', async (req: Request, res: Response) => {
     const timeframe = req.query.timeframe as string || '12m';
     const projectId = req.query.projectId as string;
 
-    const monthsMap: Record<string, number> = {
-      '3m': 3,
-      '6m': 6,
-      '12m': 12,
-      'ytd': new Date().getMonth() + 1,
-      'all': 36,
-    };
-    const months = monthsMap[timeframe] || 12;
+    // Fetch all modeling projects for the org
+    let projectsQuery = db.select({
+      id: modelingProjects.id,
+      marinaName: modelingProjects.marinaName,
+      purchasePrice: modelingProjects.purchasePrice,
+      ebitda: modelingProjects.ebitda,
+      year1CapRate: modelingProjects.year1CapRate,
+      totalStorageUnits: modelingProjects.totalStorageUnits,
+      dealOutcome: modelingProjects.dealOutcome,
+      state: modelingProjects.state,
+      region: modelingProjects.region,
+      createdAt: modelingProjects.createdAt,
+    })
+    .from(modelingProjects)
+    .where(eq(modelingProjects.orgId, orgId))
+    .orderBy(desc(modelingProjects.createdAt));
 
-    const monthlyTrends = [];
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const allProjects = await projectsQuery;
+
+    // Filter to specific project if provided
+    const filteredProjects = projectId && projectId !== 'all' 
+      ? allProjects.filter(p => p.id === projectId)
+      : allProjects;
+
+    // Fetch financial periods for all relevant projects
+    const projectIds = filteredProjects.map(p => p.id);
+    let financialPeriodsData: any[] = [];
     
-    const seasonalMultipliers = [0.55, 0.52, 0.65, 0.85, 1.12, 1.30, 1.50, 1.54, 1.20, 0.85, 0.61, 0.56];
-    const baseRevenue = 112000;
-
-    for (let i = 0; i < Math.min(months, 12); i++) {
-      const monthIdx = i % 12;
-      const revenue = Math.round(baseRevenue * seasonalMultipliers[monthIdx] * (0.95 + Math.random() * 0.1));
-      const expenseRatio = 0.55 + (Math.random() * 0.1);
-      const expenses = Math.round(revenue * expenseRatio);
-      const noi = revenue - expenses;
-
-      monthlyTrends.push({
-        period: monthNames[monthIdx],
-        revenue,
-        expenses,
-        noi,
-        occupancy: Math.round(75 + seasonalMultipliers[monthIdx] * 15),
-      });
+    if (projectIds.length > 0) {
+      financialPeriodsData = await db.select({
+        id: modelingFinancialPeriods.id,
+        modelingProjectId: modelingFinancialPeriods.modelingProjectId,
+        periodType: modelingFinancialPeriods.periodType,
+        periodLabel: modelingFinancialPeriods.periodLabel,
+        periodYear: modelingFinancialPeriods.periodYear,
+        totalRevenue: modelingFinancialPeriods.totalRevenue,
+        wetSlipRevenue: modelingFinancialPeriods.wetSlipRevenue,
+        dryStorageRevenue: modelingFinancialPeriods.dryStorageRevenue,
+        fuelRevenue: modelingFinancialPeriods.fuelRevenue,
+        shipStoreRevenue: modelingFinancialPeriods.shipStoreRevenue,
+        otherRevenue: modelingFinancialPeriods.otherRevenue,
+        totalExpenses: modelingFinancialPeriods.totalExpenses,
+        operatingExpenses: modelingFinancialPeriods.operatingExpenses,
+        payrollExpenses: modelingFinancialPeriods.payrollExpenses,
+        utilitiesExpenses: modelingFinancialPeriods.utilitiesExpenses,
+        insuranceExpenses: modelingFinancialPeriods.insuranceExpenses,
+        maintenanceExpenses: modelingFinancialPeriods.maintenanceExpenses,
+        managementFees: modelingFinancialPeriods.managementFees,
+        otherExpenses: modelingFinancialPeriods.otherExpenses,
+        noi: modelingFinancialPeriods.noi,
+        ebitda: modelingFinancialPeriods.ebitda,
+        capRate: modelingFinancialPeriods.capRate,
+        noiMargin: modelingFinancialPeriods.noiMargin,
+        occupancyRate: modelingFinancialPeriods.occupancyRate,
+        totalUnits: modelingFinancialPeriods.totalUnits,
+        occupiedUnits: modelingFinancialPeriods.occupiedUnits,
+        isProjected: modelingFinancialPeriods.isProjected,
+        sortOrder: modelingFinancialPeriods.sortOrder,
+      })
+      .from(modelingFinancialPeriods)
+      .where(
+        and(
+          eq(modelingFinancialPeriods.orgId, orgId),
+          sql`${modelingFinancialPeriods.modelingProjectId} = ANY(${projectIds})`
+        )
+      )
+      .orderBy(asc(modelingFinancialPeriods.sortOrder));
     }
 
+    // Build project-level summaries with their financial data
+    const projectSummaries = filteredProjects.map(project => {
+      const projectPeriods = financialPeriodsData.filter(fp => fp.modelingProjectId === project.id);
+      const latestHistorical = projectPeriods.find(p => !p.isProjected) || projectPeriods[0];
+      
+      return {
+        id: project.id,
+        marinaName: project.marinaName,
+        purchasePrice: project.purchasePrice ? Number(project.purchasePrice) : null,
+        ebitda: project.ebitda ? Number(project.ebitda) : null,
+        capRate: project.year1CapRate ? Number(project.year1CapRate) : null,
+        totalUnits: project.totalStorageUnits,
+        dealOutcome: project.dealOutcome,
+        state: project.state,
+        region: project.region,
+        financialPeriods: projectPeriods.length,
+        latestRevenue: latestHistorical?.totalRevenue ? Number(latestHistorical.totalRevenue) : null,
+        latestExpenses: latestHistorical?.totalExpenses ? Number(latestHistorical.totalExpenses) : null,
+        latestNoi: latestHistorical?.noi ? Number(latestHistorical.noi) : null,
+        latestOccupancy: latestHistorical?.occupancyRate ? Number(latestHistorical.occupancyRate) * 100 : null,
+      };
+    });
+
+    // Aggregate revenue breakdown from all financial periods
+    const aggregateRevenue = {
+      wetSlipRevenue: 0,
+      dryStorageRevenue: 0,
+      fuelRevenue: 0,
+      shipStoreRevenue: 0,
+      otherRevenue: 0,
+    };
+    
+    const aggregateExpenses = {
+      payrollExpenses: 0,
+      utilitiesExpenses: 0,
+      insuranceExpenses: 0,
+      maintenanceExpenses: 0,
+      managementFees: 0,
+      otherExpenses: 0,
+    };
+
+    // Use the most recent period from each project for aggregation
+    const latestPeriodsByProject = new Map<string, typeof financialPeriodsData[0]>();
+    financialPeriodsData.forEach(fp => {
+      if (!fp.isProjected) {
+        const existing = latestPeriodsByProject.get(fp.modelingProjectId);
+        if (!existing || (fp.periodYear && existing.periodYear && fp.periodYear > existing.periodYear)) {
+          latestPeriodsByProject.set(fp.modelingProjectId, fp);
+        }
+      }
+    });
+
+    latestPeriodsByProject.forEach(fp => {
+      aggregateRevenue.wetSlipRevenue += fp.wetSlipRevenue ? Number(fp.wetSlipRevenue) : 0;
+      aggregateRevenue.dryStorageRevenue += fp.dryStorageRevenue ? Number(fp.dryStorageRevenue) : 0;
+      aggregateRevenue.fuelRevenue += fp.fuelRevenue ? Number(fp.fuelRevenue) : 0;
+      aggregateRevenue.shipStoreRevenue += fp.shipStoreRevenue ? Number(fp.shipStoreRevenue) : 0;
+      aggregateRevenue.otherRevenue += fp.otherRevenue ? Number(fp.otherRevenue) : 0;
+
+      aggregateExpenses.payrollExpenses += fp.payrollExpenses ? Number(fp.payrollExpenses) : 0;
+      aggregateExpenses.utilitiesExpenses += fp.utilitiesExpenses ? Number(fp.utilitiesExpenses) : 0;
+      aggregateExpenses.insuranceExpenses += fp.insuranceExpenses ? Number(fp.insuranceExpenses) : 0;
+      aggregateExpenses.maintenanceExpenses += fp.maintenanceExpenses ? Number(fp.maintenanceExpenses) : 0;
+      aggregateExpenses.managementFees += fp.managementFees ? Number(fp.managementFees) : 0;
+      aggregateExpenses.otherExpenses += fp.otherExpenses ? Number(fp.otherExpenses) : 0;
+    });
+
+    // Build revenue breakdown for charts
     const revenueBreakdown = [
-      { name: 'Slip Rentals', value: 450000, children: [
-        { name: 'Monthly', value: 280000 },
-        { name: 'Seasonal', value: 120000 },
-        { name: 'Transient', value: 50000 },
-      ]},
-      { name: 'Fuel Sales', value: 280000, children: [
-        { name: 'Gas', value: 180000 },
-        { name: 'Diesel', value: 100000 },
-      ]},
-      { name: 'Ship Store', value: 95000, children: [
-        { name: 'Parts', value: 45000 },
-        { name: 'Supplies', value: 30000 },
-        { name: 'Accessories', value: 20000 },
-      ]},
-      { name: 'Service & Repair', value: 120000 },
-      { name: 'Winter Storage', value: 85000 },
-      { name: 'Other Income', value: 35000 },
-    ];
+      { name: 'Wet Slip Revenue', value: aggregateRevenue.wetSlipRevenue },
+      { name: 'Dry Storage Revenue', value: aggregateRevenue.dryStorageRevenue },
+      { name: 'Fuel Revenue', value: aggregateRevenue.fuelRevenue },
+      { name: 'Ship Store Revenue', value: aggregateRevenue.shipStoreRevenue },
+      { name: 'Other Revenue', value: aggregateRevenue.otherRevenue },
+    ].filter(item => item.value > 0);
+
+    // Build expense waterfall
+    const totalRevenue = Object.values(aggregateRevenue).reduce((sum, val) => sum + val, 0);
+    const totalExpensesSum = Object.values(aggregateExpenses).reduce((sum, val) => sum + val, 0);
+    const totalNoi = totalRevenue - totalExpensesSum;
 
     const expenseWaterfall = [
-      { name: 'Gross Revenue', value: 1065000, isTotal: true },
-      { name: 'Dock Master Salaries', value: -185000, details: [
-        { label: 'Full-time Staff', value: 145000 },
-        { label: 'Part-time Seasonal', value: 40000 },
-      ]},
-      { name: 'Utilities', value: -95000, details: [
-        { label: 'Electric', value: 65000 },
-        { label: 'Water/Sewer', value: 20000 },
-        { label: 'Internet/Phone', value: 10000 },
-      ]},
-      { name: 'Insurance', value: -78000, details: [
-        { label: 'Property', value: 45000 },
-        { label: 'Liability', value: 23000 },
-        { label: 'Workers Comp', value: 10000 },
-      ]},
-      { name: 'Maintenance', value: -125000, details: [
-        { label: 'Dock Repairs', value: 65000 },
-        { label: 'Equipment', value: 35000 },
-        { label: 'Grounds', value: 25000 },
-      ]},
-      { name: 'Property Taxes', value: -62000 },
-      { name: 'Admin & Office', value: -45000 },
-      { name: 'Marketing', value: -18000 },
-      { name: 'Net Operating Income', value: 457000, isTotal: true },
-    ];
+      { name: 'Gross Revenue', value: totalRevenue, isTotal: true },
+      { name: 'Payroll', value: -aggregateExpenses.payrollExpenses },
+      { name: 'Utilities', value: -aggregateExpenses.utilitiesExpenses },
+      { name: 'Insurance', value: -aggregateExpenses.insuranceExpenses },
+      { name: 'Maintenance', value: -aggregateExpenses.maintenanceExpenses },
+      { name: 'Management Fees', value: -aggregateExpenses.managementFees },
+      { name: 'Other Expenses', value: -aggregateExpenses.otherExpenses },
+      { name: 'Net Operating Income', value: totalNoi, isTotal: true },
+    ].filter(item => item.isTotal || item.value !== 0);
 
-    const totalRevenue = monthlyTrends.reduce((sum, m) => sum + m.revenue, 0);
-    const totalExpenses = monthlyTrends.reduce((sum, m) => sum + m.expenses, 0);
-    const totalNoi = totalRevenue - totalExpenses;
+    // Build comparison data by year if we have multiple periods
+    const periodsByYear = new Map<number, { revenue: number; expenses: number; noi: number; count: number }>();
+    financialPeriodsData.forEach(fp => {
+      if (fp.periodYear && !fp.isProjected) {
+        const existing = periodsByYear.get(fp.periodYear) || { revenue: 0, expenses: 0, noi: 0, count: 0 };
+        existing.revenue += fp.totalRevenue ? Number(fp.totalRevenue) : 0;
+        existing.expenses += fp.totalExpenses ? Number(fp.totalExpenses) : 0;
+        existing.noi += fp.noi ? Number(fp.noi) : 0;
+        existing.count += 1;
+        periodsByYear.set(fp.periodYear, existing);
+      }
+    });
+
+    const yearlyTrends = Array.from(periodsByYear.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([year, data]) => ({
+        period: year.toString(),
+        revenue: data.revenue,
+        expenses: data.expenses,
+        noi: data.noi,
+        projectCount: data.count,
+      }));
+
+    // Summary stats
+    const validProjects = projectSummaries.filter(p => p.latestRevenue || p.latestNoi);
+    const avgOccupancy = validProjects.length > 0
+      ? validProjects.reduce((sum, p) => sum + (p.latestOccupancy || 0), 0) / validProjects.filter(p => p.latestOccupancy).length
+      : 0;
 
     res.json({
-      monthlyTrends,
+      projects: projectSummaries,
+      projectCount: filteredProjects.length,
       revenueBreakdown,
       expenseWaterfall,
+      yearlyTrends,
       summary: {
         totalRevenue,
-        totalExpenses,
+        totalExpenses: totalExpensesSum,
         totalNoi,
-        noiMargin: totalNoi / totalRevenue,
-        avgMonthlyRevenue: totalRevenue / monthlyTrends.length,
-        avgOccupancy: monthlyTrends.reduce((sum, m) => sum + m.occupancy, 0) / monthlyTrends.length,
+        noiMargin: totalRevenue > 0 ? totalNoi / totalRevenue : 0,
+        avgOccupancy: avgOccupancy || null,
+        totalUnits: projectSummaries.reduce((sum, p) => sum + (p.totalUnits || 0), 0),
+        avgCapRate: validProjects.length > 0 
+          ? validProjects.reduce((sum, p) => sum + (p.capRate || 0), 0) / validProjects.filter(p => p.capRate).length
+          : null,
       },
       timeframe,
       projectId: projectId || 'all',

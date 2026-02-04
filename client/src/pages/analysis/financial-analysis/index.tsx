@@ -47,165 +47,86 @@ export default function FinancialAnalysisDashboard() {
     },
   });
 
-  const { data: projects } = useQuery({
-    queryKey: ['/api/modeling-projects'],
-  });
+  const projectsList = useMemo(() => {
+    return analyticsData?.projects || [];
+  }, [analyticsData]);
 
   const revenueByCategory = useMemo(() => {
-    if (!analyticsData?.revenueBreakdown) {
+    if (!analyticsData?.revenueBreakdown || analyticsData.revenueBreakdown.length === 0) {
       return [
-        { name: 'Slip Rentals', value: 450000, children: [
-          { name: 'Monthly', value: 280000 },
-          { name: 'Seasonal', value: 120000 },
-          { name: 'Transient', value: 50000 },
-        ]},
-        { name: 'Fuel Sales', value: 280000, children: [
-          { name: 'Gas', value: 180000 },
-          { name: 'Diesel', value: 100000 },
-        ]},
-        { name: 'Ship Store', value: 95000, children: [
-          { name: 'Parts', value: 45000 },
-          { name: 'Supplies', value: 30000 },
-          { name: 'Accessories', value: 20000 },
-        ]},
-        { name: 'Service & Repair', value: 120000 },
-        { name: 'Winter Storage', value: 85000 },
-        { name: 'Other Income', value: 35000 },
+        { name: 'No financial data yet', value: 0 },
       ];
     }
     return analyticsData.revenueBreakdown;
   }, [analyticsData]);
 
-  const monthlyTrends = useMemo(() => {
-    if (!analyticsData?.monthlyTrends) {
-      return [
-        { period: 'Jan', revenue: 65000, expenses: 45000, noi: 20000 },
-        { period: 'Feb', revenue: 58000, expenses: 42000, noi: 16000 },
-        { period: 'Mar', revenue: 72000, expenses: 48000, noi: 24000 },
-        { period: 'Apr', revenue: 95000, expenses: 55000, noi: 40000 },
-        { period: 'May', revenue: 125000, expenses: 62000, noi: 63000 },
-        { period: 'Jun', revenue: 145000, expenses: 68000, noi: 77000 },
-        { period: 'Jul', revenue: 168000, expenses: 75000, noi: 93000 },
-        { period: 'Aug', revenue: 172000, expenses: 78000, noi: 94000 },
-        { period: 'Sep', revenue: 135000, expenses: 65000, noi: 70000 },
-        { period: 'Oct', revenue: 95000, expenses: 52000, noi: 43000 },
-        { period: 'Nov', revenue: 68000, expenses: 44000, noi: 24000 },
-        { period: 'Dec', revenue: 62000, expenses: 42000, noi: 20000 },
-      ];
+  const yearlyTrends = useMemo(() => {
+    if (!analyticsData?.yearlyTrends || analyticsData.yearlyTrends.length === 0) {
+      return [];
     }
-    return analyticsData.monthlyTrends;
+    return analyticsData.yearlyTrends;
   }, [analyticsData]);
 
-  const monthlyBreakdown: Record<string, any[]> = useMemo(() => {
+  const yearlyBreakdown: Record<string, any[]> = useMemo(() => {
     const breakdown: Record<string, any[]> = {};
-    monthlyTrends.forEach((month: any) => {
-      breakdown[month.period] = [
-        { category: 'Slip Rentals', amount: month.revenue * 0.42, percentage: 42 },
-        { category: 'Fuel Sales', amount: month.revenue * 0.26, percentage: 26 },
-        { category: 'Ship Store', amount: month.revenue * 0.09, percentage: 9 },
-        { category: 'Service & Repair', amount: month.revenue * 0.11, percentage: 11 },
-        { category: 'Winter Storage', amount: month.revenue * 0.08, percentage: 8 },
-        { category: 'Other', amount: month.revenue * 0.04, percentage: 4 },
+    yearlyTrends.forEach((year: any) => {
+      breakdown[year.period] = [
+        { category: 'Revenue', amount: year.revenue, percentage: 100 },
+        { category: 'Expenses', amount: year.expenses, percentage: year.revenue > 0 ? (year.expenses / year.revenue) * 100 : 0 },
+        { category: 'NOI', amount: year.noi, percentage: year.revenue > 0 ? (year.noi / year.revenue) * 100 : 0 },
       ];
     });
     return breakdown;
-  }, [monthlyTrends]);
+  }, [yearlyTrends]);
 
   const expenseWaterfall = useMemo(() => {
-    if (!analyticsData?.expenseWaterfall) {
+    if (!analyticsData?.expenseWaterfall || analyticsData.expenseWaterfall.length === 0) {
       return [
-        { name: 'Gross Revenue', value: 1065000, isTotal: true },
-        { name: 'Dock Master Salaries', value: -185000, details: [
-          { label: 'Full-time Staff', value: 145000 },
-          { label: 'Part-time Seasonal', value: 40000 },
-        ]},
-        { name: 'Utilities', value: -95000, details: [
-          { label: 'Electric', value: 65000 },
-          { label: 'Water/Sewer', value: 20000 },
-          { label: 'Internet/Phone', value: 10000 },
-        ]},
-        { name: 'Insurance', value: -78000, details: [
-          { label: 'Property', value: 45000 },
-          { label: 'Liability', value: 23000 },
-          { label: 'Workers Comp', value: 10000 },
-        ]},
-        { name: 'Maintenance', value: -125000, details: [
-          { label: 'Dock Repairs', value: 65000 },
-          { label: 'Equipment', value: 35000 },
-          { label: 'Grounds', value: 25000 },
-        ]},
-        { name: 'Property Taxes', value: -62000 },
-        { name: 'Admin & Office', value: -45000 },
-        { name: 'Marketing', value: -18000 },
-        { name: 'Net Operating Income', value: 457000, isTotal: true },
+        { name: 'No expense data yet', value: 0, isTotal: true },
       ];
     }
     return analyticsData.expenseWaterfall;
   }, [analyticsData]);
 
-  const occupancyBySlipSize = useMemo(() => {
+  const expenseBreakdownData = useMemo(() => {
+    if (!analyticsData?.expenseWaterfall) return [];
+    return analyticsData.expenseWaterfall
+      .filter((e: any) => !e.isTotal && e.value !== 0)
+      .map((e: any) => ({
+        category: e.name,
+        amount: Math.abs(e.value),
+      }));
+  }, [analyticsData]);
+
+  const drillDownLevels = useMemo(() => {
+    const revenueData = revenueByCategory.filter((r: any) => r.value > 0).map((r: any) => ({
+      category: r.name,
+      amount: r.value,
+    }));
+    
+    return [{
+      label: 'By Revenue Category',
+      data: revenueData.length > 0 ? revenueData : [{ category: 'No data', amount: 0 }],
+      dataKey: 'amount',
+      nameKey: 'category',
+    }];
+  }, [revenueByCategory]);
+
+  const kpis = useMemo(() => {
+    const summary = analyticsData?.summary || {};
+    const totalRevenue = summary.totalRevenue || 0;
+    const totalNoi = summary.totalNoi || 0;
+    const noiMargin = summary.noiMargin || 0;
+    const totalUnits = summary.totalUnits || 0;
+    const revenuePerUnit = totalUnits > 0 ? totalRevenue / totalUnits : 0;
+    
     return [
-      { level: 'All Marinas', slipSize: 'All Sizes', name: 'Total', value: 485, rate: 87 },
+      { label: 'Total Revenue', value: totalRevenue, icon: DollarSign },
+      { label: 'Net Operating Income', value: totalNoi, icon: TrendingUp },
+      { label: 'NOI Margin', value: noiMargin, isPercent: true, icon: Activity },
+      { label: 'Total Projects', value: analyticsData?.projectCount || 0, isCount: true, icon: Building2 },
     ];
-  }, []);
-
-  const drillDownLevels = useMemo(() => [
-    {
-      label: 'By Category',
-      data: [
-        { category: 'Slip Rentals', amount: 450000, count: 245 },
-        { category: 'Fuel Sales', amount: 280000, count: 8500 },
-        { category: 'Ship Store', amount: 95000, count: 3200 },
-        { category: 'Service', amount: 120000, count: 420 },
-        { category: 'Storage', amount: 85000, count: 156 },
-      ],
-      dataKey: 'amount',
-      nameKey: 'category',
-    },
-    {
-      label: 'By Sub-Category',
-      data: [
-        { category: 'Monthly Slips', amount: 280000, parent: 'Slip Rentals' },
-        { category: 'Seasonal Slips', amount: 120000, parent: 'Slip Rentals' },
-        { category: 'Transient', amount: 50000, parent: 'Slip Rentals' },
-        { category: 'Gas', amount: 180000, parent: 'Fuel Sales' },
-        { category: 'Diesel', amount: 100000, parent: 'Fuel Sales' },
-        { category: 'Parts', amount: 45000, parent: 'Ship Store' },
-        { category: 'Supplies', amount: 30000, parent: 'Ship Store' },
-        { category: 'Accessories', amount: 20000, parent: 'Ship Store' },
-        { category: 'Mechanical', amount: 75000, parent: 'Service' },
-        { category: 'Electrical', amount: 25000, parent: 'Service' },
-        { category: 'Fiberglass', amount: 20000, parent: 'Service' },
-        { category: 'Indoor', amount: 55000, parent: 'Storage' },
-        { category: 'Outdoor', amount: 30000, parent: 'Storage' },
-      ],
-      dataKey: 'amount',
-      nameKey: 'category',
-      parentKey: 'parent',
-    },
-    {
-      label: 'By Individual Item',
-      data: [
-        { category: '20ft Monthly', amount: 85000, parent: 'Monthly Slips' },
-        { category: '30ft Monthly', amount: 110000, parent: 'Monthly Slips' },
-        { category: '40ft Monthly', amount: 85000, parent: 'Monthly Slips' },
-        { category: '20ft Seasonal', amount: 45000, parent: 'Seasonal Slips' },
-        { category: '30ft Seasonal', amount: 75000, parent: 'Seasonal Slips' },
-        { category: 'Regular Gas', amount: 120000, parent: 'Gas' },
-        { category: 'Premium Gas', amount: 60000, parent: 'Gas' },
-      ],
-      dataKey: 'amount',
-      nameKey: 'category',
-      parentKey: 'parent',
-    },
-  ], []);
-
-  const kpis = useMemo(() => [
-    { label: 'Total Revenue', value: 1065000, change: 8.5, icon: DollarSign },
-    { label: 'Net Operating Income', value: 457000, change: 12.3, icon: TrendingUp },
-    { label: 'NOI Margin', value: 0.429, change: 3.2, isPercent: true, icon: Activity },
-    { label: 'Avg. Revenue/Slip', value: 4367, change: 5.1, icon: Anchor },
-  ], [analyticsData]);
+  }, [analyticsData]);
 
   if (isLoading) {
     return (
@@ -238,9 +159,9 @@ export default function FinancialAnalysisDashboard() {
               <SelectValue placeholder="Select project" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Projects</SelectItem>
-              {(projects as any[])?.map((p: any) => (
-                <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+              <SelectItem value="all">All Projects ({projectsList.length})</SelectItem>
+              {projectsList.map((p: any) => (
+                <SelectItem key={p.id} value={String(p.id)}>{p.marinaName}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -268,21 +189,18 @@ export default function FinancialAnalysisDashboard() {
       </div>
 
       <div className="grid grid-cols-4 gap-4">
-        {kpis.map((kpi, index) => (
+        {kpis.map((kpi: any, index) => (
           <Card key={index}>
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">{kpi.label}</p>
                   <p className="text-2xl font-bold mt-1">
-                    {kpi.isPercent ? formatPercent(kpi.value) : formatCurrency(kpi.value)}
+                    {kpi.isCount ? kpi.value : kpi.isPercent ? formatPercent(kpi.value) : formatCurrency(kpi.value)}
                   </p>
                 </div>
                 <div className="flex flex-col items-end">
                   <kpi.icon className="h-5 w-5 text-muted-foreground mb-2" />
-                  <Badge variant={kpi.change >= 0 ? 'default' : 'destructive'} className="text-xs">
-                    {kpi.change >= 0 ? '+' : ''}{kpi.change}%
-                  </Badge>
                 </div>
               </div>
             </CardContent>
@@ -291,10 +209,14 @@ export default function FinancialAnalysisDashboard() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full max-w-2xl grid-cols-4">
+        <TabsList className="grid w-full max-w-3xl grid-cols-5">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             Overview
+          </TabsTrigger>
+          <TabsTrigger value="projects" className="flex items-center gap-2">
+            <Building2 className="h-4 w-4" />
+            Projects
           </TabsTrigger>
           <TabsTrigger value="revenue" className="flex items-center gap-2">
             <PieChart className="h-4 w-4" />
@@ -311,26 +233,104 @@ export default function FinancialAnalysisDashboard() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <DrillDownBarChart
-              title="Revenue by Category"
-              description="Click bars to drill down into sub-categories"
-              levels={drillDownLevels}
-              height={350}
-            />
-            <HierarchicalPieChart
-              title="Income Distribution"
-              description="Click segments to explore revenue breakdown"
-              data={revenueByCategory}
-              height={350}
-            />
-          </div>
-          <WaterfallChart
-            title="Revenue to NOI Waterfall"
-            description="Click expense items to see detailed breakdowns"
-            data={expenseWaterfall}
-            height={350}
-          />
+          {projectsList.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p className="text-lg font-medium">No Modeling Projects Yet</p>
+                <p className="text-sm mt-2">Create a modeling project in the Valuator to start seeing financial analytics.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <DrillDownBarChart
+                  title="Revenue by Category"
+                  description="Click bars to drill down into sub-categories"
+                  levels={drillDownLevels}
+                  height={350}
+                />
+                <HierarchicalPieChart
+                  title="Income Distribution"
+                  description="Click segments to explore revenue breakdown"
+                  data={revenueByCategory}
+                  height={350}
+                />
+              </div>
+              <WaterfallChart
+                title="Revenue to NOI Waterfall"
+                description="Click expense items to see detailed breakdowns"
+                data={expenseWaterfall}
+                height={350}
+              />
+            </>
+          )}
+        </TabsContent>
+
+        <TabsContent value="projects" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                Valuator Projects ({projectsList.length})
+              </CardTitle>
+              <CardDescription>All modeling projects with their key financial metrics</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {projectsList.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground">
+                  <Anchor className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No modeling projects found.</p>
+                  <p className="text-sm mt-2">Create a new project in the Valuator to get started.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-3 px-2 font-medium">Marina Name</th>
+                        <th className="text-left py-3 px-2 font-medium">State</th>
+                        <th className="text-right py-3 px-2 font-medium">Purchase Price</th>
+                        <th className="text-right py-3 px-2 font-medium">Revenue</th>
+                        <th className="text-right py-3 px-2 font-medium">NOI</th>
+                        <th className="text-right py-3 px-2 font-medium">Cap Rate</th>
+                        <th className="text-right py-3 px-2 font-medium">Units</th>
+                        <th className="text-center py-3 px-2 font-medium">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {projectsList.map((project: any) => (
+                        <tr key={project.id} className="border-b hover:bg-muted/50">
+                          <td className="py-3 px-2 font-medium">{project.marinaName}</td>
+                          <td className="py-3 px-2">{project.state || '-'}</td>
+                          <td className="py-3 px-2 text-right tabular-nums">
+                            {project.purchasePrice ? formatCurrency(project.purchasePrice) : '-'}
+                          </td>
+                          <td className="py-3 px-2 text-right tabular-nums">
+                            {project.latestRevenue ? formatCurrency(project.latestRevenue) : '-'}
+                          </td>
+                          <td className="py-3 px-2 text-right tabular-nums">
+                            {project.latestNoi ? formatCurrency(project.latestNoi) : '-'}
+                          </td>
+                          <td className="py-3 px-2 text-right tabular-nums">
+                            {project.capRate ? `${(project.capRate * 100).toFixed(2)}%` : '-'}
+                          </td>
+                          <td className="py-3 px-2 text-right tabular-nums">
+                            {project.totalUnits || '-'}
+                          </td>
+                          <td className="py-3 px-2 text-center">
+                            <Badge variant={project.dealOutcome === 'active' ? 'default' : 'secondary'}>
+                              {project.dealOutcome}
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="revenue" className="space-y-4">
@@ -344,31 +344,27 @@ export default function FinancialAnalysisDashboard() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Revenue KPIs</CardTitle>
-                <CardDescription>Key revenue metrics and comparisons</CardDescription>
+                <CardDescription>Key revenue metrics from modeling projects</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  {[
-                    { label: 'Total Revenue', value: 1065000, prev: 982000 },
-                    { label: 'Slip Rentals', value: 450000, prev: 420000 },
-                    { label: 'Fuel Sales', value: 280000, prev: 265000 },
-                    { label: 'Ancillary Income', value: 335000, prev: 297000 },
-                  ].map((metric, i) => {
-                    const change = ((metric.value - metric.prev) / metric.prev) * 100;
-                    return (
-                      <div key={i} className="border rounded-lg p-4">
-                        <p className="text-sm text-muted-foreground">{metric.label}</p>
-                        <p className="text-xl font-bold mt-1">{formatCurrency(metric.value)}</p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="text-xs text-muted-foreground">vs prev period:</span>
-                          <Badge variant={change >= 0 ? 'default' : 'destructive'} className="text-xs">
-                            {change >= 0 ? '+' : ''}{change.toFixed(1)}%
-                          </Badge>
+                {revenueByCategory.filter((r: any) => r.value > 0).length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <DollarSign className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                    <p>No revenue data available yet.</p>
+                    <p className="text-sm mt-1">Add financial periods to your modeling projects to see revenue metrics.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    {revenueByCategory.filter((r: any) => r.value > 0).slice(0, 4).map((metric: any, i: number) => {
+                      return (
+                        <div key={i} className="border rounded-lg p-4">
+                          <p className="text-sm text-muted-foreground">{metric.name}</p>
+                          <p className="text-xl font-bold mt-1">{formatCurrency(metric.value)}</p>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -390,19 +386,11 @@ export default function FinancialAnalysisDashboard() {
           <div className="grid grid-cols-2 gap-4">
             <DrillDownBarChart
               title="Operating Expenses by Category"
-              description="Click to drill into expense details"
+              description="Expense breakdown from modeling projects"
               levels={[
                 {
-                  label: 'By Department',
-                  data: [
-                    { category: 'Payroll', amount: 185000 },
-                    { category: 'Utilities', amount: 95000 },
-                    { category: 'Maintenance', amount: 125000 },
-                    { category: 'Insurance', amount: 78000 },
-                    { category: 'Taxes', amount: 62000 },
-                    { category: 'Admin', amount: 45000 },
-                    { category: 'Marketing', amount: 18000 },
-                  ],
+                  label: 'By Category',
+                  data: expenseBreakdownData.length > 0 ? expenseBreakdownData : [{ category: 'No data', amount: 0 }],
                   dataKey: 'amount',
                   nameKey: 'category',
                 },
@@ -412,103 +400,98 @@ export default function FinancialAnalysisDashboard() {
             <HierarchicalPieChart
               title="Expense Distribution"
               description="Click to explore expense categories"
-              data={[
-                { name: 'Payroll', value: 185000, children: [
-                  { name: 'Full-time', value: 145000 },
-                  { name: 'Part-time', value: 40000 },
-                ]},
-                { name: 'Maintenance', value: 125000, children: [
-                  { name: 'Docks', value: 65000 },
-                  { name: 'Equipment', value: 35000 },
-                  { name: 'Grounds', value: 25000 },
-                ]},
-                { name: 'Utilities', value: 95000 },
-                { name: 'Insurance', value: 78000 },
-                { name: 'Taxes', value: 62000 },
-                { name: 'Admin', value: 45000 },
-                { name: 'Marketing', value: 18000 },
-              ]}
+              data={expenseBreakdownData.length > 0 
+                ? expenseBreakdownData.map((e: any) => ({ name: e.category, value: e.amount }))
+                : [{ name: 'No data', value: 0 }]
+              }
               height={300}
             />
           </div>
         </TabsContent>
 
         <TabsContent value="trends" className="space-y-4">
-          <TimeSeriesDrillDown
-            title="Monthly Revenue, Expenses & NOI Trends"
-            description="Click on any data point to see detailed breakdown for that month"
-            data={monthlyTrends}
-            metrics={[
-              { key: 'revenue', label: 'Revenue', color: CHART_COLORS[0] },
-              { key: 'expenses', label: 'Expenses', color: CHART_COLORS[4] },
-              { key: 'noi', label: 'NOI', color: CHART_COLORS[1] },
-            ]}
-            height={400}
-            drillDownData={monthlyBreakdown}
-          />
+          {yearlyTrends.length > 0 ? (
+            <TimeSeriesDrillDown
+              title="Yearly Revenue, Expenses & NOI Trends"
+              description="Click on any data point to see detailed breakdown for that year"
+              data={yearlyTrends}
+              metrics={[
+                { key: 'revenue', label: 'Revenue', color: CHART_COLORS[0] },
+                { key: 'expenses', label: 'Expenses', color: CHART_COLORS[4] },
+                { key: 'noi', label: 'NOI', color: CHART_COLORS[1] },
+              ]}
+              height={400}
+              drillDownData={yearlyBreakdown}
+            />
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No historical trend data available yet.</p>
+                <p className="text-sm mt-2">Add financial periods to your modeling projects to see trends.</p>
+              </CardContent>
+            </Card>
+          )}
           <div className="grid grid-cols-2 gap-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Seasonal Patterns</CardTitle>
-                <CardDescription>Revenue distribution by season</CardDescription>
+                <CardTitle className="text-lg">Project Summary</CardTitle>
+                <CardDescription>Financial summary across all projects</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {[
-                    { season: 'Peak (Jun-Aug)', revenue: 485000, pct: 45.5 },
-                    { season: 'Shoulder (Apr-May, Sep)', revenue: 355000, pct: 33.3 },
-                    { season: 'Off-Peak (Oct-Mar)', revenue: 225000, pct: 21.2 },
-                  ].map((s, i) => (
-                    <div key={i} className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>{s.season}</span>
-                        <span className="font-medium">{formatCurrency(s.revenue)}</span>
+                  {analyticsData?.summary ? (
+                    <>
+                      <div className="flex items-center justify-between py-2 border-b">
+                        <span className="text-sm">Total Revenue</span>
+                        <span className="font-medium">{formatCurrency(analyticsData.summary.totalRevenue)}</span>
                       </div>
-                      <div className="h-2 bg-muted rounded-full overflow-hidden">
-                        <div 
-                          className="h-full rounded-full" 
-                          style={{ 
-                            width: `${s.pct}%`,
-                            backgroundColor: CHART_COLORS[i]
-                          }}
-                        />
+                      <div className="flex items-center justify-between py-2 border-b">
+                        <span className="text-sm">Total Expenses</span>
+                        <span className="font-medium">{formatCurrency(analyticsData.summary.totalExpenses)}</span>
                       </div>
-                      <p className="text-xs text-muted-foreground text-right">{s.pct}% of annual</p>
-                    </div>
-                  ))}
+                      <div className="flex items-center justify-between py-2 border-b">
+                        <span className="text-sm">Net Operating Income</span>
+                        <span className="font-medium">{formatCurrency(analyticsData.summary.totalNoi)}</span>
+                      </div>
+                      <div className="flex items-center justify-between py-2">
+                        <span className="text-sm">NOI Margin</span>
+                        <span className="font-medium">{formatPercent(analyticsData.summary.noiMargin)}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No summary data available</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Year-over-Year Comparison</CardTitle>
-                <CardDescription>Current period vs previous period</CardDescription>
+                <CardTitle className="text-lg">Portfolio Overview</CardTitle>
+                <CardDescription>Key metrics across modeling projects</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {[
-                    { metric: 'Total Revenue', current: 1065000, previous: 982000 },
-                    { metric: 'Operating Expenses', current: 608000, previous: 589000 },
-                    { metric: 'Net Operating Income', current: 457000, previous: 393000 },
-                    { metric: 'NOI Margin', current: 0.429, previous: 0.400, isPercent: true },
-                  ].map((item, i) => {
-                    const change = item.isPercent 
-                      ? (item.current - item.previous) * 100
-                      : ((item.current - item.previous) / item.previous) * 100;
-                    return (
-                      <div key={i} className="flex items-center justify-between py-2 border-b last:border-0">
-                        <span className="text-sm">{item.metric}</span>
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm font-medium">
-                            {item.isPercent ? formatPercent(item.current) : formatCurrency(item.current)}
-                          </span>
-                          <Badge variant={change >= 0 ? 'default' : 'destructive'} className="text-xs">
-                            {change >= 0 ? '+' : ''}{change.toFixed(1)}%
-                          </Badge>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  <div className="flex items-center justify-between py-2 border-b">
+                    <span className="text-sm">Total Projects</span>
+                    <span className="font-medium">{analyticsData?.projectCount || 0}</span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b">
+                    <span className="text-sm">Total Storage Units</span>
+                    <span className="font-medium">{analyticsData?.summary?.totalUnits || 0}</span>
+                  </div>
+                  {analyticsData?.summary?.avgCapRate && (
+                    <div className="flex items-center justify-between py-2 border-b">
+                      <span className="text-sm">Average Cap Rate</span>
+                      <span className="font-medium">{(analyticsData.summary.avgCapRate * 100).toFixed(2)}%</span>
+                    </div>
+                  )}
+                  {analyticsData?.summary?.avgOccupancy && (
+                    <div className="flex items-center justify-between py-2">
+                      <span className="text-sm">Average Occupancy</span>
+                      <span className="font-medium">{analyticsData.summary.avgOccupancy.toFixed(1)}%</span>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
