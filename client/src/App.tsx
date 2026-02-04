@@ -1821,6 +1821,13 @@ function Router() {
           </UnifiedLayout>
         )}
       </Route>
+      <Route path="/marinalytics/financial-analysis">
+        {() => (
+          <UnifiedLayout>
+            <FinancialAnalysis />
+          </UnifiedLayout>
+        )}
+      </Route>
       <Route path="/modeling/projects/new">
         {() => (
           <UnifiedLayout>
