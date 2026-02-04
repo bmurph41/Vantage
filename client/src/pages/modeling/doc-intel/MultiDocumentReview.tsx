@@ -724,6 +724,12 @@ export function MultiDocumentReview({
           })}
         </TabsList>
 
+        {/* Guidance for returning users */}
+        <div className="flex items-center gap-2 px-1 py-2 text-sm text-muted-foreground">
+          <FileSpreadsheet className="h-4 w-4" />
+          <span>Click on a document above to review and verify its line items</span>
+        </div>
+
         {uploads.map((upload) => (
           <TabsContent key={upload.id} value={upload.id} className="space-y-4">
             {/* Document Stats */}
