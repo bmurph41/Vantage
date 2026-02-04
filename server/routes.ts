@@ -932,8 +932,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/dd/projects", async (req: any, res) => {
     try {
+      let propertyId = req.body.propertyId;
+      
+      // Auto-create CRM property if address provided but no property linked
+      if (!propertyId && req.body.address && req.body.projectType !== "portfolio") {
+        try {
+          const newProperty = await storage.createCrmProperty({
+            orgId: req.user.orgId,
+            title: req.body.name?.replace(/ DD$/, '') || "New Property",
+            type: "marina",
+            status: "pending",
+            address: req.body.address,
+            city: req.body.city,
+            state: req.body.state,
+            zipCode: req.body.zipCode,
+            coordinates: req.body.coordinates,
+            ownerId: req.user.id,
+            pipelineStage: "lead",
+          });
+          propertyId = newProperty.id;
+          console.log(`[DD Project] Auto-created CRM property ${propertyId} for new project`);
+        } catch (propError) {
+          console.error("[DD Project] Failed to auto-create property:", propError);
+        }
+      }
+
       const projectData = insertProjectSchema.parse({
         ...req.body,
+        propertyId: propertyId || req.body.propertyId,
         orgId: req.user.orgId,
         createdBy: req.user.id,
       });
