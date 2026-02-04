@@ -89,10 +89,18 @@ export default function EmailCampaigns() {
       window.history.replaceState({}, "", window.location.pathname + "?tab=email-campaigns");
       queryClient.invalidateQueries({ queryKey: ["/api/email-marketing"] });
     }
+    if (params.get("connected") === "mailchimp") {
+      toast({
+        title: "Connected!",
+        description: "Successfully connected to Mailchimp.",
+      });
+      window.history.replaceState({}, "", window.location.pathname + "?tab=email-campaigns");
+      queryClient.invalidateQueries({ queryKey: ["/api/email-marketing"] });
+    }
     if (params.get("error")) {
       toast({
         title: "Connection Failed",
-        description: "Failed to connect to Constant Contact. Please try again.",
+        description: "Failed to connect. Please try again.",
         variant: "destructive",
       });
       window.history.replaceState({}, "", window.location.pathname + "?tab=email-campaigns");
@@ -107,14 +115,28 @@ export default function EmailCampaigns() {
     queryKey: ["/api/email-marketing/constant-contact/status"],
   });
 
+  const { data: mcStatus, isLoading: mcStatusLoading } = useQuery<CCStatus>({
+    queryKey: ["/api/email-marketing/mailchimp/status"],
+  });
+
   const { data: ccLists, isLoading: ccListsLoading } = useQuery<CCList[]>({
     queryKey: ["/api/email-marketing/constant-contact/lists"],
     enabled: ccStatus?.connected === true,
   });
 
+  const { data: mcLists, isLoading: mcListsLoading } = useQuery<CCList[]>({
+    queryKey: ["/api/email-marketing/mailchimp/lists"],
+    enabled: mcStatus?.connected === true,
+  });
+
   const { data: ccCampaigns, isLoading: ccCampaignsLoading } = useQuery<CCCampaign[]>({
     queryKey: ["/api/email-marketing/constant-contact/campaigns"],
     enabled: ccStatus?.connected === true,
+  });
+
+  const { data: mcCampaigns, isLoading: mcCampaignsLoading } = useQuery<CCCampaign[]>({
+    queryKey: ["/api/email-marketing/mailchimp/campaigns"],
+    enabled: mcStatus?.connected === true,
   });
 
   const { data: leads, isLoading: leadsLoading } = useQuery<Lead[]>({
@@ -140,6 +162,25 @@ export default function EmailCampaigns() {
     },
   });
 
+  const connectMailchimpMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/email-marketing/mailchimp/auth");
+      const data = await res.json();
+      if (data.authUrl) {
+        window.location.href = data.authUrl;
+      } else {
+        throw new Error(data.message || "Failed to generate auth URL");
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Connection Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const disconnectMutation = useMutation({
     mutationFn: async () => {
       await apiRequest("/api/email-marketing/constant-contact/disconnect", { method: "POST" });
@@ -149,6 +190,19 @@ export default function EmailCampaigns() {
       toast({
         title: "Disconnected",
         description: "Constant Contact has been disconnected.",
+      });
+    },
+  });
+
+  const disconnectMailchimpMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("/api/email-marketing/mailchimp/disconnect", { method: "POST" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/email-marketing"] });
+      toast({
+        title: "Disconnected",
+        description: "Mailchimp has been disconnected.",
       });
     },
   });
@@ -200,7 +254,9 @@ export default function EmailCampaigns() {
   };
 
   const ccProvider = providers?.find(p => p.slug === "constant_contact");
+  const mcProvider = providers?.find(p => p.slug === "mailchimp");
   const isConnected = ccStatus?.connected === true;
+  const isMcConnected = mcStatus?.connected === true;
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -318,24 +374,95 @@ export default function EmailCampaigns() {
 
         <Card>
           <CardHeader>
-            <div className="flex items-center space-x-2">
-              <Mail className="w-5 h-5 text-yellow-600" />
-              <CardTitle>Mailchimp</CardTitle>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Mail className="w-5 h-5 text-yellow-600" />
+                <CardTitle>Mailchimp</CardTitle>
+              </div>
+              {isMcConnected ? (
+                <Badge variant="default" className="bg-green-100 text-green-800" data-testid="badge-mc-connected">
+                  <Check className="w-3 h-3 mr-1" />
+                  Connected
+                </Badge>
+              ) : (
+                <Badge variant="outline" data-testid="badge-mc-disconnected">
+                  <X className="w-3 h-3 mr-1" />
+                  Not Connected
+                </Badge>
+              )}
             </div>
             <CardDescription>
               All-in-one marketing platform for growing businesses
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-              <AlertCircle className="w-4 h-4" />
-              <span>Coming soon - integration in development</span>
-            </div>
+          <CardContent className="space-y-4">
+            {mcStatusLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-48" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+            ) : isMcConnected ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Account:</span>
+                  <span className="font-medium">{mcStatus?.accountLabel || "Connected Account"}</span>
+                </div>
+                {mcLists && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Audiences:</span>
+                    <span className="font-medium">{mcLists.length}</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground space-y-2">
+                <p>Connect Mailchimp to:</p>
+                <ul className="list-disc list-inside space-y-1 text-sm">
+                  <li>Sync contacts from MarinaMatch leads</li>
+                  <li>Track email campaign performance</li>
+                  <li>Manage subscriber audiences</li>
+                </ul>
+              </div>
+            )}
           </CardContent>
           <CardFooter>
-            <Button variant="outline" disabled className="w-full" data-testid="btn-connect-mailchimp">
-              Coming Soon
-            </Button>
+            {isMcConnected ? (
+              <div className="flex gap-2 w-full">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/email-marketing/mailchimp"] })}
+                  data-testid="btn-refresh-mc"
+                >
+                  <RefreshCw className="w-4 h-4 mr-1" />
+                  Refresh
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => disconnectMailchimpMutation.mutate()}
+                  disabled={disconnectMailchimpMutation.isPending}
+                  data-testid="btn-disconnect-mc"
+                >
+                  <Link2Off className="w-4 h-4 mr-1" />
+                  Disconnect
+                </Button>
+              </div>
+            ) : (
+              <Button
+                onClick={() => connectMailchimpMutation.mutate()}
+                disabled={connectMailchimpMutation.isPending || !mcProvider?.configured}
+                className="w-full"
+                data-testid="btn-connect-mailchimp"
+              >
+                {connectMailchimpMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                )}
+                {mcProvider?.configured ? "Connect Mailchimp" : "API Keys Required"}
+              </Button>
+            )}
           </CardFooter>
         </Card>
       </div>
