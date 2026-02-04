@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { GoogleMap, Marker, MarkerClusterer, InfoWindow, useJsApiLoader } from '@react-google-maps/api';
+import { GoogleMap, Marker, MarkerClusterer, InfoWindow } from '@react-google-maps/api';
+import { useGoogleMaps } from '@/lib/google-maps-provider';
 import { Loader2, Share2, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -54,10 +55,7 @@ export function CompsMap({
   const [mapCenter, setMapCenter] = useState(defaultCenter);
   const [mapZoom, setMapZoom] = useState(4);
 
-  const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
-    libraries: ['places'],
-  });
+  const { isLoaded, loadError } = useGoogleMaps();
 
   const visibleItems = useMemo(() => {
     return items.filter(item => visibleLayers.includes(item.layerType));

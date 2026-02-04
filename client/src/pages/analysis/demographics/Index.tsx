@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useLoadScript, Autocomplete, GoogleMap, Circle, Marker } from "@react-google-maps/api";
+import { Autocomplete, GoogleMap, Circle, Marker } from "@react-google-maps/api";
+import { useGoogleMaps } from "@/lib/google-maps-provider";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
@@ -452,8 +453,6 @@ function TradeAreaDemographicsDisplay({ data }: { data: DemographicSummary }) {
   );
 }
 
-const libraries: ("places")[] = ["places"];
-
 function AddressSearchInput({ 
   onSelect, 
   placeholder = "Enter an address...",
@@ -467,11 +466,7 @@ function AddressSearchInput({
   const [inputValue, setInputValue] = useState("");
   
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-  
-  const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: apiKey || "",
-    libraries,
-  });
+  const { isLoaded, loadError } = useGoogleMaps();
 
   const onLoad = useCallback((autocomplete: google.maps.places.Autocomplete) => {
     autocompleteRef.current = autocomplete;
