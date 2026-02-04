@@ -31,7 +31,7 @@ import {
   insertAnalyticsReportScheduleSchema,
 } from '@shared/schema';
 import { articles } from '@shared/docktalk-schema';
-import { eq, sql, count, and, gte, lte, lt, desc, asc } from 'drizzle-orm';
+import { eq, sql, count, and, gte, lte, lt, desc, asc, inArray } from 'drizzle-orm';
 
 const router = Router();
 
@@ -898,7 +898,7 @@ router.get('/financial', async (req: Request, res: Response) => {
       .where(
         and(
           eq(modelingFinancialPeriods.orgId, orgId),
-          sql`${modelingFinancialPeriods.modelingProjectId} = ANY(${projectIds})`
+          inArray(modelingFinancialPeriods.modelingProjectId, projectIds)
         )
       )
       .orderBy(asc(modelingFinancialPeriods.sortOrder));
