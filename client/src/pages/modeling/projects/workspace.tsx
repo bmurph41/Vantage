@@ -84,14 +84,14 @@ export default function ProjectWorkspace() {
   });
   const queryClient = useQueryClient();
 
-  // Sync tab state with URL query parameter
+  // Sync tab state with URL query parameter (only on URL change, not on activeTab change)
   useEffect(() => {
     const params = new URLSearchParams(searchString);
     const tabFromUrl = params.get('tab');
-    if (tabFromUrl && tabFromUrl !== activeTab) {
+    if (tabFromUrl) {
       setActiveTab(tabFromUrl);
     }
-  }, [searchString, activeTab]);
+  }, [searchString]);
 
   const { data: project, isLoading } = useQuery<ModelingProject>({
     queryKey: ['/api/modeling/projects', projectId],
