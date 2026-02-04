@@ -2471,6 +2471,8 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     name: z.string().min(1),
     criteria: z.object({}).passthrough(),
     alertFrequency: z.enum(["none", "immediate", "daily", "weekly"]).default("none"),
+    deliveryTime: z.string().default("09:00"),
+    timezone: z.string().default("America/New_York"),
   });
 
   const SavedSearchUpdateSchema = SavedSearchSchema.partial();

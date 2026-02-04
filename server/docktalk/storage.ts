@@ -125,6 +125,7 @@ export interface IStorage {
   updateSavedSearch(id: string, userId: string, orgId: string, search: Partial<InsertSavedSearch>): Promise<SavedSearch | null>;
   deleteSavedSearch(id: string, userId: string, orgId: string): Promise<boolean>;
   updateLastAlertSent(id: string): Promise<void>;
+  markFirstAlertSent(id: string): Promise<void>;
   getActiveSearchesForAlerts(frequency: string): Promise<SavedSearch[]>;
   
   // User methods
@@ -894,6 +895,13 @@ export class DatabaseStorage implements IStorage {
     await db
       .update(savedSearches)
       .set({ lastAlertSent: new Date() })
+      .where(eq(savedSearches.id, id));
+  }
+
+  async markFirstAlertSent(id: string): Promise<void> {
+    await db
+      .update(savedSearches)
+      .set({ isFirstAlertSent: true })
       .where(eq(savedSearches.id, id));
   }
 

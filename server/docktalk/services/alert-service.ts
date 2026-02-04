@@ -25,9 +25,9 @@ export async function checkAndSendAlerts(frequency: "immediate" | "daily" | "wee
 
     for (const search of searches) {
       try {
-        // For daily/weekly alerts, check if it's the right time in user's timezone
+        // For daily/weekly alerts, check if it's the right time using per-search settings
         if (frequency === "daily" || frequency === "weekly") {
-          const shouldSend = await shouldSendAlertNow(search.userId, frequency);
+          const shouldSend = await shouldSendAlertNow(search, frequency);
           if (!shouldSend) {
             continue;
           }
@@ -45,17 +45,23 @@ export async function checkAndSendAlerts(frequency: "immediate" | "daily" | "wee
   }
 }
 
-async function shouldSendAlertNow(userId: string, frequency: "daily" | "weekly"): Promise<boolean> {
+async function shouldSendAlertNow(search: SavedSearch, frequency: "daily" | "weekly"): Promise<boolean> {
   try {
-    const preferences = await storage.getUserNotificationPreferences(userId);
-    if (!preferences) {
-      return false;
-    }
-
-    const timezone = preferences.timezone || "America/New_York";
-    const deliveryTime = preferences.deliveryTime || "09:00";
+    // Use per-search delivery settings if available, otherwise fall back to user preferences
+    let timezone = (search as any).timezone;
+    let deliveryTime = (search as any).deliveryTime;
     
-    // Get current time in user's timezone
+    // Fallback to user preferences if per-search settings not available
+    if (!timezone || !deliveryTime) {
+      const preferences = await storage.getUserNotificationPreferences(search.userId);
+      if (!preferences) {
+        return false;
+      }
+      timezone = timezone || preferences.timezone || "America/New_York";
+      deliveryTime = deliveryTime || preferences.deliveryTime || "09:00";
+    }
+    
+    // Get current time in the configured timezone
     const now = new Date();
     const userLocalTime = toZonedTime(now, timezone);
     const currentHour = userLocalTime.getHours();
@@ -91,12 +97,9 @@ async function shouldSendAlertNow(userId: string, frequency: "daily" | "weekly")
       }
     }
     
-    if (isWithinWindow) {
-    }
-    
     return isWithinWindow;
   } catch (error) {
-    console.error(`Error checking alert timing for user ${userId}:`, error);
+    console.error(`Error checking alert timing for search ${search.id}:`, error);
     return false;
   }
 }
@@ -104,16 +107,16 @@ async function shouldSendAlertNow(userId: string, frequency: "daily" | "weekly")
 async function processSearchAlert(search: SavedSearch): Promise<void> {
   const criteria = search.criteria as any;
   
-  // For testing: Use last 3 weeks instead of just new articles
-  const threeWeeksAgo = new Date();
-  threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 21);
-  const sinceDate = threeWeeksAgo; // Temporarily override to get last 3 weeks
-  // const sinceDate = search.lastAlertSent || search.createdAt; // Normal behavior
+  // For subsequent alerts, only show articles since the last alert was sent
+  // If this is somehow the first alert (shouldn't happen as recap runs first), use 7 days ago
+  const sinceDate = search.lastAlertSent 
+    ? new Date(search.lastAlertSent) 
+    : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
   // Pass userId for future tenant scoping enforcement
   const articles = await storage.getArticles(search.userId, {
     ...criteria,
-    fromDate: sinceDate ? new Date(sinceDate) : undefined,
+    fromDate: sinceDate,
     limit: 50,
     sortBy: "newest",
   });
@@ -268,18 +271,19 @@ export async function sendNewSearchRecap(searchId: string, userId: string, orgId
 
     const criteria = search.criteria as any;
     
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    // Use 7-day lookback for the first email
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
     const articles = await storage.getArticles(userId, {
       ...criteria,
-      fromDate: twentyFourHoursAgo,
+      fromDate: sevenDaysAgo,
       limit: 100,
       sortBy: "newest",
     });
 
     if (articles.length === 0) {
-      console.log(`[Recap] No matching articles in last 24 hours for search ${searchId} - skipping email`);
-      return { sent: false, articleCount: 0, error: "No matching articles in last 24 hours" };
+      console.log(`[Recap] No matching articles in last 7 days for search ${searchId} - skipping email`);
+      return { sent: false, articleCount: 0, error: "No matching articles in last 7 days" };
     }
 
     const { client, fromEmail } = await getUncachableResendClient();
@@ -299,7 +303,7 @@ export async function sendNewSearchRecap(searchId: string, userId: string, orgId
     await client.emails.send({
       from: fromEmail,
       to: preferences.emailAddress,
-      subject: `DockTalk 24-Hour Recap: ${search.name} (${articles.length} article${articles.length > 1 ? 's' : ''})`,
+      subject: `DockTalk 7-Day Recap: ${search.name} (${articles.length} article${articles.length > 1 ? 's' : ''})`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background-color: #003366; color: white; padding: 20px; text-align: center;">
@@ -309,9 +313,9 @@ export async function sendNewSearchRecap(searchId: string, userId: string, orgId
           
           <div style="padding: 30px 20px;">
             <div style="background-color: #e8f4fc; border-left: 4px solid #0066cc; padding: 15px; margin-bottom: 25px;">
-              <h2 style="color: #003366; margin: 0 0 8px 0;">🎉 24-Hour Recap</h2>
+              <h2 style="color: #003366; margin: 0 0 8px 0;">🎉 7-Day Recap</h2>
               <p style="margin: 0; color: #555;">
-                Welcome! Here are all articles from the last 24 hours matching your new search "<strong>${search.name}</strong>".
+                Welcome! Here are all articles from the past 7 days matching your new search "<strong>${search.name}</strong>".
               </p>
             </div>
             
@@ -330,11 +334,15 @@ export async function sendNewSearchRecap(searchId: string, userId: string, orgId
           
           <div style="background-color: #f5f5f5; padding: 20px; text-align: center; font-size: 12px; color: #666;">
             <p style="margin: 0;">This is a one-time recap for your new saved search "${search.name}"</p>
-            <p style="margin: 10px 0 0 0;">Future alerts will follow your configured frequency: ${search.alertFrequency}</p>
+            <p style="margin: 10px 0 0 0;">Future alerts will only include new articles since this email.</p>
           </div>
         </div>
       `,
     });
+
+    // Mark first alert as sent and update lastAlertSent timestamp
+    await storage.markFirstAlertSent(searchId);
+    await storage.updateLastAlertSent(searchId);
 
     await storage.createNotification({
       userId: userId,
@@ -349,12 +357,12 @@ export async function sendNewSearchRecap(searchId: string, userId: string, orgId
       articleIds: articles.map(a => a.id.toString()),
       articleCount: articles.length,
       frequency: "recap",
-      message: `24-Hour Recap for "${search.name}": ${articles.length} article${articles.length > 1 ? 's' : ''} found`,
+      message: `7-Day Recap for "${search.name}": ${articles.length} article${articles.length > 1 ? 's' : ''} found`,
       deliveryMethod: "email",
       deliveryStatus: "sent",
     });
 
-    console.log(`[Recap] Sent 24-hour recap for search ${searchId}: ${articles.length} articles`);
+    console.log(`[Recap] Sent 7-day recap for search ${searchId}: ${articles.length} articles`);
     return { sent: true, articleCount: articles.length };
   } catch (error) {
     console.error(`[Recap] Error sending recap for search ${searchId}:`, error);

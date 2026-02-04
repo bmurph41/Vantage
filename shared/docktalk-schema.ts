@@ -309,6 +309,9 @@ export const savedSearches = pgTable("docktalk_saved_searches", {
   name: text("name").notNull(),
   criteria: jsonb("criteria").notNull(),
   alertFrequency: text("alert_frequency").notNull().default("none"),
+  deliveryTime: text("delivery_time").default("09:00"), // Per-alert delivery time (HH:mm)
+  timezone: text("timezone").default("America/New_York"), // Per-alert timezone
+  isFirstAlertSent: boolean("is_first_alert_sent").default(false), // Track if 7-day lookback email was sent
   lastAlertSent: timestamp("last_alert_sent"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),

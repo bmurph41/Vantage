@@ -91,6 +91,24 @@ interface CurrentUser {
   name: string;
 }
 
+const TIMEZONES_LIST = [
+  { value: "America/New_York", label: "Eastern Time (ET)" },
+  { value: "America/Chicago", label: "Central Time (CT)" },
+  { value: "America/Denver", label: "Mountain Time (MT)" },
+  { value: "America/Phoenix", label: "Arizona (no DST)" },
+  { value: "America/Los_Angeles", label: "Pacific Time (PT)" },
+  { value: "America/Anchorage", label: "Alaska Time (AKT)" },
+  { value: "Pacific/Honolulu", label: "Hawaii Time (HT)" },
+  { value: "America/Toronto", label: "Toronto (ET)" },
+  { value: "America/Vancouver", label: "Vancouver (PT)" },
+  { value: "Europe/London", label: "London (GMT/BST)" },
+  { value: "Europe/Paris", label: "Paris (CET/CEST)" },
+  { value: "Asia/Tokyo", label: "Tokyo (JST)" },
+  { value: "Asia/Shanghai", label: "Shanghai (CST)" },
+  { value: "Asia/Dubai", label: "Dubai (GST)" },
+  { value: "Australia/Sydney", label: "Sydney (AEDT/AEST)" },
+] as const;
+
 const savedSearchSchema = z.object({
   name: z.string().min(1, "Name is required"),
   criteria: z.object({
@@ -100,6 +118,8 @@ const savedSearchSchema = z.object({
     dealsOnly: z.boolean().optional(),
   }),
   alertFrequency: z.enum(["none", "immediate", "daily", "weekly"]),
+  deliveryTime: z.string().default("09:00"),
+  timezone: z.string().default("America/New_York"),
 });
 
 type SavedSearchForm = z.infer<typeof savedSearchSchema>;
@@ -229,6 +249,8 @@ export default function NotificationsPage() {
         dealsOnly: false,
       },
       alertFrequency: "daily",
+      deliveryTime: "09:00",
+      timezone: "America/New_York",
     },
   });
 
@@ -246,6 +268,8 @@ export default function NotificationsPage() {
             dealsOnly: false,
           },
           alertFrequency: editingSearch.alertFrequency || "daily",
+          deliveryTime: editingSearch.deliveryTime || "09:00",
+          timezone: editingSearch.timezone || "America/New_York",
         });
       } else {
         setAllNewsSelected(false);
@@ -258,6 +282,8 @@ export default function NotificationsPage() {
             dealsOnly: false,
           },
           alertFrequency: "daily",
+          deliveryTime: "09:00",
+          timezone: "America/New_York",
         });
       }
     }
@@ -840,10 +866,83 @@ export default function NotificationsPage() {
                         <SelectItem value="weekly">Weekly Digest</SelectItem>
                       </SelectContent>
                     </Select>
+                    <FormDescription>
+                      {field.value === "immediate" && "Get notified as soon as matching articles are found"}
+                      {field.value === "daily" && "Receive a daily digest at your chosen time"}
+                      {field.value === "weekly" && "Receive a weekly digest every Monday at your chosen time"}
+                      {field.value === "none" && "Alerts are disabled for this search"}
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
+              {/* Delivery Time & Timezone - only show when alerts are enabled and not immediate */}
+              {searchForm.watch("alertFrequency") !== "none" && searchForm.watch("alertFrequency") !== "immediate" && (
+                <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg border">
+                  <FormField
+                    control={searchForm.control}
+                    name="deliveryTime"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          Delivery Time
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="time"
+                            {...field}
+                            data-testid="input-alert-delivery-time"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={searchForm.control}
+                    name="timezone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-2">
+                          <CalendarIcon className="h-4 w-4" />
+                          Timezone
+                        </FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-alert-timezone">
+                              <SelectValue placeholder="Select timezone" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {TIMEZONES_LIST.map((tz) => (
+                              <SelectItem key={tz.value} value={tz.value}>
+                                {tz.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+
+              {/* Info about first email */}
+              {searchForm.watch("alertFrequency") !== "none" && !editingSearch && (
+                <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    <strong>First alert:</strong> You'll receive articles from the past 7 days matching your criteria. 
+                    After that, you'll only receive new articles.
+                  </p>
+                </div>
+              )}
 
               <div className="flex justify-end gap-2 pt-4">
                 <Button type="button" variant="outline" onClick={() => setSearchDialogOpen(false)}>
