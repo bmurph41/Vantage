@@ -23577,3 +23577,19 @@ export type DscrTestResult = typeof dscrTestResults.$inferSelect;
 export type InsertDscrTestResult = z.infer<typeof insertDscrTestResultSchema>;
 export type LoanComparisonScenario = typeof loanComparisonScenarios.$inferSelect;
 export type InsertLoanComparisonScenario = z.infer<typeof insertLoanComparisonScenarioSchema>;
+
+export const wizardDrafts = pgTable("wizard_drafts", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  wizardType: text("wizard_type").notNull(),
+  status: text("status").notNull().default("draft"),
+  currentStepId: text("current_step_id").notNull().default("welcome"),
+  completedStepIds: jsonb("completed_step_ids").$type<string[]>().default([]),
+  payload: jsonb("payload").$type<Record<string, any>>().default({}),
+  version: text("version").notNull().default("1"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type WizardDraft = typeof wizardDrafts.$inferSelect;
+export type NewWizardDraft = typeof wizardDrafts.$inferInsert;

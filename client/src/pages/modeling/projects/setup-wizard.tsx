@@ -1,0 +1,1645 @@
+/**
+ * SETUP WIZARD - Enterprise-Grade Persistence
+ */
+
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { useLocation } from "wouter";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Loader2,
+  Building2,
+  MapPin,
+  DollarSign,
+  Anchor,
+  Ship,
+  Fuel,
+  ShoppingCart,
+  Wrench,
+  Calendar,
+  TrendingUp,
+  AlertCircle,
+  RotateCcw,
+  Cloud,
+  CloudOff,
+} from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useToast } from "@/hooks/use-toast";
+import { useWizardDraft, onWizardSubmitSuccess } from "@/hooks/use-wizard-draft";
+import { ResumeDraftModal } from "@/components/wizard/resume-draft-modal";
+import { useAuth } from "@/hooks/use-auth";
+import { cn } from "@/lib/utils";
+
+// ============================================
+// CONSTANTS
+// ============================================
+
+const ASSET_TYPES = [
+  { value: "MARINA", label: "Marina", icon: Anchor },
+  { value: "RV_PARK", label: "RV Park", icon: Ship },
+  { value: "MULTIFAMILY", label: "Multifamily", icon: Building2 },
+  { value: "RETAIL", label: "Retail", icon: ShoppingCart },
+  { value: "INDUSTRIAL", label: "Industrial", icon: Building2 },
+  { value: "MIXED_USE", label: "Mixed Use", icon: Building2 },
+  { value: "OTHER", label: "Other", icon: Building2 },
+];
+
+const STORAGE_TYPES = [
+  { value: "WET_SLIPS", label: "Wet Slips", description: "In-water boat storage" },
+  { value: "DRY_STACK", label: "Dry Stack Racks", description: "Indoor rack storage" },
+  { value: "MOORINGS", label: "Moorings", description: "Mooring balls & anchors" },
+  { value: "TRAILER_STORAGE", label: "Trailer Storage", description: "Outdoor trailer parking" },
+  { value: "RV_STORAGE", label: "RV Storage", description: "RV & camper storage" },
+  { value: "SERVICE_BAYS", label: "Service Bays", description: "Repair & maintenance" },
+];
+
+const SEASONALITY_PROFILES = [
+  { value: "YEAR_ROUND", label: "Year-Round", description: "Consistent occupancy" },
+  { value: "SEASONAL_PEAK_SUMMER", label: "Summer Peak", description: "Peak April-October" },
+  { value: "SEASONAL_PEAK_WINTER", label: "Winter Peak", description: "Peak November-March" },
+  { value: "CUSTOM", label: "Custom", description: "Define your own" },
+];
+
+const MONTHS = [
+  { value: "1", label: "January" },
+  { value: "2", label: "February" },
+  { value: "3", label: "March" },
+  { value: "4", label: "April" },
+  { value: "5", label: "May" },
+  { value: "6", label: "June" },
+  { value: "7", label: "July" },
+  { value: "8", label: "August" },
+  { value: "9", label: "September" },
+  { value: "10", label: "October" },
+  { value: "11", label: "November" },
+  { value: "12", label: "December" },
+];
+
+const CURRENT_YEAR = new Date().getFullYear();
+const HISTORICAL_YEARS = [
+  CURRENT_YEAR - 1,
+  CURRENT_YEAR - 2,
+  CURRENT_YEAR - 3,
+  CURRENT_YEAR - 4,
+  CURRENT_YEAR - 5,
+];
+
+// ============================================
+// WIZARD STEPS
+// ============================================
+
+const WIZARD_STEPS = [
+  { id: "welcome", title: "Welcome", description: "Get started" },
+  { id: "deal-details", title: "Deal Details", description: "Project & acquisition" },
+  { id: "storage-mix", title: "Storage Mix", description: "Operations" },
+  { id: "profit-centers", title: "Profit Centers", description: "Revenue streams" },
+  { id: "financial-scope", title: "Financials", description: "Historical data" },
+  { id: "underwriting", title: "Underwriting", description: "Assumptions" },
+  { id: "review", title: "Review", description: "Create project" },
+] as const;
+
+type StepId = typeof WIZARD_STEPS[number]["id"];
+
+const STEP_LABELS: Record<string, string> = {
+  "welcome": "Welcome",
+  "deal-details": "Deal Details",
+  "storage-mix": "Storage Mix",
+  "profit-centers": "Profit Centers",
+  "financial-scope": "Financial Scope",
+  "underwriting": "Underwriting",
+  "review": "Review",
+};
+
+function getStepIndex(stepId: string): number {
+  const index = WIZARD_STEPS.findIndex((s) => s.id === stepId);
+  return index >= 0 ? index : 0;
+}
+
+function getStepId(index: number): StepId {
+  return WIZARD_STEPS[index]?.id || "welcome";
+}
+// ============================================
+// FORM DATA TYPES
+// ============================================
+
+interface StorageMixItem {
+  storageType: string;
+  count: number;
+  avgRate: string;
+  currentOccupancy: string;
+}
+
+interface WizardFormData {
+  name: string;
+  assetType: string;
+  propertyName: string;
+  location: {
+    streetAddress: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    country: string;
+  };
+  acquisition: {
+    targetClosingDate: string;
+    purchasePrice: string;
+    closingCostsDollar: string;
+    closingCostsPercent: string;
+    equityInvested: string;
+    debtAmount: string;
+    ltv: string;
+  };
+  loanTerms: {
+    interestRate: string;
+    amortizationYears: string;
+    termYears: string;
+    ioMonths: string;
+  };
+  storageMix: {
+    items: StorageMixItem[];
+    hasFuelDock: boolean;
+  };
+  seasonality: {
+    profile: string;
+    seasonStartMonth: string;
+    seasonEndMonth: string;
+  };
+  profitCenters: {
+    commercialTenants: { enabled: boolean; numberOfSuites: string; totalSqFt: string };
+    fuelSales: { enabled: boolean; pumpsCount: string };
+    shipStore: { enabled: boolean; expectedRevenueBaseline: string };
+    serviceDepartment: { enabled: boolean; numberOfBays: string };
+    boatRentals: { enabled: boolean; fleetSize: string };
+  };
+  financialScope: {
+    historicalYears: number[];
+    includeT12: boolean;
+    fiscalYearEndMonth: string;
+    accountingBasis: string;
+  };
+  underwriting: {
+    revenueGrowthPercent: string;
+    expenseGrowthPercent: string;
+    occupancyGrowthPercent: string;
+    targetOccupancy: string;
+    capRateExit: string;
+    exitYear: string;
+    discountRate: string;
+    holdPeriodYears: string;
+  };
+}
+
+const DEFAULT_FORM_DATA: WizardFormData = {
+  name: "",
+  assetType: "MARINA",
+  propertyName: "",
+  location: {
+    streetAddress: "",
+    city: "",
+    state: "",
+    zipCode: "",
+    country: "USA",
+  },
+  acquisition: {
+    targetClosingDate: "",
+    purchasePrice: "",
+    closingCostsDollar: "",
+    closingCostsPercent: "2",
+    equityInvested: "",
+    debtAmount: "",
+    ltv: "65",
+  },
+  loanTerms: {
+    interestRate: "7",
+    amortizationYears: "25",
+    termYears: "10",
+    ioMonths: "0",
+  },
+  storageMix: {
+    items: [],
+    hasFuelDock: false,
+  },
+  seasonality: {
+    profile: "YEAR_ROUND",
+    seasonStartMonth: "4",
+    seasonEndMonth: "10",
+  },
+  profitCenters: {
+    commercialTenants: { enabled: false, numberOfSuites: "", totalSqFt: "" },
+    fuelSales: { enabled: false, pumpsCount: "" },
+    shipStore: { enabled: false, expectedRevenueBaseline: "" },
+    serviceDepartment: { enabled: false, numberOfBays: "" },
+    boatRentals: { enabled: false, fleetSize: "" },
+  },
+  financialScope: {
+    historicalYears: [],
+    includeT12: true,
+    fiscalYearEndMonth: "12",
+    accountingBasis: "ACCRUAL",
+  },
+  underwriting: {
+    revenueGrowthPercent: "3",
+    expenseGrowthPercent: "2.5",
+    occupancyGrowthPercent: "0",
+    targetOccupancy: "95",
+    capRateExit: "",
+    exitYear: "5",
+    discountRate: "",
+    holdPeriodYears: "5",
+  },
+};
+
+// ============================================
+// SLIDE PROPS
+// ============================================
+
+interface SlideProps {
+  payload: WizardFormData;
+  updatePayload: <K extends keyof WizardFormData>(key: K, value: WizardFormData[K]) => void;
+  updateNestedPayload: (path: string, value: any) => void;
+}
+// ============================================
+// WELCOME SLIDE
+// ============================================
+
+function WelcomeSlide() {
+  return (
+    <div className="text-center py-8">
+      <div className="w-20 h-20 mx-auto mb-6 bg-primary/10 rounded-full flex items-center justify-center">
+        <Anchor className="h-10 w-10 text-primary" />
+      </div>
+      <h2 className="text-3xl font-bold mb-4">Welcome to MarinaMatch</h2>
+      <p className="text-lg text-muted-foreground max-w-md mx-auto mb-8">
+        Let's set up your modeling project. We'll walk you through the key
+        inputs to get your valuation started.
+      </p>
+      <div className="grid grid-cols-3 gap-4 max-w-lg mx-auto text-sm">
+        <div className="p-3 bg-muted rounded-lg">
+          <Building2 className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
+          <span className="text-muted-foreground">Property Details</span>
+        </div>
+        <div className="p-3 bg-muted rounded-lg">
+          <DollarSign className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
+          <span className="text-muted-foreground">Financial Inputs</span>
+        </div>
+        <div className="p-3 bg-muted rounded-lg">
+          <TrendingUp className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
+          <span className="text-muted-foreground">Underwriting</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// DEAL DETAILS SLIDE
+// ============================================
+
+function DealDetailsSlide({ payload, updatePayload, updateNestedPayload }: SlideProps) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-xl font-semibold mb-2">Deal Details</h3>
+        <p className="text-muted-foreground">
+          Enter basic project information and acquisition parameters.
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Building2 className="h-4 w-4" />
+            Project Basics
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2 md:col-span-1">
+              <Label htmlFor="name">
+                Project Name <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="name"
+                placeholder="e.g., Sunrise Marina Acquisition"
+                value={payload.name}
+                onChange={(e) => updatePayload("name", e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+            <div className="col-span-2 md:col-span-1">
+              <Label htmlFor="assetType">
+                Asset Type <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={payload.assetType}
+                onValueChange={(v) => updatePayload("assetType", v)}
+              >
+                <SelectTrigger className="mt-1.5">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ASSET_TYPES.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-2">
+              <Label htmlFor="propertyName">Property Name (optional)</Label>
+              <Input
+                id="propertyName"
+                placeholder="e.g., Sunrise Marina"
+                value={payload.propertyName}
+                onChange={(e) => updatePayload("propertyName", e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <MapPin className="h-4 w-4" />
+            Location
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="streetAddress">Street Address</Label>
+            <Input
+              id="streetAddress"
+              placeholder="123 Marina Way"
+              value={payload.location.streetAddress}
+              onChange={(e) => updateNestedPayload("location.streetAddress", e.target.value)}
+              className="mt-1.5"
+            />
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="city">City</Label>
+              <Input
+                id="city"
+                placeholder="Miami"
+                value={payload.location.city}
+                onChange={(e) => updateNestedPayload("location.city", e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label htmlFor="state">State</Label>
+              <Input
+                id="state"
+                placeholder="FL"
+                value={payload.location.state}
+                onChange={(e) => updateNestedPayload("location.state", e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label htmlFor="zipCode">ZIP Code</Label>
+              <Input
+                id="zipCode"
+                placeholder="33101"
+                value={payload.location.zipCode}
+                onChange={(e) => updateNestedPayload("location.zipCode", e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <DollarSign className="h-4 w-4" />
+            Acquisition Parameters
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="targetClosingDate">Target Closing Date</Label>
+              <Input
+                id="targetClosingDate"
+                type="date"
+                value={payload.acquisition.targetClosingDate}
+                onChange={(e) => updateNestedPayload("acquisition.targetClosingDate", e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label htmlFor="purchasePrice">Purchase Price ($)</Label>
+              <Input
+                id="purchasePrice"
+                type="number"
+                placeholder="5,000,000"
+                value={payload.acquisition.purchasePrice}
+                onChange={(e) => updateNestedPayload("acquisition.purchasePrice", e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label htmlFor="closingCostsPercent">Closing Costs (%)</Label>
+              <Input
+                id="closingCostsPercent"
+                type="number"
+                step="0.1"
+                placeholder="2"
+                value={payload.acquisition.closingCostsPercent}
+                onChange={(e) => updateNestedPayload("acquisition.closingCostsPercent", e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label htmlFor="ltv">LTV (%)</Label>
+              <Input
+                id="ltv"
+                type="number"
+                placeholder="65"
+                value={payload.acquisition.ltv}
+                onChange={(e) => updateNestedPayload("acquisition.ltv", e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            Loan Terms
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <Label htmlFor="interestRate">Interest Rate (%)</Label>
+              <Input
+                id="interestRate"
+                type="number"
+                step="0.125"
+                placeholder="7"
+                value={payload.loanTerms.interestRate}
+                onChange={(e) => updateNestedPayload("loanTerms.interestRate", e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label htmlFor="amortizationYears">Amortization (yrs)</Label>
+              <Input
+                id="amortizationYears"
+                type="number"
+                placeholder="25"
+                value={payload.loanTerms.amortizationYears}
+                onChange={(e) => updateNestedPayload("loanTerms.amortizationYears", e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label htmlFor="termYears">Loan Term (yrs)</Label>
+              <Input
+                id="termYears"
+                type="number"
+                placeholder="10"
+                value={payload.loanTerms.termYears}
+                onChange={(e) => updateNestedPayload("loanTerms.termYears", e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label htmlFor="ioMonths">IO Period (months)</Label>
+              <Input
+                id="ioMonths"
+                type="number"
+                placeholder="0"
+                value={payload.loanTerms.ioMonths}
+                onChange={(e) => updateNestedPayload("loanTerms.ioMonths", e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+// ============================================
+// STORAGE MIX SLIDE
+// ============================================
+
+function StorageMixSlide({ payload, updatePayload, updateNestedPayload }: SlideProps) {
+  const toggleStorageType = (type: string) => {
+    const items = payload.storageMix.items;
+    const existingIndex = items.findIndex((i) => i.storageType === type);
+
+    if (existingIndex >= 0) {
+      updatePayload("storageMix", {
+        ...payload.storageMix,
+        items: items.filter((_, i) => i !== existingIndex),
+      });
+    } else {
+      updatePayload("storageMix", {
+        ...payload.storageMix,
+        items: [...items, { storageType: type, count: 0, avgRate: "", currentOccupancy: "" }],
+      });
+    }
+  };
+
+  const updateStorageItem = (storageType: string, field: string, value: any) => {
+    const items = payload.storageMix.items.map((item) =>
+      item.storageType === storageType ? { ...item, [field]: value } : item
+    );
+    updatePayload("storageMix", { ...payload.storageMix, items });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-xl font-semibold mb-2">Operations & Storage Mix</h3>
+        <p className="text-muted-foreground">
+          Configure the storage types and capacity at your marina.
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Anchor className="h-4 w-4" />
+            Storage Types
+          </CardTitle>
+          <CardDescription>Select all storage types available</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {STORAGE_TYPES.map((type) => {
+              const isSelected = payload.storageMix.items.some((i) => i.storageType === type.value);
+              return (
+                <div
+                  key={type.value}
+                  onClick={() => toggleStorageType(type.value)}
+                  className={cn(
+                    "p-3 rounded-lg border-2 cursor-pointer transition-all",
+                    isSelected
+                      ? "border-primary bg-primary/5"
+                      : "border-muted hover:border-muted-foreground/50"
+                  )}
+                >
+                  <div className="font-medium text-sm">{type.label}</div>
+                  <div className="text-xs text-muted-foreground">{type.description}</div>
+                </div>
+              );
+            })}
+          </div>
+
+          {payload.storageMix.items.length > 0 && (
+            <div className="mt-6 space-y-4">
+              <Separator />
+              <h4 className="font-medium">Storage Details</h4>
+              {payload.storageMix.items.map((item) => (
+                <div key={item.storageType} className="grid grid-cols-4 gap-3 items-end">
+                  <div className="font-medium text-sm">
+                    {STORAGE_TYPES.find((t) => t.value === item.storageType)?.label}
+                  </div>
+                  <div>
+                    <Label className="text-xs">Count</Label>
+                    <Input
+                      type="number"
+                      value={item.count}
+                      onChange={(e) => updateStorageItem(item.storageType, "count", parseInt(e.target.value) || 0)}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Avg Rate ($/mo)</Label>
+                    <Input
+                      type="number"
+                      value={item.avgRate}
+                      onChange={(e) => updateStorageItem(item.storageType, "avgRate", e.target.value)}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Occupancy (%)</Label>
+                    <Input
+                      type="number"
+                      value={item.currentOccupancy}
+                      onChange={(e) => updateStorageItem(item.storageType, "currentOccupancy", e.target.value)}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-medium flex items-center gap-2">
+                <Fuel className="h-4 w-4" />
+                Fuel Dock
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Does this property have a fuel dock?
+              </div>
+            </div>
+            <Switch
+              checked={payload.storageMix.hasFuelDock}
+              onCheckedChange={(checked) => updatePayload("storageMix", { ...payload.storageMix, hasFuelDock: checked })}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            Seasonality
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label>Seasonality Profile</Label>
+            <Select
+              value={payload.seasonality.profile}
+              onValueChange={(v) => updateNestedPayload("seasonality.profile", v)}
+            >
+              <SelectTrigger className="mt-1.5">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SEASONALITY_PROFILES.map((profile) => (
+                  <SelectItem key={profile.value} value={profile.value}>
+                    {profile.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {payload.seasonality.profile !== "YEAR_ROUND" && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Season Start</Label>
+                <Select
+                  value={payload.seasonality.seasonStartMonth}
+                  onValueChange={(v) => updateNestedPayload("seasonality.seasonStartMonth", v)}
+                >
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MONTHS.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Season End</Label>
+                <Select
+                  value={payload.seasonality.seasonEndMonth}
+                  onValueChange={(v) => updateNestedPayload("seasonality.seasonEndMonth", v)}
+                >
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MONTHS.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ============================================
+// PROFIT CENTERS SLIDE
+// ============================================
+
+function ProfitCentersSlide({ payload, updateNestedPayload }: SlideProps) {
+  const profitCenters = [
+    {
+      key: "commercialTenants",
+      label: "Commercial Tenants",
+      icon: Building2,
+      description: "Leasable commercial space",
+      fields: [
+        { key: "numberOfSuites", label: "Number of Suites", type: "number" },
+        { key: "totalSqFt", label: "Total Sq Ft", type: "number" },
+      ],
+    },
+    {
+      key: "fuelSales",
+      label: "Fuel Sales",
+      icon: Fuel,
+      description: "Fuel dock operations",
+      fields: [{ key: "pumpsCount", label: "Number of Pumps", type: "number" }],
+    },
+    {
+      key: "shipStore",
+      label: "Ship Store",
+      icon: ShoppingCart,
+      description: "Retail merchandise",
+      fields: [{ key: "expectedRevenueBaseline", label: "Expected Annual Revenue ($)", type: "number" }],
+    },
+    {
+      key: "serviceDepartment",
+      label: "Service Department",
+      icon: Wrench,
+      description: "Boat repairs & maintenance",
+      fields: [{ key: "numberOfBays", label: "Number of Bays", type: "number" }],
+    },
+    {
+      key: "boatRentals",
+      label: "Boat Rentals",
+      icon: Ship,
+      description: "Charter & rental operations",
+      fields: [{ key: "fleetSize", label: "Fleet Size", type: "number" }],
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-xl font-semibold mb-2">Profit Centers</h3>
+        <p className="text-muted-foreground">
+          Configure ancillary revenue streams for this property.
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        {profitCenters.map((pc) => {
+          const config = payload.profitCenters[pc.key as keyof typeof payload.profitCenters];
+          const Icon = pc.icon;
+
+          return (
+            <Card key={pc.key}>
+              <CardContent className="pt-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-muted rounded-lg">
+                      <Icon className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <div className="font-medium">{pc.label}</div>
+                      <div className="text-sm text-muted-foreground">{pc.description}</div>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={config.enabled}
+                    onCheckedChange={(checked) =>
+                      updateNestedPayload(`profitCenters.${pc.key}.enabled`, checked)
+                    }
+                  />
+                </div>
+
+                {config.enabled && (
+                  <div className="mt-4 pt-4 border-t grid grid-cols-2 gap-4">
+                    {pc.fields.map((field) => (
+                      <div key={field.key}>
+                        <Label className="text-sm">{field.label}</Label>
+                        <Input
+                          type={field.type}
+                          value={(config as any)[field.key] || ""}
+                          onChange={(e) =>
+                            updateNestedPayload(`profitCenters.${pc.key}.${field.key}`, e.target.value)
+                          }
+                          className="mt-1"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+// ============================================
+// FINANCIAL SCOPE SLIDE
+// ============================================
+
+function FinancialScopeSlide({ payload, updateNestedPayload }: SlideProps) {
+  const toggleYear = (year: number) => {
+    const years = payload.financialScope.historicalYears;
+    if (years.includes(year)) {
+      updateNestedPayload("financialScope.historicalYears", years.filter((y) => y !== year));
+    } else {
+      updateNestedPayload("financialScope.historicalYears", [...years, year].sort((a, b) => b - a));
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-xl font-semibold mb-2">Financial Data Scope</h3>
+        <p className="text-muted-foreground">
+          Define the historical financial data you'll be working with.
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Historical P&L Years</CardTitle>
+          <CardDescription>Select years of historical data available</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            {HISTORICAL_YEARS.map((year) => {
+              const isSelected = payload.financialScope.historicalYears.includes(year);
+              return (
+                <Badge
+                  key={year}
+                  variant={isSelected ? "default" : "outline"}
+                  className="cursor-pointer px-4 py-2 transition-colors"
+                  onClick={() => toggleYear(year)}
+                >
+                  {year}
+                </Badge>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="pt-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-medium">Include T12 (Trailing 12 Months)</div>
+              <div className="text-sm text-muted-foreground">
+                Use most recent 12-month period
+              </div>
+            </div>
+            <Switch
+              checked={payload.financialScope.includeT12}
+              onCheckedChange={(checked) => updateNestedPayload("financialScope.includeT12", checked)}
+            />
+          </div>
+
+          <Separator />
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Fiscal Year End Month</Label>
+              <Select
+                value={payload.financialScope.fiscalYearEndMonth}
+                onValueChange={(v) => updateNestedPayload("financialScope.fiscalYearEndMonth", v)}
+              >
+                <SelectTrigger className="mt-1.5">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MONTHS.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Accounting Basis</Label>
+              <Select
+                value={payload.financialScope.accountingBasis}
+                onValueChange={(v) => updateNestedPayload("financialScope.accountingBasis", v)}
+              >
+                <SelectTrigger className="mt-1.5">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CASH">Cash Basis</SelectItem>
+                  <SelectItem value="ACCRUAL">Accrual Basis</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ============================================
+// UNDERWRITING SLIDE
+// ============================================
+
+function UnderwritingSlide({ payload, updateNestedPayload }: SlideProps) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-xl font-semibold mb-2">Underwriting Defaults</h3>
+        <p className="text-muted-foreground">
+          Set your baseline assumptions for the valuation model.
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" />
+            Growth Assumptions
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <Label>Revenue Growth (%)</Label>
+              <Input
+                type="number"
+                step="0.1"
+                value={payload.underwriting.revenueGrowthPercent}
+                onChange={(e) => updateNestedPayload("underwriting.revenueGrowthPercent", e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label>Expense Growth (%)</Label>
+              <Input
+                type="number"
+                step="0.1"
+                value={payload.underwriting.expenseGrowthPercent}
+                onChange={(e) => updateNestedPayload("underwriting.expenseGrowthPercent", e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label>Occupancy Growth (%)</Label>
+              <Input
+                type="number"
+                step="0.1"
+                value={payload.underwriting.occupancyGrowthPercent}
+                onChange={(e) => updateNestedPayload("underwriting.occupancyGrowthPercent", e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label>Target Occupancy (%)</Label>
+              <Input
+                type="number"
+                value={payload.underwriting.targetOccupancy}
+                onChange={(e) => updateNestedPayload("underwriting.targetOccupancy", e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <DollarSign className="h-4 w-4" />
+            Exit Assumptions
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <Label>Exit Cap Rate (%)</Label>
+              <Input
+                type="number"
+                step="0.1"
+                value={payload.underwriting.capRateExit}
+                onChange={(e) => updateNestedPayload("underwriting.capRateExit", e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label>Exit Year</Label>
+              <Input
+                type="number"
+                value={payload.underwriting.exitYear}
+                onChange={(e) => updateNestedPayload("underwriting.exitYear", e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label>Discount Rate (%)</Label>
+              <Input
+                type="number"
+                step="0.1"
+                value={payload.underwriting.discountRate}
+                onChange={(e) => updateNestedPayload("underwriting.discountRate", e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label>Hold Period (yrs)</Label>
+              <Input
+                type="number"
+                value={payload.underwriting.holdPeriodYears}
+                onChange={(e) => updateNestedPayload("underwriting.holdPeriodYears", e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ============================================
+// REVIEW SLIDE
+// ============================================
+
+function ReviewSlide({
+  payload,
+  isCreating,
+  error,
+}: {
+  payload: WizardFormData;
+  isCreating: boolean;
+  error: string | null;
+}) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-xl font-semibold mb-2">Review & Create</h3>
+        <p className="text-muted-foreground">
+          Review your project configuration before creating.
+        </p>
+      </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Project</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-lg font-semibold">{payload.name || "Unnamed Project"}</p>
+            <p className="text-sm text-muted-foreground">
+              {ASSET_TYPES.find((t) => t.value === payload.assetType)?.label}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Location</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-lg font-semibold">
+              {payload.location.city && payload.location.state
+                ? `${payload.location.city}, ${payload.location.state}`
+                : "No location set"}
+            </p>
+            {payload.location.streetAddress && (
+              <p className="text-sm text-muted-foreground">{payload.location.streetAddress}</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Storage Types</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-lg font-semibold">
+              {payload.storageMix.items.length} types configured
+            </p>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {payload.storageMix.items.slice(0, 3).map((item) => (
+                <Badge key={item.storageType} variant="secondary" className="text-xs">
+                  {STORAGE_TYPES.find((t) => t.value === item.storageType)?.label}
+                </Badge>
+              ))}
+              {payload.storageMix.items.length > 3 && (
+                <Badge variant="secondary" className="text-xs">
+                  +{payload.storageMix.items.length - 3} more
+                </Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Profit Centers</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-lg font-semibold">
+              {Object.values(payload.profitCenters).filter((p) => p.enabled).length} enabled
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {isCreating && (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-3 text-muted-foreground">Creating project...</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================
+// SYNC STATUS INDICATOR
+// ============================================
+
+function SyncStatusIndicator({ isSyncing, isOffline }: { isSyncing: boolean; isOffline: boolean }) {
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="flex items-center gap-1.5">
+            {isSyncing ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Saving...</span>
+              </>
+            ) : isOffline ? (
+              <>
+                <CloudOff className="h-3.5 w-3.5 text-amber-500" />
+                <span className="text-xs text-amber-500">Offline</span>
+              </>
+            ) : (
+              <>
+                <Cloud className="h-3.5 w-3.5 text-green-500" />
+                <span className="text-xs text-green-500">Saved</span>
+              </>
+            )}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>
+          {isSyncing ? "Saving your progress..." : isOffline ? "Working offline - saved locally" : "All changes saved"}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+// ============================================
+// MAIN WIZARD COMPONENT
+// ============================================
+
+export default function SetupWizard() {
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const { user } = useAuth();
+
+  // State for project creation
+  const [isCreating, setIsCreating] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Initialize the draft persistence hook
+  const {
+    draft,
+    isLoading: isDraftLoading,
+    isInitialized,
+    isSyncing,
+    isOffline,
+    needsVersionMigration,
+    payload,
+    currentStepId,
+    completedStepIds,
+    initializeDraft,
+    updatePayload,
+    updateNestedPayload,
+    setCurrentStep,
+    markStepComplete,
+    clearDraft,
+    showResumeModal,
+    pendingDraft,
+    resumeDraft,
+    startOver,
+    dismissResumeModal,
+  } = useWizardDraft<WizardFormData>("newProject", {
+    defaultPayload: DEFAULT_FORM_DATA,
+    defaultStepId: "welcome",
+    onRestored: () => {
+      toast({
+        title: "Welcome back!",
+        description: "Your progress has been restored.",
+      });
+    },
+  });
+
+  // Get current step index from step ID
+  const currentStepIndex = useMemo(() => getStepIndex(currentStepId), [currentStepId]);
+
+  // Initialize draft when component mounts (if no existing draft)
+  useEffect(() => {
+    if (isInitialized && !draft && !showResumeModal) {
+      initializeDraft();
+    }
+  }, [isInitialized, draft, showResumeModal, initializeDraft]);
+
+  // Navigation handlers
+  const goToStep = useCallback((stepId: StepId) => {
+    const newIndex = getStepIndex(stepId);
+    if (newIndex > currentStepIndex && currentStepId !== "review") {
+      markStepComplete(currentStepId);
+    }
+    setCurrentStep(stepId);
+  }, [currentStepIndex, currentStepId, markStepComplete, setCurrentStep]);
+
+  const nextStep = useCallback(() => {
+    if (currentStepIndex < WIZARD_STEPS.length - 1) {
+      markStepComplete(currentStepId);
+      goToStep(getStepId(currentStepIndex + 1));
+    }
+  }, [currentStepIndex, currentStepId, markStepComplete, goToStep]);
+
+  const prevStep = useCallback(() => {
+    if (currentStepIndex > 0) {
+      goToStep(getStepId(currentStepIndex - 1));
+    }
+  }, [currentStepIndex, goToStep]);
+
+  // Validation for current step
+  const canProceed = useCallback(() => {
+    switch (currentStepId) {
+      case "welcome":
+        return true;
+      case "deal-details":
+        return !!payload.name && !!payload.assetType;
+      case "storage-mix":
+      case "profit-centers":
+      case "financial-scope":
+      case "underwriting":
+        return true;
+      case "review":
+        return !!payload.name && !!payload.assetType && !isCreating;
+      default:
+        return false;
+    }
+  }, [currentStepId, payload.name, payload.assetType, isCreating]);
+
+  // Handle project creation
+  const createProject = useCallback(async () => {
+    setIsCreating(true);
+    setErrorMessage(null);
+
+    try {
+      const parseNumber = (s: string) => {
+        const n = parseFloat(s);
+        return isNaN(n) ? undefined : n;
+      };
+
+      const input = {
+        name: payload.name,
+        assetType: payload.assetType,
+        projectType: "BOTH",
+        propertyName: payload.propertyName || undefined,
+        location: {
+          streetAddress: payload.location.streetAddress || undefined,
+          city: payload.location.city || undefined,
+          state: payload.location.state || undefined,
+          zipCode: payload.location.zipCode || undefined,
+          country: payload.location.country || undefined,
+        },
+        valuatorInputs: {
+          storageMix: {
+            items: payload.storageMix.items.map((item) => ({
+              storageType: item.storageType,
+              count: item.count,
+              avgRate: parseNumber(item.avgRate),
+              currentOccupancy: parseNumber(item.currentOccupancy),
+            })),
+            hasFuelDock: payload.storageMix.hasFuelDock,
+          },
+          profitCenters: {
+            commercialTenants: {
+              enabled: payload.profitCenters.commercialTenants.enabled,
+              numberOfSuites: parseNumber(payload.profitCenters.commercialTenants.numberOfSuites),
+              totalSqFt: parseNumber(payload.profitCenters.commercialTenants.totalSqFt),
+            },
+            fuelSales: {
+              enabled: payload.profitCenters.fuelSales.enabled,
+              pumpsCount: parseNumber(payload.profitCenters.fuelSales.pumpsCount),
+            },
+            shipStore: {
+              enabled: payload.profitCenters.shipStore.enabled,
+              expectedRevenueBaseline: parseNumber(payload.profitCenters.shipStore.expectedRevenueBaseline),
+            },
+            serviceDepartment: {
+              enabled: payload.profitCenters.serviceDepartment.enabled,
+              numberOfBays: parseNumber(payload.profitCenters.serviceDepartment.numberOfBays),
+            },
+            boatRentals: {
+              enabled: payload.profitCenters.boatRentals.enabled,
+              fleetSize: parseNumber(payload.profitCenters.boatRentals.fleetSize),
+            },
+          },
+          seasonality: {
+            profile: payload.seasonality.profile,
+            seasonStartMonth: parseNumber(payload.seasonality.seasonStartMonth),
+            seasonEndMonth: parseNumber(payload.seasonality.seasonEndMonth),
+          },
+          financialScope: {
+            historicalYears: payload.financialScope.historicalYears,
+            includeT12: payload.financialScope.includeT12,
+            fiscalYearEndMonth: parseInt(payload.financialScope.fiscalYearEndMonth) || 12,
+            accountingBasis: payload.financialScope.accountingBasis,
+          },
+          underwriting: {
+            revenueGrowthPercent: parseNumber(payload.underwriting.revenueGrowthPercent) || 3,
+            expenseGrowthPercent: parseNumber(payload.underwriting.expenseGrowthPercent) || 2.5,
+            occupancyGrowthPercent: parseNumber(payload.underwriting.occupancyGrowthPercent) || 0,
+            targetOccupancy: parseNumber(payload.underwriting.targetOccupancy) || 95,
+            capRateExit: parseNumber(payload.underwriting.capRateExit),
+            exitYear: parseInt(payload.underwriting.exitYear) || 5,
+            discountRate: parseNumber(payload.underwriting.discountRate),
+            holdPeriodYears: parseInt(payload.underwriting.holdPeriodYears) || 5,
+          },
+          acquisition: {
+            targetClosingDate: payload.acquisition.targetClosingDate || undefined,
+            purchasePrice: parseNumber(payload.acquisition.purchasePrice),
+            closingCostsDollar: parseNumber(payload.acquisition.closingCostsDollar),
+            closingCostsPercent: parseNumber(payload.acquisition.closingCostsPercent),
+            ltv: parseNumber(payload.acquisition.ltv),
+          },
+          loanTerms: {
+            interestRate: parseNumber(payload.loanTerms.interestRate),
+            amortizationYears: parseInt(payload.loanTerms.amortizationYears) || undefined,
+            termYears: parseInt(payload.loanTerms.termYears) || undefined,
+            ioMonths: parseInt(payload.loanTerms.ioMonths) || undefined,
+          },
+        },
+      };
+
+      const response = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(input),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error?.message || "Failed to create project");
+      }
+
+      // Clear draft on success
+      await onWizardSubmitSuccess("newProject", user?.id || null);
+      await clearDraft();
+
+      toast({
+        title: "Project created!",
+        description: `${payload.name} has been created successfully.`,
+      });
+
+      // Redirect to the new project
+      if (result.project?.id) {
+        setLocation(`/modeling/projects/${result.project.id}`);
+      } else {
+        setLocation("/modeling/projects");
+      }
+    } catch (error: any) {
+      console.error("[SETUP_WIZARD] Creation error:", error);
+      setErrorMessage(error.message || "Failed to create project");
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create project",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreating(false);
+    }
+  }, [payload, user?.id, clearDraft, toast, setLocation]);
+
+  // Handle next/submit
+  const handleNext = useCallback(async () => {
+    if (currentStepId === "review") {
+      await createProject();
+    } else {
+      nextStep();
+    }
+  }, [currentStepId, createProject, nextStep]);
+
+  // Progress percentage
+  const progress = ((currentStepIndex + 1) / WIZARD_STEPS.length) * 100;
+
+  // Loading state
+  if (isDraftLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Loading wizard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Resume Modal */}
+      <ResumeDraftModal
+        open={showResumeModal}
+        draft={pendingDraft}
+        needsVersionMigration={needsVersionMigration}
+        stepLabels={STEP_LABELS}
+        onResume={resumeDraft}
+        onStartOver={startOver}
+        onDismiss={() => {
+          dismissResumeModal();
+          if (!draft) initializeDraft();
+        }}
+      />
+
+      {/* Header */}
+      <div className="border-b bg-card">
+        <div className="max-w-3xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-4">
+              <h1 className="text-xl font-semibold">Setup Wizard</h1>
+              <SyncStatusIndicator isSyncing={isSyncing} isOffline={isOffline} />
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-muted-foreground">
+                Step {currentStepIndex + 1} of {WIZARD_STEPS.length}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={startOver}
+                disabled={isCreating}
+                className="text-muted-foreground"
+              >
+                <RotateCcw className="h-4 w-4 mr-1" />
+                Start Over
+              </Button>
+            </div>
+          </div>
+          <Progress value={progress} className="h-2" />
+
+          {/* Step indicators */}
+          <div className="hidden md:flex justify-between mt-4">
+            {WIZARD_STEPS.map((step, i) => {
+              const isCompleted = completedStepIds.includes(step.id);
+              const isCurrent = i === currentStepIndex;
+              const isClickable = i < currentStepIndex;
+
+              return (
+                <div
+                  key={step.id}
+                  className={cn(
+                    "flex items-center gap-2 text-xs transition-colors",
+                    isClickable && "cursor-pointer hover:text-primary",
+                    i <= currentStepIndex ? "text-primary" : "text-muted-foreground"
+                  )}
+                  onClick={() => isClickable && goToStep(step.id)}
+                >
+                  <div
+                    className={cn(
+                      "w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium transition-colors",
+                      isCompleted
+                        ? "bg-primary text-primary-foreground"
+                        : isCurrent
+                        ? "bg-primary/20 text-primary border border-primary"
+                        : "bg-muted text-muted-foreground"
+                    )}
+                  >
+                    {isCompleted ? <Check className="h-3 w-3" /> : i + 1}
+                  </div>
+                  <span className="hidden lg:inline">{step.title}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="max-w-3xl mx-auto px-4 py-8 pb-32">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentStepId}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2 }}
+          >
+            {currentStepId === "welcome" && <WelcomeSlide />}
+            {currentStepId === "deal-details" && (
+              <DealDetailsSlide
+                payload={payload}
+                updatePayload={updatePayload}
+                updateNestedPayload={updateNestedPayload}
+              />
+            )}
+            {currentStepId === "storage-mix" && (
+              <StorageMixSlide
+                payload={payload}
+                updatePayload={updatePayload}
+                updateNestedPayload={updateNestedPayload}
+              />
+            )}
+            {currentStepId === "profit-centers" && (
+              <ProfitCentersSlide
+                payload={payload}
+                updatePayload={updatePayload}
+                updateNestedPayload={updateNestedPayload}
+              />
+            )}
+            {currentStepId === "financial-scope" && (
+              <FinancialScopeSlide
+                payload={payload}
+                updatePayload={updatePayload}
+                updateNestedPayload={updateNestedPayload}
+              />
+            )}
+            {currentStepId === "underwriting" && (
+              <UnderwritingSlide
+                payload={payload}
+                updatePayload={updatePayload}
+                updateNestedPayload={updateNestedPayload}
+              />
+            )}
+            {currentStepId === "review" && (
+              <ReviewSlide
+                payload={payload}
+                isCreating={isCreating}
+                error={errorMessage}
+              />
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* Footer */}
+      <div className="fixed bottom-0 left-0 right-0 border-t bg-card">
+        <div className="max-w-3xl mx-auto px-4 py-4 flex justify-between">
+          <Button
+            variant="ghost"
+            onClick={prevStep}
+            disabled={currentStepIndex === 0 || isCreating}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <Button
+            onClick={handleNext}
+            disabled={!canProceed()}
+          >
+            {isCreating ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Creating...
+              </>
+            ) : currentStepId === "review" ? (
+              <>
+                <Check className="h-4 w-4 mr-2" />
+                Create Project
+              </>
+            ) : (
+              <>
+                Next
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

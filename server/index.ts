@@ -20,6 +20,7 @@ import { tenantContextMiddleware } from "./middleware/tenant-context";
 import { logger } from "./lib/logger";
 import settingsRoutes from './routes/settings-routes';
 import leasesRouter from './routes/leases';
+import wizardDraftsRouter from './routes/wizard-drafts';
 
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
@@ -95,6 +96,7 @@ app.get("/health/db", (req: Request, res: Response) => {
     // Then add after auth routes:
     app.use('/api/settings', settingsRoutes);
     app.use('/api/valuator/:projectId/leases', leasesRouter);
+    app.use('/api/wizard-drafts', wizardDraftsRouter);
 
     // Initialize DockTalk storage and register routes
     const dockTalkStorage = new DockTalkStorage();
