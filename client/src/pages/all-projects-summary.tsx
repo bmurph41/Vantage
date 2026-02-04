@@ -17,7 +17,8 @@ import {
   Building2,
   AlertCircle,
   Info,
-  Plus
+  Plus,
+  X
 } from "lucide-react";
 import { CreateProjectDialog } from "@/components/create-project-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -26,7 +27,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Project, DDTask } from "@shared/schema";
+
+type ModalType = "deadlines" | "overdue" | "projects" | "progress" | "actions" | "investment" | null;
 
 interface ProjectSummary {
   project: Project;
@@ -43,6 +48,8 @@ interface ProjectSummary {
 }
 
 export default function AllProjectsSummaryPage() {
+  const [activeModal, setActiveModal] = useState<ModalType>(null);
+  
   // Fetch all projects
   const { data: projects = [], isLoading: projectsLoading } = useQuery<Project[]>({
     queryKey: ["/api/dd/projects"],
@@ -158,6 +165,55 @@ export default function AllProjectsSummaryPage() {
     };
   }, [projectSummaries]);
 
+  // Computed data for modals
+  const modalData = useMemo(() => {
+    const now = tzNow();
+    
+    // Upcoming deadlines (within 7 days)
+    const upcomingTasks: Array<{ task: DDTask; project: Project; daysUntil: number }> = [];
+    projectSummaries.forEach(ps => {
+      ps.tasks.forEach(t => {
+        if (t.status === 'completed' || !t.deadline) return;
+        const deadline = parseISO(t.deadline);
+        const daysUntil = differenceInCalendarDays(deadline, now);
+        if (daysUntil >= 0 && daysUntil <= 7) {
+          upcomingTasks.push({ task: t, project: ps.project, daysUntil });
+        }
+      });
+    });
+    upcomingTasks.sort((a, b) => a.daysUntil - b.daysUntil);
+
+    // Overdue tasks
+    const overdueTasks: Array<{ task: DDTask; project: Project; daysOverdue: number }> = [];
+    projectSummaries.forEach(ps => {
+      ps.tasks.forEach(t => {
+        if (t.status === 'completed' || !t.deadline) return;
+        const deadline = parseISO(t.deadline);
+        const daysOverdue = differenceInCalendarDays(now, deadline);
+        if (daysOverdue > 0) {
+          overdueTasks.push({ task: t, project: ps.project, daysOverdue });
+        }
+      });
+    });
+    overdueTasks.sort((a, b) => b.daysOverdue - a.daysOverdue);
+
+    // Investment by project
+    const investmentByProject = projectSummaries.map(ps => ({
+      project: ps.project,
+      totalCost: ps.totalCost,
+      paidCost: ps.paidCost,
+      tasks: ps.tasks.filter(t => {
+        const cost = parseFloat(t.cost?.replace(/[^0-9.-]/g, '') || '0');
+        return !isNaN(cost) && cost > 0;
+      }).map(t => ({
+        ...t,
+        parsedCost: parseFloat(t.cost?.replace(/[^0-9.-]/g, '') || '0'),
+      })),
+    })).filter(p => p.totalCost > 0);
+
+    return { upcomingTasks, overdueTasks, investmentByProject };
+  }, [projectSummaries]);
+
   const handlePrint = () => {
     window.print();
   };
@@ -204,7 +260,10 @@ export default function AllProjectsSummaryPage() {
         {/* Hostaway-Style Today's Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           {/* Upcoming Tasks */}
-          <Card className="border-l-4 border-l-amber-500">
+          <Card 
+            className="border-l-4 border-l-amber-500 cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => setActiveModal("deadlines")}
+          >
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -232,7 +291,10 @@ export default function AllProjectsSummaryPage() {
           </Card>
 
           {/* Overdue Tasks */}
-          <Card className="border-l-4 border-l-red-500">
+          <Card 
+            className="border-l-4 border-l-red-500 cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => setActiveModal("overdue")}
+          >
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -264,7 +326,10 @@ export default function AllProjectsSummaryPage() {
 
         {/* Overall Statistics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="border-l-4 border-l-blue-500">
+          <Card 
+            className="border-l-4 border-l-blue-500 cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => setActiveModal("projects")}
+          >
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-600">Total Projects</CardTitle>
             </CardHeader>
@@ -281,7 +346,10 @@ export default function AllProjectsSummaryPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-green-500">
+          <Card 
+            className="border-l-4 border-l-green-500 cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => setActiveModal("progress")}
+          >
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-600">Overall Progress</CardTitle>
             </CardHeader>
@@ -299,7 +367,10 @@ export default function AllProjectsSummaryPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-purple-500">
+          <Card 
+            className="border-l-4 border-l-purple-500 cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => setActiveModal("actions")}
+          >
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-600">Action Items</CardTitle>
             </CardHeader>
@@ -323,7 +394,10 @@ export default function AllProjectsSummaryPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-emerald-500">
+          <Card 
+            className="border-l-4 border-l-emerald-500 cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => setActiveModal("investment")}
+          >
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-gray-600">Total Investment</CardTitle>
             </CardHeader>
@@ -524,6 +598,332 @@ export default function AllProjectsSummaryPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Modal Dialogs */}
+      {/* Upcoming Deadlines Modal */}
+      <Dialog open={activeModal === "deadlines"} onOpenChange={(open) => !open && setActiveModal(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-amber-500" />
+              Upcoming Deadlines (Next 7 Days)
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            {modalData.upcomingTasks.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground">
+                <Calendar className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                <p>No upcoming deadlines in the next 7 days</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {modalData.upcomingTasks.map(({ task, project, daysUntil }) => (
+                  <Link key={task.id} href={`/dd/projects/${project.id}`}>
+                    <div className="border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900">{task.name}</p>
+                          <p className="text-sm text-muted-foreground">{project.name}</p>
+                        </div>
+                        <div className="text-right">
+                          <Badge variant={daysUntil === 0 ? "destructive" : daysUntil <= 2 ? "warning" : "outline"}>
+                            {daysUntil === 0 ? "Today" : daysUntil === 1 ? "Tomorrow" : `${daysUntil} days`}
+                          </Badge>
+                          {task.deadline && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {format(parseISO(task.deadline), 'MMM dd, yyyy')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Overdue Tasks Modal */}
+      <Dialog open={activeModal === "overdue"} onOpenChange={(open) => !open && setActiveModal(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              Overdue Tasks
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            {modalData.overdueTasks.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground">
+                <CheckCircle className="h-12 w-12 mx-auto mb-3 text-green-300" />
+                <p>No overdue tasks - great job!</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {modalData.overdueTasks.map(({ task, project, daysOverdue }) => (
+                  <Link key={task.id} href={`/dd/projects/${project.id}`}>
+                    <div className="border border-red-200 bg-red-50 rounded-lg p-4 hover:bg-red-100 transition-colors cursor-pointer">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900">{task.name}</p>
+                          <p className="text-sm text-muted-foreground">{project.name}</p>
+                        </div>
+                        <div className="text-right">
+                          <Badge variant="destructive">
+                            {daysOverdue} day{daysOverdue !== 1 ? 's' : ''} overdue
+                          </Badge>
+                          {task.deadline && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Due: {format(parseISO(task.deadline), 'MMM dd, yyyy')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Projects List Modal */}
+      <Dialog open={activeModal === "projects"} onOpenChange={(open) => !open && setActiveModal(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-blue-500" />
+              All Projects ({overallStats.totalProjects})
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            {projectSummaries.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground">
+                <Building2 className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                <p>No projects found</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {projectSummaries.map((summary) => (
+                  <Link key={summary.project.id} href={`/dd/projects/${summary.project.id}`}>
+                    <div className="border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-gray-900">{summary.project.name}</p>
+                            {summary.project.status === 'accepted' ? (
+                              <Badge className="bg-green-100 text-green-800">Completed</Badge>
+                            ) : (
+                              <Badge variant="outline">Active</Badge>
+                            )}
+                          </div>
+                          {(summary.project.city || summary.project.state) && (
+                            <p className="text-sm text-muted-foreground">
+                              {[summary.project.city, summary.project.state].filter(Boolean).join(', ')}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-medium">{Math.round(summary.completionPct)}% complete</p>
+                          <p className="text-xs text-muted-foreground">
+                            {summary.completedTasks}/{summary.totalTasks} tasks
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Progress Breakdown Modal */}
+      <Dialog open={activeModal === "progress"} onOpenChange={(open) => !open && setActiveModal(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-green-500" />
+              Progress Breakdown by Project
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            {projectSummaries.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground">
+                <Target className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                <p>No projects to show progress for</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {projectSummaries.map((summary) => (
+                  <Link key={summary.project.id} href={`/dd/projects/${summary.project.id}`}>
+                    <div className="border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="font-medium text-gray-900">{summary.project.name}</p>
+                        <span className="text-sm font-bold text-gray-900">
+                          {Math.round(summary.completionPct)}%
+                        </span>
+                      </div>
+                      <Progress value={summary.completionPct} className="h-2 mb-2" />
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>{summary.completedTasks} completed</span>
+                        <span>{summary.totalTasks - summary.completedTasks} remaining</span>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Action Items Modal */}
+      <Dialog open={activeModal === "actions"} onOpenChange={(open) => !open && setActiveModal(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-purple-500" />
+              Action Items Summary
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            <div className="space-y-6">
+              {/* Overdue Section */}
+              <div>
+                <h3 className="font-medium text-red-600 flex items-center gap-2 mb-3">
+                  <AlertTriangle className="h-4 w-4" />
+                  Overdue ({modalData.overdueTasks.length})
+                </h3>
+                {modalData.overdueTasks.length === 0 ? (
+                  <p className="text-sm text-muted-foreground pl-6">No overdue tasks</p>
+                ) : (
+                  <div className="space-y-2 pl-6">
+                    {modalData.overdueTasks.slice(0, 5).map(({ task, project, daysOverdue }) => (
+                      <Link key={task.id} href={`/dd/projects/${project.id}`}>
+                        <div className="flex items-center justify-between p-2 border border-red-200 rounded bg-red-50 hover:bg-red-100 cursor-pointer">
+                          <div>
+                            <p className="text-sm font-medium">{task.name}</p>
+                            <p className="text-xs text-muted-foreground">{project.name}</p>
+                          </div>
+                          <Badge variant="destructive" className="text-xs">
+                            {daysOverdue}d overdue
+                          </Badge>
+                        </div>
+                      </Link>
+                    ))}
+                    {modalData.overdueTasks.length > 5 && (
+                      <p className="text-xs text-muted-foreground">+{modalData.overdueTasks.length - 5} more</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Upcoming Section */}
+              <div>
+                <h3 className="font-medium text-amber-600 flex items-center gap-2 mb-3">
+                  <Clock className="h-4 w-4" />
+                  Upcoming (7 days) ({modalData.upcomingTasks.length})
+                </h3>
+                {modalData.upcomingTasks.length === 0 ? (
+                  <p className="text-sm text-muted-foreground pl-6">No upcoming deadlines</p>
+                ) : (
+                  <div className="space-y-2 pl-6">
+                    {modalData.upcomingTasks.slice(0, 5).map(({ task, project, daysUntil }) => (
+                      <Link key={task.id} href={`/dd/projects/${project.id}`}>
+                        <div className="flex items-center justify-between p-2 border border-amber-200 rounded bg-amber-50 hover:bg-amber-100 cursor-pointer">
+                          <div>
+                            <p className="text-sm font-medium">{task.name}</p>
+                            <p className="text-xs text-muted-foreground">{project.name}</p>
+                          </div>
+                          <Badge variant="outline" className="text-xs bg-amber-100 text-amber-700">
+                            {daysUntil === 0 ? "Today" : `${daysUntil}d`}
+                          </Badge>
+                        </div>
+                      </Link>
+                    ))}
+                    {modalData.upcomingTasks.length > 5 && (
+                      <p className="text-xs text-muted-foreground">+{modalData.upcomingTasks.length - 5} more</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Investment Breakdown Modal */}
+      <Dialog open={activeModal === "investment"} onOpenChange={(open) => !open && setActiveModal(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-emerald-500" />
+              Investment Breakdown
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm text-emerald-700">Total Investment</p>
+                  <p className="text-2xl font-bold text-emerald-900">{formatLargeCurrency(overallStats.totalInvestment)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-emerald-700">Paid</p>
+                  <p className="text-lg font-medium text-emerald-900">
+                    {formatLargeCurrency(overallStats.totalPaid)} ({Math.round((overallStats.totalPaid / (overallStats.totalInvestment || 1)) * 100)}%)
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {modalData.investmentByProject.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground">
+                <DollarSign className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                <p>No costs tracked yet</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {modalData.investmentByProject.map(({ project, totalCost, paidCost, tasks }) => (
+                  <div key={project.id} className="border rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <Link href={`/dd/projects/${project.id}`}>
+                        <p className="font-medium text-gray-900 hover:text-blue-600 cursor-pointer">{project.name}</p>
+                      </Link>
+                      <div className="text-right">
+                        <p className="font-bold text-gray-900">{formatLargeCurrency(totalCost)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatLargeCurrency(paidCost)} paid
+                        </p>
+                      </div>
+                    </div>
+                    {tasks.length > 0 && (
+                      <div className="pl-4 border-l-2 border-gray-200 space-y-1">
+                        {tasks.slice(0, 3).map(t => (
+                          <div key={t.id} className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">{t.name}</span>
+                            <span className="font-medium">{formatLargeCurrency(t.parsedCost)}</span>
+                          </div>
+                        ))}
+                        {tasks.length > 3 && (
+                          <p className="text-xs text-muted-foreground">+{tasks.length - 3} more items</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
