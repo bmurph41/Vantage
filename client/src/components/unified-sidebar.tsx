@@ -19,6 +19,7 @@ const crmNav = [
   { name: "Contacts", href: "/crm/contacts", icon: Users },
   { name: "Companies", href: "/crm/companies", icon: Building },
   { name: "Properties", href: "/crm/properties", icon: Home },
+  { name: "Marketing", href: "/marketing", icon: Send },
 ];
 
 // Pipeline Navigation (Deal flow, marketing, analytics)
@@ -236,8 +237,8 @@ export default function UnifiedSidebar() {
   useEffect(() => {
     // Determine which section the current page belongs to
     const isOperationsPage = location.startsWith('/operations/');
-    // CRM: contacts, companies, properties (core entity management)
-    const isCrmPage = ['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location);
+    // CRM: contacts, companies, properties, marketing (core entity management)
+    const isCrmPage = ['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location) || location.startsWith('/marketing');
     const isPendingPage = location.includes('/pending-');
     // Pipeline section: Deal Board, Activity Log, Follow-Ups, Forecast
     const isPipelinePage = ['/deal-workspace', '/crm/activity', '/crm/tasks', '/crm/forecast'].includes(location) || location.startsWith('/deal-workspace');
@@ -578,7 +579,7 @@ export default function UnifiedSidebar() {
               title="CRM" 
               expanded={crmExpanded} 
               onToggle={() => setCrmExpanded(!crmExpanded)}
-              isActive={['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location)}
+              isActive={['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location) || location.startsWith('/marketing')}
             />
             {crmExpanded && (
               <>
@@ -653,26 +654,6 @@ export default function UnifiedSidebar() {
                 <NavLink item={{ name: "Workroom", href: "/prospecting/workroom", icon: Target }} />
               </>
             )}
-          </div>
-        )}
-        
-        {/* Marketing - Standalone Section */}
-        {canViewSection('crm') && (
-          <div className="mb-2">
-            <Link href="/marketing">
-              <div 
-                className={cn(
-                  "flex items-center px-4 py-2.5 text-sm font-medium transition-colors rounded-md mx-2",
-                  location.startsWith('/marketing')
-                    ? "bg-primary/10 text-primary"
-                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent"
-                )}
-                data-testid="nav-marketing"
-              >
-                <Send className="w-4 h-4 mr-3 flex-shrink-0" />
-                <span className="truncate">Marketing</span>
-              </div>
-            </Link>
           </div>
         )}
         
