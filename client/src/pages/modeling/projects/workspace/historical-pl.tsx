@@ -237,6 +237,11 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
     }).format(value);
   };
 
+  const formatPercent = (value: number | null | undefined) => {
+    if (value === null || value === undefined || !isFinite(value)) return '-';
+    return `${Math.round(value)}%`;
+  };
+
   const isSeasonalMonth = (monthIndex: number) => seasonMonths.includes(monthIndex + 1);
 
   const emptyData: PLLineItem[] = [];
@@ -636,7 +641,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-64 sticky left-0 bg-background">Category / Line Item</TableHead>
+                    <TableHead className="w-64 min-w-[16rem] sticky left-0 z-20 bg-background border-r">Category / Line Item</TableHead>
                     {months.map((month, idx) => (
                       <TableHead 
                         key={month} 
@@ -655,7 +660,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                         className="bg-muted/50 cursor-pointer hover:bg-muted"
                         onClick={() => toggleCategory(category)}
                       >
-                        <TableCell className="font-semibold sticky left-0 bg-muted/50">
+                        <TableCell className="font-semibold sticky left-0 z-10 bg-muted/50 border-r">
                           <div className="flex items-center gap-2">
                             {expandedCategories.has(category) ? (
                               <ChevronDown className="h-4 w-4" />
@@ -695,7 +700,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                         const SourceIcon = item.dataSource ? dataSourceIcons[item.dataSource] : null;
                         return (
                           <TableRow key={item.id} className="text-sm">
-                            <TableCell className="pl-10 sticky left-0 bg-background">
+                            <TableCell className="pl-10 sticky left-0 z-10 bg-background border-r">
                               <div className="flex items-center gap-2">
                                 {SourceIcon && (
                                   <SourceIcon className="h-3 w-3 text-muted-foreground" />
@@ -724,7 +729,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   ))}
 
                   <TableRow className="bg-muted font-bold border-t-2">
-                    <TableCell className="sticky left-0 bg-muted">Gross Profit</TableCell>
+                    <TableCell className="sticky left-0 z-10 bg-muted border-r">Gross Profit</TableCell>
                     {months.map((month, idx) => {
                       const revenue = getCategoryTotal('Revenue', month);
                       const cogs = getCategoryTotal('COGS', month);
@@ -740,8 +745,29 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                     <TableCell className="text-right">{formatCurrency(grossProfit)}</TableCell>
                   </TableRow>
 
+                  <TableRow className="bg-muted/30">
+                    <TableCell className="sticky left-0 z-10 bg-muted/30 border-r text-sm text-muted-foreground">Gross Profit Margin</TableCell>
+                    {months.map((month, idx) => {
+                      const revenue = getCategoryTotal('Revenue', month);
+                      const cogs = getCategoryTotal('COGS', month);
+                      const gp = revenue - cogs;
+                      const margin = revenue !== 0 ? (gp / revenue) * 100 : null;
+                      return (
+                        <TableCell 
+                          key={month} 
+                          className={`text-right text-sm text-muted-foreground ${!isSeasonalMonth(idx) ? 'bg-muted/20' : ''}`}
+                        >
+                          {formatPercent(margin)}
+                        </TableCell>
+                      );
+                    })}
+                    <TableCell className="text-right text-sm text-muted-foreground">
+                      {formatPercent(totalRevenue !== 0 ? (grossProfit / totalRevenue) * 100 : null)}
+                    </TableCell>
+                  </TableRow>
+
                   <TableRow className="bg-primary/10 font-bold">
-                    <TableCell className="sticky left-0 bg-primary/10">Net Operating Income</TableCell>
+                    <TableCell className="sticky left-0 z-10 bg-primary/10 border-r">{config?.bottomLineMetric === 'ebitda' ? 'EBITDA' : 'NOI'}</TableCell>
                     {months.map((month, idx) => {
                       const revenue = getCategoryTotal('Revenue', month);
                       const cogs = getCategoryTotal('COGS', month);
@@ -760,13 +786,35 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                       {formatCurrency(netIncome)}
                     </TableCell>
                   </TableRow>
+
+                  <TableRow className="bg-primary/5">
+                    <TableCell className="sticky left-0 z-10 bg-primary/5 border-r text-sm text-muted-foreground">Operating Margin</TableCell>
+                    {months.map((month, idx) => {
+                      const revenue = getCategoryTotal('Revenue', month);
+                      const cogs = getCategoryTotal('COGS', month);
+                      const expenses = getCategoryTotal('Expenses', month);
+                      const noi = revenue - cogs - expenses;
+                      const margin = revenue !== 0 ? (noi / revenue) * 100 : null;
+                      return (
+                        <TableCell 
+                          key={month} 
+                          className={`text-right text-sm ${margin !== null && margin >= 0 ? 'text-green-600' : 'text-red-600'} ${!isSeasonalMonth(idx) ? 'opacity-60' : ''}`}
+                        >
+                          {formatPercent(margin)}
+                        </TableCell>
+                      );
+                    })}
+                    <TableCell className={`text-right text-sm ${netIncome >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {formatPercent(totalRevenue !== 0 ? (netIncome / totalRevenue) * 100 : null)}
+                    </TableCell>
+                  </TableRow>
                 </TableBody>
               </Table>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-64 sticky left-0 bg-background">Category / Line Item</TableHead>
+                    <TableHead className="w-64 min-w-[16rem] sticky left-0 z-20 bg-background border-r">Category / Line Item</TableHead>
                     {yearRange.map((year) => (
                       <TableHead key={year} className="text-right w-28 font-bold">
                         {year}
@@ -781,7 +829,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                         className="bg-muted/50 cursor-pointer hover:bg-muted"
                         onClick={() => toggleCategory(category)}
                       >
-                        <TableCell className="font-semibold sticky left-0 bg-muted/50">
+                        <TableCell className="font-semibold sticky left-0 z-10 bg-muted/50 border-r">
                           <div className="flex items-center gap-2">
                             {expandedCategories.has(category) ? (
                               <ChevronDown className="h-4 w-4" />
@@ -807,7 +855,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
 
                       {expandedCategories.has(category) && annualSubcategories[category as keyof typeof annualSubcategories]?.map((subcategory) => (
                         <TableRow key={`${category}-${subcategory}`} className="text-sm">
-                          <TableCell className="pl-10 sticky left-0 bg-background">
+                          <TableCell className="pl-10 sticky left-0 z-10 bg-background border-r">
                             <span>{subcategory}</span>
                           </TableCell>
                           {yearRange.map((year) => {
@@ -828,7 +876,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   ))}
 
                   <TableRow className="bg-muted font-bold border-t-2">
-                    <TableCell className="sticky left-0 bg-muted">Gross Profit</TableCell>
+                    <TableCell className="sticky left-0 z-10 bg-muted border-r">Gross Profit</TableCell>
                     {yearRange.map((year) => {
                       const revenue = getAnnualCategoryTotal('Revenue', year);
                       const cogs = getAnnualCategoryTotal('COGS', year);
@@ -844,8 +892,27 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                     })}
                   </TableRow>
 
+                  <TableRow className="bg-muted/30">
+                    <TableCell className="sticky left-0 z-10 bg-muted/30 border-r text-sm text-muted-foreground">Gross Profit Margin</TableCell>
+                    {yearRange.map((year) => {
+                      const revenue = getAnnualCategoryTotal('Revenue', year);
+                      const cogs = getAnnualCategoryTotal('COGS', year);
+                      const gp = revenue - cogs;
+                      const margin = revenue !== 0 ? (gp / revenue) * 100 : null;
+                      const hasData = availableYears.includes(String(year));
+                      return (
+                        <TableCell 
+                          key={year} 
+                          className={`text-right text-sm text-muted-foreground ${!hasData ? 'opacity-50' : ''}`}
+                        >
+                          {hasData ? formatPercent(margin) : '-'}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+
                   <TableRow className="bg-primary/10 font-bold">
-                    <TableCell className="sticky left-0 bg-primary/10">Net Operating Income</TableCell>
+                    <TableCell className="sticky left-0 z-10 bg-primary/10 border-r">{config?.bottomLineMetric === 'ebitda' ? 'EBITDA' : 'NOI'}</TableCell>
                     {yearRange.map((year) => {
                       const revenue = getAnnualCategoryTotal('Revenue', year);
                       const cogs = getAnnualCategoryTotal('COGS', year);
@@ -858,6 +925,26 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           className={`text-right ${!hasData ? 'text-muted-foreground/50' : noi >= 0 ? 'text-green-600' : 'text-red-600'}`}
                         >
                           {hasData ? formatCurrency(noi) : '-'}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+
+                  <TableRow className="bg-primary/5">
+                    <TableCell className="sticky left-0 z-10 bg-primary/5 border-r text-sm text-muted-foreground">Operating Margin</TableCell>
+                    {yearRange.map((year) => {
+                      const revenue = getAnnualCategoryTotal('Revenue', year);
+                      const cogs = getAnnualCategoryTotal('COGS', year);
+                      const expenses = getAnnualCategoryTotal('Expenses', year);
+                      const noi = revenue - cogs - expenses;
+                      const margin = revenue !== 0 ? (noi / revenue) * 100 : null;
+                      const hasData = availableYears.includes(String(year));
+                      return (
+                        <TableCell 
+                          key={year} 
+                          className={`text-right text-sm ${!hasData ? 'opacity-50' : margin !== null && margin >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                        >
+                          {hasData ? formatPercent(margin) : '-'}
                         </TableCell>
                       );
                     })}
