@@ -1725,35 +1725,51 @@ Respond with JSON only:
     console.log('[DocIntel Import] Loaded', allCategories.length, 'categories for org:', orgId);
 
     const importedActuals: ModelingActuals[] = [];
-    let skippedNoCategory = 0;
-    let skippedCategoryNotFound = 0;
+    let skippedNoTier = 0;
+
+    // Tier mapping for both category.categoryType and item.categoryTierConfirmed
+    const tierMapping: Record<string, string> = {
+      'revenue': 'Revenue',
+      'cogs': 'COGS',
+      'cost_of_goods_sold': 'COGS',
+      'expenses': 'Expenses',
+      'expense': 'Expenses',
+      'opex': 'Expenses',
+      'operating_expenses': 'Expenses',
+      'payroll': 'Expenses'
+    };
 
     for (const item of items) {
-      if (!item.categoryConfirmed) {
-        skippedNoCategory++;
+      let plCategory: string | null = null;
+      let subcategory: string = 'Uncategorized';
+
+      // First try to use categoryConfirmed with full category lookup
+      if (item.categoryConfirmed) {
+        const category = categoryMap.get(item.categoryConfirmed);
+        if (category) {
+          const mappedTier = tierMapping[category.categoryType?.toLowerCase() || ''];
+          if (mappedTier) {
+            plCategory = mappedTier;
+            subcategory = category.name || 'Uncategorized';
+          }
+        }
+      }
+      
+      // If no category or category lookup failed, try tier confirmation
+      if (!plCategory && item.categoryTierConfirmed) {
+        const mappedTier = tierMapping[item.categoryTierConfirmed.toLowerCase()];
+        if (mappedTier) {
+          plCategory = mappedTier;
+          subcategory = item.rawText?.substring(0, 100) || 'Uncategorized';
+        }
+      }
+      
+      // If we still don't have a valid tier, skip this item
+      if (!plCategory) {
+        console.log('[DocIntel Import] Skipping item with no valid tier:', item.id, item.rawText?.substring(0, 50));
+        skippedNoTier++;
         continue;
       }
-
-      // Look up category details
-      const category = categoryMap.get(item.categoryConfirmed);
-      if (!category) {
-        console.log('[DocIntel Import] Category not found for ID:', item.categoryConfirmed);
-        skippedCategoryNotFound++;
-        continue;
-      }
-
-      // Determine the P&L tier (Revenue, COGS, Expenses) from category categoryType
-      const tierMapping: Record<string, string> = {
-        'revenue': 'Revenue',
-        'cogs': 'COGS',
-        'cost_of_goods_sold': 'COGS',
-        'expenses': 'Expenses',
-        'expense': 'Expenses',
-        'opex': 'Expenses',
-        'operating_expenses': 'Expenses',
-        'payroll': 'Expenses'
-      };
-      const plCategory = tierMapping[category.categoryType?.toLowerCase() || ''] || 'Expenses';
 
       // Parse periodKey (YYYY-MM) or use fiscalYear
       let year = fiscalYear || new Date().getFullYear();
@@ -1784,7 +1800,7 @@ Respond with JSON only:
           year,
           month,
           category: plCategory,
-          subcategory: category.name || 'Uncategorized',
+          subcategory: subcategory,
           lineItemDescription: item.rawText,
           amount: String(amount),
           dataSource: 'doc_intel',
@@ -1822,8 +1838,7 @@ Respond with JSON only:
     }
 
     console.log('[DocIntel Import] Summary - imported:', importedActuals.length, 
-      'skippedNoCategory:', skippedNoCategory, 
-      'skippedCategoryNotFound:', skippedCategoryNotFound);
+      'skippedNoTier:', skippedNoTier);
 
     await this.updateUpload(orgId, uploadId, {
       status: 'completed',
