@@ -19,7 +19,7 @@ export default function DockTalkTabs({ activeTab }: DockTalkTabsProps) {
         <Link href="/docktalk">
           <TabsTrigger 
             value="all-articles" 
-            className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent px-6 py-3"
+            className="flex items-center gap-2 rounded-none border-b-2 border-transparent text-muted-foreground data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent px-6 py-3"
             data-testid="tab-all-articles"
           >
             <Newspaper className="w-4 h-4" />
@@ -29,7 +29,7 @@ export default function DockTalkTabs({ activeTab }: DockTalkTabsProps) {
         <Link href="/docktalk/market-intelligence">
           <TabsTrigger 
             value="market-intelligence" 
-            className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent px-6 py-3"
+            className="flex items-center gap-2 rounded-none border-b-2 border-transparent text-muted-foreground data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent px-6 py-3"
             data-testid="tab-market-intelligence"
           >
             <BarChart3 className="w-4 h-4" />
@@ -39,7 +39,7 @@ export default function DockTalkTabs({ activeTab }: DockTalkTabsProps) {
         <Link href="/docktalk/m&a-spotlight">
           <TabsTrigger 
             value="m&a-spotlight" 
-            className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent px-6 py-3"
+            className="flex items-center gap-2 rounded-none border-b-2 border-transparent text-muted-foreground data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent px-6 py-3"
             data-testid="tab-m&a-spotlight"
           >
             <Handshake className="w-4 h-4" />
@@ -49,7 +49,7 @@ export default function DockTalkTabs({ activeTab }: DockTalkTabsProps) {
         <Link href="/docktalk/saved">
           <TabsTrigger 
             value="saved" 
-            className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent px-6 py-3"
+            className="flex items-center gap-2 rounded-none border-b-2 border-transparent text-muted-foreground data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent px-6 py-3"
             data-testid="tab-saved"
           >
             <Bookmark className="w-4 h-4" />
@@ -59,7 +59,7 @@ export default function DockTalkTabs({ activeTab }: DockTalkTabsProps) {
         <Link href="/docktalk/watchlist">
           <TabsTrigger 
             value="watchlist" 
-            className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent px-6 py-3"
+            className="flex items-center gap-2 rounded-none border-b-2 border-transparent text-muted-foreground data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent px-6 py-3"
             data-testid="tab-watchlist"
           >
             <Eye className="w-4 h-4" />
@@ -69,7 +69,7 @@ export default function DockTalkTabs({ activeTab }: DockTalkTabsProps) {
         <Link href="/docktalk/email-alerts">
           <TabsTrigger 
             value="email-alerts" 
-            className="flex items-center gap-2 rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent px-6 py-3"
+            className="flex items-center gap-2 rounded-none border-b-2 border-transparent text-muted-foreground data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent px-6 py-3"
             data-testid="tab-email-alerts"
           >
             <Mail className="w-4 h-4" />
