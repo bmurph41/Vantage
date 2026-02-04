@@ -32,6 +32,7 @@ export const startStrategyEnum = pgEnum("start_strategy", ["fixed", "offset"]);
 export const priorityEnum = pgEnum("priority", ["low", "med", "high"]);
 export const statusEnum = pgEnum("status", ["not_started", "engaged", "scheduled", "in_progress", "completed"]);
 export const projectStatusEnum = pgEnum("project_status", ["active", "accepted", "completed"]);
+export const projectTypeEnum = pgEnum("project_type", ["single", "portfolio"]);
 export const paymentStatusEnum = pgEnum("payment_status", ["not_paid", "paid", "no_cost"]);
 export const shareAccessEnum = pgEnum("share_access", ["view", "comment"]);
 export const shareTypeEnum = pgEnum("share_type", ["public", "invite", "organization"]);
@@ -723,6 +724,14 @@ export const projects = pgTable("projects", {
   city: text("city"),
   state: text("state"),
   status: projectStatusEnum("status").notNull().default("active"),
+  // Portfolio support
+  projectType: projectTypeEnum("project_type").notNull().default("single"),
+  parentProjectId: varchar("parent_project_id").references(() => projects.id, { onDelete: 'cascade' }),
+  // Full address fields
+  address: text("address"),
+  zipCode: text("zip_code"),
+  coordinates: jsonb("coordinates"), // { lat: number, lng: number }
+  placeId: text("place_id"),
   anchorType: anchorTypeEnum("anchor_type").notNull().default("psa"),
   psaSignedDate: date("psa_signed_date"),
   ddExpirationDate: date("dd_expiration_date"),
