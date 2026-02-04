@@ -13,6 +13,7 @@ import { AIAssistant } from "@/components/ai-assistant";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 import { ThemeProvider } from '@/contexts/ThemeProvider';
 import { ProspectingActivityProvider } from "@/contexts/ProspectingActivityContext";
+import { GoogleMapsProvider } from "@/lib/google-maps-provider";
 
 
 // Lazy load all pages for optimal bundle splitting
@@ -2115,18 +2116,20 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="system">
         <QueryClientProvider client={queryClient}>
-          <SettingsProvider>
-            <AuthProvider>
-              <ProspectingActivityProvider>
-                <TooltipProvider>
-                  <Toaster />
-                  <Suspense fallback={<PageLoader />}>
-                    <Router />
-                  </Suspense>
-                </TooltipProvider>
-              </ProspectingActivityProvider>
-            </AuthProvider>
-          </SettingsProvider>
+          <GoogleMapsProvider>
+            <SettingsProvider>
+              <AuthProvider>
+                <ProspectingActivityProvider>
+                  <TooltipProvider>
+                    <Toaster />
+                    <Suspense fallback={<PageLoader />}>
+                      <Router />
+                    </Suspense>
+                  </TooltipProvider>
+                </ProspectingActivityProvider>
+              </AuthProvider>
+            </SettingsProvider>
+          </GoogleMapsProvider>
         </QueryClientProvider>
       </ThemeProvider>
     </ErrorBoundary>
