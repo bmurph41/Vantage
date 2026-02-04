@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MapPin, Loader2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { loadGoogleMaps } from '@/lib/googleMaps';
+import { useGoogleMaps } from '@/lib/google-maps-provider';
 
 export interface AddressComponents {
   street?: string;
@@ -196,11 +195,8 @@ export function AddressInput({
 }: AddressInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [apiReady, setApiReady] = useState(false);
-  const { toast } = useToast();
+  const { isLoaded, loadError } = useGoogleMaps();
 
-  // Store latest callbacks in refs to avoid reinstantiating autocomplete
   const onChangeRef = useRef(onChange);
   const onAddressSelectRef = useRef(onAddressSelect);
 
@@ -209,41 +205,6 @@ export function AddressInput({
     onAddressSelectRef.current = onAddressSelect;
   }, [onChange, onAddressSelect]);
 
-  useEffect(() => {
-    const initGoogleMaps = async () => {
-      if (typeof google !== 'undefined' && google.maps) {
-        setApiReady(true);
-        return;
-      }
-
-      setIsLoading(true);
-      try {
-        await loadGoogleMaps();
-        setApiReady(true);
-      } catch (error) {
-        console.error('Failed to load Google Maps API:', error);
-        
-        const errorMessage = error instanceof Error ? error.message : '';
-        const isReferrerIssue = errorMessage.includes('RefererNotAllowedMapError') || 
-                                errorMessage.includes('ApiNotActivatedMapError') ||
-                                error instanceof Event;
-        
-        if (isReferrerIssue) {
-          console.error(
-            'Google Maps API key restriction detected. ' +
-            'Please add this domain to your API key\'s HTTP referrer restrictions in Google Cloud Console.'
-          );
-        }
-        
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initGoogleMaps();
-  }, [toast]);
-
-  // Stable handler using refs - won't change between renders
   const handlePlaceChanged = useCallback(() => {
     const place = autocompleteRef.current?.getPlace();
     
@@ -259,7 +220,6 @@ export function AddressInput({
       source: 'google',
     };
 
-    // Parse address components
     place.address_components?.forEach((component) => {
       const types = component.types;
       
@@ -275,7 +235,7 @@ export function AddressInput({
         components.city = component.long_name;
       }
       if (types.includes('administrative_area_level_1')) {
-        components.state = component.short_name; // Use short name for state abbreviation
+        components.state = component.short_name;
       }
       if (types.includes('postal_code')) {
         components.zipCode = component.long_name;
@@ -285,31 +245,26 @@ export function AddressInput({
       }
     });
 
-    // Set streetAddress as alias for street
     components.streetAddress = components.street;
 
-    // Update the input value with the full address
     if (inputRef.current && components.fullAddress) {
       inputRef.current.value = components.fullAddress;
     }
 
-    // Call onChange with full address string using latest ref
     if (onChangeRef.current) {
       onChangeRef.current(components.fullAddress || '', components);
     }
 
-    // Call onAddressSelect with parsed components using latest ref
     if (onAddressSelectRef.current) {
       onAddressSelectRef.current(components);
     }
-  }, []); // Empty deps - never changes
+  }, []);
 
   useEffect(() => {
-    if (!apiReady || !inputRef.current || disabled) {
+    if (!isLoaded || !inputRef.current || disabled) {
       return;
     }
 
-    // Initialize autocomplete
     try {
       autocompleteRef.current = new google.maps.places.Autocomplete(inputRef.current, {
         types: ['address'],
@@ -335,7 +290,7 @@ export function AddressInput({
         google.maps.event.clearInstanceListeners(autocompleteRef.current);
       }
     };
-  }, [apiReady, disabled, handlePlaceChanged, countries, biasCenter, biasRadiusMeters]);
+  }, [isLoaded, disabled, handlePlaceChanged, countries, biasCenter, biasRadiusMeters]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (onChange) {
@@ -372,7 +327,7 @@ export function AddressInput({
       )}
       <div className="relative">
         <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-          {isLoading ? (
+          {!isLoaded && !loadError ? (
             <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
             <MapPin className="w-4 h-4" />
@@ -393,7 +348,7 @@ export function AddressInput({
           autoComplete="off"
         />
       </div>
-      {!apiReady && !isLoading && (
+      {!isLoaded && loadError && (
         <p className="text-xs text-muted-foreground mt-1">
           Enter full address with city, state and zip. Fields will auto-fill on blur.
         </p>

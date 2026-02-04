@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { loadGoogleMaps } from "@/lib/googleMaps";
+import { useGoogleMaps } from "@/lib/google-maps-provider";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -94,8 +94,9 @@ export function AddressAutocompleteInput({
   searchType = "all",
 }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const [internalValue, setInternalValue] = useState(value ?? "");
-  const [isLoaded, setIsLoaded] = useState(false);
+  const { isLoaded } = useGoogleMaps();
 
   useEffect(() => {
     if (typeof value === "string" && value !== internalValue) {
@@ -115,62 +116,65 @@ export function AddressAutocompleteInput({
     return [searchType];
   }, [searchType]);
 
+  const onSelectAddressRef = useRef(onSelectAddress);
+  const onChangeTextRef = useRef(onChangeText);
+  
   useEffect(() => {
-    let autocomplete: google.maps.places.Autocomplete | null = null;
-    let listener: google.maps.MapsEventListener | null = null;
+    onSelectAddressRef.current = onSelectAddress;
+    onChangeTextRef.current = onChangeText;
+  }, [onSelectAddress, onChangeText]);
 
-    (async () => {
-      try {
-        const g = await loadGoogleMaps();
-        setIsLoaded(true);
-        if (!inputRef.current) return;
+  useEffect(() => {
+    if (!isLoaded || !inputRef.current) return;
 
-        const options: google.maps.places.AutocompleteOptions = {
-          componentRestrictions,
-        };
-        
-        if (autocompleteTypes) {
-          options.types = autocompleteTypes;
-        }
-
-        autocomplete = new g.maps.places.Autocomplete(inputRef.current, options);
-
-        autocomplete.setFields?.([
-          "address_components",
-          "formatted_address",
-          "geometry",
-          "place_id",
-          "name",
-        ]);
-
-        if (biasCenter) {
-          const circle = new g.maps.Circle({
-            center: biasCenter,
-            radius: biasRadiusMeters,
-          });
-          autocomplete.setBounds(circle.getBounds() as google.maps.LatLngBounds);
-        }
-
-        listener = autocomplete.addListener("place_changed", () => {
-          const place = autocomplete!.getPlace();
-          const normalized = normalizePlace(place);
-
-          const nextText = normalized.name || normalized.formattedAddress || inputRef.current!.value;
-          setInternalValue(nextText);
-          onChangeText?.(nextText);
-
-          onSelectAddress(normalized);
-        });
-      } catch (error) {
-        console.error("Failed to load Google Maps:", error);
+    try {
+      const options: google.maps.places.AutocompleteOptions = {
+        componentRestrictions,
+      };
+      
+      if (autocompleteTypes) {
+        options.types = autocompleteTypes;
       }
-    })();
 
-    return () => {
-      if (listener) listener.remove();
-      autocomplete = null;
-    };
-  }, [componentRestrictions, autocompleteTypes, biasCenter, biasRadiusMeters, onChangeText, onSelectAddress]);
+      autocompleteRef.current = new google.maps.places.Autocomplete(inputRef.current, options);
+
+      autocompleteRef.current.setFields?.([
+        "address_components",
+        "formatted_address",
+        "geometry",
+        "place_id",
+        "name",
+      ]);
+
+      if (biasCenter) {
+        const circle = new google.maps.Circle({
+          center: biasCenter,
+          radius: biasRadiusMeters,
+        });
+        autocompleteRef.current.setBounds(circle.getBounds() as google.maps.LatLngBounds);
+      }
+
+      const listener = autocompleteRef.current.addListener("place_changed", () => {
+        const place = autocompleteRef.current!.getPlace();
+        const normalized = normalizePlace(place);
+
+        const nextText = normalized.name || normalized.formattedAddress || inputRef.current!.value;
+        setInternalValue(nextText);
+        onChangeTextRef.current?.(nextText);
+
+        onSelectAddressRef.current(normalized);
+      });
+
+      return () => {
+        if (listener) listener.remove();
+        if (autocompleteRef.current) {
+          google.maps.event.clearInstanceListeners(autocompleteRef.current);
+        }
+      };
+    } catch (error) {
+      console.error("Failed to initialize Google Maps autocomplete:", error);
+    }
+  }, [isLoaded, componentRestrictions, autocompleteTypes, biasCenter, biasRadiusMeters]);
 
   return (
     <Input
