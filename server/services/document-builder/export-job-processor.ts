@@ -9,9 +9,9 @@ import { documentBuilderService } from './document-builder-service';
 import { pdfExportService } from './pdf-export-service';
 import { pptxExportService } from './pptx-export-service';
 import { docxExportService } from './docx-export-service';
-import { DocumentType, AudiencePersona } from '@shared/document-builder/types';
+import { DocumentType, AudiencePersona } from '../../../shared/document-builder/types';
 import { db } from '../../db';
-import { omBuilderDocuments, omDocumentSections, omExportJobs } from '@shared/document-builder/schema';
+import { omBuilderDocuments, omDocumentSections, omExportJobs } from '../../../shared/document-builder/schema';
 import { eq, and, asc } from 'drizzle-orm';
 
 // =============================================================================

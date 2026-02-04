@@ -32,10 +32,9 @@ import {
   DocumentType,
   SectionDefinition,
   SectionCategory,
-  DataBindingValue,
   AudiencePersona,
-} from '@shared/document-builder/types';
-import { SECTION_LIBRARY } from '@shared/document-builder/section-library';
+} from '../../../shared/document-builder/types';
+import { SECTION_LIBRARY } from '../../../shared/document-builder/section-library';
 
 // =============================================================================
 // Types
@@ -69,7 +68,7 @@ export interface DocumentSection {
   order: number;
   enabled: boolean;
   content: Record<string, any>;
-  dataBindings: Record<string, DataBindingValue>;
+  dataBindings: Record<string, any>;
   media: Record<string, MediaAttachment>;
   completionStatus: {
     isComplete: boolean;
@@ -146,8 +145,8 @@ class DocxExportService {
 
     // Disclaimer (for certain document types)
     if (
-      documentData.documentType === DocumentType.OFFERING_MEMORANDUM ||
-      documentData.documentType === DocumentType.INVESTMENT_COMMITTEE_MEMO
+      documentData.documentType === 'offering_memorandum' ||
+      documentData.documentType === 'ic_memo'
     ) {
       children.push(new Paragraph({ children: [new PageBreak()] }));
       children.push(...this.createDisclaimer(theme, options));
@@ -465,27 +464,27 @@ class DocxExportService {
 
     // Content based on section category
     switch (sectionDef.category) {
-      case SectionCategory.SUMMARY:
+      case 'summary':
         elements.push(...this.createSummaryContent(section, theme));
         break;
 
-      case SectionCategory.PROPERTY:
+      case 'property':
         elements.push(...this.createPropertyContent(section, theme));
         break;
 
-      case SectionCategory.MARKET:
+      case 'market':
         elements.push(...this.createMarketContent(section, theme));
         break;
 
-      case SectionCategory.FINANCIAL:
+      case 'financial':
         elements.push(...this.createFinancialContent(section, theme));
         break;
 
-      case SectionCategory.UNDERWRITING:
+      case 'operations':
         elements.push(...this.createUnderwritingContent(section, theme));
         break;
 
-      case SectionCategory.DUE_DILIGENCE:
+      case 'due_diligence':
         elements.push(...this.createDueDiligenceContent(section, theme));
         break;
 
@@ -1434,40 +1433,42 @@ class DocxExportService {
 
   private getSubjectFromDocType(docType: DocumentType): string {
     const subjects: Record<DocumentType, string> = {
-      [DocumentType.OFFERING_MEMORANDUM]: 'Investment Offering Memorandum',
-      [DocumentType.INVESTMENT_COMMITTEE_MEMO]: 'Investment Committee Memorandum',
-      [DocumentType.PITCH_DECK]: 'Investment Pitch Deck',
-      [DocumentType.EXECUTIVE_SUMMARY]: 'Executive Summary',
-      [DocumentType.TEASER]: 'Investment Teaser',
-      [DocumentType.LENDER_PACKAGE]: 'Lender Package',
-      [DocumentType.DD_SUMMARY]: 'Due Diligence Summary',
-      [DocumentType.CUSTOM]: 'Custom Document',
+      offering_memorandum: 'Investment Offering Memorandum',
+      ic_memo: 'Investment Committee Memorandum',
+      pitch_deck: 'Investment Pitch Deck',
+      executive_summary: 'Executive Summary',
+      teaser: 'Investment Teaser',
+      lender_package: 'Lender Package',
+      due_diligence_summary: 'Due Diligence Summary',
+      custom: 'Custom Document',
     };
     return subjects[docType] || 'Investment Document';
   }
 
   private getDocumentTypeLabel(docType: DocumentType): string {
     const labels: Record<DocumentType, string> = {
-      [DocumentType.OFFERING_MEMORANDUM]: 'Offering Memorandum',
-      [DocumentType.INVESTMENT_COMMITTEE_MEMO]: 'Investment Committee Memo',
-      [DocumentType.PITCH_DECK]: 'Pitch Deck',
-      [DocumentType.EXECUTIVE_SUMMARY]: 'Executive Summary',
-      [DocumentType.TEASER]: 'Investment Teaser',
-      [DocumentType.LENDER_PACKAGE]: 'Lender Package',
-      [DocumentType.DD_SUMMARY]: 'Due Diligence Summary',
-      [DocumentType.CUSTOM]: 'Custom Document',
+      offering_memorandum: 'Offering Memorandum',
+      ic_memo: 'Investment Committee Memo',
+      pitch_deck: 'Pitch Deck',
+      executive_summary: 'Executive Summary',
+      teaser: 'Investment Teaser',
+      lender_package: 'Lender Package',
+      due_diligence_summary: 'Due Diligence Summary',
+      custom: 'Custom Document',
     };
     return labels[docType] || 'Document';
   }
 
   private formatAudience(audience: AudiencePersona): string {
     const labels: Record<AudiencePersona, string> = {
-      [AudiencePersona.INSTITUTIONAL_INVESTOR]: 'Institutional Investors',
-      [AudiencePersona.LENDER]: 'Lenders',
-      [AudiencePersona.BROKER]: 'Brokers',
-      [AudiencePersona.OWNER_OPERATOR]: 'Owner-Operators',
-      [AudiencePersona.MANAGEMENT_COMPANY]: 'Management Companies',
-      [AudiencePersona.INTERNAL_TEAM]: 'Internal Review',
+      institutional_investor: 'Institutional Investors',
+      private_equity: 'Private Equity',
+      family_office: 'Family Offices',
+      lender: 'Lenders',
+      investment_committee: 'Investment Committee',
+      board_of_directors: 'Board of Directors',
+      potential_buyer: 'Potential Buyers',
+      broker: 'Brokers',
     };
     return labels[audience] || 'Investors';
   }

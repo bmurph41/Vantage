@@ -4,15 +4,15 @@
  */
 
 import { db } from '../../db';
-import { omTemplates } from '@shared/document-builder/schema';
+import { omTemplates } from '../../../shared/document-builder/schema';
 import { eq, and, or, isNull } from 'drizzle-orm';
 import {
   DocumentType,
   SectionDefinition,
   AudiencePersona,
   AssetClass,
-} from '@shared/document-builder/types';
-import { SECTION_LIBRARY, DOCUMENT_TYPE_CONFIGS } from '@shared/document-builder/section-library';
+} from '../../../shared/document-builder/types';
+import { SECTION_LIBRARY, DOCUMENT_TYPE_CONFIGS } from '../../../shared/document-builder/section-library';
 
 // =============================================================================
 // Types
@@ -76,7 +76,7 @@ const DEFAULT_TEMPLATES: Omit<CreateTemplateInput, 'scope'>[] = [
   {
     name: 'Standard Offering Memorandum',
     description: 'Comprehensive OM for institutional investors',
-    documentType: DocumentType.OFFERING_MEMORANDUM,
+    documentType: 'offering_memorandum' as DocumentType,
     sections: [
       'cover_page',
       'executive_summary',
@@ -101,7 +101,7 @@ const DEFAULT_TEMPLATES: Omit<CreateTemplateInput, 'scope'>[] = [
   {
     name: 'Condensed Offering Memorandum',
     description: 'Shorter OM focusing on key investment points',
-    documentType: DocumentType.OFFERING_MEMORANDUM,
+    documentType: 'offering_memorandum' as DocumentType,
     sections: [
       'cover_page',
       'executive_summary',
@@ -123,7 +123,7 @@ const DEFAULT_TEMPLATES: Omit<CreateTemplateInput, 'scope'>[] = [
   {
     name: 'Standard IC Memo',
     description: 'Investment Committee memo with full analysis',
-    documentType: DocumentType.INVESTMENT_COMMITTEE_MEMO,
+    documentType: 'ic_memo' as DocumentType,
     sections: [
       'cover_page',
       'executive_summary',
@@ -149,7 +149,7 @@ const DEFAULT_TEMPLATES: Omit<CreateTemplateInput, 'scope'>[] = [
   {
     name: 'Investor Pitch Deck',
     description: 'Presentation-style pitch for investors',
-    documentType: DocumentType.PITCH_DECK,
+    documentType: 'pitch_deck' as DocumentType,
     sections: [
       'cover_page',
       'executive_summary',
@@ -173,7 +173,7 @@ const DEFAULT_TEMPLATES: Omit<CreateTemplateInput, 'scope'>[] = [
   {
     name: 'One-Page Executive Summary',
     description: 'Concise single-page summary',
-    documentType: DocumentType.EXECUTIVE_SUMMARY,
+    documentType: 'executive_summary' as DocumentType,
     sections: [
       'executive_summary',
       'investment_highlights',
@@ -192,7 +192,7 @@ const DEFAULT_TEMPLATES: Omit<CreateTemplateInput, 'scope'>[] = [
   {
     name: 'Investment Teaser',
     description: 'Brief overview to generate interest',
-    documentType: DocumentType.TEASER,
+    documentType: 'teaser' as DocumentType,
     sections: [
       'cover_page',
       'investment_highlights',
@@ -212,7 +212,7 @@ const DEFAULT_TEMPLATES: Omit<CreateTemplateInput, 'scope'>[] = [
   {
     name: 'Standard Lender Package',
     description: 'Comprehensive package for debt financing',
-    documentType: DocumentType.LENDER_PACKAGE,
+    documentType: 'lender_package' as DocumentType,
     sections: [
       'cover_page',
       'executive_summary',
@@ -238,7 +238,7 @@ const DEFAULT_TEMPLATES: Omit<CreateTemplateInput, 'scope'>[] = [
   {
     name: 'Due Diligence Summary',
     description: 'Summary of due diligence findings',
-    documentType: DocumentType.DD_SUMMARY,
+    documentType: 'due_diligence_summary' as DocumentType,
     sections: [
       'cover_page',
       'executive_summary',

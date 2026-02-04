@@ -15,12 +15,12 @@ import {
   type OmDocumentSection,
   type InsertOmBuilderDocument,
   type InsertOmDocumentSection,
-} from '@shared/document-builder/schema';
+} from '../../../shared/document-builder/schema';
 import {
   SECTION_LIBRARY,
   getSectionsByDocType,
   getSectionDefinition,
-} from '@shared/document-builder/section-library';
+} from '../../../shared/document-builder/section-library';
 import {
   DOCUMENT_TYPE_CONFIGS,
   type DocumentType,
@@ -29,7 +29,7 @@ import {
   type BuilderCompletionSummary,
   type ResolvedBinding,
   type DataSource,
-} from '@shared/document-builder/types';
+} from '../../../shared/document-builder/types';
 
 // =============================================================================
 // Document CRUD Operations

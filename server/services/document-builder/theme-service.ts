@@ -4,7 +4,7 @@
  */
 
 import { db } from '../../db';
-import { omThemes } from '@shared/document-builder/schema';
+import { omThemes } from '../../../shared/document-builder/schema';
 import { eq, and, or } from 'drizzle-orm';
 
 // =============================================================================

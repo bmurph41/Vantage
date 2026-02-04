@@ -5,8 +5,8 @@
 
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
-import { getSectionDefinition } from '@shared/document-builder/section-library';
-import type { AIPromptTemplate, ResolvedBinding } from '@shared/document-builder/types';
+import { getSectionDefinition } from '../../../shared/document-builder/section-library';
+import type { AIPromptTemplate, ResolvedBinding } from '../../../shared/document-builder/types';
 
 // =============================================================================
 // Provider Types

@@ -11,12 +11,12 @@ import {
   modelingProjects,
   rentRolls,
   rentRollEntries,
-} from '@shared/schema';
+} from '../../../shared/schema';
 import {
   type DataSource,
   type ResolvedBinding,
   type DataBindingRequirement,
-} from '@shared/document-builder/types';
+} from '../../../shared/document-builder/types';
 
 // =============================================================================
 // Binding Resolution

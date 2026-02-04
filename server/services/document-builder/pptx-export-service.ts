@@ -10,10 +10,9 @@ import {
   DocumentType,
   SectionDefinition,
   SectionCategory,
-  DataBindingValue,
   AudiencePersona,
-} from '@shared/document-builder/types';
-import { SECTION_LIBRARY } from '@shared/document-builder/section-library';
+} from '../../../shared/document-builder/types';
+import { SECTION_LIBRARY } from '../../../shared/document-builder/section-library';
 
 // =============================================================================
 // Types
@@ -46,7 +45,7 @@ export interface DocumentSection {
   order: number;
   enabled: boolean;
   content: Record<string, any>;
-  dataBindings: Record<string, DataBindingValue>;
+  dataBindings: Record<string, any>;
   media: Record<string, MediaAttachment>;
   completionStatus: {
     isComplete: boolean;
@@ -130,8 +129,8 @@ class PptxExportService {
     }
 
     // Add disclaimer slide if applicable
-    if (document.documentType === DocumentType.OFFERING_MEMORANDUM ||
-        document.documentType === DocumentType.INVESTMENT_COMMITTEE_MEMO) {
+    if (document.documentType === 'offering_memorandum' ||
+        document.documentType === 'ic_memo') {
       this.addDisclaimerSlide(pptx, theme, options);
     }
 
@@ -457,31 +456,31 @@ class PptxExportService {
 
     // Add content slides based on section category
     switch (sectionDef.category) {
-      case SectionCategory.COVER:
+      case 'cover':
         // Already handled by title slide
         break;
 
-      case SectionCategory.SUMMARY:
+      case 'summary':
         this.addSummarySlides(pptx, section, sectionDef, theme);
         break;
 
-      case SectionCategory.PROPERTY:
+      case 'property':
         this.addPropertySlides(pptx, section, sectionDef, theme);
         break;
 
-      case SectionCategory.MARKET:
+      case 'market':
         this.addMarketSlides(pptx, section, sectionDef, theme);
         break;
 
-      case SectionCategory.FINANCIAL:
+      case 'financial':
         this.addFinancialSlides(pptx, section, sectionDef, theme);
         break;
 
-      case SectionCategory.UNDERWRITING:
+      case 'operations':
         this.addUnderwritingSlides(pptx, section, sectionDef, theme);
         break;
 
-      case SectionCategory.DUE_DILIGENCE:
+      case 'due_diligence':
         this.addDueDiligenceSlides(pptx, section, sectionDef, theme);
         break;
 
@@ -1399,28 +1398,28 @@ This presentation does not constitute an offer to sell or a solicitation of an o
 
   private getSubjectFromDocType(docType: DocumentType): string {
     const subjects: Record<DocumentType, string> = {
-      [DocumentType.OFFERING_MEMORANDUM]: 'Investment Offering Memorandum',
-      [DocumentType.INVESTMENT_COMMITTEE_MEMO]: 'Investment Committee Memorandum',
-      [DocumentType.PITCH_DECK]: 'Investment Pitch Deck',
-      [DocumentType.EXECUTIVE_SUMMARY]: 'Executive Summary',
-      [DocumentType.TEASER]: 'Investment Teaser',
-      [DocumentType.LENDER_PACKAGE]: 'Lender Package',
-      [DocumentType.DD_SUMMARY]: 'Due Diligence Summary',
-      [DocumentType.CUSTOM]: 'Custom Document',
+      offering_memorandum: 'Investment Offering Memorandum',
+      ic_memo: 'Investment Committee Memorandum',
+      pitch_deck: 'Investment Pitch Deck',
+      executive_summary: 'Executive Summary',
+      teaser: 'Investment Teaser',
+      lender_package: 'Lender Package',
+      due_diligence_summary: 'Due Diligence Summary',
+      custom: 'Custom Document',
     };
     return subjects[docType] || 'Investment Document';
   }
 
   private getDocumentTypeLabel(docType: DocumentType): string {
     const labels: Record<DocumentType, string> = {
-      [DocumentType.OFFERING_MEMORANDUM]: 'Offering Memorandum',
-      [DocumentType.INVESTMENT_COMMITTEE_MEMO]: 'Investment Committee Memo',
-      [DocumentType.PITCH_DECK]: 'Pitch Deck',
-      [DocumentType.EXECUTIVE_SUMMARY]: 'Executive Summary',
-      [DocumentType.TEASER]: 'Investment Teaser',
-      [DocumentType.LENDER_PACKAGE]: 'Lender Package',
-      [DocumentType.DD_SUMMARY]: 'Due Diligence Summary',
-      [DocumentType.CUSTOM]: 'Custom Document',
+      offering_memorandum: 'Offering Memorandum',
+      ic_memo: 'Investment Committee Memo',
+      pitch_deck: 'Pitch Deck',
+      executive_summary: 'Executive Summary',
+      teaser: 'Investment Teaser',
+      lender_package: 'Lender Package',
+      due_diligence_summary: 'Due Diligence Summary',
+      custom: 'Custom Document',
     };
     return labels[docType] || 'Document';
   }
