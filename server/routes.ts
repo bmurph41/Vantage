@@ -75,6 +75,7 @@ import tourProgressRoutes from "./routes/tour-progress-routes";
 import operationsSyncRoutes from "./routes/operations-sync-routes";
 import ddAutomationRoutes from "./routes/dd-automation-routes";
 import modelingValidationRoutes from "./routes/modeling-validation-routes";
+import enhancedDebtRoutes from "./routes/enhanced-debt-routes";
 import operationsContextRoutes from "./routes/operations-context-routes";
 import { userSessions, insertProspectingEntrySchema, users, salesComps, rateComps, industryStandards, modelingProjectConfig } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
@@ -408,6 +409,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/modeling/scenario-templates", authenticateUser, scenarioTemplateRoutes);
   app.use("/api/modeling", authenticateUser, modelingValidationRoutes);
   app.use("/api/marinalytics", authenticateUser, marinalyticsRoutes);
+  app.use("/api/debt", authenticateUser, enhancedDebtRoutes);
   app.use("/api/commercial-tenants", authenticateUser, commercialTenantsRoutes);
   app.use(authenticateUser, tourProgressRoutes);
   app.use("/api/dd/automation", authenticateUser, ddAutomationRoutes);

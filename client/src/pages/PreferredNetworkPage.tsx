@@ -6,7 +6,7 @@
  */
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation } from 'wouter';
 import { Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLeaderboard } from '@/hooks/useContactIntelligence';
 import { LeaderboardCard, RelationshipStatusPill } from '@/components/crm/ContactIntelligence';
@@ -23,7 +23,7 @@ import {
 } from '@/types/contact-intelligence';
 
 const PreferredNetworkPage: React.FC = () => {
-  const navigate = useNavigate();
+  const [, navigate] = useLocation();
   
   // Filter state
   const [filters, setFilters] = useState<LeaderboardFilters>({

@@ -52,6 +52,7 @@ import type { CapitalStack, DebtTranche, EquityLayer, CapitalStackProjection, Fu
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { MarketRatePicker } from '@/components/modeling/MarketRatePicker';
 import WorkspaceDebtScenarios from './debt-scenarios';
+import LoanBuilder from '@/components/modeling/LoanBuilder';
 
 interface CapitalStackWorkspaceProps {
   projectId: string;
@@ -697,16 +698,41 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
       )}
 
       <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
+        <TabsList className="grid w-full grid-cols-3 max-w-xl">
           <TabsTrigger value="capital-stack" className="gap-2">
             <Building2 className="h-4 w-4" />
             Capital Stack
+          </TabsTrigger>
+          <TabsTrigger value="advanced-debt" className="gap-2">
+            <Layers className="h-4 w-4" />
+            Advanced Debt
           </TabsTrigger>
           <TabsTrigger value="debt-scenarios" className="gap-2">
             <Calculator className="h-4 w-4" />
             Debt Scenarios
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="advanced-debt" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Multi-Loan Debt Modeling</CardTitle>
+              <CardDescription>
+                Build complex loan structures, view blended metrics, compare scenarios, and run DSCR covenant testing
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <LoanBuilder 
+                projectId={projectId}
+                purchasePrice={stackDetails?.stack?.purchasePrice ? parseNumber(stackDetails.stack.purchasePrice) : 10000000}
+                noi={parseFloat(noi) || 1000000}
+                onUpdate={() => {
+                  queryClient.invalidateQueries({ queryKey: ['/api/modeling/capital-stacks', selectedStackId] });
+                }}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="debt-scenarios" className="space-y-6">
           <WorkspaceDebtScenarios projectId={projectId} onTabChange={onTabChange} />

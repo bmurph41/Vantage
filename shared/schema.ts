@@ -23263,3 +23263,317 @@ export const modelingRentRollConfigRelations = relations(modelingRentRollConfig,
     references: [rraMarinaLocations.id],
   }),
 }));
+
+
+// ============================================================================
+// ENHANCED DEBT MODELING SCHEMA
+// Multi-Loan Structures, Blended Analysis, and Cash Flow Integration
+// ============================================================================
+
+// Loan Purpose - Categorizes how debt is used in the capital stack
+export const loanPurposeEnum = pgEnum("loan_purpose", [
+  "acquisition",
+  "construction", 
+  "bridge",
+  "permanent",
+  "refinancing",
+  "mezzanine",
+  "preferred_equity",
+  "line_of_credit"
+]);
+
+// Prepayment Penalty Types
+export const prepaymentPenaltyTypeEnum = pgEnum("prepayment_penalty_type", [
+  "none",
+  "declining_balance",     // % of balance, declining over time
+  "yield_maintenance",     // Make-whole based on treasury spread
+  "defeasance",           // Replace collateral with treasuries
+  "step_down",            // Fixed % that steps down annually
+  "lockout",              // No prepayment allowed for period
+  "custom"
+]);
+
+// DSCR Test Frequency
+export const dscrTestFrequencyEnum = pgEnum("dscr_test_frequency", [
+  "monthly",
+  "quarterly",
+  "semi_annual",
+  "annual",
+  "at_closing",
+  "at_maturity"
+]);
+
+// Loan Structures - Groups multiple loans together for blended analysis
+export const loanStructures = pgTable('loan_structures', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  capitalStackId: varchar('capital_stack_id').notNull().references(() => capitalStacks.id, { onDelete: 'cascade' }),
+  modelingProjectId: varchar('modeling_project_id').references(() => modelingProjects.id),
+  
+  name: text('name').notNull(),
+  description: text('description'),
+  
+  // Structure Type
+  structureType: text('structure_type').notNull().default('single'), // 'single', 'combined', 'sequential', 'layered'
+  
+  // For combined structures - blended metrics
+  totalDebtAmount: decimal('total_debt_amount', { precision: 18, scale: 2 }),
+  blendedInterestRate: decimal('blended_interest_rate', { precision: 8, scale: 4 }),
+  blendedTermMonths: integer('blended_term_months'),
+  combinedLtv: decimal('combined_ltv', { precision: 8, scale: 4 }),
+  totalAnnualDebtService: decimal('total_annual_debt_service', { precision: 18, scale: 2 }),
+  
+  // Comparison mode data
+  isComparisonMode: boolean('is_comparison_mode').default(false),
+  
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  createdBy: varchar('created_by').references(() => users.id),
+}, (table) => ({
+  orgIdx: index('loan_structures_org_idx').on(table.orgId),
+  capitalStackIdx: index('loan_structures_capital_stack_idx').on(table.capitalStackId),
+  projectIdx: index('loan_structures_project_idx').on(table.modelingProjectId),
+}));
+
+// Enhanced Loan Details - Extends debtTranches with advanced features
+export const loanDetails = pgTable('loan_details', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  debtTrancheId: varchar('debt_tranche_id').notNull().references(() => debtTranches.id, { onDelete: 'cascade' }).unique(),
+  loanStructureId: varchar('loan_structure_id').references(() => loanStructures.id, { onDelete: 'set null' }),
+  
+  // Loan Purpose
+  loanPurpose: loanPurposeEnum('loan_purpose').notNull().default('acquisition'),
+  
+  // Lender Information
+  lenderName: text('lender_name'),
+  lenderType: text('lender_type'), // 'bank', 'life_company', 'debt_fund', 'cmbs', 'agency', 'credit_union', 'private'
+  lenderContact: text('lender_contact'),
+  
+  // LTV Tracking
+  ltvAtOrigination: decimal('ltv_at_origination', { precision: 8, scale: 4 }),
+  maxLtv: decimal('max_ltv', { precision: 8, scale: 4 }),
+  
+  // Exit Fees (detailed)
+  exitFeeType: text('exit_fee_type'), // 'flat', 'percentage', 'sliding', 'none'
+  exitFeeAmount: decimal('exit_fee_amount', { precision: 18, scale: 2 }),
+  exitFeePct: decimal('exit_fee_pct', { precision: 8, scale: 4 }),
+  exitFeeExpiresMonth: integer('exit_fee_expires_month'), // Month after which exit fee no longer applies
+  
+  // Prepayment Penalty Structure
+  prepaymentPenaltyType: prepaymentPenaltyTypeEnum('prepayment_penalty_type').default('none'),
+  prepaymentLockoutMonths: integer('prepayment_lockout_months').default(0),
+  prepaymentSchedule: jsonb('prepayment_schedule').$type<{
+    yearStart: number;
+    yearEnd: number;
+    penaltyPct: number;
+  }[]>(), // Step-down schedule
+  yieldMaintenanceSpread: decimal('yield_maintenance_spread', { precision: 8, scale: 4 }), // Spread over treasury for YM calc
+  
+  // DSCR Covenant Testing
+  dscrMinimum: decimal('dscr_minimum', { precision: 8, scale: 4 }).default('1.20'),
+  dscrTestFrequency: dscrTestFrequencyEnum('dscr_test_frequency').default('quarterly'),
+  dscrTestStartMonth: integer('dscr_test_start_month').default(1), // When DSCR testing begins
+  dscrCashTrap: decimal('dscr_cash_trap', { precision: 8, scale: 4 }), // Below this, excess cash trapped
+  
+  // Debt Yield Requirements
+  debtYieldMinimum: decimal('debt_yield_minimum', { precision: 8, scale: 4 }),
+  
+  // Construction/Draw Features
+  isDrawLoan: boolean('is_draw_loan').default(false),
+  drawSchedule: jsonb('draw_schedule').$type<{
+    month: number;
+    drawAmount: number;
+    description: string;
+  }[]>(),
+  constructionPeriodMonths: integer('construction_period_months'),
+  
+  // Loan Transitions (Bridge to Perm, etc.)
+  transitionsToLoanId: varchar('transitions_to_loan_id'), // ID of successor loan
+  transitionMonth: integer('transition_month'), // When transition occurs
+  transitionType: text('transition_type'), // 'refinance', 'conversion', 'payoff'
+  
+  // Interest Rate Details
+  isFloatingRate: boolean('is_floating_rate').default(false),
+  floatingRateIndex: text('floating_rate_index'), // 'SOFR', 'Prime', 'Treasury'
+  floatingRateSpreadBps: integer('floating_rate_spread_bps'),
+  rateCap: decimal('rate_cap', { precision: 8, scale: 4 }),
+  rateFloor: decimal('rate_floor', { precision: 8, scale: 4 }),
+  
+  // Extension Options
+  extensionOptions: jsonb('extension_options').$type<{
+    optionNumber: number;
+    durationMonths: number;
+    feePct: number;
+    conditions: string;
+  }[]>(),
+  
+  // Recourse
+  isRecourse: boolean('is_recourse').default(false),
+  recoursePercentage: decimal('recourse_percentage', { precision: 8, scale: 4 }),
+  recourseDescription: text('recourse_description'),
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('loan_details_org_idx').on(table.orgId),
+  debtTrancheIdx: index('loan_details_debt_tranche_idx').on(table.debtTrancheId),
+  structureIdx: index('loan_details_structure_idx').on(table.loanStructureId),
+}));
+
+// Monthly Loan Schedule - Tracks loan balance and payments over time
+export const monthlyLoanSchedule = pgTable('monthly_loan_schedule', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  debtTrancheId: varchar('debt_tranche_id').notNull().references(() => debtTranches.id, { onDelete: 'cascade' }),
+  capitalStackId: varchar('capital_stack_id').notNull().references(() => capitalStacks.id, { onDelete: 'cascade' }),
+  
+  // Period Information
+  periodMonth: integer('period_month').notNull(), // 1-indexed month in loan term
+  periodYear: integer('period_year').notNull(),
+  periodDate: date('period_date').notNull(),
+  
+  // Balance Tracking
+  beginningBalance: decimal('beginning_balance', { precision: 18, scale: 2 }).notNull(),
+  endingBalance: decimal('ending_balance', { precision: 18, scale: 2 }).notNull(),
+  
+  // Payment Breakdown
+  scheduledPayment: decimal('scheduled_payment', { precision: 18, scale: 2 }).notNull(),
+  principalPayment: decimal('principal_payment', { precision: 18, scale: 2 }).notNull(),
+  interestPayment: decimal('interest_payment', { precision: 18, scale: 2 }).notNull(),
+  
+  // Interest Rate (for floating rate tracking)
+  interestRate: decimal('interest_rate', { precision: 8, scale: 4 }).notNull(),
+  
+  // Status
+  isInterestOnly: boolean('is_interest_only').default(false),
+  isDrawPeriod: boolean('is_draw_period').default(false),
+  drawAmount: decimal('draw_amount', { precision: 18, scale: 2 }),
+  
+  // Prepayment
+  prepaymentAmount: decimal('prepayment_amount', { precision: 18, scale: 2 }),
+  prepaymentPenalty: decimal('prepayment_penalty', { precision: 18, scale: 2 }),
+  
+  // DSCR at this period
+  periodNoi: decimal('period_noi', { precision: 18, scale: 2 }),
+  periodDscr: decimal('period_dscr', { precision: 8, scale: 4 }),
+  dscrPassFail: boolean('dscr_pass_fail'),
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('monthly_loan_schedule_org_idx').on(table.orgId),
+  debtTrancheIdx: index('monthly_loan_schedule_debt_tranche_idx').on(table.debtTrancheId),
+  capitalStackIdx: index('monthly_loan_schedule_capital_stack_idx').on(table.capitalStackId),
+  periodIdx: index('monthly_loan_schedule_period_idx').on(table.periodYear, table.periodMonth),
+}));
+
+// DSCR Test Results - Tracks covenant testing outcomes
+export const dscrTestResults = pgTable('dscr_test_results', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  debtTrancheId: varchar('debt_tranche_id').notNull().references(() => debtTranches.id, { onDelete: 'cascade' }),
+  capitalStackId: varchar('capital_stack_id').notNull().references(() => capitalStacks.id, { onDelete: 'cascade' }),
+  
+  testDate: date('test_date').notNull(),
+  testPeriod: text('test_period').notNull(), // 'Q1 2025', '2025', etc.
+  
+  // Inputs
+  trailingNoi: decimal('trailing_noi', { precision: 18, scale: 2 }).notNull(),
+  annualDebtService: decimal('annual_debt_service', { precision: 18, scale: 2 }).notNull(),
+  
+  // Result
+  calculatedDscr: decimal('calculated_dscr', { precision: 8, scale: 4 }).notNull(),
+  requiredDscr: decimal('required_dscr', { precision: 8, scale: 4 }).notNull(),
+  passedTest: boolean('passed_test').notNull(),
+  
+  // Cure info
+  cushionAmount: decimal('cushion_amount', { precision: 18, scale: 2 }), // How much above/below minimum
+  cushionPct: decimal('cushion_pct', { precision: 8, scale: 4 }),
+  
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('dscr_test_results_org_idx').on(table.orgId),
+  debtTrancheIdx: index('dscr_test_results_debt_tranche_idx').on(table.debtTrancheId),
+  testDateIdx: index('dscr_test_results_test_date_idx').on(table.testDate),
+}));
+
+// Loan Comparison Scenarios - For side-by-side loan analysis
+export const loanComparisonScenarios = pgTable('loan_comparison_scenarios', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  modelingProjectId: varchar('modeling_project_id').references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  capitalStackId: varchar('capital_stack_id').references(() => capitalStacks.id),
+  
+  name: text('name').notNull(),
+  description: text('description'),
+  
+  // Scenario loans (references to debt tranches being compared)
+  scenarioLoans: jsonb('scenario_loans').$type<{
+    debtTrancheId: string;
+    label: string; // 'Option A', 'Option B', etc.
+    isSelected: boolean; // Is this the preferred option?
+  }[]>(),
+  
+  // Comparison metrics (calculated)
+  comparisonMetrics: jsonb('comparison_metrics').$type<{
+    loanId: string;
+    totalInterestPaid: number;
+    totalPayments: number;
+    effectiveRate: number;
+    monthlyPayment: number;
+    breakEvenMonth: number;
+  }[]>(),
+  
+  selectedLoanId: varchar('selected_loan_id'), // Preferred loan option
+  
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  createdBy: varchar('created_by').references(() => users.id),
+}, (table) => ({
+  orgIdx: index('loan_comparison_scenarios_org_idx').on(table.orgId),
+  projectIdx: index('loan_comparison_scenarios_project_idx').on(table.modelingProjectId),
+}));
+
+// Insert schemas
+export const insertLoanStructureSchema = createInsertSchema(loanStructures).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertLoanDetailsSchema = createInsertSchema(loanDetails).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertMonthlyLoanScheduleSchema = createInsertSchema(monthlyLoanSchedule).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertDscrTestResultSchema = createInsertSchema(dscrTestResults).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertLoanComparisonScenarioSchema = createInsertSchema(loanComparisonScenarios).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Types
+export type LoanStructure = typeof loanStructures.$inferSelect;
+export type InsertLoanStructure = z.infer<typeof insertLoanStructureSchema>;
+export type LoanDetails = typeof loanDetails.$inferSelect;
+export type InsertLoanDetails = z.infer<typeof insertLoanDetailsSchema>;
+export type MonthlyLoanSchedule = typeof monthlyLoanSchedule.$inferSelect;
+export type InsertMonthlyLoanSchedule = z.infer<typeof insertMonthlyLoanScheduleSchema>;
+export type DscrTestResult = typeof dscrTestResults.$inferSelect;
+export type InsertDscrTestResult = z.infer<typeof insertDscrTestResultSchema>;
+export type LoanComparisonScenario = typeof loanComparisonScenarios.$inferSelect;
+export type InsertLoanComparisonScenario = z.infer<typeof insertLoanComparisonScenarioSchema>;
