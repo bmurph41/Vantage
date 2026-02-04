@@ -58,6 +58,20 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { DocIntelUpload, CustomDocumentType } from "@shared/schema";
 
+function getCsrfToken(): string {
+  const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
+async function ensureCsrfToken(): Promise<string> {
+  let token = getCsrfToken();
+  if (!token) {
+    await fetch('/api/auth/me', { credentials: 'include' });
+    token = getCsrfToken();
+  }
+  return token;
+}
+
 type DocType = "pnl" | "rent_roll" | "balance_sheet" | "rate_sheet" | "invoice" | "other" | string;
 
 interface HoldingStationProps {
@@ -159,9 +173,17 @@ export function HoldingStation({ projectId, onReviewDocuments }: HoldingStationP
         formData.append("customTypeName", stagedFile.customTypeName);
       }
 
+      const csrfToken = await ensureCsrfToken();
+      const headers: Record<string, string> = {};
+      if (csrfToken) {
+        headers['X-CSRF-Token'] = csrfToken;
+      }
+
       const response = await fetch(`/api/modeling/projects/${projectId}/documents`, {
         method: "POST",
         body: formData,
+        headers,
+        credentials: 'include',
       });
       if (!response.ok) {
         const error = await response.json();
