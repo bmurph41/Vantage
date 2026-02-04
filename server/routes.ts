@@ -18853,6 +18853,72 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Get available years for actuals data
+  app.get('/api/modeling/projects/:projectId/actuals/years', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { operationsDataSyncService } = await import('./services/operations-data-sync-service');
+      const years = await operationsDataSyncService.getAvailableYears(projectId);
+
+      res.json({ years });
+    } catch (error: any) {
+      console.error('Failed to fetch available years:', error);
+      res.status(500).json({ error: 'Failed to fetch available years' });
+    }
+  });
+
+  // Get actuals for multiple years for comparison
+  app.get('/api/modeling/projects/:projectId/actuals/multi-year', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { years } = req.query;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { operationsDataSyncService } = await import('./services/operations-data-sync-service');
+      const yearList = years ? String(years).split(',').map(Number) : [];
+      const actualsData = await operationsDataSyncService.getActualsForMultipleYears(projectId, yearList);
+
+      // Group each year's data
+      const groupedByYear: Record<number, any> = {};
+      for (const [year, actuals] of Object.entries(actualsData)) {
+        const grouped = (actuals as any[]).reduce((acc: any, item) => {
+          const key = `${item.category}-${item.subcategory}`;
+          if (!acc[key]) {
+            acc[key] = {
+              category: item.category,
+              subcategory: item.subcategory,
+              monthlyData: {},
+              annualTotal: 0
+            };
+          }
+          const monthKey = new Date(item.year, item.month - 1).toLocaleString('default', { month: 'short' });
+          const amount = parseFloat(item.amount);
+          acc[key].monthlyData[monthKey] = (acc[key].monthlyData[monthKey] || 0) + amount;
+          acc[key].annualTotal += amount;
+          return acc;
+        }, {});
+        groupedByYear[Number(year)] = Object.values(grouped);
+      }
+
+      res.json({ byYear: groupedByYear, years: yearList });
+    } catch (error: any) {
+      console.error('Failed to fetch multi-year actuals:', error);
+      res.status(500).json({ error: 'Failed to fetch multi-year actuals' });
+    }
+  });
+
   // Get sync job history for a project
   app.get('/api/modeling/projects/:projectId/sync-history', authenticateUser, async (req: any, res) => {
     try {

@@ -1,4 +1,4 @@
-import { useState, Fragment } from 'react';
+import { useState, Fragment, useMemo, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -59,7 +59,10 @@ import {
   EyeOff,
   ArrowUpRight,
   ArrowDownRight,
-  Percent
+  Percent,
+  Activity,
+  Target,
+  Sparkles
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
@@ -110,7 +113,7 @@ const dataSourceLabels: Record<string, string> = {
 
 export default function WorkspaceHistoricalPL({ projectId, onTabChange }: WorkspaceHistoricalPLProps) {
   const { toast } = useToast();
-  const [selectedYear, setSelectedYear] = useState('2024');
+  const [selectedYear, setSelectedYear] = useState<string>('');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['Revenue', 'COGS', 'Expenses']));
   const [showSyncDialog, setShowSyncDialog] = useState(false);
   const [syncSources, setSyncSources] = useState({
@@ -119,18 +122,54 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
     ship_store: true
   });
   const [viewMode, setViewMode] = useState<'single' | 'all' | 'compare'>('single');
-  const [compareYears, setCompareYears] = useState<string[]>(['2023', '2024']);
+  const [compareYears, setCompareYears] = useState<string[]>([]);
   const [showMonthly, setShowMonthly] = useState(true);
   const [showAnalytics, setShowAnalytics] = useState(false);
-  const availableYears = ['2020', '2021', '2022', '2023', '2024'];
+  const [showMoM, setShowMoM] = useState(false);
+  const [showYoY, setShowYoY] = useState(false);
+
+  const { data: availableYearsData } = useQuery<{ years: number[] }>({
+    queryKey: [`/api/modeling/projects/${projectId}/actuals/years`],
+  });
+
+  const availableYears = useMemo(() => {
+    const years = availableYearsData?.years || [];
+    return years.map(String);
+  }, [availableYearsData]);
+
+  useEffect(() => {
+    if (availableYears.length > 0 && !selectedYear) {
+      const latestYear = availableYears[availableYears.length - 1];
+      setSelectedYear(latestYear);
+      if (availableYears.length >= 2) {
+        const prevYear = availableYears[availableYears.length - 2];
+        setCompareYears([prevYear, latestYear]);
+      } else {
+        setCompareYears([latestYear, latestYear]);
+      }
+    }
+  }, [availableYears, selectedYear]);
 
   const { data: plData, isLoading } = useQuery<any>({
     queryKey: ['/api/modeling/projects', projectId, 'historical-pl', selectedYear],
+    enabled: !!selectedYear,
   });
 
   const { data: actualsData, isLoading: actualsLoading } = useQuery<any>({
     queryKey: [`/api/modeling/projects/${projectId}/actuals?year=${selectedYear}`],
+    enabled: !!selectedYear,
   });
+
+  const { data: multiYearData } = useQuery<{ byYear: Record<number, any[]>; years: number[] }>({
+    queryKey: [`/api/modeling/projects/${projectId}/actuals/multi-year?years=${availableYears.join(',')}`],
+    enabled: availableYears.length > 1,
+  });
+
+  const priorYearActuals = useMemo(() => {
+    if (!multiYearData?.byYear || !selectedYear) return null;
+    const priorYear = parseInt(selectedYear) - 1;
+    return multiYearData.byYear[priorYear] || null;
+  }, [multiYearData, selectedYear]);
 
   const { data: dataSources } = useQuery<DataSourceSummary[]>({
     queryKey: [`/api/modeling/projects/${projectId}/data-sources`],
@@ -249,6 +288,89 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
   const totalExpenses = getCategoryAnnualTotal('Expenses');
   const grossProfit = totalRevenue - totalCOGS;
   const netIncome = grossProfit - totalExpenses;
+
+  const priorYearTotals = useMemo(() => {
+    if (!priorYearActuals) return null;
+    const grouped = priorYearActuals.reduce((acc: Record<string, number>, item: any) => {
+      if (!acc[item.category]) acc[item.category] = 0;
+      acc[item.category] += item.annualTotal || 0;
+      return acc;
+    }, {});
+    const revenue = grouped['Revenue'] || 0;
+    const cogs = grouped['COGS'] || 0;
+    const expenses = grouped['Expenses'] || 0;
+    return {
+      revenue,
+      cogs,
+      expenses,
+      grossProfit: revenue - cogs,
+      netIncome: revenue - cogs - expenses
+    };
+  }, [priorYearActuals]);
+
+  const yoyChanges = useMemo(() => {
+    if (!priorYearTotals || priorYearTotals.revenue === 0) return null;
+    const calcChange = (current: number, prior: number) => 
+      prior === 0 ? null : ((current - prior) / Math.abs(prior)) * 100;
+    return {
+      revenue: calcChange(totalRevenue, priorYearTotals.revenue),
+      grossProfit: calcChange(grossProfit, priorYearTotals.grossProfit),
+      expenses: calcChange(totalExpenses, priorYearTotals.expenses),
+      netIncome: calcChange(netIncome, priorYearTotals.netIncome),
+      grossMargin: totalRevenue > 0 && priorYearTotals.revenue > 0
+        ? ((grossProfit / totalRevenue) * 100) - ((priorYearTotals.grossProfit / priorYearTotals.revenue) * 100)
+        : null,
+      operatingMargin: totalRevenue > 0 && priorYearTotals.revenue > 0
+        ? ((netIncome / totalRevenue) * 100) - ((priorYearTotals.netIncome / priorYearTotals.revenue) * 100)
+        : null
+    };
+  }, [totalRevenue, grossProfit, totalExpenses, netIncome, priorYearTotals]);
+
+  const momChanges = useMemo(() => {
+    const changes: Record<string, number | null> = {};
+    for (let i = 1; i < months.length; i++) {
+      const prevMonth = months[i - 1];
+      const currMonth = months[i];
+      const prevTotal = getCategoryTotal('Revenue', prevMonth);
+      const currTotal = getCategoryTotal('Revenue', currMonth);
+      changes[currMonth] = prevTotal === 0 ? null : ((currTotal - prevTotal) / Math.abs(prevTotal)) * 100;
+    }
+    return changes;
+  }, [lineItems]);
+
+  const seasonalAnalysis = useMemo(() => {
+    const inSeasonRevenue = months.filter((_, idx) => seasonMonths.includes(idx + 1))
+      .reduce((sum, month) => sum + getCategoryTotal('Revenue', month), 0);
+    const offSeasonRevenue = months.filter((_, idx) => !seasonMonths.includes(idx + 1))
+      .reduce((sum, month) => sum + getCategoryTotal('Revenue', month), 0);
+    const total = inSeasonRevenue + offSeasonRevenue;
+    return {
+      inSeasonRevenue,
+      offSeasonRevenue,
+      inSeasonPct: total > 0 ? (inSeasonRevenue / total) * 100 : 0,
+      offSeasonPct: total > 0 ? (offSeasonRevenue / total) * 100 : 0
+    };
+  }, [lineItems, seasonMonths]);
+
+  const monthlyPerformance = useMemo(() => {
+    const monthlyRevenue = months.map(month => ({
+      month,
+      revenue: getCategoryTotal('Revenue', month),
+      expenses: getCategoryTotal('Expenses', month),
+      noi: getCategoryTotal('Revenue', month) - getCategoryTotal('COGS', month) - getCategoryTotal('Expenses', month)
+    }));
+    const sortedByRevenue = [...monthlyRevenue].sort((a, b) => b.revenue - a.revenue);
+    const sortedByNoi = [...monthlyRevenue].sort((a, b) => b.noi - a.noi);
+    return {
+      monthly: monthlyRevenue,
+      bestRevenueMonth: sortedByRevenue[0]?.month || '-',
+      worstRevenueMonth: sortedByRevenue[sortedByRevenue.length - 1]?.month || '-',
+      bestNoiMonth: sortedByNoi[0]?.month || '-',
+      worstNoiMonth: sortedByNoi[sortedByNoi.length - 1]?.month || '-',
+      avgMonthlyRevenue: totalRevenue / 12,
+      avgMonthlyNoi: netIncome / 12
+    };
+  }, [lineItems, totalRevenue, netIncome]);
 
   const handleSync = () => {
     const sources = Object.entries(syncSources)
@@ -558,6 +680,12 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
             <div className="text-2xl font-bold text-green-600" data-testid="text-total-revenue">
               {formatCurrency(totalRevenue)}
             </div>
+            {yoyChanges?.revenue !== null && yoyChanges?.revenue !== undefined && (
+              <div className={`flex items-center gap-1 text-xs mt-1 ${yoyChanges.revenue >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {yoyChanges.revenue >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                {yoyChanges.revenue >= 0 ? '+' : ''}{yoyChanges.revenue.toFixed(1)}% YoY
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -571,6 +699,12 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
             <p className="text-xs text-muted-foreground mt-1">
               {totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100).toFixed(1) : 0}% margin
             </p>
+            {yoyChanges?.grossProfit !== null && yoyChanges?.grossProfit !== undefined && (
+              <div className={`flex items-center gap-1 text-xs mt-1 ${yoyChanges.grossProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {yoyChanges.grossProfit >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                {yoyChanges.grossProfit >= 0 ? '+' : ''}{yoyChanges.grossProfit.toFixed(1)}% YoY
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -581,6 +715,12 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
             <div className="text-2xl font-bold text-red-600" data-testid="text-total-expenses">
               {formatCurrency(totalExpenses)}
             </div>
+            {yoyChanges?.expenses !== null && yoyChanges?.expenses !== undefined && (
+              <div className={`flex items-center gap-1 text-xs mt-1 ${yoyChanges.expenses <= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {yoyChanges.expenses <= 0 ? <ArrowDownRight className="h-3 w-3" /> : <ArrowUpRight className="h-3 w-3" />}
+                {yoyChanges.expenses >= 0 ? '+' : ''}{yoyChanges.expenses.toFixed(1)}% YoY
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -591,6 +731,12 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
             <div className={`text-2xl font-bold ${netIncome >= 0 ? 'text-green-600' : 'text-red-600'}`} data-testid="text-noi">
               {formatCurrency(netIncome)}
             </div>
+            {yoyChanges?.netIncome !== null && yoyChanges?.netIncome !== undefined && (
+              <div className={`flex items-center gap-1 text-xs mt-1 ${yoyChanges.netIncome >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {yoyChanges.netIncome >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                {yoyChanges.netIncome >= 0 ? '+' : ''}{yoyChanges.netIncome.toFixed(1)}% YoY
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -616,10 +762,14 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                 <div className="text-xl font-bold">
                   {totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100).toFixed(1) : 0}%
                 </div>
-                <div className="flex items-center gap-1 text-xs text-green-600">
-                  <ArrowUpRight className="h-3 w-3" />
-                  +2.3% vs prior year
-                </div>
+                {yoyChanges?.grossMargin !== null && yoyChanges?.grossMargin !== undefined ? (
+                  <div className={`flex items-center gap-1 text-xs ${yoyChanges.grossMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {yoyChanges.grossMargin >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                    {yoyChanges.grossMargin >= 0 ? '+' : ''}{yoyChanges.grossMargin.toFixed(1)}pp vs prior year
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted-foreground">No prior year data</div>
+                )}
               </div>
               
               <div className="p-3 rounded-lg border space-y-2">
@@ -630,22 +780,32 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                 <div className="text-xl font-bold">
                   {totalRevenue > 0 ? ((netIncome / totalRevenue) * 100).toFixed(1) : 0}%
                 </div>
-                <div className="flex items-center gap-1 text-xs text-green-600">
-                  <ArrowUpRight className="h-3 w-3" />
-                  +1.8% vs prior year
-                </div>
+                {yoyChanges?.operatingMargin !== null && yoyChanges?.operatingMargin !== undefined ? (
+                  <div className={`flex items-center gap-1 text-xs ${yoyChanges.operatingMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {yoyChanges.operatingMargin >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                    {yoyChanges.operatingMargin >= 0 ? '+' : ''}{yoyChanges.operatingMargin.toFixed(1)}pp vs prior year
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted-foreground">No prior year data</div>
+                )}
               </div>
               
               <div className="p-3 rounded-lg border space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">Revenue Growth</span>
-                  <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
+                  {yoyChanges?.revenue !== null && yoyChanges?.revenue !== undefined && yoyChanges.revenue >= 0 ? (
+                    <TrendingUp className="h-3.5 w-3.5 text-green-600" />
+                  ) : (
+                    <TrendingDown className="h-3.5 w-3.5 text-red-600" />
+                  )}
                 </div>
-                <div className="text-xl font-bold text-green-600">
-                  +8.2%
+                <div className={`text-xl font-bold ${yoyChanges?.revenue !== null && yoyChanges?.revenue !== undefined && yoyChanges.revenue >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {yoyChanges?.revenue !== null && yoyChanges?.revenue !== undefined 
+                    ? `${yoyChanges.revenue >= 0 ? '+' : ''}${yoyChanges.revenue.toFixed(1)}%`
+                    : 'N/A'}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Year-over-year increase
+                  Year-over-year change
                 </div>
               </div>
               
@@ -657,14 +817,102 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                 <div className="text-xl font-bold">
                   {totalRevenue > 0 ? ((totalExpenses / totalRevenue) * 100).toFixed(1) : 0}%
                 </div>
-                <div className="flex items-center gap-1 text-xs text-red-600">
-                  <ArrowDownRight className="h-3 w-3" />
-                  -0.5% vs prior year
+                <div className="text-xs text-muted-foreground">
+                  of total revenue
                 </div>
               </div>
             </div>
             
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <div className="mt-4 grid gap-4 md:grid-cols-3">
+              <div className="p-3 rounded-lg border">
+                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                  <Activity className="h-4 w-4" />
+                  Seasonal Performance
+                </h4>
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-muted-foreground">In-Season Revenue</span>
+                      <span className="font-medium">{formatCurrency(seasonalAnalysis.inSeasonRevenue)}</span>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-2">
+                      <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${seasonalAnalysis.inSeasonPct}%` }} />
+                    </div>
+                    <div className="text-xs text-right text-muted-foreground mt-0.5">{seasonalAnalysis.inSeasonPct.toFixed(1)}%</div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-muted-foreground">Off-Season Revenue</span>
+                      <span className="font-medium">{formatCurrency(seasonalAnalysis.offSeasonRevenue)}</span>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-2">
+                      <div className="bg-gray-400 h-2 rounded-full" style={{ width: `${seasonalAnalysis.offSeasonPct}%` }} />
+                    </div>
+                    <div className="text-xs text-right text-muted-foreground mt-0.5">{seasonalAnalysis.offSeasonPct.toFixed(1)}%</div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="p-3 rounded-lg border">
+                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                  <Target className="h-4 w-4" />
+                  Monthly Performance
+                </h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Best Revenue Month</span>
+                    <span className="font-medium text-green-600">{monthlyPerformance.bestRevenueMonth}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Lowest Revenue Month</span>
+                    <span className="font-medium text-red-600">{monthlyPerformance.worstRevenueMonth}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Best NOI Month</span>
+                    <span className="font-medium text-green-600">{monthlyPerformance.bestNoiMonth}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Avg Monthly Revenue</span>
+                    <span className="font-medium">{formatCurrency(monthlyPerformance.avgMonthlyRevenue)}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="p-3 rounded-lg border">
+                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  Key Insights
+                </h4>
+                <div className="space-y-2 text-xs">
+                  {seasonalAnalysis.inSeasonPct > 70 && (
+                    <div className="flex items-start gap-2 p-2 rounded bg-blue-50 text-blue-800">
+                      <Info className="h-4 w-4 mt-0.5 shrink-0" />
+                      <span>{seasonalAnalysis.inSeasonPct.toFixed(0)}% of revenue concentrated in-season months</span>
+                    </div>
+                  )}
+                  {yoyChanges?.revenue !== null && yoyChanges?.revenue !== undefined && yoyChanges.revenue > 5 && (
+                    <div className="flex items-start gap-2 p-2 rounded bg-green-50 text-green-800">
+                      <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+                      <span>Strong revenue growth of {yoyChanges.revenue.toFixed(1)}% YoY</span>
+                    </div>
+                  )}
+                  {yoyChanges?.expenses !== null && yoyChanges?.expenses !== undefined && yoyChanges.expenses > 8 && (
+                    <div className="flex items-start gap-2 p-2 rounded bg-amber-50 text-amber-800">
+                      <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                      <span>Expenses grew {yoyChanges.expenses.toFixed(1)}% YoY - review cost controls</span>
+                    </div>
+                  )}
+                  {(!yoyChanges || (yoyChanges.revenue === null && yoyChanges.expenses === null)) && (
+                    <div className="flex items-start gap-2 p-2 rounded bg-gray-50 text-gray-700">
+                      <Info className="h-4 w-4 mt-0.5 shrink-0" />
+                      <span>Upload prior year data for YoY analysis</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-4">
               <div className="p-3 rounded-lg border">
                 <h4 className="text-sm font-medium mb-3">Revenue Mix by Category</h4>
                 <div className="space-y-2">
@@ -675,33 +923,16 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                         <div key={item.id} className="flex items-center justify-between text-sm">
                           <span className="text-muted-foreground truncate flex-1">{item.description}</span>
                           <div className="flex items-center gap-2">
-                            <div className="w-20 bg-muted rounded-full h-2">
+                            <div className="w-32 bg-muted rounded-full h-2">
                               <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${Math.min(pct, 100)}%` }} />
                             </div>
-                            <span className="w-12 text-right font-medium">{pct.toFixed(1)}%</span>
+                            <span className="w-16 text-right font-medium">{formatCurrency(item.annualTotal)}</span>
+                            <span className="w-12 text-right text-muted-foreground">{pct.toFixed(1)}%</span>
                           </div>
                         </div>
                       );
                     })
                   )}
-                </div>
-              </div>
-              
-              <div className="p-3 rounded-lg border">
-                <h4 className="text-sm font-medium mb-3">Key Insights</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-start gap-2 p-2 rounded bg-green-50 text-green-800">
-                    <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
-                    <span>Storage revenue shows strong seasonal peak with 85% of annual revenue during Apr-Oct</span>
-                  </div>
-                  <div className="flex items-start gap-2 p-2 rounded bg-blue-50 text-blue-800">
-                    <Info className="h-4 w-4 mt-0.5 shrink-0" />
-                    <span>Fuel sales margins improved 2.1% through better supplier negotiations</span>
-                  </div>
-                  <div className="flex items-start gap-2 p-2 rounded bg-amber-50 text-amber-800">
-                    <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                    <span>Payroll expenses grew 6% YoY - consider efficiency improvements</span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -711,14 +942,30 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
-              <CardTitle>Monthly Detail</CardTitle>
+              <CardTitle>Monthly Detail {selectedYear && `- ${selectedYear}`}</CardTitle>
               <CardDescription>
                 Click category rows to expand/collapse line items
               </CardDescription>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={showMoM ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setShowMoM(!showMoM)}
+                      className="h-8 text-xs"
+                    >
+                      <TrendingUp className="h-3 w-3 mr-1" />
+                      MoM
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Show month-over-month changes</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <Badge variant="outline" className="gap-1">
                 <div className="w-2 h-2 rounded-full bg-blue-500" />
                 In-Season
@@ -764,14 +1011,27 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           {category}
                         </div>
                       </TableCell>
-                      {months.map((month, idx) => (
-                        <TableCell 
-                          key={month} 
-                          className={`text-right font-semibold ${!isSeasonalMonth(idx) ? 'bg-muted/30' : ''}`}
-                        >
-                          {formatCurrency(getCategoryTotal(category, month))}
-                        </TableCell>
-                      ))}
+                      {months.map((month, idx) => {
+                        const value = getCategoryTotal(category, month);
+                        const prevMonth = idx > 0 ? months[idx - 1] : null;
+                        const prevValue = prevMonth ? getCategoryTotal(category, prevMonth) : null;
+                        const momChange = prevValue && prevValue !== 0 ? ((value - prevValue) / Math.abs(prevValue)) * 100 : null;
+                        return (
+                          <TableCell 
+                            key={month} 
+                            className={`text-right font-semibold ${!isSeasonalMonth(idx) ? 'bg-muted/30' : ''}`}
+                          >
+                            <div className="flex flex-col items-end">
+                              <span>{formatCurrency(value)}</span>
+                              {showMoM && momChange !== null && idx > 0 && (
+                                <span className={`text-xs ${momChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  {momChange >= 0 ? '+' : ''}{momChange.toFixed(0)}%
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                        );
+                      })}
                       <TableCell className="text-right font-bold">
                         {formatCurrency(getCategoryAnnualTotal(category))}
                       </TableCell>

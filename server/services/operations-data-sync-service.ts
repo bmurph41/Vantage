@@ -417,6 +417,38 @@ export class OperationsDataSyncService {
       .orderBy(modelingActuals.year, modelingActuals.month, modelingActuals.category);
   }
 
+  async getAvailableYears(projectId: string): Promise<number[]> {
+    const years = await db.selectDistinct({ year: modelingActuals.year })
+      .from(modelingActuals)
+      .where(eq(modelingActuals.modelingProjectId, projectId))
+      .orderBy(modelingActuals.year);
+    
+    return years.map(y => y.year);
+  }
+
+  async getActualsForMultipleYears(
+    projectId: string, 
+    years: number[]
+  ): Promise<Record<number, any[]>> {
+    if (years.length === 0) return {};
+    
+    const actuals = await db.select()
+      .from(modelingActuals)
+      .where(and(
+        eq(modelingActuals.modelingProjectId, projectId),
+        inArray(modelingActuals.year, years)
+      ))
+      .orderBy(modelingActuals.year, modelingActuals.month, modelingActuals.category);
+
+    return actuals.reduce((acc, item) => {
+      if (!acc[item.year]) {
+        acc[item.year] = [];
+      }
+      acc[item.year].push(item);
+      return acc;
+    }, {} as Record<number, any[]>);
+  }
+
   async getSyncJobHistory(projectId: string, limit = 10) {
     return db.select()
       .from(operationsDataSyncJobs)
