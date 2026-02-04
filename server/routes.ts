@@ -21442,8 +21442,10 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const { projectId, uploadId } = req.params;
       const { fiscalYear } = req.body;
       
+      console.log("[Doc Intel Import] projectId:", projectId, "uploadId:", uploadId, "fiscalYear:", fiscalYear);
       const lines = await docIntelService.importConfirmedItems(orgId, uploadId, projectId, userId, fiscalYear);
       res.json({ imported: lines.length, lines });
+      console.log("[Doc Intel Import] Result - imported lines:", lines.length);
     } catch (error: any) {
       console.error('Failed to import items:', error);
       res.status(500).json({ error: 'Failed to import items' });

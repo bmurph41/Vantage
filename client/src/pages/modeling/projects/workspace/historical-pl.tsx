@@ -37,8 +37,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import {
   FileSpreadsheet,
   TrendingUp,
-  TrendingDown,
-  Minus,
   ChevronDown,
   ChevronRight,
   Download,
@@ -51,18 +49,11 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  Info,
   BarChart3,
   Layers,
   Calendar,
   Eye,
-  EyeOff,
-  ArrowUpRight,
-  ArrowDownRight,
-  Percent,
-  Activity,
-  Target,
-  Sparkles
+  EyeOff
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
@@ -124,9 +115,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
   const [viewMode, setViewMode] = useState<'single' | 'all' | 'compare'>('single');
   const [compareYears, setCompareYears] = useState<string[]>([]);
   const [showMonthly, setShowMonthly] = useState(true);
-  const [showAnalytics, setShowAnalytics] = useState(false);
   const [showMoM, setShowMoM] = useState(false);
-  const [showYoY, setShowYoY] = useState(false);
 
   const { data: availableYearsData } = useQuery<{ years: number[] }>({
     queryKey: [`/api/modeling/projects/${projectId}/actuals/years`],
@@ -159,17 +148,6 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
     queryKey: [`/api/modeling/projects/${projectId}/actuals?year=${selectedYear}`],
     enabled: !!selectedYear,
   });
-
-  const { data: multiYearData } = useQuery<{ byYear: Record<number, any[]>; years: number[] }>({
-    queryKey: [`/api/modeling/projects/${projectId}/actuals/multi-year?years=${availableYears.join(',')}`],
-    enabled: availableYears.length > 1,
-  });
-
-  const priorYearActuals = useMemo(() => {
-    if (!multiYearData?.byYear || !selectedYear) return null;
-    const priorYear = parseInt(selectedYear) - 1;
-    return multiYearData.byYear[priorYear] || null;
-  }, [multiYearData, selectedYear]);
 
   const { data: dataSources } = useQuery<DataSourceSummary[]>({
     queryKey: [`/api/modeling/projects/${projectId}/data-sources`],
@@ -289,43 +267,6 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
   const grossProfit = totalRevenue - totalCOGS;
   const netIncome = grossProfit - totalExpenses;
 
-  const priorYearTotals = useMemo(() => {
-    if (!priorYearActuals) return null;
-    const grouped = priorYearActuals.reduce((acc: Record<string, number>, item: any) => {
-      if (!acc[item.category]) acc[item.category] = 0;
-      acc[item.category] += item.annualTotal || 0;
-      return acc;
-    }, {});
-    const revenue = grouped['Revenue'] || 0;
-    const cogs = grouped['COGS'] || 0;
-    const expenses = grouped['Expenses'] || 0;
-    return {
-      revenue,
-      cogs,
-      expenses,
-      grossProfit: revenue - cogs,
-      netIncome: revenue - cogs - expenses
-    };
-  }, [priorYearActuals]);
-
-  const yoyChanges = useMemo(() => {
-    if (!priorYearTotals || priorYearTotals.revenue === 0) return null;
-    const calcChange = (current: number, prior: number) => 
-      prior === 0 ? null : ((current - prior) / Math.abs(prior)) * 100;
-    return {
-      revenue: calcChange(totalRevenue, priorYearTotals.revenue),
-      grossProfit: calcChange(grossProfit, priorYearTotals.grossProfit),
-      expenses: calcChange(totalExpenses, priorYearTotals.expenses),
-      netIncome: calcChange(netIncome, priorYearTotals.netIncome),
-      grossMargin: totalRevenue > 0 && priorYearTotals.revenue > 0
-        ? ((grossProfit / totalRevenue) * 100) - ((priorYearTotals.grossProfit / priorYearTotals.revenue) * 100)
-        : null,
-      operatingMargin: totalRevenue > 0 && priorYearTotals.revenue > 0
-        ? ((netIncome / totalRevenue) * 100) - ((priorYearTotals.netIncome / priorYearTotals.revenue) * 100)
-        : null
-    };
-  }, [totalRevenue, grossProfit, totalExpenses, netIncome, priorYearTotals]);
-
   const momChanges = useMemo(() => {
     const changes: Record<string, number | null> = {};
     for (let i = 1; i < months.length; i++) {
@@ -337,40 +278,6 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
     }
     return changes;
   }, [lineItems]);
-
-  const seasonalAnalysis = useMemo(() => {
-    const inSeasonRevenue = months.filter((_, idx) => seasonMonths.includes(idx + 1))
-      .reduce((sum, month) => sum + getCategoryTotal('Revenue', month), 0);
-    const offSeasonRevenue = months.filter((_, idx) => !seasonMonths.includes(idx + 1))
-      .reduce((sum, month) => sum + getCategoryTotal('Revenue', month), 0);
-    const total = inSeasonRevenue + offSeasonRevenue;
-    return {
-      inSeasonRevenue,
-      offSeasonRevenue,
-      inSeasonPct: total > 0 ? (inSeasonRevenue / total) * 100 : 0,
-      offSeasonPct: total > 0 ? (offSeasonRevenue / total) * 100 : 0
-    };
-  }, [lineItems, seasonMonths]);
-
-  const monthlyPerformance = useMemo(() => {
-    const monthlyRevenue = months.map(month => ({
-      month,
-      revenue: getCategoryTotal('Revenue', month),
-      expenses: getCategoryTotal('Expenses', month),
-      noi: getCategoryTotal('Revenue', month) - getCategoryTotal('COGS', month) - getCategoryTotal('Expenses', month)
-    }));
-    const sortedByRevenue = [...monthlyRevenue].sort((a, b) => b.revenue - a.revenue);
-    const sortedByNoi = [...monthlyRevenue].sort((a, b) => b.noi - a.noi);
-    return {
-      monthly: monthlyRevenue,
-      bestRevenueMonth: sortedByRevenue[0]?.month || '-',
-      worstRevenueMonth: sortedByRevenue[sortedByRevenue.length - 1]?.month || '-',
-      bestNoiMonth: sortedByNoi[0]?.month || '-',
-      worstNoiMonth: sortedByNoi[sortedByNoi.length - 1]?.month || '-',
-      avgMonthlyRevenue: totalRevenue / 12,
-      avgMonthlyNoi: netIncome / 12
-    };
-  }, [lineItems, totalRevenue, netIncome]);
 
   const handleSync = () => {
     const sources = Object.entries(syncSources)
@@ -470,25 +377,6 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
             </div>
           )}
           
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={showAnalytics ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setShowAnalytics(!showAnalytics)}
-                  className="h-9"
-                >
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  {showAnalytics ? "Hide Analytics" : "Analytics"}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{showAnalytics ? "Click to return to P&L view" : "Show analytics and insights"}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-
           <Button
             variant="outline"
             size="sm"
@@ -632,309 +520,6 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   </Badge>
                 );
               })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {!hasActualsData && lineItems.length === 0 && (
-        <Card className="border-dashed">
-          <CardContent className="py-8 text-center">
-            <FileSpreadsheet className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-            <h4 className="font-semibold mb-2">No P&L Data Yet</h4>
-            <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
-              {isOwnedMarina 
-                ? "Upload financial documents via Doc Intel or sync operations data to populate your historical P&L statement."
-                : "Upload financial documents via Doc Intel to populate your historical P&L statement for this prospective acquisition."}
-            </p>
-            <div className="flex justify-center gap-3">
-              {isOwnedMarina && (
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={() => setShowSyncDialog(true)}
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Sync Operations Data
-                </Button>
-              )}
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onTabChange?.('uploads')}
-              >
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                Upload Documents
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Revenue</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600" data-testid="text-total-revenue">
-              {formatCurrency(totalRevenue)}
-            </div>
-            {yoyChanges?.revenue !== null && yoyChanges?.revenue !== undefined && (
-              <div className={`flex items-center gap-1 text-xs mt-1 ${yoyChanges.revenue >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {yoyChanges.revenue >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                {yoyChanges.revenue >= 0 ? '+' : ''}{yoyChanges.revenue.toFixed(1)}% YoY
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Gross Profit</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-gross-profit">
-              {formatCurrency(grossProfit)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100).toFixed(1) : 0}% margin
-            </p>
-            {yoyChanges?.grossProfit !== null && yoyChanges?.grossProfit !== undefined && (
-              <div className={`flex items-center gap-1 text-xs mt-1 ${yoyChanges.grossProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {yoyChanges.grossProfit >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                {yoyChanges.grossProfit >= 0 ? '+' : ''}{yoyChanges.grossProfit.toFixed(1)}% YoY
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Expenses</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600" data-testid="text-total-expenses">
-              {formatCurrency(totalExpenses)}
-            </div>
-            {yoyChanges?.expenses !== null && yoyChanges?.expenses !== undefined && (
-              <div className={`flex items-center gap-1 text-xs mt-1 ${yoyChanges.expenses <= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {yoyChanges.expenses <= 0 ? <ArrowDownRight className="h-3 w-3" /> : <ArrowUpRight className="h-3 w-3" />}
-                {yoyChanges.expenses >= 0 ? '+' : ''}{yoyChanges.expenses.toFixed(1)}% YoY
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Net Operating Income</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${netIncome >= 0 ? 'text-green-600' : 'text-red-600'}`} data-testid="text-noi">
-              {formatCurrency(netIncome)}
-            </div>
-            {yoyChanges?.netIncome !== null && yoyChanges?.netIncome !== undefined && (
-              <div className={`flex items-center gap-1 text-xs mt-1 ${yoyChanges.netIncome >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {yoyChanges.netIncome >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                {yoyChanges.netIncome >= 0 ? '+' : ''}{yoyChanges.netIncome.toFixed(1)}% YoY
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {showAnalytics && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Historical Analytics & Insights
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Key performance metrics, margins, and year-over-year analysis
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <div className="p-3 rounded-lg border space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Gross Margin</span>
-                  <Percent className="h-3.5 w-3.5 text-muted-foreground" />
-                </div>
-                <div className="text-xl font-bold">
-                  {totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100).toFixed(1) : 0}%
-                </div>
-                {yoyChanges?.grossMargin !== null && yoyChanges?.grossMargin !== undefined ? (
-                  <div className={`flex items-center gap-1 text-xs ${yoyChanges.grossMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {yoyChanges.grossMargin >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                    {yoyChanges.grossMargin >= 0 ? '+' : ''}{yoyChanges.grossMargin.toFixed(1)}pp vs prior year
-                  </div>
-                ) : (
-                  <div className="text-xs text-muted-foreground">No prior year data</div>
-                )}
-              </div>
-              
-              <div className="p-3 rounded-lg border space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Operating Margin</span>
-                  <Percent className="h-3.5 w-3.5 text-muted-foreground" />
-                </div>
-                <div className="text-xl font-bold">
-                  {totalRevenue > 0 ? ((netIncome / totalRevenue) * 100).toFixed(1) : 0}%
-                </div>
-                {yoyChanges?.operatingMargin !== null && yoyChanges?.operatingMargin !== undefined ? (
-                  <div className={`flex items-center gap-1 text-xs ${yoyChanges.operatingMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {yoyChanges.operatingMargin >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                    {yoyChanges.operatingMargin >= 0 ? '+' : ''}{yoyChanges.operatingMargin.toFixed(1)}pp vs prior year
-                  </div>
-                ) : (
-                  <div className="text-xs text-muted-foreground">No prior year data</div>
-                )}
-              </div>
-              
-              <div className="p-3 rounded-lg border space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Revenue Growth</span>
-                  {yoyChanges?.revenue !== null && yoyChanges?.revenue !== undefined && yoyChanges.revenue >= 0 ? (
-                    <TrendingUp className="h-3.5 w-3.5 text-green-600" />
-                  ) : (
-                    <TrendingDown className="h-3.5 w-3.5 text-red-600" />
-                  )}
-                </div>
-                <div className={`text-xl font-bold ${yoyChanges?.revenue !== null && yoyChanges?.revenue !== undefined && yoyChanges.revenue >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {yoyChanges?.revenue !== null && yoyChanges?.revenue !== undefined 
-                    ? `${yoyChanges.revenue >= 0 ? '+' : ''}${yoyChanges.revenue.toFixed(1)}%`
-                    : 'N/A'}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Year-over-year change
-                </div>
-              </div>
-              
-              <div className="p-3 rounded-lg border space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Expense Ratio</span>
-                  <Percent className="h-3.5 w-3.5 text-muted-foreground" />
-                </div>
-                <div className="text-xl font-bold">
-                  {totalRevenue > 0 ? ((totalExpenses / totalRevenue) * 100).toFixed(1) : 0}%
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  of total revenue
-                </div>
-              </div>
-            </div>
-            
-            <div className="mt-4 grid gap-4 md:grid-cols-3">
-              <div className="p-3 rounded-lg border">
-                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-                  <Activity className="h-4 w-4" />
-                  Seasonal Performance
-                </h4>
-                <div className="space-y-3">
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-muted-foreground">In-Season Revenue</span>
-                      <span className="font-medium">{formatCurrency(seasonalAnalysis.inSeasonRevenue)}</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-2">
-                      <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${seasonalAnalysis.inSeasonPct}%` }} />
-                    </div>
-                    <div className="text-xs text-right text-muted-foreground mt-0.5">{seasonalAnalysis.inSeasonPct.toFixed(1)}%</div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-muted-foreground">Off-Season Revenue</span>
-                      <span className="font-medium">{formatCurrency(seasonalAnalysis.offSeasonRevenue)}</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-2">
-                      <div className="bg-gray-400 h-2 rounded-full" style={{ width: `${seasonalAnalysis.offSeasonPct}%` }} />
-                    </div>
-                    <div className="text-xs text-right text-muted-foreground mt-0.5">{seasonalAnalysis.offSeasonPct.toFixed(1)}%</div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="p-3 rounded-lg border">
-                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-                  <Target className="h-4 w-4" />
-                  Monthly Performance
-                </h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Best Revenue Month</span>
-                    <span className="font-medium text-green-600">{monthlyPerformance.bestRevenueMonth}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Lowest Revenue Month</span>
-                    <span className="font-medium text-red-600">{monthlyPerformance.worstRevenueMonth}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Best NOI Month</span>
-                    <span className="font-medium text-green-600">{monthlyPerformance.bestNoiMonth}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Avg Monthly Revenue</span>
-                    <span className="font-medium">{formatCurrency(monthlyPerformance.avgMonthlyRevenue)}</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="p-3 rounded-lg border">
-                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-                  <Sparkles className="h-4 w-4" />
-                  Key Insights
-                </h4>
-                <div className="space-y-2 text-xs">
-                  {seasonalAnalysis.inSeasonPct > 70 && (
-                    <div className="flex items-start gap-2 p-2 rounded bg-blue-50 text-blue-800">
-                      <Info className="h-4 w-4 mt-0.5 shrink-0" />
-                      <span>{seasonalAnalysis.inSeasonPct.toFixed(0)}% of revenue concentrated in-season months</span>
-                    </div>
-                  )}
-                  {yoyChanges?.revenue !== null && yoyChanges?.revenue !== undefined && yoyChanges.revenue > 5 && (
-                    <div className="flex items-start gap-2 p-2 rounded bg-green-50 text-green-800">
-                      <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
-                      <span>Strong revenue growth of {yoyChanges.revenue.toFixed(1)}% YoY</span>
-                    </div>
-                  )}
-                  {yoyChanges?.expenses !== null && yoyChanges?.expenses !== undefined && yoyChanges.expenses > 8 && (
-                    <div className="flex items-start gap-2 p-2 rounded bg-amber-50 text-amber-800">
-                      <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                      <span>Expenses grew {yoyChanges.expenses.toFixed(1)}% YoY - review cost controls</span>
-                    </div>
-                  )}
-                  {(!yoyChanges || (yoyChanges.revenue === null && yoyChanges.expenses === null)) && (
-                    <div className="flex items-start gap-2 p-2 rounded bg-gray-50 text-gray-700">
-                      <Info className="h-4 w-4 mt-0.5 shrink-0" />
-                      <span>Upload prior year data for YoY analysis</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-            
-            <div className="mt-4">
-              <div className="p-3 rounded-lg border">
-                <h4 className="text-sm font-medium mb-3">Revenue Mix by Category</h4>
-                <div className="space-y-2">
-                  {Object.entries(groupedData).filter(([cat]) => cat === 'Revenue').flatMap(([_, items]) => 
-                    items.slice(0, 5).map((item: PLLineItem) => {
-                      const pct = totalRevenue > 0 ? (item.annualTotal / totalRevenue) * 100 : 0;
-                      return (
-                        <div key={item.id} className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground truncate flex-1">{item.description}</span>
-                          <div className="flex items-center gap-2">
-                            <div className="w-32 bg-muted rounded-full h-2">
-                              <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${Math.min(pct, 100)}%` }} />
-                            </div>
-                            <span className="w-16 text-right font-medium">{formatCurrency(item.annualTotal)}</span>
-                            <span className="w-12 text-right text-muted-foreground">{pct.toFixed(1)}%</span>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
             </div>
           </CardContent>
         </Card>
