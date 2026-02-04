@@ -1,12 +1,16 @@
-# Dependencies
+# Dependencies - will be reinstalled in Docker
 node_modules/
 
-# Development files
+# Version control
 .git/
 .gitignore
+.gitattributes
+
+# Environment files (secrets handled separately)
 .env.local
 .env.development
 .env*.local
+.env.test
 
 # IDE and editor files
 .vscode/
@@ -14,23 +18,32 @@ node_modules/
 *.swp
 *.swo
 *~
+.editorconfig
 
-# Test files
+# Test files and coverage
 **/*.test.ts
 **/*.test.tsx
 **/*.spec.ts
 **/*.spec.tsx
 __tests__/
+tests/
 coverage/
 .nyc_output/
+jest.config.*
+vitest.config.*
 
-# Documentation
+# Documentation (not needed in production)
 docs/
 *.md
 !README.md
+CHANGELOG*
+LICENSE*
 
-# Build artifacts (we rebuild in Docker)
+# Build artifacts (rebuilt in Docker)
 dist/
+build/
+.next/
+out/
 
 # Logs
 *.log
@@ -42,6 +55,7 @@ logs/
 # OS files
 .DS_Store
 Thumbs.db
+*.DS_Store
 
 # Temporary files
 tmp/
@@ -49,28 +63,47 @@ temp/
 .tmp/
 /tmp/
 
-# Development assets
+# Large development assets (2.6GB!)
 attached_assets/
 *.psd
 *.ai
 *.sketch
+*.fig
 
-# Optional: Large media files if not needed
+# Large media files
 *.mp4
 *.mov
 *.avi
 *.wmv
+*.mkv
+*.flv
+*.webm
 
-# Replit specific
+# Replit specific (large cache)
 .replit
 replit.nix
 .cache/
 .upm/
 .config/
+.local/
 
 # TypeScript build info
 *.tsbuildinfo
 
-# Package manager locks (keep package-lock.json for reproducible builds)
+# Package manager files
 yarn.lock
 pnpm-lock.yaml
+.pnpm-store/
+.yarn/
+
+# Skills and local configs
+.local/skills/
+
+# Database files (handled by Replit DB)
+*.sqlite
+*.db
+
+# Backup files
+*.bak
+*.backup
+*~

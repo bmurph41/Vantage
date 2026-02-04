@@ -4,3 +4,36 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Build artifacts
+*.tsbuildinfo
+.cache/
+.tmp/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# OS files
+Thumbs.db
+
+# Temporary files
+tmp/
+/tmp/
+
+# Large media files
+*.mp4
+*.mov
+*.avi
+*.psd
+*.ai
+
+# IDE
+.idea/
+*.swp
+*.swo
