@@ -51,9 +51,7 @@ import {
   Clock,
   BarChart3,
   Layers,
-  Calendar,
-  Eye,
-  EyeOff
+  Calendar
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
@@ -114,7 +112,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
   });
   const [viewMode, setViewMode] = useState<'single' | 'all' | 'compare'>('single');
   const [compareYears, setCompareYears] = useState<string[]>([]);
-  const [showMonthly, setShowMonthly] = useState(true);
+  const [displayMode, setDisplayMode] = useState<'monthly' | 'annual'>('monthly');
   const [showMoM, setShowMoM] = useState(false);
 
   const { data: availableYearsData } = useQuery<{ years: number[] }>({
@@ -125,6 +123,18 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
     const years = availableYearsData?.years || [];
     return years.map(String);
   }, [availableYearsData]);
+
+  const yearRange = useMemo(() => {
+    if (availableYears.length === 0) return [];
+    const numericYears = availableYears.map(Number);
+    const minYear = Math.min(...numericYears);
+    const maxYear = Math.max(...numericYears);
+    const range: number[] = [];
+    for (let y = minYear; y <= maxYear; y++) {
+      range.push(y);
+    }
+    return range;
+  }, [availableYears]);
 
   useEffect(() => {
     if (availableYears.length > 0 && !selectedYear) {
@@ -147,6 +157,11 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
   const { data: actualsData, isLoading: actualsLoading } = useQuery<any>({
     queryKey: [`/api/modeling/projects/${projectId}/actuals?year=${selectedYear}`],
     enabled: !!selectedYear,
+  });
+
+  const { data: allYearsActualsData } = useQuery<any>({
+    queryKey: [`/api/modeling/projects/${projectId}/actuals`],
+    enabled: displayMode === 'annual' && yearRange.length > 0,
   });
 
   const { data: dataSources } = useQuery<DataSourceSummary[]>({
@@ -279,6 +294,50 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
     return changes;
   }, [lineItems]);
 
+  const annualDataByYear = useMemo(() => {
+    if (!allYearsActualsData?.grouped) return {};
+    const dataByYear: Record<number, Record<string, Record<string, number>>> = {};
+    for (const year of yearRange) {
+      dataByYear[year] = { Revenue: {}, COGS: {}, Expenses: {} };
+    }
+    for (const item of allYearsActualsData.grouped) {
+      const year = item.year || parseInt(selectedYear);
+      if (!dataByYear[year]) continue;
+      const cat = item.category || 'Expenses';
+      const subcat = item.subcategory || 'Other';
+      if (!dataByYear[year][cat]) dataByYear[year][cat] = {};
+      dataByYear[year][cat][subcat] = (dataByYear[year][cat][subcat] || 0) + (item.annualTotal || 0);
+    }
+    return dataByYear;
+  }, [allYearsActualsData, yearRange, selectedYear]);
+
+  const getAnnualCategoryTotal = (category: string, year: number) => {
+    const catData = annualDataByYear[year]?.[category];
+    if (!catData) return 0;
+    return Object.values(catData).reduce((sum, val) => sum + val, 0);
+  };
+
+  const getAnnualSubcategoryAmount = (category: string, subcategory: string, year: number) => {
+    return annualDataByYear[year]?.[category]?.[subcategory] || 0;
+  };
+
+  const annualSubcategories = useMemo(() => {
+    const subcats: Record<string, Set<string>> = { Revenue: new Set(), COGS: new Set(), Expenses: new Set() };
+    for (const year of yearRange) {
+      for (const cat of ['Revenue', 'COGS', 'Expenses']) {
+        const catData = annualDataByYear[year]?.[cat];
+        if (catData) {
+          Object.keys(catData).forEach(sub => subcats[cat].add(sub));
+        }
+      }
+    }
+    return {
+      Revenue: Array.from(subcats.Revenue),
+      COGS: Array.from(subcats.COGS),
+      Expenses: Array.from(subcats.Expenses)
+    };
+  }, [annualDataByYear, yearRange]);
+
   const handleSync = () => {
     const sources = Object.entries(syncSources)
       .filter(([_, enabled]) => enabled)
@@ -377,15 +436,18 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
             </div>
           )}
           
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowMonthly(!showMonthly)}
-            className="h-9"
-          >
-            {showMonthly ? <Eye className="h-4 w-4 mr-2" /> : <EyeOff className="h-4 w-4 mr-2" />}
-            {showMonthly ? 'Monthly' : 'Annual'}
-          </Button>
+          <Tabs value={displayMode} onValueChange={(v) => setDisplayMode(v as 'monthly' | 'annual')} className="h-9">
+            <TabsList className="h-9">
+              <TabsTrigger value="monthly" className="text-xs px-3">
+                <Calendar className="h-3.5 w-3.5 mr-1.5" />
+                Monthly
+              </TabsTrigger>
+              <TabsTrigger value="annual" className="text-xs px-3">
+                <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
+                Annual
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
           
           {/* Sync button only shown for owned marinas, not for acquisitions/prospective deals */}
           {isOwnedMarina && (
@@ -529,170 +591,280 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
         <CardHeader>
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
-              <CardTitle>Monthly Detail {selectedYear && `- ${selectedYear}`}</CardTitle>
+              <CardTitle>
+                {displayMode === 'monthly' ? `Monthly Detail - ${selectedYear || ''}` : 'Annual Comparison'}
+              </CardTitle>
               <CardDescription>
                 Click category rows to expand/collapse line items
               </CardDescription>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={showMoM ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setShowMoM(!showMoM)}
-                      className="h-8 text-xs"
-                    >
-                      <TrendingUp className="h-3 w-3 mr-1" />
-                      MoM
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Show month-over-month changes</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <Badge variant="outline" className="gap-1">
-                <div className="w-2 h-2 rounded-full bg-blue-500" />
-                In-Season
-              </Badge>
-              <Badge variant="secondary" className="gap-1">
-                <div className="w-2 h-2 rounded-full bg-gray-300" />
-                Off-Season
-              </Badge>
+              {displayMode === 'monthly' && (
+                <>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={showMoM ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setShowMoM(!showMoM)}
+                          className="h-8 text-xs"
+                        >
+                          <TrendingUp className="h-3 w-3 mr-1" />
+                          MoM
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Show month-over-month changes</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <Badge variant="outline" className="gap-1">
+                    <div className="w-2 h-2 rounded-full bg-blue-500" />
+                    In-Season
+                  </Badge>
+                  <Badge variant="secondary" className="gap-1">
+                    <div className="w-2 h-2 rounded-full bg-gray-300" />
+                    Off-Season
+                  </Badge>
+                </>
+              )}
             </div>
           </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-64 sticky left-0 bg-background">Category / Line Item</TableHead>
-                  {months.map((month, idx) => (
-                    <TableHead 
-                      key={month} 
-                      className={`text-right w-24 ${!isSeasonalMonth(idx) ? 'bg-muted/30' : ''}`}
-                    >
-                      {month}
-                    </TableHead>
-                  ))}
-                  <TableHead className="text-right w-28 font-bold">Annual</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {['Revenue', 'COGS', 'Expenses'].map((category) => (
-                  <Fragment key={category}>
-                    <TableRow 
-                      className="bg-muted/50 cursor-pointer hover:bg-muted"
-                      onClick={() => toggleCategory(category)}
-                    >
-                      <TableCell className="font-semibold sticky left-0 bg-muted/50">
-                        <div className="flex items-center gap-2">
-                          {expandedCategories.has(category) ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                          {category}
-                        </div>
-                      </TableCell>
-                      {months.map((month, idx) => {
-                        const value = getCategoryTotal(category, month);
-                        const prevMonth = idx > 0 ? months[idx - 1] : null;
-                        const prevValue = prevMonth ? getCategoryTotal(category, prevMonth) : null;
-                        const momChange = prevValue && prevValue !== 0 ? ((value - prevValue) / Math.abs(prevValue)) * 100 : null;
-                        return (
-                          <TableCell 
-                            key={month} 
-                            className={`text-right font-semibold ${!isSeasonalMonth(idx) ? 'bg-muted/30' : ''}`}
-                          >
-                            <div className="flex flex-col items-end">
-                              <span>{formatCurrency(value)}</span>
-                              {showMoM && momChange !== null && idx > 0 && (
-                                <span className={`text-xs ${momChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                  {momChange >= 0 ? '+' : ''}{momChange.toFixed(0)}%
-                                </span>
-                              )}
-                            </div>
-                          </TableCell>
-                        );
-                      })}
-                      <TableCell className="text-right font-bold">
-                        {formatCurrency(getCategoryAnnualTotal(category))}
-                      </TableCell>
-                    </TableRow>
-
-                    {expandedCategories.has(category) && (groupedData[category] || []).map((item: PLLineItem) => {
-                      const SourceIcon = item.dataSource ? dataSourceIcons[item.dataSource] : null;
-                      return (
-                        <TableRow key={item.id} className="text-sm">
-                          <TableCell className="pl-10 sticky left-0 bg-background">
-                            <div className="flex items-center gap-2">
-                              {SourceIcon && (
-                                <SourceIcon className="h-3 w-3 text-muted-foreground" />
-                              )}
-                              <div className="flex flex-col">
-                                <span>{item.description}</span>
-                                <span className="text-xs text-muted-foreground">{item.subcategory}</span>
-                              </div>
-                            </div>
-                          </TableCell>
-                          {months.map((month, idx) => (
+            {displayMode === 'monthly' ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-64 sticky left-0 bg-background">Category / Line Item</TableHead>
+                    {months.map((month, idx) => (
+                      <TableHead 
+                        key={month} 
+                        className={`text-right w-24 ${!isSeasonalMonth(idx) ? 'bg-muted/30' : ''}`}
+                      >
+                        {month}
+                      </TableHead>
+                    ))}
+                    <TableHead className="text-right w-28 font-bold">Annual</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {['Revenue', 'COGS', 'Expenses'].map((category) => (
+                    <Fragment key={category}>
+                      <TableRow 
+                        className="bg-muted/50 cursor-pointer hover:bg-muted"
+                        onClick={() => toggleCategory(category)}
+                      >
+                        <TableCell className="font-semibold sticky left-0 bg-muted/50">
+                          <div className="flex items-center gap-2">
+                            {expandedCategories.has(category) ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                            {category}
+                          </div>
+                        </TableCell>
+                        {months.map((month, idx) => {
+                          const value = getCategoryTotal(category, month);
+                          const prevMonth = idx > 0 ? months[idx - 1] : null;
+                          const prevValue = prevMonth ? getCategoryTotal(category, prevMonth) : null;
+                          const momChange = prevValue && prevValue !== 0 ? ((value - prevValue) / Math.abs(prevValue)) * 100 : null;
+                          return (
                             <TableCell 
                               key={month} 
-                              className={`text-right ${!isSeasonalMonth(idx) ? 'bg-muted/30 text-muted-foreground' : ''}`}
+                              className={`text-right font-semibold ${!isSeasonalMonth(idx) ? 'bg-muted/30' : ''}`}
                             >
-                              {formatCurrency(item.monthlyData[month])}
+                              <div className="flex flex-col items-end">
+                                <span>{formatCurrency(value)}</span>
+                                {showMoM && momChange !== null && idx > 0 && (
+                                  <span className={`text-xs ${momChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {momChange >= 0 ? '+' : ''}{momChange.toFixed(0)}%
+                                  </span>
+                                )}
+                              </div>
                             </TableCell>
-                          ))}
-                          <TableCell className="text-right font-medium">
-                            {formatCurrency(item.annualTotal)}
-                          </TableCell>
-                        </TableRow>
+                          );
+                        })}
+                        <TableCell className="text-right font-bold">
+                          {formatCurrency(getCategoryAnnualTotal(category))}
+                        </TableCell>
+                      </TableRow>
+
+                      {expandedCategories.has(category) && (groupedData[category] || []).map((item: PLLineItem) => {
+                        const SourceIcon = item.dataSource ? dataSourceIcons[item.dataSource] : null;
+                        return (
+                          <TableRow key={item.id} className="text-sm">
+                            <TableCell className="pl-10 sticky left-0 bg-background">
+                              <div className="flex items-center gap-2">
+                                {SourceIcon && (
+                                  <SourceIcon className="h-3 w-3 text-muted-foreground" />
+                                )}
+                                <div className="flex flex-col">
+                                  <span>{item.description}</span>
+                                  <span className="text-xs text-muted-foreground">{item.subcategory}</span>
+                                </div>
+                              </div>
+                            </TableCell>
+                            {months.map((month, idx) => (
+                              <TableCell 
+                                key={month} 
+                                className={`text-right ${!isSeasonalMonth(idx) ? 'bg-muted/30 text-muted-foreground' : ''}`}
+                              >
+                                {formatCurrency(item.monthlyData[month])}
+                              </TableCell>
+                            ))}
+                            <TableCell className="text-right font-medium">
+                              {formatCurrency(item.annualTotal)}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </Fragment>
+                  ))}
+
+                  <TableRow className="bg-muted font-bold border-t-2">
+                    <TableCell className="sticky left-0 bg-muted">Gross Profit</TableCell>
+                    {months.map((month, idx) => {
+                      const revenue = getCategoryTotal('Revenue', month);
+                      const cogs = getCategoryTotal('COGS', month);
+                      return (
+                        <TableCell 
+                          key={month} 
+                          className={`text-right ${!isSeasonalMonth(idx) ? 'bg-muted/70' : ''}`}
+                        >
+                          {formatCurrency(revenue - cogs)}
+                        </TableCell>
                       );
                     })}
-                  </Fragment>
-                ))}
+                    <TableCell className="text-right">{formatCurrency(grossProfit)}</TableCell>
+                  </TableRow>
 
-                <TableRow className="bg-muted font-bold border-t-2">
-                  <TableCell className="sticky left-0 bg-muted">Gross Profit</TableCell>
-                  {months.map((month, idx) => {
-                    const revenue = getCategoryTotal('Revenue', month);
-                    const cogs = getCategoryTotal('COGS', month);
-                    return (
-                      <TableCell 
-                        key={month} 
-                        className={`text-right ${!isSeasonalMonth(idx) ? 'bg-muted/70' : ''}`}
+                  <TableRow className="bg-primary/10 font-bold">
+                    <TableCell className="sticky left-0 bg-primary/10">Net Operating Income</TableCell>
+                    {months.map((month, idx) => {
+                      const revenue = getCategoryTotal('Revenue', month);
+                      const cogs = getCategoryTotal('COGS', month);
+                      const expenses = getCategoryTotal('Expenses', month);
+                      const noi = revenue - cogs - expenses;
+                      return (
+                        <TableCell 
+                          key={month} 
+                          className={`text-right ${noi >= 0 ? 'text-green-600' : 'text-red-600'} ${!isSeasonalMonth(idx) ? 'opacity-60' : ''}`}
+                        >
+                          {formatCurrency(noi)}
+                        </TableCell>
+                      );
+                    })}
+                    <TableCell className={`text-right ${netIncome >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {formatCurrency(netIncome)}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-64 sticky left-0 bg-background">Category / Line Item</TableHead>
+                    {yearRange.map((year) => (
+                      <TableHead key={year} className="text-right w-28 font-bold">
+                        {year}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {['Revenue', 'COGS', 'Expenses'].map((category) => (
+                    <Fragment key={category}>
+                      <TableRow 
+                        className="bg-muted/50 cursor-pointer hover:bg-muted"
+                        onClick={() => toggleCategory(category)}
                       >
-                        {formatCurrency(revenue - cogs)}
-                      </TableCell>
-                    );
-                  })}
-                  <TableCell className="text-right">{formatCurrency(grossProfit)}</TableCell>
-                </TableRow>
+                        <TableCell className="font-semibold sticky left-0 bg-muted/50">
+                          <div className="flex items-center gap-2">
+                            {expandedCategories.has(category) ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                            {category}
+                          </div>
+                        </TableCell>
+                        {yearRange.map((year) => {
+                          const total = getAnnualCategoryTotal(category, year);
+                          const hasData = availableYears.includes(String(year));
+                          return (
+                            <TableCell 
+                              key={year} 
+                              className={`text-right font-semibold ${!hasData ? 'text-muted-foreground/50' : ''}`}
+                            >
+                              {hasData ? formatCurrency(total) : '-'}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
 
-                <TableRow className="bg-primary/10 font-bold">
-                  <TableCell className="sticky left-0 bg-primary/10">Net Operating Income</TableCell>
-                  {months.map((month, idx) => {
-                    const revenue = getCategoryTotal('Revenue', month);
-                    const cogs = getCategoryTotal('COGS', month);
-                    const expenses = getCategoryTotal('Expenses', month);
-                    const noi = revenue - cogs - expenses;
-                    return (
-                      <TableCell 
-                        key={month} 
-                        className={`text-right ${noi >= 0 ? 'text-green-600' : 'text-red-600'} ${!isSeasonalMonth(idx) ? 'opacity-60' : ''}`}
-                      >
-                        {formatCurrency(noi)}
-                      </TableCell>
-                    );
-                  })}
-                  <TableCell className={`text-right ${netIncome >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {formatCurrency(netIncome)}
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
+                      {expandedCategories.has(category) && annualSubcategories[category as keyof typeof annualSubcategories]?.map((subcategory) => (
+                        <TableRow key={`${category}-${subcategory}`} className="text-sm">
+                          <TableCell className="pl-10 sticky left-0 bg-background">
+                            <span>{subcategory}</span>
+                          </TableCell>
+                          {yearRange.map((year) => {
+                            const amount = getAnnualSubcategoryAmount(category, subcategory, year);
+                            const hasData = availableYears.includes(String(year));
+                            return (
+                              <TableCell 
+                                key={year} 
+                                className={`text-right ${!hasData ? 'text-muted-foreground/50' : ''}`}
+                              >
+                                {hasData && amount !== 0 ? formatCurrency(amount) : '-'}
+                              </TableCell>
+                            );
+                          })}
+                        </TableRow>
+                      ))}
+                    </Fragment>
+                  ))}
+
+                  <TableRow className="bg-muted font-bold border-t-2">
+                    <TableCell className="sticky left-0 bg-muted">Gross Profit</TableCell>
+                    {yearRange.map((year) => {
+                      const revenue = getAnnualCategoryTotal('Revenue', year);
+                      const cogs = getAnnualCategoryTotal('COGS', year);
+                      const hasData = availableYears.includes(String(year));
+                      return (
+                        <TableCell 
+                          key={year} 
+                          className={`text-right ${!hasData ? 'text-muted-foreground/50' : ''}`}
+                        >
+                          {hasData ? formatCurrency(revenue - cogs) : '-'}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+
+                  <TableRow className="bg-primary/10 font-bold">
+                    <TableCell className="sticky left-0 bg-primary/10">Net Operating Income</TableCell>
+                    {yearRange.map((year) => {
+                      const revenue = getAnnualCategoryTotal('Revenue', year);
+                      const cogs = getAnnualCategoryTotal('COGS', year);
+                      const expenses = getAnnualCategoryTotal('Expenses', year);
+                      const noi = revenue - cogs - expenses;
+                      const hasData = availableYears.includes(String(year));
+                      return (
+                        <TableCell 
+                          key={year} 
+                          className={`text-right ${!hasData ? 'text-muted-foreground/50' : noi >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                        >
+                          {hasData ? formatCurrency(noi) : '-'}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                </TableBody>
+              </Table>
+            )}
           </div>
         </CardContent>
       </Card>
