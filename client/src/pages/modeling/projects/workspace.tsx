@@ -257,10 +257,6 @@ export default function ProjectWorkspace() {
               <Settings2 className="h-4 w-4" />
               <span className="hidden sm:inline">Inputs</span>
             </TabsTrigger>
-            <TabsTrigger value="assumptions" className="gap-2" data-testid="tab-assumptions">
-              <TrendingUp className="h-4 w-4" />
-              <span className="hidden sm:inline">Assumptions</span>
-            </TabsTrigger>
             <TabsTrigger value="uploads" className="gap-2" data-testid="tab-uploads">
               <Upload className="h-4 w-4" />
               <span className="hidden sm:inline">Uploads</span>
@@ -268,6 +264,10 @@ export default function ProjectWorkspace() {
             <TabsTrigger value="historical" className="gap-2" data-testid="tab-historical">
               <FileSpreadsheet className="h-4 w-4" />
               <span className="hidden sm:inline">Historical</span>
+            </TabsTrigger>
+            <TabsTrigger value="assumptions" className="gap-2" data-testid="tab-assumptions">
+              <TrendingUp className="h-4 w-4" />
+              <span className="hidden sm:inline">Assumptions</span>
             </TabsTrigger>
             <TabsTrigger value="proforma" className="gap-2" data-testid="tab-proforma">
               <BarChart3 className="h-4 w-4" />
