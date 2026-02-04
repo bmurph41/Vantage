@@ -17,12 +17,13 @@ import {
 import { 
   Calculator, TrendingUp, AlertCircle, Save, Trash2, Copy, 
   DollarSign, Percent, Calendar, Building2, ArrowRight,
-  RefreshCw, FileSpreadsheet, ChevronRight, ExternalLink
+  RefreshCw, FileSpreadsheet, ChevronRight, ExternalLink, Layers
 } from "lucide-react";
 import { format, subYears } from "date-fns";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { DebtScenario, ModelingProject } from "@shared/schema";
+import LoanBuilder from '@/components/modeling/LoanBuilder';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { MarketRatePicker, CurrentRateBadge } from '@/components/modeling/MarketRatePicker';
 import { useAllMarketRates } from '@/hooks/use-market-rates';
@@ -542,6 +543,10 @@ export default function WorkspaceDebtScenarios({ projectId, onTabChange }: Works
           <TabsTrigger value="overview" data-testid="tab-debt-overview">Overview</TabsTrigger>
           <TabsTrigger value="calculator" data-testid="tab-debt-calculator">Calculator</TabsTrigger>
           <TabsTrigger value="amortization" data-testid="tab-debt-amortization">Amortization</TabsTrigger>
+          <TabsTrigger value="advanced" data-testid="tab-debt-advanced" className="gap-1">
+            <Layers className="h-4 w-4" />
+            Advanced
+          </TabsTrigger>
           <TabsTrigger value="scenarios" data-testid="tab-debt-scenarios">Saved Scenarios</TabsTrigger>
         </TabsList>
 
@@ -860,6 +865,27 @@ export default function WorkspaceDebtScenarios({ projectId, onTabChange }: Works
                   </tbody>
                 </table>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="advanced" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Layers className="h-5 w-5" />
+                Multi-Loan Debt Builder
+              </CardTitle>
+              <CardDescription>
+                Build complex loan structures, view blended metrics, compare scenarios, and run DSCR covenant testing
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <LoanBuilder 
+                projectId={projectId}
+                purchasePrice={parseFormattedNumber(inputs.purchasePrice)}
+                noi={parseFormattedNumber(inputs.noi)}
+              />
             </CardContent>
           </Card>
         </TabsContent>

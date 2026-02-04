@@ -9,11 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar } from "recharts";
-import { Calculator, TrendingUp, AlertCircle, Save, Trash2, Copy, Upload } from "lucide-react";
+import { Calculator, TrendingUp, AlertCircle, Save, Trash2, Copy, Upload, Layers } from "lucide-react";
 import { format, subYears } from "date-fns";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { DebtScenario } from "@shared/schema";
+import LoanBuilder from '@/components/modeling/LoanBuilder';
 
 // FRED Series IDs for base rates
 const BASE_RATE_OPTIONS = [
@@ -494,9 +495,13 @@ export default function DebtScenariosIndex() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="rates" data-testid="tab-rates">Rate Analysis</TabsTrigger>
           <TabsTrigger value="underwriting" data-testid="tab-underwriting">Underwriting Metrics</TabsTrigger>
+          <TabsTrigger value="advanced" data-testid="tab-advanced" className="gap-1">
+            <Layers className="h-4 w-4" />
+            Advanced Debt
+          </TabsTrigger>
           <TabsTrigger value="scenarios" data-testid="tab-scenarios">Saved Scenarios</TabsTrigger>
         </TabsList>
 
@@ -988,7 +993,29 @@ export default function DebtScenariosIndex() {
           )}
         </TabsContent>
 
-        {/* Tab 3: Saved Scenarios */}
+        {/* Tab 3: Advanced Debt Modeling */}
+        <TabsContent value="advanced" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Layers className="h-5 w-5" />
+                Multi-Loan Debt Builder
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Build complex loan structures, view blended metrics, compare scenarios, and run DSCR covenant testing
+              </p>
+            </CardHeader>
+            <CardContent>
+              <LoanBuilder 
+                projectId="standalone"
+                purchasePrice={parseFormattedNumber(inputs.purchasePrice)}
+                noi={parseFormattedNumber(inputs.noi)}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab 4: Saved Scenarios */}
         <TabsContent value="scenarios" className="space-y-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
