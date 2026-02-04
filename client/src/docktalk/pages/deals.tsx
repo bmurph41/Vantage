@@ -1,17 +1,22 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, DollarSign, TrendingUp, Building2, Users, ExternalLink, Filter, X, BarChart3, Activity, Globe, Download, Share2, FileText } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Calendar, DollarSign, TrendingUp, Building2, Users, ExternalLink, Filter, X, BarChart3, Activity, Globe, Download, Share2, FileText, Plus, RefreshCw } from "lucide-react";
 import { format, parse } from "date-fns";
 import { Link } from "wouter";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { exportDealsToCSV, type DealExportData } from "../lib/csv-export";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 interface Deal {
   id: number;
@@ -113,6 +118,67 @@ export default function DealsPage() {
   const [regionFilter, setRegionFilter] = useState<string>("");
   const [limit] = useState(50);
   const [offset] = useState(0);
+  const [showAddDealModal, setShowAddDealModal] = useState(false);
+  const [dealForm, setDealForm] = useState({
+    transactionType: "Asset Sale" as string,
+    dealStatus: "Closed" as string,
+    buyer: "",
+    seller: "",
+    assetDescription: "",
+    dealSize: "",
+    dealDate: "",
+    city: "",
+    state: "",
+    region: "US/Domestic",
+  });
+
+  const createDealMutation = useMutation({
+    mutationFn: async (data: typeof dealForm) => {
+      return apiRequest("POST", "/api/docktalk/deals", data);
+    },
+    onSuccess: () => {
+      toast({ title: "Deal Added", description: "The deal has been added successfully." });
+      setShowAddDealModal(false);
+      setDealForm({
+        transactionType: "Asset Sale",
+        dealStatus: "Closed",
+        buyer: "",
+        seller: "",
+        assetDescription: "",
+        dealSize: "",
+        dealDate: "",
+        city: "",
+        state: "",
+        region: "US/Domestic",
+      });
+      queryClient.invalidateQueries({ predicate: (query) => 
+        String(query.queryKey[0]).startsWith("/api/docktalk/deals")
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to add deal", variant: "destructive" });
+    },
+  });
+
+  const syncFromSalesCompsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/docktalk/deals/sync-from-sales-comps", {});
+      return response;
+    },
+    onSuccess: async (response: any) => {
+      const result = await response.json();
+      toast({ 
+        title: "Sync Complete", 
+        description: `Synced ${result.synced || 0} deals from Sales Comps (${result.skipped || 0} already existed).` 
+      });
+      queryClient.invalidateQueries({ predicate: (query) => 
+        String(query.queryKey[0]).startsWith("/api/docktalk/deals")
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "Sync Failed", description: error.message || "Failed to sync from Sales Comps", variant: "destructive" });
+    },
+  });
 
   // Read URL parameters on mount to restore filter state
   useEffect(() => {
@@ -397,6 +463,153 @@ export default function DealsPage() {
 
           {/* Action Buttons */}
           <div className="flex justify-end gap-3 mb-6">
+            <Button 
+              variant="outline" 
+              onClick={() => syncFromSalesCompsMutation.mutate()}
+              disabled={syncFromSalesCompsMutation.isPending}
+            >
+              {syncFromSalesCompsMutation.isPending ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              Sync from Sales Comps
+            </Button>
+            <Dialog open={showAddDealModal} onOpenChange={setShowAddDealModal}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Deal
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Add New Deal</DialogTitle>
+                  <DialogDescription>
+                    Manually add a marina transaction to track
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="assetDescription">Marina / Asset Name *</Label>
+                    <Input
+                      id="assetDescription"
+                      value={dealForm.assetDescription}
+                      onChange={(e) => setDealForm(prev => ({ ...prev, assetDescription: e.target.value }))}
+                      placeholder="e.g. Sunset Marina"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label>Transaction Type</Label>
+                      <Select value={dealForm.transactionType} onValueChange={(v) => setDealForm(prev => ({ ...prev, transactionType: v }))}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TRANSACTION_TYPES.map(type => (
+                            <SelectItem key={type} value={type}>{type}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Status</Label>
+                      <Select value={dealForm.dealStatus} onValueChange={(v) => setDealForm(prev => ({ ...prev, dealStatus: v }))}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {DEAL_STATUSES.map(status => (
+                            <SelectItem key={status} value={status}>{status}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="seller">Seller</Label>
+                      <Input
+                        id="seller"
+                        value={dealForm.seller}
+                        onChange={(e) => setDealForm(prev => ({ ...prev, seller: e.target.value }))}
+                        placeholder="Seller name"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="buyer">Buyer</Label>
+                      <Input
+                        id="buyer"
+                        value={dealForm.buyer}
+                        onChange={(e) => setDealForm(prev => ({ ...prev, buyer: e.target.value }))}
+                        placeholder="Buyer name"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="dealSize">Deal Size</Label>
+                      <Input
+                        id="dealSize"
+                        value={dealForm.dealSize}
+                        onChange={(e) => setDealForm(prev => ({ ...prev, dealSize: e.target.value }))}
+                        placeholder="e.g. $5.2M"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="dealDate">Deal Date</Label>
+                      <Input
+                        id="dealDate"
+                        type="date"
+                        value={dealForm.dealDate}
+                        onChange={(e) => setDealForm(prev => ({ ...prev, dealDate: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="city">City</Label>
+                      <Input
+                        id="city"
+                        value={dealForm.city}
+                        onChange={(e) => setDealForm(prev => ({ ...prev, city: e.target.value }))}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="state">State</Label>
+                      <Input
+                        id="state"
+                        value={dealForm.state}
+                        onChange={(e) => setDealForm(prev => ({ ...prev, state: e.target.value }))}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Region</Label>
+                      <Select value={dealForm.region} onValueChange={(v) => setDealForm(prev => ({ ...prev, region: v }))}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {REGIONS.map(r => (
+                            <SelectItem key={r} value={r}>{r}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowAddDealModal(false)}>Cancel</Button>
+                  <Button 
+                    onClick={() => createDealMutation.mutate(dealForm)}
+                    disabled={!dealForm.assetDescription || createDealMutation.isPending}
+                  >
+                    {createDealMutation.isPending ? "Adding..." : "Add Deal"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
             <Button variant="outline" onClick={handleShareURL} data-testid="button-share-url">
               <Share2 className="h-4 w-4 mr-2" />
               Share Filters

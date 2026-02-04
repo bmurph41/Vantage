@@ -2060,6 +2060,137 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
+  // Create a deal manually
+  const ManualDealSchema = z.object({
+    transactionType: z.enum(["M&A", "Financing", "Partnership", "Asset Sale", "Lease", "Other"]),
+    dealStatus: z.enum(["Announced", "Pending", "Closed", "Terminated"]).optional(),
+    buyer: z.string().optional(),
+    seller: z.string().optional(),
+    assetDescription: z.string().min(1, "Asset description is required"),
+    dealSize: z.string().optional(),
+    valuation: z.string().optional(),
+    dealDate: z.string().optional(),
+    closingDate: z.string().optional(),
+    dealSummary: z.string().optional(),
+    region: z.string().optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
+  });
+
+  app.post("/api/docktalk/deals", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const data = ManualDealSchema.parse(req.body);
+      const orgId = req.marinaMatchUser?.orgId;
+      const userId = req.marinaMatchUser?.id;
+      
+      if (!orgId || !userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const announcedDate = data.dealDate ? new Date(data.dealDate) : new Date();
+      const closingDate = data.closingDate ? new Date(data.closingDate) : null;
+
+      const deal = await dockTalkStorage.createDeal({
+        orgId,
+        createdBy: userId,
+        origin: 'marinaMatch',
+        transactionType: data.transactionType,
+        dealStatus: (data.dealStatus || 'Announced') as any,
+        buyer: data.buyer || null,
+        seller: data.seller || null,
+        assetDescription: data.assetDescription,
+        dealSize: data.dealSize || null,
+        valuation: data.valuation || null,
+        announcedDate,
+        closingDate,
+        dealSummary: data.dealSummary || null,
+        region: data.region || null,
+        city: data.city || null,
+        state: data.state || null,
+        confidence: 100,
+      });
+
+      res.status(201).json(deal);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid input data", details: error.errors });
+      }
+      console.error("Error creating deal:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Sync deals from Sales Comps
+  app.post("/api/docktalk/deals/sync-from-sales-comps", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const orgId = req.marinaMatchUser?.orgId;
+      const userId = req.marinaMatchUser?.id;
+      
+      if (!orgId || !userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      // Dynamic imports to avoid circular dependencies
+      const { salesComps, docktalkDeals } = await import("@shared/schema");
+      const { isNull, eq: eqOp, and: andOp } = await import("drizzle-orm");
+      const { db } = await import("./db");
+      
+      const comps = await db.select().from(salesComps)
+        .where(andOp(
+          eqOp(salesComps.orgId, orgId),
+          isNull(salesComps.deletedAt)
+        ));
+
+      let synced = 0;
+      let skipped = 0;
+
+      for (const comp of comps) {
+        // Check if already synced by externalId
+        const existing = await db.select().from(docktalkDeals)
+          .where(andOp(
+            eqOp(docktalkDeals.orgId, orgId),
+            eqOp(docktalkDeals.externalId, comp.id)
+          ))
+          .limit(1);
+
+        if (existing.length > 0) {
+          skipped++;
+          continue;
+        }
+
+        // Create deal from sales comp
+        const dealDate = comp.saleYear && comp.saleMonth 
+          ? new Date(comp.saleYear, comp.saleMonth - 1, 15)
+          : new Date();
+
+        await dockTalkStorage.createDeal({
+          orgId,
+          createdBy: userId,
+          origin: 'marinaMatch',
+          externalId: comp.id,
+          sourceReference: `Sales Comp: ${comp.marina}`,
+          transactionType: 'Asset Sale',
+          dealStatus: 'Closed',
+          assetDescription: comp.marina,
+          dealSize: comp.salePrice ? `$${(comp.salePrice / 1000000).toFixed(1)}M` : null,
+          valuation: comp.salePrice ? `$${(comp.salePrice / 1000000).toFixed(1)}M` : null,
+          announcedDate: dealDate,
+          closingDate: dealDate,
+          region: comp.region || null,
+          city: comp.city || null,
+          state: comp.state || null,
+          confidence: 100,
+        });
+        synced++;
+      }
+
+      res.json({ synced, skipped, total: comps.length });
+    } catch (error) {
+      console.error("Error syncing from sales comps:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.get("/api/docktalk/articles/:id/deals", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
       const articleId = parseInt(req.params.id, 10);
