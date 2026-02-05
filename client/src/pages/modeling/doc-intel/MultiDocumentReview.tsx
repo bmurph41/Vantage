@@ -117,7 +117,7 @@ export function MultiDocumentReview({
   const [, navigate] = useLocation();
   const [activeDocumentId, setActiveDocumentId] = useState(uploads[0]?.id || "");
   const [documentItems, setDocumentItems] = useState<DocumentItemsState>({});
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'rejected'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'rejected' | 'excluded'>('pending');
   const [searchText, setSearchText] = useState("");
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [isApplying, setIsApplying] = useState(false);
@@ -162,6 +162,7 @@ export function MultiDocumentReview({
   const totalPending = allItems.filter(i => i.status === "pending").length;
   const totalConfirmed = allItems.filter(i => i.status === "confirmed").length;
   const totalRejected = allItems.filter(i => i.status === "rejected").length;
+  const totalExcluded = allItems.filter(i => i.status === "excluded").length;
   const totalItems = allItems.length;
 
   // Check if all items are processed (no pending items)
@@ -642,6 +643,7 @@ export function MultiDocumentReview({
               <h3 className="font-semibold">Overall Progress</h3>
               <p className="text-sm text-muted-foreground">
                 {totalConfirmed} confirmed • {totalRejected} rejected • {totalPending} pending
+                {totalExcluded > 0 && <span className="text-gray-400"> • {totalExcluded} excluded</span>}
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -790,6 +792,7 @@ export function MultiDocumentReview({
                     <SelectItem value="pending">Pending</SelectItem>
                     <SelectItem value="confirmed">Confirmed</SelectItem>
                     <SelectItem value="rejected">Rejected</SelectItem>
+                    <SelectItem value="excluded">Excluded</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button
