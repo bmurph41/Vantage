@@ -646,57 +646,57 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
             </div>
           </CardContent>
         </Card>
-      </div>
 
-      {/* NEW: Winter Season Configuration */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Snowflake className="h-5 w-5" />
-            Winter Season Months
-          </CardTitle>
-          <CardDescription>
-            Select months for winter storage contracts (e.g., winter wet slips)
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <Badge variant="outline" className="gap-1">
-              <Snowflake className="h-3 w-3" />
-              {getWinterSeasonLabel()}
-            </Badge>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setWinterMonths([11, 12, 1, 2, 3])}
-            >
-              <Snowflake className="h-3 w-3 mr-1" />
-              Typical (Nov-Mar)
-            </Button>
-          </div>
-          <div className="grid grid-cols-4 gap-2">
-            {months.map((month) => (
+        {/* Winter Season Configuration - placed under In-Season Months */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Snowflake className="h-5 w-5" />
+              Winter Season Months
+            </CardTitle>
+            <CardDescription>
+              Select months for winter storage contracts (e.g., winter wet slips)
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Badge variant="outline" className="gap-1">
+                <Snowflake className="h-3 w-3" />
+                {getWinterSeasonLabel()}
+              </Badge>
               <Button
-                key={month.value}
-                variant={winterMonths.includes(month.value) ? 'secondary' : 'outline'}
+                variant="outline"
                 size="sm"
-                onClick={() => toggleWinterMonth(month.value)}
-                className={`w-full ${winterMonths.includes(month.value) ? 'bg-cyan-100 hover:bg-cyan-200 dark:bg-cyan-900' : ''}`}
+                onClick={() => setWinterMonths([11, 12, 1, 2, 3])}
               >
-                {winterMonths.includes(month.value) ? (
-                  <Snowflake className="h-3 w-3 mr-1 text-cyan-700 dark:text-cyan-300" />
-                ) : (
-                  <Sun className="h-3 w-3 mr-1" />
-                )}
-                {month.short}
+                <Snowflake className="h-3 w-3 mr-1" />
+                Typical (Nov-Mar)
               </Button>
-            ))}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Storage types marked as "Winter" will only show revenue during these months
-          </p>
-        </CardContent>
-      </Card>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {months.map((month) => (
+                <Button
+                  key={month.value}
+                  variant={winterMonths.includes(month.value) ? 'secondary' : 'outline'}
+                  size="sm"
+                  onClick={() => toggleWinterMonth(month.value)}
+                  className={`w-full ${winterMonths.includes(month.value) ? 'bg-cyan-100 hover:bg-cyan-200 dark:bg-cyan-900' : ''}`}
+                >
+                  {winterMonths.includes(month.value) ? (
+                    <Snowflake className="h-3 w-3 mr-1 text-cyan-700 dark:text-cyan-300" />
+                  ) : (
+                    <Sun className="h-3 w-3 mr-1" />
+                  )}
+                  {month.short}
+                </Button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Storage types marked as "Winter" will only show revenue during these months
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
       <Card>
         <CardHeader>
