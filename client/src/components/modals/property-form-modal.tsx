@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
@@ -90,6 +90,19 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
   // Dynamic storage entries state
   const [storageEntries, setStorageEntries] = useState<StorageEntryRow[]>([]);
   const [customStorageType, setCustomStorageType] = useState("");
+  
+  // Validation state
+  const [touched, setTouched] = useState(false);
+  
+  // Address field errors
+  const errors = useMemo(() => {
+    const e: Record<string, string> = {};
+    if (!address.trim()) e.address = "Street address is required";
+    if (!city.trim()) e.city = "City is required";
+    if (!state.trim()) e.state = "State is required";
+    if (!zipCode.trim()) e.zipCode = "Zip code is required";
+    return e;
+  }, [address, city, state, zipCode]);
 
   // Fetch existing storage entries (for edit mode)
   const { data: existingStorageEntries = [] } = useQuery<CrmPropertyStorageEntry[]>({
@@ -348,6 +361,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
       setLastSaleYear("");
       setLastSalePrice("");
       setStorageEntries([]);
+      setTouched(false);
     }
   }, [property, form, isOpen]);
 
@@ -538,13 +552,10 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
   });
 
   const onSubmit = (data: any) => {
-    // Validate required address fields
-    if (!address.trim() || !city.trim() || !state.trim() || !zipCode.trim()) {
-      toast({
-        title: "Address Required",
-        description: "Please fill in all required address fields (street, city, state, zip code)",
-        variant: "destructive",
-      });
+    setTouched(true);
+    
+    // Validate required address fields using computed errors
+    if (Object.keys(errors).length > 0) {
       return;
     }
     
@@ -674,6 +685,9 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                     placeholder="123 Harbor Way"
                     testId="input-property-address"
                   />
+                  {touched && errors.address && (
+                    <p className="text-xs text-destructive">{errors.address}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="unit" className="text-sm">Unit/Suite</Label>
@@ -694,9 +708,12 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
                       placeholder="Marina City"
-                      className="bg-white dark:bg-slate-900"
+                      className={`bg-white dark:bg-slate-900 ${touched && errors.city ? "border-destructive focus-visible:ring-destructive" : ""}`}
                       data-testid="input-city"
                     />
+                    {touched && errors.city && (
+                      <p className="text-xs text-destructive">{errors.city}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="state" className="text-sm">State *</Label>
@@ -704,8 +721,11 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                       value={state}
                       onValueChange={setState}
                       placeholder="Select state"
-                      className="bg-white dark:bg-slate-900"
+                      className={`bg-white dark:bg-slate-900 ${touched && errors.state ? "border-destructive focus-visible:ring-destructive" : ""}`}
                     />
+                    {touched && errors.state && (
+                      <p className="text-xs text-destructive">{errors.state}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="zipCode" className="text-sm">Zip Code *</Label>
@@ -714,9 +734,12 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                       value={zipCode}
                       onChange={(e) => setZipCode(e.target.value)}
                       placeholder="33000"
-                      className="bg-white dark:bg-slate-900"
+                      className={`bg-white dark:bg-slate-900 ${touched && errors.zipCode ? "border-destructive focus-visible:ring-destructive" : ""}`}
                       data-testid="input-zip-code"
                     />
+                    {touched && errors.zipCode && (
+                      <p className="text-xs text-destructive">{errors.zipCode}</p>
+                    )}
                   </div>
                 </div>
               </CardContent>
