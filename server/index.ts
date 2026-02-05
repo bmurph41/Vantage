@@ -21,6 +21,8 @@ import { logger } from "./lib/logger";
 import settingsRoutes from './routes/settings-routes';
 import leasesRouter from './routes/leases';
 import wizardDraftsRouter from './routes/wizard-drafts';
+import healthRoutes from './routes/health';
+import { deprecationWarning } from './routes/api-versioning';
 
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
@@ -50,45 +52,13 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.use(requestLoggingMiddleware);
 
-// Basic health check - always accessible
-app.get("/health", (_req: Request, res: Response) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
-});
+// Enhanced health check routes (mounted BEFORE auth middleware)
+// Provides /health, /health/live, /health/ready endpoints
+app.use(healthRoutes);
 
-// Database health check endpoint - returns hostname only, no credentials
-app.get("/health/db", (req: Request, res: Response) => {
-  try {
-    const conn = process.env.DATABASE_URL;
-
-    if (!conn) {
-      return res.status(500).json({
-        ok: false,
-        error: "DATABASE_URL is missing"
-      });
-    }
-
-    // Handle both URL format and postgres:// connection strings
-    let hostname: string;
-    try {
-      const url = new URL(conn);
-      hostname = url.hostname;
-    } catch {
-      // Fallback: extract host from connection string pattern
-      const hostMatch = conn.match(/@([^:\/]+)/);
-      hostname = hostMatch ? hostMatch[1] : "unknown";
-    }
-
-    return res.json({
-      ok: true,
-      host: hostname
-    });
-  } catch (err) {
-    return res.status(500).json({
-      ok: false,
-      error: String(err)
-    });
-  }
-});
+// API deprecation warning for legacy /api/* routes (sunset 2027-06-01)
+// Clients should migrate to /api/v1/*
+app.use('/api', deprecationWarning('2027-06-01'));
 
 (async () => {
   try {
