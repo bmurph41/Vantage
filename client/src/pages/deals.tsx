@@ -464,7 +464,9 @@ export default function Deals() {
     setIsFormOpen(true);
   };
 
-  const handleDelete = (deal: Deal) => {
+  const handleDelete = (e: React.MouseEvent | undefined, deal: Deal) => {
+    e?.stopPropagation();
+    e?.preventDefault();
     if (confirm(`Are you sure you want to delete "${deal.title}"? This action cannot be undone.`)) {
       deleteDealMutation.mutate(deal.id);
     }
@@ -1026,8 +1028,7 @@ export default function Deals() {
                         </DropdownMenuItem>
                         <DropdownMenuItem 
                           onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(deal);
+                            handleDelete(e, deal);
                           }}
                           className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 text-xs"
                           data-testid={`deal-delete-${deal.id}`}
@@ -1219,8 +1220,7 @@ export default function Deals() {
                               </DropdownMenuItem>
                               <DropdownMenuItem 
                                 onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDelete(deal);
+                                  handleDelete(e, deal);
                                 }}
                                 className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
                                 data-testid={`table-deal-delete-${deal.id}`}

@@ -239,7 +239,9 @@ export default function Companies() {
     setIsFormOpen(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    e.preventDefault();
     if (confirm('Are you sure you want to delete this company?')) {
       deleteCompanyMutation.mutate(id);
     }
@@ -455,7 +457,7 @@ export default function Companies() {
           <Button variant="ghost" size="sm" onClick={() => handleEdit(company)} className="h-7 w-7 p-0">
             <Edit className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => handleDelete(company.id)} className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50" disabled={deleteCompanyMutation.isPending}>
+          <Button variant="ghost" size="sm" onClick={(e) => handleDelete(e, company.id)} className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50" disabled={deleteCompanyMutation.isPending}>
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>

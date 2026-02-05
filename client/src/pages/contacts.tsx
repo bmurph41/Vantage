@@ -125,7 +125,9 @@ export default function Contacts() {
     setIsContactFormOpen(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    e.preventDefault();
     if (confirm('Are you sure you want to delete this contact?')) {
       deleteContactMutation.mutate(id);
     }
@@ -342,7 +344,7 @@ export default function Contacts() {
           <Button variant="ghost" size="sm" onClick={() => handleEdit(contact)} className="h-7 w-7 p-0">
             <Edit className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => handleDelete(contact.id)} className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50">
+          <Button variant="ghost" size="sm" onClick={(e) => handleDelete(e, contact.id)} className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50">
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>
