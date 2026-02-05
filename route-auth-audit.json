@@ -1,0 +1,363 @@
+{
+  "generatedAt": "2026-02-05T22:09:55.543Z",
+  "summary": {
+    "totalRoutes": 1140,
+    "authenticatedRoutes": 1136,
+    "routeLevelAuthOnly": 569,
+    "inlineAuthOnly": 0,
+    "bothAuth": 567,
+    "unauthenticatedRoutes": 4,
+    "intentionallyPublic": 4,
+    "needsReview": 0,
+    "criticalUnprotected": 0
+  },
+  "authMiddleware": [
+    {
+      "line": 390,
+      "prefix": "/api/dd",
+      "coveredRoutes": 138
+    },
+    {
+      "line": 391,
+      "prefix": "/api/crm",
+      "coveredRoutes": 83
+    },
+    {
+      "line": 403,
+      "prefix": "/api",
+      "coveredRoutes": 1136
+    },
+    {
+      "line": 404,
+      "prefix": "/api/prospecting",
+      "coveredRoutes": 12
+    },
+    {
+      "line": 407,
+      "prefix": "/api/email-marketing",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 408,
+      "prefix": "/api/archive",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 409,
+      "prefix": "/api/modeling/scenario-templates",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 410,
+      "prefix": "/api/modeling",
+      "coveredRoutes": 242
+    },
+    {
+      "line": 411,
+      "prefix": "/api/marinalytics",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 412,
+      "prefix": "/api/debt",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 413,
+      "prefix": "/api/commercial-tenants",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 415,
+      "prefix": "/api/dd/automation",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 417,
+      "prefix": "/api/leads",
+      "coveredRoutes": 4
+    },
+    {
+      "line": 418,
+      "prefix": "/api/deals",
+      "coveredRoutes": 17
+    },
+    {
+      "line": 419,
+      "prefix": "/api/contacts",
+      "coveredRoutes": 12
+    },
+    {
+      "line": 420,
+      "prefix": "/api/companies",
+      "coveredRoutes": 12
+    },
+    {
+      "line": 421,
+      "prefix": "/api/properties",
+      "coveredRoutes": 21
+    },
+    {
+      "line": 422,
+      "prefix": "/api/pipelines",
+      "coveredRoutes": 6
+    },
+    {
+      "line": 423,
+      "prefix": "/api/stages",
+      "coveredRoutes": 6
+    },
+    {
+      "line": 424,
+      "prefix": "/api/pipeline-stages",
+      "coveredRoutes": 5
+    },
+    {
+      "line": 425,
+      "prefix": "/api/activities",
+      "coveredRoutes": 4
+    },
+    {
+      "line": 426,
+      "prefix": "/api/sales-comps",
+      "coveredRoutes": 60
+    },
+    {
+      "line": 427,
+      "prefix": "/api/comp-columns",
+      "coveredRoutes": 4
+    },
+    {
+      "line": 428,
+      "prefix": "/api/sc-projects",
+      "coveredRoutes": 15
+    },
+    {
+      "line": 429,
+      "prefix": "/api/saved-searches",
+      "coveredRoutes": 6
+    },
+    {
+      "line": 430,
+      "prefix": "/api/profit-centers",
+      "coveredRoutes": 1
+    },
+    {
+      "line": 431,
+      "prefix": "/api/recommendations",
+      "coveredRoutes": 1
+    },
+    {
+      "line": 432,
+      "prefix": "/api/pending-properties",
+      "coveredRoutes": 6
+    },
+    {
+      "line": 433,
+      "prefix": "/api/pending-contacts",
+      "coveredRoutes": 6
+    },
+    {
+      "line": 434,
+      "prefix": "/api/pending-companies",
+      "coveredRoutes": 6
+    },
+    {
+      "line": 435,
+      "prefix": "/api/rate-comps",
+      "coveredRoutes": 35
+    },
+    {
+      "line": 436,
+      "prefix": "/api/rc-columns",
+      "coveredRoutes": 4
+    },
+    {
+      "line": 437,
+      "prefix": "/api/rc-projects",
+      "coveredRoutes": 14
+    },
+    {
+      "line": 438,
+      "prefix": "/api/rc-saved-searches",
+      "coveredRoutes": 6
+    },
+    {
+      "line": 439,
+      "prefix": "/api/rc-recommendations",
+      "coveredRoutes": 1
+    },
+    {
+      "line": 440,
+      "prefix": "/api/rc-pending-properties",
+      "coveredRoutes": 3
+    },
+    {
+      "line": 441,
+      "prefix": "/api/debt-scenarios",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 442,
+      "prefix": "/api/docktalk",
+      "coveredRoutes": 1
+    },
+    {
+      "line": 443,
+      "prefix": "/api/docktalk/v2",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 444,
+      "prefix": "/api/pnl",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 445,
+      "prefix": "/api/rent-roll",
+      "coveredRoutes": 1
+    },
+    {
+      "line": 446,
+      "prefix": "/api/modeling-rent-roll",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 447,
+      "prefix": "/api/marina-integrations",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 448,
+      "prefix": "/api/executive-dashboard",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 449,
+      "prefix": "/api/capital-markets",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 450,
+      "prefix": "/api/listings/v2",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 451,
+      "prefix": "/api/marketplace",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 452,
+      "prefix": "/api/funds",
+      "coveredRoutes": 37
+    },
+    {
+      "line": 453,
+      "prefix": "/api/vdr",
+      "coveredRoutes": 1
+    },
+    {
+      "line": 456,
+      "prefix": "/api/ship-store",
+      "coveredRoutes": 1
+    },
+    {
+      "line": 457,
+      "prefix": "/api/service",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 458,
+      "prefix": "/api/boat-rentals",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 459,
+      "prefix": "/api/boat-club",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 460,
+      "prefix": "/api/boat-sales",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 461,
+      "prefix": "/api/operations",
+      "coveredRoutes": 68
+    },
+    {
+      "line": 462,
+      "prefix": "/api/operations-context",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 463,
+      "prefix": "/api/opssos",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 464,
+      "prefix": "/api/admin",
+      "coveredRoutes": 6
+    },
+    {
+      "line": 465,
+      "prefix": "/api/integration",
+      "coveredRoutes": 1
+    },
+    {
+      "line": 467,
+      "prefix": "/api/marinamatch",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 468,
+      "prefix": "/api/om",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 470,
+      "prefix": "/api/document-builder",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 475,
+      "prefix": "/api/analytics",
+      "coveredRoutes": 9
+    },
+    {
+      "line": 476,
+      "prefix": "/api/ai-assistant",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 477,
+      "prefix": "/api/marina-comps",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 478,
+      "prefix": "/api/valuations",
+      "coveredRoutes": 0
+    },
+    {
+      "line": 11672,
+      "prefix": "/api/email-sequences",
+      "coveredRoutes": 8
+    },
+    {
+      "line": 11673,
+      "prefix": "/api/email-templates",
+      "coveredRoutes": 5
+    },
+    {
+      "line": 31103,
+      "prefix": "/api/operations/fuel-integrations",
+      "coveredRoutes": 7
+    }
+  ],
+  "criticalRoutes": [],
+  "needsReview": []
+}
