@@ -985,15 +985,15 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                 <TableRow>
                   <TableHead className="w-64 sticky left-0 bg-background z-10">Category / Line Item</TableHead>
 
-                  {/* Historical Period Columns (excluding baseline) */}
+                  {/* Historical Period Columns (excluding baseline) - blue tint to signify actuals */}
                   {showHistorical && priorPeriods.map(period => (
-                    <TableHead key={period.id} className="text-right w-28 bg-slate-50 dark:bg-slate-900/50">
+                    <TableHead key={period.id} className="text-right w-28 bg-blue-50/60 dark:bg-blue-950/20">
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div className="cursor-help">
-                              <div className="text-xs text-muted-foreground">Historical</div>
-                              <div>{period.shortLabel}</div>
+                              <div className="text-xs text-blue-600/70 dark:text-blue-400/70">Historical</div>
+                              <div className="text-blue-700 dark:text-blue-300">{period.shortLabel}</div>
                             </div>
                           </TooltipTrigger>
                           <TooltipContent>
@@ -1091,9 +1091,9 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                           </div>
                         </TableCell>
 
-                        {/* Historical totals */}
+                        {/* Historical totals - blue tint for actuals */}
                         {showHistorical && priorPeriods.map(period => (
-                          <TableCell key={period.id} className="text-right font-semibold bg-slate-50 dark:bg-slate-900/50">
+                          <TableCell key={period.id} className="text-right font-semibold bg-blue-50/60 dark:bg-blue-950/20 text-blue-900 dark:text-blue-100">
                             {formatCurrency(getCategoryTotal(category, period.id))}
                           </TableCell>
                         ))}
@@ -1154,9 +1154,9 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                               {itemName}
                             </TableCell>
 
-                            {/* Historical values */}
+                            {/* Historical values - blue tint for actuals */}
                             {showHistorical && priorPeriods.map(period => (
-                              <TableCell key={period.id} className="text-right bg-slate-50 dark:bg-slate-900/50">
+                              <TableCell key={period.id} className="text-right bg-blue-50/60 dark:bg-blue-950/20 text-blue-900 dark:text-blue-100">
                                 {formatCurrency(values.historical[period.id])}
                               </TableCell>
                             ))}
@@ -1219,7 +1219,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                   {showHistorical && priorPeriods.map(period => {
                     const summary = calculatePeriodSummary(period.id);
                     return (
-                      <TableCell key={period.id} className="text-right bg-slate-100 dark:bg-slate-800/50">
+                      <TableCell key={period.id} className="text-right bg-blue-100/60 dark:bg-blue-950/30 text-blue-900 dark:text-blue-100">
                         {formatCurrency(summary.grossProfit)}
                       </TableCell>
                     );
@@ -1272,7 +1272,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                     return (
                       <TableCell 
                         key={period.id} 
-                        className={`text-right ${summary.noi >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                        className={`text-right bg-blue-100/60 dark:bg-blue-950/30 ${summary.noi >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}
                       >
                         {formatCurrency(summary.noi)}
                       </TableCell>
@@ -1329,7 +1329,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                   {showHistorical && priorPeriods.map(period => {
                     const summary = calculatePeriodSummary(period.id);
                     return (
-                      <TableCell key={period.id} className="text-right text-muted-foreground bg-slate-50 dark:bg-slate-900/50">
+                      <TableCell key={period.id} className="text-right text-blue-700 dark:text-blue-300 bg-blue-50/60 dark:bg-blue-950/20">
                         {formatPercentSimple(summary.noiMargin)}
                       </TableCell>
                     );
