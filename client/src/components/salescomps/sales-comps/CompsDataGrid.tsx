@@ -12,6 +12,7 @@ import {
   ChevronLeft, 
   ChevronRight, 
   Eye, 
+  EyeOff,
   Edit, 
   Trash2, 
   ExternalLink,
@@ -21,9 +22,14 @@ import {
   Minus,
   Check,
   X,
-  Copy
+  Copy,
+  Settings2,
+  RotateCcw
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { formatCurrency, formatPercent, formatNumber } from '@/lib/salescomps/format';
 import Detail from "@/pages/analysis/sales-comps/Detail";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -75,10 +81,11 @@ export default function CompsDataGrid({
   columnUniqueValues,
   onCompClick,
 }: CompsDataGridProps) {
-  // Column configuration state for widths and ordering
-  const [columnConfig, setColumnConfig] = useState<Record<string, { width: number; order: number }>>({});
+  // Column configuration state for widths, ordering, and visibility
+  const [columnConfig, setColumnConfig] = useState<Record<string, { width: number; order: number; visible?: boolean }>>({});
   const [isResizing, setIsResizing] = useState<{ columnKey: string; startX: number; startWidth: number } | null>(null);
   const [isDraggingColumn, setIsDraggingColumn] = useState<string | null>(null);
+  const [showColumnSettings, setShowColumnSettings] = useState(false);
 
   // Dialog states for empty portfolio actions
   const [showSelectMarinaDialog, setShowSelectMarinaDialog] = useState(false);
@@ -564,16 +571,51 @@ export default function CompsDataGrid({
     }
   }, [columnConfig]);
 
-  // Get ordered columns with custom widths
-  const columns = useMemo(() => {
+  // Get all columns with config (for settings UI)
+  const allColumns = useMemo(() => {
     return defaultColumns
       .map(col => ({
         ...col,
         width: columnConfig[col.key]?.width ?? col.width,
-        order: columnConfig[col.key]?.order ?? col.order
+        order: columnConfig[col.key]?.order ?? col.order,
+        visible: columnConfig[col.key]?.visible ?? true
       }))
       .sort((a, b) => a.order - b.order);
   }, [columnConfig]);
+
+  // Get visible columns only (for rendering)
+  const columns = useMemo(() => {
+    return allColumns.filter(col => col.visible || col.key === 'expand' || col.key === 'actions');
+  }, [allColumns]);
+
+  // Toggle column visibility
+  const toggleColumnVisibility = (columnKey: string) => {
+    setColumnConfig(prev => ({
+      ...prev,
+      [columnKey]: {
+        ...prev[columnKey],
+        width: prev[columnKey]?.width ?? defaultColumns.find(c => c.key === columnKey)?.width ?? 100,
+        order: prev[columnKey]?.order ?? defaultColumns.find(c => c.key === columnKey)?.order ?? 0,
+        visible: prev[columnKey]?.visible === false ? true : false
+      }
+    }));
+  };
+
+  // Reset all columns to default visibility
+  const resetColumnVisibility = () => {
+    const newConfig: Record<string, { width: number; order: number; visible?: boolean }> = {};
+    defaultColumns.forEach(col => {
+      newConfig[col.key] = {
+        width: columnConfig[col.key]?.width ?? col.width,
+        order: columnConfig[col.key]?.order ?? col.order,
+        visible: true
+      };
+    });
+    setColumnConfig(newConfig);
+  };
+
+  // Count hidden columns
+  const hiddenColumnCount = allColumns.filter(col => !col.visible && col.key !== 'expand' && col.key !== 'actions').length;
 
   // Handle column resize
   const handleColumnResize = (columnKey: string, newWidth: number) => {
@@ -588,8 +630,8 @@ export default function CompsDataGrid({
 
   // Handle column reorder
   const handleColumnReorder = (draggedKey: string, targetKey: string) => {
-    const draggedColumn = columns.find(col => col.key === draggedKey);
-    const targetColumn = columns.find(col => col.key === targetKey);
+    const draggedColumn = allColumns.find(col => col.key === draggedKey);
+    const targetColumn = allColumns.find(col => col.key === targetKey);
     
     if (!draggedColumn || !targetColumn) return;
 
@@ -597,11 +639,12 @@ export default function CompsDataGrid({
       const newConfig = { ...prev };
       
       // Get all columns in their CURRENT order (not default order)
-      // This preserves all previous reordering operations
-      const currentOrderedColumns = columns.map(col => ({
+      // This preserves all previous reordering operations including visibility
+      const currentOrderedColumns = allColumns.map(col => ({
         key: col.key,
         order: col.order,
-        width: col.width
+        width: col.width,
+        visible: col.visible
       }));
       
       // Remove dragged column and insert at target position
@@ -611,15 +654,16 @@ export default function CompsDataGrid({
       // Reorder columns by inserting dragged column at target position
       const reorderedColumns = [
         ...filteredColumns.slice(0, targetIndex),
-        { key: draggedKey, order: draggedColumn.order, width: draggedColumn.width },
+        { key: draggedKey, order: draggedColumn.order, width: draggedColumn.width, visible: draggedColumn.visible },
         ...filteredColumns.slice(targetIndex)
       ];
       
-      // Update orders sequentially to maintain consistency
+      // Update orders sequentially to maintain consistency, preserving visibility
       reorderedColumns.forEach((col, index) => {
         newConfig[col.key] = {
           width: newConfig[col.key]?.width ?? col.width,
-          order: index
+          order: index,
+          visible: newConfig[col.key]?.visible ?? col.visible
         };
       });
       
@@ -1103,6 +1147,77 @@ export default function CompsDataGrid({
     <>
       {/* Iframe-styled container that extends to bottom of sidebar */}
       <div className="flex-1 border-2 border-border rounded-lg bg-card shadow-lg overflow-y-hidden" style={{height: 'calc(100vh - 120px)'}}>
+        {/* Column Settings Button */}
+        <div className="flex items-center justify-end gap-2 px-3 py-2 border-b border-border bg-muted/30">
+          <Popover open={showColumnSettings} onOpenChange={setShowColumnSettings}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Settings2 className="h-4 w-4" />
+                Customize Columns
+                {hiddenColumnCount > 0 && (
+                  <Badge variant="secondary" className="ml-1 px-1.5 py-0.5 text-xs">
+                    {hiddenColumnCount} hidden
+                  </Badge>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-0" align="end">
+              <div className="p-3 border-b border-border">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-sm">Visible Columns</h4>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs gap-1"
+                    onClick={resetColumnVisibility}
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Reset
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Toggle columns to show or hide them in the table
+                </p>
+              </div>
+              <ScrollArea className="h-[300px]">
+                <div className="p-2 space-y-1">
+                  {allColumns
+                    .filter(col => col.key !== 'expand' && col.key !== 'actions')
+                    .map(col => (
+                      <div
+                        key={col.key}
+                        className="flex items-center justify-between py-2 px-2 rounded hover:bg-muted/50 cursor-pointer"
+                        onClick={() => toggleColumnVisibility(col.key)}
+                      >
+                        <span className={`text-sm ${!col.visible ? 'text-muted-foreground' : ''}`}>
+                          {col.label}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleColumnVisibility(col.key);
+                          }}
+                        >
+                          {col.visible ? (
+                            <Eye className="h-4 w-4 text-primary" />
+                          ) : (
+                            <EyeOff className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </Button>
+                      </div>
+                    ))}
+                </div>
+              </ScrollArea>
+              <Separator />
+              <div className="p-2 text-xs text-muted-foreground text-center">
+                {allColumns.filter(col => col.visible && col.key !== 'expand' && col.key !== 'actions').length} of {allColumns.filter(col => col.key !== 'expand' && col.key !== 'actions').length} columns visible
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
         {/* Data Grid container with enhanced horizontal and vertical scroll */}
         <div 
           ref={tableContainerRef}
