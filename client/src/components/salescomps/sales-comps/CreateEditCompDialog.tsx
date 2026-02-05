@@ -173,6 +173,14 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
   const [showAgentDropdown, setShowAgentDropdown] = useState(false);
   const [agentSearch, setAgentSearch] = useState("");
   const [isNewAgent, setIsNewAgent] = useState(false);
+  
+  // Additional agents state for multi-agent support
+  type AdditionalAgent = { name: string; contactId?: string };
+  const [additionalAgents, setAdditionalAgents] = useState<AdditionalAgent[]>(
+    (comp as any)?.additionalAgents || []
+  );
+  const [showAdditionalAgentDropdown, setShowAdditionalAgentDropdown] = useState<number | null>(null);
+  const [additionalAgentSearch, setAdditionalAgentSearch] = useState("");
 
   // Seller company/principal state
   const [sellerCompanySearch, setSellerCompanySearch] = useState("");
@@ -339,6 +347,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
   useEffect(() => {
     if (comp) {
       setArticleUrls(comp.articleUrls && comp.articleUrls.length > 0 ? comp.articleUrls : [""]);
+      setAdditionalAgents((comp as any).additionalAgents || []);
       
       // Reset form with comp data when editing
       form.reset({
@@ -501,6 +510,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
         profitCenterBoatClubCompany: "",
       });
       setArticleUrls([""]);
+      setAdditionalAgents([]);
     }
   }, [comp, form, isPortfolioMode]);
 
@@ -659,6 +669,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       agentLastName: data.agentLastName || undefined,
       agentName: data.agentName || undefined,
       agentContactId: data.agentContactId || undefined,
+      additionalAgents: additionalAgents.filter(a => a.name.trim() !== ""),
       address: data.address || undefined,
       zip: data.zip || undefined,
       seller: data.seller || undefined,
@@ -1100,7 +1111,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                                 <Input 
                                   {...field} 
                                   type="text"
-                                  placeholder="156"
+                                  placeholder="e.g. 156"
                                   data-testid="input-wet-slips"
                                 />
                               </FormControl>
@@ -1119,7 +1130,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                                 <Input 
                                   {...field} 
                                   type="text"
-                                  placeholder="89"
+                                  placeholder="e.g. 89"
                                   data-testid="input-dry-racks"
                                 />
                               </FormControl>
@@ -1140,7 +1151,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                                 <Input 
                                   {...field} 
                                   type="text"
-                                  placeholder="12.5"
+                                  placeholder="e.g. 12.5"
                                   data-testid="input-acres"
                                 />
                               </FormControl>
@@ -1803,6 +1814,92 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                           );
                         }}
                       />
+                      
+                      {/* Additional Agents Section */}
+                      <div className="space-y-2 pt-2 border-t mt-4">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium">Additional Agents</Label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setAdditionalAgents([...additionalAgents, { name: "", contactId: undefined }])}
+                            className="h-7 text-xs"
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Add Agent
+                          </Button>
+                        </div>
+                        {additionalAgents.length > 0 && (
+                          <div className="space-y-2">
+                            {additionalAgents.map((agent, index) => (
+                              <div key={index} className="flex gap-2 items-center">
+                                <div className="relative flex-1">
+                                  <Input
+                                    value={agent.name}
+                                    onChange={(e) => {
+                                      const updated = [...additionalAgents];
+                                      updated[index] = { ...updated[index], name: e.target.value, contactId: undefined };
+                                      setAdditionalAgents(updated);
+                                      setAdditionalAgentSearch(e.target.value);
+                                      setShowAdditionalAgentDropdown(index);
+                                    }}
+                                    onFocus={() => {
+                                      setShowAdditionalAgentDropdown(index);
+                                      setAdditionalAgentSearch(agent.name);
+                                    }}
+                                    onBlur={() => setTimeout(() => setShowAdditionalAgentDropdown(null), 200)}
+                                    placeholder="Enter agent name"
+                                    className="h-8 text-sm"
+                                  />
+                                  {showAdditionalAgentDropdown === index && selectedBrokerageCompanyId && (
+                                    <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-32 overflow-y-auto">
+                                      {brokerageContacts
+                                        .filter((c: any) => {
+                                          const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ') || c.name || '';
+                                          return fullName.toLowerCase().includes(additionalAgentSearch.toLowerCase());
+                                        })
+                                        .slice(0, 5)
+                                        .map((contact: any) => {
+                                          const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.name || 'Unnamed Contact';
+                                          return (
+                                            <div
+                                              key={contact.id}
+                                              className="px-2 py-1.5 cursor-pointer hover:bg-gray-100 text-sm"
+                                              onMouseDown={() => {
+                                                const updated = [...additionalAgents];
+                                                updated[index] = { name: fullName, contactId: contact.id };
+                                                setAdditionalAgents(updated);
+                                                setShowAdditionalAgentDropdown(null);
+                                              }}
+                                            >
+                                              {fullName}
+                                            </div>
+                                          );
+                                        })}
+                                    </div>
+                                  )}
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    const updated = additionalAgents.filter((_, i) => i !== index);
+                                    setAdditionalAgents(updated);
+                                  }}
+                                  className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {additionalAgents.length === 0 && (
+                          <p className="text-xs text-muted-foreground">Click "Add Agent" to add more agents from this brokerage</p>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
                 </div>
