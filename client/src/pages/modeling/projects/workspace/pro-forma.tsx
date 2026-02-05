@@ -80,6 +80,7 @@ interface LineItemData {
 }
 
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const monthsFull = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 /**
  * Generate period label based on document metadata
@@ -292,6 +293,13 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
 
   const isSeasonalMonth = (monthIndex: number) => seasonMonths.includes(monthIndex + 1);
 
+  // Get monthly periods for the selected year
+  const selectedYearInt = parseInt(selectedYear);
+  const getMonthKey = (year: number, month: number) => {
+    const monthStr = (month + 1).toString().padStart(2, '0');
+    return `${year}-${monthStr}`;
+  };
+
   // Build data structure from actuals and projections
   const tableData = useMemo(() => {
     // Structure: { category: { lineItem: { historical: {periodId: value}, projected: [year values] } } }
@@ -348,6 +356,62 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
     return Object.values(items).reduce((sum, item) => 
       sum + (item.projected[yearIndex] || 0), 0
     );
+  };
+
+  // Get monthly totals from proFormaData for a specific category
+  // Note: Pro-forma engine includes COGS within expenses for monthly projections
+  const getMonthlyTotal = (category: 'Revenue' | 'COGS' | 'Expenses', year: number, monthIndex: number) => {
+    if (!proFormaData) return 0;
+    const monthKey = getMonthKey(year, monthIndex);
+    if (category === 'Revenue') {
+      return proFormaData.revenue?.totalsMonthly?.[monthKey] || 0;
+    } else if (category === 'COGS') {
+      // COGS is included in expenses in the monthly projections
+      // Return 0 as COGS is not tracked separately at monthly level
+      return 0;
+    } else {
+      return proFormaData.expenses?.totalsMonthly?.[monthKey] || 0;
+    }
+  };
+
+  // Get monthly line item value from proFormaData
+  const getLineItemMonthlyValue = (category: string, itemName: string, year: number, monthIndex: number) => {
+    if (!proFormaData) return 0;
+    const monthKey = getMonthKey(year, monthIndex);
+    // Map category to the correct lineItems array
+    let lineItems: any[] = [];
+    if (category === 'Revenue') {
+      lineItems = proFormaData.revenue?.lineItems || [];
+    } else if (category === 'Expenses' || category === 'COGS') {
+      // Both COGS and Expenses are in expenses lineItems
+      lineItems = proFormaData.expenses?.lineItems || [];
+    }
+    const item = lineItems.find((li: any) => li.name === itemName);
+    return item?.projectionsMonthly?.[monthKey] || 0;
+  };
+
+  // Calculate monthly summary for a specific month
+  // Note: Monthly projections from pro-forma engine have COGS combined into expenses
+  // Gross profit = Revenue - Expenses (which includes COGS), NOI = Gross Profit in monthly view
+  const calculateMonthSummary = (year: number, monthIndex: number) => {
+    const monthKey = getMonthKey(year, monthIndex);
+    const monthlyProj = proFormaData?.monthlyProjections?.find((p: any) => p.periodKey === monthKey);
+    if (monthlyProj) {
+      const revenue = monthlyProj.revenue;
+      const expenses = monthlyProj.expenses;
+      const noi = monthlyProj.noi;
+      // Gross profit in monthly view = Revenue - Expenses (COGS is included in expenses)
+      const grossProfit = revenue - expenses;
+      return {
+        revenue,
+        cogs: 0,
+        expenses,
+        grossProfit,
+        noi,
+        noiMargin: revenue > 0 ? (noi / revenue) * 100 : 0
+      };
+    }
+    return { revenue: 0, cogs: 0, expenses: 0, grossProfit: 0, noi: 0, noiMargin: 0 };
   };
 
   // Summary calculations by period
@@ -646,9 +710,12 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Annual Pro Forma</CardTitle>
+              <CardTitle>{viewMode === 'monthly' ? `Monthly Pro Forma - ${selectedYear}` : 'Annual Pro Forma'}</CardTitle>
               <CardDescription>
-                Projected P&L for {holdPeriod}-year hold period starting {new Date(startDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                {viewMode === 'monthly' 
+                  ? `Monthly breakout for ${selectedYear} showing seasonal patterns`
+                  : `Projected P&L for ${holdPeriod}-year hold period starting ${new Date(startDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`
+                }
               </CardDescription>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -718,15 +785,31 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                     </TooltipProvider>
                   </TableHead>
 
-                  {/* Projected Year Columns */}
-                  {years.map((year, i) => (
-                    <TableHead key={year} className="text-right w-28">
-                      <div>Year {i + 1}</div>
-                      <div className="text-xs text-muted-foreground font-normal">{year}</div>
-                    </TableHead>
-                  ))}
+                  {/* Monthly or Annual Columns based on viewMode */}
+                  {viewMode === 'monthly' ? (
+                    // Monthly columns for selected year
+                    months.map((month, i) => (
+                      <TableHead 
+                        key={i} 
+                        className={`text-right w-24 ${isSeasonalMonth(i) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}
+                      >
+                        <div>{month}</div>
+                        <div className="text-xs text-muted-foreground font-normal">
+                          {isSeasonalMonth(i) ? 'In-Season' : 'Off-Season'}
+                        </div>
+                      </TableHead>
+                    ))
+                  ) : (
+                    // Annual columns
+                    years.map((year, i) => (
+                      <TableHead key={year} className="text-right w-28">
+                        <div>Year {i + 1}</div>
+                        <div className="text-xs text-muted-foreground font-normal">{year}</div>
+                      </TableHead>
+                    ))
+                  )}
 
-                  <TableHead className="text-right w-24">CAGR</TableHead>
+                  <TableHead className="text-right w-24">{viewMode === 'monthly' ? 'Total' : 'CAGR'}</TableHead>
                 </TableRow>
               </TableHeader>
 
@@ -766,20 +849,45 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                           {formatCurrency(baselineTotal)}
                         </TableCell>
 
-                        {/* Projected totals */}
-                        {years.map((_, i) => (
-                          <TableCell key={i} className="text-right font-semibold">
-                            {formatCurrency(getCategoryProjectedTotal(category, i))}
-                          </TableCell>
-                        ))}
+                        {/* Projected totals - Monthly or Annual */}
+                        {viewMode === 'monthly' ? (
+                          // Monthly totals for selected year
+                          months.map((_, monthIndex) => {
+                            const value = getMonthlyTotal(category, selectedYearInt, monthIndex);
+                            return (
+                              <TableCell 
+                                key={monthIndex} 
+                                className={`text-right font-semibold ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}
+                              >
+                                {formatCurrency(value)}
+                              </TableCell>
+                            );
+                          })
+                        ) : (
+                          // Annual totals
+                          years.map((_, i) => (
+                            <TableCell key={i} className="text-right font-semibold">
+                              {formatCurrency(getCategoryProjectedTotal(category, i))}
+                            </TableCell>
+                          ))
+                        )}
 
-                        {/* CAGR */}
+                        {/* CAGR or Annual Total */}
                         <TableCell className="text-right text-muted-foreground">
-                          {formatPercent(calculateCAGR(
-                            getCategoryProjectedTotal(category, 0),
-                            getCategoryProjectedTotal(category, holdPeriod - 1),
-                            holdPeriod - 1
-                          ))}
+                          {viewMode === 'monthly' ? (
+                            // Show annual total for the selected year
+                            formatCurrency(
+                              months.reduce((sum, _, monthIndex) => {
+                                return sum + getMonthlyTotal(category, selectedYearInt, monthIndex);
+                              }, 0)
+                            )
+                          ) : (
+                            formatPercent(calculateCAGR(
+                              getCategoryProjectedTotal(category, 0),
+                              getCategoryProjectedTotal(category, holdPeriod - 1),
+                              holdPeriod - 1
+                            ))
+                          )}
                         </TableCell>
                       </TableRow>
 
@@ -804,20 +912,44 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                               {formatCurrency(baselineValue)}
                             </TableCell>
 
-                            {/* Projected values */}
-                            {values.projected.map((value: number, i: number) => (
-                              <TableCell key={i} className="text-right">
-                                {formatCurrency(value)}
-                              </TableCell>
-                            ))}
+                            {/* Projected values - Monthly or Annual */}
+                            {viewMode === 'monthly' ? (
+                              // Monthly values for selected year
+                              months.map((_, monthIndex) => {
+                                const monthValue = getLineItemMonthlyValue(category, itemName, selectedYearInt, monthIndex);
+                                return (
+                                  <TableCell 
+                                    key={monthIndex} 
+                                    className={`text-right ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}
+                                  >
+                                    {formatCurrency(monthValue)}
+                                  </TableCell>
+                                );
+                              })
+                            ) : (
+                              // Annual values
+                              values.projected.map((value: number, i: number) => (
+                                <TableCell key={i} className="text-right">
+                                  {formatCurrency(value)}
+                                </TableCell>
+                              ))
+                            )}
 
-                            {/* Line item CAGR */}
+                            {/* Line item CAGR or Annual Total */}
                             <TableCell className="text-right text-xs text-muted-foreground">
-                              {formatPercent(calculateCAGR(
-                                values.projected[0],
-                                values.projected[holdPeriod - 1],
-                                holdPeriod - 1
-                              ))}
+                              {viewMode === 'monthly' ? (
+                                // Show annual total for the line item
+                                formatCurrency(
+                                  months.reduce((sum, _, monthIndex) => 
+                                    sum + getLineItemMonthlyValue(category, itemName, selectedYearInt, monthIndex), 0)
+                                )
+                              ) : (
+                                formatPercent(calculateCAGR(
+                                  values.projected[0],
+                                  values.projected[holdPeriod - 1],
+                                  holdPeriod - 1
+                                ))
+                              )}
                             </TableCell>
                           </TableRow>
                         );
@@ -843,19 +975,37 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                     {formatCurrency(baselineSummary?.grossProfit)}
                   </TableCell>
 
-                  {years.map((_, i) => {
-                    const summary = calculateYearSummary(i);
-                    return (
-                      <TableCell key={i} className="text-right">{formatCurrency(summary.grossProfit)}</TableCell>
-                    );
-                  })}
+                  {viewMode === 'monthly' ? (
+                    months.map((_, monthIndex) => {
+                      const summary = calculateMonthSummary(selectedYearInt, monthIndex);
+                      return (
+                        <TableCell 
+                          key={monthIndex} 
+                          className={`text-right ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}
+                        >
+                          {formatCurrency(summary.grossProfit)}
+                        </TableCell>
+                      );
+                    })
+                  ) : (
+                    years.map((_, i) => {
+                      const summary = calculateYearSummary(i);
+                      return (
+                        <TableCell key={i} className="text-right">{formatCurrency(summary.grossProfit)}</TableCell>
+                      );
+                    })
+                  )}
 
                   <TableCell className="text-right text-muted-foreground">
-                    {formatPercent(calculateCAGR(
-                      calculateYearSummary(0).grossProfit,
-                      calculateYearSummary(holdPeriod - 1).grossProfit,
-                      holdPeriod - 1
-                    ))}
+                    {viewMode === 'monthly' ? (
+                      formatCurrency(months.reduce((sum, _, monthIndex) => sum + calculateMonthSummary(selectedYearInt, monthIndex).grossProfit, 0))
+                    ) : (
+                      formatPercent(calculateCAGR(
+                        calculateYearSummary(0).grossProfit,
+                        calculateYearSummary(holdPeriod - 1).grossProfit,
+                        holdPeriod - 1
+                      ))
+                    )}
                   </TableCell>
                 </TableRow>
 
@@ -879,24 +1029,42 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                     {formatCurrency(baselineSummary?.noi)}
                   </TableCell>
 
-                  {years.map((_, i) => {
-                    const summary = calculateYearSummary(i);
-                    return (
-                      <TableCell 
-                        key={i} 
-                        className={`text-right ${summary.noi >= 0 ? 'text-green-600' : 'text-red-600'}`}
-                      >
-                        {formatCurrency(summary.noi)}
-                      </TableCell>
-                    );
-                  })}
+                  {viewMode === 'monthly' ? (
+                    months.map((_, monthIndex) => {
+                      const summary = calculateMonthSummary(selectedYearInt, monthIndex);
+                      return (
+                        <TableCell 
+                          key={monthIndex} 
+                          className={`text-right ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''} ${summary.noi >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                        >
+                          {formatCurrency(summary.noi)}
+                        </TableCell>
+                      );
+                    })
+                  ) : (
+                    years.map((_, i) => {
+                      const summary = calculateYearSummary(i);
+                      return (
+                        <TableCell 
+                          key={i} 
+                          className={`text-right ${summary.noi >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                        >
+                          {formatCurrency(summary.noi)}
+                        </TableCell>
+                      );
+                    })
+                  )}
 
                   <TableCell className="text-right text-green-600">
-                    {formatPercent(calculateCAGR(
-                      calculateYearSummary(0).noi,
-                      calculateYearSummary(holdPeriod - 1).noi,
-                      holdPeriod - 1
-                    ))}
+                    {viewMode === 'monthly' ? (
+                      formatCurrency(months.reduce((sum, _, monthIndex) => sum + calculateMonthSummary(selectedYearInt, monthIndex).noi, 0))
+                    ) : (
+                      formatPercent(calculateCAGR(
+                        calculateYearSummary(0).noi,
+                        calculateYearSummary(holdPeriod - 1).noi,
+                        holdPeriod - 1
+                      ))
+                    )}
                   </TableCell>
                 </TableRow>
 
@@ -917,14 +1085,28 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                     {formatPercentSimple(baselineSummary?.noiMargin)}
                   </TableCell>
 
-                  {years.map((_, i) => {
-                    const summary = calculateYearSummary(i);
-                    return (
-                      <TableCell key={i} className="text-right text-muted-foreground">
-                        {formatPercentSimple(summary.noiMargin)}
-                      </TableCell>
-                    );
-                  })}
+                  {viewMode === 'monthly' ? (
+                    months.map((_, monthIndex) => {
+                      const summary = calculateMonthSummary(selectedYearInt, monthIndex);
+                      return (
+                        <TableCell 
+                          key={monthIndex} 
+                          className={`text-right text-muted-foreground ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}
+                        >
+                          {formatPercentSimple(summary.noiMargin)}
+                        </TableCell>
+                      );
+                    })
+                  ) : (
+                    years.map((_, i) => {
+                      const summary = calculateYearSummary(i);
+                      return (
+                        <TableCell key={i} className="text-right text-muted-foreground">
+                          {formatPercentSimple(summary.noiMargin)}
+                        </TableCell>
+                      );
+                    })
+                  )}
 
                   <TableCell className="text-right text-muted-foreground">-</TableCell>
                 </TableRow>
