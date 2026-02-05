@@ -12800,9 +12800,119 @@ Current context: Project ${req.params.projectId}`;
         }
       }
 
-      // NOTE: Pending property profiles are NOT auto-created from sales comps.
-      // Sales comps are the source of truth for transaction data.
-      // Pending sales comps are only created when users add transaction data to CRM Properties.
+      // Auto-create pending property if marina/property data is provided but not linked to existing property
+      if (!compData.propertyId && compData.marina) {
+        try {
+          // Check if a pending property already exists for this sales comp
+          const existingPending = await storage.getPendingProperties(orgId, 'pending');
+          const alreadyExists = existingPending.some((p: any) => 
+            p.sourceType === 'sales_comp' && p.compId === comp.id
+          );
+          
+          if (!alreadyExists) {
+            // Find similar properties to suggest as duplicates
+            const similarProperties = await storage.findSimilarProperties(
+              orgId, 
+              compData.marina, 
+              compData.city, 
+              compData.state
+            );
+            
+            await storage.createPendingProperty({
+              orgId,
+              sourceType: 'sales_comp',
+              compId: comp.id,
+              marinaName: compData.marina,
+              city: compData.city || null,
+              state: compData.state || null,
+              address: compData.address || null,
+              salePrice: compData.salePrice ? Number(compData.salePrice) : null,
+              status: 'pending',
+              suggestedDuplicates: similarProperties.map((p: any) => p.id),
+              compMetadata: {
+                wetSlips: compData.wetSlips,
+                drySlips: compData.drySlips,
+                buyer: compData.buyerCompany,
+                seller: compData.sellerCompany,
+                saleDate: compData.saleDate,
+              },
+              createdBy: userId,
+            });
+            console.log('[SalesComps] Created pending property for "' + compData.marina + '"');
+          }
+        } catch (propertyError) {
+          console.error('Error auto-creating pending property:', propertyError);
+        }
+      }
+
+      // Auto-create pending brokerage company if brokerage name is provided but not linked
+      if (!compData.brokerageCompanyId && compData.brokerage && compData.brokerage.trim()) {
+        try {
+          await storage.autoCreatePendingCompanyFromSalesComp({
+            salesCompId: comp.id,
+            orgId,
+            userId,
+            companyName: compData.brokerage.trim(),
+            role: 'brokerage' as any,
+            city: compData.city,
+            state: compData.state,
+          });
+          console.log('[SalesComps] Created pending brokerage company "' + compData.brokerage + '"');
+        } catch (brokerageError) {
+          console.error('Error auto-creating pending brokerage company:', brokerageError);
+        }
+      }
+
+      // Auto-create pending contacts for additional agents
+      if (compData.additionalAgents && Array.isArray(compData.additionalAgents)) {
+        for (let i = 0; i < compData.additionalAgents.length; i++) {
+          const agent = compData.additionalAgents[i];
+          // Only create pending contact if agent has a name but no linked contactId
+          if (agent && agent.name && agent.name.trim() && !agent.contactId) {
+            try {
+              // Parse the name into first and last name
+              const nameParts = agent.name.trim().split(' ');
+              const firstName = nameParts[0] || '';
+              const lastName = nameParts.slice(1).join(' ') || '';
+              
+              // Use a unique sourceId for each additional agent
+              const agentSourceId = comp.id + ':agent:' + i;
+              
+              // Check if pending contact already exists for this agent
+              const existingPending = await storage.getPendingContacts(orgId, 'pending');
+              const alreadyExists = existingPending.some((c: any) => 
+                c.sourceType === 'sales_comp' && c.sourceId === agentSourceId
+              );
+              
+              if (!alreadyExists) {
+                const similarContacts = await storage.findSimilarContacts(orgId, firstName, lastName);
+                
+                await storage.createPendingContact({
+                  orgId,
+                  sourceType: 'sales_comp',
+                  sourceId: agentSourceId,
+                  fullName: agent.name.trim(),
+                  status: 'pending',
+                  suggestedDuplicates: similarContacts.map((c: any) => c.id),
+                  sourceMetadata: {
+                    salesCompId: comp.id,
+                    agentFirstName: firstName,
+                    agentLastName: lastName,
+                    brokerage: compData.brokerage,
+                    isAdditionalAgent: true,
+                    agentIndex: i,
+                  },
+                  createdBy: userId,
+                });
+                console.log('[SalesComps] Created pending contact for additional agent "' + agent.name + '"');
+              }
+            } catch (agentError) {
+              console.error('Error auto-creating pending contact for additional agent "' + agent.name + '":', agentError);
+            }
+          }
+        }
+      }
+
 
       res.status(201).json(comp);
     } catch (error: any) {
@@ -12895,6 +13005,109 @@ Current context: Project ${req.params.projectId}`;
           });
         } catch (contactError) {
           console.error('Error auto-creating pending contact:', contactError);
+        }
+      }
+
+      // Auto-create pending property if marina/property data is updated but not linked to existing property
+      if (!updates.propertyId && updates.marina) {
+        try {
+          const existingPending = await storage.getPendingProperties(orgId, 'pending');
+          const alreadyExists = existingPending.some((p: any) => 
+            p.sourceType === 'sales_comp' && p.compId === req.params.id
+          );
+          
+          if (!alreadyExists) {
+            const similarProperties = await storage.findSimilarProperties(
+              orgId, 
+              updates.marina, 
+              updates.city, 
+              updates.state
+            );
+            
+            await storage.createPendingProperty({
+              orgId,
+              sourceType: 'sales_comp',
+              compId: req.params.id,
+              marinaName: updates.marina,
+              city: updates.city || null,
+              state: updates.state || null,
+              address: updates.address || null,
+              salePrice: updates.salePrice ? Number(updates.salePrice) : null,
+              status: 'pending',
+              suggestedDuplicates: similarProperties.map((p: any) => p.id),
+              compMetadata: {
+                wetSlips: updates.wetSlips,
+                drySlips: updates.drySlips,
+                buyer: updates.buyerCompany,
+                seller: updates.sellerCompany,
+                saleDate: updates.saleDate,
+              },
+              createdBy: userId,
+            });
+          }
+        } catch (propertyError) {
+          console.error('Error auto-creating pending property on update:', propertyError);
+        }
+      }
+
+      // Auto-create pending brokerage company if brokerage name is updated but not linked
+      if (!updates.brokerageCompanyId && updates.brokerage && updates.brokerage.trim()) {
+        try {
+          await storage.autoCreatePendingCompanyFromSalesComp({
+            salesCompId: req.params.id,
+            orgId,
+            userId,
+            companyName: updates.brokerage.trim(),
+            role: 'brokerage' as any,
+            city: updates.city,
+            state: updates.state,
+          });
+        } catch (brokerageError) {
+          console.error('Error auto-creating pending brokerage company on update:', brokerageError);
+        }
+      }
+
+      // Auto-create pending contacts for additional agents on update
+      if (updates.additionalAgents && Array.isArray(updates.additionalAgents)) {
+        for (let i = 0; i < updates.additionalAgents.length; i++) {
+          const agent = updates.additionalAgents[i];
+          if (agent && agent.name && agent.name.trim() && !agent.contactId) {
+            try {
+              const nameParts = agent.name.trim().split(' ');
+              const firstName = nameParts[0] || '';
+              const lastName = nameParts.slice(1).join(' ') || '';
+              const agentSourceId = req.params.id + ':agent:' + i;
+              
+              const existingPending = await storage.getPendingContacts(orgId, 'pending');
+              const alreadyExists = existingPending.some((c: any) => 
+                c.sourceType === 'sales_comp' && c.sourceId === agentSourceId
+              );
+              
+              if (!alreadyExists) {
+                const similarContacts = await storage.findSimilarContacts(orgId, firstName, lastName);
+                
+                await storage.createPendingContact({
+                  orgId,
+                  sourceType: 'sales_comp',
+                  sourceId: agentSourceId,
+                  fullName: agent.name.trim(),
+                  status: 'pending',
+                  suggestedDuplicates: similarContacts.map((c: any) => c.id),
+                  sourceMetadata: {
+                    salesCompId: req.params.id,
+                    agentFirstName: firstName,
+                    agentLastName: lastName,
+                    brokerage: updates.brokerage,
+                    isAdditionalAgent: true,
+                    agentIndex: i,
+                  },
+                  createdBy: userId,
+                });
+              }
+            } catch (agentError) {
+              console.error('Error auto-creating pending contact for additional agent on update:', agentError);
+            }
+          }
         }
       }
 
