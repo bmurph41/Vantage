@@ -132,11 +132,14 @@ function isTrailing12(startDate: string, endDate: string): boolean {
   return isFullYear && !isCalendarYear;
 }
 
+type KPIDrilldownType = 'baseline-revenue' | 'baseline-noi' | 'year1-noi' | 'exit-noi' | null;
+
 export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceProFormaProps) {
   const [viewMode, setViewMode] = useState<'monthly' | 'annual'>('annual');
   const [selectedYear, setSelectedYear] = useState('2026');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['revenue']));
   const [showHistorical, setShowHistorical] = useState(true);
+  const [selectedKPI, setSelectedKPI] = useState<KPIDrilldownType>(null);
   const { toast } = useToast();
 
   // Fetch project configuration
@@ -611,7 +614,10 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
 
       {/* KPI Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
+        <Card 
+          className={`cursor-pointer transition-all hover:shadow-md hover:border-primary/50 ${selectedKPI === 'baseline-revenue' ? 'ring-2 ring-primary border-primary' : ''}`}
+          onClick={() => setSelectedKPI(selectedKPI === 'baseline-revenue' ? null : 'baseline-revenue')}
+        >
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               {baselinePeriod?.shortLabel || 'Baseline'} Revenue
@@ -644,7 +650,10 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
           </CardContent>
         </Card>
 
-        <Card>
+        <Card 
+          className={`cursor-pointer transition-all hover:shadow-md hover:border-primary/50 ${selectedKPI === 'baseline-noi' ? 'ring-2 ring-primary border-primary' : ''}`}
+          onClick={() => setSelectedKPI(selectedKPI === 'baseline-noi' ? null : 'baseline-noi')}
+        >
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               {baselinePeriod?.shortLabel || 'Baseline'} NOI
@@ -658,7 +667,10 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
           </CardContent>
         </Card>
 
-        <Card>
+        <Card 
+          className={`cursor-pointer transition-all hover:shadow-md hover:border-primary/50 ${selectedKPI === 'year1-noi' ? 'ring-2 ring-primary border-primary' : ''}`}
+          onClick={() => setSelectedKPI(selectedKPI === 'year1-noi' ? null : 'year1-noi')}
+        >
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Year 1 NOI</CardTitle>
           </CardHeader>
@@ -688,7 +700,10 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
           </CardContent>
         </Card>
 
-        <Card>
+        <Card 
+          className={`cursor-pointer transition-all hover:shadow-md hover:border-primary/50 ${selectedKPI === 'exit-noi' ? 'ring-2 ring-primary border-primary' : ''}`}
+          onClick={() => setSelectedKPI(selectedKPI === 'exit-noi' ? null : 'exit-noi')}
+        >
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Year {holdPeriod} NOI</CardTitle>
           </CardHeader>
@@ -704,6 +719,245 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
           </CardContent>
         </Card>
       </div>
+
+      {/* KPI Drilldown Panel */}
+      {selectedKPI && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg">
+                  {selectedKPI === 'baseline-revenue' && `${baselinePeriod?.shortLabel || 'Baseline'} Revenue Breakdown`}
+                  {selectedKPI === 'baseline-noi' && `${baselinePeriod?.shortLabel || 'Baseline'} NOI Breakdown`}
+                  {selectedKPI === 'year1-noi' && 'Year 1 NOI Breakdown'}
+                  {selectedKPI === 'exit-noi' && `Year ${holdPeriod} NOI Breakdown`}
+                </CardTitle>
+                <CardDescription className="text-xs mt-1">
+                  Annual totals • Click card again to close
+                </CardDescription>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedKPI(null)}>
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {/* Empty state for baseline metrics when no historical data */}
+            {(selectedKPI === 'baseline-revenue' || selectedKPI === 'baseline-noi') && !baselinePeriod && (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <AlertCircle className="h-10 w-10 text-amber-500 mb-3" />
+                <h4 className="font-medium text-lg mb-1">No Baseline Data Available</h4>
+                <p className="text-sm text-muted-foreground max-w-md">
+                  Upload P&L documents in the Documents tab to populate baseline actuals. 
+                  Once uploaded, you'll see a detailed breakdown of revenue and NOI.
+                </p>
+              </div>
+            )}
+
+            {selectedKPI === 'baseline-revenue' && baselinePeriod && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="p-3 rounded-lg bg-background border">
+                    <div className="text-sm text-muted-foreground">Total Revenue</div>
+                    <div className="text-xl font-bold">{formatCurrency(baselineSummary?.revenue)}</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-background border">
+                    <div className="text-sm text-muted-foreground">Cost of Goods Sold</div>
+                    <div className="text-xl font-bold">{formatCurrency(baselineSummary?.cogs)}</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-background border">
+                    <div className="text-sm text-muted-foreground">Gross Profit</div>
+                    <div className="text-xl font-bold">{formatCurrency(baselineSummary?.grossProfit)}</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-background border">
+                    <div className="text-sm text-muted-foreground">Gross Margin</div>
+                    <div className="text-xl font-bold">{formatPercentSimple(baselineSummary?.revenue ? ((baselineSummary.grossProfit / baselineSummary.revenue) * 100) : 0)}</div>
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium mb-2">Revenue by Category</h4>
+                  <div className="space-y-2">
+                    {Object.entries(tableData.Revenue || {}).map(([name, values]) => {
+                      const baseValue = baselinePeriod ? values.historical[baselinePeriod.id] || 0 : 0;
+                      const pct = baselineSummary?.revenue ? (baseValue / baselineSummary.revenue) * 100 : 0;
+                      return (
+                        <div key={name} className="flex items-center justify-between p-2 rounded bg-background border">
+                          <span className="text-sm">{name}</span>
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm text-muted-foreground">{formatPercentSimple(pct)}</span>
+                            <span className="font-medium">{formatCurrency(baseValue)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedKPI === 'baseline-noi' && baselinePeriod && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="p-3 rounded-lg bg-background border">
+                    <div className="text-sm text-muted-foreground">Revenue</div>
+                    <div className="text-xl font-bold">{formatCurrency(baselineSummary?.revenue)}</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-background border">
+                    <div className="text-sm text-muted-foreground">Total Expenses</div>
+                    <div className="text-xl font-bold">{formatCurrency((baselineSummary?.cogs || 0) + (baselineSummary?.expenses || 0))}</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-background border border-green-200 bg-green-50 dark:bg-green-950/30">
+                    <div className="text-sm text-muted-foreground">Net Operating Income</div>
+                    <div className="text-xl font-bold text-green-600">{formatCurrency(baselineSummary?.noi)}</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-background border">
+                    <div className="text-sm text-muted-foreground">NOI Margin</div>
+                    <div className="text-xl font-bold">{formatPercentSimple(baselineSummary?.noiMargin)}</div>
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium mb-2">NOI Waterfall</h4>
+                  <div className="space-y-1">
+                    <div className="flex justify-between p-2 rounded bg-blue-50 dark:bg-blue-950/30 border border-blue-200">
+                      <span>Revenue</span>
+                      <span className="font-medium">{formatCurrency(baselineSummary?.revenue)}</span>
+                    </div>
+                    <div className="flex justify-between p-2 rounded bg-red-50 dark:bg-red-950/30 border border-red-200">
+                      <span>(-) Cost of Goods Sold</span>
+                      <span className="font-medium text-red-600">{formatCurrency(baselineSummary?.cogs)}</span>
+                    </div>
+                    <div className="flex justify-between p-2 rounded bg-slate-50 dark:bg-slate-900/50 border">
+                      <span className="font-medium">= Gross Profit</span>
+                      <span className="font-medium">{formatCurrency(baselineSummary?.grossProfit)}</span>
+                    </div>
+                    <div className="flex justify-between p-2 rounded bg-red-50 dark:bg-red-950/30 border border-red-200">
+                      <span>(-) Operating Expenses</span>
+                      <span className="font-medium text-red-600">{formatCurrency(baselineSummary?.expenses)}</span>
+                    </div>
+                    <div className="flex justify-between p-2 rounded bg-green-100 dark:bg-green-900/30 border border-green-300">
+                      <span className="font-bold">= Net Operating Income</span>
+                      <span className="font-bold text-green-600">{formatCurrency(baselineSummary?.noi)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedKPI === 'year1-noi' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="p-3 rounded-lg bg-background border">
+                    <div className="text-sm text-muted-foreground">Year 1 Revenue</div>
+                    <div className="text-xl font-bold">{formatCurrency(year1Summary.revenue)}</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-background border">
+                    <div className="text-sm text-muted-foreground">Year 1 Expenses</div>
+                    <div className="text-xl font-bold">{formatCurrency(year1Summary.cogs + year1Summary.expenses)}</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-background border border-green-200 bg-green-50 dark:bg-green-950/30">
+                    <div className="text-sm text-muted-foreground">Year 1 NOI</div>
+                    <div className="text-xl font-bold text-green-600">{formatCurrency(year1Summary.noi)}</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-background border">
+                    <div className="text-sm text-muted-foreground">vs Baseline</div>
+                    <div className="text-xl font-bold">{formatPercent(calculateYoYGrowth(year1Summary.noi, baselineSummary?.noi || 0))}</div>
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium mb-2">Year 1 NOI Waterfall</h4>
+                  <div className="space-y-1">
+                    <div className="flex justify-between p-2 rounded bg-blue-50 dark:bg-blue-950/30 border border-blue-200">
+                      <span>Revenue</span>
+                      <span className="font-medium">{formatCurrency(year1Summary.revenue)}</span>
+                    </div>
+                    <div className="flex justify-between p-2 rounded bg-red-50 dark:bg-red-950/30 border border-red-200">
+                      <span>(-) Cost of Goods Sold</span>
+                      <span className="font-medium text-red-600">{formatCurrency(year1Summary.cogs)}</span>
+                    </div>
+                    <div className="flex justify-between p-2 rounded bg-slate-50 dark:bg-slate-900/50 border">
+                      <span className="font-medium">= Gross Profit</span>
+                      <span className="font-medium">{formatCurrency(year1Summary.grossProfit)}</span>
+                    </div>
+                    <div className="flex justify-between p-2 rounded bg-red-50 dark:bg-red-950/30 border border-red-200">
+                      <span>(-) Operating Expenses</span>
+                      <span className="font-medium text-red-600">{formatCurrency(year1Summary.expenses)}</span>
+                    </div>
+                    <div className="flex justify-between p-2 rounded bg-green-100 dark:bg-green-900/30 border border-green-300">
+                      <span className="font-bold">= Net Operating Income</span>
+                      <span className="font-bold text-green-600">{formatCurrency(year1Summary.noi)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedKPI === 'exit-noi' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="p-3 rounded-lg bg-background border">
+                    <div className="text-sm text-muted-foreground">Year {holdPeriod} Revenue</div>
+                    <div className="text-xl font-bold">{formatCurrency(finalYearSummary.revenue)}</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-background border">
+                    <div className="text-sm text-muted-foreground">Year {holdPeriod} Expenses</div>
+                    <div className="text-xl font-bold">{formatCurrency(finalYearSummary.cogs + finalYearSummary.expenses)}</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-background border border-green-200 bg-green-50 dark:bg-green-950/30">
+                    <div className="text-sm text-muted-foreground">Year {holdPeriod} NOI</div>
+                    <div className="text-xl font-bold text-green-600">{formatCurrency(finalYearSummary.noi)}</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-background border">
+                    <div className="text-sm text-muted-foreground">{holdPeriod - 1}Y CAGR</div>
+                    <div className="text-xl font-bold text-green-600">{formatPercent(calculateCAGR(year1Summary.noi, finalYearSummary.noi, holdPeriod - 1))}</div>
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium mb-2">Year {holdPeriod} NOI Waterfall</h4>
+                  <div className="space-y-1">
+                    <div className="flex justify-between p-2 rounded bg-blue-50 dark:bg-blue-950/30 border border-blue-200">
+                      <span>Revenue</span>
+                      <span className="font-medium">{formatCurrency(finalYearSummary.revenue)}</span>
+                    </div>
+                    <div className="flex justify-between p-2 rounded bg-red-50 dark:bg-red-950/30 border border-red-200">
+                      <span>(-) Cost of Goods Sold</span>
+                      <span className="font-medium text-red-600">{formatCurrency(finalYearSummary.cogs)}</span>
+                    </div>
+                    <div className="flex justify-between p-2 rounded bg-slate-50 dark:bg-slate-900/50 border">
+                      <span className="font-medium">= Gross Profit</span>
+                      <span className="font-medium">{formatCurrency(finalYearSummary.grossProfit)}</span>
+                    </div>
+                    <div className="flex justify-between p-2 rounded bg-red-50 dark:bg-red-950/30 border border-red-200">
+                      <span>(-) Operating Expenses</span>
+                      <span className="font-medium text-red-600">{formatCurrency(finalYearSummary.expenses)}</span>
+                    </div>
+                    <div className="flex justify-between p-2 rounded bg-green-100 dark:bg-green-900/30 border border-green-300">
+                      <span className="font-bold">= Net Operating Income</span>
+                      <span className="font-bold text-green-600">{formatCurrency(finalYearSummary.noi)}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 border">
+                  <h4 className="text-sm font-medium mb-2">NOI Growth Over Hold Period</h4>
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <div className="text-xs text-muted-foreground">Year 1</div>
+                      <div className="font-medium">{formatCurrency(year1Summary.noi)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Total Growth</div>
+                      <div className="font-medium text-green-600">{formatPercent(calculateYoYGrowth(finalYearSummary.noi, year1Summary.noi))}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Year {holdPeriod}</div>
+                      <div className="font-medium">{formatCurrency(finalYearSummary.noi)}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Main Pro Forma Table */}
       <Card>
