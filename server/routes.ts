@@ -242,6 +242,7 @@ import { z } from "zod";
 import crypto from "crypto";
 import { WebhookSecurity, type WebhookEvent } from "./webhook-security";
 import multer from "multer";
+import { validateFileUpload } from "./middleware/file-upload-security";
 import path from "path";
 import fs from "fs-extra";
 
@@ -2485,7 +2486,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Task File Management
-  app.post("/api/dd/tasks/:taskId/files", upload.single('file'), async (req: any, res) => {
+  app.post("/api/dd/tasks/:taskId/files", upload.single('file'), validateFileUpload({ maxSize: 20 * 1024 * 1024 }), async (req: any, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
@@ -5252,7 +5253,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Upload CDD Document
-  app.post("/api/dd/projects/:projectId/cdd-documents", cddUpload.single('file'), async (req: any, res) => {
+  app.post("/api/dd/projects/:projectId/cdd-documents", cddUpload.single('file'), validateFileUpload({ maxSize: 50 * 1024 * 1024 }), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const { inArray } = await import('drizzle-orm');
@@ -8224,7 +8225,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Upload file
-  app.post("/api/crm/files", crmFileUpload.single('file'), async (req: any, res) => {
+  app.post("/api/crm/files", crmFileUpload.single('file'), validateFileUpload({ maxSize: 10 * 1024 * 1024 }), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const { inArray } = await import('drizzle-orm');
@@ -21236,7 +21237,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   });
 
   // Upload new document for processing (with SHA-256 duplicate detection)
-  app.post('/api/modeling/projects/:projectId/documents', authenticateUser, docIntelUpload.single('file'), async (req: any, res) => {
+  app.post('/api/modeling/projects/:projectId/documents', authenticateUser, docIntelUpload.single('file'), validateFileUpload({ maxSize: 50 * 1024 * 1024 }), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const userId = req.user.id;
@@ -31899,7 +31900,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   });
 
   // Parse uploaded file and return headers, sample rows, and suggested mappings
-  app.post('/api/import/parse', importWizardUpload.single('file'), async (req: any, res) => {
+  app.post('/api/import/parse', importWizardUpload.single('file'), validateFileUpload({ maxSize: 25 * 1024 * 1024 }), async (req: any, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded' });
