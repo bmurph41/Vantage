@@ -43,9 +43,14 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
     toInsert: number;
     toUpdate: number;
     toSkip: number;
-    duplicateMatches: Array<{ row: any; match: any; confidence: number; action: 'insert' | 'update' | 'skip' }>;
+    duplicateMatches: Array<{ row: any; match: any; confidence: number; action: 'insert' | 'update' | 'skip'; rowIndex: number }>;
+    plan?: {
+      rows: Array<{ rowIndex: number; rowData: any; action: 'insert' | 'update' | 'skip'; confidence: number; matchedComp?: any; reason?: string }>;
+      summary: { toInsert: number; toUpdate: number; toSkip: number };
+    };
   } | null>(null);
   const [excludedRows, setExcludedRows] = useState<number[]>([]);
+  const [selectedFilter, setSelectedFilter] = useState<'insert' | 'update' | 'skip' | null>(null);
   const [linkToPortfolio, setLinkToPortfolio] = useState(false);
   const [selectedPortfolioId, setSelectedPortfolioId] = useState<string>("");
   const [showNewPortfolioDialog, setShowNewPortfolioDialog] = useState(false);
@@ -248,11 +253,20 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
       importId: uploadData.importId,
       mapping,
       normalization,
-      excludedRows: [],
+      excludedRows,
       parentPortfolioId: linkToPortfolio ? selectedPortfolioId : undefined,
       importMode,
       updateBlankValues,
     });
+  };
+
+  const getActiveImportCount = () => {
+    if (!previewData?.plan?.rows) {
+      return (previewData?.toInsert || 0) + (previewData?.toUpdate || 0);
+    }
+    return previewData.plan.rows.filter(r => 
+      (r.action === 'insert' || r.action === 'update') && !excludedRows.includes(r.rowIndex)
+    ).length;
   };
 
 
@@ -455,77 +469,191 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
     </div>
   );
 
-  const renderPreviewStep = () => (
-    <div>
-      <div className="mb-6">
-        <h3 className="text-lg font-medium text-foreground mb-2">Step 4: Preview Import</h3>
-        <p className="text-sm text-muted-foreground">Review what will be imported</p>
-      </div>
+  const renderPreviewStep = () => {
+    const getFilteredRows = () => {
+      if (!previewData?.plan?.rows || !selectedFilter) return [];
+      return previewData.plan.rows.filter(r => r.action === selectedFilter);
+    };
 
-      {previewData && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-4">
-            <Card className="p-4 text-center">
-              <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                {previewData.toInsert}
-              </div>
-              <div className="text-sm text-muted-foreground mt-1">Will be added</div>
-            </Card>
-            <Card className="p-4 text-center">
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                {previewData.toUpdate}
-              </div>
-              <div className="text-sm text-muted-foreground mt-1">Will be updated</div>
-            </Card>
-            <Card className="p-4 text-center">
-              <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
-                {previewData.toSkip}
-              </div>
-              <div className="text-sm text-muted-foreground mt-1">Will be skipped</div>
-            </Card>
-          </div>
+    const filteredRows = getFilteredRows();
 
-          {previewData.duplicateMatches.length > 0 && (
-            <Card className="p-4">
-              <h4 className="font-medium text-foreground mb-3">Duplicate Matches Found</h4>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {previewData.duplicateMatches.slice(0, 10).map((match, i) => (
-                  <div key={i} className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm">
-                    <div className="flex-1">
-                      <span className="font-medium">{match.row.marina || 'Unknown'}</span>
-                      <span className="text-muted-foreground ml-2">
-                        ({match.row.city}, {match.row.state})
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">
-                        {Math.round(match.confidence * 100)}% match
-                      </span>
-                      {match.action === 'update' && (
-                        <span className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded">
-                          Will update
-                        </span>
-                      )}
-                      {match.action === 'skip' && (
-                        <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded">
-                          Will skip
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {previewData.duplicateMatches.length > 10 && (
-                  <div className="text-xs text-muted-foreground text-center pt-2">
-                    ... and {previewData.duplicateMatches.length - 10} more matches
+    const getActiveCount = (action: 'insert' | 'update' | 'skip') => {
+      if (!previewData?.plan?.rows) return 0;
+      return previewData.plan.rows.filter(r => r.action === action && !excludedRows.includes(r.rowIndex)).length;
+    };
+
+    const toggleRowExclusion = (rowIndex: number) => {
+      setExcludedRows(prev => 
+        prev.includes(rowIndex) 
+          ? prev.filter(i => i !== rowIndex)
+          : [...prev, rowIndex]
+      );
+    };
+
+    const toggleAllInFilter = (include: boolean) => {
+      if (!selectedFilter) return;
+      const filterRows = getFilteredRows();
+      if (include) {
+        setExcludedRows(prev => prev.filter(i => !filterRows.some(r => r.rowIndex === i)));
+      } else {
+        setExcludedRows(prev => [...new Set([...prev, ...filterRows.map(r => r.rowIndex)])]);
+      }
+    };
+
+    return (
+      <div>
+        <div className="mb-6">
+          <h3 className="text-lg font-medium text-foreground mb-2">Step 4: Preview Import</h3>
+          <p className="text-sm text-muted-foreground">Click a category to view and manage records</p>
+        </div>
+
+        {previewData && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-4">
+              <Card 
+                className={`p-4 text-center cursor-pointer transition-all hover:border-green-500 ${selectedFilter === 'insert' ? 'ring-2 ring-green-500 border-green-500' : ''}`}
+                onClick={() => setSelectedFilter(selectedFilter === 'insert' ? null : 'insert')}
+              >
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  {getActiveCount('insert')}
+                </div>
+                <div className="text-sm text-muted-foreground mt-1">Will be added</div>
+                {excludedRows.length > 0 && previewData.plan && (
+                  <div className="text-xs text-orange-500 mt-1">
+                    {previewData.plan.rows.filter(r => r.action === 'insert' && excludedRows.includes(r.rowIndex)).length} excluded
                   </div>
                 )}
+              </Card>
+              <Card 
+                className={`p-4 text-center cursor-pointer transition-all hover:border-blue-500 ${selectedFilter === 'update' ? 'ring-2 ring-blue-500 border-blue-500' : ''}`}
+                onClick={() => setSelectedFilter(selectedFilter === 'update' ? null : 'update')}
+              >
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {getActiveCount('update')}
+                </div>
+                <div className="text-sm text-muted-foreground mt-1">Will be updated</div>
+                {excludedRows.length > 0 && previewData.plan && (
+                  <div className="text-xs text-orange-500 mt-1">
+                    {previewData.plan.rows.filter(r => r.action === 'update' && excludedRows.includes(r.rowIndex)).length} excluded
+                  </div>
+                )}
+              </Card>
+              <Card 
+                className={`p-4 text-center cursor-pointer transition-all hover:border-gray-500 ${selectedFilter === 'skip' ? 'ring-2 ring-gray-500 border-gray-500' : ''}`}
+                onClick={() => setSelectedFilter(selectedFilter === 'skip' ? null : 'skip')}
+              >
+                <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
+                  {previewData.toSkip}
+                </div>
+                <div className="text-sm text-muted-foreground mt-1">Will be skipped</div>
+              </Card>
+            </div>
+
+            {selectedFilter && filteredRows.length > 0 && (
+              <Card className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-medium text-foreground">
+                    {selectedFilter === 'insert' && 'Records to Add'}
+                    {selectedFilter === 'update' && 'Records to Update'}
+                    {selectedFilter === 'skip' && 'Records to Skip'}
+                    <span className="text-muted-foreground font-normal ml-2">({filteredRows.length} records)</span>
+                  </h4>
+                  {selectedFilter !== 'skip' && (
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => toggleAllInFilter(true)}
+                      >
+                        Include All
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => toggleAllInFilter(false)}
+                      >
+                        Exclude All
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {filteredRows.map((row, i) => {
+                    const isExcluded = excludedRows.includes(row.rowIndex);
+                    return (
+                      <div 
+                        key={i} 
+                        className={`flex items-center gap-3 p-2 rounded text-sm ${isExcluded ? 'bg-muted/30 opacity-60' : 'bg-muted/50'}`}
+                      >
+                        {selectedFilter !== 'skip' && (
+                          <Checkbox
+                            checked={!isExcluded}
+                            onCheckedChange={() => toggleRowExclusion(row.rowIndex)}
+                          />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <span className={`font-medium ${isExcluded ? 'line-through' : ''}`}>
+                            {row.rowData.marina || 'Unknown'}
+                          </span>
+                          <span className="text-muted-foreground ml-2">
+                            {row.rowData.city && row.rowData.state ? `(${row.rowData.city}, ${row.rowData.state})` : ''}
+                          </span>
+                          {row.rowData.salePrice && (
+                            <span className="text-muted-foreground ml-2">
+                              ${Number(row.rowData.salePrice).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                        {row.confidence > 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            {Math.round(row.confidence * 100)}% match
+                          </span>
+                        )}
+                        {row.reason && selectedFilter === 'skip' && (
+                          <span className="text-xs text-muted-foreground italic">
+                            {row.reason}
+                          </span>
+                        )}
+                        <span className={`text-xs px-2 py-1 rounded ${
+                          selectedFilter === 'insert' ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' :
+                          selectedFilter === 'update' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' :
+                          'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+                        }`}>
+                          {selectedFilter === 'insert' ? 'Add' : selectedFilter === 'update' ? 'Update' : 'Skip'}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+            )}
+
+            {selectedFilter && filteredRows.length === 0 && (
+              <Card className="p-4 text-center text-muted-foreground">
+                No records in this category
+              </Card>
+            )}
+
+            {excludedRows.length > 0 && (
+              <div className="flex items-center justify-between p-3 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-lg">
+                <span className="text-sm text-orange-700 dark:text-orange-300">
+                  {excludedRows.length} record(s) excluded from import
+                </span>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setExcludedRows([])}
+                  className="text-orange-700 dark:text-orange-300 hover:text-orange-800"
+                >
+                  Reset
+                </Button>
               </div>
-            </Card>
-          )}
-        </div>
-      )}
-    </div>
-  );
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const renderProcessingStep = () => (
     <div>
@@ -691,7 +819,7 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
                   disabled={commitMutation.isPending}
                   data-testid="button-confirm-import"
                 >
-                  {commitMutation.isPending ? 'Starting Import...' : `Confirm & Import ${previewData?.toInsert + previewData?.toUpdate || 0} Records`}
+                  {commitMutation.isPending ? 'Starting Import...' : `Confirm & Import ${getActiveImportCount()} Records`}
                 </Button>
               )}
             </div>
