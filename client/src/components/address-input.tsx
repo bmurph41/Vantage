@@ -209,6 +209,19 @@ export function AddressInput({
     const place = autocompleteRef.current?.getPlace();
     
     if (!place || !place.address_components) {
+      const domValue = inputRef.current?.value;
+      if (domValue && domValue.includes(',')) {
+        const parsed = parseAddressString(domValue);
+        parsed.source = 'google';
+        if (parsed.city || parsed.state || parsed.zipCode) {
+          if (onChangeRef.current) {
+            onChangeRef.current(parsed.street || domValue, parsed);
+          }
+          if (onAddressSelectRef.current) {
+            onAddressSelectRef.current(parsed);
+          }
+        }
+      }
       return;
     }
 
@@ -231,8 +244,10 @@ export function AddressInput({
           ? `${components.street} ${component.long_name}`
           : component.long_name;
       }
-      if (types.includes('locality')) {
-        components.city = component.long_name;
+      if (types.includes('locality') || types.includes('sublocality_level_1')) {
+        if (!components.city) {
+          components.city = component.long_name;
+        }
       }
       if (types.includes('administrative_area_level_1')) {
         components.state = component.short_name;
@@ -244,6 +259,14 @@ export function AddressInput({
         components.country = component.long_name;
       }
     });
+
+    if (components.fullAddress && (!components.state || !components.zipCode || !components.city)) {
+      const parsed = parseAddressString(components.fullAddress);
+      if (!components.city && parsed.city) components.city = parsed.city;
+      if (!components.state && parsed.state) components.state = parsed.state;
+      if (!components.zipCode && parsed.zipCode) components.zipCode = parsed.zipCode;
+      if (!components.street && parsed.street) components.street = parsed.street;
+    }
 
     components.streetAddress = components.street;
 
@@ -258,6 +281,12 @@ export function AddressInput({
     if (onAddressSelectRef.current) {
       onAddressSelectRef.current(components);
     }
+
+    setTimeout(() => {
+      if (onAddressSelectRef.current) {
+        onAddressSelectRef.current(components);
+      }
+    }, 50);
   }, []);
 
   useEffect(() => {
