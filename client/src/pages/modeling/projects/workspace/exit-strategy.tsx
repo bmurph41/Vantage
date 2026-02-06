@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,10 +30,14 @@ import {
   Plus,
   Trash2,
   Users,
-  PieChart
+  PieChart,
+  Save,
+  Check
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { ModelingProject, ExitScenario } from "@shared/schema";
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 
@@ -319,6 +323,34 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
   const [activeTab, setActiveTab] = useState("tax");
   const [activeScenario, setActiveScenario] = useState<ScenarioType>('base');
   const [scenarios, setScenarios] = useState(defaultScenarios);
+
+  const { toast } = useToast();
+
+  const { data: savedScenarios } = useQuery<any[]>({
+    queryKey: ['/api/modeling/projects', projectId, 'exit', 'scenarios'],
+  });
+
+  const saveScenarioMutation = useMutation({
+    mutationFn: async (data: { id?: string; name: string; scenarioType: string; exitCapRate: number; purchasePrice: number; holdingPeriodYears: number; exitNoi: number; projectedSalePrice: number }) => {
+      if (data.id) {
+        return apiRequest(`/api/modeling/projects/${projectId}/exit/scenarios/${data.id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        });
+      }
+      return apiRequest(`/api/modeling/projects/${projectId}/exit/scenarios`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'exit', 'scenarios'] });
+      toast({ title: "Saved", description: "Exit scenario saved successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save exit scenario", variant: "destructive" });
+    },
+  });
   
   const { data: project, isLoading: projectLoading } = useQuery<ModelingProject>({
     queryKey: ['/api/modeling/projects', projectId],
@@ -334,6 +366,30 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
 
   const holdPeriod = config?.holdPeriod || 5;
   const purchasePrice = Number(project?.purchasePrice) || 0;
+
+  useEffect(() => {
+    if (savedScenarios && savedScenarios.length > 0) {
+      const loaded: Record<ScenarioType, ScenarioConfig> = { ...defaultScenarios };
+      const scenarioTypeMap: Record<string, ScenarioType> = {
+        'cash_sale': 'base',
+        'exchange_1031': 'aggressive',
+        'seller_financing': 'conservative',
+      };
+      for (const s of savedScenarios) {
+        const type = scenarioTypeMap[s.scenarioType] || null;
+        if (type) {
+          loaded[type] = {
+            name: s.name || loaded[type].name,
+            description: s.description || loaded[type].description,
+            revenueGrowth: loaded[type].revenueGrowth,
+            expenseGrowth: loaded[type].expenseGrowth,
+            exitCapRate: Number(s.exitCapRate) * 100 || loaded[type].exitCapRate,
+          };
+        }
+      }
+      setScenarios(loaded);
+    }
+  }, [savedScenarios]);
   
   const currentScenario = scenarios[activeScenario];
   const exitCapRate = currentScenario.exitCapRate;
@@ -398,6 +454,35 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
                 </SelectItem>
               </SelectContent>
             </Select>
+            <Button
+              size="sm"
+              onClick={() => {
+                const activeScenarioTypeMap: Record<ScenarioType, string> = {
+                  base: 'cash_sale',
+                  aggressive: 'exchange_1031',
+                  conservative: 'seller_financing',
+                };
+                const targetType = activeScenarioTypeMap[activeScenario];
+                const scenarioId = savedScenarios?.find(s => s.scenarioType === targetType)?.id;
+                saveScenarioMutation.mutate({
+                  id: scenarioId,
+                  name: currentScenario.name,
+                  scenarioType: activeScenario === 'base' ? 'cash_sale' : activeScenario === 'aggressive' ? 'exchange_1031' : 'seller_financing',
+                  exitCapRate: currentScenario.exitCapRate / 100,
+                  purchasePrice: purchasePrice,
+                  holdingPeriodYears: holdPeriod,
+                  exitNoi: exitNOI,
+                  projectedSalePrice: calculatedSalePrice,
+                });
+              }}
+              disabled={saveScenarioMutation.isPending}
+            >
+              {saveScenarioMutation.isPending ? (
+                <><RefreshCcw className="h-4 w-4 mr-1 animate-spin" /> Saving...</>
+              ) : (
+                <><Save className="h-4 w-4 mr-1" /> Save Scenario</>
+              )}
+            </Button>
           </div>
         </div>
       </div>

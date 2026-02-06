@@ -39,7 +39,9 @@ The platform uses React 18 with TypeScript and Wouter for routing. The UI is bui
 - **OM Builder**: Professional offering memorandum creation with data binding and PDF export.
 - **Cross-Module Architecture**: Comprehensive system for connecting CRM, Due Diligence, Modeling, and DockTalk via database schema consolidation, a query key factory for cache invalidation, a Deal Orchestrator Service, Entity Linking API, and a Cross-Module Event System.
 - **Marina Integration Adapters**: Abstract adapter framework for connecting to 10+ marina management systems (DockMaster, Dockwa, Storable Marine, Marina Office) with OAuth handling, rate limiting, retry logic, and automatic sync recording.
-- **Operations Data Sync**: Pipeline connecting Fuel Sales, Rent Roll V2, and Ship Store modules to marina integrations with real-time sync capabilities.
+- **Operations Data Sync**: Pipeline connecting Fuel Sales, Rent Roll V2, and Ship Store modules to marina integrations with real-time sync capabilities. Pro Forma Engine now pulls operational data from all 8 profit center assumption tables (fuel, ship store, service, boat rentals, boat club, boat sales, commercial tenants, bookkeeping) via `enrichFromProfitCenters()`.
+- **Valuator Profit Centers**: 6-tab interface (Summary, Fuel Sales, Ship Store, Service Dept, Boat Rentals, Bookkeeping) with full CRUD, CSV import/export, and edit dialogs on all tabs. CSV import uses client-side parsing with column auto-detection. Commercial Tenants tab uses unified `commercialTenants` table via `/api/valuator/:projectId/leases` routes.
+- **Exit Strategy Persistence**: Frontend wired to backend CRUD at `/api/modeling/projects/:projectId/exit/scenarios` with Save Scenario button, scenarioType-based lookup (cash_sale=base, exchange_1031=aggressive, seller_financing=conservative).
 - **Unified Analytics Dashboard**: Cross-module analytics aggregating metrics from CRM, DD, Modeling, and Operations with time period filtering and trend visualization.
 - **OM Builder**: Professional offering memorandum generation with template system, multi-module data aggregation, and PDF export.
 

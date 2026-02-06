@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Wrench, DollarSign, TrendingUp, Download } from "lucide-react";
+import { Plus, Trash2, Edit, Wrench, DollarSign, TrendingUp, Download } from "lucide-react";
 import { format, subMonths } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -46,6 +46,7 @@ interface ValuatorServiceDeptProps {
 
 export default function ValuatorServiceDeptTab({ projectId, projectName }: ValuatorServiceDeptProps) {
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<ServiceWorkOrder | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [period, setPeriod] = useState<"ytd" | "12m" | "all">("12m");
   
@@ -142,6 +143,23 @@ export default function ValuatorServiceDeptTab({ projectId, projectName }: Valua
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to delete work order", variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<ServiceWorkOrder> }) => {
+      return apiRequest(`/api/operations-context/projects/${projectId}/ops/service/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/operations-context/projects", projectId] });
+      toast({ title: "Success", description: "Work order updated" });
+      setEditingOrder(null);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update work order", variant: "destructive" });
     },
   });
 
@@ -395,6 +413,13 @@ export default function ValuatorServiceDeptTab({ projectId, projectName }: Valua
                         <Button
                           variant="ghost"
                           size="icon"
+                          onClick={() => setEditingOrder(order)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           onClick={() => deleteMutation.mutate(order.id)}
                           disabled={deleteMutation.isPending}
                         >
@@ -409,6 +434,79 @@ export default function ValuatorServiceDeptTab({ projectId, projectName }: Valua
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!editingOrder} onOpenChange={(open) => !open && setEditingOrder(null)}>
+        <DialogContent key={editingOrder?.id}>
+          <DialogHeader>
+            <DialogTitle>Edit Work Order</DialogTitle>
+            <DialogDescription>Update service work order details</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            if (!editingOrder) return;
+            const fd = new FormData(e.currentTarget);
+            updateMutation.mutate({
+              id: editingOrder.id,
+              data: {
+                openDate: fd.get("editOpenDate") as string,
+                closeDate: (fd.get("editCloseDate") as string) || null,
+                laborRevenue: fd.get("editLaborRevenue") as string,
+                partsRevenue: (fd.get("editPartsRevenue") as string) || "0",
+                cogs: (fd.get("editCogs") as string) || "0",
+                status: fd.get("editStatus") as string,
+                notes: (fd.get("editNotes") as string) || null,
+              },
+            });
+          }}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Open Date</Label>
+                  <Input type="date" name="editOpenDate" defaultValue={editingOrder?.openDate?.split('T')[0]} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Close Date</Label>
+                  <Input type="date" name="editCloseDate" defaultValue={editingOrder?.closeDate?.split('T')[0] || ''} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Labor Revenue</Label>
+                  <Input type="number" step="0.01" name="editLaborRevenue" defaultValue={editingOrder?.laborRevenue} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Parts Revenue</Label>
+                  <Input type="number" step="0.01" name="editPartsRevenue" defaultValue={editingOrder?.partsRevenue} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>COGS</Label>
+                  <Input type="number" step="0.01" name="editCogs" defaultValue={editingOrder?.cogs} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <select name="editStatus" defaultValue={editingOrder?.status} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                    <option value="open">Open</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="closed">Closed</option>
+                  </select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Notes</Label>
+                <Input name="editNotes" defaultValue={editingOrder?.notes || ''} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditingOrder(null)}>Cancel</Button>
+              <Button type="submit" disabled={updateMutation.isPending}>
+                {updateMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <ImportFromActualsModal
         open={showImportModal}

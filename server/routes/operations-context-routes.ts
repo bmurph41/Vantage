@@ -793,6 +793,356 @@ router.post('/projects/:projectId/assumptions/ship-store/bulk', async (req: Requ
 });
 
 // ============================================================================
+// ASSUMPTIONS CRUD - Service Department
+// ============================================================================
+
+router.get('/projects/:projectId/assumptions/service', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId } = req.params;
+    if (!await requireProjectInOrg(projectId, orgId)) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    const assumptions = await db.select()
+      .from(asmpService)
+      .where(eq(asmpService.projectId, projectId))
+      .orderBy(asmpService.periodMonth);
+    res.json(assumptions);
+  } catch (error) {
+    console.error('Error fetching service assumptions:', error);
+    res.status(500).json({ error: 'Failed to fetch service assumptions' });
+  }
+});
+
+router.post('/projects/:projectId/assumptions/service/bulk', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId } = req.params;
+    if (!await requireProjectInOrg(projectId, orgId)) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    const { rows } = req.body;
+    const results = [];
+    for (const row of rows) {
+      const existing = await db.select()
+        .from(asmpService)
+        .where(and(eq(asmpService.projectId, projectId), eq(asmpService.periodMonth, row.periodMonth)));
+      let result;
+      if (existing.length > 0) {
+        [result] = await db.update(asmpService)
+          .set({ ...row, updatedAt: new Date() })
+          .where(and(eq(asmpService.projectId, projectId), eq(asmpService.periodMonth, row.periodMonth)))
+          .returning();
+      } else {
+        [result] = await db.insert(asmpService)
+          .values({ ...row, projectId, orgId })
+          .returning();
+      }
+      results.push(result);
+    }
+    res.json(results);
+  } catch (error) {
+    console.error('Error bulk updating service assumptions:', error);
+    res.status(500).json({ error: 'Failed to bulk update service assumptions' });
+  }
+});
+
+// ============================================================================
+// ASSUMPTIONS CRUD - Commercial Tenants
+// ============================================================================
+
+router.get('/projects/:projectId/assumptions/commercial-tenants', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId } = req.params;
+    if (!await requireProjectInOrg(projectId, orgId)) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    const assumptions = await db.select()
+      .from(asmpCommercialTenants)
+      .where(eq(asmpCommercialTenants.projectId, projectId))
+      .orderBy(asmpCommercialTenants.periodMonth);
+    res.json(assumptions);
+  } catch (error) {
+    console.error('Error fetching commercial tenant assumptions:', error);
+    res.status(500).json({ error: 'Failed to fetch commercial tenant assumptions' });
+  }
+});
+
+router.post('/projects/:projectId/assumptions/commercial-tenants/bulk', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId } = req.params;
+    if (!await requireProjectInOrg(projectId, orgId)) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    const { rows } = req.body;
+    const results = [];
+    for (const row of rows) {
+      const existing = await db.select()
+        .from(asmpCommercialTenants)
+        .where(and(eq(asmpCommercialTenants.projectId, projectId), eq(asmpCommercialTenants.periodMonth, row.periodMonth)));
+      let result;
+      if (existing.length > 0) {
+        [result] = await db.update(asmpCommercialTenants)
+          .set({ ...row, updatedAt: new Date() })
+          .where(and(eq(asmpCommercialTenants.projectId, projectId), eq(asmpCommercialTenants.periodMonth, row.periodMonth)))
+          .returning();
+      } else {
+        [result] = await db.insert(asmpCommercialTenants)
+          .values({ ...row, projectId, orgId })
+          .returning();
+      }
+      results.push(result);
+    }
+    res.json(results);
+  } catch (error) {
+    console.error('Error bulk updating commercial tenant assumptions:', error);
+    res.status(500).json({ error: 'Failed to bulk update commercial tenant assumptions' });
+  }
+});
+
+// ============================================================================
+// ASSUMPTIONS CRUD - Boat Rentals
+// ============================================================================
+
+router.get('/projects/:projectId/assumptions/boat-rentals', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId } = req.params;
+    if (!await requireProjectInOrg(projectId, orgId)) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    const assumptions = await db.select()
+      .from(asmpBoatRentals)
+      .where(eq(asmpBoatRentals.projectId, projectId))
+      .orderBy(asmpBoatRentals.periodMonth);
+    res.json(assumptions);
+  } catch (error) {
+    console.error('Error fetching boat rental assumptions:', error);
+    res.status(500).json({ error: 'Failed to fetch boat rental assumptions' });
+  }
+});
+
+router.post('/projects/:projectId/assumptions/boat-rentals/bulk', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId } = req.params;
+    if (!await requireProjectInOrg(projectId, orgId)) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    const { rows } = req.body;
+    const results = [];
+    for (const row of rows) {
+      const existing = await db.select()
+        .from(asmpBoatRentals)
+        .where(and(eq(asmpBoatRentals.projectId, projectId), eq(asmpBoatRentals.periodMonth, row.periodMonth)));
+      let result;
+      if (existing.length > 0) {
+        [result] = await db.update(asmpBoatRentals)
+          .set({ ...row, updatedAt: new Date() })
+          .where(and(eq(asmpBoatRentals.projectId, projectId), eq(asmpBoatRentals.periodMonth, row.periodMonth)))
+          .returning();
+      } else {
+        [result] = await db.insert(asmpBoatRentals)
+          .values({ ...row, projectId, orgId })
+          .returning();
+      }
+      results.push(result);
+    }
+    res.json(results);
+  } catch (error) {
+    console.error('Error bulk updating boat rental assumptions:', error);
+    res.status(500).json({ error: 'Failed to bulk update boat rental assumptions' });
+  }
+});
+
+// ============================================================================
+// ASSUMPTIONS CRUD - Boat Club
+// ============================================================================
+
+router.get('/projects/:projectId/assumptions/boat-club', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId } = req.params;
+    if (!await requireProjectInOrg(projectId, orgId)) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    const assumptions = await db.select()
+      .from(asmpBoatClub)
+      .where(eq(asmpBoatClub.projectId, projectId))
+      .orderBy(asmpBoatClub.periodMonth);
+    res.json(assumptions);
+  } catch (error) {
+    console.error('Error fetching boat club assumptions:', error);
+    res.status(500).json({ error: 'Failed to fetch boat club assumptions' });
+  }
+});
+
+router.post('/projects/:projectId/assumptions/boat-club/bulk', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId } = req.params;
+    if (!await requireProjectInOrg(projectId, orgId)) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    const { rows } = req.body;
+    const results = [];
+    for (const row of rows) {
+      const existing = await db.select()
+        .from(asmpBoatClub)
+        .where(and(eq(asmpBoatClub.projectId, projectId), eq(asmpBoatClub.periodMonth, row.periodMonth)));
+      let result;
+      if (existing.length > 0) {
+        [result] = await db.update(asmpBoatClub)
+          .set({ ...row, updatedAt: new Date() })
+          .where(and(eq(asmpBoatClub.projectId, projectId), eq(asmpBoatClub.periodMonth, row.periodMonth)))
+          .returning();
+      } else {
+        [result] = await db.insert(asmpBoatClub)
+          .values({ ...row, projectId, orgId })
+          .returning();
+      }
+      results.push(result);
+    }
+    res.json(results);
+  } catch (error) {
+    console.error('Error bulk updating boat club assumptions:', error);
+    res.status(500).json({ error: 'Failed to bulk update boat club assumptions' });
+  }
+});
+
+// ============================================================================
+// ASSUMPTIONS CRUD - Boat Sales
+// ============================================================================
+
+router.get('/projects/:projectId/assumptions/boat-sales', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId } = req.params;
+    if (!await requireProjectInOrg(projectId, orgId)) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    const assumptions = await db.select()
+      .from(asmpBoatSales)
+      .where(eq(asmpBoatSales.projectId, projectId))
+      .orderBy(asmpBoatSales.periodMonth);
+    res.json(assumptions);
+  } catch (error) {
+    console.error('Error fetching boat sales assumptions:', error);
+    res.status(500).json({ error: 'Failed to fetch boat sales assumptions' });
+  }
+});
+
+router.post('/projects/:projectId/assumptions/boat-sales/bulk', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId } = req.params;
+    if (!await requireProjectInOrg(projectId, orgId)) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    const { rows } = req.body;
+    const results = [];
+    for (const row of rows) {
+      const existing = await db.select()
+        .from(asmpBoatSales)
+        .where(and(eq(asmpBoatSales.projectId, projectId), eq(asmpBoatSales.periodMonth, row.periodMonth)));
+      let result;
+      if (existing.length > 0) {
+        [result] = await db.update(asmpBoatSales)
+          .set({ ...row, updatedAt: new Date() })
+          .where(and(eq(asmpBoatSales.projectId, projectId), eq(asmpBoatSales.periodMonth, row.periodMonth)))
+          .returning();
+      } else {
+        [result] = await db.insert(asmpBoatSales)
+          .values({ ...row, projectId, orgId })
+          .returning();
+      }
+      results.push(result);
+    }
+    res.json(results);
+  } catch (error) {
+    console.error('Error bulk updating boat sales assumptions:', error);
+    res.status(500).json({ error: 'Failed to bulk update boat sales assumptions' });
+  }
+});
+
+// ============================================================================
+// ASSUMPTIONS CRUD - Bookkeeping
+// ============================================================================
+
+router.get('/projects/:projectId/assumptions/bookkeeping', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId } = req.params;
+    if (!await requireProjectInOrg(projectId, orgId)) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    const assumptions = await db.select()
+      .from(asmpBookkeeping)
+      .where(eq(asmpBookkeeping.projectId, projectId))
+      .orderBy(asmpBookkeeping.periodMonth);
+    res.json(assumptions);
+  } catch (error) {
+    console.error('Error fetching bookkeeping assumptions:', error);
+    res.status(500).json({ error: 'Failed to fetch bookkeeping assumptions' });
+  }
+});
+
+router.post('/projects/:projectId/assumptions/bookkeeping/bulk', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId } = req.params;
+    if (!await requireProjectInOrg(projectId, orgId)) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    const { rows } = req.body;
+    const results = [];
+    for (const row of rows) {
+      const existing = await db.select()
+        .from(asmpBookkeeping)
+        .where(and(eq(asmpBookkeeping.projectId, projectId), eq(asmpBookkeeping.periodMonth, row.periodMonth)));
+      let result;
+      if (existing.length > 0) {
+        [result] = await db.update(asmpBookkeeping)
+          .set({ ...row, updatedAt: new Date() })
+          .where(and(eq(asmpBookkeeping.projectId, projectId), eq(asmpBookkeeping.periodMonth, row.periodMonth)))
+          .returning();
+      } else {
+        [result] = await db.insert(asmpBookkeeping)
+          .values({ ...row, projectId, orgId })
+          .returning();
+      }
+      results.push(result);
+    }
+    res.json(results);
+  } catch (error) {
+    console.error('Error bulk updating bookkeeping assumptions:', error);
+    res.status(500).json({ error: 'Failed to bulk update bookkeeping assumptions' });
+  }
+});
+
+router.delete('/projects/:projectId/assumptions/bookkeeping/:id', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId, id } = req.params;
+    if (!await requireProjectInOrg(projectId, orgId)) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    const [deleted] = await db.delete(asmpBookkeeping)
+      .where(and(eq(asmpBookkeeping.id, id), eq(asmpBookkeeping.projectId, projectId)))
+      .returning();
+    if (!deleted) {
+      return res.status(404).json({ error: 'Entry not found' });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting bookkeeping entry:', error);
+    res.status(500).json({ error: 'Failed to delete bookkeeping entry' });
+  }
+});
+
+// ============================================================================
 // IMPORT ACTUALS TO ASSUMPTIONS
 // ============================================================================
 
@@ -1032,6 +1382,81 @@ router.get('/projects/:projectId/module-outputs', async (req: Request, res: Resp
         cogs: row.cogs,
         grossProfit: row.grossProfit,
         drivers: { laborRevenue: row.laborRevenue, partsRevenue: row.partsRevenue }
+      });
+    }
+
+    const rentalData = await db.select().from(asmpBoatRentals)
+      .where(eq(asmpBoatRentals.projectId, projectId))
+      .orderBy(asmpBoatRentals.periodMonth);
+
+    for (const row of rentalData) {
+      outputs.push({
+        module: 'BOAT_RENTALS',
+        month: row.periodMonth,
+        revenue: row.revenue,
+        cogs: null,
+        grossProfit: row.revenue,
+        drivers: { hours: row.hours, avgRatePerHour: row.avgRatePerHour, utilizationPct: row.utilizationPct }
+      });
+    }
+
+    const clubData = await db.select().from(asmpBoatClub)
+      .where(eq(asmpBoatClub.projectId, projectId))
+      .orderBy(asmpBoatClub.periodMonth);
+
+    for (const row of clubData) {
+      outputs.push({
+        module: 'BOAT_CLUB',
+        month: row.periodMonth,
+        revenue: row.monthlyRecurringRevenue,
+        cogs: null,
+        grossProfit: row.monthlyRecurringRevenue,
+        drivers: { memberCount: row.memberCount, avgMonthlyDues: row.avgMonthlyDues, churnPct: row.churnPct }
+      });
+    }
+
+    const boatSalesData = await db.select().from(asmpBoatSales)
+      .where(eq(asmpBoatSales.projectId, projectId))
+      .orderBy(asmpBoatSales.periodMonth);
+
+    for (const row of boatSalesData) {
+      outputs.push({
+        module: 'BOAT_SALES',
+        month: row.periodMonth,
+        revenue: row.revenue,
+        cogs: row.cogs,
+        grossProfit: row.grossProfit,
+        drivers: { units: row.units, avgSalePrice: row.avgSalePrice, marginPct: row.marginPct }
+      });
+    }
+
+    const tenantData = await db.select().from(asmpCommercialTenants)
+      .where(eq(asmpCommercialTenants.projectId, projectId))
+      .orderBy(asmpCommercialTenants.periodMonth);
+
+    for (const row of tenantData) {
+      outputs.push({
+        module: 'COMMERCIAL_TENANTS',
+        month: row.periodMonth,
+        revenue: row.totalRevenue,
+        cogs: null,
+        grossProfit: row.totalRevenue,
+        drivers: { tenantCount: row.tenantCount, occupancyPct: row.occupancyPct, avgRentPerSqft: row.avgRentPerSqft }
+      });
+    }
+
+    const bkData = await db.select().from(asmpBookkeeping)
+      .where(eq(asmpBookkeeping.projectId, projectId))
+      .orderBy(asmpBookkeeping.periodMonth);
+
+    for (const row of bkData) {
+      outputs.push({
+        module: 'BOOKKEEPING',
+        month: row.periodMonth,
+        revenue: row.revenueTotalOverride,
+        cogs: row.expenseTotalOverride,
+        grossProfit: row.noiOverride,
+        drivers: {}
       });
     }
     
@@ -1959,6 +2384,42 @@ router.post('/projects/:projectId/ops/service', async (req: Request, res: Respon
   }
 });
 
+router.put('/projects/:projectId/ops/service/:orderId', async (req: Request, res: Response) => {
+  try {
+    const { projectId, orderId } = req.params;
+    const orgId = req.tenantId!;
+    
+    await requireProjectInOrg(projectId, orgId);
+    
+    const updateData: any = { updatedAt: new Date() };
+    if (req.body.openDate !== undefined) updateData.openDate = req.body.openDate;
+    if (req.body.closeDate !== undefined) updateData.closeDate = req.body.closeDate || null;
+    if (req.body.laborRevenue !== undefined) updateData.laborRevenue = req.body.laborRevenue;
+    if (req.body.partsRevenue !== undefined) updateData.partsRevenue = req.body.partsRevenue;
+    if (req.body.cogs !== undefined) updateData.cogs = req.body.cogs;
+    if (req.body.status !== undefined) updateData.status = req.body.status;
+    if (req.body.notes !== undefined) updateData.notes = req.body.notes || null;
+    
+    const [updated] = await db.update(opsServiceWorkOrders)
+      .set(updateData)
+      .where(and(
+        eq(opsServiceWorkOrders.id, orderId),
+        eq(opsServiceWorkOrders.modelingProjectId, projectId),
+        eq(opsServiceWorkOrders.orgId, orgId)
+      ))
+      .returning();
+    
+    if (!updated) {
+      return res.status(404).json({ error: 'Work order not found' });
+    }
+    
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    console.error('Error updating service work order:', error);
+    res.status(500).json({ error: 'Failed to update service work order' });
+  }
+});
+
 router.delete('/projects/:projectId/ops/service/:orderId', async (req: Request, res: Response) => {
   try {
     const { projectId, orderId } = req.params;
@@ -2100,6 +2561,41 @@ router.post('/projects/:projectId/ops/rentals', async (req: Request, res: Respon
   } catch (error) {
     console.error('Error creating boat rental:', error);
     res.status(500).json({ error: 'Failed to create boat rental' });
+  }
+});
+
+router.put('/projects/:projectId/ops/rentals/:rentalId', async (req: Request, res: Response) => {
+  try {
+    const { projectId, rentalId } = req.params;
+    const orgId = req.tenantId!;
+    
+    await requireProjectInOrg(projectId, orgId);
+    
+    const updateData: any = { updatedAt: new Date() };
+    if (req.body.rentalDate !== undefined) updateData.rentalDate = req.body.rentalDate;
+    if (req.body.hours !== undefined) updateData.hours = req.body.hours;
+    if (req.body.grossSales !== undefined) updateData.grossSales = req.body.grossSales;
+    if (req.body.channel !== undefined) updateData.channel = req.body.channel || null;
+    if (req.body.boatType !== undefined) updateData.boatType = req.body.boatType || null;
+    if (req.body.notes !== undefined) updateData.notes = req.body.notes || null;
+    
+    const [updated] = await db.update(opsBoatRentals)
+      .set(updateData)
+      .where(and(
+        eq(opsBoatRentals.id, rentalId),
+        eq(opsBoatRentals.modelingProjectId, projectId),
+        eq(opsBoatRentals.orgId, orgId)
+      ))
+      .returning();
+    
+    if (!updated) {
+      return res.status(404).json({ error: 'Rental not found' });
+    }
+    
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    console.error('Error updating boat rental:', error);
+    res.status(500).json({ error: 'Failed to update boat rental' });
   }
 });
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Ship, Clock, DollarSign, Download } from "lucide-react";
+import { Plus, Trash2, Ship, Clock, DollarSign, Download, Edit, Upload } from "lucide-react";
 import { format, subMonths } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -41,8 +41,10 @@ interface ValuatorBoatRentalsProps {
 }
 
 export default function ValuatorBoatRentalsTab({ projectId, projectName }: ValuatorBoatRentalsProps) {
+  const csvInputRef = useRef<HTMLInputElement>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [editingRental, setEditingRental] = useState<BoatRental | null>(null);
   const [period, setPeriod] = useState<"ytd" | "12m" | "all">("12m");
   
   const [formData, setFormData] = useState({
@@ -140,6 +142,23 @@ export default function ValuatorBoatRentalsTab({ projectId, projectName }: Valua
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<BoatRental> }) => {
+      return apiRequest(`/api/operations-context/projects/${projectId}/ops/rentals/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/operations-context/projects", projectId] });
+      toast({ title: "Success", description: "Rental updated" });
+      setEditingRental(null);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update rental", variant: "destructive" });
+    },
+  });
+
   const resetForm = () => {
     setFormData({
       rentalDate: format(new Date(), "yyyy-MM-dd"),
@@ -164,6 +183,86 @@ export default function ValuatorBoatRentalsTab({ projectId, projectName }: Valua
       boatType: formData.boatType || null,
       notes: formData.notes || null,
     });
+  };
+
+  const handleCsvImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+
+    try {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter((l) => l.trim());
+      if (lines.length < 2) {
+        toast({ title: "Error", description: "CSV file is empty or has no data rows", variant: "destructive" });
+        return;
+      }
+
+      const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+      const dateIdx = headers.findIndex((h) => h.includes("date"));
+      const hoursIdx = headers.findIndex((h) => h.includes("hour"));
+      const salesIdx = headers.findIndex((h) => h.includes("sales") || h.includes("revenue") || h.includes("gross"));
+      const channelIdx = headers.findIndex((h) => h.includes("channel"));
+      const boatTypeIdx = headers.findIndex((h) => h.includes("boat") || h.includes("type"));
+
+      if (dateIdx === -1 || salesIdx === -1) {
+        toast({ title: "Error", description: "CSV must have at least date and sales/revenue columns", variant: "destructive" });
+        return;
+      }
+
+      let imported = 0;
+      let failed = 0;
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
+        if (!cols[dateIdx]) continue;
+        try {
+          await apiRequest(`/api/operations-context/projects/${projectId}/ops/rentals`, {
+            method: "POST",
+            body: JSON.stringify({
+              rentalDate: cols[dateIdx],
+              hours: hoursIdx >= 0 ? cols[hoursIdx] || "0" : "0",
+              grossSales: cols[salesIdx] || "0",
+              channel: channelIdx >= 0 ? cols[channelIdx] || null : null,
+              boatType: boatTypeIdx >= 0 ? cols[boatTypeIdx] || null : null,
+              source: "CSV_IMPORT",
+            }),
+          });
+          imported++;
+        } catch {
+          failed++;
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["/api/operations-context/projects", projectId] });
+      toast({
+        title: "Import Complete",
+        description: `${imported} rows imported${failed > 0 ? `, ${failed} failed` : ""}`,
+        variant: failed > 0 ? "destructive" : "default",
+      });
+    } catch {
+      toast({ title: "Error", description: "Failed to parse CSV file", variant: "destructive" });
+    }
+  };
+
+  const handleCsvExport = () => {
+    const csvHeaders = ["Date", "Hours", "GrossSales", "Channel", "BoatType", "Source"];
+    const csvRows = rentals.map((r) => [
+      r.rentalDate,
+      r.hours,
+      r.grossSales,
+      r.channel || "",
+      r.boatType || "",
+      r.source,
+    ].join(","));
+    const csvContent = [csvHeaders.join(","), ...csvRows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `boat-rentals-${projectId}-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "Exported", description: `${rentals.length} rows exported to CSV` });
   };
 
   if (isLoading) {
@@ -205,6 +304,14 @@ export default function ValuatorBoatRentalsTab({ projectId, projectName }: Valua
           <Button variant="outline" size="sm" onClick={() => setShowImportModal(true)}>
             <Download className="h-4 w-4 mr-2" />
             Import
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => csvInputRef.current?.click()}>
+            <Upload className="h-4 w-4 mr-2" />
+            Import CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleCsvExport}>
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
           </Button>
           <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
             <DialogTrigger asChild>
@@ -366,6 +473,13 @@ export default function ValuatorBoatRentalsTab({ projectId, projectName }: Valua
                         <Button
                           variant="ghost"
                           size="icon"
+                          onClick={() => setEditingRental(rental)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           onClick={() => deleteMutation.mutate(rental.id)}
                           disabled={deleteMutation.isPending}
                         >
@@ -380,6 +494,74 @@ export default function ValuatorBoatRentalsTab({ projectId, projectName }: Valua
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!editingRental} onOpenChange={(open) => !open && setEditingRental(null)}>
+        <DialogContent key={editingRental?.id}>
+          <DialogHeader>
+            <DialogTitle>Edit Boat Rental</DialogTitle>
+            <DialogDescription>Update rental details</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            if (!editingRental) return;
+            const fd = new FormData(e.currentTarget);
+            updateMutation.mutate({
+              id: editingRental.id,
+              data: {
+                rentalDate: fd.get("editRentalDate") as string,
+                hours: fd.get("editHours") as string,
+                grossSales: fd.get("editGrossSales") as string,
+                channel: (fd.get("editChannel") as string) || null,
+                boatType: (fd.get("editBoatType") as string) || null,
+                notes: (fd.get("editNotes") as string) || null,
+              },
+            });
+          }}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Rental Date</Label>
+                  <Input type="date" name="editRentalDate" defaultValue={editingRental?.rentalDate?.split('T')[0]} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Hours</Label>
+                  <Input type="number" step="0.5" name="editHours" defaultValue={editingRental?.hours} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Gross Sales</Label>
+                  <Input type="number" step="0.01" name="editGrossSales" defaultValue={editingRental?.grossSales} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Channel</Label>
+                  <select name="editChannel" defaultValue={editingRental?.channel || 'walk-in'} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                    <option value="walk-in">Walk-in</option>
+                    <option value="online">Online</option>
+                    <option value="phone">Phone</option>
+                  </select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Boat Type</Label>
+                <Input name="editBoatType" defaultValue={editingRental?.boatType || ''} placeholder="e.g., Pontoon, Kayak, Jet Ski" />
+              </div>
+              <div className="space-y-2">
+                <Label>Notes</Label>
+                <Input name="editNotes" defaultValue={editingRental?.notes || ''} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditingRental(null)}>Cancel</Button>
+              <Button type="submit" disabled={updateMutation.isPending}>
+                {updateMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <input ref={csvInputRef} type="file" accept=".csv" className="hidden" onChange={handleCsvImport} />
 
       <ImportFromActualsModal
         open={showImportModal}

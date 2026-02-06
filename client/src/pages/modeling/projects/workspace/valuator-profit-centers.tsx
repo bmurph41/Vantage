@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, Fuel, ShoppingCart, Wrench, Ship, TrendingUp } from "lucide-react";
+import { BarChart3, Fuel, ShoppingCart, Wrench, Ship, TrendingUp, BookOpen } from "lucide-react";
 import ValuatorFuelSalesTab from "./valuator-fuel-sales";
 import ValuatorShipStoreTab from "./valuator-ship-store";
 import ValuatorOperationsSummary from "./valuator-operations-summary";
 import ValuatorServiceDeptTab from "./valuator-service-dept";
 import ValuatorBoatRentalsTab from "./valuator-boat-rentals";
+import ValuatorBookkeepingTab from "./valuator-bookkeeping";
 
 interface ValuatorProfitCentersProps {
   projectId: string;
@@ -34,7 +35,7 @@ export default function ValuatorProfitCenters({ projectId, projectName }: Valuat
         </CardHeader>
         <CardContent className="pt-0">
           <Tabs value={activeSubTab} onValueChange={setActiveSubTab}>
-            <TabsList className="grid w-full grid-cols-5 mb-6">
+            <TabsList className="grid w-full grid-cols-6 mb-6">
               <TabsTrigger value="summary" className="gap-2">
                 <BarChart3 className="h-4 w-4" />
                 <span className="hidden sm:inline">Summary</span>
@@ -54,6 +55,10 @@ export default function ValuatorProfitCenters({ projectId, projectName }: Valuat
               <TabsTrigger value="rentals" className="gap-2">
                 <Ship className="h-4 w-4" />
                 <span className="hidden sm:inline">Boat Rentals</span>
+              </TabsTrigger>
+              <TabsTrigger value="bookkeeping" className="gap-2">
+                <BookOpen className="h-4 w-4" />
+                <span className="hidden sm:inline">Bookkeeping</span>
               </TabsTrigger>
             </TabsList>
 
@@ -75,6 +80,10 @@ export default function ValuatorProfitCenters({ projectId, projectName }: Valuat
 
             <TabsContent value="rentals" className="mt-0">
               <ValuatorBoatRentalsTab projectId={projectId} projectName={projectName} />
+            </TabsContent>
+
+            <TabsContent value="bookkeeping" className="mt-0">
+              <ValuatorBookkeepingTab projectId={projectId} projectName={projectName} />
             </TabsContent>
           </Tabs>
         </CardContent>

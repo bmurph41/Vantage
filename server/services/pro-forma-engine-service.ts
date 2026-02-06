@@ -16,7 +16,15 @@ import {
   modelingActuals,
   modelingProjectConfig,
   seasonalityProfiles,
-  seasonalityProfileMonths
+  seasonalityProfileMonths,
+  asmpFuel,
+  asmpShipStore,
+  asmpService,
+  asmpBoatRentals,
+  asmpBoatClub,
+  asmpBoatSales,
+  asmpCommercialTenants,
+  asmpBookkeeping
 } from '@shared/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import { debtScheduleService, type DebtSchedule, type DSCRMetrics } from './debt-schedule-service';
@@ -272,6 +280,12 @@ export class ProFormaEngineService {
         expensesBySubcat[subcat].amount += amount;
       }
     }
+
+    // ========================================
+    // 4b. ENRICH WITH PROFIT CENTERS DATA
+    // ========================================
+    
+    await this.enrichFromProfitCenters(projectId, revenueBySubcat, expensesBySubcat);
 
     // ========================================
     // 5. VALIDATION: Require actuals or base amounts
@@ -605,6 +619,100 @@ export class ProFormaEngineService {
       
       lastUpdated: new Date().toISOString()
     };
+  }
+
+  /**
+   * Enrich revenue/expense maps with data from Profit Centers assumptions tables.
+   * Annualizes monthly assumptions data and merges into existing actuals-based aggregation.
+   * Only adds data for modules that have assumption rows — does not overwrite actuals.
+   */
+  private async enrichFromProfitCenters(
+    projectId: string,
+    revenueBySubcat: Record<string, { amount: number; category: string; subcategory: string; department?: string }>,
+    expensesBySubcat: Record<string, { amount: number; category: string; subcategory: string; department?: string }>
+  ): Promise<void> {
+    const addRevenue = (name: string, amount: number, dept?: string) => {
+      if (amount <= 0) return;
+      const key = `PC: ${name}`;
+      if (!revenueBySubcat[key]) {
+        revenueBySubcat[key] = { amount: 0, category: 'Revenue', subcategory: key, department: dept };
+      }
+      revenueBySubcat[key].amount += amount;
+    };
+
+    const addExpense = (name: string, amount: number, dept?: string) => {
+      if (amount <= 0) return;
+      const key = `PC: ${name} COGS`;
+      if (!expensesBySubcat[key]) {
+        expensesBySubcat[key] = { amount: 0, category: 'COGS', subcategory: key, department: dept };
+      }
+      expensesBySubcat[key].amount += amount;
+    };
+
+    try {
+      const [fuelRows, storeRows, serviceRows, rentalRows, clubRows, salesRows, tenantRows, bkRows] = await Promise.all([
+        db.select().from(asmpFuel).where(eq(asmpFuel.projectId, projectId)),
+        db.select().from(asmpShipStore).where(eq(asmpShipStore.projectId, projectId)),
+        db.select().from(asmpService).where(eq(asmpService.projectId, projectId)),
+        db.select().from(asmpBoatRentals).where(eq(asmpBoatRentals.projectId, projectId)),
+        db.select().from(asmpBoatClub).where(eq(asmpBoatClub.projectId, projectId)),
+        db.select().from(asmpBoatSales).where(eq(asmpBoatSales.projectId, projectId)),
+        db.select().from(asmpCommercialTenants).where(eq(asmpCommercialTenants.projectId, projectId)),
+        db.select().from(asmpBookkeeping).where(eq(asmpBookkeeping.projectId, projectId)),
+      ]);
+
+      if (fuelRows.length > 0) {
+        const totalRev = fuelRows.reduce((s, r) => s + Number(r.revenue || 0), 0);
+        const totalCogs = fuelRows.reduce((s, r) => s + Number(r.cogs || 0), 0);
+        addRevenue('Fuel Sales', totalRev, 'Fuel');
+        addExpense('Fuel Sales', totalCogs, 'Fuel');
+      }
+
+      if (storeRows.length > 0) {
+        const totalRev = storeRows.reduce((s, r) => s + Number(r.revenue || 0), 0);
+        const totalCogs = storeRows.reduce((s, r) => s + Number(r.cogs || 0), 0);
+        addRevenue('Ship Store', totalRev, 'Ship Store');
+        addExpense('Ship Store', totalCogs, 'Ship Store');
+      }
+
+      if (serviceRows.length > 0) {
+        const totalRev = serviceRows.reduce((s, r) => s + Number(r.totalRevenue || 0), 0);
+        const totalCogs = serviceRows.reduce((s, r) => s + Number(r.cogs || 0), 0);
+        addRevenue('Service Department', totalRev, 'Service');
+        addExpense('Service Department', totalCogs, 'Service');
+      }
+
+      if (rentalRows.length > 0) {
+        const totalRev = rentalRows.reduce((s, r) => s + Number(r.revenue || 0), 0);
+        addRevenue('Boat Rentals', totalRev, 'Boat Rentals');
+      }
+
+      if (clubRows.length > 0) {
+        const totalRev = clubRows.reduce((s, r) => s + Number(r.monthlyRecurringRevenue || 0), 0);
+        addRevenue('Boat Club', totalRev, 'Boat Club');
+      }
+
+      if (salesRows.length > 0) {
+        const totalRev = salesRows.reduce((s, r) => s + Number(r.revenue || 0), 0);
+        const totalCogs = salesRows.reduce((s, r) => s + Number(r.cogs || 0), 0);
+        addRevenue('Boat Sales', totalRev, 'Boat Sales');
+        addExpense('Boat Sales', totalCogs, 'Boat Sales');
+      }
+
+      if (tenantRows.length > 0) {
+        const totalRev = tenantRows.reduce((s, r) => s + Number(r.totalRevenue || 0), 0);
+        addRevenue('Commercial Tenants', totalRev, 'Commercial');
+      }
+
+      if (bkRows.length > 0) {
+        const totalRevOverride = bkRows.reduce((s, r) => s + Number(r.revenueTotalOverride || 0), 0);
+        const totalExpOverride = bkRows.reduce((s, r) => s + Number(r.expenseTotalOverride || 0), 0);
+        if (totalRevOverride > 0) addRevenue('Bookkeeping Revenue', totalRevOverride, 'Bookkeeping');
+        if (totalExpOverride > 0) addExpense('Bookkeeping Expenses', totalExpOverride, 'Bookkeeping');
+      }
+    } catch (err) {
+      console.warn('Profit Centers enrichment skipped:', err);
+    }
   }
 
   /**

@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, subMonths } from "date-fns";
 import {
   ShoppingCart, Plus, Trash2, DollarSign,
-  TrendingUp, Package, Upload, Building2
+  TrendingUp, Package, Upload, Building2, Download
 } from "lucide-react";
 import ImportFromActualsModal from "@/components/operations/ImportFromActualsModal";
 import { Button } from "@/components/ui/button";
@@ -82,6 +82,7 @@ const categoryLabels: Record<string, string> = {
 
 export default function ValuatorShipStoreTab({ projectId, projectName }: ValuatorShipStoreTabProps) {
   const { toast } = useToast();
+  const csvInputRef = useRef<HTMLInputElement>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [timeframe, setTimeframe] = useState("12m");
@@ -175,6 +176,86 @@ export default function ValuatorShipStoreTab({ projectId, projectName }: Valuato
     createMutation.mutate(data);
   };
 
+  const handleCsvImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+
+    try {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter((l) => l.trim());
+      if (lines.length < 2) {
+        toast({ title: "Error", description: "CSV file is empty or has no data rows", variant: "destructive" });
+        return;
+      }
+
+      const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+      const dateIdx = headers.findIndex((h) => h.includes("date"));
+      const categoryIdx = headers.findIndex((h) => h.includes("category"));
+      const salesIdx = headers.findIndex((h) => h.includes("sales") || h.includes("revenue"));
+      const cogsIdx = headers.findIndex((h) => h.includes("cogs") || h.includes("cost"));
+      const qtyIdx = headers.findIndex((h) => h.includes("qty") || h.includes("count") || h.includes("txn"));
+
+      if (dateIdx === -1 || salesIdx === -1) {
+        toast({ title: "Error", description: "CSV must have at least date and sales/revenue columns", variant: "destructive" });
+        return;
+      }
+
+      let imported = 0;
+      let failed = 0;
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
+        if (!cols[dateIdx]) continue;
+        try {
+          await apiRequest(`/api/operations-context/projects/${projectId}/ops/ship-store`, {
+            method: "POST",
+            body: JSON.stringify({
+              txnDate: cols[dateIdx],
+              category: categoryIdx >= 0 ? cols[categoryIdx] : "GENERAL",
+              grossSales: cols[salesIdx] || "0",
+              cogs: cogsIdx >= 0 ? cols[cogsIdx] || "0" : "0",
+              qty: qtyIdx >= 0 ? parseInt(cols[qtyIdx]) || 1 : 1,
+              source: "CSV_IMPORT",
+            }),
+          });
+          imported++;
+        } catch {
+          failed++;
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["/api/operations-context/projects", projectId] });
+      toast({
+        title: "Import Complete",
+        description: `${imported} rows imported${failed > 0 ? `, ${failed} failed` : ""}`,
+        variant: failed > 0 ? "destructive" : "default",
+      });
+    } catch {
+      toast({ title: "Error", description: "Failed to parse CSV file", variant: "destructive" });
+    }
+  };
+
+  const handleCsvExport = () => {
+    const csvHeaders = ["Date", "Category", "Revenue", "COGS", "Transactions", "Source"];
+    const csvRows = sales.map((sale) => [
+      sale.txnDate,
+      sale.category,
+      sale.grossSales,
+      sale.cogs,
+      sale.txnCount,
+      sale.source,
+    ].join(","));
+    const csvContent = [csvHeaders.join(","), ...csvRows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ship-store-${projectId}-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "Exported", description: `${sales.length} rows exported to CSV` });
+  };
+
   const kpis = [
     {
       label: "Total Revenue",
@@ -228,9 +309,13 @@ export default function ValuatorShipStoreTab({ projectId, projectName }: Valuato
             <Building2 className="h-4 w-4 mr-2" />
             Import from Actuals
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => csvInputRef.current?.click()}>
             <Upload className="h-4 w-4 mr-2" />
             Import CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleCsvExport}>
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
           </Button>
           <Button size="sm" onClick={() => setShowAddDialog(true)}>
             <Plus className="h-4 w-4 mr-2" />
@@ -429,6 +514,8 @@ export default function ValuatorShipStoreTab({ projectId, projectName }: Valuato
           </form>
         </DialogContent>
       </Dialog>
+
+      <input ref={csvInputRef} type="file" accept=".csv" className="hidden" onChange={handleCsvImport} />
 
       <ImportFromActualsModal
         open={showImportModal}

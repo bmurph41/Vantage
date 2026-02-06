@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, subMonths } from "date-fns";
 import {
@@ -87,6 +87,7 @@ export default function ValuatorFuelSalesTab({ projectId, projectName }: Valuato
   const [showImportModal, setShowImportModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<FuelTransaction | null>(null);
   const [timeframe, setTimeframe] = useState("12m");
+  const csvInputRef = useRef<HTMLInputElement>(null);
   
   const getDateRange = () => {
     const end = new Date();
@@ -148,6 +149,23 @@ export default function ValuatorFuelSalesTab({ projectId, projectName }: Valuato
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<FuelTransaction> }) => {
+      return apiRequest(`/api/operations-context/projects/${projectId}/ops/fuel/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/operations-context/projects", projectId] });
+      toast({ title: "Success", description: "Transaction updated" });
+      setEditingTransaction(null);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update transaction", variant: "destructive" });
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (txnId: string) => {
       return apiRequest(`/api/operations-context/projects/${projectId}/ops/fuel/${txnId}`, {
@@ -177,13 +195,76 @@ export default function ValuatorFuelSalesTab({ projectId, projectName }: Valuato
     createMutation.mutate(data);
   };
 
+  const handleCsvImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const text = await file.text();
+    const lines = text.split('\n').filter(line => line.trim());
+    if (lines.length < 2) {
+      toast({ title: "Error", description: "CSV file must have a header row and at least one data row", variant: "destructive" });
+      return;
+    }
+    
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    const dateIdx = headers.findIndex(h => h.includes('date'));
+    const typeIdx = headers.findIndex(h => h.includes('type') || h.includes('fuel'));
+    const galIdx = headers.findIndex(h => h.includes('gallon'));
+    const revIdx = headers.findIndex(h => h.includes('revenue') || h.includes('sales') || h.includes('gross'));
+    const cogsIdx = headers.findIndex(h => h.includes('cogs') || h.includes('cost'));
+    
+    if (dateIdx === -1 || galIdx === -1 || revIdx === -1) {
+      toast({ title: "Error", description: "CSV must have date, gallons, and revenue/sales columns", variant: "destructive" });
+      return;
+    }
+    
+    let imported = 0;
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+      if (cols.length < Math.max(dateIdx, galIdx, revIdx) + 1) continue;
+      
+      try {
+        await apiRequest(`/api/operations-context/projects/${projectId}/ops/fuel`, {
+          method: "POST",
+          body: JSON.stringify({
+            txnDate: cols[dateIdx],
+            fuelType: typeIdx >= 0 ? (cols[typeIdx] || 'DIESEL').toUpperCase().replace(/\s/g, '_') : 'DIESEL',
+            gallons: cols[galIdx],
+            grossSales: cols[revIdx],
+            cogs: cogsIdx >= 0 ? cols[cogsIdx] : '0',
+            source: 'CSV_IMPORT',
+          }),
+        });
+        imported++;
+      } catch {}
+    }
+    
+    queryClient.invalidateQueries({ queryKey: ["/api/operations-context/projects", projectId] });
+    toast({ title: "Import Complete", description: `${imported} of ${lines.length - 1} rows imported` });
+    if (csvInputRef.current) csvInputRef.current.value = '';
+  };
+
+  const handleExport = () => {
+    if (transactions.length === 0) return;
+    const headers = ['Date,Fuel Type,Gallons,Revenue,COGS,Source'];
+    const rows = transactions.map(txn => 
+      `${txn.txnDate},${txn.fuelType},${txn.gallons},${txn.grossSales},${txn.cogs},${txn.source}`
+    );
+    const csv = [...headers, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `fuel-sales-${projectId.slice(0, 8)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const kpis = [
     {
       label: "Total Revenue",
       value: formatCurrency(summary?.totals?.totalRevenue || 0),
       icon: DollarSign,
-      trend: "+12%",
-      trendUp: true,
     },
     {
       label: "Total Gallons",
@@ -230,9 +311,13 @@ export default function ValuatorFuelSalesTab({ projectId, projectName }: Valuato
             <Building2 className="h-4 w-4 mr-2" />
             Import from Actuals
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => csvInputRef.current?.click()}>
             <Upload className="h-4 w-4 mr-2" />
             Import CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={transactions.length === 0}>
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
           </Button>
           <Button size="sm" onClick={() => setShowAddDialog(true)}>
             <Plus className="h-4 w-4 mr-2" />
@@ -331,6 +416,13 @@ export default function ValuatorFuelSalesTab({ projectId, projectName }: Valuato
                         </Badge>
                       </TableCell>
                       <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setEditingTransaction(txn)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -436,11 +528,127 @@ export default function ValuatorFuelSalesTab({ projectId, projectName }: Valuato
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!editingTransaction} onOpenChange={(open) => !open && setEditingTransaction(null)}>
+        <DialogContent key={editingTransaction?.id}>
+          <DialogHeader>
+            <DialogTitle>Edit Fuel Transaction</DialogTitle>
+            <DialogDescription>
+              Update fuel sales data for {projectName || "this project"}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            if (!editingTransaction) return;
+            const formData = new FormData(e.currentTarget);
+            const data = {
+              txnDate: formData.get("txnDate") as string,
+              fuelType: formData.get("fuelType") as string,
+              gallons: formData.get("gallons") as string,
+              grossSales: formData.get("grossSales") as string,
+              cogs: formData.get("cogs") as string,
+              notes: formData.get("notes") as string,
+            };
+            updateMutation.mutate({ id: editingTransaction.id, data });
+          }}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-txnDate">Date</Label>
+                  <Input
+                    id="edit-txnDate"
+                    name="txnDate"
+                    type="date"
+                    defaultValue={editingTransaction?.txnDate ? format(new Date(editingTransaction.txnDate), "yyyy-MM-dd") : ""}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-fuelType">Fuel Type</Label>
+                  <Select name="fuelType" defaultValue={editingTransaction?.fuelType || "DIESEL"}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="DIESEL">Diesel</SelectItem>
+                      <SelectItem value="GAS_87">Regular (87)</SelectItem>
+                      <SelectItem value="GAS_89">Mid-Grade (89)</SelectItem>
+                      <SelectItem value="GAS_93">Premium (93)</SelectItem>
+                      <SelectItem value="NON_ETHANOL">Non-Ethanol</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-gallons">Gallons</Label>
+                  <Input
+                    id="edit-gallons"
+                    name="gallons"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    defaultValue={editingTransaction?.gallons || ""}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-grossSales">Revenue ($)</Label>
+                  <Input
+                    id="edit-grossSales"
+                    name="grossSales"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    defaultValue={editingTransaction?.grossSales || ""}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-cogs">COGS ($)</Label>
+                  <Input
+                    id="edit-cogs"
+                    name="cogs"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    defaultValue={editingTransaction?.cogs || ""}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-notes">Notes (optional)</Label>
+                <Input
+                  id="edit-notes"
+                  name="notes"
+                  placeholder="Additional notes..."
+                  defaultValue={editingTransaction?.notes || ""}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditingTransaction(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={updateMutation.isPending}>
+                {updateMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       <ImportFromActualsModal
         open={showImportModal}
         onOpenChange={setShowImportModal}
         projectId={projectId}
         projectName={projectName}
+      />
+      <input
+        ref={csvInputRef}
+        type="file"
+        accept=".csv"
+        className="hidden"
+        onChange={handleCsvImport}
       />
     </div>
   );
