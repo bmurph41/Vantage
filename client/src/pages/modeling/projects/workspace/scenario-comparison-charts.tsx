@@ -522,19 +522,19 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
                   <div className="space-y-3">
                     <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
                       <span className="text-sm">Revenue Growth</span>
-                      <span className="font-bold">{scenario.assumptions.revenueGrowth.toFixed(1)}%</span>
+                      <span className="font-bold">{(scenario.assumptions?.revenueGrowth ?? 0).toFixed(1)}%</span>
                     </div>
                     <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
                       <span className="text-sm">Expense Growth</span>
-                      <span className="font-bold">{scenario.assumptions.expenseGrowth.toFixed(1)}%</span>
+                      <span className="font-bold">{(scenario.assumptions?.expenseGrowth ?? 0).toFixed(1)}%</span>
                     </div>
                     <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
                       <span className="text-sm">Starting Occupancy</span>
-                      <span className="font-bold">{scenario.assumptions.occupancyStart.toFixed(0)}%</span>
+                      <span className="font-bold">{(scenario.assumptions?.occupancyStart ?? 0).toFixed(0)}%</span>
                     </div>
                     <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
                       <span className="text-sm">Exit Cap Rate</span>
-                      <span className="font-bold">{scenario.assumptions.exitCapRate.toFixed(1)}%</span>
+                      <span className="font-bold">{(scenario.assumptions?.exitCapRate ?? 0).toFixed(1)}%</span>
                     </div>
                   </div>
                 </CardContent>
