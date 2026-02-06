@@ -1247,7 +1247,7 @@ function Router() {
       </Route>
       <Route path="/operations/marketing/email-campaigns">
         {() => {
-          window.location.replace('/marketing?tab=email-campaigns');
+          window.location.replace('/marketing?tab=campaigns');
           return null;
         }}
       </Route>

@@ -1,13 +1,13 @@
 import { lazy } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Megaphone, LayoutDashboard, Target, DollarSign, Link2, Mail, Settings, Send } from "lucide-react";
+import { Megaphone, LayoutDashboard, Target, DollarSign, Link2, Settings, Send } from "lucide-react";
 import { TabbedModuleLayout, TabDefinition } from "@/components/layout/TabbedModuleLayout";
 
 const MarketingDashboard = lazy(() => import("./marketing/Dashboard"));
 const MarketingCampaigns = lazy(() => import("./marketing/Campaigns"));
 const MarketingExpenses = lazy(() => import("./marketing/Expenses"));
 const MarketingAttribution = lazy(() => import("./marketing/Attribution"));
-const MarketingEmailCampaigns = lazy(() => import("./marketing/EmailCampaigns"));
+
 const MarketingAutomation = lazy(() => import("@/pages/marketing-automation"));
 const MarketingSettings = lazy(() => import("./marketing/Settings"));
 
@@ -61,13 +61,6 @@ export default function MarketingTabbed() {
       icon: Link2,
       component: MarketingAttribution,
       description: "Lead source attribution",
-    },
-    {
-      id: "email-campaigns",
-      label: "Email Campaigns",
-      icon: Mail,
-      component: MarketingEmailCampaigns,
-      description: "External email integrations",
     },
     {
       id: "automation",
