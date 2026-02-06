@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MapPin, Loader2 } from 'lucide-react';
@@ -302,6 +302,9 @@ export function AddressInput({
     });
   }, []);
 
+  const countriesKey = useMemo(() => JSON.stringify(countries), [countries]);
+  const biasCenterKey = useMemo(() => biasCenter ? `${biasCenter.lat},${biasCenter.lng}` : '', [biasCenter]);
+
   useEffect(() => {
     if (!isLoaded || !inputRef.current || disabled) {
       return;
@@ -332,7 +335,8 @@ export function AddressInput({
         google.maps.event.clearInstanceListeners(autocompleteRef.current);
       }
     };
-  }, [isLoaded, disabled, handlePlaceChanged, countries, biasCenter, biasRadiusMeters]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, disabled, handlePlaceChanged, countriesKey, biasCenterKey, biasRadiusMeters]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (onChange) {
