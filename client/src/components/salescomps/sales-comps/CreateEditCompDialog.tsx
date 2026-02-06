@@ -1021,36 +1021,20 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                                 value={field.value || ""}
                                 onChange={(value, components) => {
                                   if (components && (components.street || components.city || components.state || components.zipCode)) {
-                                    setAddressDebug(`onChange: street=${components.street||''} city=${components.city||''} state=${components.state||''} zip=${components.zipCode||''}`);
+                                    const raw = (components as any)._rawDebug || 'none';
+                                    const afterLoop = (components as any)._afterLoop || 'none';
+                                    const fallback = (components as any)._fallbackParsed || 'no-fallback';
+                                    const afterFallback = (components as any)._afterFallback || 'none';
+                                    setAddressDebug(`FINAL: state=[${components.state}] zip=[${components.zipCode}] | afterLoop: ${afterLoop} | fallback: ${fallback} | afterFallback: ${afterFallback} | RAW: ${raw}`);
                                     if (components.street) field.onChange(components.street);
                                     if (components.city) form.setValue("city", components.city);
                                     if (components.state) form.setValue("state", components.state);
                                     if (components.zipCode) form.setValue("zip", components.zipCode);
-                                    setTimeout(() => {
-                                      if (components.state) {
-                                        const stateInput = document.querySelector('[data-testid="input-state"]') as HTMLInputElement;
-                                        if (stateInput) {
-                                          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-                                          nativeInputValueSetter?.call(stateInput, components.state);
-                                          stateInput.dispatchEvent(new Event('input', { bubbles: true }));
-                                        }
-                                      }
-                                      if (components.zipCode) {
-                                        const zipInput = document.querySelector('[data-testid="input-zip"]') as HTMLInputElement;
-                                        if (zipInput) {
-                                          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-                                          nativeInputValueSetter?.call(zipInput, components.zipCode);
-                                          zipInput.dispatchEvent(new Event('input', { bubbles: true }));
-                                        }
-                                      }
-                                      setAddressDebug(prev => prev + ` | DOM set done. formState=${form.getValues('state')} formZip=${form.getValues('zip')}`);
-                                    }, 100);
                                   } else {
                                     field.onChange(value);
                                   }
                                 }}
                                 onAddressSelect={(components) => {
-                                  setAddressDebug(prev => prev + ` | onSelect: state=${components?.state||'?'} zip=${components?.zipCode||'?'}`);
                                   if (components.street || components.streetAddress) {
                                     form.setValue("address", components.street || components.streetAddress || '');
                                   }

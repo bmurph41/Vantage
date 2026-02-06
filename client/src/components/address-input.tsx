@@ -208,20 +208,11 @@ export function AddressInput({
   const handlePlaceChanged = useCallback(() => {
     const place = autocompleteRef.current?.getPlace();
 
-    console.error('[AddressInput:place_changed]', JSON.stringify({
-      hasPlace: !!place,
-      hasComponents: !!place?.address_components,
-      formatted: place?.formatted_address,
-      componentCount: place?.address_components?.length,
-    }));
-
     if (!place || !place.address_components) {
       const domValue = inputRef.current?.value;
-      console.error('[AddressInput:place_changed] no components, DOM:', domValue);
       if (domValue && domValue.includes(',')) {
         const parsed = parseAddressString(domValue);
         parsed.source = 'google';
-        console.error('[AddressInput:place_changed] parsed fallback:', JSON.stringify(parsed));
         if (parsed.city || parsed.state || parsed.zipCode) {
           if (onChangeRef.current) {
             onChangeRef.current(parsed.street || domValue, parsed);
@@ -234,6 +225,12 @@ export function AddressInput({
       return;
     }
 
+    const rawComponents = place.address_components.map(c => ({
+      long_name: c.long_name,
+      short_name: c.short_name,
+      types: c.types,
+    }));
+
     const components: AddressComponents = {
       fullAddress: place.formatted_address || '',
       placeId: place.place_id,
@@ -241,6 +238,8 @@ export function AddressInput({
       lng: place.geometry?.location?.lng(),
       source: 'google',
     };
+
+    (components as any)._rawDebug = JSON.stringify(rawComponents);
 
     place.address_components?.forEach((component) => {
       const types = component.types;
@@ -269,20 +268,20 @@ export function AddressInput({
       }
     });
 
+    (components as any)._afterLoop = `state=${String(components.state)} zip=${String(components.zipCode)}`;
+
     if (components.fullAddress && (!components.state || !components.zipCode || !components.city)) {
       const parsed = parseAddressString(components.fullAddress);
+      (components as any)._fallbackParsed = `state=${parsed.state} zip=${parsed.zipCode}`;
       if (!components.city && parsed.city) components.city = parsed.city;
       if (!components.state && parsed.state) components.state = parsed.state;
       if (!components.zipCode && parsed.zipCode) components.zipCode = parsed.zipCode;
       if (!components.street && parsed.street) components.street = parsed.street;
     }
 
-    components.streetAddress = components.street;
+    (components as any)._afterFallback = `state=${String(components.state)} zip=${String(components.zipCode)}`;
 
-    console.error('[AddressInput:place_changed] final:', JSON.stringify({
-      street: components.street, city: components.city,
-      state: components.state, zip: components.zipCode,
-    }));
+    components.streetAddress = components.street;
 
     if (inputRef.current && components.street) {
       inputRef.current.value = components.street;
