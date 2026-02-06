@@ -1320,27 +1320,21 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                                 value={field.value || ""}
                                 onChange={(value, components) => {
                                   if (components && (components.street || components.city || components.state || components.zipCode)) {
-                                    const current = form.getValues();
-                                    const updates: Record<string, string> = {};
-                                    if (components.street) updates.address = components.street;
-                                    if (components.city) updates.city = components.city;
-                                    if (components.state) updates.state = components.state;
-                                    if (components.zipCode) updates.zip = components.zipCode;
-                                    form.reset({ ...current, ...updates }, { keepDefaultValues: true });
+                                    if (components.street) field.onChange(components.street);
+                                    if (components.city) form.setValue("city", components.city);
+                                    if (components.state) form.setValue("state", components.state);
+                                    if (components.zipCode) form.setValue("zip", components.zipCode);
                                   } else {
                                     field.onChange(value);
                                   }
                                 }}
                                 onAddressSelect={(components) => {
-                                  const current = form.getValues();
-                                  const updates: Record<string, string> = {};
                                   if (components.street || components.streetAddress) {
-                                    updates.address = components.street || components.streetAddress || '';
+                                    form.setValue("address", components.street || components.streetAddress || '');
                                   }
-                                  if (components.city) updates.city = components.city;
-                                  if (components.state) updates.state = components.state;
-                                  if (components.zipCode) updates.zip = components.zipCode;
-                                  form.reset({ ...current, ...updates }, { keepDefaultValues: true });
+                                  if (components.city) form.setValue("city", components.city);
+                                  if (components.state) form.setValue("state", components.state);
+                                  if (components.zipCode) form.setValue("zip", components.zipCode);
                                 }}
                                 label="Address"
                                 placeholder="Enter full address..."
