@@ -92,7 +92,7 @@ export default function MarketingTabbed() {
       moduleIcon={Megaphone}
       tabs={tabs}
       defaultTab="dashboard"
-      basePath="/operations/marketing"
+      basePath="/marketing"
       activePacks={activePacks}
     />
   );
