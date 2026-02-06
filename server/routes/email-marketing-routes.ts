@@ -202,23 +202,23 @@ router.get('/constant-contact/callback', async (req: AuthenticatedRequest, res: 
     const { code, state, error: oauthError } = req.query;
 
     if (oauthError) {
-      return res.redirect('/operations/marketing?tab=email-campaigns&error=oauth_denied');
+      return res.redirect('/marketing?tab=campaigns&error=oauth_denied');
     }
 
     if (!code || !state || typeof state !== 'string') {
-      return res.redirect('/operations/marketing?tab=email-campaigns&error=invalid_callback');
+      return res.redirect('/marketing?tab=campaigns&error=invalid_callback');
     }
 
     const stateData = validateAndConsumeState(state);
     if (!stateData) {
       console.error('Invalid or expired OAuth state');
-      return res.redirect('/operations/marketing?tab=email-campaigns&error=invalid_state');
+      return res.redirect('/marketing?tab=campaigns&error=invalid_state');
     }
 
     const { userId, orgId } = stateData;
 
     if (!CONSTANT_CONTACT_CLIENT_ID || !CONSTANT_CONTACT_CLIENT_SECRET) {
-      return res.redirect('/operations/marketing?tab=email-campaigns&error=not_configured');
+      return res.redirect('/marketing?tab=campaigns&error=not_configured');
     }
 
     const tokenResponse = await fetch(`${CONSTANT_CONTACT_AUTH_BASE}/token`, {
@@ -237,7 +237,7 @@ router.get('/constant-contact/callback', async (req: AuthenticatedRequest, res: 
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
       console.error('Token exchange failed:', errorText);
-      return res.redirect('/operations/marketing?tab=email-campaigns&error=token_exchange_failed');
+      return res.redirect('/marketing?tab=campaigns&error=token_exchange_failed');
     }
 
     const tokens = await tokenResponse.json() as {
@@ -298,10 +298,10 @@ router.get('/constant-contact/callback', async (req: AuthenticatedRequest, res: 
       });
     }
 
-    res.redirect('/operations/marketing?tab=email-campaigns&connected=constant_contact');
+    res.redirect('/marketing?tab=campaigns&connected=constant_contact');
   } catch (error) {
     console.error('OAuth callback error:', error);
-    res.redirect('/operations/marketing?tab=email-campaigns&error=callback_failed');
+    res.redirect('/marketing?tab=campaigns&error=callback_failed');
   }
 });
 
@@ -395,23 +395,23 @@ router.get('/mailchimp/callback', async (req: AuthenticatedRequest, res: Respons
     const { code, state, error: oauthError } = req.query;
 
     if (oauthError) {
-      return res.redirect('/operations/marketing?tab=email-campaigns&error=oauth_denied');
+      return res.redirect('/marketing?tab=campaigns&error=oauth_denied');
     }
 
     if (!code || !state || typeof state !== 'string') {
-      return res.redirect('/operations/marketing?tab=email-campaigns&error=invalid_callback');
+      return res.redirect('/marketing?tab=campaigns&error=invalid_callback');
     }
 
     const stateData = validateAndConsumeState(state);
     if (!stateData) {
       console.error('Invalid or expired OAuth state');
-      return res.redirect('/operations/marketing?tab=email-campaigns&error=invalid_state');
+      return res.redirect('/marketing?tab=campaigns&error=invalid_state');
     }
 
     const { userId, orgId } = stateData;
 
     if (!MAILCHIMP_CLIENT_ID || !MAILCHIMP_CLIENT_SECRET) {
-      return res.redirect('/operations/marketing?tab=email-campaigns&error=not_configured');
+      return res.redirect('/marketing?tab=campaigns&error=not_configured');
     }
 
     const tokenResponse = await fetch(`${MAILCHIMP_AUTH_BASE}/token`, {
@@ -431,7 +431,7 @@ router.get('/mailchimp/callback', async (req: AuthenticatedRequest, res: Respons
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
       console.error('Mailchimp token exchange failed:', errorText);
-      return res.redirect('/operations/marketing?tab=email-campaigns&error=token_exchange_failed');
+      return res.redirect('/marketing?tab=campaigns&error=token_exchange_failed');
     }
 
     const tokens = await tokenResponse.json() as {
@@ -498,10 +498,10 @@ router.get('/mailchimp/callback', async (req: AuthenticatedRequest, res: Respons
       });
     }
 
-    res.redirect('/operations/marketing?tab=email-campaigns&connected=mailchimp');
+    res.redirect('/marketing?tab=campaigns&connected=mailchimp');
   } catch (error) {
     console.error('Mailchimp OAuth callback error:', error);
-    res.redirect('/operations/marketing?tab=email-campaigns&error=callback_failed');
+    res.redirect('/marketing?tab=campaigns&error=callback_failed');
   }
 });
 
