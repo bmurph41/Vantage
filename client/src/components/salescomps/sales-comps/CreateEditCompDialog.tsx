@@ -125,7 +125,6 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
   const queryClient = useQueryClient();
   const isEdit = !!comp;
 
-  const [addressDebug, setAddressDebug] = useState<string>('');
   const [articleUrls, setArticleUrls] = useState<string[]>(comp?.articleUrls || [""]);
   const [showNewPortfolioDialog, setShowNewPortfolioDialog] = useState(false);
   const [newPortfolioName, setNewPortfolioName] = useState("");
@@ -1021,11 +1020,6 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                                 value={field.value || ""}
                                 onChange={(value, components) => {
                                   if (components && (components.street || components.city || components.state || components.zipCode)) {
-                                    const raw = (components as any)._rawDebug || 'none';
-                                    const afterLoop = (components as any)._afterLoop || 'none';
-                                    const fallback = (components as any)._fallbackParsed || 'no-fallback';
-                                    const afterFallback = (components as any)._afterFallback || 'none';
-                                    setAddressDebug(`FINAL: state=[${components.state}] zip=[${components.zipCode}] | afterLoop: ${afterLoop} | fallback: ${fallback} | afterFallback: ${afterFallback} | RAW: ${raw}`);
                                     if (components.street) field.onChange(components.street);
                                     if (components.city) form.setValue("city", components.city);
                                     if (components.state) form.setValue("state", components.state);
@@ -1041,7 +1035,6 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                                   if (components.city) form.setValue("city", components.city);
                                   if (components.state) form.setValue("state", components.state);
                                   if (components.zipCode) form.setValue("zip", components.zipCode);
-                                  form.trigger(["state", "zip", "city", "address"]);
                                 }}
                                 label="Address"
                                 placeholder="Enter full address..."
@@ -1053,12 +1046,6 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                           </FormItem>
                         )}
                       />
-
-                      {addressDebug && (
-                        <div className="text-xs p-2 bg-yellow-100 dark:bg-yellow-900 rounded border border-yellow-300 dark:border-yellow-700 break-all">
-                          DEBUG: {addressDebug}
-                        </div>
-                      )}
                       
                       <div className="grid grid-cols-3 gap-3">
                         <FormField

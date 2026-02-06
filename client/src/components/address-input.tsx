@@ -225,12 +225,6 @@ export function AddressInput({
       return;
     }
 
-    const rawComponents = place.address_components.map(c => ({
-      long_name: c.long_name,
-      short_name: c.short_name,
-      types: c.types,
-    }));
-
     const components: AddressComponents = {
       fullAddress: place.formatted_address || '',
       placeId: place.place_id,
@@ -238,8 +232,6 @@ export function AddressInput({
       lng: place.geometry?.location?.lng(),
       source: 'google',
     };
-
-    (components as any)._rawDebug = JSON.stringify(rawComponents);
 
     place.address_components?.forEach((component) => {
       const types = component.types;
@@ -268,18 +260,13 @@ export function AddressInput({
       }
     });
 
-    (components as any)._afterLoop = `state=${String(components.state)} zip=${String(components.zipCode)}`;
-
     if (components.fullAddress && (!components.state || !components.zipCode || !components.city)) {
       const parsed = parseAddressString(components.fullAddress);
-      (components as any)._fallbackParsed = `state=${parsed.state} zip=${parsed.zipCode}`;
       if (!components.city && parsed.city) components.city = parsed.city;
       if (!components.state && parsed.state) components.state = parsed.state;
       if (!components.zipCode && parsed.zipCode) components.zipCode = parsed.zipCode;
       if (!components.street && parsed.street) components.street = parsed.street;
     }
-
-    (components as any)._afterFallback = `state=${String(components.state)} zip=${String(components.zipCode)}`;
 
     components.streetAddress = components.street;
 
