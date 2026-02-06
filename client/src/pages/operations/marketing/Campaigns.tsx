@@ -106,7 +106,7 @@ export default function Campaigns() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('/api/marketing/campaigns', 'POST', data),
+    mutationFn: (data: any) => apiRequest('POST', '/api/marketing/campaigns', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/marketing/campaigns'] });
       toast({ title: "Campaign created successfully" });
@@ -120,7 +120,7 @@ export default function Campaigns() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) =>
-      apiRequest(`/api/marketing/campaigns/${id}`, 'PATCH', data),
+      apiRequest('PATCH', `/api/marketing/campaigns/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/marketing/campaigns'] });
       toast({ title: "Campaign updated successfully" });
@@ -134,7 +134,7 @@ export default function Campaigns() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiRequest(`/api/marketing/campaigns/${id}`, 'DELETE'),
+    mutationFn: (id: string) => apiRequest('DELETE', `/api/marketing/campaigns/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/marketing/campaigns'] });
       toast({ title: "Campaign deleted successfully" });

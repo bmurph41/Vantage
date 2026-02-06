@@ -10,6 +10,7 @@
  */
 
 import React, { useState, useEffect } from "react";
+import { UnifiedTenantFormDialog } from "@/components/commercial-tenants/UnifiedTenantFormDialog";
 import { useLeases, useProjectLeaseStats, useLeaseMutations } from "@/hooks/use-leases";
 import type { CommercialLease, LeaseType } from "@shared/commercial-lease-types";
 
@@ -360,113 +361,15 @@ export default function LeaseListPage({ projectId, onSelectLease }: LeaseListPag
       )}
 
       {/* Create Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-lg">
-            <h2 className="text-lg font-semibold mb-4">Add New Lease</h2>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tenant Name *</label>
-                <input
-                  type="text"
-                  value={newLease.tenantName}
-                  onChange={(e) => setNewLease({ ...newLease, tenantName: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg text-sm"
-                  placeholder="e.g., Coastal Law Group"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Lease Type</label>
-                  <select
-                    value={newLease.leaseType}
-                    onChange={(e) => setNewLease({ ...newLease, leaseType: e.target.value as LeaseType })}
-                    className="w-full px-3 py-2 border rounded-lg text-sm"
-                  >
-                    <option value="retail">Retail</option>
-                    <option value="office">Office</option>
-                    <option value="industrial">Industrial</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Suite</label>
-                  <input
-                    type="text"
-                    value={newLease.suite}
-                    onChange={(e) => setNewLease({ ...newLease, suite: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg text-sm"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Square Feet</label>
-                  <input
-                    type="number"
-                    value={newLease.sf}
-                    onChange={(e) => setNewLease({ ...newLease, sf: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Security Deposit</label>
-                  <input
-                    type="number"
-                    value={newLease.securityDeposit}
-                    onChange={(e) => setNewLease({ ...newLease, securityDeposit: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg text-sm"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Date *</label>
-                  <input
-                    type="date"
-                    value={newLease.commencementDate}
-                    onChange={(e) => setNewLease({ ...newLease, commencementDate: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Expiration *</label>
-                  <input
-                    type="date"
-                    value={newLease.expirationDate}
-                    onChange={(e) => setNewLease({ ...newLease, expirationDate: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg text-sm"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-                <textarea
-                  value={newLease.notes}
-                  onChange={(e) => setNewLease({ ...newLease, notes: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg text-sm"
-                  rows={2}
-                />
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreate}
-                disabled={saving || !newLease.tenantName || !newLease.commencementDate || !newLease.expirationDate}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {saving ? "Creating..." : "Create Lease"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <UnifiedTenantFormDialog
+        open={showCreateModal}
+        onOpenChange={(open) => {
+          setShowCreateModal(open);
+          if (!open) { refetch(); refetchStats(); }
+        }}
+        context="valuator"
+        projectId={projectId}
+      />
     </div>
   );
 }
