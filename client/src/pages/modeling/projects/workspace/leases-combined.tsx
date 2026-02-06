@@ -3,12 +3,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
 import { 
   Building2, 
-  Anchor
+  Anchor,
+  RefreshCw
 } from 'lucide-react';
-import LeaseCashFlowPage from './lease-cashflow';
+import LeaseListPage from '@/components/leases/LeaseListPage';
 import RentRollDataTab from './rent-roll-data';
+import { apiRequest } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 
 interface LeasesCombinedProps {
   projectId: string;
@@ -17,6 +21,22 @@ interface LeasesCombinedProps {
 
 export default function LeasesCombined({ projectId, projectName }: LeasesCombinedProps) {
   const [activeSection, setActiveSection] = useState<'commercial' | 'storage'>('commercial');
+  const [syncing, setSyncing] = useState(false);
+  const { toast } = useToast();
+
+  const handleSyncToProForma = async () => {
+    setSyncing(true);
+    try {
+      const result = await apiRequest(`/api/commercial-leases/projects/${projectId}/sync-to-proforma`, {
+        method: 'POST',
+      });
+      toast({ title: 'Synced', description: `${(result as any).synced} months synced to Pro Forma` });
+    } catch (e) {
+      toast({ title: 'Error', description: 'Failed to sync lease data', variant: 'destructive' });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -54,12 +74,23 @@ export default function LeasesCombined({ projectId, projectName }: LeasesCombine
                     Retail, restaurant, office, and other commercial space tenants
                   </CardDescription>
                 </div>
-                <Badge variant="outline" className="ml-auto">Commercial</Badge>
+                <div className="ml-auto flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleSyncToProForma}
+                    disabled={syncing}
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+                    {syncing ? 'Syncing...' : 'Sync to Pro Forma'}
+                  </Button>
+                  <Badge variant="outline">Commercial</Badge>
+                </div>
               </div>
             </CardHeader>
             <Separator />
             <CardContent className="pt-6">
-              <LeaseCashFlowPage />
+              <LeaseListPage projectId={projectId} />
             </CardContent>
           </Card>
         </TabsContent>
