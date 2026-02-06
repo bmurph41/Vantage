@@ -1019,21 +1019,25 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                               <AddressInput
                                 value={field.value || ""}
                                 onChange={(value, components) => {
+                                  console.log('[SalesComp onChange]', { value, components: components ? JSON.stringify(components) : 'none' });
                                   field.onChange(value);
                                   if (components) {
                                     if (components.street) form.setValue("address", components.street, { shouldDirty: true });
                                     if (components.city) form.setValue("city", components.city, { shouldDirty: true });
                                     if (components.state) form.setValue("state", components.state, { shouldDirty: true });
                                     if (components.zipCode) form.setValue("zip", components.zipCode, { shouldDirty: true });
+                                    console.log('[SalesComp onChange] After setValue, form values:', form.getValues());
                                   }
                                 }}
                                 onAddressSelect={(components) => {
+                                  console.log('[SalesComp onAddressSelect]', JSON.stringify(components));
                                   if (components.street || components.streetAddress) {
                                     form.setValue("address", components.street || components.streetAddress || '', { shouldDirty: true });
                                   }
                                   if (components.city) form.setValue("city", components.city, { shouldDirty: true });
                                   if (components.state) form.setValue("state", components.state, { shouldDirty: true });
                                   if (components.zipCode) form.setValue("zip", components.zipCode, { shouldDirty: true });
+                                  console.log('[SalesComp onAddressSelect] After setValue, form values:', form.getValues());
                                 }}
                                 label="Address"
                                 placeholder="Enter full address..."
