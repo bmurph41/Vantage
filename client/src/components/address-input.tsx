@@ -208,11 +208,20 @@ export function AddressInput({
   const handlePlaceChanged = useCallback(() => {
     const place = autocompleteRef.current?.getPlace();
 
+    console.error('[AddressInput:place_changed]', JSON.stringify({
+      hasPlace: !!place,
+      hasComponents: !!place?.address_components,
+      formatted: place?.formatted_address,
+      componentCount: place?.address_components?.length,
+    }));
+
     if (!place || !place.address_components) {
       const domValue = inputRef.current?.value;
+      console.error('[AddressInput:place_changed] no components, DOM:', domValue);
       if (domValue && domValue.includes(',')) {
         const parsed = parseAddressString(domValue);
         parsed.source = 'google';
+        console.error('[AddressInput:place_changed] parsed fallback:', JSON.stringify(parsed));
         if (parsed.city || parsed.state || parsed.zipCode) {
           if (onChangeRef.current) {
             onChangeRef.current(parsed.street || domValue, parsed);
@@ -269,6 +278,11 @@ export function AddressInput({
     }
 
     components.streetAddress = components.street;
+
+    console.error('[AddressInput:place_changed] final:', JSON.stringify({
+      street: components.street, city: components.city,
+      state: components.state, zip: components.zipCode,
+    }));
 
     if (inputRef.current && components.street) {
       inputRef.current.value = components.street;

@@ -1019,6 +1019,11 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                               <AddressInput
                                 value={field.value || ""}
                                 onChange={(value, components) => {
+                                  console.error('[SalesComp:onChange]', JSON.stringify({
+                                    value, hasComponents: !!components,
+                                    street: components?.street, city: components?.city,
+                                    state: components?.state, zip: components?.zipCode,
+                                  }));
                                   if (components && (components.street || components.city || components.state || components.zipCode)) {
                                     const current = form.getValues();
                                     const updates: Record<string, string> = {};
@@ -1026,12 +1031,23 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                                     if (components.city) updates.city = components.city;
                                     if (components.state) updates.state = components.state;
                                     if (components.zipCode) updates.zip = components.zipCode;
+                                    console.error('[SalesComp:onChange] resetting with updates:', JSON.stringify(updates));
                                     form.reset({ ...current, ...updates }, { keepDefaultValues: true });
+                                    console.error('[SalesComp:onChange] after reset, values:', JSON.stringify({
+                                      address: form.getValues('address'),
+                                      city: form.getValues('city'),
+                                      state: form.getValues('state'),
+                                      zip: form.getValues('zip'),
+                                    }));
                                   } else {
                                     field.onChange(value);
                                   }
                                 }}
                                 onAddressSelect={(components) => {
+                                  console.error('[SalesComp:onAddressSelect]', JSON.stringify({
+                                    street: components?.street, city: components?.city,
+                                    state: components?.state, zip: components?.zipCode,
+                                  }));
                                   const current = form.getValues();
                                   const updates: Record<string, string> = {};
                                   if (components.street || components.streetAddress) {
