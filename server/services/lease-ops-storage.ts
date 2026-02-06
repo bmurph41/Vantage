@@ -1,0 +1,252 @@
+/**
+ * Operations Lease Storage
+ * ========================
+ * Org-scoped queries for the Operations → Commercial Tenants page.
+ * Uses the same `commercial_leases` table as Valuator, filtered by
+ * lease_context = 'operations'.
+ */
+
+import { eq, and, or, ilike, sql, desc, asc, gte, lte, isNull } from "drizzle-orm";
+import {
+  commercialLeases,
+  leaseTerms,
+  leaseMonthlyCashflows,
+} from "@shared/commercial-lease-schema";
+import type {
+  OperationsLeaseListParams,
+  OperationsLeaseStats,
+} from "@shared/lease-context-types";
+
+type DB = any; // Use your actual Drizzle db type
+
+// ─── List Leases (Operations) ─────────────────────────────────────────────────
+
+export async function listOperationsLeases(
+  db: DB,
+  orgId: string,
+  params: OperationsLeaseListParams
+) {
+  const {
+    propertyId,
+    search,
+    status = "all",
+    limit = 25,
+    offset = 0,
+    sortBy = "tenantName",
+    sortDir = "asc",
+  } = params;
+
+  // Build WHERE conditions
+  const conditions: any[] = [
+    eq(commercialLeases.orgId, orgId),
+    eq(commercialLeases.leaseContext, "operations"),
+  ];
+
+  if (propertyId) {
+    conditions.push(eq(commercialLeases.propertyId, propertyId));
+  }
+
+  if (status === "active") {
+    conditions.push(eq(commercialLeases.active, true));
+  } else if (status === "inactive") {
+    conditions.push(eq(commercialLeases.active, false));
+  }
+
+  if (search && search.trim()) {
+    const pattern = `%${search.trim()}%`;
+    conditions.push(
+      or(
+        ilike(commercialLeases.tenantName, pattern),
+        ilike(commercialLeases.suite, pattern)
+      )!
+    );
+  }
+
+  const where = and(...conditions);
+
+  // Sort
+  const sortColumnMap: Record<string, any> = {
+    tenantName: commercialLeases.tenantName,
+    leaseType: commercialLeases.leaseType,
+    sf: commercialLeases.sf,
+    commencementDate: commercialLeases.commencementDate,
+    expirationDate: commercialLeases.expirationDate,
+    createdAt: commercialLeases.createdAt,
+  };
+  const sortCol = sortColumnMap[sortBy] || commercialLeases.tenantName;
+  const orderFn = sortDir === "desc" ? desc : asc;
+
+  // Data query
+  const data = await db
+    .select()
+    .from(commercialLeases)
+    .where(where)
+    .orderBy(orderFn(sortCol))
+    .limit(limit)
+    .offset(offset);
+
+  // Total count
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(commercialLeases)
+    .where(where);
+
+  return {
+    data,
+    total: count,
+    limit,
+    offset,
+    hasMore: offset + data.length < count,
+  };
+}
+
+// ─── Operations Stats (KPIs) ─────────────────────────────────────────────────
+
+export async function getOperationsStats(
+  db: DB,
+  orgId: string,
+  propertyId?: string
+): Promise<OperationsLeaseStats> {
+  const conditions: any[] = [
+    eq(commercialLeases.orgId, orgId),
+    eq(commercialLeases.leaseContext, "operations"),
+  ];
+
+  if (propertyId) {
+    conditions.push(eq(commercialLeases.propertyId, propertyId));
+  }
+
+  const where = and(...conditions);
+
+  const [stats] = await db
+    .select({
+      totalLeases: sql<number>`count(*)::int`,
+      activeLeases: sql<number>`count(*) FILTER (WHERE active = true)::int`,
+      totalSf: sql<number>`coalesce(sum(sf::numeric) FILTER (WHERE active = true), 0)::numeric`,
+    })
+    .from(commercialLeases)
+    .where(where);
+
+  // Expiration counts
+  const now = new Date().toISOString().split("T")[0];
+  const ninetyDays = new Date();
+  ninetyDays.setDate(ninetyDays.getDate() + 90);
+  const twelveMonths = new Date();
+  twelveMonths.setDate(twelveMonths.getDate() + 365);
+
+  const [expirations] = await db
+    .select({
+      within90: sql<number>`count(*) FILTER (WHERE expiration_date >= ${now} AND expiration_date <= ${ninetyDays.toISOString().split("T")[0]})::int`,
+      within12mo: sql<number>`count(*) FILTER (WHERE expiration_date >= ${now} AND expiration_date <= ${twelveMonths.toISOString().split("T")[0]})::int`,
+    })
+    .from(commercialLeases)
+    .where(and(...conditions, eq(commercialLeases.active, true)));
+
+  // Lease type breakdown
+  const typeBreakdown = await db
+    .select({
+      leaseType: commercialLeases.leaseType,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(commercialLeases)
+    .where(where)
+    .groupBy(commercialLeases.leaseType);
+
+  const leaseTypeBreakdown: Record<string, number> = {};
+  for (const row of typeBreakdown) {
+    leaseTypeBreakdown[row.leaseType] = row.count;
+  }
+
+  // Get total monthly base rent from first terms
+  const [rentStats] = await db
+    .select({
+      totalMonthly: sql<number>`coalesce(sum(
+        CASE 
+          WHEN t.base_rent_mode = 'PER_SF_YEAR' THEN (t.base_rent_value::numeric * cl.sf::numeric) / 12
+          WHEN t.base_rent_mode = 'PER_MONTH' THEN t.base_rent_value::numeric
+          WHEN t.base_rent_mode = 'PER_YEAR' THEN t.base_rent_value::numeric / 12
+          ELSE 0
+        END
+      ), 0)::numeric`,
+    })
+    .from(commercialLeases)
+    .innerJoin(
+      leaseTerms,
+      and(
+        eq(leaseTerms.leaseId, commercialLeases.id),
+        eq(leaseTerms.termIndex, 0)
+      )
+    )
+    .where(and(...conditions, eq(commercialLeases.active, true)));
+
+  const totalSf = Number(stats.totalSf) || 0;
+  const totalMonthly = Number(rentStats.totalMonthly) || 0;
+
+  return {
+    totalLeases: stats.totalLeases,
+    activeLeases: stats.activeLeases,
+    totalSf,
+    avgRentPerSf: totalSf > 0 ? (totalMonthly * 12) / totalSf : 0,
+    totalMonthlyBaseRent: totalMonthly,
+    expiringWithin90Days: expirations.within90,
+    expiringWithin12Months: expirations.within12mo,
+    leaseTypeBreakdown,
+  };
+}
+
+// ─── Get Leases Available for Import ──────────────────────────────────────────
+
+export async function getAvailableForImport(
+  db: DB,
+  orgId: string,
+  projectId: string,
+  propertyId?: string
+) {
+  const conditions: any[] = [
+    eq(commercialLeases.orgId, orgId),
+    eq(commercialLeases.leaseContext, "operations"),
+  ];
+
+  if (propertyId) {
+    conditions.push(eq(commercialLeases.propertyId, propertyId));
+  }
+
+  // Get operations leases
+  const opsLeases = await db
+    .select()
+    .from(commercialLeases)
+    .where(and(...conditions))
+    .orderBy(asc(commercialLeases.tenantName));
+
+  // Get already-imported lease IDs for this project
+  const imported = await db
+    .select({
+      sourceLeaseId: commercialLeases.sourceLeaseId,
+      id: commercialLeases.id,
+    })
+    .from(commercialLeases)
+    .where(
+      and(
+        eq(commercialLeases.projectId, projectId),
+        eq(commercialLeases.leaseContext, "valuator"),
+        sql`${commercialLeases.sourceLeaseId} IS NOT NULL`
+      )
+    );
+
+  const importedMap = new Map(
+    imported.map((r: any) => [r.sourceLeaseId, r.id])
+  );
+
+  return opsLeases.map((lease: any) => ({
+    id: lease.id,
+    tenantName: lease.tenantName,
+    suite: lease.suite,
+    sf: Number(lease.sf),
+    leaseType: lease.leaseType,
+    commencementDate: lease.commencementDate,
+    expirationDate: lease.expirationDate,
+    active: lease.active,
+    alreadyImported: importedMap.has(lease.id),
+    importedLeaseId: importedMap.get(lease.id) || undefined,
+  }));
+}

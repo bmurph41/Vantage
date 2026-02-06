@@ -143,7 +143,7 @@ export const commercialLeases = pgTable(
   "commercial_leases",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    projectId: uuid("project_id").notNull(),
+    projectId: uuid("project_id"),  // nullable for Operations leases
     tenantName: text("tenant_name").notNull(),
     leaseType: leaseTypeEnum("lease_type").notNull().default("retail"),
     suite: text("suite"),
@@ -158,11 +158,18 @@ export const commercialLeases = pgTable(
       .notNull()
       .default(12),
     notes: text("notes"),
+    // ─── Unified Context Fields ───
+    orgId: uuid("org_id"),
+    propertyId: uuid("property_id"),
+    sourceLeaseId: uuid("source_lease_id"),
+    leaseContext: text("lease_context").notNull().default("valuator"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
     index("idx_commercial_leases_project").on(table.projectId),
+    index("idx_cl_org_context").on(table.orgId, table.leaseContext),
+    index("idx_cl_org_property").on(table.orgId, table.propertyId),
   ]
 );
 
