@@ -177,8 +177,8 @@ export default function ModelingProjectFormDialog({
   const dealSource = form.watch('dealSource');
 
   const handleAddressSelect = useCallback((components: AddressComponents) => {
-    if (components.source === 'google' && components.street) {
-      form.setValue('address', components.street, { shouldDirty: true });
+    if (components.street || components.streetAddress) {
+      form.setValue('address', components.street || components.streetAddress || '', { shouldDirty: true });
     }
     if (components.city) {
       form.setValue('city', components.city, { shouldDirty: true });
@@ -384,7 +384,12 @@ export default function ModelingProjectFormDialog({
                 <FormControl>
                   <AddressInput
                     value={field.value || ''}
-                    onChange={(value) => field.onChange(value)}
+                    onChange={(value, components) => {
+                      field.onChange(value);
+                      if (components) {
+                        handleAddressSelect(components);
+                      }
+                    }}
                     onAddressSelect={handleAddressSelect}
                     label="Address"
                     placeholder="Start typing an address..."

@@ -979,10 +979,18 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                     <div className="space-y-2">
                       <AddressInput
                         value={address}
-                        onChange={(value) => setAddress(value)}
+                        onChange={(value, components) => {
+                          setAddress(value);
+                          if (components) {
+                            if (components.street) setAddress(components.street);
+                            if (components.city) setCity(components.city);
+                            if (components.state) setState(components.state);
+                            if (components.zipCode) setZipCode(components.zipCode);
+                          }
+                        }}
                         onAddressSelect={(components: AddressComponents) => {
-                          if (components.source === 'google' && components.street) {
-                            setAddress(components.street);
+                          if (components.street || components.streetAddress) {
+                            setAddress(components.street || components.streetAddress || '');
                           }
                           if (components.city) setCity(components.city);
                           if (components.state) setState(components.state);

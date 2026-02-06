@@ -561,8 +561,19 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                                 <FormControl>
                                   <AddressInput
                                     value={field.value || ""}
-                                    onChange={field.onChange}
+                                    onChange={(value, components) => {
+                                      field.onChange(value);
+                                      if (components) {
+                                        if (components.street) marinaForm.setValue("address", components.street, { shouldDirty: true });
+                                        if (components.city) marinaForm.setValue("city", components.city, { shouldDirty: true });
+                                        if (components.state) marinaForm.setValue("state", components.state, { shouldDirty: true });
+                                        if (components.zipCode) marinaForm.setValue("zip", components.zipCode, { shouldDirty: true });
+                                      }
+                                    }}
                                     onAddressSelect={(components) => {
+                                      if (components.street || components.streetAddress) {
+                                        marinaForm.setValue("address", components.street || components.streetAddress || '', { shouldDirty: true });
+                                      }
                                       if (components.city) marinaForm.setValue("city", components.city, { shouldDirty: true });
                                       if (components.state) marinaForm.setValue("state", components.state, { shouldDirty: true });
                                       if (components.zipCode) marinaForm.setValue("zip", components.zipCode, { shouldDirty: true });
