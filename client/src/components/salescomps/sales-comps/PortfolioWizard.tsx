@@ -563,24 +563,27 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                                     value={field.value || ""}
                                     onChange={(value, components) => {
                                       if (components && (components.street || components.city || components.state || components.zipCode)) {
-                                        const opts = { shouldDirty: true, shouldValidate: true, shouldTouch: true };
-                                        if (components.street) marinaForm.setValue("address", components.street, opts);
-                                        else field.onChange(value);
-                                        if (components.city) marinaForm.setValue("city", components.city, opts);
-                                        if (components.state) marinaForm.setValue("state", components.state, opts);
-                                        if (components.zipCode) marinaForm.setValue("zip", components.zipCode, opts);
+                                        const current = marinaForm.getValues();
+                                        const updates: Record<string, string> = {};
+                                        if (components.street) updates.address = components.street;
+                                        if (components.city) updates.city = components.city;
+                                        if (components.state) updates.state = components.state;
+                                        if (components.zipCode) updates.zip = components.zipCode;
+                                        marinaForm.reset({ ...current, ...updates }, { keepDefaultValues: true });
                                       } else {
                                         field.onChange(value);
                                       }
                                     }}
                                     onAddressSelect={(components) => {
-                                      const opts = { shouldDirty: true, shouldValidate: true, shouldTouch: true };
+                                      const current = marinaForm.getValues();
+                                      const updates: Record<string, string> = {};
                                       if (components.street || components.streetAddress) {
-                                        marinaForm.setValue("address", components.street || components.streetAddress || '', opts);
+                                        updates.address = components.street || components.streetAddress || '';
                                       }
-                                      if (components.city) marinaForm.setValue("city", components.city, opts);
-                                      if (components.state) marinaForm.setValue("state", components.state, opts);
-                                      if (components.zipCode) marinaForm.setValue("zip", components.zipCode, opts);
+                                      if (components.city) updates.city = components.city;
+                                      if (components.state) updates.state = components.state;
+                                      if (components.zipCode) updates.zip = components.zipCode;
+                                      marinaForm.reset({ ...current, ...updates }, { keepDefaultValues: true });
                                     }}
                                     label="Address"
                                     placeholder="Enter full address..."

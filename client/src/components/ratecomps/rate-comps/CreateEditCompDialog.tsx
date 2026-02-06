@@ -1320,24 +1320,27 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                                 value={field.value || ""}
                                 onChange={(value, components) => {
                                   if (components && (components.street || components.city || components.state || components.zipCode)) {
-                                    const opts = { shouldDirty: true, shouldValidate: true, shouldTouch: true };
-                                    if (components.street) form.setValue("address", components.street, opts);
-                                    else field.onChange(value);
-                                    if (components.city) form.setValue("city", components.city, opts);
-                                    if (components.state) form.setValue("state", components.state, opts);
-                                    if (components.zipCode) form.setValue("zip", components.zipCode, opts);
+                                    const current = form.getValues();
+                                    const updates: Record<string, string> = {};
+                                    if (components.street) updates.address = components.street;
+                                    if (components.city) updates.city = components.city;
+                                    if (components.state) updates.state = components.state;
+                                    if (components.zipCode) updates.zip = components.zipCode;
+                                    form.reset({ ...current, ...updates }, { keepDefaultValues: true });
                                   } else {
                                     field.onChange(value);
                                   }
                                 }}
                                 onAddressSelect={(components) => {
-                                  const opts = { shouldDirty: true, shouldValidate: true, shouldTouch: true };
+                                  const current = form.getValues();
+                                  const updates: Record<string, string> = {};
                                   if (components.street || components.streetAddress) {
-                                    form.setValue("address", components.street || components.streetAddress || '', opts);
+                                    updates.address = components.street || components.streetAddress || '';
                                   }
-                                  if (components.city) form.setValue("city", components.city, opts);
-                                  if (components.state) form.setValue("state", components.state, opts);
-                                  if (components.zipCode) form.setValue("zip", components.zipCode, opts);
+                                  if (components.city) updates.city = components.city;
+                                  if (components.state) updates.state = components.state;
+                                  if (components.zipCode) updates.zip = components.zipCode;
+                                  form.reset({ ...current, ...updates }, { keepDefaultValues: true });
                                 }}
                                 label="Address"
                                 placeholder="Enter full address..."

@@ -177,19 +177,15 @@ export default function ModelingProjectFormDialog({
   const dealSource = form.watch('dealSource');
 
   const handleAddressSelect = useCallback((components: AddressComponents) => {
-    const opts = { shouldDirty: true, shouldValidate: true, shouldTouch: true };
+    const current = form.getValues();
+    const updates: Record<string, string> = {};
     if (components.street || components.streetAddress) {
-      form.setValue('address', components.street || components.streetAddress || '', opts);
+      updates.address = components.street || components.streetAddress || '';
     }
-    if (components.city) {
-      form.setValue('city', components.city, opts);
-    }
-    if (components.state) {
-      form.setValue('state', components.state, opts);
-    }
-    if (components.zipCode) {
-      form.setValue('zipCode', components.zipCode, opts);
-    }
+    if (components.city) updates.city = components.city;
+    if (components.state) updates.state = components.state;
+    if (components.zipCode) updates.zipCode = components.zipCode;
+    form.reset({ ...current, ...updates }, { keepDefaultValues: true });
   }, [form]);
 
   useEffect(() => {
