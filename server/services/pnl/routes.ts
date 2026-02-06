@@ -1087,4 +1087,23 @@ router.get('/keyword-bank/stats', async (req: any, res) => {
   }
 });
 
+router.post('/promote-to-actuals', async (req: any, res) => {
+  try {
+    const { orgId } = getAuthContext(req);
+    const { modelingProjectId, documentId } = req.body;
+
+    if (!modelingProjectId) {
+      return res.status(400).json({ error: 'modelingProjectId is required' });
+    }
+
+    const { promotePnlFactsToActuals } = await import('./promote-to-actuals');
+    const result = await promotePnlFactsToActuals(orgId, modelingProjectId, documentId);
+
+    res.json(result);
+  } catch (error: any) {
+    console.error('Promote to actuals error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

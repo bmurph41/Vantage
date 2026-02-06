@@ -106,6 +106,8 @@ export interface ProFormaData {
   holdPeriod: number;
   years: number[];
   baseYear: number;
+  latestHistoricalYear: number;
+  granularAssumptionsApplied: boolean;
   
   // Revenue
   revenue: {
@@ -242,40 +244,62 @@ export class ProFormaEngineService {
     const holdPeriod = annualPeriods.length;
     
     // ========================================
-    // 3. PARSE SCENARIO ASSUMPTIONS
+    // 3. PARSE SCENARIO ASSUMPTIONS (Granular)
     // ========================================
     
-    const revenueGrowthRate = parseFloat(scenario?.revenueGrowthRate?.toString() || '3') / 100;
-    const expenseGrowthRate = parseFloat(scenario?.expenseGrowthRate?.toString() || '2.5') / 100;
+    const flatRevenueGrowthRate = parseFloat(scenario?.revenueGrowthRate?.toString() || '3') / 100;
+    const flatExpenseGrowthRate = parseFloat(scenario?.expenseGrowthRate?.toString() || '2.5') / 100;
     const exitCapRate = parseFloat(scenario?.exitCapRate?.toString() || '7.5') / 100;
     const purchasePrice = parseFloat(project.purchasePrice?.toString() || '0');
     
-    // Stabilized NOI config
     const stabilizedNoiMode = (config?.stabilizedNoiMode as StabilizedNoiMode) || 'fixed_year';
     const stabilizedNoiYear = config?.stabilizedNoiYear || 3;
     const irrDisplayPreference = (config?.irrDisplayPreference as IrrDisplayPreference) || 'monthly';
     
+    const assumptions = (scenario?.assumptions as any) || {};
+    const granularGrowthRates: Record<string, number> = assumptions.growthRates || {};
+    const granularExpenseGrowth: Record<string, number> = assumptions.expenseGrowth || {};
+    const granularOccupancy: Record<string, Record<string, number>> = assumptions.occupancy || {};
+    const granularMargins: Record<string, { historical: number; projected: number }> = assumptions.margins || {};
+    const storageGrowthData: {
+      mode: string;
+      universalRate: number;
+      typeRates: Record<string, number>;
+      locationRates: Record<string, number>;
+    } = assumptions.storageGrowth || { mode: 'universal', universalRate: flatRevenueGrowthRate * 100, typeRates: {}, locationRates: {} };
+    
+    const hasGranularAssumptions = Object.keys(granularGrowthRates).length > 0 || Object.keys(granularExpenseGrowth).length > 0;
+    
+    const { inferDepartment, departmentToAssumptionKey, storageSubcategoryToTypeKey } = await import('../utils/department-mapping');
+    
     // ========================================
-    // 4. AGGREGATE BASE AMOUNTS FROM ACTUALS
+    // 4. AGGREGATE BASE AMOUNTS FROM ACTUALS (by latest historical year)
     // ========================================
     
-    const revenueBySubcat: Record<string, { amount: number; category: string; subcategory: string; department?: string }> = {};
-    const expensesBySubcat: Record<string, { amount: number; category: string; subcategory: string; department?: string }> = {};
+    interface ActualEntry { amount: number; category: string; subcategory: string; department?: string; year: number }
+    const revenueBySubcat: Record<string, ActualEntry> = {};
+    const expensesBySubcat: Record<string, ActualEntry> = {};
+    
+    const actualsYears = Array.from(new Set(actuals.map(a => a.year))).sort((a, b) => b - a);
+    const latestHistoricalYear = actualsYears[0] || baseYear - 1;
+    const historicalYears = actualsYears.filter(y => y < baseYear || actualsYears.length === 1 ? true : y <= latestHistoricalYear);
 
     for (const actual of actuals) {
-      const amount = parseFloat(actual.amount?.toString() || '0');
-      const subcat = actual.subcategory || actual.lineItem || 'Other';
-      const category = actual.category || 'Other';
-      const department = actual.department || undefined;
+      if (actual.year !== latestHistoricalYear) continue;
       
-      if (category === 'Revenue' || actual.isRevenue) {
+      const amount = parseFloat(actual.amount?.toString() || '0');
+      const subcat = actual.subcategory || (actual as any).lineItem || 'Other';
+      const category = actual.category || 'Other';
+      const dept = (actual as any).department || inferDepartment(subcat, category);
+      
+      if (category === 'Revenue' || (actual as any).isRevenue) {
         if (!revenueBySubcat[subcat]) {
-          revenueBySubcat[subcat] = { amount: 0, category, subcategory: subcat, department };
+          revenueBySubcat[subcat] = { amount: 0, category, subcategory: subcat, department: dept, year: actual.year };
         }
         revenueBySubcat[subcat].amount += amount;
       } else if (['Expenses', 'COGS', 'Operating Expenses', 'OpEx'].includes(category)) {
         if (!expensesBySubcat[subcat]) {
-          expensesBySubcat[subcat] = { amount: 0, category, subcategory: subcat, department };
+          expensesBySubcat[subcat] = { amount: 0, category, subcategory: subcat, department: dept, year: actual.year };
         }
         expensesBySubcat[subcat].amount += amount;
       }
@@ -309,27 +333,95 @@ export class ProFormaEngineService {
         fieldPath: 'expenses'
       });
     }
+
+    if (hasGranularAssumptions) {
+      warnings.push({
+        code: 'GRANULAR_ASSUMPTIONS_ACTIVE',
+        message: 'Department-level growth rates and occupancy assumptions are being applied.',
+        fieldPath: 'assumptions'
+      });
+    }
     
     // ========================================
-    // 6. BUILD MONTHLY PROJECTIONS
+    // 6. BUILD MONTHLY PROJECTIONS (Granular)
     // ========================================
     
-    // Convert annual growth to monthly
-    const monthlyRevGrowth = annualToMonthlyRate(revenueGrowthRate);
-    const monthlyExpGrowth = annualToMonthlyRate(expenseGrowthRate);
+    const getRevenueGrowthForDept = (department: string, subcategory: string): number => {
+      if (!hasGranularAssumptions) return flatRevenueGrowthRate;
+      
+      const assumptionKey = departmentToAssumptionKey(department);
+      
+      if (department === 'Storage') {
+        const storageTypeKey = storageSubcategoryToTypeKey(subcategory);
+        if (storageGrowthData.mode === 'per_type' && storageTypeKey && storageGrowthData.typeRates[storageTypeKey] !== undefined) {
+          return storageGrowthData.typeRates[storageTypeKey] / 100;
+        }
+        if (storageGrowthData.mode === 'granular' && storageTypeKey && storageGrowthData.locationRates) {
+          const locationRate = Object.entries(storageGrowthData.locationRates)
+            .find(([key]) => key.startsWith(storageTypeKey || ''));
+          if (locationRate) return locationRate[1] / 100;
+        }
+        return (storageGrowthData.universalRate ?? flatRevenueGrowthRate * 100) / 100;
+      }
+      
+      if (granularGrowthRates[assumptionKey] !== undefined) {
+        return granularGrowthRates[assumptionKey] / 100;
+      }
+      
+      return flatRevenueGrowthRate;
+    };
     
-    // Build line items with monthly projections
+    const getExpenseGrowthForCategory = (subcategory: string, department: string): number => {
+      if (!hasGranularAssumptions) return flatExpenseGrowthRate;
+      
+      const key = departmentToAssumptionKey(department);
+      if (granularExpenseGrowth[key] !== undefined) {
+        return granularExpenseGrowth[key] / 100;
+      }
+      
+      const lowerSubcat = subcategory.toLowerCase();
+      for (const [expKey, rate] of Object.entries(granularExpenseGrowth)) {
+        if (lowerSubcat.includes(expKey.replace(/_/g, ' '))) {
+          return rate / 100;
+        }
+      }
+      
+      return flatExpenseGrowthRate;
+    };
+    
+    const getOccupancyAdjustment = (department: string, subcategory: string, year: number): number => {
+      if (department !== 'Storage') return 1.0;
+      
+      const storageTypeKey = storageSubcategoryToTypeKey(subcategory);
+      if (!storageTypeKey || Object.keys(granularOccupancy).length === 0) return 1.0;
+      
+      const typeOccupancy = granularOccupancy[storageTypeKey];
+      if (!typeOccupancy) return 1.0;
+      
+      const currentOccPct = typeOccupancy[String(year)] ?? 85;
+      const baseOccPct = typeOccupancy[String(latestHistoricalYear)] ?? 85;
+      
+      if (baseOccPct <= 0) return 1.0;
+      return currentOccPct / baseOccPct;
+    };
+    
     const revenueLineItems: LineItem[] = Object.entries(revenueBySubcat).map(([name, data], idx) => {
-      const baseMonthly = data.amount / 12;  // Annualize then monthlyize
+      const department = data.department || inferDepartment(name, data.category);
+      const annualGrowthRate = getRevenueGrowthForDept(department, name);
+      const monthlyGrowthRate = annualToMonthlyRate(annualGrowthRate);
+      const baseMonthly = data.amount / 12;
       const projectionsMonthly: Record<string, number> = {};
       
       for (const period of monthlyPeriods) {
-        // Apply compound growth from period 0
-        const growthFactor = Math.pow(1 + monthlyRevGrowth, period.index);
-        projectionsMonthly[period.key] = Math.round(baseMonthly * growthFactor);
+        const growthFactor = Math.pow(1 + monthlyGrowthRate, period.index);
+        let projectedAmount = baseMonthly * growthFactor;
+        
+        const occAdj = getOccupancyAdjustment(department, name, period.year);
+        projectedAmount *= occAdj;
+        
+        projectionsMonthly[period.key] = Math.round(projectedAmount);
       }
       
-      // Roll up to annual for legacy compatibility
       const projections = annualPeriods.map(year => {
         return year.monthIndices.reduce((sum, mi) => {
           const period = monthlyPeriods[mi];
@@ -342,9 +434,9 @@ export class ProFormaEngineService {
         name,
         category: data.category,
         subcategory: data.subcategory,
-        department: data.department,
+        department,
         baseAmount: data.amount,
-        growthRate: revenueGrowthRate * 100,
+        growthRate: annualGrowthRate * 100,
         projections,
         projectionsMonthly,
         isRevenue: true
@@ -352,12 +444,41 @@ export class ProFormaEngineService {
     });
 
     const expenseLineItems: LineItem[] = Object.entries(expensesBySubcat).map(([name, data], idx) => {
+      const department = data.department || inferDepartment(name, data.category);
+      const annualGrowthRate = getExpenseGrowthForCategory(name, department);
+      const monthlyGrowthRate = annualToMonthlyRate(annualGrowthRate);
       const baseMonthly = data.amount / 12;
       const projectionsMonthly: Record<string, number> = {};
       
-      for (const period of monthlyPeriods) {
-        const growthFactor = Math.pow(1 + monthlyExpGrowth, period.index);
-        projectionsMonthly[period.key] = Math.round(baseMonthly * growthFactor);
+      if (granularMargins[departmentToAssumptionKey(department)]) {
+        const marginData = granularMargins[departmentToAssumptionKey(department)];
+        const projectedMarginPct = marginData.projected / 100;
+        const revenueKey = department === 'Fuel' ? 'fuel_dock' : 'ship_store';
+        const matchingRevenue = Object.entries(revenueBySubcat).find(([_, rd]) =>
+          departmentToAssumptionKey(rd.department || inferDepartment(rd.subcategory)) === revenueKey
+        );
+        
+        if (matchingRevenue) {
+          const revBase = matchingRevenue[1].amount;
+          const revGrowthRate = getRevenueGrowthForDept(department, matchingRevenue[0]);
+          const revMonthlyGrowth = annualToMonthlyRate(revGrowthRate);
+          
+          for (const period of monthlyPeriods) {
+            const revGrowthFactor = Math.pow(1 + revMonthlyGrowth, period.index);
+            const projectedRevMonth = (revBase / 12) * revGrowthFactor;
+            projectionsMonthly[period.key] = Math.round(projectedRevMonth * (1 - projectedMarginPct));
+          }
+        } else {
+          for (const period of monthlyPeriods) {
+            const growthFactor = Math.pow(1 + monthlyGrowthRate, period.index);
+            projectionsMonthly[period.key] = Math.round(baseMonthly * growthFactor);
+          }
+        }
+      } else {
+        for (const period of monthlyPeriods) {
+          const growthFactor = Math.pow(1 + monthlyGrowthRate, period.index);
+          projectionsMonthly[period.key] = Math.round(baseMonthly * growthFactor);
+        }
       }
       
       const projections = annualPeriods.map(year => {
@@ -372,9 +493,9 @@ export class ProFormaEngineService {
         name,
         category: data.category,
         subcategory: data.subcategory,
-        department: data.department,
+        department,
         baseAmount: data.amount,
-        growthRate: expenseGrowthRate * 100,
+        growthRate: annualGrowthRate * 100,
         projections,
         projectionsMonthly,
         isRevenue: false
@@ -563,6 +684,8 @@ export class ProFormaEngineService {
       holdPeriod,
       years,
       baseYear,
+      latestHistoricalYear,
+      granularAssumptionsApplied: hasGranularAssumptions,
       
       revenue: {
         lineItems: revenueLineItems,
@@ -590,8 +713,8 @@ export class ProFormaEngineService {
       metrics: {
         goingInCapRate,
         exitCapRate: exitCapRate * 100,
-        revenueGrowthRate: revenueGrowthRate * 100,
-        expenseGrowthRate: expenseGrowthRate * 100,
+        revenueGrowthRate: flatRevenueGrowthRate * 100,
+        expenseGrowthRate: flatExpenseGrowthRate * 100,
         purchasePrice,
         exitValue,
         totalReturn: totalDistributions,

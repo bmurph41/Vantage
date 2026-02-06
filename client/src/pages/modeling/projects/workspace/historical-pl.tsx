@@ -105,6 +105,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
   const [selectedYear, setSelectedYear] = useState<string>('');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['Revenue', 'COGS', 'Expenses']));
   const [showSyncDialog, setShowSyncDialog] = useState(false);
+  const [showPromoteDialog, setShowPromoteDialog] = useState(false);
   const [syncSources, setSyncSources] = useState({
     rent_roll: true,
     fuel_sales: true,
@@ -208,6 +209,33 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
       toast({
         title: 'Sync Failed',
         description: error.message || 'Failed to sync operations data',
+        variant: 'destructive'
+      });
+    }
+  });
+
+  const promoteMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest('/api/pnl/promote-to-actuals', {
+        method: 'POST',
+        body: JSON.stringify({ modelingProjectId: projectId })
+      });
+    },
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/modeling/projects/${projectId}/actuals`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/modeling/projects/${projectId}/actuals/years`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/modeling/projects/${projectId}/data-sources`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'historical-pl'] });
+      setShowPromoteDialog(false);
+      toast({
+        title: 'P&L Data Imported',
+        description: `Promoted ${result.promoted} line items from uploaded P&L documents${result.years?.length ? ` (${result.years.join(', ')})` : ''}.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Import Failed',
+        description: error.message || 'Failed to import P&L document data',
         variant: 'destructive'
       });
     }
@@ -559,6 +587,57 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
               </DialogContent>
             </Dialog>
           )}
+
+          <Dialog open={showPromoteDialog} onOpenChange={setShowPromoteDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9" data-testid="button-import-pnl">
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Import P&L Docs
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Import P&L Document Data</DialogTitle>
+                <DialogDescription>
+                  Promote extracted line items from uploaded P&L documents into this project's historicals. 
+                  Each line item will be mapped to the marina chart of accounts with department-level classification.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 py-4">
+                <div className="bg-muted/50 p-3 rounded-lg text-sm space-y-1">
+                  <p className="font-medium">What this does:</p>
+                  <ul className="list-disc list-inside text-muted-foreground space-y-0.5">
+                    <li>Reads parsed P&L facts from uploaded documents</li>
+                    <li>Maps each line to Storage, Fuel, Service, Ship Store, etc.</li>
+                    <li>Creates historical actuals that feed the Pro Forma engine</li>
+                    <li>Existing manual entries are preserved (upsert by line item)</li>
+                  </ul>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowPromoteDialog(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => promoteMutation.mutate()}
+                  disabled={promoteMutation.isPending}
+                  data-testid="button-confirm-promote"
+                >
+                  {promoteMutation.isPending ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Importing...
+                    </>
+                  ) : (
+                    <>
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                      Import Now
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           <Button variant="outline" size="sm" data-testid="button-export-pl">
             <Download className="h-4 w-4 mr-2" />
