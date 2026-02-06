@@ -207,21 +207,12 @@ export function AddressInput({
 
   const handlePlaceChanged = useCallback(() => {
     const place = autocompleteRef.current?.getPlace();
-    
-    console.log('[AddressInput] place_changed fired', {
-      hasPlace: !!place,
-      hasComponents: !!place?.address_components,
-      formattedAddress: place?.formatted_address,
-      rawComponents: place?.address_components?.map(c => ({ types: c.types, long: c.long_name, short: c.short_name })),
-    });
 
     if (!place || !place.address_components) {
       const domValue = inputRef.current?.value;
-      console.log('[AddressInput] No address_components, DOM value:', domValue);
       if (domValue && domValue.includes(',')) {
         const parsed = parseAddressString(domValue);
         parsed.source = 'google';
-        console.log('[AddressInput] Parsed from DOM:', parsed);
         if (parsed.city || parsed.state || parsed.zipCode) {
           if (onChangeRef.current) {
             onChangeRef.current(parsed.street || domValue, parsed);
@@ -279,26 +270,23 @@ export function AddressInput({
 
     components.streetAddress = components.street;
 
-    console.log('[AddressInput] Final components:', JSON.stringify(components));
-    console.log('[AddressInput] hasOnChange:', !!onChangeRef.current, 'hasOnAddressSelect:', !!onAddressSelectRef.current);
-
-    if (inputRef.current && components.fullAddress) {
-      inputRef.current.value = components.fullAddress;
+    if (inputRef.current && components.street) {
+      inputRef.current.value = components.street;
     }
 
     if (onChangeRef.current) {
-      onChangeRef.current(components.fullAddress || '', components);
+      onChangeRef.current(components.street || components.fullAddress || '', components);
     }
 
     if (onAddressSelectRef.current) {
       onAddressSelectRef.current(components);
     }
 
-    setTimeout(() => {
+    requestAnimationFrame(() => {
       if (onAddressSelectRef.current) {
         onAddressSelectRef.current(components);
       }
-    }, 50);
+    });
   }, []);
 
   useEffect(() => {
@@ -340,7 +328,8 @@ export function AddressInput({
   };
 
   const handleBlur = useCallback(() => {
-    const currentValue = inputRef.current?.value || value;
+    const domValue = inputRef.current?.value;
+    const currentValue = domValue || value;
     if (!currentValue || currentValue.trim().length < 5) return;
     
     const hasComma = currentValue.includes(',');
@@ -351,6 +340,9 @@ export function AddressInput({
       parsed.source = 'manual';
       
       if (parsed.city || parsed.state || parsed.zipCode) {
+        if (parsed.street && onChangeRef.current) {
+          onChangeRef.current(parsed.street, parsed);
+        }
         if (onAddressSelectRef.current) {
           onAddressSelectRef.current(parsed);
         }

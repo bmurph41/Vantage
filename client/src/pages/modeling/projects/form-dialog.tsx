@@ -177,17 +177,18 @@ export default function ModelingProjectFormDialog({
   const dealSource = form.watch('dealSource');
 
   const handleAddressSelect = useCallback((components: AddressComponents) => {
+    const opts = { shouldDirty: true, shouldValidate: true, shouldTouch: true };
     if (components.street || components.streetAddress) {
-      form.setValue('address', components.street || components.streetAddress || '', { shouldDirty: true });
+      form.setValue('address', components.street || components.streetAddress || '', opts);
     }
     if (components.city) {
-      form.setValue('city', components.city, { shouldDirty: true });
+      form.setValue('city', components.city, opts);
     }
     if (components.state) {
-      form.setValue('state', components.state, { shouldDirty: true });
+      form.setValue('state', components.state, opts);
     }
     if (components.zipCode) {
-      form.setValue('zipCode', components.zipCode, { shouldDirty: true });
+      form.setValue('zipCode', components.zipCode, opts);
     }
   }, [form]);
 
