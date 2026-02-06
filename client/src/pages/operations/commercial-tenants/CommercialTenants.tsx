@@ -44,7 +44,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CommercialTenant } from "@shared/schema";
 import { PageTour } from "@/components/onboarding/PageTour";
 import { TOUR_IDS, commercialTenantsTourSteps } from "@/lib/tour-configs";
-import { TenantFormDialog } from "./TenantFormDialog";
+import { UnifiedTenantFormDialog } from "@/components/commercial-tenants/UnifiedTenantFormDialog";
 import { TenantDetailSheet } from "./TenantDetailSheet";
 import { LeaseImportWizard } from "./LeaseImportWizard";
 
@@ -373,9 +373,10 @@ export default function CommercialTenants() {
         </CardContent>
       </Card>
 
-      <TenantFormDialog
+      <UnifiedTenantFormDialog
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
+        context="operations"
         tenant={editingTenant}
       />
 

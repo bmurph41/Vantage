@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { format, differenceInMonths } from "date-fns";
+import { format } from "date-fns";
+import { UnifiedTenantFormDialog } from "@/components/commercial-tenants/UnifiedTenantFormDialog";
 import {
   Building2, Plus, Trash2, Edit, DollarSign, Users,
   TrendingUp, Download, AlertTriangle, ChevronDown,
@@ -25,14 +26,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -43,12 +36,8 @@ import {
   Alert,
   AlertDescription,
 } from "@/components/ui/alert";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatCurrency } from "@/lib/utils";
@@ -64,9 +53,6 @@ interface ValuatorCommercialTenantsProps {
 
 type LeaseType = "NNN" | "MOD_GROSS" | "FULL_GROSS" | "ABSOLUTE_NNN" | "OTHER";
 type LeaseStatus = "ACTIVE" | "FUTURE" | "EXPIRING" | "EXPIRED" | "ARCHIVED";
-type RentInputUnit = "PSF_YEAR" | "PER_MONTH" | "PER_YEAR";
-type EscalationType = "NONE" | "PERCENT" | "FIXED_DOLLAR" | "DOLLAR_PSF_YEAR" | "CPI";
-type SecurityDepositType = "CASH" | "LOC" | "NONE";
 
 interface TenantLease {
   id: string;
@@ -100,48 +86,11 @@ interface LeaseKpis {
   expiredCount: number;
 }
 
-interface NewLeaseFormData {
-  tenantName: string;
-  suiteLabel: string;
-  sf: string;
-  leaseType: LeaseType;
-  leaseStartDate: string;
-  leaseEndDate: string;
-  baseRentInputUnit: RentInputUnit;
-  baseRentInputValue: string;
-  escalationType: EscalationType;
-  escalationValue: string;
-  escalationFrequencyMonths: string;
-  securityDepositAmount: string;
-  securityDepositType: SecurityDepositType;
-  notes: string;
-}
 
 // ============================================
 // CONSTANTS
 // ============================================
 
-const LEASE_TYPE_OPTIONS: { value: LeaseType; label: string }[] = [
-  { value: "NNN", label: "NNN (Triple Net)" },
-  { value: "MOD_GROSS", label: "Modified Gross" },
-  { value: "FULL_GROSS", label: "Full Gross" },
-  { value: "ABSOLUTE_NNN", label: "Absolute NNN" },
-  { value: "OTHER", label: "Other" },
-];
-
-const RENT_UNIT_OPTIONS: { value: RentInputUnit; label: string }[] = [
-  { value: "PSF_YEAR", label: "$/SF/Year" },
-  { value: "PER_MONTH", label: "$/Month" },
-  { value: "PER_YEAR", label: "$/Year" },
-];
-
-const ESCALATION_TYPE_OPTIONS: { value: EscalationType; label: string }[] = [
-  { value: "NONE", label: "None" },
-  { value: "PERCENT", label: "% Annual" },
-  { value: "FIXED_DOLLAR", label: "$ Step-Up" },
-  { value: "DOLLAR_PSF_YEAR", label: "$/SF/Yr Step-Up" },
-  { value: "CPI", label: "CPI" },
-];
 
 const STATUS_FILTER_OPTIONS: { value: LeaseStatus | "all"; label: string }[] = [
   { value: "all", label: "All Statuses" },
@@ -172,22 +121,6 @@ const getHealthBadgeColor = (status: string) => {
   }
 };
 
-const getInitialFormData = (): NewLeaseFormData => ({
-  tenantName: "",
-  suiteLabel: "",
-  sf: "",
-  leaseType: "NNN",
-  leaseStartDate: format(new Date(), "yyyy-MM-dd"),
-  leaseEndDate: "",
-  baseRentInputUnit: "PSF_YEAR",
-  baseRentInputValue: "",
-  escalationType: "PERCENT",
-  escalationValue: "3",
-  escalationFrequencyMonths: "12",
-  securityDepositAmount: "",
-  securityDepositType: "CASH",
-  notes: "",
-});
 
 // ============================================
 // MAIN COMPONENT
@@ -199,7 +132,6 @@ export default function ValuatorCommercialTenantsTab({ projectId, projectName }:
   const [editingLease, setEditingLease] = useState<TenantLease | null>(null);
   const [statusFilter, setStatusFilter] = useState<LeaseStatus | "all">("all");
   const [bannerDismissed, setBannerDismissed] = useState(false);
-  const [formData, setFormData] = useState<NewLeaseFormData>(getInitialFormData());
 
   // Fetch leases
   const { data: leases = [], isLoading: leasesLoading } = useQuery<TenantLease[]>({
@@ -231,51 +163,6 @@ export default function ValuatorCommercialTenantsTab({ projectId, projectName }:
     },
   });
 
-  // Create lease mutation
-  const createMutation = useMutation({
-    mutationFn: async (data: NewLeaseFormData) => {
-      const sf = parseFloat(data.sf) || 0;
-      const rentValue = parseFloat(data.baseRentInputValue) || 0;
-      
-      const payload = {
-        lease: {
-          tenantName: data.tenantName,
-          suiteLabel: data.suiteLabel || null,
-          sf,
-          leaseType: data.leaseType,
-          leaseStartDate: data.leaseStartDate,
-          leaseEndDate: data.leaseEndDate,
-          securityDepositAmount: data.securityDepositAmount ? parseFloat(data.securityDepositAmount) : null,
-          securityDepositType: data.securityDepositType,
-          notes: data.notes || null,
-        },
-        initialTerm: {
-          termStartDate: data.leaseStartDate,
-          termEndDate: data.leaseEndDate,
-          baseRentInputUnit: data.baseRentInputUnit,
-          baseRentInputValue: rentValue,
-          escalationType: data.escalationType,
-          escalationValue: data.escalationType !== "NONE" ? parseFloat(data.escalationValue) : null,
-          escalationFrequencyMonths: data.escalationType !== "NONE" ? parseInt(data.escalationFrequencyMonths) : null,
-        },
-      };
-
-      return apiRequest(`/api/valuator/${projectId}/leases`, {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/valuator", projectId, "leases"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/valuator", projectId, "leases/kpis"] });
-      toast({ title: "Success", description: "Tenant lease added" });
-      setShowAddDialog(false);
-      setFormData(getInitialFormData());
-    },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to add lease", variant: "destructive" });
-    },
-  });
 
   // Duplicate lease mutation
   const duplicateMutation = useMutation({
@@ -310,37 +197,6 @@ export default function ValuatorCommercialTenantsTab({ projectId, projectName }:
     },
   });
 
-  const handleSubmit = () => {
-    if (!formData.tenantName || !formData.sf || !formData.leaseStartDate || !formData.leaseEndDate) {
-      toast({ title: "Error", description: "Please fill all required fields", variant: "destructive" });
-      return;
-    }
-    if (!formData.baseRentInputValue) {
-      toast({ title: "Error", description: "Please enter base rent", variant: "destructive" });
-      return;
-    }
-    createMutation.mutate(formData);
-  };
-
-  // Calculate derived rent values for display
-  const getDerivedRent = () => {
-    const sf = parseFloat(formData.sf) || 0;
-    const value = parseFloat(formData.baseRentInputValue) || 0;
-    if (!sf || !value) return { monthly: 0, yearly: 0, psfYear: 0 };
-
-    switch (formData.baseRentInputUnit) {
-      case "PSF_YEAR":
-        return { psfYear: value, yearly: value * sf, monthly: (value * sf) / 12 };
-      case "PER_MONTH":
-        return { monthly: value, yearly: value * 12, psfYear: sf > 0 ? (value * 12) / sf : 0 };
-      case "PER_YEAR":
-        return { yearly: value, monthly: value / 12, psfYear: sf > 0 ? value / sf : 0 };
-      default:
-        return { monthly: 0, yearly: 0, psfYear: 0 };
-    }
-  };
-
-  const derivedRent = getDerivedRent();
   const showBanner = !bannerDismissed && kpis && (kpis.expiringCount > 0 || kpis.expiredCount > 0);
 
   // KPI cards data
@@ -592,247 +448,13 @@ export default function ValuatorCommercialTenantsTab({ projectId, projectName }:
         </CardContent>
       </Card>
 
-      {/* Add Lease Dialog */}
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Add Tenant Lease</DialogTitle>
-            <DialogDescription>
-              Enter lease details for {projectName}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="grid gap-6 py-4">
-            {/* Tenant Info */}
-            <div className="space-y-4">
-              <h4 className="font-medium text-sm">Tenant Information</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="tenantName">Tenant Name *</Label>
-                  <Input
-                    id="tenantName"
-                    placeholder="e.g., Starbucks"
-                    value={formData.tenantName}
-                    onChange={(e) => setFormData({ ...formData, tenantName: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="suiteLabel">Suite / Unit</Label>
-                  <Input
-                    id="suiteLabel"
-                    placeholder="e.g., Suite 100"
-                    value={formData.suiteLabel}
-                    onChange={(e) => setFormData({ ...formData, suiteLabel: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="sf">Square Feet *</Label>
-                  <Input
-                    id="sf"
-                    type="number"
-                    placeholder="e.g., 2500"
-                    value={formData.sf}
-                    onChange={(e) => setFormData({ ...formData, sf: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="leaseType">Lease Type</Label>
-                  <Select 
-                    value={formData.leaseType} 
-                    onValueChange={(v: LeaseType) => setFormData({ ...formData, leaseType: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LEASE_TYPE_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-
-            {/* Lease Dates */}
-            <div className="space-y-4">
-              <h4 className="font-medium text-sm">Lease Dates</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="leaseStartDate">Start Date *</Label>
-                  <Input
-                    id="leaseStartDate"
-                    type="date"
-                    value={formData.leaseStartDate}
-                    onChange={(e) => setFormData({ ...formData, leaseStartDate: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="leaseEndDate">End Date *</Label>
-                  <Input
-                    id="leaseEndDate"
-                    type="date"
-                    value={formData.leaseEndDate}
-                    onChange={(e) => setFormData({ ...formData, leaseEndDate: e.target.value })}
-                  />
-                </div>
-              </div>
-              {formData.leaseStartDate && formData.leaseEndDate && (
-                <p className="text-sm text-muted-foreground">
-                  Term: {differenceInMonths(new Date(formData.leaseEndDate), new Date(formData.leaseStartDate))} months
-                </p>
-              )}
-            </div>
-
-            {/* Base Rent */}
-            <div className="space-y-4">
-              <h4 className="font-medium text-sm">Base Rent</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="baseRentInputUnit">Rent Unit</Label>
-                  <Select 
-                    value={formData.baseRentInputUnit} 
-                    onValueChange={(v: RentInputUnit) => setFormData({ ...formData, baseRentInputUnit: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {RENT_UNIT_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="baseRentInputValue">Rent Amount *</Label>
-                  <Input
-                    id="baseRentInputValue"
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={formData.baseRentInputValue}
-                    onChange={(e) => setFormData({ ...formData, baseRentInputValue: e.target.value })}
-                  />
-                </div>
-              </div>
-              {derivedRent.monthly > 0 && (
-                <div className="flex gap-4 text-sm text-muted-foreground bg-muted p-3 rounded-md">
-                  <span>Monthly: <strong className="text-foreground">{formatCurrency(derivedRent.monthly)}</strong></span>
-                  <span>Annual: <strong className="text-foreground">{formatCurrency(derivedRent.yearly)}</strong></span>
-                  <span>$/SF/Yr: <strong className="text-foreground">${derivedRent.psfYear.toFixed(2)}</strong></span>
-                </div>
-              )}
-            </div>
-
-            {/* Escalations */}
-            <div className="space-y-4">
-              <h4 className="font-medium text-sm">Escalations</h4>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="escalationType">Type</Label>
-                  <Select 
-                    value={formData.escalationType} 
-                    onValueChange={(v: EscalationType) => setFormData({ ...formData, escalationType: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ESCALATION_TYPE_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {formData.escalationType !== "NONE" && (
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor="escalationValue">
-                        {formData.escalationType === "PERCENT" || formData.escalationType === "CPI" ? "Percent" : "Amount"}
-                      </Label>
-                      <Input
-                        id="escalationValue"
-                        type="number"
-                        step="0.1"
-                        placeholder={formData.escalationType === "PERCENT" ? "3" : "500"}
-                        value={formData.escalationValue}
-                        onChange={(e) => setFormData({ ...formData, escalationValue: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="escalationFrequencyMonths">Frequency (months)</Label>
-                      <Input
-                        id="escalationFrequencyMonths"
-                        type="number"
-                        placeholder="12"
-                        value={formData.escalationFrequencyMonths}
-                        onChange={(e) => setFormData({ ...formData, escalationFrequencyMonths: e.target.value })}
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Security Deposit */}
-            <div className="space-y-4">
-              <h4 className="font-medium text-sm">Security Deposit</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="securityDepositAmount">Amount</Label>
-                  <Input
-                    id="securityDepositAmount"
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={formData.securityDepositAmount}
-                    onChange={(e) => setFormData({ ...formData, securityDepositAmount: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="securityDepositType">Type</Label>
-                  <Select 
-                    value={formData.securityDepositType} 
-                    onValueChange={(v: SecurityDepositType) => setFormData({ ...formData, securityDepositType: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="CASH">Cash</SelectItem>
-                      <SelectItem value="LOC">Letter of Credit</SelectItem>
-                      <SelectItem value="NONE">None</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-
-            {/* Notes */}
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                placeholder="Additional notes about this lease..."
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSubmit} disabled={createMutation.isPending}>
-              {createMutation.isPending ? "Adding..." : "Add Lease"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <UnifiedTenantFormDialog
+        open={showAddDialog}
+        onOpenChange={setShowAddDialog}
+        context="valuator"
+        projectId={projectId}
+        projectName={projectName}
+      />
     </div>
   );
 }
