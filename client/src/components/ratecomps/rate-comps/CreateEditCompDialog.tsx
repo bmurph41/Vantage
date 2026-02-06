@@ -1320,9 +1320,9 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                                 value={field.value || ""}
                                 onChange={field.onChange}
                                 onAddressSelect={(components) => {
-                                  if (components.city) form.setValue("city", components.city);
-                                  if (components.state) form.setValue("state", components.state);
-                                  if (components.zipCode) form.setValue("zip", components.zipCode);
+                                  if (components.city) form.setValue("city", components.city, { shouldDirty: true });
+                                  if (components.state) form.setValue("state", components.state, { shouldDirty: true });
+                                  if (components.zipCode) form.setValue("zip", components.zipCode, { shouldDirty: true });
                                 }}
                                 label="Address"
                                 placeholder="Enter full address..."

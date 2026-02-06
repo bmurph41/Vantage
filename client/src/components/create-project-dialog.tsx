@@ -186,13 +186,13 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
   }, [watchedPropertyId, properties, form]);
 
   const handleAddressSelect = (addr: NormalizedAddress) => {
-    form.setValue("address", addr.line1 || addr.formattedAddress || "");
-    form.setValue("city", addr.city || "");
-    form.setValue("state", addr.state || "");
-    form.setValue("zipCode", addr.postalCode || "");
-    form.setValue("placeId", addr.placeId || "");
-    if (addr.lat) form.setValue("lat", addr.lat);
-    if (addr.lng) form.setValue("lng", addr.lng);
+    form.setValue("address", addr.line1 || addr.formattedAddress || "", { shouldDirty: true });
+    form.setValue("city", addr.city || "", { shouldDirty: true });
+    form.setValue("state", addr.state || "", { shouldDirty: true });
+    form.setValue("zipCode", addr.postalCode || "", { shouldDirty: true });
+    form.setValue("placeId", addr.placeId || "", { shouldDirty: true });
+    if (addr.lat) form.setValue("lat", addr.lat, { shouldDirty: true });
+    if (addr.lng) form.setValue("lng", addr.lng, { shouldDirty: true });
     setAddressInputValue(addr.formattedAddress || "");
   };
 

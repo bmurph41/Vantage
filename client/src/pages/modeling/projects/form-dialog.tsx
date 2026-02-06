@@ -178,16 +178,16 @@ export default function ModelingProjectFormDialog({
 
   const handleAddressSelect = useCallback((components: AddressComponents) => {
     if (components.source === 'google' && components.street) {
-      form.setValue('address', components.street);
+      form.setValue('address', components.street, { shouldDirty: true });
     }
     if (components.city) {
-      form.setValue('city', components.city);
+      form.setValue('city', components.city, { shouldDirty: true });
     }
     if (components.state) {
-      form.setValue('state', components.state);
+      form.setValue('state', components.state, { shouldDirty: true });
     }
     if (components.zipCode) {
-      form.setValue('zipCode', components.zipCode);
+      form.setValue('zipCode', components.zipCode, { shouldDirty: true });
     }
   }, [form]);
 
