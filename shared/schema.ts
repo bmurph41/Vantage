@@ -21801,6 +21801,18 @@ export const escalationTypeEnum = pgEnum("escalation_type", ["fixed_dollar", "fi
 export const rentStructureEnum = pgEnum("rent_structure", ["base_only", "base_plus_percentage", "percentage_only"]);
 export const tenantStatusEnum = pgEnum("tenant_status", ["active", "pending", "expired", "terminated", "month_to_month"]);
 
+
+// New enums for institutional-grade commercial tenant fields
+export const tenantTypeEnum = pgEnum("tenant_type", ["national", "regional", "local", "mom_pop"]);
+export const assetClassTemplateEnum = pgEnum("asset_class_template", ["retail", "office", "industrial", "marina", "mixed_use", "other"]);
+export const abatementTimingEnum = pgEnum("abatement_timing", ["upfront", "spread", "custom"]);
+export const recoveryStructureEnum = pgEnum("recovery_structure", ["nnn", "base_year_stop", "expense_stop", "mod_gross"]);
+export const utilitiesResponsibilityEnum = pgEnum("utilities_responsibility", ["landlord", "tenant", "submetered"]);
+export const optionTypeEnum = pgEnum("option_type", ["renewal", "expansion", "termination", "rofr", "rofo", "other"]);
+export const rentResetMethodEnum = pgEnum("rent_reset_method", ["fixed_pct", "fixed_amt", "cpi", "fmv", "tbd"]);
+export const tiStructureTypeEnum = pgEnum("ti_structure_type", ["landlord", "tenant", "shared"]);
+export const commissionTypeEnum = pgEnum("commission_type", ["pct_total_rent", "pct_base_year", "flat"]);
+export const commissionTimingEnum = pgEnum("commission_timing", ["upfront", "spread", "custom"]);
 // Commercial Tenants - Main tenant/lease records
 export const commercialTenants = pgTable('commercial_tenants', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
@@ -21938,6 +21950,37 @@ export const commercialTenants = pgTable('commercial_tenants', {
   notes: text('notes'),
   customFields: jsonb('custom_fields').default(sql`'{}'`),
 
+
+  // --- Institutional-grade fields (migration-v2) ---
+  tenantType: tenantTypeEnum('tenant_type'),
+  industry: text('industry'),
+  tenantWebsite: text('tenant_website'),
+  spaceType: text('space_type'),
+  building: text('building'),
+  possessionDate: date('possession_date'),
+  assetClassTemplate: assetClassTemplateEnum('asset_class_template').default('other'),
+  advancedModeEnabled: boolean('advanced_mode_enabled').default(false),
+  billingFrequency: billingFrequencyEnum('billing_frequency').default('monthly'),
+  abatementTiming: abatementTimingEnum('abatement_timing').default('upfront'),
+  breakpointType: text('breakpoint_type').default('natural'),
+  trueUpMonth: integer('true_up_month'),
+  recoveryStructure: recoveryStructureEnum('recovery_structure').default('nnn'),
+  reconMonth: integer('recon_month'),
+  utilitiesResponsibility: utilitiesResponsibilityEnum('utilities_responsibility').default('tenant'),
+  tiStructure: tiStructureTypeEnum('ti_structure').default('landlord'),
+  commissionType: commissionTypeEnum('commission_type'),
+  commissionValue: decimal('commission_value', { precision: 10, scale: 2 }),
+  commissionTiming: commissionTimingEnum('commission_timing').default('upfront'),
+  amortizeTi: boolean('amortize_ti').default(false),
+  amortizationTermMonths: integer('amortization_term_months'),
+  amortizationRate: decimal('amortization_rate', { precision: 6, scale: 4 }),
+  internalRiskRating: integer('internal_risk_rating'),
+  underwritingNotes: text('underwriting_notes'),
+  assignmentClause: boolean('assignment_clause').default(false),
+  subleaseClause: boolean('sublease_clause').default(false),
+  additionalInsured: boolean('additional_insured').default(false),
+  glLimits: text('gl_limits'),
+  createdByRole: text('created_by_role'),
   // Audit
   createdBy: varchar('created_by').notNull().references(() => users.id),
   updatedBy: varchar('updated_by').references(() => users.id),
@@ -22037,6 +22080,26 @@ export const commercialTenantScenarios = pgTable('commercial_tenant_scenarios', 
   caseTypeIdx: index('tenant_scenarios_case_type_idx').on(table.caseType),
 }));
 
+// Commercial Tenant Options - Repeatable lease options (renewal, expansion, termination, ROFR, etc.)
+export const commercialTenantOptions = pgTable('commercial_tenant_options', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar('tenant_id').notNull().references(() => commercialTenants.id, { onDelete: 'cascade' }),
+  optionType: optionTypeEnum('option_type').notNull().default('renewal'),
+  noticeMonths: integer('notice_months'),
+  optionTermMonths: integer('option_term_months'),
+  rentResetMethod: rentResetMethodEnum('rent_reset_method').default('tbd'),
+  rentResetValue: decimal('rent_reset_value', { precision: 10, scale: 4 }),
+  effectiveDate: date('effective_date'),
+  conditions: text('conditions'),
+  assumeInUnderwriting: boolean('assume_in_underwriting').default(false),
+  sortOrder: integer('sort_order').default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index('tenant_options_tenant_idx').on(table.tenantId),
+}));
+
+
 // Import types and validation schemas
 export const insertCommercialTenantSchema = createInsertSchema(commercialTenants).omit({
   id: true,
@@ -22065,6 +22128,14 @@ export type CommercialTenantAmendment = typeof commercialTenantAmendments.$infer
 export type InsertCommercialTenantAmendment = z.infer<typeof insertCommercialTenantAmendmentSchema>;
 export type CommercialTenantScenario = typeof commercialTenantScenarios.$inferSelect;
 export type InsertCommercialTenantScenario = z.infer<typeof insertCommercialTenantScenarioSchema>;
+
+export const insertCommercialTenantOptionSchema = createInsertSchema(commercialTenantOptions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type CommercialTenantOption = typeof commercialTenantOptions.$inferSelect;
+export type InsertCommercialTenantOption = z.infer<typeof insertCommercialTenantOptionSchema>;
 
 // ============================================================================
 // User Tour Progress - Track page tour completion and preferences

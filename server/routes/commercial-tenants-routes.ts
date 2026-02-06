@@ -5,6 +5,7 @@ import {
   commercialTenantRentSchedule, 
   commercialTenantAmendments,
   commercialTenantScenarios,
+  commercialTenantOptions,
   insertCommercialTenantSchema,
   insertCommercialTenantRentScheduleSchema,
   insertCommercialTenantAmendmentSchema,
@@ -116,13 +117,17 @@ router.get("/:id", async (req: Request, res: Response) => {
     // Get scenarios
     const scenarios = await db.select()
       .from(commercialTenantScenarios)
-      .where(eq(commercialTenantScenarios.tenantId, id));
-
+    // Get lease options
+    const tenantOptions = await db.select()
+      .from(commercialTenantOptions)
+      .where(eq(commercialTenantOptions.tenantId, id))
+      .orderBy(commercialTenantOptions.sortOrder);
     res.json({
       ...tenant,
       rentSchedule,
       amendments,
       scenarios,
+      tenantOptions,
     });
   } catch (error: any) {
     console.error("[CommercialTenants] Error fetching tenant:", error);
@@ -135,8 +140,9 @@ router.post("/", async (req: Request, res: Response) => {
   try {
     const { orgId, userId } = req.user!;
     
+    const { leaseOptions, ...tenantData } = req.body;
     const validated = insertCommercialTenantSchema.parse({
-      ...req.body,
+      ...tenantData,
       orgId,
       createdBy: userId,
     });
@@ -150,6 +156,21 @@ router.post("/", async (req: Request, res: Response) => {
       await generateRentSchedule(tenant);
     }
 
+    // Save lease options if provided (Advanced mode)
+    if (leaseOptions && Array.isArray(leaseOptions) && leaseOptions.length > 0) {
+      const optionRows = leaseOptions.map((opt: any, idx: number) => ({
+        tenantId: tenant.id,
+        optionType: opt.optionType || "renewal",
+        noticeMonths: opt.noticeMonths || null,
+        optionTermMonths: opt.optionTermMonths || null,
+        rentResetMethod: opt.rentResetMethod || "tbd",
+        rentResetValue: opt.rentResetValue || null,
+        conditions: opt.conditions || null,
+        assumeInUnderwriting: opt.assumeInUnderwriting || false,
+        sortOrder: idx,
+      }));
+      await db.insert(commercialTenantOptions).values(optionRows);
+    }
     res.status(201).json(tenant);
   } catch (error: any) {
     console.error("[CommercialTenants] Error creating tenant:", error);
@@ -174,15 +195,35 @@ router.patch("/:id", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Tenant not found" });
     }
 
+    const { leaseOptions, ...tenantPayload } = req.body;
     const [updated] = await db.update(commercialTenants)
       .set({
-        ...req.body,
+        ...tenantPayload,
         updatedBy: userId,
         updatedAt: new Date(),
       })
       .where(eq(commercialTenants.id, id))
       .returning();
 
+    // Replace lease options if provided
+    if (leaseOptions !== undefined) {
+      await db.delete(commercialTenantOptions)
+        .where(eq(commercialTenantOptions.tenantId, id));
+      if (Array.isArray(leaseOptions) && leaseOptions.length > 0) {
+        const optionRows = leaseOptions.map((opt: any, idx: number) => ({
+          tenantId: id,
+          optionType: opt.optionType || "renewal",
+          noticeMonths: opt.noticeMonths || null,
+          optionTermMonths: opt.optionTermMonths || null,
+          rentResetMethod: opt.rentResetMethod || "tbd",
+          rentResetValue: opt.rentResetValue || null,
+          conditions: opt.conditions || null,
+          assumeInUnderwriting: opt.assumeInUnderwriting || false,
+          sortOrder: idx,
+        }));
+        await db.insert(commercialTenantOptions).values(optionRows);
+      }
+    }
     res.json(updated);
   } catch (error: any) {
     console.error("[CommercialTenants] Error updating tenant:", error);
