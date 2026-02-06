@@ -117,8 +117,21 @@ export default function CommercialTenants() {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [editingTenant, setEditingTenant] = useState<CommercialTenant | null>(null);
 
+  const tenantsQueryUrl = (() => {
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+    if (statusFilter) params.set("status", statusFilter);
+    const qs = params.toString();
+    return qs ? `/api/commercial-tenants?${qs}` : "/api/commercial-tenants";
+  })();
+
   const { data: tenants, isLoading, error } = useQuery<CommercialTenant[]>({
-    queryKey: ["/api/commercial-tenants", { search, status: statusFilter }],
+    queryKey: ["/api/commercial-tenants", search, statusFilter],
+    queryFn: async () => {
+      const res = await fetch(tenantsQueryUrl, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load tenants");
+      return res.json();
+    },
   });
 
   const { data: summary } = useQuery({
@@ -277,11 +290,11 @@ export default function CommercialTenants() {
               ))}
             </div>
           ) : error ? (
-            <div className="text-center py-8 text-red-500">Error loading tenants</div>
+            <div className="text-center py-8 text-red-500">Unable to load tenants. Please try again.</div>
           ) : !filteredTenants?.length ? (
             <div className="text-center py-12">
               <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium">No Commercial Tenants</h3>
+              <h3 className="text-lg font-medium">No tenants in portfolio</h3>
               <p className="text-muted-foreground mb-4">
                 Add tenants manually or import from a lease abstract document
               </p>
