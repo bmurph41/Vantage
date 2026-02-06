@@ -38,6 +38,7 @@ import scraperV2Routes from "./docktalk/scraper_v2/routes";
 import { liv2Routes } from "./listings/ingestion_v2";
 import marketplaceRoutes from "./routes/marketplace-routes";
 import pnlRouter from "./services/pnl/routes";
+import valuatorExportRoutes from "./routes/valuator-export-routes";
 import capitalMarketsRouter from "./services/capital-markets/routes";
 import rraRoutes from "./routes/rra-routes";
 import modelingRentRollRoutes from "./routes/modeling-rent-roll-routes";
@@ -444,6 +445,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/docktalk/v2", authenticateUser, enforceTenant, scraperV2Routes);
   app.use("/api/pnl", authenticateUser, enforceTenant, pnlRouter);
   app.use("/api/rent-roll", authenticateUser, enforceTenant, requireRentRoll(), rraRoutes);
+  app.use("/api/valuator-export", authenticateUser, valuatorExportRoutes);
   app.use("/api/modeling-rent-roll", authenticateUser, enforceTenant, modelingRentRollRoutes);
   app.use("/api/marina-integrations", authenticateUser, enforceTenant, marinaIntegrationsRoutes);
   app.use("/api/executive-dashboard", authenticateUser, enforceTenant, requireRentRoll(), executiveDashboardRoutes);

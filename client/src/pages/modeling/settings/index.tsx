@@ -39,7 +39,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, GripVertical, Loader2, Settings, BookText, ChevronRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, GripVertical, Loader2, Settings, BookText, ChevronRight, Download } from 'lucide-react';
 import { Link } from 'wouter';
 import { DndContext, closestCenter, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -382,6 +382,37 @@ export default function ModelingSettings() {
               </SortableContext>
             </DndContext>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Export Valuator & Operations Code</CardTitle>
+          <CardDescription>
+            Download a ZIP archive containing all Valuator workspace files, Operations modules,
+            Pro Forma engine, Document Intelligence pipeline, and a comprehensive guide on
+            how everything connects.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-4">
+            <Button
+              onClick={() => {
+                const link = document.createElement('a');
+                link.href = '/api/valuator-export/download';
+                link.download = 'valuator-operations-export.zip';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Download ZIP Archive
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Includes 200+ files with GUIDE.md documentation
+            </span>
+          </div>
         </CardContent>
       </Card>
 
