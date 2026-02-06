@@ -125,6 +125,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
   const queryClient = useQueryClient();
   const isEdit = !!comp;
 
+  const [addressDebug, setAddressDebug] = useState<string>('');
   const [articleUrls, setArticleUrls] = useState<string[]>(comp?.articleUrls || [""]);
   const [showNewPortfolioDialog, setShowNewPortfolioDialog] = useState(false);
   const [newPortfolioName, setNewPortfolioName] = useState("");
@@ -1019,44 +1020,44 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                               <AddressInput
                                 value={field.value || ""}
                                 onChange={(value, components) => {
-                                  console.error('[SalesComp:onChange]', JSON.stringify({
-                                    value, hasComponents: !!components,
-                                    street: components?.street, city: components?.city,
-                                    state: components?.state, zip: components?.zipCode,
-                                  }));
                                   if (components && (components.street || components.city || components.state || components.zipCode)) {
-                                    const current = form.getValues();
-                                    const updates: Record<string, string> = {};
-                                    if (components.street) updates.address = components.street;
-                                    if (components.city) updates.city = components.city;
-                                    if (components.state) updates.state = components.state;
-                                    if (components.zipCode) updates.zip = components.zipCode;
-                                    console.error('[SalesComp:onChange] resetting with updates:', JSON.stringify(updates));
-                                    form.reset({ ...current, ...updates }, { keepDefaultValues: true });
-                                    console.error('[SalesComp:onChange] after reset, values:', JSON.stringify({
-                                      address: form.getValues('address'),
-                                      city: form.getValues('city'),
-                                      state: form.getValues('state'),
-                                      zip: form.getValues('zip'),
-                                    }));
+                                    setAddressDebug(`onChange: street=${components.street||''} city=${components.city||''} state=${components.state||''} zip=${components.zipCode||''}`);
+                                    if (components.street) field.onChange(components.street);
+                                    if (components.city) form.setValue("city", components.city);
+                                    if (components.state) form.setValue("state", components.state);
+                                    if (components.zipCode) form.setValue("zip", components.zipCode);
+                                    setTimeout(() => {
+                                      if (components.state) {
+                                        const stateInput = document.querySelector('[data-testid="input-state"]') as HTMLInputElement;
+                                        if (stateInput) {
+                                          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+                                          nativeInputValueSetter?.call(stateInput, components.state);
+                                          stateInput.dispatchEvent(new Event('input', { bubbles: true }));
+                                        }
+                                      }
+                                      if (components.zipCode) {
+                                        const zipInput = document.querySelector('[data-testid="input-zip"]') as HTMLInputElement;
+                                        if (zipInput) {
+                                          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+                                          nativeInputValueSetter?.call(zipInput, components.zipCode);
+                                          zipInput.dispatchEvent(new Event('input', { bubbles: true }));
+                                        }
+                                      }
+                                      setAddressDebug(prev => prev + ` | DOM set done. formState=${form.getValues('state')} formZip=${form.getValues('zip')}`);
+                                    }, 100);
                                   } else {
                                     field.onChange(value);
                                   }
                                 }}
                                 onAddressSelect={(components) => {
-                                  console.error('[SalesComp:onAddressSelect]', JSON.stringify({
-                                    street: components?.street, city: components?.city,
-                                    state: components?.state, zip: components?.zipCode,
-                                  }));
-                                  const current = form.getValues();
-                                  const updates: Record<string, string> = {};
+                                  setAddressDebug(prev => prev + ` | onSelect: state=${components?.state||'?'} zip=${components?.zipCode||'?'}`);
                                   if (components.street || components.streetAddress) {
-                                    updates.address = components.street || components.streetAddress || '';
+                                    form.setValue("address", components.street || components.streetAddress || '');
                                   }
-                                  if (components.city) updates.city = components.city;
-                                  if (components.state) updates.state = components.state;
-                                  if (components.zipCode) updates.zip = components.zipCode;
-                                  form.reset({ ...current, ...updates }, { keepDefaultValues: true });
+                                  if (components.city) form.setValue("city", components.city);
+                                  if (components.state) form.setValue("state", components.state);
+                                  if (components.zipCode) form.setValue("zip", components.zipCode);
+                                  form.trigger(["state", "zip", "city", "address"]);
                                 }}
                                 label="Address"
                                 placeholder="Enter full address..."
@@ -1068,6 +1069,12 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                           </FormItem>
                         )}
                       />
+
+                      {addressDebug && (
+                        <div className="text-xs p-2 bg-yellow-100 dark:bg-yellow-900 rounded border border-yellow-300 dark:border-yellow-700 break-all">
+                          DEBUG: {addressDebug}
+                        </div>
+                      )}
                       
                       <div className="grid grid-cols-3 gap-3">
                         <FormField
