@@ -148,7 +148,7 @@ export default function OmBuilderEditorPage() {
       <div className="h-screen flex flex-col items-center justify-center gap-4">
         <div className="text-destructive">Failed to load document</div>
         <Button onClick={() => navigate('/modeling/om-builder')}>
-          Back to OM Builder
+          Back to Investment Materials
         </Button>
       </div>
     );

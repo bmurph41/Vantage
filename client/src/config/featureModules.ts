@@ -197,7 +197,7 @@ export const MODULE_INFO: Record<FeatureModule, ModuleInfo> = {
   },
   [FEATURE_MODULES.UNDERWRITING_OM]: {
     key: FEATURE_MODULES.UNDERWRITING_OM,
-    name: 'OM Builder',
+    name: 'Investment Materials',
     description: 'Offering memorandum generation',
     category: 'Underwriting',
     price: 40,
@@ -418,7 +418,7 @@ export const SUBSCRIPTION_PACKAGES: SubscriptionPackage[] = [
       'Tasks & Follow-Up Management',
       'Prospecting & Marketing Tools',
       'Due Diligence Tracking',
-      'OM Builder',
+      'Investment Materials',
       'Debt & Exit Modeling',
       'Demographics & Capital Markets',
     ],

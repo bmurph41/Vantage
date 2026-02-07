@@ -233,7 +233,7 @@ export default function OMBuilder({ dealId }: OMBuilderProps) {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <FileText className="h-6 w-6" />
-            OM Builder
+            Investment Materials
           </h1>
           <p className="text-muted-foreground">
             {omData?.dealName || 'Create professional offering memorandums'}

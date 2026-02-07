@@ -275,7 +275,7 @@ export const sidebarConfig: SidebarGroup[] = [
       },
       {
         id: 'om-builder',
-        label: 'OM Builder',
+        label: 'Investment Materials',
         href: '/underwriting/om-builder',
         icon: FileText,
         matchRoutes: ['/underwriting/om-builder', '/om-builder'],

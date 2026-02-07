@@ -702,7 +702,7 @@ export default function UnifiedSidebar() {
                 </div>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
-                <p>OM Builder</p>
+                <p>Investment Materials</p>
               </TooltipContent>
             </Tooltip>
           ) : (
@@ -718,7 +718,7 @@ export default function UnifiedSidebar() {
               >
                 <div className="flex items-center gap-2">
                   <FileText className="w-3.5 h-3.5" />
-                  <span>OM Builder</span>
+                  <span>Investment Materials</span>
                 </div>
                 <ChevronRight className="w-3 h-3" />
               </div>
