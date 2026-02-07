@@ -233,7 +233,7 @@ export default function UnifiedSidebar() {
     // Determine which section the current page belongs to
     const isOperationsPage = location.startsWith('/operations/');
     // CRM: contacts, companies, properties, marketing (core entity management)
-    const isCrmPage = ['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location) || location.startsWith('/marketing');
+    const isCrmPage = ['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location) || location.startsWith('/marketing') || location === '/prospecting' || location.startsWith('/prospecting/');
     const isPendingPage = location.includes('/pending-');
     // Pipeline section: Deal Board, Activity Log, Follow-Ups, Forecast
     const isPipelinePage = ['/deal-workspace', '/crm/activity', '/crm/tasks', '/crm/forecast'].includes(location) || location.startsWith('/deal-workspace');
@@ -587,7 +587,7 @@ export default function UnifiedSidebar() {
               icon={Users}
               expanded={crmExpanded} 
               onToggle={() => setCrmExpanded(!crmExpanded)}
-              isActive={['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location) || location.startsWith('/marketing')}
+              isActive={['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location) || location.startsWith('/marketing') || location === '/prospecting' || location.startsWith('/prospecting/')}
             />
             {crmExpanded && (
               <>
@@ -621,6 +621,30 @@ export default function UnifiedSidebar() {
                     ))}
                   </div>
                 )}
+                {/* Prospecting - nested under CRM */}
+                <div className="ml-4 mt-1 mb-2">
+                  <button
+                    onClick={() => setProspectingExpanded(!prospectingExpanded)}
+                    className={cn(
+                      "flex items-center justify-between w-full px-4 py-1.5 text-xs font-medium transition-colors rounded-lg",
+                      location === '/prospecting' || location.startsWith('/prospecting/')
+                        ? "bg-primary/10 text-primary hover:bg-primary/20"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    )}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Target className="w-3.5 h-3.5" />
+                      <span>Prospecting</span>
+                    </div>
+                    {prospectingExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                  </button>
+                  {prospectingExpanded && (
+                    <>
+                      <NavLink item={{ name: "Overview", href: "/prospecting" }} />
+                      <NavLink item={{ name: "Workroom", href: "/prospecting/workroom" }} />
+                    </>
+                  )}
+                </div>
               </>
             )}
           </div>
@@ -748,24 +772,6 @@ export default function UnifiedSidebar() {
           </div>
         )}
         
-        {/* Prospecting Section - Overview and Workroom */}
-        {canViewSection('crm') && (
-          <div className="mb-2">
-            <SectionHeader 
-              title="Prospecting" 
-              icon={Target}
-              expanded={prospectingExpanded} 
-              onToggle={() => setProspectingExpanded(!prospectingExpanded)}
-              isActive={location === '/prospecting' || location.startsWith('/prospecting/')}
-            />
-            {prospectingExpanded && (
-              <>
-                <NavLink item={{ name: "Overview", href: "/prospecting" }} />
-                <NavLink item={{ name: "Workroom", href: "/prospecting/workroom" }} />
-              </>
-            )}
-          </div>
-        )}
         
         {/* MarinaMatch - Section Title Style Link */}
         <div className="mb-2">
