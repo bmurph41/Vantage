@@ -2289,7 +2289,7 @@ router.post('/export-pdf', async (req: Request, res: Response) => {
         { label: 'Overdue Tasks', value: String(analyticsData.dueDiligence?.overdueTasks || 0) },
         { label: 'Total Contacts', value: String(analyticsData.crm?.totalContacts || 0) },
         { label: 'Total Companies', value: String(analyticsData.crm?.totalCompanies || 0) },
-        { label: 'DD Projects', value: String(analyticsData.dueDiligence?.totalProjects || 0) },
+        { label: 'Due Diligence', value: String(analyticsData.dueDiligence?.totalProjects || 0) },
         { label: 'Modeling Projects', value: String(analyticsData.modeling?.totalProjects || 0) },
         { label: 'Occupancy Rate', value: formatPercent(analyticsData.operations?.occupancyRate || 0) },
         { label: 'Monthly Revenue', value: formatCurrency(analyticsData.operations?.totalMonthlyRevenue || 0) },
@@ -2341,7 +2341,7 @@ router.post('/export-pdf', async (req: Request, res: Response) => {
       }
       
       if (analyticsData.dueDiligence?.projectsByStatus) {
-        page.drawText('DD Projects by Status', {
+        page.drawText('Due Diligence by Status', {
           x: 50,
           y: yOffset,
           size: 14,
@@ -2580,7 +2580,7 @@ router.post('/report-schedules/:id/preview', async (req: Request, res: Response)
                 <div class="kpi-value">${Object.values(dealsByStage).reduce((a, b) => a + b, 0)}</div>
               </div>
               <div class="kpi">
-                <div class="kpi-label">DD Projects</div>
+                <div class="kpi-label">Due Diligence</div>
                 <div class="kpi-value">${Object.values(projectsByStatus).reduce((a, b) => a + b, 0)}</div>
               </div>
             </div>
@@ -2595,7 +2595,7 @@ router.post('/report-schedules/:id/preview', async (req: Request, res: Response)
           </div>
           
           <div class="section">
-            <h2>DD Projects by Status</h2>
+            <h2>Due Diligence by Status</h2>
             <table>
               <tr><th>Status</th><th>Count</th></tr>
               ${Object.entries(projectsByStatus).map(([status, cnt]) => `<tr><td>${status}</td><td>${cnt}</td></tr>`).join('')}

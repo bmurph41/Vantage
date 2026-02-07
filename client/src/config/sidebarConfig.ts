@@ -185,7 +185,7 @@ export const sidebarConfig: SidebarGroup[] = [
       },
       {
         id: 'dd-projects',
-        label: 'DD Projects',
+        label: 'Due Diligence',
         href: '/deal-workspace/dd-projects',
         icon: FileCheck,
         matchRoutes: ['/deal-workspace/dd-projects', '/dd-projects'],

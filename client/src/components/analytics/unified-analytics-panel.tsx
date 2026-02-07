@@ -130,7 +130,7 @@ export function UnifiedAnalyticsPanel() {
         />
         <MetricCard
           icon={<FolderKanban className="h-5 w-5 text-purple-500" />}
-          label="DD Projects"
+          label="Due Diligence"
           value={analytics.dueDiligence.totalProjects}
           breakdown={`${analytics.dueDiligence.activeProjects} active, ${analytics.dueDiligence.completedProjects} completed`}
           testId="metric-dd-projects"
@@ -148,7 +148,7 @@ export function UnifiedAnalyticsPanel() {
           <CardContent className="space-y-4">
             <div>
               <div className="flex justify-between text-sm mb-1">
-                <span className="text-muted-foreground">Deals with DD Projects</span>
+                <span className="text-muted-foreground">Deals with Due Diligence</span>
                 <span className="font-medium">{analytics.crossModule.dealsWithDDProjects}</span>
               </div>
               <Progress value={dealIntegrationRate} className="h-2" />
@@ -255,7 +255,7 @@ export function UnifiedAnalyticsPanel() {
                     dataKey="projects" 
                     stroke="#8b5cf6" 
                     strokeWidth={2}
-                    name="DD Projects"
+                    name="Due Diligence"
                   />
                   <Line 
                     type="monotone" 

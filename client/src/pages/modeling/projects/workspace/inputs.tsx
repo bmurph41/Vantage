@@ -278,14 +278,6 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
     );
   };
 
-  const toggleWinterMonth = (month: number) => {
-    setWinterMonths(prev => 
-      prev.includes(month) 
-        ? prev.filter(m => m !== month)
-        : [...prev, month].sort((a, b) => a - b)
-    );
-  };
-
   // NEW: Toggle season for storage type (multi-select)
   const toggleItemSeason = (itemId: string, section: 'storage' | 'designated', season: SeasonalityOption) => {
     const updateFn = (prev: StorageTypeConfig[]) => prev.map(item => {
@@ -399,13 +391,6 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
     const startMonth = months.find(m => m.value === Math.min(...seasonMonths));
     const endMonth = months.find(m => m.value === Math.max(...seasonMonths));
     return `${startMonth?.short} - ${endMonth?.short} (${seasonMonths.length} months)`;
-  };
-
-  const getWinterSeasonLabel = () => {
-    if (winterMonths.length === 0) return 'No winter season';
-    const startMonth = months.find(m => m.value === winterMonths[0]);
-    const endMonth = months.find(m => m.value === winterMonths[winterMonths.length - 1]);
-    return `${startMonth?.short} - ${endMonth?.short} (${winterMonths.length} months)`;
   };
 
   // NEW: Render seasonality selector
@@ -647,55 +632,6 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
           </CardContent>
         </Card>
 
-        {/* Winter Season Configuration - placed under In-Season Months */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Snowflake className="h-5 w-5" />
-              Winter Season Months
-            </CardTitle>
-            <CardDescription>
-              Select months for winter storage contracts (e.g., winter wet slips)
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Badge variant="outline" className="gap-1">
-                <Snowflake className="h-3 w-3" />
-                {getWinterSeasonLabel()}
-              </Badge>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setWinterMonths([11, 12, 1, 2, 3])}
-              >
-                <Snowflake className="h-3 w-3 mr-1" />
-                Typical (Nov-Mar)
-              </Button>
-            </div>
-            <div className="grid grid-cols-4 gap-2">
-              {months.map((month) => (
-                <Button
-                  key={month.value}
-                  variant={winterMonths.includes(month.value) ? 'secondary' : 'outline'}
-                  size="sm"
-                  onClick={() => toggleWinterMonth(month.value)}
-                  className={`w-full ${winterMonths.includes(month.value) ? 'bg-cyan-100 hover:bg-cyan-200 dark:bg-cyan-900' : ''}`}
-                >
-                  {winterMonths.includes(month.value) ? (
-                    <Snowflake className="h-3 w-3 mr-1 text-cyan-700 dark:text-cyan-300" />
-                  ) : (
-                    <Sun className="h-3 w-3 mr-1" />
-                  )}
-                  {month.short}
-                </Button>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Storage types marked as "Winter" will only show revenue during these months
-            </p>
-          </CardContent>
-        </Card>
       </div>
 
       <Card>

@@ -82,7 +82,7 @@ export const dueDiligenceTourSteps: TourStep[] = [
   {
     target: '[data-tour="dd-projects"]',
     content: "Your active due diligence projects. Each project tracks all the items needed to close a deal.",
-    title: "DD Projects",
+    title: "Due Diligence",
     placement: "bottom",
     disableBeacon: true,
   },

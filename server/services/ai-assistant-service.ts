@@ -559,7 +559,7 @@ async function getTenantContext(orgId: string, context: AssistantContext): Promi
 
     if (ddProjects.length > 0) {
       const inProgress = ddProjects.filter(p => p.status === 'in-progress');
-      tenantData += `\n\n**Your DD Projects**: ${ddProjects.length} total, ${inProgress.length} in progress`;
+      tenantData += `\n\n**Your Due Diligence**: ${ddProjects.length} total, ${inProgress.length} in progress`;
     }
 
     if (properties.length > 0) {

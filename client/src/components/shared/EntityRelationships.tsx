@@ -74,7 +74,7 @@ const ENTITY_CONFIG: Record<EntityType, {
   dd_project: {
     icon: ClipboardList,
     label: 'DD Project',
-    pluralLabel: 'DD Projects',
+    pluralLabel: 'Due Diligence',
     route: (id) => `/dd/projects/${id}`,
     color: 'text-red-600 bg-red-100 dark:bg-red-900',
   },

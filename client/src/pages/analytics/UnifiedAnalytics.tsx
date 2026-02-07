@@ -336,7 +336,7 @@ export default function UnifiedAnalytics() {
 
   const handlePieClick = (data: any) => {
     if (data?.name) {
-      setDrilldown({ type: 'dd-projects', filter: data.name, label: `DD Projects with "${data.name}" Status` });
+      setDrilldown({ type: 'dd-projects', filter: data.name, label: `Due Diligence with "${data.name}" Status` });
     }
   };
 
@@ -398,7 +398,7 @@ export default function UnifiedAnalytics() {
         { label: 'Overdue Tasks', value: String(data?.dueDiligence.overdueTasks || 0) },
         { label: 'Total Contacts', value: String(data?.crm.totalContacts || 0) },
         { label: 'Total Companies', value: String(data?.crm.totalCompanies || 0) },
-        { label: 'DD Projects', value: String(data?.dueDiligence.totalProjects || 0) },
+        { label: 'Due Diligence', value: String(data?.dueDiligence.totalProjects || 0) },
         { label: 'Modeling Projects', value: String(data?.modeling.totalProjects || 0) },
         { label: 'Occupancy Rate', value: formatPercent(data?.operations.occupancyRate || 0) },
         { label: 'Monthly Revenue', value: formatCurrency(data?.operations.totalMonthlyRevenue || 0) },
@@ -447,7 +447,7 @@ export default function UnifiedAnalytics() {
       });
       yOffset -= dealStageData.length * 18 + 25;
       
-      page.drawText('DD Projects by Status', {
+      page.drawText('Due Diligence by Status', {
         x: 50,
         y: yOffset,
         size: 14,
@@ -818,7 +818,7 @@ export default function UnifiedAnalytics() {
                   icon={Building2}
                 />
                 <KpiCard
-                  title="DD Projects"
+                  title="Due Diligence"
                   value={data?.dueDiligence.totalProjects || 0}
                   subtitle={`${data?.dueDiligence.activeProjects || 0} active`}
                   icon={FileCheck}
@@ -858,7 +858,7 @@ export default function UnifiedAnalytics() {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>DD Projects by Status</CardTitle>
+                    <CardTitle>Due Diligence by Status</CardTitle>
                     <CardDescription>Click a segment to drill down into projects</CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -902,7 +902,7 @@ export default function UnifiedAnalytics() {
                   <div className="grid gap-4 md:grid-cols-4">
                     <div className="text-center p-4 bg-muted rounded-lg">
                       <div className="text-2xl font-bold">{data?.crossModule.dealsWithDDProjects || 0}</div>
-                      <div className="text-sm text-muted-foreground">Deals with DD Projects</div>
+                      <div className="text-sm text-muted-foreground">Deals with Due Diligence</div>
                     </div>
                     <div className="text-center p-4 bg-muted rounded-lg">
                       <div className="text-2xl font-bold">{data?.crossModule.dealsWithModelingProjects || 0}</div>
@@ -1048,7 +1048,7 @@ export default function UnifiedAnalytics() {
                           <button 
                             key={item.name} 
                             className="w-full flex items-center justify-between p-2 rounded-md hover:bg-muted transition-colors"
-                            onClick={() => setDrilldown({ type: 'dd-projects', filter: item.name, label: `DD Projects with "${item.name}" Status` })}
+                            onClick={() => setDrilldown({ type: 'dd-projects', filter: item.name, label: `Due Diligence with "${item.name}" Status` })}
                           >
                             <div className="flex items-center gap-2">
                               <div 
@@ -1415,7 +1415,7 @@ export default function UnifiedAnalytics() {
                     </Card>
                     <Card>
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-sm">DD Projects by Status</CardTitle>
+                        <CardTitle className="text-sm">Due Diligence by Status</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-2">

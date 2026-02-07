@@ -162,7 +162,7 @@ export default function DealCrossModuleSummary({ deal }: DealCrossModuleSummaryP
           />
           <StatCard
             icon={FileText}
-            label="DD Projects"
+            label="Due Diligence"
             value={conversions.length}
             color="bg-orange-500"
             isLoading={convLoading}

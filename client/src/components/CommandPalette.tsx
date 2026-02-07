@@ -90,7 +90,7 @@ const navigationItems = [
   { name: 'Campaigns', href: '/prospecting/campaigns', icon: Send, category: 'Prospecting' },
   { name: 'Modeling Projects', href: '/modeling', icon: Calculator, category: 'Modeling' },
   { name: 'Sales Comps', href: '/sales-comps', icon: BarChart3, category: 'Analytics' },
-  { name: 'DD Projects', href: '/projects', icon: ClipboardList, category: 'Due Diligence' },
+  { name: 'Due Diligence', href: '/projects', icon: ClipboardList, category: 'Due Diligence' },
   { name: 'Fuel Sales', href: '/operations/fuel/dashboard', icon: Fuel, category: 'Operations' },
   { name: 'Ship Store', href: '/operations/ship-store/dashboard', icon: Package, category: 'Operations' },
   { name: 'VDR', href: '/vdr', icon: FolderLock, category: 'Documents' },

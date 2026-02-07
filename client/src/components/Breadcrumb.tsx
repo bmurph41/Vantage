@@ -764,7 +764,7 @@ function getBreadcrumbsForPath(path: string): BreadcrumbItem[] {
     
     items = [
       CATEGORIES.DUE_DILIGENCE,
-      { label: 'DD Projects', href: '/dd/projects' },
+      { label: 'Due Diligence', href: '/dd/projects' },
       { label: projectId, isDynamic: true, dynamicType: 'dd-project', dynamicId: projectId },
     ];
     

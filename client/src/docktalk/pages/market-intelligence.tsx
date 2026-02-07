@@ -202,7 +202,7 @@ function ProInsightsSection() {
         </Card>
         <Card className="p-3 text-center">
           <p className="text-2xl font-bold text-blue-600">{report.marketOverview.activeDdProjects}</p>
-          <p className="text-xs text-muted-foreground">DD Projects</p>
+          <p className="text-xs text-muted-foreground">Due Diligence</p>
         </Card>
         <Card className="p-3 text-center">
           <p className="text-2xl font-bold text-purple-600">{report.marketOverview.modelingProjectsCount}</p>
