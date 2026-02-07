@@ -66,7 +66,7 @@ const PAY_TYPES = [
 export default function Plans() {
   const { user } = useAuth();
   const { data: plans, isLoading } = usePayrollPlans({});
-  const { data: departments } = useDepartments();
+  const { data: departments } = useDepartments(user?.orgId);
   const { data: positions } = usePositions(user?.orgId);
   const createPlan = useCreatePlan();
   const deletePlan = useDeletePlan();

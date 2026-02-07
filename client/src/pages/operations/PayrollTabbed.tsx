@@ -1,11 +1,12 @@
 import { lazy } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { DollarSign, LayoutDashboard, Users, ClipboardList, Shield, Calculator, GitBranch } from "lucide-react";
+import { DollarSign, LayoutDashboard, Users, UserPlus, ClipboardList, Shield, Calculator, GitBranch } from "lucide-react";
 import { TabbedModuleLayout, TabDefinition } from "@/components/layout/TabbedModuleLayout";
 
 const PayrollDashboard = lazy(() => import("./payroll/Dashboard"));
 const PayrollPlans = lazy(() => import("./payroll/Plans"));
 const PositionLibrary = lazy(() => import("./payroll/PositionLibrary"));
+const PayrollEmployees = lazy(() => import("./payroll/Employees"));
 const BurdenProfiles = lazy(() => import("./payroll/BurdenProfiles"));
 const DeptPnl = lazy(() => import("./payroll/DeptPnl"));
 const PayrollPermissions = lazy(() => import("./payroll/Permissions"));
@@ -53,6 +54,13 @@ export default function PayrollTabbed() {
       icon: Users,
       component: PositionLibrary,
       description: "Standard position templates",
+    },
+    {
+      id: "employees",
+      label: "Employees",
+      icon: UserPlus,
+      component: PayrollEmployees,
+      description: "Manage employees and asset assignments",
     },
     {
       id: "burden",

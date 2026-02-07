@@ -211,6 +211,17 @@ export function usePositions(orgId: string | undefined, templateOnly?: boolean) 
   });
 }
 
+// ─── POSITIONS MUTATIONS ────────────────────────────────────────────────────
+
+export function useCreatePosition() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) =>
+      apiFetch("/payroll/positions", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["payroll-positions"] }),
+  });
+}
+
 // ─── EMPLOYEES ──────────────────────────────────────────────────────────────
 
 export function useEmployees(orgId: string | undefined) {
@@ -218,6 +229,15 @@ export function useEmployees(orgId: string | undefined) {
     queryKey: ["payroll-employees", orgId],
     queryFn: () => apiFetch(`/payroll/employees?orgId=${orgId}`),
     enabled: !!orgId,
+  });
+}
+
+export function useCreateEmployee() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) =>
+      apiFetch("/payroll/employees", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["payroll-employees"] }),
   });
 }
 
