@@ -378,7 +378,18 @@ export default function UnifiedSidebar() {
       return (
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className="relative">{linkContent}</div>
+            <div 
+              className={cn(
+                "flex items-center justify-center py-2.5 px-2 cursor-pointer hover:bg-sidebar-accent transition-colors relative",
+                isActive && "bg-sidebar-accent"
+              )}
+              onClick={() => setSidebarCollapsed(false)}
+            >
+              {item.icon && <item.icon className={cn("w-4 h-4", isActive ? "text-sidebar-primary" : "text-sidebar-foreground/50")} />}
+              {item.badge && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full" />
+              )}
+            </div>
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={10}>
             <p>{item.name}{item.badge ? ` (${item.badge})` : ''}</p>
@@ -406,16 +417,15 @@ export default function UnifiedSidebar() {
     const IconComponent = icon;
     
     if (sidebarCollapsed) {
-      // When collapsed, show just a divider line
       return (
         <Tooltip>
           <TooltipTrigger asChild>
             <div 
               className={cn(
-                "flex items-center justify-center py-2 mx-2 border-t border-sidebar-border mt-2 cursor-pointer hover:bg-sidebar-accent",
+                "flex items-center justify-center py-2.5 px-2 cursor-pointer hover:bg-sidebar-accent transition-colors",
                 isActive && "bg-sidebar-accent"
               )}
-              onClick={onToggle}
+              onClick={() => setSidebarCollapsed(false)}
             >
               {IconComponent && <IconComponent className={cn("w-4 h-4", isActive ? "text-sidebar-primary" : "text-sidebar-foreground/50")} />}
             </div>
@@ -722,24 +732,22 @@ export default function UnifiedSidebar() {
         
         {/* MarinaMatch - Section Title Style Link */}
         <div className="mb-2">
-          <Link href="/marinamatch">
-            {sidebarCollapsed ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div 
-                    className={cn(
-                      "flex items-center justify-center py-2 mx-2 border-t border-sidebar-border mt-2 cursor-pointer hover:bg-sidebar-accent",
-                      location.startsWith('/marinamatch') && "bg-sidebar-accent"
-                    )}
-                  >
-                    <Target className={cn("w-4 h-4", location.startsWith('/marinamatch') ? "text-sidebar-primary" : "text-sidebar-foreground/50")} />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="right" sideOffset={10}>
-                  <p>MarinaMatch</p>
-                </TooltipContent>
-              </Tooltip>
-            ) : (
+          {sidebarCollapsed ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div 
+                  className="flex items-center justify-center py-2.5 px-2 cursor-pointer hover:bg-sidebar-accent transition-colors"
+                  onClick={() => setSidebarCollapsed(false)}
+                >
+                  <Target className={cn("w-4 h-4", location.startsWith('/marinamatch') ? "text-sidebar-primary" : "text-sidebar-foreground/50")} />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={10}>
+                <p>MarinaMatch</p>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <Link href="/marinamatch">
               <div
                 className={cn(
                   "flex items-center justify-between w-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-colors cursor-pointer",
@@ -755,30 +763,28 @@ export default function UnifiedSidebar() {
                 </div>
                 <ChevronRight className="w-3 h-3" />
               </div>
-            )}
-          </Link>
+            </Link>
+          )}
         </div>
         
         {/* DockTalk - Section Title Style Link */}
         <div className="mb-2">
-          <Link href="/docktalk">
-            {sidebarCollapsed ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div 
-                    className={cn(
-                      "flex items-center justify-center py-2 mx-2 border-t border-sidebar-border mt-2 cursor-pointer hover:bg-sidebar-accent",
-                      location.startsWith('/docktalk') && "bg-sidebar-accent"
-                    )}
-                  >
-                    <MessageSquare className={cn("w-4 h-4", location.startsWith('/docktalk') ? "text-sidebar-primary" : "text-sidebar-foreground/50")} />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="right" sideOffset={10}>
-                  <p>DockTalk</p>
-                </TooltipContent>
-              </Tooltip>
-            ) : (
+          {sidebarCollapsed ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div 
+                  className="flex items-center justify-center py-2.5 px-2 cursor-pointer hover:bg-sidebar-accent transition-colors"
+                  onClick={() => setSidebarCollapsed(false)}
+                >
+                  <MessageSquare className={cn("w-4 h-4", location.startsWith('/docktalk') ? "text-sidebar-primary" : "text-sidebar-foreground/50")} />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={10}>
+                <p>DockTalk</p>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <Link href="/docktalk">
               <div
                 className={cn(
                   "flex items-center justify-between w-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-colors cursor-pointer",
@@ -794,8 +800,8 @@ export default function UnifiedSidebar() {
                 </div>
                 <ChevronRight className="w-3 h-3" />
               </div>
-            )}
-          </Link>
+            </Link>
+          )}
         </div>
         
         {/* Market Intelligence Section */}
@@ -816,24 +822,22 @@ export default function UnifiedSidebar() {
 
         {/* Integrations - Section Title Style Link */}
         <div className="mb-2">
-          <Link href="/settings/integrations">
-            {sidebarCollapsed ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div 
-                    className={cn(
-                      "flex items-center justify-center py-2 mx-2 border-t border-sidebar-border mt-2 cursor-pointer hover:bg-sidebar-accent",
-                      location.startsWith('/settings/integrations') && "bg-sidebar-accent"
-                    )}
-                  >
-                    <Plug className={cn("w-4 h-4", location.startsWith('/settings/integrations') ? "text-sidebar-primary" : "text-sidebar-foreground/50")} />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="right" sideOffset={10}>
-                  <p>Integrations</p>
-                </TooltipContent>
-              </Tooltip>
-            ) : (
+          {sidebarCollapsed ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div 
+                  className="flex items-center justify-center py-2.5 px-2 cursor-pointer hover:bg-sidebar-accent transition-colors"
+                  onClick={() => setSidebarCollapsed(false)}
+                >
+                  <Plug className={cn("w-4 h-4", location.startsWith('/settings/integrations') ? "text-sidebar-primary" : "text-sidebar-foreground/50")} />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={10}>
+                <p>Integrations</p>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <Link href="/settings/integrations">
               <div
                 className={cn(
                   "flex items-center justify-between w-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-colors cursor-pointer",
@@ -849,8 +853,8 @@ export default function UnifiedSidebar() {
                 </div>
                 <ChevronRight className="w-3 h-3" />
               </div>
-            )}
-          </Link>
+            </Link>
+          )}
         </div>
       </nav>
       
