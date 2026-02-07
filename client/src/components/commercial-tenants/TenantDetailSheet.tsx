@@ -397,7 +397,7 @@ export function TenantDetailSheet({
             )}
           </div>
 
-          {/* All-in summary strip (when we have data) */}
+          {/* All-in summary strip */}
           {allInAnnual > 0 && (
             <div className="rounded-lg border bg-muted/40 p-3 grid grid-cols-4 gap-3 text-xs">
               <div>
@@ -431,7 +431,6 @@ export function TenantDetailSheet({
 
             {/* ════════════ TAB 1: LEASE TERMS ════════════ */}
             <TabsContent value="lease" className="mt-4 space-y-4">
-              {/* Tenant Identity */}
               <SectionCard title="Tenant Identity" icon={<Building2 className="h-4 w-4" />}>
                 <DetailRow label="Legal Name" value={tenant.tenantName} />
                 {tenant.tradeName && <DetailRow label="Trade Name (DBA)" value={tenant.tradeName} />}
@@ -448,7 +447,6 @@ export function TenantDetailSheet({
                 )}
               </SectionCard>
 
-              {/* Space */}
               <SectionCard title="Space Details" icon={<Layers className="h-4 w-4" />}>
                 <DetailRow label="Suite / Unit" value={tenant.suiteNumber} />
                 <DetailRow label="Square Footage" value={sf > 0 ? sf.toLocaleString() : "-"} />
@@ -458,7 +456,6 @@ export function TenantDetailSheet({
                 {tenant.parkingSpaces && <DetailRow label="Parking Spaces" value={tenant.parkingSpaces} />}
               </SectionCard>
 
-              {/* Dates */}
               <SectionCard title="Dates & Term" icon={<Calendar className="h-4 w-4" />}>
                 <DetailRow label="Lease Type" value={leaseTypeLabels[tenant.leaseType] || tenant.leaseType} />
                 <DetailRow label="Commencement" value={formatDate(tenant.leaseCommencementDate)} />
@@ -469,7 +466,6 @@ export function TenantDetailSheet({
                 {leaseTermMonths && <DetailRow label="Term" value={`${leaseTermMonths} months (${(leaseTermMonths / 12).toFixed(1)} years)`} />}
               </SectionCard>
 
-              {/* Use & Clauses */}
               <SectionCard title="Use & Clauses" icon={<FileText className="h-4 w-4" />}>
                 <DetailRow label="Permitted Use" value={tenant.permittedUse} />
                 {tenant.useRestrictions && <DetailRow label="Restrictions" value={tenant.useRestrictions} />}
@@ -479,7 +475,6 @@ export function TenantDetailSheet({
                 {tenant.signageRights && <DetailRow label="Signage Rights" value={tenant.signageRights} />}
               </SectionCard>
 
-              {/* Co-tenancy (if applicable) */}
               {(tenant.hasOpeningCoTenancy || tenant.hasOperatingCoTenancy) && (
                 <SectionCard title="Co-Tenancy">
                   <DetailRow label="Opening Co-Tenancy" value={<BooleanBadge value={tenant.hasOpeningCoTenancy} />} />
@@ -490,7 +485,6 @@ export function TenantDetailSheet({
                 </SectionCard>
               )}
 
-              {/* Contact */}
               {(tenant.contactName || tenant.contactEmail || tenant.contactPhone) && (
                 <SectionCard title="Contact">
                   {tenant.contactName && <DetailRow label="Name" value={tenant.contactName} />}
@@ -502,7 +496,6 @@ export function TenantDetailSheet({
 
             {/* ════════════ TAB 2: FINANCIAL ════════════ */}
             <TabsContent value="financial" className="mt-4 space-y-4">
-              {/* Base Rent */}
               <SectionCard title="Base Rent" icon={<DollarSign className="h-4 w-4" />}>
                 <DetailRow label="Annual Base Rent" value={formatCurrency(tenant.currentBaseRent)} />
                 <DetailRow label="Rent per SF/Year" value={formatCurrencyPrecise(tenant.baseRentPerSF)} />
@@ -524,7 +517,6 @@ export function TenantDetailSheet({
                 )}
               </SectionCard>
 
-              {/* Escalations */}
               <SectionCard title="Escalations" icon={<TrendingUp className="h-4 w-4" />}>
                 <DetailRow label="Type" value={escalationTypeLabels[tenant.escalationType || ""] || tenant.escalationType} />
                 {tenant.escalationRate && <DetailRow label="Rate" value={formatPercent(tenant.escalationRate)} />}
@@ -543,7 +535,6 @@ export function TenantDetailSheet({
                 )}
               </SectionCard>
 
-              {/* Security */}
               {(tenant.securityDeposit || tenant.letterOfCreditAmount || tenant.guarantorName) && (
                 <SectionCard title="Security & Guarantees" icon={<Shield className="h-4 w-4" />}>
                   {tenant.securityDeposit && <DetailRow label="Security Deposit" value={formatCurrency(tenant.securityDeposit)} />}
@@ -553,7 +544,6 @@ export function TenantDetailSheet({
                 </SectionCard>
               )}
 
-              {/* Percentage Rent */}
               {tenant.percentageRentRate && (
                 <SectionCard title="Percentage Rent">
                   <DetailRow label="Rate" value={formatPercent(tenant.percentageRentRate)} />
@@ -566,7 +556,6 @@ export function TenantDetailSheet({
                 </SectionCard>
               )}
 
-              {/* NNN / Operating Expenses */}
               <SectionCard title="NNN / Operating Expenses">
                 {t.recoveryStructure && (
                   <DetailRow label="Recovery Structure" value={recoveryLabels[t.recoveryStructure] || t.recoveryStructure} />
@@ -634,7 +623,6 @@ export function TenantDetailSheet({
                 </CardContent>
               </Card>
 
-              {/* Amendments */}
               {amendments.length > 0 && (
                 <SectionCard title="Amendment History" icon={<FileText className="h-4 w-4" />}>
                   <Table>
@@ -660,7 +648,6 @@ export function TenantDetailSheet({
                 </SectionCard>
               )}
 
-              {/* Scenarios (shown if any exist, regardless of context) */}
               {scenarios.length > 0 && (
                 <SectionCard title="Underwriting Scenarios" icon={<BarChart3 className="h-4 w-4" />}>
                   <Table>
@@ -699,7 +686,6 @@ export function TenantDetailSheet({
 
             {/* ════════════ TAB 4: OPTIONS ════════════ */}
             <TabsContent value="options" className="mt-4 space-y-4">
-              {/* Advanced options from commercial_tenant_options table */}
               {tenantOptions.length > 0 && (
                 <SectionCard title="Lease Options (Detailed)" icon={<RefreshCw className="h-4 w-4" />}>
                   {tenantOptions.map((opt: any, idx: number) => (
@@ -740,7 +726,6 @@ export function TenantDetailSheet({
                 </SectionCard>
               )}
 
-              {/* Simple mode flat fields (backward compat) */}
               <SectionCard title="Renewal Options">
                 <DetailRow label="Number of Renewals" value={tenant.renewalOptions} />
                 <DetailRow label="Renewal Term" value={tenant.renewalTermYears ? `${tenant.renewalTermYears} years` : "-"} />
@@ -761,7 +746,6 @@ export function TenantDetailSheet({
                 {tenant.expansionNoticeMonths && <DetailRow label="Notice" value={`${tenant.expansionNoticeMonths} months`} />}
               </SectionCard>
 
-              {/* Maintenance */}
               {(tenant.tenantMaintenance?.length || tenant.landlordMaintenance?.length) && (
                 <SectionCard title="Maintenance Responsibilities">
                   {tenant.tenantMaintenance?.length > 0 && <DetailRow label="Tenant" value={tenant.tenantMaintenance.join(", ")} />}
@@ -773,7 +757,6 @@ export function TenantDetailSheet({
 
             {/* ════════════ TAB 5: RISK & TI ════════════ */}
             <TabsContent value="risk" className="mt-4 space-y-4">
-              {/* Tenant Improvements */}
               <SectionCard title="Tenant Improvements" icon={<DollarSign className="h-4 w-4" />}>
                 {t.tiStructure && <DetailRow label="TI Structure" value={tiStructureLabels[t.tiStructure] || t.tiStructure} />}
                 <DetailRow label="TI Allowance" value={formatCurrency(tenant.tiAllowance)} />
@@ -788,7 +771,6 @@ export function TenantDetailSheet({
                 )}
               </SectionCard>
 
-              {/* Commissions */}
               {(t.commissionType || t.commissionValue) && (
                 <SectionCard title="Leasing Commissions">
                   {t.commissionType && <DetailRow label="Type" value={commissionTypeLabels[t.commissionType] || t.commissionType} />}
@@ -799,7 +781,6 @@ export function TenantDetailSheet({
                 </SectionCard>
               )}
 
-              {/* Risk */}
               <SectionCard title="Risk Assessment" icon={<AlertTriangle className="h-4 w-4" />}>
                 <DetailRow label="Risk Rating" value={
                   riskRating ? (
@@ -812,7 +793,6 @@ export function TenantDetailSheet({
                 {t.subleaseClause !== undefined && <DetailRow label="Sublease Clause" value={<BooleanBadge value={t.subleaseClause} />} />}
               </SectionCard>
 
-              {/* Insurance */}
               {(tenant.requiredLiabilityLimit || tenant.requiredPropertyLimit || t.glLimits) && (
                 <SectionCard title="Insurance Requirements" icon={<Shield className="h-4 w-4" />}>
                   {t.glLimits && <DetailRow label="GL Limits" value={t.glLimits} />}
@@ -822,14 +802,12 @@ export function TenantDetailSheet({
                 </SectionCard>
               )}
 
-              {/* Underwriting Notes */}
               {t.underwritingNotes && (
                 <SectionCard title="Underwriting Notes">
                   <p className="text-sm text-muted-foreground whitespace-pre-wrap">{t.underwritingNotes}</p>
                 </SectionCard>
               )}
 
-              {/* Review Status (operations-relevant) */}
               {(tenant.needsReview || tenant.reviewedAt) && (
                 <SectionCard title="Review Status">
                   <DetailRow label="Needs Review" value={<BooleanBadge value={tenant.needsReview} />} />
@@ -853,7 +831,6 @@ export function TenantDetailSheet({
             </Card>
           )}
 
-          {/* ─── Document Reference ─────────────────────────────────── */}
           {tenant.leaseDocumentId && (
             <div className="text-xs text-muted-foreground">
               Document: {tenant.leaseDocumentId}

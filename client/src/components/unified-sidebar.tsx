@@ -720,39 +720,81 @@ export default function UnifiedSidebar() {
           </div>
         )}
         
-        {/* MarinaMatch - Direct Link */}
+        {/* MarinaMatch - Section Title Style Link */}
         <div className="mb-2">
           <Link href="/marinamatch">
-            <div 
-              className={cn(
-                "flex items-center px-4 py-2.5 text-sm font-medium transition-colors rounded-md mx-2",
-                location.startsWith('/marinamatch')
-                  ? "bg-primary/10 text-primary"
-                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent"
-              )}
-              data-testid="nav-marinamatch"
-            >
-              <Target className="w-4 h-4 mr-3 flex-shrink-0" />
-              <span className="truncate">MarinaMatch</span>
-            </div>
+            {sidebarCollapsed ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div 
+                    className={cn(
+                      "flex items-center justify-center py-2 mx-2 border-t border-sidebar-border mt-2 cursor-pointer hover:bg-sidebar-accent",
+                      location.startsWith('/marinamatch') && "bg-sidebar-accent"
+                    )}
+                  >
+                    <Target className={cn("w-4 h-4", location.startsWith('/marinamatch') ? "text-sidebar-primary" : "text-sidebar-foreground/50")} />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="right" sideOffset={10}>
+                  <p>MarinaMatch</p>
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <div
+                className={cn(
+                  "flex items-center justify-between w-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-colors cursor-pointer",
+                  location.startsWith('/marinamatch')
+                    ? "bg-blue-600 text-white hover:bg-blue-700" 
+                    : "text-gray-500 hover:text-gray-700"
+                )}
+                data-testid="nav-marinamatch"
+              >
+                <div className="flex items-center gap-2">
+                  <Target className="w-3.5 h-3.5" />
+                  <span>MarinaMatch</span>
+                </div>
+                <ChevronRight className="w-3 h-3" />
+              </div>
+            )}
           </Link>
         </div>
         
-        {/* DockTalk - Standalone Direct Link */}
+        {/* DockTalk - Section Title Style Link */}
         <div className="mb-2">
           <Link href="/docktalk">
-            <div 
-              className={cn(
-                "flex items-center px-4 py-2.5 text-sm font-medium transition-colors rounded-md mx-2",
-                location.startsWith('/docktalk')
-                  ? "bg-primary/10 text-primary"
-                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent"
-              )}
-              data-testid="nav-docktalk"
-            >
-              <MessageSquare className="w-4 h-4 mr-3 flex-shrink-0" />
-              <span className="truncate">DockTalk</span>
-            </div>
+            {sidebarCollapsed ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div 
+                    className={cn(
+                      "flex items-center justify-center py-2 mx-2 border-t border-sidebar-border mt-2 cursor-pointer hover:bg-sidebar-accent",
+                      location.startsWith('/docktalk') && "bg-sidebar-accent"
+                    )}
+                  >
+                    <MessageSquare className={cn("w-4 h-4", location.startsWith('/docktalk') ? "text-sidebar-primary" : "text-sidebar-foreground/50")} />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="right" sideOffset={10}>
+                  <p>DockTalk</p>
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <div
+                className={cn(
+                  "flex items-center justify-between w-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-colors cursor-pointer",
+                  location.startsWith('/docktalk')
+                    ? "bg-blue-600 text-white hover:bg-blue-700" 
+                    : "text-gray-500 hover:text-gray-700"
+                )}
+                data-testid="nav-docktalk"
+              >
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>DockTalk</span>
+                </div>
+                <ChevronRight className="w-3 h-3" />
+              </div>
+            )}
           </Link>
         </div>
         
@@ -772,18 +814,42 @@ export default function UnifiedSidebar() {
           </div>
         )}
 
-        {/* Integrations - Direct Link */}
+        {/* Integrations - Section Title Style Link */}
         <div className="mb-2">
           <Link href="/settings/integrations">
-            <div className={cn(
-              "flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg cursor-pointer transition-colors",
-              location.startsWith("/settings/integrations")
-                ? "bg-sidebar-accent text-sidebar-primary"
-                : "text-sidebar-foreground hover:bg-sidebar-accent"
-            )}>
-              <Plug className="w-4 h-4" />
-              {!sidebarCollapsed && <span>Integrations</span>}
-            </div>
+            {sidebarCollapsed ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div 
+                    className={cn(
+                      "flex items-center justify-center py-2 mx-2 border-t border-sidebar-border mt-2 cursor-pointer hover:bg-sidebar-accent",
+                      location.startsWith('/settings/integrations') && "bg-sidebar-accent"
+                    )}
+                  >
+                    <Plug className={cn("w-4 h-4", location.startsWith('/settings/integrations') ? "text-sidebar-primary" : "text-sidebar-foreground/50")} />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="right" sideOffset={10}>
+                  <p>Integrations</p>
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <div
+                className={cn(
+                  "flex items-center justify-between w-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-colors cursor-pointer",
+                  location.startsWith('/settings/integrations')
+                    ? "bg-blue-600 text-white hover:bg-blue-700" 
+                    : "text-gray-500 hover:text-gray-700"
+                )}
+                data-testid="nav-integrations"
+              >
+                <div className="flex items-center gap-2">
+                  <Plug className="w-3.5 h-3.5" />
+                  <span>Integrations</span>
+                </div>
+                <ChevronRight className="w-3 h-3" />
+              </div>
+            )}
           </Link>
         </div>
       </nav>
