@@ -63,6 +63,7 @@ const createProjectSchema = z.object({
   projectType: z.enum(["single", "portfolio"]).default("single"),
   linkedDealId: z.string().optional(),
   linkedPropertyId: z.string().optional(),
+  propertyName: z.string().optional(),
   address: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
@@ -144,6 +145,7 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
       projectType: "single",
       linkedDealId: "",
       linkedPropertyId: "",
+      propertyName: "",
       address: "",
       city: "",
       state: "",
@@ -160,8 +162,11 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
     if (watchedDealId && watchedDealId !== "_none") {
       const deal = deals.find(d => d.id === watchedDealId);
       if (deal) {
+        if (deal.title || deal.name) form.setValue("propertyName", (deal.title || deal.name) ?? "");
         if (deal.city) form.setValue("city", deal.city);
         if (deal.state) form.setValue("state", deal.state);
+        const addr = [deal.city, deal.state].filter(Boolean).join(", ");
+        if (addr) setAddressInputValue(addr);
         if (!form.getValues("name")) {
           form.setValue("name", `${deal.title || deal.name} DD`);
         }
@@ -173,6 +178,7 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
     if (watchedPropertyId && watchedPropertyId !== "_none") {
       const property = properties.find(p => p.id === watchedPropertyId);
       if (property) {
+        if (property.title) form.setValue("propertyName", property.title);
         if (property.address) form.setValue("address", property.address);
         if (property.city) form.setValue("city", property.city);
         if (property.state) form.setValue("state", property.state);
@@ -220,6 +226,7 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
         projectType: values.projectType as "single" | "portfolio",
         dealId: values.linkedDealId && values.linkedDealId !== "_none" ? values.linkedDealId : undefined,
         propertyId: values.linkedPropertyId && values.linkedPropertyId !== "_none" ? values.linkedPropertyId : undefined,
+        propertyName: values.propertyName || undefined,
         address: values.address || undefined,
         city: values.city || undefined,
         state: values.state || undefined,
@@ -424,23 +431,42 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                   )}
                 />
 
-                {!hasLinkedDealOrProperty && (
-                  <div className="space-y-2">
-                    <Label>Property Address</Label>
-                    <AddressAutocompleteInput
-                      value={addressInputValue}
-                      onChangeText={setAddressInputValue}
-                      onSelectAddress={handleAddressSelect}
-                      placeholder="Start typing an address..."
-                      searchType="establishment"
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Search for a marina or enter an address. A new property will be created in your CRM.
-                    </p>
-                  </div>
-                )}
+                <FormField
+                  control={form.control}
+                  name="propertyName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Property Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. Sunset Marina" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        {hasLinkedDealOrProperty
+                          ? "Auto-populated from linked record. You can edit if needed."
+                          : "Enter the name of the property for this project."}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                {hasLinkedDealOrProperty && (
+                <div className="space-y-2">
+                  <Label>Property Address</Label>
+                  <AddressAutocompleteInput
+                    value={addressInputValue}
+                    onChangeText={setAddressInputValue}
+                    onSelectAddress={handleAddressSelect}
+                    placeholder="Start typing an address..."
+                    searchType="establishment"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    {hasLinkedDealOrProperty
+                      ? "Address auto-populated from linked record. You can change it if needed."
+                      : "Search for a marina or enter an address."}
+                  </p>
+                </div>
+
+                {(form.watch("city") || form.watch("state")) && (
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -449,7 +475,7 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                         <FormItem>
                           <FormLabel>City</FormLabel>
                           <FormControl>
-                            <Input placeholder="City" {...field} disabled />
+                            <Input placeholder="City" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -462,7 +488,7 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                         <FormItem>
                           <FormLabel>State</FormLabel>
                           <FormControl>
-                            <Input placeholder="State" {...field} disabled />
+                            <Input placeholder="State" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
