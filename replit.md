@@ -15,7 +15,7 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 ### UI/UX Decisions
-The platform utilizes React 18 with TypeScript and Wouter for routing. The UI is built with shadcn/ui (on Radix UI), styled using Tailwind CSS with CSS variables, and employs Lucide-React for icons, ensuring mobile optimization. Navigation is structured with a "Pack System" for modular premium features and a consolidated "Deal Workspace" for project-specific tabs, alongside "Market Intelligence" and "Analysis" sections. The system includes reusable UI components like `skeleton-variants`, `empty-state`, `inline-banner`, and `bulk-action-bar`. Keyboard shortcuts are implemented for common actions (Cmd/Ctrl+K, /, ESC).
+The platform utilizes React 18 with TypeScript and Wouter for routing. The UI is built with shadcn/ui (on Radix UI), styled using Tailwind CSS with CSS variables, and employs Lucide-React for icons, ensuring mobile optimization. Navigation sidebar order: Dashboard > Operations > CRM > Pipeline > Deal Workspace > Underwriting Tools > Investor Services > Prospecting > MarinaMatch (direct link) > DockTalk (standalone direct link) > Market Intelligence (Sales Comps, Rate Comps, etc.) > Integrations. The system uses a "Pack System" for modular premium features. Reusable UI components include `skeleton-variants`, `empty-state`, `inline-banner`, and `bulk-action-bar`. Keyboard shortcuts are implemented for common actions (Cmd/Ctrl+K, /, ESC).
 
 ### Technical Implementations
 - **Frontend**: React 18, TypeScript, Wouter, TanStack Query, React Hook Form with Zod.

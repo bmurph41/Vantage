@@ -45,7 +45,7 @@ import { CommercialTenant } from "@shared/schema";
 import { PageTour } from "@/components/onboarding/PageTour";
 import { TOUR_IDS, commercialTenantsTourSteps } from "@/lib/tour-configs";
 import { UnifiedTenantFormDialog } from "@/components/commercial-tenants/UnifiedTenantFormDialog";
-import { TenantDetailSheet } from "./TenantDetailSheet";
+import { TenantDetailSheet } from "@/components/commercial-tenants/TenantDetailSheet";
 import { LeaseImportWizard } from "./LeaseImportWizard";
 
 const formatCurrency = (value: string | number | null | undefined) => {
