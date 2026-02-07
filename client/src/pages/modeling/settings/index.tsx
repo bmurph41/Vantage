@@ -290,7 +290,7 @@ export default function ModelingSettings() {
       <div className="flex items-center gap-3">
         <Settings className="h-8 w-8 text-muted-foreground" />
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-settings-title">Modeling Settings</h1>
+          <h1 className="text-2xl font-bold" data-testid="text-settings-title">Model Settings</h1>
           <p className="text-muted-foreground">Configure regions and preferences for modeling projects</p>
         </div>
       </div>

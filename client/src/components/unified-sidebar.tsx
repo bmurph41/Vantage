@@ -88,7 +88,7 @@ const analysisNav = [
   { name: "Financial Model", href: "/modeling/projects" },
   { name: "Returns & Valuation", href: "/modeling/returns-valuation" },
   { name: "Scenarios", href: "/modeling/scenarios" },
-  { name: "Modeling Settings", href: "/modeling/settings" },
+  { name: "Model Settings", href: "/modeling/settings" },
 ];
 
 // Investor Services Navigation (GP users only via pack check)

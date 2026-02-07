@@ -205,7 +205,7 @@ export const MODULE_INFO: Record<FeatureModule, ModuleInfo> = {
   },
   [FEATURE_MODULES.UNDERWRITING_SETTINGS]: {
     key: FEATURE_MODULES.UNDERWRITING_SETTINGS,
-    name: 'Modeling Settings',
+    name: 'Model Settings',
     description: 'Custom modeling parameters',
     category: 'Underwriting',
     includedIn: ['investor-essentials', 'broker-pro', 'full-platform'],

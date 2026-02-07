@@ -283,7 +283,7 @@ export const sidebarConfig: SidebarGroup[] = [
       },
       {
         id: 'modeling-settings',
-        label: 'Modeling Settings',
+        label: 'Model Settings',
         href: '/underwriting/modeling-settings',
         icon: Settings,
         matchRoutes: ['/underwriting/modeling-settings', '/modeling-settings'],
