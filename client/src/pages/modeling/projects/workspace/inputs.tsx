@@ -770,7 +770,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
           <div>
             <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
               <MapPin className="h-4 w-4" />
-              Designated Spaces
+              Designated Storage Spaces
             </h4>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {designatedSpaces.map((item) => (
