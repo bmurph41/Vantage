@@ -66,8 +66,10 @@ const PAY_TYPES = [
 export default function Plans() {
   const { user } = useAuth();
   const { data: plans, isLoading } = usePayrollPlans({});
-  const { data: departments } = useDepartments(user?.orgId);
-  const { data: positions } = usePositions(user?.orgId);
+  const { data: departmentsData } = useDepartments(user?.orgId);
+  const departments = departmentsData?.departments || [];
+  const { data: positionsData } = usePositions(user?.orgId);
+  const positions = positionsData?.positions || [];
   const createPlan = useCreatePlan();
   const deletePlan = useDeletePlan();
   const createLine = useCreateLine();
@@ -244,7 +246,7 @@ export default function Plans() {
             <PlanCard
               key={plan.id}
               plan={plan}
-              departments={departments || []}
+              departments={departments}
               isExpanded={expandedPlan === plan.id}
               onToggle={() =>
                 setExpandedPlan(expandedPlan === plan.id ? null : plan.id)
@@ -295,7 +297,7 @@ export default function Plans() {
                   <SelectValue placeholder="Select department" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(departments || []).map((dept: any) => (
+                  {departments.map((dept: any) => (
                     <SelectItem key={dept.id} value={dept.id}>
                       {dept.name}
                     </SelectItem>

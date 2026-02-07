@@ -53,8 +53,10 @@ const ASSET_CLASSES = [
 export default function PositionLibrary() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { data: positions, isLoading } = usePositions(user?.orgId, true);
-  const { data: departments } = useDepartments(user?.orgId);
+  const { data: positionsData, isLoading } = usePositions(user?.orgId, true);
+  const positions = positionsData?.positions || [];
+  const { data: departmentsData } = useDepartments(user?.orgId);
+  const departments = departmentsData?.departments || [];
   const createPosition = useCreatePosition();
   const [search, setSearch] = useState("");
   const [filterGroup, setFilterGroup] = useState<string>("all");
@@ -92,7 +94,7 @@ export default function PositionLibrary() {
   const getRoleLabel = (value: string) =>
     ROLE_GROUPS.find((g) => g.value === value)?.label || value;
 
-  const filtered = (positions || []).filter((pos: any) => {
+  const filtered = positions.filter((pos: any) => {
     const roleLabel = getRoleLabel(pos.roleGroup || "");
     const matchesSearch =
       !search ||
@@ -187,7 +189,7 @@ export default function PositionLibrary() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
-                    {(departments || []).map((dept: any) => (
+                    {departments.map((dept: any) => (
                       <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
                     ))}
                   </SelectContent>
