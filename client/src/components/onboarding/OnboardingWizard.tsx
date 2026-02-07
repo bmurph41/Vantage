@@ -219,12 +219,12 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
               region: data.region || null,
               latitude: marina.address.lat,
               longitude: marina.address.lng,
-              dealSource: data.dealType,
               dealOutcome: data.dealStatus,
               portfolioName: data.portfolioName || 'Untitled Portfolio',
               isPortfolio: true,
               dealId: crmDeal.id,
               propertyId: crmProperty.id,
+              customMetrics: { dealType: data.dealType },
             });
             const modelingProject = await projectRes.json();
             
@@ -270,10 +270,10 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
           region: data.region || null,
           latitude: data.marinaAddress.lat,
           longitude: data.marinaAddress.lng,
-          dealSource: data.dealType,
           dealOutcome: data.dealStatus,
           dealId: crmDeal.id,
           propertyId: crmProperty.id,
+          customMetrics: { dealType: data.dealType },
         });
         const modelingProject = await projectRes.json();
         

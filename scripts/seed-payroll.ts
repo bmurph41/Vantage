@@ -11,7 +11,7 @@ import {
   seasonalityTemplates,
   pnlCategories,
   pnlLineItems,
-} from "@shared/payroll-schema";
+} from "../shared/payroll-schema";
 
 export async function seedPayrollDefaults(orgId: string) {
   // ─── DEPARTMENTS ──────────────────────────────────────────────────────────
@@ -161,3 +161,5 @@ export async function seedPayrollDefaults(orgId: string) {
 
   console.log(`✅ Payroll seed data created for org ${orgId}`);
 }
+
+seedPayrollDefaults("cd3719c3-ef82-4ccc-acb9-261c80fb64b4").then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });
