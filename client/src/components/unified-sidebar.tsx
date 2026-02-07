@@ -15,97 +15,97 @@ import { UserMenu } from "@/components/layout/UserMenu";
 
 // CRM Navigation (Core CRM - Entity Management)
 const crmNav = [
-  { name: "Dashboard", href: "/crm", icon: LayoutDashboard },
-  { name: "Contacts", href: "/crm/contacts", icon: Users },
-  { name: "Companies", href: "/crm/companies", icon: Building },
-  { name: "Properties", href: "/crm/properties", icon: Home },
-  { name: "Marketing", href: "/marketing", icon: Send },
+  { name: "Dashboard", href: "/crm" },
+  { name: "Contacts", href: "/crm/contacts" },
+  { name: "Companies", href: "/crm/companies" },
+  { name: "Properties", href: "/crm/properties" },
+  { name: "Marketing", href: "/marketing" },
 ];
 
 // Pipeline Navigation (Deal flow, marketing, analytics)
 const pipelineDealNav = [
-  { name: "Deal Board", href: "/deal-workspace", icon: Handshake },
-  { name: "Activity Log", href: "/crm/activity", icon: History },
-  { name: "Follow-Ups", href: "/crm/tasks", icon: ListTodo },
-  { name: "Forecast", href: "/crm/forecast", icon: TrendingUp },
+  { name: "Deal Board", href: "/deal-workspace" },
+  { name: "Activity Log", href: "/crm/activity" },
+  { name: "Follow-Ups", href: "/crm/tasks" },
+  { name: "Forecast", href: "/crm/forecast" },
 ];
 
 
 // Prospecting & Outreach Navigation (Premium/Broker Add-On)
 const prospectingNav = [
-  { name: "Prospecting", href: "/prospecting", icon: Target },
-  { name: "Market Targets", href: "/prospecting/markets", icon: LayoutList },
-  { name: "Campaigns & Templates", href: "/prospecting/campaigns", icon: Send },
-  { name: "Deal Sourcing Analytics", href: "/prospecting/analytics", icon: PieChart },
+  { name: "Prospecting", href: "/prospecting" },
+  { name: "Market Targets", href: "/prospecting/markets" },
+  { name: "Campaigns & Templates", href: "/prospecting/campaigns" },
+  { name: "Deal Sourcing Analytics", href: "/prospecting/analytics" },
 ];
 
 // CRM Tools Submenu
 const crmToolsNav = [
-  { name: "Calendar Sync", href: "/calendar-settings", icon: Calendar },
-  { name: "Labels", href: "/crm/labels", icon: Tag },
-  { name: "Products", href: "/crm/products", icon: Package },
-  { name: "Forms", href: "/crm/forms", icon: FileText },
-  { name: "Workflows", href: "/crm/workflows", icon: Bot },
-  { name: "Webhooks", href: "/crm/webhooks", icon: Webhook },
-  { name: "Dedupe & Merge", href: "/crm/dedupe", icon: GitMerge },
-  { name: "Scoring", href: "/crm/scoring", icon: Target },
-  { name: "Import Contacts", href: "/import-contacts", icon: Upload },
-  { name: "Import History", href: "/import-history", icon: History },
+  { name: "Calendar Sync", href: "/calendar-settings" },
+  { name: "Labels", href: "/crm/labels" },
+  { name: "Products", href: "/crm/products" },
+  { name: "Forms", href: "/crm/forms" },
+  { name: "Workflows", href: "/crm/workflows" },
+  { name: "Webhooks", href: "/crm/webhooks" },
+  { name: "Dedupe & Merge", href: "/crm/dedupe" },
+  { name: "Scoring", href: "/crm/scoring" },
+  { name: "Import Contacts", href: "/import-contacts" },
+  { name: "Import History", href: "/import-history" },
 ];
 
 // Operations Navigation - Flattened module links (tabs handle sub-navigation)
 const operationsModulesNav = [
-  { name: "Portfolio", href: "/portfolio", icon: Building2 },
-  { name: "Dockit", href: "/operations/dockit", icon: Anchor },
-  { name: "Rent Roll", href: "/rent-roll/executive", icon: Building2 },
-  { name: "Commercial Tenants", href: "/operations/commercial-tenants", icon: Building2 },
-  { name: "Fuel Sales", href: "/operations/fuel", icon: Fuel },
-  { name: "Ship Store", href: "/operations/ship-store", icon: ShoppingCart },
-  { name: "Service Dept", href: "/operations/service", icon: Wrench },
-  { name: "Boat Rentals", href: "/operations/boat-rentals", icon: Ship },
-  { name: "Boat Club", href: "/operations/boat-club", icon: Users },
-  { name: "Boat Sales", href: "/operations/boat-sales", icon: ShoppingCart },
-  { name: "Bookkeeping", href: "/operations/bookkeeping", icon: BookOpen },
+  { name: "Portfolio", href: "/portfolio" },
+  { name: "Dockit", href: "/operations/dockit" },
+  { name: "Rent Roll", href: "/rent-roll/executive" },
+  { name: "Commercial Tenants", href: "/operations/commercial-tenants" },
+  { name: "Fuel Sales", href: "/operations/fuel" },
+  { name: "Ship Store", href: "/operations/ship-store" },
+  { name: "Service Dept", href: "/operations/service" },
+  { name: "Boat Rentals", href: "/operations/boat-rentals" },
+  { name: "Boat Club", href: "/operations/boat-club" },
+  { name: "Boat Sales", href: "/operations/boat-sales" },
+  { name: "Bookkeeping", href: "/operations/bookkeeping" },
 ];
 
 // Deal Workspace Navigation - Consolidated DD, VDR, and Modeling
 const dealWorkspaceNav = [
-  { name: "DD Projects", href: "/dd/projects", icon: ClipboardList },
-  { name: "Data Room", href: "/vdr", icon: FolderLock },
+  { name: "DD Projects", href: "/dd/projects" },
+  { name: "Data Room", href: "/vdr" },
 ];
 
 // Deal Workspace sub-nav (shown when inside a workspace)
 const getWorkspaceSubNav = (workspaceId: string) => [
-  { name: "Overview", href: `/workspaces/${workspaceId}`, icon: LayoutDashboard },
-  { name: "Financials", href: `/workspaces/${workspaceId}?tab=financials`, icon: Calculator },
-  { name: "Diligence", href: `/workspaces/${workspaceId}?tab=diligence`, icon: ClipboardList },
-  { name: "Documents", href: `/workspaces/${workspaceId}?tab=documents`, icon: FolderLock },
-  { name: "Team", href: `/workspaces/${workspaceId}?tab=team`, icon: Users },
+  { name: "Overview", href: `/workspaces/${workspaceId}` },
+  { name: "Financials", href: `/workspaces/${workspaceId}?tab=financials` },
+  { name: "Diligence", href: `/workspaces/${workspaceId}?tab=diligence` },
+  { name: "Documents", href: `/workspaces/${workspaceId}?tab=documents` },
+  { name: "Team", href: `/workspaces/${workspaceId}?tab=team` },
 ];
 
 // Underwriting Tools Navigation (all users - modeling, analysis, and document processing)
 const underwritingToolsNav = [
-  { name: "Valuator", href: "/modeling/projects", icon: Calculator },
-  { name: "Debt Scenarios", href: "/modeling/debt-scenarios", icon: Calculator },
-  { name: "Exit Strategies", href: "/modeling/exit-strategies", icon: Target },
-  { name: "OM Builder", href: "/om", icon: FileText },
-  { name: "Modeling Settings", href: "/modeling/settings", icon: Settings },
+  { name: "Valuator", href: "/modeling/projects" },
+  { name: "Debt Scenarios", href: "/modeling/debt-scenarios" },
+  { name: "Exit Strategies", href: "/modeling/exit-strategies" },
+  { name: "OM Builder", href: "/om" },
+  { name: "Modeling Settings", href: "/modeling/settings" },
 ];
 
 // Investor Services Navigation (GP users only via pack check)
 const investorServicesNav = [
-  { name: "Fund Management", href: "/modeling/funds", icon: Briefcase },
-  { name: "LP Portal", href: "/modeling/lp-portal", icon: Users },
+  { name: "Fund Management", href: "/modeling/funds" },
+  { name: "LP Portal", href: "/modeling/lp-portal" },
 ];
 
 // Market Intelligence Navigation (formerly Marinalytics)
 const marketIntelligenceNav = [
-  { name: "Sales Comps", href: "/analysis/sales-comps", icon: BarChart3 },
-  { name: "Rate Comps", href: "/analysis/rate-comps", icon: TrendingUp },
-  { name: "Financial Analysis", href: "/analysis/financial-analysis", icon: Activity },
-  { name: "Demographics", href: "/analysis/demographics", icon: Users },
-  { name: "Capital Markets", href: "/analysis/benchmarks", icon: Target },
-  { name: "Portfolio Analytics", href: "/analysis/marinalytics", icon: BarChart3 },
+  { name: "Sales Comps", href: "/analysis/sales-comps" },
+  { name: "Rate Comps", href: "/analysis/rate-comps" },
+  { name: "Financial Analysis", href: "/analysis/financial-analysis" },
+  { name: "Demographics", href: "/analysis/demographics" },
+  { name: "Capital Markets", href: "/analysis/benchmarks" },
+  { name: "Portfolio Analytics", href: "/analysis/marinalytics" },
 ];
 
 // Integrations - direct link (no sub-navigation)
@@ -270,19 +270,16 @@ export default function UnifiedSidebar() {
     ...(pendingContactsCount > 0 ? [{ 
       name: "Contacts", 
       href: "/crm/pending-contacts", 
-      icon: Users,
       badge: String(pendingContactsCount)
     }] : []),
     ...(pendingCompaniesCount > 0 ? [{ 
       name: "Companies", 
       href: "/crm/pending-companies", 
-      icon: Building,
       badge: String(pendingCompaniesCount)
     }] : []),
     ...(pendingPropertiesCount > 0 ? [{ 
       name: "Properties", 
       href: "/crm/pending-properties", 
-      icon: Home,
       badge: String(pendingPropertiesCount)
     }] : []),
   ];
@@ -292,7 +289,7 @@ export default function UnifiedSidebar() {
     setMobileMenuOpen(false);
   };
 
-  const NavLink = ({ item }: { item: { name: string; href: string; icon: any; badge?: string; disabled?: boolean } }) => {
+  const NavLink = ({ item }: { item: { name: string; href: string; icon?: any; badge?: string; disabled?: boolean } }) => {
     // Check if current location is a child of this nav item's href
     // Parse both location and href to handle query parameters using wouter's location string
     const [itemPath, itemQuery] = item.href.split('?');
@@ -330,7 +327,7 @@ export default function UnifiedSidebar() {
           )}
           data-testid={`nav-${item.name.toLowerCase().replace(/ /g, '-')}`}
         >
-          <item.icon className={cn("w-4 h-4 flex-shrink-0", !sidebarCollapsed && "mr-3")} />
+          {item.icon && <item.icon className={cn("w-4 h-4 flex-shrink-0", !sidebarCollapsed && "mr-3")} />}
           {!sidebarCollapsed && <span className="truncate">{item.name}</span>}
         </div>
       );
@@ -360,7 +357,7 @@ export default function UnifiedSidebar() {
         )}
         data-testid={`nav-${item.name.toLowerCase().replace(/ /g, '-')}`}
       >
-        <item.icon className={cn("w-4 h-4 flex-shrink-0", !sidebarCollapsed && "mr-3", isActive && "text-sidebar-primary")} />
+        {item.icon && <item.icon className={cn("w-4 h-4 flex-shrink-0", !sidebarCollapsed && "mr-3", isActive && "text-sidebar-primary")} />}
         {!sidebarCollapsed && (
           <>
             <span className="truncate">{item.name}</span>
@@ -441,7 +438,10 @@ export default function UnifiedSidebar() {
         )}
         data-testid={`toggle-${title.toLowerCase()}`}
       >
-        <span>{title}</span>
+        <div className="flex items-center gap-2">
+          {IconComponent && <IconComponent className="w-3.5 h-3.5" />}
+          <span>{title}</span>
+        </div>
         {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
       </button>
     );
@@ -557,6 +557,7 @@ export default function UnifiedSidebar() {
           <div className="mb-2">
             <SectionHeader 
               title="Operations" 
+              icon={Building2}
               expanded={operationsExpanded} 
               onToggle={() => setOperationsExpanded(!operationsExpanded)}
               isActive={location.startsWith('/operations/')}
@@ -572,6 +573,7 @@ export default function UnifiedSidebar() {
           <div className="mb-2">
             <SectionHeader 
               title="CRM" 
+              icon={Users}
               expanded={crmExpanded} 
               onToggle={() => setCrmExpanded(!crmExpanded)}
               isActive={['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location) || location.startsWith('/marketing')}
@@ -618,6 +620,7 @@ export default function UnifiedSidebar() {
           <div className="mb-2">
             <SectionHeader 
               title="Pipeline" 
+              icon={Handshake}
               expanded={pipelineExpanded} 
               onToggle={() => setPipelineExpanded(!pipelineExpanded)}
               isActive={['/deal-workspace', '/crm/activity', '/crm/tasks', '/crm/forecast'].includes(location) || location.startsWith('/deal-workspace')}
@@ -637,6 +640,7 @@ export default function UnifiedSidebar() {
           <div className="mb-2">
             <SectionHeader 
               title="Deal Workspace" 
+              icon={Briefcase}
               expanded={dealWorkspaceExpanded} 
               onToggle={() => setDealWorkspaceExpanded(!dealWorkspaceExpanded)}
               isActive={location.startsWith('/workspaces') || location.startsWith('/projects') || location === '/progress-report' || location.startsWith('/vdr')}
@@ -664,6 +668,7 @@ export default function UnifiedSidebar() {
           <div className="mb-2">
             <SectionHeader 
               title="Underwriting Tools" 
+              icon={Calculator}
               expanded={underwritingToolsExpanded} 
               onToggle={() => setUnderwritingToolsExpanded(!underwritingToolsExpanded)}
               isActive={location.startsWith('/modeling/projects') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/om') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings')}
@@ -679,6 +684,7 @@ export default function UnifiedSidebar() {
           <div className="mb-2">
             <SectionHeader 
               title="Investor Services" 
+              icon={DollarSign}
               expanded={investorServicesExpanded} 
               onToggle={() => setInvestorServicesExpanded(!investorServicesExpanded)}
               isActive={location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal')}
@@ -700,14 +706,15 @@ export default function UnifiedSidebar() {
           <div className="mb-2">
             <SectionHeader 
               title="Prospecting" 
+              icon={Target}
               expanded={prospectingExpanded} 
               onToggle={() => setProspectingExpanded(!prospectingExpanded)}
               isActive={location === '/prospecting' || location.startsWith('/prospecting/')}
             />
             {prospectingExpanded && (
               <>
-                <NavLink item={{ name: "Overview", href: "/prospecting", icon: PieChart }} />
-                <NavLink item={{ name: "Workroom", href: "/prospecting/workroom", icon: Target }} />
+                <NavLink item={{ name: "Overview", href: "/prospecting" }} />
+                <NavLink item={{ name: "Workroom", href: "/prospecting/workroom" }} />
               </>
             )}
           </div>
@@ -754,6 +761,7 @@ export default function UnifiedSidebar() {
           <div className="mb-2">
             <SectionHeader 
               title="Market Intelligence" 
+              icon={BarChart3}
               expanded={marketIntelExpanded} 
               onToggle={() => setMarketIntelExpanded(!marketIntelExpanded)}
               isActive={location.startsWith('/analysis/')}
