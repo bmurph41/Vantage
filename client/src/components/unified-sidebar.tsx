@@ -799,7 +799,6 @@ export default function UnifiedSidebar() {
                   <Target className="w-3.5 h-3.5" />
                   <span>MarinaMatch</span>
                 </div>
-                <ChevronRight className="w-3 h-3" />
               </div>
             </Link>
           )}
@@ -836,7 +835,6 @@ export default function UnifiedSidebar() {
                   <MessageSquare className="w-3.5 h-3.5" />
                   <span>DockTalk</span>
                 </div>
-                <ChevronRight className="w-3 h-3" />
               </div>
             </Link>
           )}
@@ -889,7 +887,6 @@ export default function UnifiedSidebar() {
                   <Plug className="w-3.5 h-3.5" />
                   <span>Integrations</span>
                 </div>
-                <ChevronRight className="w-3 h-3" />
               </div>
             </Link>
           )}
