@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Building2, Briefcase, Trash2, MapPin } from "lucide-react";
+import { Plus, Building2, Briefcase, Trash2, MapPin, Anchor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -63,7 +63,7 @@ const createProjectSchema = z.object({
   projectType: z.enum(["single", "portfolio"]).default("single"),
   linkedDealId: z.string().optional(),
   linkedPropertyId: z.string().optional(),
-  propertyName: z.string().optional(),
+  marinaName: z.string().optional(),
   address: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
@@ -145,7 +145,7 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
       projectType: "single",
       linkedDealId: "",
       linkedPropertyId: "",
-      propertyName: "",
+      marinaName: "",
       address: "",
       city: "",
       state: "",
@@ -162,7 +162,7 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
     if (watchedDealId && watchedDealId !== "_none") {
       const deal = deals.find(d => d.id === watchedDealId);
       if (deal) {
-        if (deal.title || deal.name) form.setValue("propertyName", (deal.title || deal.name) ?? "");
+        if (deal.title || deal.name) form.setValue("marinaName", (deal.title || deal.name) ?? "");
         if (deal.city) form.setValue("city", deal.city);
         if (deal.state) form.setValue("state", deal.state);
         const addr = [deal.city, deal.state].filter(Boolean).join(", ");
@@ -178,7 +178,7 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
     if (watchedPropertyId && watchedPropertyId !== "_none") {
       const property = properties.find(p => p.id === watchedPropertyId);
       if (property) {
-        if (property.title) form.setValue("propertyName", property.title);
+        if (property.title) form.setValue("marinaName", property.title);
         if (property.address) form.setValue("address", property.address);
         if (property.city) form.setValue("city", property.city);
         if (property.state) form.setValue("state", property.state);
@@ -209,13 +209,13 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
         : undefined;
       
       const portfolioPropertiesPayload = values.projectType === "portfolio" 
-        ? portfolioProperties.filter(p => p.name && p.address).map(p => ({
+        ? portfolioProperties.filter(p => p.name).map(p => ({
             name: p.name,
-            address: p.address,
-            city: p.city,
-            state: p.state,
-            zipCode: p.zipCode,
-            placeId: p.placeId,
+            address: p.address || undefined,
+            city: p.city || undefined,
+            state: p.state || undefined,
+            zipCode: p.zipCode || undefined,
+            placeId: p.placeId || undefined,
             coordinates: (p.lat && p.lng) ? { lat: p.lat, lng: p.lng } : undefined,
           }))
         : undefined;
@@ -226,7 +226,7 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
         projectType: values.projectType as "single" | "portfolio",
         dealId: values.linkedDealId && values.linkedDealId !== "_none" ? values.linkedDealId : undefined,
         propertyId: values.linkedPropertyId && values.linkedPropertyId !== "_none" ? values.linkedPropertyId : undefined,
-        propertyName: values.propertyName || undefined,
+        marinaName: values.marinaName || undefined,
         address: values.address || undefined,
         city: values.city || undefined,
         state: values.state || undefined,
@@ -241,7 +241,7 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/dd/projects"] });
       queryClient.invalidateQueries({ queryKey: ["all-projects-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/properties"] });
-      const childCount = portfolioProperties.filter(p => p.name && p.address).length;
+      const childCount = portfolioProperties.filter(p => p.name).length;
       toast({
         title: "Project created",
         description: watchedProjectType === "portfolio" && childCount > 0
@@ -339,6 +339,27 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                       {...field} 
                     />
                   </FormControl>
+                  {watchedProjectType === "single" && field.value && (
+                    <div className="flex items-center gap-2">
+                      {form.watch("marinaName") === field.value ? (
+                        <span className="text-xs text-green-600 flex items-center gap-1">
+                          <Anchor className="h-3 w-3" />
+                          Using as Marina Name
+                        </span>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-xs text-muted-foreground hover:text-primary"
+                          onClick={() => form.setValue("marinaName", field.value, { shouldDirty: true })}
+                        >
+                          <Anchor className="h-3 w-3 mr-1" />
+                          Use as Marina Name
+                        </Button>
+                      )}
+                    </div>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
@@ -431,33 +452,14 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="propertyName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Property Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. Sunset Marina" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        {hasLinkedDealOrProperty
-                          ? "Auto-populated from linked record. You can edit if needed."
-                          : "Enter the name of the property for this project."}
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
                 <div className="space-y-2">
                   <Label>Property Address</Label>
                   <AddressAutocompleteInput
                     value={addressInputValue}
                     onChangeText={setAddressInputValue}
                     onSelectAddress={handleAddressSelect}
-                    placeholder="Start typing an address..."
-                    searchType="establishment"
+                    placeholder="Search for a marina or enter an address..."
+                    searchType="all"
                   />
                   <p className="text-sm text-muted-foreground">
                     {hasLinkedDealOrProperty
@@ -543,7 +545,7 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                           <CardContent className="pt-4 pb-3">
                             <div className="flex items-start justify-between mb-3">
                               <span className="text-sm font-medium text-muted-foreground">
-                                Property {index + 1}
+                                Marina {index + 1}
                               </span>
                               <Button
                                 type="button"
@@ -557,7 +559,7 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                             </div>
                             <div className="space-y-3">
                               <div>
-                                <Label className="text-sm">Property Name *</Label>
+                                <Label className="text-sm">Marina Name *</Label>
                                 <Input
                                   placeholder="e.g. Sunset Marina"
                                   value={prop.name}
@@ -566,13 +568,13 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                                 />
                               </div>
                               <div>
-                                <Label className="text-sm">Address *</Label>
+                                <Label className="text-sm">Address</Label>
                                 <AddressAutocompleteInput
                                   value={prop.addressInputValue}
                                   onChangeText={(val) => updatePortfolioProperty(prop.id, { addressInputValue: val })}
                                   onSelectAddress={(addr) => handlePortfolioAddressSelect(prop.id, addr)}
                                   placeholder="Search for marina or address..."
-                                  searchType="establishment"
+                                  searchType="all"
                                   className="mt-1"
                                 />
                                 {prop.city && prop.state && (
@@ -585,6 +587,16 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                           </CardContent>
                         </Card>
                       ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={addPortfolioProperty}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Another Marina
+                      </Button>
                     </div>
                   </ScrollArea>
                 )}

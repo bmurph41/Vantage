@@ -957,7 +957,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const newProperty = await storage.createCrmProperty({
             orgId: req.user.orgId,
-            title: req.body.name?.replace(/ DD$/, '') || "New Property",
+            title: req.body.marinaName || req.body.name?.replace(/ DD$/, '') || "New Property",
             type: "marina",
             status: "pending",
             address: req.body.address,
@@ -976,12 +976,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const projectData = insertProjectSchema.parse({
-        ...req.body,
-        propertyId: propertyId || req.body.propertyId,
+        name: req.body.name,
+        description: req.body.description || undefined,
+        projectType: req.body.projectType,
+        dealId: req.body.dealId || undefined,
+        propertyId: propertyId || req.body.propertyId || undefined,
+        address: req.body.address || undefined,
+        city: req.body.city || undefined,
+        state: req.body.state || undefined,
+        zipCode: req.body.zipCode || undefined,
+        placeId: req.body.placeId || undefined,
+        coordinates: req.body.coordinates || undefined,
         orgId: req.user.orgId,
         createdBy: req.user.id,
       });
-      
+
       const project = await storage.createProject(projectData);
       
       // Create default project settings
@@ -1015,7 +1024,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const childProjects: any[] = [];
       if (req.body.projectType === "portfolio" && Array.isArray(req.body.portfolioProperties)) {
         for (const prop of req.body.portfolioProperties) {
-          if (!prop.name || !prop.address) continue;
+          if (!prop.name) continue;
           try {
             let childPropertyId = null;
             try {
@@ -5098,7 +5107,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const childProjects: any[] = [];
       if (req.body.projectType === "portfolio" && Array.isArray(req.body.portfolioProperties)) {
         for (const prop of req.body.portfolioProperties) {
-          if (!prop.name || !prop.address) continue;
+          if (!prop.name) continue;
           try {
             let childPropertyId = null;
             try {
@@ -17044,7 +17053,7 @@ Current context: Project ${req.params.projectId}`;
       const childProjects: any[] = [];
       if (req.body.projectType === "portfolio" && Array.isArray(req.body.portfolioProperties)) {
         for (const prop of req.body.portfolioProperties) {
-          if (!prop.name || !prop.address) continue;
+          if (!prop.name) continue;
           try {
             let childPropertyId = null;
             try {
@@ -17229,7 +17238,7 @@ Current context: Project ${req.params.projectId}`;
       const childProjects: any[] = [];
       if (req.body.projectType === "portfolio" && Array.isArray(req.body.portfolioProperties)) {
         for (const prop of req.body.portfolioProperties) {
-          if (!prop.name || !prop.address) continue;
+          if (!prop.name) continue;
           try {
             let childPropertyId = null;
             try {
@@ -27288,7 +27297,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const childProjects: any[] = [];
       if (req.body.projectType === "portfolio" && Array.isArray(req.body.portfolioProperties)) {
         for (const prop of req.body.portfolioProperties) {
-          if (!prop.name || !prop.address) continue;
+          if (!prop.name) continue;
           try {
             let childPropertyId = null;
             try {
@@ -29919,7 +29928,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const childProjects: any[] = [];
       if (req.body.projectType === "portfolio" && Array.isArray(req.body.portfolioProperties)) {
         for (const prop of req.body.portfolioProperties) {
-          if (!prop.name || !prop.address) continue;
+          if (!prop.name) continue;
           try {
             let childPropertyId = null;
             try {
