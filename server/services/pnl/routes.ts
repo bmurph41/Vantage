@@ -105,7 +105,7 @@ router.post('/upload', upload.single('file'), async (req: any, res) => {
         documentId: doc.id,
         status: 'queued',
         stage: 'ingest',
-        parserVersion: 'v1',
+        parserVersion: 'v2',
         mapperVersion: 'v1',
       })
       .returning();
@@ -143,7 +143,17 @@ router.get('/jobs/:jobId', async (req: any, res) => {
     
     const ambiguousCount = reviewItems.filter(r => r.status === 'ambiguous').length;
 
-    res.json({ job, reviewNeedsCount: reviewItems.length, ambiguousCount });
+    // v2: include validation + metrics info if available
+    const jobData: any = { ...job };
+
+    res.json({
+      job: jobData,
+      reviewNeedsCount: reviewItems.length,
+      ambiguousCount,
+      validationStatus: (job as any).validationStatus ?? null,
+      validationJson: (job as any).validationJson ?? null,
+      parseMetricsJson: (job as any).parseMetricsJson ?? null,
+    });
   } catch (error: any) {
     console.error('Get job error:', error);
     res.status(500).json({ error: error.message });
@@ -179,9 +189,68 @@ router.get('/jobs/:jobId/review', async (req: any, res) => {
       where: and(eq(pnlReviewItems.jobId, jobId), eq(pnlReviewItems.orgId, orgId)),
     });
 
-    res.json({ items });
+    // v2: include job-level validation/metrics for Review UI
+    const job = await db.query.pnlJobs.findFirst({
+      where: and(eq(pnlJobs.id, jobId), eq(pnlJobs.orgId, orgId)),
+    });
+
+    res.json({
+      items,
+      validationStatus: (job as any)?.validationStatus ?? null,
+      validationJson: (job as any)?.validationJson ?? null,
+      parseMetricsJson: (job as any)?.parseMetricsJson ?? null,
+    });
   } catch (error: any) {
     console.error('Get review items error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── Debug endpoint (v2) ──────────────────────────────────────────────────────
+router.get('/jobs/:jobId/debug', async (req: any, res) => {
+  try {
+    const { orgId } = getAuthContext(req);
+    const jobId = String(req.params.jobId);
+
+    const job = await db.query.pnlJobs.findFirst({
+      where: and(eq(pnlJobs.id, jobId), eq(pnlJobs.orgId, orgId)),
+    });
+
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    const parsed = await db.query.pnlParsedStatements.findFirst({
+      where: and(eq(pnlParsedStatements.jobId, jobId), eq(pnlParsedStatements.orgId, orgId)),
+    });
+
+    const pj = parsed?.parsedJson as any;
+
+    // First 50 rows with trace
+    const sampleRows = (pj?.rows ?? []).slice(0, 50).map((r: any) => ({
+      label: r.label,
+      normalizedLabel: r.normalizedLabel,
+      values: r.values,
+      trace: r.trace,
+      mapping: r.mapping ?? null,
+    }));
+
+    res.json({
+      jobId,
+      status: job.status,
+      stage: job.stage,
+      parserVersion: job.parserVersion,
+      parseMetricsJson: (job as any).parseMetricsJson ?? null,
+      validationJson: (job as any).validationJson ?? null,
+      validationStatus: (job as any).validationStatus ?? null,
+      periodsDetected: pj?.periods?.length ?? 0,
+      periods: pj?.periods ?? [],
+      totalRows: pj?.rows?.length ?? 0,
+      sampleRows,
+      rawExtraction: pj?.rawExtraction ?? null,
+    });
+  } catch (error: any) {
+    console.error('Debug endpoint error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1000,57 +1069,6 @@ router.post('/department-verifications/:id/skip', async (req: any, res) => {
     res.json({ success: true, verification });
   } catch (error: any) {
     console.error('Skip department verification error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.get('/keyword-bank', async (req: any, res) => {
-  try {
-    const { orgId } = getAuthContext(req);
-    const source = req.query.source ? String(req.query.source) : undefined;
-    
-    const rules = await getKeywordBankRules(orgId, source);
-    res.json({ rules, total: rules.length });
-  } catch (error: any) {
-    console.error('Get keyword bank error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.patch('/keyword-bank/:id', async (req: any, res) => {
-  try {
-    const { orgId } = getAuthContext(req);
-    const ruleId = String(req.params.id);
-    
-    const schema = z.object({
-      department: z.string().optional(),
-      bucket: z.enum(['Revenue', 'COGS', 'Expense']).optional(),
-      priority: z.number().int().min(0).max(1000).optional(),
-      isActive: z.boolean().optional(),
-    });
-    
-    const parsedBody = schema.safeParse(req.body);
-    if (!parsedBody.success) {
-      return res.status(400).json({ error: parsedBody.error.flatten() });
-    }
-    
-    const updated = await updateKeywordRule(ruleId, orgId, parsedBody.data);
-    res.json({ success: true, rule: updated });
-  } catch (error: any) {
-    console.error('Update keyword rule error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.delete('/keyword-bank/:id', async (req: any, res) => {
-  try {
-    const { orgId } = getAuthContext(req);
-    const ruleId = String(req.params.id);
-    
-    await deleteKeywordRule(ruleId, orgId);
-    res.json({ success: true });
-  } catch (error: any) {
-    console.error('Delete keyword rule error:', error);
     res.status(500).json({ error: error.message });
   }
 });
