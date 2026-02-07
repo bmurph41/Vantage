@@ -16736,7 +16736,68 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
-  // Get all modeling projects for organization
+  // Returns & Valuation - aggregate view of all projects with latest valuation snapshots
+  app.get('/api/modeling/returns-valuation', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { modelingProjects, valuationSnapshots, modelingFinancialPeriods } = await import('@shared/schema');
+
+      const rows = await db.execute(sql`
+        SELECT
+          p.id, p.marina_name, p.city, p.state, p.purchase_price, p.year_1_cap_rate,
+          p.ebitda, p.total_storage_units, p.deal_outcome, p.updated_at,
+          fp.noi AS t12_noi,
+          vs.indicated_value, vs.cap_rate AS snap_cap_rate, vs.noi AS snap_noi,
+          vs.ebitda AS snap_ebitda, vs.irr, vs.equity_multiple, vs.cash_on_cash,
+          vs.gross_revenue, vs.snapshot_date
+        FROM modeling_projects p
+        LEFT JOIN LATERAL (
+          SELECT * FROM valuation_snapshots s
+          WHERE s.modeling_project_id = p.id AND s.org_id = ${orgId}
+          ORDER BY s.snapshot_date DESC
+          LIMIT 1
+        ) vs ON true
+        LEFT JOIN modeling_financial_periods fp
+          ON fp.modeling_project_id = p.id AND fp.org_id = ${orgId} AND fp.period_type = 't12'
+        WHERE p.org_id = ${orgId}
+        ORDER BY p.updated_at DESC
+      `);
+
+      const toNum = (v: any) => v != null ? parseFloat(v) : null;
+
+      const results = rows.rows.map((r: any) => ({
+        id: r.id,
+        marinaName: r.marina_name,
+        city: r.city,
+        state: r.state,
+        purchasePrice: toNum(r.purchase_price),
+        year1CapRate: toNum(r.year_1_cap_rate),
+        ebitda: toNum(r.ebitda),
+        totalStorageUnits: r.total_storage_units,
+        dealOutcome: r.deal_outcome,
+        updatedAt: r.updated_at,
+        t12Noi: toNum(r.t12_noi),
+        snapshot: r.snapshot_date ? {
+          indicatedValue: toNum(r.indicated_value),
+          capRate: toNum(r.snap_cap_rate),
+          noi: toNum(r.snap_noi),
+          ebitda: toNum(r.snap_ebitda),
+          irr: toNum(r.irr),
+          equityMultiple: toNum(r.equity_multiple),
+          cashOnCash: toNum(r.cash_on_cash),
+          grossRevenue: toNum(r.gross_revenue),
+          snapshotDate: r.snapshot_date,
+        } : null,
+      }));
+
+      res.json(results);
+    } catch (error: any) {
+      console.error('Failed to fetch returns & valuation data:', error);
+      res.status(500).json({ error: 'Failed to fetch returns & valuation data' });
+    }
+  });
+
+    // Get all modeling projects for organization
   app.get('/api/modeling/projects', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
