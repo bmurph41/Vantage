@@ -13360,6 +13360,88 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+
+  app.post('/api/sales-comps/import/:importId/submit-reviewed', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { reviewedRows, parentPortfolioId } = req.body;
+
+      if (!reviewedRows || !Array.isArray(reviewedRows)) {
+        return res.status(400).json({ message: "reviewedRows array is required" });
+      }
+
+      const results = {
+        successCount: 0,
+        errorCount: 0,
+        errors: [] as Array<{ row: number; message: string }>,
+      };
+
+      for (let i = 0; i < reviewedRows.length; i++) {
+        const row = reviewedRows[i];
+        try {
+          if (!row.marina || !String(row.marina).trim()) {
+            results.errors.push({ row: i + 1, message: 'Marina name is still missing' });
+            results.errorCount++;
+            continue;
+          }
+
+          const insertData: any = {
+            orgId,
+            createdBy: userId,
+            updatedBy: userId,
+            marina: row.marina,
+            salePrice: row.salePrice || undefined,
+            isPriceDisclosed: Boolean(row.salePrice),
+            capRate: row.capRate || undefined,
+            isCapRateDisclosed: Boolean(row.capRate),
+            noi: row.noi || undefined,
+            isNoiDisclosed: Boolean(row.noi),
+            saleMonth: row.saleMonth || undefined,
+            saleYear: row.saleYear || undefined,
+            state: row.state || undefined,
+            city: row.city || undefined,
+            region: row.region || undefined,
+            wetSlips: row.wetSlips || undefined,
+            dryRacks: row.dryRacks || undefined,
+            ioBoth: row.ioBoth || undefined,
+            bodyOfWater: row.bodyOfWater || undefined,
+            waterfront: row.waterfront || undefined,
+            saleCondition: row.saleCondition || undefined,
+            daysOnMarket: row.daysOnMarket || undefined,
+            broker: row.broker || undefined,
+            agentFirstName: row.agentFirstName || undefined,
+            agentLastName: row.agentLastName || undefined,
+            brokerage: row.brokerage || undefined,
+            address: row.address || undefined,
+            zip: row.zip || undefined,
+            seller: row.seller || undefined,
+            company: row.company || undefined,
+            owner: row.owner || undefined,
+            listPrice: row.listPrice || undefined,
+            acres: row.acres || undefined,
+            occupancy: row.occupancy || undefined,
+            yearBuilt: row.yearBuilt || undefined,
+            notes: row.notes || undefined,
+            articleUrls: row.articleUrls || [],
+            parentPortfolioId: parentPortfolioId || undefined,
+          };
+
+          await storage.createComp(insertData);
+          results.successCount++;
+        } catch (error) {
+          results.errors.push({ row: i + 1, message: (error as Error).message });
+          results.errorCount++;
+        }
+      }
+
+      res.json(results);
+    } catch (error: any) {
+      console.error("Error submitting reviewed records:", error);
+      res.status(500).json({ message: "Failed to submit reviewed records" });
+    }
+  });
+
   // Comp Columns management routes
   app.get('/api/comp-columns', async (req: any, res) => {
     try {

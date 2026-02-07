@@ -9,8 +9,9 @@ export interface RowMatchResult {
   matchedComp?: any;
   confidence: number;
   matchType: 'exact' | 'fuzzy' | 'none';
-  action: 'insert' | 'update' | 'skip';
+  action: 'insert' | 'update' | 'skip' | 'review';
   reason?: string;
+  reviewReasons?: string[];
   fieldChanges?: Array<{
     field: string;
     oldValue: any;
@@ -28,6 +29,7 @@ export interface ImportPlan {
     toInsert: number;
     toUpdate: number;
     toSkip: number;
+    toReview: number;
   };
 }
 
@@ -68,21 +70,52 @@ export class ImportAnalysisService {
     let toInsert = 0;
     let toUpdate = 0;
     let toSkip = 0;
+    let toReview = 0;
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
+      const reviewReasons: string[] = [];
+      
+      const hasAnyData = Object.values(row).some(v => v !== null && v !== undefined && String(v).trim() !== '');
+      if (!hasAnyData) {
+        toSkip++;
+        continue;
+      }
+
+      const hasMarina = row.marina && String(row.marina).trim();
+      const hasCity = row.city && String(row.city).trim();
+      const hasState = row.state && String(row.state).trim();
+
+      if (!hasMarina) reviewReasons.push('Missing marina name');
+      if (!hasCity) reviewReasons.push('Missing city');
+      if (!hasState) reviewReasons.push('Missing state');
+
       const key = this.normalizeMatchKey(row.marina, row.city, row.state);
       
       if (!key) {
-        results.push({
-          rowIndex: i,
-          rowData: row,
-          confidence: 0,
-          matchType: 'none',
-          action: 'skip',
-          reason: 'Missing required fields (marina, city, or state)'
-        });
-        toSkip++;
+        if (hasMarina) {
+          results.push({
+            rowIndex: i,
+            rowData: row,
+            confidence: 0.5,
+            matchType: 'none',
+            action: 'review',
+            reason: 'Incomplete location data - needs review',
+            reviewReasons,
+          });
+          toReview++;
+        } else {
+          results.push({
+            rowIndex: i,
+            rowData: row,
+            confidence: 0,
+            matchType: 'none',
+            action: 'review',
+            reason: 'Missing marina name - needs review',
+            reviewReasons,
+          });
+          toReview++;
+        }
         continue;
       }
 
@@ -150,7 +183,8 @@ export class ImportAnalysisService {
         totalRows: rows.length,
         toInsert,
         toUpdate,
-        toSkip
+        toSkip,
+        toReview
       }
     };
   }

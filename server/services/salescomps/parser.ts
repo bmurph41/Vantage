@@ -269,20 +269,22 @@ export class ParserService {
       const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
       
       headers = jsonData[0] as string[];
-      data = (jsonData.slice(1, 201) as any[][]).map((row: any[]) => {
+      data = (jsonData.slice(1) as any[][]).map((row: any[]) => {
         const obj: Record<string, any> = {};
         headers.forEach((header, idx) => {
           obj[header] = row[idx];
         });
         return obj;
+      }).filter(row => {
+        const values = Object.values(row);
+        return values.some(v => v !== null && v !== undefined && String(v).trim() !== '');
       });
     } else {
-      // CSV parsing
+      // CSV parsing - parse ALL rows (no preview limit)
       const csvText = file.buffer.toString('utf-8');
       const parseResult = Papa.parse(csvText, {
         header: true,
-        skipEmptyLines: true,
-        preview: 200,
+        skipEmptyLines: 'greedy',
       });
       
       data = parseResult.data as Record<string, any>[];

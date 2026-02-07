@@ -173,6 +173,14 @@ export const salesCompsApi = {
     const response = await apiRequest('GET', `/api/sales-comps/import/${importId}/status`);
     return await response.json();
   },
+
+  submitReviewedRows: async (importId: string, reviewedRows: any[], parentPortfolioId?: string): Promise<any> => {
+    const response = await apiRequest('POST', `/api/sales-comps/import/${importId}/submit-reviewed`, {
+      reviewedRows,
+      parentPortfolioId,
+    });
+    return await response.json();
+  },
 };
 
 export const columnsApi = {

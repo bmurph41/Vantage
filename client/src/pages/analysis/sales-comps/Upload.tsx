@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ArrowLeft, Upload as UploadIcon, X, Check, AlertTriangle, Plus } from "lucide-react";
+import { ArrowLeft, Upload as UploadIcon, X, Check, AlertTriangle, Plus, Pencil, Eye } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { salesCompsApi } from "@/lib/salescomps/api";
@@ -25,7 +25,7 @@ interface UploadProps {
 
 export default function Upload({ onClose, onImportComplete }: UploadProps) {
   const { toast } = useToast();
-  const [step, setStep] = useState<'upload' | 'mapping' | 'mode' | 'preview' | 'duplicates' | 'processing' | 'complete'>('upload');
+  const [step, setStep] = useState<'upload' | 'mapping' | 'mode' | 'preview' | 'review' | 'processing' | 'complete'>('upload');
   const [uploadData, setUploadData] = useState<{
     importId: string;
     analysis: any;
@@ -43,14 +43,17 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
     toInsert: number;
     toUpdate: number;
     toSkip: number;
-    duplicateMatches: Array<{ row: any; match: any; confidence: number; action: 'insert' | 'update' | 'skip'; rowIndex: number }>;
+    toReview: number;
+    duplicateMatches: Array<{ row: any; match: any; confidence: number; action: 'insert' | 'update' | 'skip' | 'review'; rowIndex: number }>;
     plan?: {
-      rows: Array<{ rowIndex: number; rowData: any; action: 'insert' | 'update' | 'skip'; confidence: number; matchedComp?: any; reason?: string }>;
-      summary: { toInsert: number; toUpdate: number; toSkip: number };
+      rows: Array<{ rowIndex: number; rowData: any; action: 'insert' | 'update' | 'skip' | 'review'; confidence: number; matchedComp?: any; reason?: string; reviewReasons?: string[] }>;
+      summary: { toInsert: number; toUpdate: number; toSkip: number; toReview: number };
     };
   } | null>(null);
   const [excludedRows, setExcludedRows] = useState<number[]>([]);
-  const [selectedFilter, setSelectedFilter] = useState<'insert' | 'update' | 'skip' | null>(null);
+  const [selectedFilter, setSelectedFilter] = useState<'insert' | 'update' | 'skip' | 'review' | null>(null);
+  const [reviewRows, setReviewRows] = useState<Array<{ rowIndex: number; rowData: Record<string, any>; reasons: string[]; editing: boolean }>>([]);
+  const [importResults, setImportResults] = useState<any>(null);
   const [linkToPortfolio, setLinkToPortfolio] = useState(false);
   const [selectedPortfolioId, setSelectedPortfolioId] = useState<string>("");
   const [showNewPortfolioDialog, setShowNewPortfolioDialog] = useState(false);
@@ -217,6 +220,19 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
   });
 
 
+  const submitReviewMutation = useMutation({
+    mutationFn: ({ importId, reviewedRows, parentPortfolioId }: any) =>
+      salesCompsApi.submitReviewedRows(importId, reviewedRows, parentPortfolioId),
+    onSuccess: (data) => {
+      toast({
+        title: "Review Records Submitted",
+        description: `${data.successCount} reviewed records imported successfully${data.errorCount > 0 ? `, ${data.errorCount} failed` : ''}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['comps'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/sales-comps'] });
+    },
+  });
+
   const handleBack = () => {
     if (step === 'mapping') {
       setStep('upload');
@@ -224,16 +240,16 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
       setStep('mapping');
     } else if (step === 'preview') {
       setStep('mode');
+    } else if (step === 'review') {
+      setStep('preview');
     }
   };
 
   const handleNextFromMapping = () => {
-    // After mapping, go to mode selection
     setStep('mode');
   };
 
   const handleNextFromMode = () => {
-    // After mode selection, preview the import
     if (!uploadData) return;
     
     previewMutation.mutate({
@@ -246,9 +262,20 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
   };
 
   const handleConfirmImport = () => {
-    // From preview, commit the import
     if (!uploadData) return;
     
+    const reviewRowsFromPlan = previewData?.plan?.rows?.filter(r => r.action === 'review') || [];
+    if (reviewRowsFromPlan.length > 0) {
+      setReviewRows(reviewRowsFromPlan.map(r => ({
+        rowIndex: r.rowIndex,
+        rowData: { ...r.rowData },
+        reasons: r.reviewReasons || ['Needs review'],
+        editing: false,
+      })));
+      setStep('review');
+      return;
+    }
+
     commitMutation.mutate({
       importId: uploadData.importId,
       mapping,
@@ -260,6 +287,65 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
     });
   };
 
+  const handleCommitWithoutReview = () => {
+    if (!uploadData) return;
+    const reviewRowIndices = reviewRows.map(r => r.rowIndex);
+    commitMutation.mutate({
+      importId: uploadData.importId,
+      mapping,
+      normalization,
+      excludedRows: [...excludedRows, ...reviewRowIndices],
+      parentPortfolioId: linkToPortfolio ? selectedPortfolioId : undefined,
+      importMode,
+      updateBlankValues,
+    });
+  };
+
+  const handleCommitWithReview = async () => {
+    if (!uploadData) return;
+    const reviewRowIndices = reviewRows.map(r => r.rowIndex);
+    
+    commitMutation.mutate({
+      importId: uploadData.importId,
+      mapping,
+      normalization,
+      excludedRows: [...excludedRows, ...reviewRowIndices],
+      parentPortfolioId: linkToPortfolio ? selectedPortfolioId : undefined,
+      importMode,
+      updateBlankValues,
+    });
+
+    const completedReviewRows = reviewRows
+      .filter(r => r.rowData.marina && String(r.rowData.marina).trim())
+      .map(r => r.rowData);
+    
+    if (completedReviewRows.length > 0) {
+      submitReviewMutation.mutate({
+        importId: uploadData.importId,
+        reviewedRows: completedReviewRows,
+        parentPortfolioId: linkToPortfolio ? selectedPortfolioId : undefined,
+      });
+    }
+  };
+
+  const updateReviewRow = (rowIndex: number, field: string, value: any) => {
+    setReviewRows(prev => prev.map(r => 
+      r.rowIndex === rowIndex 
+        ? { ...r, rowData: { ...r.rowData, [field]: value } }
+        : r
+    ));
+  };
+
+  const toggleReviewRowEditing = (rowIndex: number) => {
+    setReviewRows(prev => prev.map(r => 
+      r.rowIndex === rowIndex ? { ...r, editing: !r.editing } : r
+    ));
+  };
+
+  const removeReviewRow = (rowIndex: number) => {
+    setReviewRows(prev => prev.filter(r => r.rowIndex !== rowIndex));
+  };
+
   const getActiveImportCount = () => {
     if (!previewData?.plan?.rows) {
       return (previewData?.toInsert || 0) + (previewData?.toUpdate || 0);
@@ -267,6 +353,10 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
     return previewData.plan.rows.filter(r => 
       (r.action === 'insert' || r.action === 'update') && !excludedRows.includes(r.rowIndex)
     ).length;
+  };
+
+  const getReviewCount = () => {
+    return previewData?.toReview || 0;
   };
 
 
@@ -469,6 +559,52 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
     </div>
   );
 
+  const renderMappingVerification = () => {
+    if (!uploadData?.analysis || !mapping) return null;
+    const mappedFields = Object.entries(mapping).filter(([_, target]) => target);
+    const sampleData = uploadData.analysis.sampleRows?.slice(0, 3) || [];
+
+    return (
+      <Card className="p-4 mb-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Eye className="h-4 w-4 text-primary" />
+          <h4 className="font-medium text-foreground">Mapping Verification</h4>
+          <span className="text-xs text-muted-foreground">({mappedFields.length} fields mapped)</span>
+        </div>
+        <p className="text-xs text-muted-foreground mb-3">
+          Verify how your data will be mapped. Showing first {sampleData.length} rows as a preview.
+        </p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">Row</th>
+                {mappedFields.map(([source, target]) => (
+                  <th key={source} className="px-2 py-1.5 text-left">
+                    <div className="font-medium text-foreground">{target}</div>
+                    <div className="font-normal text-muted-foreground truncate max-w-[100px]">{source}</div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {sampleData.map((row: any, idx: number) => (
+                <tr key={idx} className="border-b border-border/50">
+                  <td className="px-2 py-1.5 text-muted-foreground">{idx + 1}</td>
+                  {mappedFields.map(([source]) => (
+                    <td key={source} className="px-2 py-1.5 truncate max-w-[120px]">
+                      {row[source] !== null && row[source] !== undefined ? String(row[source]) : <span className="text-muted-foreground italic">empty</span>}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    );
+  };
+
   const renderPreviewStep = () => {
     const getFilteredRows = () => {
       if (!previewData?.plan?.rows || !selectedFilter) return [];
@@ -477,8 +613,9 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
 
     const filteredRows = getFilteredRows();
 
-    const getActiveCount = (action: 'insert' | 'update' | 'skip') => {
+    const getActiveCount = (action: 'insert' | 'update' | 'skip' | 'review') => {
       if (!previewData?.plan?.rows) return 0;
+      if (action === 'review') return previewData.plan.rows.filter(r => r.action === 'review').length;
       return previewData.plan.rows.filter(r => r.action === action && !excludedRows.includes(r.rowIndex)).length;
     };
 
@@ -503,13 +640,15 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
     return (
       <div>
         <div className="mb-6">
-          <h3 className="text-lg font-medium text-foreground mb-2">Step 4: Preview Import</h3>
-          <p className="text-sm text-muted-foreground">Click a category to view and manage records</p>
+          <h3 className="text-lg font-medium text-foreground mb-2">Step 4: Preview & Verify Import</h3>
+          <p className="text-sm text-muted-foreground">Verify mapping accuracy and review record categories before importing</p>
         </div>
+
+        {renderMappingVerification()}
 
         {previewData && (
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
+            <div className={`grid gap-4 ${getActiveCount('review') > 0 ? 'grid-cols-4' : 'grid-cols-3'}`}>
               <Card 
                 className={`p-4 text-center cursor-pointer transition-all hover:border-green-500 ${selectedFilter === 'insert' ? 'ring-2 ring-green-500 border-green-500' : ''}`}
                 onClick={() => setSelectedFilter(selectedFilter === 'insert' ? null : 'insert')}
@@ -538,6 +677,17 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
                   </div>
                 )}
               </Card>
+              {getActiveCount('review') > 0 && (
+                <Card 
+                  className={`p-4 text-center cursor-pointer transition-all hover:border-amber-500 ${selectedFilter === 'review' ? 'ring-2 ring-amber-500 border-amber-500' : ''}`}
+                  onClick={() => setSelectedFilter(selectedFilter === 'review' ? null : 'review')}
+                >
+                  <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                    {getActiveCount('review')}
+                  </div>
+                  <div className="text-sm text-muted-foreground mt-1">Need review</div>
+                </Card>
+              )}
               <Card 
                 className={`p-4 text-center cursor-pointer transition-all hover:border-gray-500 ${selectedFilter === 'skip' ? 'ring-2 ring-gray-500 border-gray-500' : ''}`}
                 onClick={() => setSelectedFilter(selectedFilter === 'skip' ? null : 'skip')}
@@ -556,9 +706,10 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
                     {selectedFilter === 'insert' && 'Records to Add'}
                     {selectedFilter === 'update' && 'Records to Update'}
                     {selectedFilter === 'skip' && 'Records to Skip'}
+                    {selectedFilter === 'review' && 'Records Needing Review'}
                     <span className="text-muted-foreground font-normal ml-2">({filteredRows.length} records)</span>
                   </h4>
-                  {selectedFilter !== 'skip' && (
+                  {selectedFilter !== 'skip' && selectedFilter !== 'review' && (
                     <div className="flex gap-2">
                       <Button 
                         variant="outline" 
@@ -585,7 +736,7 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
                         key={i} 
                         className={`flex items-center gap-3 p-2 rounded text-sm ${isExcluded ? 'bg-muted/30 opacity-60' : 'bg-muted/50'}`}
                       >
-                        {selectedFilter !== 'skip' && (
+                        {selectedFilter !== 'skip' && selectedFilter !== 'review' && (
                           <Checkbox
                             checked={!isExcluded}
                             onCheckedChange={() => toggleRowExclusion(row.rowIndex)}
@@ -593,7 +744,7 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
                         )}
                         <div className="flex-1 min-w-0">
                           <span className={`font-medium ${isExcluded ? 'line-through' : ''}`}>
-                            {row.rowData.marina || 'Unknown'}
+                            {row.rowData.marina || <span className="italic text-amber-600">No marina name</span>}
                           </span>
                           <span className="text-muted-foreground ml-2">
                             {row.rowData.city && row.rowData.state ? `(${row.rowData.city}, ${row.rowData.state})` : ''}
@@ -604,12 +755,7 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
                             </span>
                           )}
                         </div>
-                        {row.confidence > 0 && (
-                          <span className="text-xs text-muted-foreground">
-                            {Math.round(row.confidence * 100)}% match
-                          </span>
-                        )}
-                        {row.reason && selectedFilter === 'skip' && (
+                        {row.reason && (selectedFilter === 'skip' || selectedFilter === 'review') && (
                           <span className="text-xs text-muted-foreground italic">
                             {row.reason}
                           </span>
@@ -617,9 +763,10 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
                         <span className={`text-xs px-2 py-1 rounded ${
                           selectedFilter === 'insert' ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' :
                           selectedFilter === 'update' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' :
+                          selectedFilter === 'review' ? 'bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300' :
                           'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
                         }`}>
-                          {selectedFilter === 'insert' ? 'Add' : selectedFilter === 'update' ? 'Update' : 'Skip'}
+                          {selectedFilter === 'insert' ? 'Add' : selectedFilter === 'update' ? 'Update' : selectedFilter === 'review' ? 'Review' : 'Skip'}
                         </span>
                       </div>
                     );
@@ -655,10 +802,118 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
     );
   };
 
+  const renderReviewStep = () => {
+    const REVIEW_FIELDS = [
+      { key: 'marina', label: 'Marina Name', required: true },
+      { key: 'city', label: 'City' },
+      { key: 'state', label: 'State' },
+      { key: 'salePrice', label: 'Sale Price' },
+      { key: 'saleYear', label: 'Sale Year' },
+      { key: 'wetSlips', label: 'Wet Slips' },
+      { key: 'dryRacks', label: 'Dry Racks' },
+      { key: 'address', label: 'Address' },
+      { key: 'zip', label: 'ZIP' },
+      { key: 'capRate', label: 'Cap Rate' },
+      { key: 'noi', label: 'NOI' },
+      { key: 'notes', label: 'Notes' },
+    ];
+
+    const completedCount = reviewRows.filter(r => r.rowData.marina && String(r.rowData.marina).trim()).length;
+
+    return (
+      <div>
+        <div className="mb-6">
+          <h3 className="text-lg font-medium text-foreground mb-2">Step 5: Review Incomplete Records</h3>
+          <p className="text-sm text-muted-foreground">
+            {reviewRows.length} record(s) need your attention. Edit to complete or remove records you don't want to import.
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">{completedCount}</span> of {reviewRows.length} ready to import
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setReviewRows(prev => prev.map(r => ({ ...r, editing: true })))}>
+              Edit All
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setReviewRows(prev => prev.map(r => ({ ...r, editing: false })))}>
+              Collapse All
+            </Button>
+          </div>
+        </div>
+
+        <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+          {reviewRows.map((row, idx) => (
+            <Card key={row.rowIndex} className={`p-3 ${row.rowData.marina ? 'border-green-200 dark:border-green-800' : 'border-amber-200 dark:border-amber-800'}`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono text-muted-foreground">Row {row.rowIndex + 1}</span>
+                  {row.reasons.map((reason, ri) => (
+                    <span key={ri} className="text-xs px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300">
+                      {reason}
+                    </span>
+                  ))}
+                  {row.rowData.marina && String(row.rowData.marina).trim() && (
+                    <Check className="h-3.5 w-3.5 text-green-600" />
+                  )}
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => toggleReviewRowEditing(row.rowIndex)}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => removeReviewRow(row.rowIndex)}>
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+
+              {!row.editing ? (
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                  {REVIEW_FIELDS.filter(f => row.rowData[f.key]).map(f => (
+                    <span key={f.key}>
+                      <span className="text-muted-foreground">{f.label}:</span>{' '}
+                      <span className="text-foreground">{String(row.rowData[f.key])}</span>
+                    </span>
+                  ))}
+                  {!row.rowData.marina && (
+                    <span className="text-amber-600 italic cursor-pointer" onClick={() => toggleReviewRowEditing(row.rowIndex)}>
+                      Click edit to add marina name
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {REVIEW_FIELDS.map(f => (
+                    <div key={f.key}>
+                      <Label className="text-xs text-muted-foreground">{f.label}{f.required ? ' *' : ''}</Label>
+                      <Input
+                        className="h-7 text-xs"
+                        value={row.rowData[f.key] || ''}
+                        onChange={(e) => updateReviewRow(row.rowIndex, f.key, e.target.value)}
+                        placeholder={f.label}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          ))}
+        </div>
+
+        {reviewRows.length === 0 && (
+          <Card className="p-8 text-center text-muted-foreground">
+            All review records have been removed. Click "Import" to proceed with the main records.
+          </Card>
+        )}
+      </div>
+    );
+  };
+
   const renderProcessingStep = () => (
     <div>
       <div className="mb-6">
-        <h3 className="text-lg font-medium text-foreground mb-2">Step 5: Importing Data</h3>
+        <h3 className="text-lg font-medium text-foreground mb-2">Importing Data</h3>
         <p className="text-sm text-muted-foreground">Processing your file and importing records</p>
       </div>
 
@@ -710,6 +965,7 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
           <h3 className="text-lg font-medium text-foreground mb-2">Import Complete</h3>
           <p className="text-sm text-muted-foreground mb-4">
             Successfully imported {importStatus.summary?.successCount || 0} records
+            {importStatus.summary?.reviewCount > 0 && ` (${importStatus.summary.reviewCount} sent to review)`}
           </p>
           {importStatus.summary?.errorCount > 0 && (
             <p className="text-sm text-destructive mb-4">
@@ -763,6 +1019,7 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
           {step === 'mapping' && renderMappingStep()}
           {step === 'mode' && renderModeStep()}
           {step === 'preview' && renderPreviewStep()}
+          {step === 'review' && renderReviewStep()}
           {step === 'processing' && renderProcessingStep()}
           {step === 'complete' && renderCompleteStep()}
         </div>
@@ -776,10 +1033,10 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
               disabled={step === 'upload' || step === 'processing' || step === 'complete'}
               data-testid="button-back"
             >
-              {(step === 'mapping' || step === 'mode' || step === 'preview') && (
+              {(step === 'mapping' || step === 'mode' || step === 'preview' || step === 'review') && (
                 <ArrowLeft className="h-4 w-4 mr-2" />
               )}
-              {(step === 'mapping' || step === 'mode' || step === 'preview') ? 'Back' : ''}
+              {(step === 'mapping' || step === 'mode' || step === 'preview' || step === 'review') ? 'Back' : ''}
             </Button>
             
             <div className="flex items-center gap-2">
@@ -819,8 +1076,30 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
                   disabled={commitMutation.isPending}
                   data-testid="button-confirm-import"
                 >
-                  {commitMutation.isPending ? 'Starting Import...' : `Confirm & Import ${getActiveImportCount()} Records`}
+                  {commitMutation.isPending ? 'Starting Import...' : getReviewCount() > 0 
+                    ? `Next: Review ${getReviewCount()} Records & Import ${getActiveImportCount()}`
+                    : `Confirm & Import ${getActiveImportCount()} Records`}
                 </Button>
+              )}
+
+              {step === 'review' && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleCommitWithoutReview}
+                    disabled={commitMutation.isPending || submitReviewMutation.isPending}
+                  >
+                    Skip Review Records
+                  </Button>
+                  <Button 
+                    onClick={handleCommitWithReview}
+                    disabled={commitMutation.isPending || submitReviewMutation.isPending}
+                  >
+                    {(commitMutation.isPending || submitReviewMutation.isPending) 
+                      ? 'Importing...' 
+                      : `Import All (${getActiveImportCount() + reviewRows.filter(r => r.rowData.marina && String(r.rowData.marina).trim()).length} Records)`}
+                  </Button>
+                </div>
               )}
             </div>
           </div>

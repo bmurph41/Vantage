@@ -479,6 +479,7 @@ export class CompService {
       toInsert: plan.summary.toInsert,
       toUpdate: plan.summary.toUpdate,
       toSkip: plan.summary.toSkip,
+      toReview: plan.summary.toReview,
       duplicateMatches,
       plan
     };
@@ -530,6 +531,8 @@ export class CompService {
         insertedCount: 0,
         updatedCount: 0,
         skippedCount: 0,
+        reviewCount: 0,
+        reviewRows: [] as Array<{ rowIndex: number; rowData: any; reasons: string[]; originalRow: any }>,
         pendingPropertiesCreated: 0,
         pendingCompaniesCreated: 0,
         pendingContactsCreated: 0,
@@ -548,10 +551,15 @@ export class CompService {
         try {
           const transformedData = planRow.rowData;
           
-          // Validate required fields
-          if (!transformedData.marina) {
-            results.errors.push({ row: rowNumber, message: 'Marina name is required' });
-            results.errorCount++;
+          // Handle review rows - store for user review instead of rejecting
+          if (planRow.action === 'review') {
+            results.reviewRows.push({
+              rowIndex: planRow.rowIndex,
+              rowData: transformedData,
+              reasons: planRow.reviewReasons || ['Needs review'],
+              originalRow: importRecord.parsedData[planRow.rowIndex],
+            });
+            results.reviewCount++;
             continue;
           }
 
