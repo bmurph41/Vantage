@@ -17,12 +17,14 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import DuplicateResolutionModal from "@/components/modals/duplicate-resolution-modal";
+import { PendingContactDetailDialog } from "@/components/pending-contact-detail-dialog";
 import type { PendingContact, CrmContact } from "@shared/schema";
 
 export default function PendingContacts() {
   const [selectedPending, setSelectedPending] = useState<PendingContact | null>(null);
   const [selectedExisting, setSelectedExisting] = useState<CrmContact | null>(null);
   const [showDuplicatesDialog, setShowDuplicatesDialog] = useState(false);
+  const [showDetailDialog, setShowDetailDialog] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -194,6 +196,10 @@ export default function PendingContacts() {
                       key={pending.id}
                       className="cursor-pointer hover:bg-muted/50"
                       data-testid={`row-pending-contact-${pending.id}`}
+                      onClick={() => {
+                        setSelectedPending(pending);
+                        setShowDetailDialog(true);
+                      }}
                     >
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2" data-testid={`text-contact-name-${pending.id}`}>
@@ -310,6 +316,12 @@ export default function PendingContacts() {
         onAccept={handleAcceptWithMode}
         onReject={handleReject}
         isLoading={acceptMutation.isPending || rejectMutation.isPending}
+      />
+
+      <PendingContactDetailDialog
+        pending={selectedPending}
+        open={showDetailDialog}
+        onOpenChange={setShowDetailDialog}
       />
     </div>
   );

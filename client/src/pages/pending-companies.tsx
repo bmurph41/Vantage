@@ -17,14 +17,14 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import DuplicateResolutionModal from "@/components/modals/duplicate-resolution-modal";
-import CompanyFormModal from "@/components/modals/company-form-modal";
+import { PendingCompanyDetailDialog } from "@/components/pending-company-detail-dialog";
 import type { PendingCompany, CrmCompany } from "@shared/schema";
 
 export default function PendingCompanies() {
   const [selectedPending, setSelectedPending] = useState<PendingCompany | null>(null);
   const [selectedExisting, setSelectedExisting] = useState<CrmCompany | null>(null);
   const [showDuplicatesDialog, setShowDuplicatesDialog] = useState(false);
-  const [showCompanyFormModal, setShowCompanyFormModal] = useState(false);
+  const [showDetailDialog, setShowDetailDialog] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -113,20 +113,7 @@ export default function PendingCompanies() {
 
   const handleEditDetails = () => {
     setShowDuplicatesDialog(false);
-    setShowCompanyFormModal(true);
-  };
-
-  const handleCompanyFormClose = () => {
-    setShowCompanyFormModal(false);
-    setSelectedPending(null);
-  };
-
-  const handleCompanyFormSuccess = () => {
-    setShowCompanyFormModal(false);
-    queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-companies'] });
-    if (selectedPending) {
-      setShowDuplicatesDialog(true);
-    }
+    setShowDetailDialog(true);
   };
 
   const formatDate = (dateString: string) => {
@@ -223,7 +210,7 @@ export default function PendingCompanies() {
                       data-testid={`row-pending-company-${pending.id}`}
                       onClick={() => {
                         setSelectedPending(pending);
-                        setShowCompanyFormModal(true);
+                        setShowDetailDialog(true);
                       }}
                     >
                       <TableCell className="font-medium">
@@ -347,36 +334,10 @@ export default function PendingCompanies() {
         isLoading={acceptMutation.isPending || rejectMutation.isPending}
       />
 
-      <CompanyFormModal
-        isOpen={showCompanyFormModal}
-        onClose={handleCompanyFormClose}
-        onSuccess={handleCompanyFormSuccess}
-        pendingCompanyId={selectedPending?.id}
-        company={selectedPending ? {
-          id: '',
-          orgId: '',
-          name: selectedPending.name || '',
-          domain: '',
-          industry: selectedPending.industry || '',
-          size: '',
-          address: selectedPending.address || '',
-          phone: selectedPending.phone || '',
-          website: selectedPending.website || '',
-          description: '',
-          city: selectedPending.city || '',
-          state: selectedPending.state || '',
-          zipCode: selectedPending.zipCode || '',
-          country: '',
-          linkedInUrl: '',
-          twitterHandle: '',
-          annualRevenue: null,
-          employeeCount: null,
-          tags: [],
-          metadata: {},
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          ownerId: null,
-        } : null}
+      <PendingCompanyDetailDialog
+        pending={selectedPending}
+        open={showDetailDialog}
+        onOpenChange={setShowDetailDialog}
       />
     </div>
   );
