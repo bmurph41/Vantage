@@ -368,7 +368,7 @@ export const sidebarConfig: SidebarGroup[] = [
     id: 'operations',
     label: 'Operations',
     icon: Wrench,
-    matchRoutes: ['/operations', '/portfolio', '/dockit', '/commercial-tenants', '/fuel-sales', '/ship-store', '/service-dept', '/boat-rentals', '/boat-club', '/boat-sales', '/bookkeeping'],
+    matchRoutes: ['/operations', '/portfolio', '/dockit', '/commercial-tenants', '/fuel-sales', '/ship-store', '/service-dept', '/boat-rentals', '/boat-club', '/boat-sales', '/bookkeeping','/payroll'],
     requiredModules: [FEATURE_MODULES.OPS_PORTFOLIO],
     defaultExpanded: false,
     children: [
@@ -427,6 +427,14 @@ export const sidebarConfig: SidebarGroup[] = [
         icon: WrenchIcon,
         matchRoutes: ['/operations/service-dept', '/service-dept'],
         requiredModules: [FEATURE_MODULES.OPS_SERVICE],
+      },
+      {
+        id: 'payroll',
+        label: 'Payroll',
+        href: '/operations/payroll',
+        icon: DollarSign,
+        matchRoutes: ['/operations/payroll', '/payroll'],
+        requiredModules: [FEATURE_MODULES.OPS_PAYROLL],
       },
       {
         id: 'boat-rentals',

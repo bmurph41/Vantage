@@ -63,7 +63,8 @@ export const FEATURE_MODULES = {
   OPS_RENTALS: 'ops.rentals',           // Boat Rentals
   OPS_CLUB: 'ops.club',                 // Boat Club
   OPS_SALES: 'ops.sales',               // Boat Sales
-  OPS_BOOKKEEPING: 'ops.bookkeeping',   // Bookkeeping
+  OPS_BOOKKEEPING: 'ops.bookkeeping',
+  OPS_PAYROLL: 'ops.payroll',           // Payroll
 
   // ─────────────────────────────────────────────────────────────
   // INTEGRATIONS MODULES
@@ -322,6 +323,13 @@ export const MODULE_INFO: Record<FeatureModule, ModuleInfo> = {
     category: 'Operations',
     includedIn: ['owner-operator', 'full-platform'],
   },
+  [FEATURE_MODULES.OPS_PAYROLL]: {
+    key: FEATURE_MODULES.OPS_PAYROLL,
+    name: 'Payroll',
+    description: 'Staff payroll and labor cost management',
+    category: 'Operations',
+    includedIn: ['owner-operator', 'full-platform'],
+  },
 
   // Integrations
   [FEATURE_MODULES.INTEGRATIONS_MARKETPLACE]: {
@@ -448,6 +456,7 @@ export const SUBSCRIPTION_PACKAGES: SubscriptionPackage[] = [
       FEATURE_MODULES.OPS_CLUB,
       FEATURE_MODULES.OPS_SALES,
       FEATURE_MODULES.OPS_BOOKKEEPING,
+      FEATURE_MODULES.OPS_PAYROLL,
     ],
     features: [
       'Contact & Property Management',
