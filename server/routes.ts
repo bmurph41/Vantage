@@ -13427,8 +13427,95 @@ Current context: Project ${req.params.projectId}`;
             parentPortfolioId: parentPortfolioId || undefined,
           };
 
-          await storage.createComp(insertData);
+          const createdComp = await storage.createComp(insertData);
           results.successCount++;
+
+          // Create pending entities from reviewed rows
+          if (createdComp) {
+            // Pending Property - only when no existing property match found
+            const matchedProperty = await storage.findPropertyByLocation(orgId, String(row.marina).trim(), row.city, row.state).catch(() => null);
+            if (row.marina && String(row.marina).trim() && !matchedProperty) {
+              try {
+                const propDuplicates = await DuplicateDetectionService.findPropertyDuplicates({
+                  title: String(row.marina).trim(),
+                  city: row.city,
+                  state: row.state,
+                  address: row.address,
+                }, orgId);
+                await storage.createPendingProperty({
+                  orgId,
+                  sourceType: 'sales_comp',
+                  compId: createdComp.id,
+                  marinaName: String(row.marina).trim(),
+                  city: row.city || undefined,
+                  state: row.state || undefined,
+                  address: row.address || undefined,
+                  salePrice: row.salePrice ? parseInt(row.salePrice) : undefined,
+                  status: 'pending',
+                  suggestedDuplicates: propDuplicates.matches.map((m: any) => m.existingEntity.id),
+                  compMetadata: { salesCompId: createdComp.id },
+                  createdBy: userId,
+                });
+              } catch (err) { console.error('Error creating pending property from review:', err); }
+            }
+
+            // Pending Companies: Seller Company, Buyer Company, Brokerage
+            const companyEntries = [
+              { name: (row.sellerCompany || row.seller || '').trim(), role: 'seller' },
+              { name: (row.buyerCompany || row.company || '').trim(), role: 'buyer' },
+              { name: (row.brokerage || '').trim(), role: 'brokerage' },
+            ];
+            for (const entry of companyEntries) {
+              if (entry.name) {
+                try {
+                  const dupes = await DuplicateDetectionService.findCompanyDuplicates({ name: entry.name }, orgId);
+                  await storage.createPendingCompany({
+                    orgId,
+                    name: entry.name,
+                    city: row.city || undefined,
+                    state: row.state || undefined,
+                    status: 'pending',
+                    suggestedDuplicates: dupes.matches.map((m: any) => m.existingEntity.id),
+                    sourceMetadata: { salesCompId: createdComp.id, role: entry.role },
+                    createdBy: userId,
+                  });
+                } catch (err) { console.error('Error creating pending ' + entry.role + ' company from review:', err); }
+              }
+            }
+
+            // Pending Contacts: Seller Principal, Buyer Principal, Agent
+            const contactEntries: Array<{name: string; role: string}> = [
+              { name: (row.sellerPrincipal || '').trim(), role: 'seller_principal' },
+              { name: (row.buyerPrincipal || '').trim(), role: 'buyer_principal' },
+            ];
+            const agentName = (row.agentFirstName && row.agentLastName)
+              ? (row.agentFirstName.trim() + ' ' + row.agentLastName.trim())
+              : (row.broker || '').trim();
+            if (agentName) contactEntries.push({ name: agentName, role: 'agent' });
+
+            for (const entry of contactEntries) {
+              if (entry.name) {
+                try {
+                  const parts = entry.name.split(' ');
+                  const firstName = parts[0] || '';
+                  const lastName = parts.slice(1).join(' ') || '';
+                  const dupes = await DuplicateDetectionService.findContactDuplicates({ firstName, lastName, fullName: entry.name }, orgId);
+                  await storage.createPendingContact({
+                    orgId,
+                    sourceType: 'sales_comp',
+                    sourceId: createdComp.id,
+                    firstName: firstName || undefined,
+                    lastName: lastName || undefined,
+                    fullName: entry.name,
+                    status: 'pending',
+                    suggestedDuplicates: dupes.matches.map((m: any) => m.existingEntity.id),
+                    sourceMetadata: { compId: createdComp.id, marina: row.marina, role: entry.role },
+                    createdBy: userId,
+                  });
+                } catch (err) { console.error('Error creating pending ' + entry.role + ' contact from review:', err); }
+              }
+            }
+          }
         } catch (error) {
           results.errors.push({ row: i + 1, message: (error as Error).message });
           results.errorCount++;

@@ -644,51 +644,56 @@ export class CompService {
             results.insertedCount++;
             results.successCount++;
 
-            // NOTE: Pending property profiles are NOT created during sales comp import.
-            // Sales comps are the source of truth for transaction data.
-            // Pending sales comps are only created when users add transaction data to CRM Properties.
-
-            // Create pending buyer company for user confirmation
-            if (createdComp && transformedData.company && transformedData.company.trim()) {
+            // === PENDING PROPERTIES ===
+            // Create pending property from marina name + address for CRM linking
+            if (createdComp && transformedData.marina && transformedData.marina.trim() && !propertyId) {
               try {
-                const companyData = {
-                  name: transformedData.company.trim(),
-                };
-                
-                // Find potential duplicates to suggest to user
-                const companyDuplicates = await DuplicateDetectionService.findCompanyDuplicates(companyData, orgId);
-                const suggestedDuplicates = companyDuplicates.matches.map(m => m.existingEntity.id);
-                
-                // Always create pending company for user review/confirmation
-                await this.storage.createPendingCompany({
+                const propDuplicates = await DuplicateDetectionService.findPropertyDuplicates({
+                  title: transformedData.marina.trim(),
+                  city: transformedData.city,
+                  state: transformedData.state,
+                  address: transformedData.address,
+                }, orgId);
+                const suggestedDuplicates = propDuplicates.matches.map(m => m.existingEntity.id);
+
+                await this.storage.createPendingProperty({
                   orgId,
-                  name: transformedData.company.trim(),
+                  sourceType: 'sales_comp',
+                  compId: createdComp.id,
+                  marinaName: transformedData.marina.trim(),
+                  city: transformedData.city || undefined,
+                  state: transformedData.state || undefined,
+                  address: transformedData.address || undefined,
+                  salePrice: transformedData.salePrice ? parseInt(transformedData.salePrice) : undefined,
                   status: 'pending',
                   suggestedDuplicates,
-                  sourceMetadata: { salesCompId: createdComp.id, role: 'buyer' },
+                  compMetadata: {
+                    salesCompId: createdComp.id,
+                    wetSlips: transformedData.wetSlips,
+                    dryRacks: transformedData.dryRacks,
+                    capRate: transformedData.capRate,
+                    noi: transformedData.noi,
+                  },
                   createdBy: userId,
                 });
-                results.pendingCompaniesCreated = (results.pendingCompaniesCreated || 0) + 1;
+                results.pendingPropertiesCreated = (results.pendingPropertiesCreated || 0) + 1;
               } catch (error) {
-                console.error('Error processing buyer company duplicate detection:', error);
+                console.error('Error creating pending property:', error);
               }
             }
 
-            // Create pending seller company for user confirmation
-            if (createdComp && transformedData.seller && transformedData.seller.trim()) {
+            // === PENDING COMPANIES ===
+            // Seller Company (prefer sellerCompany mapping, fallback to seller field)
+            const sellerCompanyName = (transformedData.sellerCompany && transformedData.sellerCompany.trim()) || (transformedData.seller && transformedData.seller.trim());
+            if (createdComp && sellerCompanyName) {
               try {
-                const companyData = {
-                  name: transformedData.seller.trim(),
-                };
-                
-                // Find potential duplicates to suggest to user
-                const companyDuplicates = await DuplicateDetectionService.findCompanyDuplicates(companyData, orgId);
+                const companyDuplicates = await DuplicateDetectionService.findCompanyDuplicates({ name: sellerCompanyName }, orgId);
                 const suggestedDuplicates = companyDuplicates.matches.map(m => m.existingEntity.id);
-                
-                // Always create pending company for user review/confirmation
                 await this.storage.createPendingCompany({
                   orgId,
-                  name: transformedData.seller.trim(),
+                  name: sellerCompanyName,
+                  city: transformedData.city || undefined,
+                  state: transformedData.state || undefined,
                   status: 'pending',
                   suggestedDuplicates,
                   sourceMetadata: { salesCompId: createdComp.id, role: 'seller' },
@@ -696,69 +701,102 @@ export class CompService {
                 });
                 results.pendingCompaniesCreated = (results.pendingCompaniesCreated || 0) + 1;
               } catch (error) {
-                console.error('Error processing seller company duplicate detection:', error);
+                console.error('Error processing seller company:', error);
               }
             }
 
-            // Create pending broker/agent contact for user confirmation
-            // Support both broker string field and agentFirstName/agentLastName structured fields
+            // Buyer Company (prefer buyerCompany mapping, fallback to company field)
+            const buyerCompanyName = (transformedData.buyerCompany && transformedData.buyerCompany.trim()) || (transformedData.company && transformedData.company.trim());
+            if (createdComp && buyerCompanyName) {
+              try {
+                const companyDuplicates = await DuplicateDetectionService.findCompanyDuplicates({ name: buyerCompanyName }, orgId);
+                const suggestedDuplicates = companyDuplicates.matches.map(m => m.existingEntity.id);
+                await this.storage.createPendingCompany({
+                  orgId,
+                  name: buyerCompanyName,
+                  city: transformedData.city || undefined,
+                  state: transformedData.state || undefined,
+                  status: 'pending',
+                  suggestedDuplicates,
+                  sourceMetadata: { salesCompId: createdComp.id, role: 'buyer' },
+                  createdBy: userId,
+                });
+                results.pendingCompaniesCreated = (results.pendingCompaniesCreated || 0) + 1;
+              } catch (error) {
+                console.error('Error processing buyer company:', error);
+              }
+            }
+
+            // Brokerage Company
+            if (createdComp && transformedData.brokerage && transformedData.brokerage.trim()) {
+              try {
+                const companyDuplicates = await DuplicateDetectionService.findCompanyDuplicates({ name: transformedData.brokerage.trim() }, orgId);
+                const suggestedDuplicates = companyDuplicates.matches.map(m => m.existingEntity.id);
+                await this.storage.createPendingCompany({
+                  orgId,
+                  name: transformedData.brokerage.trim(),
+                  status: 'pending',
+                  suggestedDuplicates,
+                  sourceMetadata: { salesCompId: createdComp.id, role: 'brokerage' },
+                  createdBy: userId,
+                });
+                results.pendingCompaniesCreated = (results.pendingCompaniesCreated || 0) + 1;
+              } catch (error) {
+                console.error('Error processing brokerage company:', error);
+              }
+            }
+
+            // === PENDING CONTACTS ===
+            // Helper to create a pending contact from a name string
+            const createPendingContactFromName = async (nameStr: string, role: string) => {
+              const nameParts = nameStr.trim().split(' ');
+              const firstName = nameParts[0] || '';
+              const lastName = nameParts.slice(1).join(' ') || '';
+              const fullName = nameStr.trim();
+              const contactDuplicates = await DuplicateDetectionService.findContactDuplicates({ firstName, lastName, fullName }, orgId);
+              const suggestedDuplicates = contactDuplicates.matches.map(m => m.existingEntity.id);
+              await this.storage.createPendingContact({
+                orgId,
+                sourceType: 'sales_comp',
+                sourceId: createdComp.id,
+                firstName: firstName || undefined,
+                lastName: lastName || undefined,
+                fullName,
+                status: 'pending',
+                createdBy: userId,
+                suggestedDuplicates,
+                sourceMetadata: {
+                  compId: createdComp.id,
+                  marina: transformedData.marina,
+                  city: transformedData.city,
+                  state: transformedData.state,
+                  role,
+                },
+              });
+              results.pendingContactsCreated++;
+            };
+
+            // Seller Principal
+            if (createdComp && transformedData.sellerPrincipal && transformedData.sellerPrincipal.trim()) {
+              try { await createPendingContactFromName(transformedData.sellerPrincipal, 'seller_principal'); } catch (error) { console.error('Error processing seller principal contact:', error); }
+            }
+
+            // Buyer Principal
+            if (createdComp && transformedData.buyerPrincipal && transformedData.buyerPrincipal.trim()) {
+              try { await createPendingContactFromName(transformedData.buyerPrincipal, 'buyer_principal'); } catch (error) { console.error('Error processing buyer principal contact:', error); }
+            }
+
+            // Agent (broker) - Support both broker string field and agentFirstName/agentLastName structured fields
             if (createdComp) {
-              const hasBrokerString = transformedData.broker && transformedData.broker.trim();
               const hasAgentFields = transformedData.agentFirstName && transformedData.agentLastName && 
                                     transformedData.agentFirstName.trim() && transformedData.agentLastName.trim();
-              
-              if (hasBrokerString || hasAgentFields) {
-                try {
-                  let firstName = '';
-                  let lastName = '';
-                  let fullName = '';
-                  
-                  if (hasAgentFields) {
-                    // Prefer structured agent fields if available
-                    firstName = transformedData.agentFirstName.trim();
-                    lastName = transformedData.agentLastName.trim();
-                    fullName = `${firstName} ${lastName}`;
-                  } else if (hasBrokerString) {
-                    // Fallback to parsing broker string
-                    const nameParts = transformedData.broker.trim().split(' ');
-                    firstName = nameParts[0] || '';
-                    lastName = nameParts.slice(1).join(' ') || '';
-                    fullName = transformedData.broker.trim();
-                  }
-                  
-                  const contactData = {
-                    firstName,
-                    lastName,
-                    fullName,
-                  };
-                  
-                  // Find potential duplicates to suggest to user
-                  const contactDuplicates = await DuplicateDetectionService.findContactDuplicates(contactData, orgId);
-                  const suggestedDuplicates = contactDuplicates.matches.map(m => m.existingEntity.id);
-                  
-                  // Always create pending contact for user review/confirmation
-                  await this.storage.createPendingContact({
-                    orgId,
-                    sourceType: 'sales_comp',
-                    sourceId: createdComp.id,
-                    fullName,
-                    status: 'pending',
-                    createdBy: userId,
-                    suggestedDuplicates,
-                    sourceMetadata: {
-                      compId: createdComp.id,
-                      marina: transformedData.marina,
-                      city: transformedData.city,
-                      state: transformedData.state,
-                      role: 'broker',
-                      agentFirstName: firstName,
-                      agentLastName: lastName,
-                    },
-                  });
-                  results.pendingContactsCreated++;
-                } catch (error) {
-                  console.error('Error processing broker/agent contact duplicate detection:', error);
-                }
+              const hasBrokerString = transformedData.broker && transformedData.broker.trim();
+              const agentFullName = hasAgentFields
+                ? `${transformedData.agentFirstName.trim()} ${transformedData.agentLastName.trim()}`
+                : hasBrokerString ? transformedData.broker.trim() : null;
+
+              if (agentFullName) {
+                try { await createPendingContactFromName(agentFullName, 'agent'); } catch (error) { console.error('Error processing agent contact:', error); }
               }
             }
 
