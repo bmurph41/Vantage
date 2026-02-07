@@ -56,6 +56,8 @@ const crmToolsNav = [
 // Operations Navigation - Flattened module links (tabs handle sub-navigation)
 const operationsModulesNav = [
   { name: "Portfolio", href: "/portfolio" },
+  { name: "Bookkeeping", href: "/operations/bookkeeping" },
+  { name: "Payroll", href: "/operations/payroll" },
   { name: "Dockit", href: "/operations/dockit" },
   { name: "Rent Roll", href: "/rent-roll/executive" },
   { name: "Commercial Tenants", href: "/operations/commercial-tenants" },
@@ -65,8 +67,6 @@ const operationsModulesNav = [
   { name: "Boat Rentals", href: "/operations/boat-rentals" },
   { name: "Boat Club", href: "/operations/boat-club" },
   { name: "Boat Sales", href: "/operations/boat-sales" },
-  { name: "Bookkeeping", href: "/operations/bookkeeping" },
-  { name: "Payroll", href: "/operations/payroll" },
 ];
 
 // Deal Workspace Navigation - Consolidated DD, VDR, and Modeling
