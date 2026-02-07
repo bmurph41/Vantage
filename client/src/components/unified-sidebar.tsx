@@ -88,7 +88,6 @@ const analysisNav = [
   { name: "Financial Model", href: "/modeling/projects" },
   { name: "Returns & Valuation", href: "/modeling/returns-valuation" },
   { name: "Scenarios", href: "/modeling/scenarios" },
-  { name: "OM Builder", href: "/om" },
   { name: "Modeling Settings", href: "/modeling/settings" },
 ];
 
@@ -242,7 +241,8 @@ export default function UnifiedSidebar() {
     // Deal Workspace: consolidated DD, VDR pages (workspaces, DD projects, data room)
     const isDealWorkspacePage = location.startsWith('/workspaces') || location.startsWith('/projects') || location === '/progress-report' || location.startsWith('/vdr');
     // Analysis: Modeling Projects (Financial Model), Debt Scenarios, Exit Strategies, P&L Parser, OM Builder, Modeling Settings
-    const isUnderwritingToolsPage = location.startsWith('/modeling/projects') || location.startsWith('/modeling/returns-valuation') || location.startsWith('/modeling/scenarios') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/om') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings');
+    const isUnderwritingToolsPage = location.startsWith('/modeling/projects') || location.startsWith('/modeling/returns-valuation') || location.startsWith('/modeling/scenarios') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings');
+    const isOmBuilderPage = location.startsWith('/om');
     // Investor Services: Fund Management, LP Portal (GP only)
     const isInvestorServicesPage = location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal');
     const isMarketIntelPage = location.startsWith('/analysis/');
@@ -681,13 +681,50 @@ export default function UnifiedSidebar() {
               icon={Calculator}
               expanded={analysisExpanded} 
               onToggle={() => setAnalysisExpanded(!analysisExpanded)}
-              isActive={location.startsWith('/modeling/projects') || location.startsWith('/modeling/returns-valuation') || location.startsWith('/modeling/scenarios') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/om') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings')}
+              isActive={location.startsWith('/modeling/projects') || location.startsWith('/modeling/returns-valuation') || location.startsWith('/modeling/scenarios') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings')}
             />
             {analysisExpanded && analysisNav.map((item) => (
               <NavLink key={item.name} item={item} />
             ))}
           </div>
         )}
+        
+        {/* OM Builder - Standalone Section Link */}
+        <div className="mb-2">
+          {sidebarCollapsed ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div 
+                  className="flex items-center justify-center py-2.5 px-2 cursor-pointer hover:bg-sidebar-accent transition-colors"
+                  onClick={() => setSidebarCollapsed(false)}
+                >
+                  <FileText className={cn("w-4 h-4", location.startsWith('/om') ? "text-sidebar-primary" : "text-sidebar-foreground/50")} />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={10}>
+                <p>OM Builder</p>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <Link href="/om">
+              <div
+                className={cn(
+                  "flex items-center justify-between w-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-colors cursor-pointer",
+                  location.startsWith('/om')
+                    ? "bg-blue-600 text-white hover:bg-blue-700" 
+                    : "text-gray-500 hover:text-gray-700"
+                )}
+                data-testid="nav-om-builder"
+              >
+                <div className="flex items-center gap-2">
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>OM Builder</span>
+                </div>
+                <ChevronRight className="w-3 h-3" />
+              </div>
+            </Link>
+          )}
+        </div>
         
         {/* Investor Services Section - Fund Management, LP Portal (GP users only via pack check) */}
         {(hasPack('fund_management') || hasPack('lp_portal')) && (
