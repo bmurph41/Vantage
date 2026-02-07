@@ -177,6 +177,22 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
 
   return (
     <div className="space-y-6">
+      {hasProcessingUploads && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-4 p-8 rounded-lg bg-card border shadow-lg max-w-md">
+            <div className="relative">
+              <Loader2 className="h-16 w-16 animate-spin text-primary" />
+              <Brain className="h-8 w-8 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-primary" />
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-semibold">Processing Documents</p>
+              <p className="text-sm text-muted-foreground mt-1">{processingMessages[processingMessageIndex]}</p>
+            </div>
+            <Progress value={undefined} className="w-64 h-2" />
+          </div>
+        </div>
+      )}
+
       {onTabChange && (
         <WorkflowNavigation currentTab="uploads" onNavigate={onTabChange} />
       )}
