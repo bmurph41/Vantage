@@ -536,7 +536,7 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                     </CardContent>
                   </Card>
                 ) : (
-                  <ScrollArea className="max-h-[300px]">
+                  <ScrollArea className="max-h-[50vh]">
                     <div className="space-y-4 pr-2">
                       {portfolioProperties.map((prop, index) => (
                         <Card key={prop.id} className="relative">
