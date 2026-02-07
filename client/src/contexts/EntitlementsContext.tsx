@@ -144,6 +144,8 @@ export function EntitlementsProvider({
     
     // Always include dashboard
     modules.add(FEATURE_MODULES.DASHBOARD);
+    modules.add(FEATURE_MODULES.OPS_PAYROLL);
+    modules.add(FEATURE_MODULES.OPS_PORTFOLIO);
     
     // Add package modules
     if (currentPackage && subscription.status !== 'expired' && subscription.status !== 'cancelled') {

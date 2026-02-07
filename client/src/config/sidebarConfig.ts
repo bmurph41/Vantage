@@ -434,7 +434,7 @@ export const sidebarConfig: SidebarGroup[] = [
         href: '/operations/payroll',
         icon: DollarSign,
         matchRoutes: ['/operations/payroll', '/payroll'],
-        requiredModules: [FEATURE_MODULES.OPS_PAYROLL],
+        
       },
       {
         id: 'boat-rentals',
