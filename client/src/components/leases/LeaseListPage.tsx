@@ -11,6 +11,7 @@
 
 import React, { useState, useEffect } from "react";
 import { UnifiedTenantFormDialog } from "@/components/commercial-tenants/UnifiedTenantFormDialog";
+import { TenantDetailSheet } from "@/components/commercial-tenants/TenantDetailSheet";
 import { useLeases, useProjectLeaseStats, useLeaseMutations } from "@/hooks/use-leases";
 import type { CommercialLease, LeaseType } from "@shared/commercial-lease-types";
 
@@ -72,6 +73,9 @@ export default function LeaseListPage({ projectId, onSelectLease }: LeaseListPag
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [showInactive, setShowInactive] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedLease, setSelectedLease] = useState<any | null>(null);
+  const [showDetail, setShowDetail] = useState(false);
+  const [editLease, setEditLease] = useState<any | null>(null);
   const [page, setPage] = useState(0);
   const [sortBy, setSortBy] = useState<SortColumn>("tenantName");
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -269,7 +273,7 @@ export default function LeaseListPage({ projectId, onSelectLease }: LeaseListPag
                 {leases.map((lease) => (
                   <tr
                     key={lease.id}
-                    onClick={() => onSelectLease?.(lease.id)}
+                    onClick={() => { setSelectedLease(lease); setShowDetail(true); onSelectLease?.(lease.id); }}
                     className="hover:bg-blue-50 cursor-pointer transition-colors"
                   >
                     <td className="px-4 py-3 text-sm font-medium text-gray-900">
@@ -370,6 +374,30 @@ export default function LeaseListPage({ projectId, onSelectLease }: LeaseListPag
         context="valuator"
         projectId={projectId}
       />
+
+      <TenantDetailSheet
+        open={showDetail}
+        onOpenChange={setShowDetail}
+        tenant={selectedLease}
+        onEdit={(tenant) => {
+          setShowDetail(false);
+          setEditLease(tenant);
+        }}
+        context="valuator"
+        projectId={projectId}
+      />
+
+      {editLease && (
+        <UnifiedTenantFormDialog
+          open={!!editLease}
+          onOpenChange={(open) => {
+            if (!open) { setEditLease(null); refetch(); refetchStats(); }
+          }}
+          context="valuator"
+          projectId={projectId}
+          tenant={editLease}
+        />
+      )}
     </div>
   );
 }

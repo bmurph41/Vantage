@@ -98,13 +98,8 @@ const investorServicesNav = [
   { name: "LP Portal", href: "/modeling/lp-portal", icon: Users },
 ];
 
-// DockTalk Navigation - Single Entry Point
-const dockTalkNav = [
-  { name: "DockTalk", href: "/docktalk", icon: MessageSquare },
-];
-
-// Marinalytics Navigation (Sales Comps)
-const marinalyticsNav = [
+// Market Intelligence Navigation (formerly Marinalytics)
+const marketIntelligenceNav = [
   { name: "Sales Comps", href: "/analysis/sales-comps", icon: BarChart3 },
   { name: "Rate Comps", href: "/analysis/rate-comps", icon: TrendingUp },
   { name: "Financial Analysis", href: "/analysis/financial-analysis", icon: Activity },
@@ -143,7 +138,7 @@ export default function UnifiedSidebar() {
   const [dealWorkspaceExpanded, setDealWorkspaceExpanded] = useState(false); // Consolidated DD, VDR, Modeling
   const [underwritingToolsExpanded, setUnderwritingToolsExpanded] = useState(false);
   const [investorServicesExpanded, setInvestorServicesExpanded] = useState(false);
-  const [marinalyticsExpanded, setMarinalyticsExpanded] = useState(false);
+  const [marketIntelExpanded, setMarketIntelExpanded] = useState(false);
   const [pendingExpanded, setPendingExpanded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
@@ -250,7 +245,7 @@ export default function UnifiedSidebar() {
     const isUnderwritingToolsPage = location.startsWith('/modeling/projects') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/om') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings');
     // Investor Services: Fund Management, LP Portal (GP only)
     const isInvestorServicesPage = location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal');
-    const isMarinalyticsPage = location.startsWith('/analysis/') || location.startsWith('/docktalk');
+    const isMarketIntelPage = location.startsWith('/analysis/');
 
     // Set expanded states - Operations stays expanded by default, others expand when active
     if (isOperationsPage) {
@@ -263,7 +258,7 @@ export default function UnifiedSidebar() {
     setDealWorkspaceExpanded(isDealWorkspacePage);
     setUnderwritingToolsExpanded(isUnderwritingToolsPage);
     setInvestorServicesExpanded(isInvestorServicesPage);
-    setMarinalyticsExpanded(isMarinalyticsPage);
+    setMarketIntelExpanded(isMarketIntelPage);
   }, [location]);
 
   // Check if there are any pending items to show the Pending section
@@ -637,44 +632,6 @@ export default function UnifiedSidebar() {
           </div>
         )}
         
-        {/* Prospecting Section - Overview and Workroom */}
-        {canViewSection('crm') && (
-          <div className="mb-2">
-            <SectionHeader 
-              title="Prospecting" 
-              expanded={prospectingExpanded} 
-              onToggle={() => setProspectingExpanded(!prospectingExpanded)}
-              isActive={location === '/prospecting' || location.startsWith('/prospecting/')}
-            />
-            {prospectingExpanded && (
-              <>
-                {/* Overview - merged Dashboard + Analytics */}
-                <NavLink item={{ name: "Overview", href: "/prospecting", icon: PieChart }} />
-                {/* Workroom - weekly cards and goals */}
-                <NavLink item={{ name: "Workroom", href: "/prospecting/workroom", icon: Target }} />
-              </>
-            )}
-          </div>
-        )}
-        
-        {/* MarinaMatch - Direct Link (no dropdown) */}
-        <div className="mb-2">
-          <Link href="/marinamatch">
-            <div 
-              className={cn(
-                "flex items-center px-4 py-2.5 text-sm font-medium transition-colors rounded-md mx-2",
-                location.startsWith('/marinamatch')
-                  ? "bg-primary/10 text-primary"
-                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent"
-              )}
-              data-testid="nav-marinamatch"
-            >
-              <Target className="w-4 h-4 mr-3 flex-shrink-0" />
-              <span className="truncate">MarinaMatch</span>
-            </div>
-          </Link>
-        </div>
-        
         {/* Deal Workspace Section - Consolidated DD, VDR, and Modeling */}
         {canViewSection('deal_workspace') && (
           <div className="mb-2">
@@ -689,7 +646,6 @@ export default function UnifiedSidebar() {
                 {dealWorkspaceNav.map((item) => (
                   <NavLink key={item.name} item={item} />
                 ))}
-                {/* Active Workspace Sub-navigation - shown when inside a specific workspace */}
                 {activeWorkspaceId && (
                   <div className="ml-4 mt-2 border-l-2 border-blue-200 pl-2">
                     <div className="text-xs font-medium text-blue-600 mb-1 px-2">Active Workspace</div>
@@ -703,7 +659,7 @@ export default function UnifiedSidebar() {
           </div>
         )}
         
-        {/* Underwriting Tools Section - Modeling Projects, Debt Scenarios, Exit Strategies, P&L Parser, OM Builder (all users) */}
+        {/* Underwriting Tools Section - Modeling Projects, Debt Scenarios, Exit Strategies, OM Builder (all users) */}
         {canViewSection('modeling_tools') && (
           <div className="mb-2">
             <SectionHeader 
@@ -739,38 +695,72 @@ export default function UnifiedSidebar() {
           </div>
         )}
         
-        {/* Marinalytics Section */}
+        {/* Prospecting Section - Overview and Workroom */}
+        {canViewSection('crm') && (
+          <div className="mb-2">
+            <SectionHeader 
+              title="Prospecting" 
+              expanded={prospectingExpanded} 
+              onToggle={() => setProspectingExpanded(!prospectingExpanded)}
+              isActive={location === '/prospecting' || location.startsWith('/prospecting/')}
+            />
+            {prospectingExpanded && (
+              <>
+                <NavLink item={{ name: "Overview", href: "/prospecting", icon: PieChart }} />
+                <NavLink item={{ name: "Workroom", href: "/prospecting/workroom", icon: Target }} />
+              </>
+            )}
+          </div>
+        )}
+        
+        {/* MarinaMatch - Direct Link */}
+        <div className="mb-2">
+          <Link href="/marinamatch">
+            <div 
+              className={cn(
+                "flex items-center px-4 py-2.5 text-sm font-medium transition-colors rounded-md mx-2",
+                location.startsWith('/marinamatch')
+                  ? "bg-primary/10 text-primary"
+                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent"
+              )}
+              data-testid="nav-marinamatch"
+            >
+              <Target className="w-4 h-4 mr-3 flex-shrink-0" />
+              <span className="truncate">MarinaMatch</span>
+            </div>
+          </Link>
+        </div>
+        
+        {/* DockTalk - Standalone Direct Link */}
+        <div className="mb-2">
+          <Link href="/docktalk">
+            <div 
+              className={cn(
+                "flex items-center px-4 py-2.5 text-sm font-medium transition-colors rounded-md mx-2",
+                location.startsWith('/docktalk')
+                  ? "bg-primary/10 text-primary"
+                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent"
+              )}
+              data-testid="nav-docktalk"
+            >
+              <MessageSquare className="w-4 h-4 mr-3 flex-shrink-0" />
+              <span className="truncate">DockTalk</span>
+            </div>
+          </Link>
+        </div>
+        
+        {/* Market Intelligence Section */}
         {canViewSection('market_intelligence') && (
           <div className="mb-2">
             <SectionHeader 
-              title="Marinalytics" 
-              expanded={marinalyticsExpanded} 
-              onToggle={() => setMarinalyticsExpanded(!marinalyticsExpanded)}
-              isActive={location.startsWith('/analysis/') || location.startsWith('/docktalk')}
+              title="Market Intelligence" 
+              expanded={marketIntelExpanded} 
+              onToggle={() => setMarketIntelExpanded(!marketIntelExpanded)}
+              isActive={location.startsWith('/analysis/')}
             />
-            {marinalyticsExpanded && (
-              <div className="ml-4 mt-1 mb-2">
-                {/* DockTalk - Always visible above Sales Comps */}
-                <Link 
-                  href="/docktalk"
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center px-4 py-2.5 text-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors",
-                    location.startsWith('/docktalk') && "bg-sidebar-accent border-r-3 border-sidebar-primary text-sidebar-primary font-medium"
-                  )}
-                  data-testid="nav-docktalk"
-                >
-                  <MessageSquare className={cn("w-4 h-4 mr-3 flex-shrink-0", location.startsWith('/docktalk') && "text-sidebar-primary")} />
-                  <span className="truncate">DockTalk</span>
-                </Link>
-                {/* Other Marinalytics Pages - Sales Comps, Rate Comps, etc. */}
-                <div>
-                  {marinalyticsNav.map((item) => (
-                    <NavLink key={item.name} item={item} />
-                  ))}
-                </div>
-              </div>
-            )}
+            {marketIntelExpanded && marketIntelligenceNav.map((item) => (
+              <NavLink key={item.name} item={item} />
+            ))}
           </div>
         )}
 
