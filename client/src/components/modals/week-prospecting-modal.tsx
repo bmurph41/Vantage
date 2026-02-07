@@ -43,7 +43,7 @@ import {
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { DailyActivitiesModal } from "./daily-activities-modal";
-import type { ProspectingEntry, ProspectingActivity, Contact, Deal } from "@shared/schema";
+import type { ProspectingEntry, ProspectingActivity, Contact, Deal, CrmCompany, Property } from "@shared/schema";
 import type { PendingProspectingActivity } from "@/contexts/ProspectingActivityContext";
 
 interface WeekProspectingModalProps {
@@ -145,7 +145,10 @@ interface ActivityBox {
   outcome?: string;
   notes?: string;
   contactId?: string;
+  companyId?: string;
+  propertyId?: string;
   dealId?: string;
+  persistedActivityId?: string;
   timestamp?: Date;
   isScheduled?: boolean;
   scheduledFrom?: {
@@ -389,6 +392,8 @@ export default function WeekProspectingModal({
     outcome: string;
     notes: string;
     contactId?: string;
+    companyId?: string;
+    propertyId?: string;
     dealId?: string;
     callbackDay?: string;
   }>({
@@ -414,6 +419,16 @@ export default function WeekProspectingModal({
   // Fetch deals for linking
   const { data: deals = [] } = useQuery<Deal[]>({
     queryKey: ['/api/deals'],
+  });
+
+  // Fetch companies for linking
+  const { data: companies = [] } = useQuery<CrmCompany[]>({
+    queryKey: ['/api/companies'],
+  });
+
+  // Fetch properties for linking
+  const { data: properties = [] } = useQuery<Property[]>({
+    queryKey: ['/api/properties'],
   });
 
   // Mock prospecting activities for now - will be replaced with real data
@@ -1103,12 +1118,14 @@ export default function WeekProspectingModal({
       outcome: boxData?.outcome || '',
       notes: boxData?.notes || '',
       contactId: boxData?.contactId || '',
+      companyId: boxData?.companyId || '',
+      propertyId: boxData?.propertyId || '',
       dealId: boxData?.dealId || '',
       callbackDay: ''
     });
   };
   
-  const saveActivityBoxDetails = () => {
+  const saveActivityBoxDetails = async () => {
     const { day, boxId } = activityBoxModal;
     
     if (!boxActivityForm.type || !boxActivityForm.outcome) {
@@ -1130,7 +1147,45 @@ export default function WeekProspectingModal({
       return;
     }
     
-    // Save the current activity
+    // Find existing box to check if it has a persisted ID
+    const existingBox = dailyData[day]?.activityBoxes.find(b => b.id === boxId);
+
+    // Persist activity to database
+    const dayIndex = ALL_DAYS_OF_WEEK.findIndex(d => d.id === day);
+    const activityDate = new Date(weekStart);
+    if (dayIndex >= 0) activityDate.setDate(activityDate.getDate() + dayIndex);
+
+    let persistedId = existingBox?.persistedActivityId;
+
+    try {
+      const activityPayload = {
+        prospectingEntryId: entry?.id || '',
+        activityType: boxActivityForm.type,
+        outcome: boxActivityForm.outcome,
+        dayOfWeek: day,
+        activityDate: activityDate.toISOString(),
+        notes: boxActivityForm.notes || null,
+        contactId: boxActivityForm.contactId || null,
+        companyId: boxActivityForm.companyId || null,
+        propertyId: boxActivityForm.propertyId || null,
+        dealId: boxActivityForm.dealId || null,
+      };
+
+      if (persistedId) {
+        const res = await apiRequest('PATCH', `/api/prospecting/activities/${persistedId}`, activityPayload);
+        const updated = await res.json();
+        persistedId = updated.id;
+      } else {
+        const res = await apiRequest('POST', '/api/prospecting/activities', activityPayload);
+        const created = await res.json();
+        persistedId = created.id;
+      }
+      queryClient.invalidateQueries({ queryKey: ['/api/prospecting/activities'] });
+    } catch (err) {
+      console.error('Failed to persist prospecting activity:', err);
+    }
+
+    // Save the current activity to local state
     setDailyData(data => ({
       ...data,
       [day]: {
@@ -1143,8 +1198,11 @@ export default function WeekProspectingModal({
             outcome: boxActivityForm.outcome,
             notes: boxActivityForm.notes,
             contactId: boxActivityForm.contactId || undefined,
+            companyId: boxActivityForm.companyId || undefined,
+            propertyId: boxActivityForm.propertyId || undefined,
             dealId: boxActivityForm.dealId || undefined,
-            timestamp: new Date()
+            timestamp: new Date(),
+            persistedActivityId: persistedId,
           } : box
         )
       }
@@ -2113,6 +2171,47 @@ export default function WeekProspectingModal({
                   </Command>
                 </PopoverContent>
               </Popover>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="text-sm font-medium mb-2 block">Link to Company</Label>
+              <Select
+                value={boxActivityForm.companyId || "none"}
+                onValueChange={(value) => setBoxActivityForm({...boxActivityForm, companyId: value === "none" ? "" : value})}
+              >
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Select company..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No company linked</SelectItem>
+                  {companies.map(company => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-sm font-medium mb-2 block">Link to Property</Label>
+              <Select
+                value={boxActivityForm.propertyId || "none"}
+                onValueChange={(value) => setBoxActivityForm({...boxActivityForm, propertyId: value === "none" ? "" : value})}
+              >
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Select property..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No property linked</SelectItem>
+                  {properties.map(property => (
+                    <SelectItem key={property.id} value={property.id}>
+                      {property.name}{property.city ? ` - ${property.city}, ${property.state}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           

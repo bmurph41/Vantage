@@ -5,7 +5,7 @@ import {
   documentRequirements, projectIntegrations, taskDependencies, taskFiles, userEmails, calendarGuests,
   cddDocuments, docPages, kpis, findings, recommendations, vectorChunks, cddReports, comps, checklistItems,
   crmDeals, crmLeads, crmContacts, crmCompanies, crmProperties, crmStorageTypes, crmPropertyStorageEntries, crmContactProperties, crmCompanyProperties, crmContactCompanies, crmEntityDDProjectLinks, pendingProperties, pendingContacts, pendingCompanies, crmPipelines, crmPipelineStages, crmActivities, crmNotes, crmDealContacts, crmDealCompanies,
-  crmImportJobs, crmImportedRecords, crmProspectingEntries, crmProspectingUserSettings, crmProspectingGoalTemplates,
+  crmImportJobs, crmImportedRecords, crmProspectingEntries, crmProspectingActivities, crmProspectingUserSettings, crmProspectingGoalTemplates,
   crmEmailSequences, crmEmailTemplates, crmEmailSequenceSteps, crmEmailSequenceEnrollments, crmEmailSequenceStepExecutions,
   calendarSettings,
   salesComps, compColumns, compImports, scProjects, scProjectComps, scAuditLog, scRecommendationFeedback, scOrgPreferences, scSavedSearches, scAnalyticsFilterPresets, scCustomStorageTypes, scPortfolios, scPortfolioComps, scPendingPropertyProfiles, scDuplicateAuditLog, scMetricSeries, scMetricPoints, scMetricAlerts,
@@ -23,7 +23,7 @@ import {
   type DocumentRequirement, type ProjectIntegration, type TaskDependency, type TaskFile, type UserEmail, type CalendarGuest,
   type CddDocument, type DocPage, type Kpi, type Finding, type Recommendation, type VectorChunk, type CddReport, type Comp, type ChecklistItem,
   type CrmDeal, type CrmLead, type CrmContact, type CrmCompany, type Property, type CrmStorageType, type CrmPropertyStorageEntry, type PendingProperty, type PendingContact, type PendingCompany, type CrmPipeline, type CrmPipelineStage, type CrmActivity, type CrmNote, type InsertCrmNote,
-  type CrmImportJob, type CrmImportedRecord, type ProspectingEntry, type CrmProspectingUserSettings, type CrmProspectingGoalTemplate,
+  type CrmImportJob, type CrmImportedRecord, type ProspectingEntry, type CrmProspectingActivity, type InsertCrmProspectingActivity, type CrmProspectingUserSettings, type CrmProspectingGoalTemplate,
   type EmailSequence, type EmailTemplate, type EmailSequenceStep, type EmailSequenceEnrollment, type EmailSequenceStepExecution,
   type CalendarSettings,
   type SalesComp, type CompColumn, type CompImport, type ScProject, type ScProjectComp, type ScAuditLog, type ScRecommendationFeedback, type ScOrgPreferences, type ScSavedSearch, type ScAnalyticsFilterPreset, type ScCustomStorageType, type ScPendingPropertyProfile, type ScDuplicateAuditLog, type ScMetricSeries, type ScMetricPoint, type ScMetricAlert,
@@ -494,6 +494,12 @@ export interface IStorage {
   updateProspectingEntry(id: string, updates: Partial<InsertProspectingEntry>): Promise<ProspectingEntry>;
   deleteProspectingEntry(id: string): Promise<void>;
   
+  // CRM - Prospecting Activities (persisted daily tracking)
+  createProspectingActivity(activity: InsertCrmProspectingActivity): Promise<CrmProspectingActivity>;
+  getProspectingActivities(orgId: string, filters?: { contactId?: string; companyId?: string; propertyId?: string; dealId?: string; prospectingEntryId?: string; userId?: string }): Promise<CrmProspectingActivity[]>;
+  updateProspectingActivity(id: string, data: Partial<InsertCrmProspectingActivity>, orgId?: string): Promise<CrmProspectingActivity>;
+  deleteProspectingActivity(id: string, orgId?: string): Promise<void>;
+
   // CRM - Prospecting Settings
   getProspectingUserSettings(userId: string): Promise<CrmProspectingUserSettings | undefined>;
   createProspectingUserSettings(settings: InsertCrmProspectingUserSettings): Promise<CrmProspectingUserSettings>;
@@ -4005,6 +4011,50 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProspectingEntry(id: string): Promise<void> {
     await db.delete(crmProspectingEntries).where(eq(crmProspectingEntries.id, id));
+  }
+
+  // CRM - Prospecting Activities (persisted daily tracking)
+
+  async createProspectingActivity(activity: InsertCrmProspectingActivity): Promise<CrmProspectingActivity> {
+    const [created] = await db.insert(crmProspectingActivities).values(activity).returning();
+    return created;
+  }
+
+  async getProspectingActivities(orgId: string, filters?: { contactId?: string; companyId?: string; propertyId?: string; dealId?: string; prospectingEntryId?: string; userId?: string }): Promise<CrmProspectingActivity[]> {
+    const conditions = [eq(crmProspectingActivities.orgId, orgId)];
+    if (filters?.contactId) conditions.push(eq(crmProspectingActivities.contactId, filters.contactId));
+    if (filters?.companyId) conditions.push(eq(crmProspectingActivities.companyId, filters.companyId));
+    if (filters?.propertyId) conditions.push(eq(crmProspectingActivities.propertyId, filters.propertyId));
+    if (filters?.dealId) conditions.push(eq(crmProspectingActivities.dealId, filters.dealId));
+    if (filters?.prospectingEntryId) conditions.push(eq(crmProspectingActivities.prospectingEntryId, filters.prospectingEntryId));
+    if (filters?.userId) conditions.push(eq(crmProspectingActivities.userId, filters.userId));
+    return db.select().from(crmProspectingActivities)
+      .where(and(...conditions))
+      .orderBy(desc(crmProspectingActivities.activityDate));
+  }
+
+  private async validateActivityOrgOwnership(activityId: string, orgId: string): Promise<void> {
+    const [activity] = await db.select().from(crmProspectingActivities).where(eq(crmProspectingActivities.id, activityId));
+    if (!activity) throw new Error("Activity not found");
+    const [entry] = await db.select().from(crmProspectingEntries).where(eq(crmProspectingEntries.id, activity.prospectingEntryId));
+    if (!entry || entry.orgId !== orgId) {
+      throw new Error("Unauthorized: activity does not belong to this organization");
+    }
+  }
+
+  async updateProspectingActivity(id: string, data: Partial<InsertCrmProspectingActivity>, orgId?: string): Promise<CrmProspectingActivity> {
+    if (orgId) await this.validateActivityOrgOwnership(id, orgId);
+    const { prospectingEntryId, ...safeData } = data as any;
+    const [updated] = await db.update(crmProspectingActivities)
+      .set({ ...safeData, updatedAt: new Date() })
+      .where(eq(crmProspectingActivities.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteProspectingActivity(id: string, orgId?: string): Promise<void> {
+    if (orgId) await this.validateActivityOrgOwnership(id, orgId);
+    await db.delete(crmProspectingActivities).where(eq(crmProspectingActivities.id, id));
   }
 
   // CRM - Prospecting Settings

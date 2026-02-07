@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { ProspectingActivitiesSection } from "@/components/prospecting-activities-section";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
@@ -642,6 +643,9 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
               </TabsTrigger>
               <TabsTrigger value="connections" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
                 Connections
+              </TabsTrigger>
+              <TabsTrigger value="prospecting" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+                Prospecting
               </TabsTrigger>
             </TabsList>
           </div>
@@ -1351,6 +1355,11 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="prospecting" className="mt-0 space-y-4">
+              <h3 className="text-lg font-semibold">Prospecting Activities</h3>
+              <ProspectingActivitiesSection entityType="contact" entityId={contact?.id || ""} />
             </TabsContent>
           </ScrollArea>
         </Tabs>

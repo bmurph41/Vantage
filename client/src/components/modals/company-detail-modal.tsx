@@ -12,6 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { ProspectingActivitiesSection } from "@/components/prospecting-activities-section";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
@@ -788,6 +789,9 @@ export default function CompanyDetailModal({
               <TabsTrigger value="tasks" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
                 Tasks
                 {openTasks.length > 0 && <Badge variant="secondary" className="ml-1.5 h-5 px-1.5">{openTasks.length}</Badge>}
+              </TabsTrigger>
+              <TabsTrigger value="prospecting" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+                Prospecting
               </TabsTrigger>
             </TabsList>
           </div>
@@ -1650,6 +1654,11 @@ export default function CompanyDetailModal({
                   ))}
                 </div>
               )}
+            </TabsContent>
+
+            <TabsContent value="prospecting" className="mt-0 space-y-4">
+              <h3 className="text-lg font-semibold">Prospecting Activities</h3>
+              <ProspectingActivitiesSection entityType="company" entityId={company?.id || ""} />
             </TabsContent>
           </ScrollArea>
         </Tabs>

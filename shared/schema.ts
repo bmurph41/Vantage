@@ -4988,6 +4988,8 @@ export const crmProspectingActivities = pgTable("crm_prospecting_activities", {
 
   // Linking to CRM entities
   contactId: varchar("contact_id").references(() => crmContacts.id),
+  companyId: varchar("company_id").references(() => crmCompanies.id),
+  propertyId: varchar("property_id").references(() => crmProperties.id),
   dealId: varchar("deal_id").references(() => crmDeals.id),
 
   // Activity details
@@ -6597,6 +6599,15 @@ export const insertProspectingWeekSchema = createInsertSchema(prospectingWeeks).
 export type InsertProspectingWeek = z.infer<typeof insertProspectingWeekSchema>;
 export type ProspectingWeek = typeof prospectingWeeks.$inferSelect;
 
+
+// CRM Prospecting Activities schema
+export const insertCrmProspectingActivitySchema = createInsertSchema(crmProspectingActivities).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCrmProspectingActivity = z.infer<typeof insertCrmProspectingActivitySchema>;
+export type CrmProspectingActivity = typeof crmProspectingActivities.$inferSelect;
 // Outreach Campaigns schema
 export const insertOutreachCampaignSchema = createInsertSchema(outreachCampaigns).omit({
   id: true,

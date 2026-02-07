@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ProspectingActivitiesSection } from "@/components/prospecting-activities-section";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   EntityAvatar, 
@@ -526,7 +527,7 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
-          <TabsList className="grid w-full grid-cols-8 flex-shrink-0">
+          <TabsList className="grid w-full grid-cols-9 flex-shrink-0">
             <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
             <TabsTrigger value="intelligence" data-testid="tab-intelligence">
               <BarChart3 className="w-3 h-3 mr-1" />
@@ -540,6 +541,7 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
               Comps
             </TabsTrigger>
             <TabsTrigger value="activity" data-testid="tab-activity">Activity</TabsTrigger>
+            <TabsTrigger value="prospecting" data-testid="tab-prospecting">Prospecting</TabsTrigger>
             <TabsTrigger value="notes" data-testid="tab-notes">Notes</TabsTrigger>
           </TabsList>
 
@@ -1214,6 +1216,11 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="prospecting" className="mt-0 space-y-4">
+              <h3 className="text-lg font-semibold">Prospecting Activities</h3>
+              <ProspectingActivitiesSection entityType="property" entityId={property?.id || ""} />
             </TabsContent>
           </div>
         </Tabs>

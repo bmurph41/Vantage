@@ -9413,6 +9413,73 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // ===================================================================
+  // ===================================================================
+  // CRM Prospecting Activities (persisted daily tracking)
+  // ===================================================================
+
+  app.post("/api/prospecting/activities", async (req: any, res) => {
+    try {
+      const { id, createdAt, updatedAt, ...body } = req.body;
+      const activity = await storage.createProspectingActivity({
+        ...body,
+        userId: req.user.id,
+        activityDate: body.activityDate ? new Date(body.activityDate) : new Date(),
+      });
+      res.json(activity);
+    } catch (error: any) {
+      console.error("Failed to create prospecting activity:", error);
+      res.status(500).json({ error: "Failed to create prospecting activity" });
+    }
+  });
+
+  app.patch("/api/prospecting/activities/:id", async (req: any, res) => {
+    try {
+      const { activityType, outcome, dayOfWeek, activityDate: rawDate, notes, contactId, companyId, propertyId, dealId } = req.body;
+      const body: any = {};
+      if (activityType !== undefined) body.activityType = activityType;
+      if (outcome !== undefined) body.outcome = outcome;
+      if (dayOfWeek !== undefined) body.dayOfWeek = dayOfWeek;
+      if (rawDate !== undefined) body.activityDate = new Date(rawDate);
+      if (notes !== undefined) body.notes = notes;
+      if (contactId !== undefined) body.contactId = contactId;
+      if (companyId !== undefined) body.companyId = companyId;
+      if (propertyId !== undefined) body.propertyId = propertyId;
+      if (dealId !== undefined) body.dealId = dealId;
+      const activity = await storage.updateProspectingActivity(req.params.id, body, req.user.orgId);
+      res.json(activity);
+    } catch (error: any) {
+      console.error("Failed to update prospecting activity:", error);
+      res.status(500).json({ error: "Failed to update prospecting activity" });
+    }
+  });
+
+  app.get("/api/prospecting/activities", async (req: any, res) => {
+    try {
+      const filters: any = {};
+      if (req.query.contactId) filters.contactId = req.query.contactId;
+      if (req.query.companyId) filters.companyId = req.query.companyId;
+      if (req.query.propertyId) filters.propertyId = req.query.propertyId;
+      if (req.query.dealId) filters.dealId = req.query.dealId;
+      if (req.query.prospectingEntryId) filters.prospectingEntryId = req.query.prospectingEntryId;
+      if (req.query.userId) filters.userId = req.query.userId;
+      const activities = await storage.getProspectingActivities(req.user.orgId, filters);
+      res.json(activities);
+    } catch (error: any) {
+      console.error("Failed to get prospecting activities:", error);
+      res.status(500).json({ error: "Failed to retrieve prospecting activities" });
+    }
+  });
+
+  app.delete("/api/prospecting/activities/:id", async (req: any, res) => {
+    try {
+      await storage.deleteProspectingActivity(req.params.id, req.user.orgId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Failed to delete prospecting activity:", error);
+      res.status(500).json({ error: "Failed to delete prospecting activity" });
+    }
+  });
+
   // CRM Prospecting Settings
   // ===================================================================
 
