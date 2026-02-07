@@ -28,6 +28,10 @@ import serviceRouter from "./service-router";
 import boatRentalsRouter from "./boat-rentals-router";
 import boatClubRouter from "./boat-club-router";
 import boatSalesRouter from "./boat-sales-router";
+import { payrollRouter } from "./routes/payroll-routes";
+import { permissionsRouter } from "./routes/payroll-permissions-routes";
+import { valuatorPayrollRouter } from "./routes/valuator-payroll-routes";
+import { deptPnlRouter } from "./routes/dept-pnl-routes";
 import integrationRouter from "./integration-routes";
 import { integrationsRouter } from "./integrations";
 import marinamatchRouter from "./marinamatch/routes";
@@ -418,6 +422,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/commercial-leases", authenticateUser, commercialLeaseRoutes);
   app.use("/api/commercial-leases", authenticateUser, unifiedLeaseRoutes);
   app.use(authenticateUser, tourProgressRoutes);
+  // Payroll module routes
+  app.use("/api/payroll", authenticateUser, payrollRouter);
+  app.use("/api/payroll/permissions", authenticateUser, permissionsRouter);
+  app.use("/api/valuator", authenticateUser, valuatorPayrollRouter);
+  app.use("/api/dept-pnl", authenticateUser, deptPnlRouter);
   app.use("/api/dd/automation", authenticateUser, ddAutomationRoutes);
   // Apply authentication to CRM route aliases
   app.use("/api/leads", authenticateUser, enforceTenant);

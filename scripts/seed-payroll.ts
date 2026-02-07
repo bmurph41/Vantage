@@ -150,16 +150,16 @@ export async function seedPayrollDefaults(orgId: string) {
     { section: "OPEX" as const, name: "Other Operating Expense", order: 11 },
   ];
 
-  await db.insert(pnlCategories).values(
-    categories.map((c) => ({
-      orgId,
-      statementSection: c.section,
-      categoryName: c.name,
-      sortOrder: c.order,
-    }))
-  );
+////  await db.insert(pnlCategories).values(
+////    categories.map((c) => ({
+////      orgId,
+////      statementSection: c.section,
+////      categoryName: c.name,
+////      sortOrder: c.order,
+////    }))
+//  );
 
-  console.log(`✅ Payroll seed data created for org ${orgId}`);
+  console.log("Payroll seed data created");
 }
 
 seedPayrollDefaults("cd3719c3-ef82-4ccc-acb9-261c80fb64b4").then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });

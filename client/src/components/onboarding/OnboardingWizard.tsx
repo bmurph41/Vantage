@@ -185,7 +185,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
         
         const results = await Promise.all(
           validMarinas.map(async (marina) => {
-            const propertyRes = await apiRequest('POST', '/api/crm/properties', {
+            const propertyRes = await apiRequest('POST', '/api/properties', {
               name: marina.name,
               address: marina.address.line1,
               addressLine2: marina.address.line2 || null,
@@ -200,7 +200,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
             });
             const crmProperty = await propertyRes.json();
             
-            const dealRes = await apiRequest('POST', '/api/crm/deals', {
+            const dealRes = await apiRequest('POST', '/api/deals', {
               name: `${marina.name} - ${data.dealType === 'acquisition' ? 'Acquisition' : data.dealType === 'refinance' ? 'Refinance' : 'Operations'}`,
               propertyId: crmProperty.id,
               dealSource: data.dealType,
@@ -237,7 +237,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
           throw new Error("Please provide a marina name, city, and state");
         }
         
-        const propertyRes = await apiRequest('POST', '/api/crm/properties', {
+        const propertyRes = await apiRequest('POST', '/api/properties', {
           name: data.marinaName,
           address: data.marinaAddress.line1,
           addressLine2: data.marinaAddress.line2 || null,
@@ -252,7 +252,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
         });
         const crmProperty = await propertyRes.json();
         
-        const dealRes = await apiRequest('POST', '/api/crm/deals', {
+        const dealRes = await apiRequest('POST', '/api/deals', {
           name: `${data.marinaName} - ${data.dealType === 'acquisition' ? 'Acquisition' : data.dealType === 'refinance' ? 'Refinance' : 'Operations'}`,
           propertyId: crmProperty.id,
           dealSource: data.dealType,
