@@ -22,7 +22,7 @@ const TOUR_INFO = [
   { id: TOUR_IDS.COMMERCIAL_TENANTS, name: "Commercial Tenants", description: "Lease management", route: "/operations/commercial-tenants" },
   { id: TOUR_IDS.VDR, name: "Virtual Data Room", description: "Secure document storage", route: "/vdr" },
   { id: TOUR_IDS.RENT_ROLL, name: "Rent Roll", description: "Marina lease tracking", route: "/operations/rent-roll" },
-  { id: TOUR_IDS.VALUATOR, name: "Valuator", description: "Financial modeling", route: "/modeling" },
+  { id: TOUR_IDS.VALUATOR, name: "Financial Model", description: "Financial modeling", route: "/modeling" },
   { id: TOUR_IDS.SALES_COMPS, name: "Sales Comps", description: "Comparable sales analysis", route: "/analysis/sales-comps" },
 ];
 
@@ -30,7 +30,7 @@ const VIDEO_PLACEHOLDERS = [
   { title: "Getting Started with MarinaMatch", description: "Learn the basics of navigating the platform", duration: "5 min" },
   { title: "CRM & Deal Management", description: "How to manage your acquisition pipeline", duration: "8 min" },
   { title: "Rent Roll Deep Dive", description: "Advanced rent roll features and reporting", duration: "12 min" },
-  { title: "Valuator & Financial Modeling", description: "Building accurate marina valuations", duration: "15 min" },
+  { title: "Financial Modeling", description: "Building accurate marina valuations", duration: "15 min" },
 ];
 
 export default function UserSettingsPage() {

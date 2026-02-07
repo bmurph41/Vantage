@@ -174,7 +174,7 @@ export const MODULE_INFO: Record<FeatureModule, ModuleInfo> = {
   // Underwriting
   [FEATURE_MODULES.UNDERWRITING_VALUATOR]: {
     key: FEATURE_MODULES.UNDERWRITING_VALUATOR,
-    name: 'Valuator',
+    name: 'Financial Model',
     description: 'Property valuation and analysis',
     category: 'Underwriting',
     includedIn: ['investor-essentials', 'broker-pro', 'full-platform'],
@@ -374,7 +374,7 @@ export const SUBSCRIPTION_PACKAGES: SubscriptionPackage[] = [
       'Contact & Property Management',
       'Deal Project Tracking',
       'Secure Data Room',
-      'Property Valuator',
+      'Financial Model',
       'Sales & Rate Comps',
       'Industry News (DockTalk)',
     ],

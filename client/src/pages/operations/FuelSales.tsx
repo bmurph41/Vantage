@@ -243,7 +243,7 @@ export default function FuelSales() {
               data-testid="button-use-in-valuator"
             >
               <Calculator className="mr-2 h-4 w-4" />
-              Use in Valuator
+              Use in Financial Model
             </Button>
           )}
           <Button onClick={handleExportCSV} variant="outline" data-testid="button-export-csv">

@@ -238,7 +238,7 @@ export default function FinancialAnalysisDashboard() {
               <CardContent className="py-12 text-center text-muted-foreground">
                 <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p className="text-lg font-medium">No Modeling Projects Yet</p>
-                <p className="text-sm mt-2">Create a modeling project in the Valuator to start seeing financial analytics.</p>
+                <p className="text-sm mt-2">Create a modeling project in the Financial Model to start seeing financial analytics.</p>
               </CardContent>
             </Card>
           ) : (
@@ -272,7 +272,7 @@ export default function FinancialAnalysisDashboard() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Building2 className="h-5 w-5" />
-                Valuator Projects ({projectsList.length})
+                Financial Model Projects ({projectsList.length})
               </CardTitle>
               <CardDescription>All modeling projects with their key financial metrics</CardDescription>
             </CardHeader>
@@ -281,7 +281,7 @@ export default function FinancialAnalysisDashboard() {
                 <div className="py-12 text-center text-muted-foreground">
                   <Anchor className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>No modeling projects found.</p>
-                  <p className="text-sm mt-2">Create a new project in the Valuator to get started.</p>
+                  <p className="text-sm mt-2">Create a new project in the Financial Model to get started.</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">

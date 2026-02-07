@@ -192,7 +192,7 @@ export function GlobalControlsBar({
         {showValuatorButton && onUseInValuator && (
           <Button variant="default" size="sm" onClick={onUseInValuator}>
             <ArrowRightToLine className="h-4 w-4 mr-2" />
-            Use in Valuator
+            Use in Financial Model
           </Button>
         )}
       </div>

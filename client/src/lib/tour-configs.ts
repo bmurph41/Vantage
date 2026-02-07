@@ -320,7 +320,7 @@ export const dealWorkspaceTourSteps: TourStep[] = [
   },
   {
     target: '[data-tour="workspace-financials"]',
-    content: "Model the deal with integrated Valuator tools and rent roll analysis.",
+    content: "Model the deal with integrated financial modeling tools and rent roll analysis.",
     title: "Financials Tab",
     placement: "right",
   },
@@ -366,7 +366,7 @@ export function getTourConfig(tourId: TourId): { steps: TourStep[]; videoUrl?: s
     case TOUR_IDS.VALUATOR:
       return { 
         steps: valuatorTourSteps,
-        videoTitle: "Valuator Walkthrough",
+        videoTitle: "Financial Model Walkthrough",
       };
     case TOUR_IDS.PORTFOLIO:
       return { steps: portfolioTourSteps };

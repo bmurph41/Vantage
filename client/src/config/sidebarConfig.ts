@@ -251,7 +251,7 @@ export const sidebarConfig: SidebarGroup[] = [
     children: [
       {
         id: 'valuator',
-        label: 'Valuator',
+        label: 'Financial Model',
         href: '/underwriting/valuator',
         icon: DollarSign,
         matchRoutes: ['/underwriting/valuator', '/valuator'],

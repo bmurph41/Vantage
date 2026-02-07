@@ -85,7 +85,7 @@ const getWorkspaceSubNav = (workspaceId: string) => [
 
 // Analysis Navigation (all users - modeling, analysis, and document processing)
 const analysisNav = [
-  { name: "Valuator", href: "/modeling/projects" },
+  { name: "Financial Model", href: "/modeling/projects" },
   { name: "Debt Scenarios", href: "/modeling/debt-scenarios" },
   { name: "Exit Strategies", href: "/modeling/exit-strategies" },
   { name: "OM Builder", href: "/om" },
@@ -241,7 +241,7 @@ export default function UnifiedSidebar() {
     const isProspectingPage = location === '/prospecting' || location.startsWith('/prospecting/');
     // Deal Workspace: consolidated DD, VDR pages (workspaces, DD projects, data room)
     const isDealWorkspacePage = location.startsWith('/workspaces') || location.startsWith('/projects') || location === '/progress-report' || location.startsWith('/vdr');
-    // Analysis: Modeling Projects (Valuator), Debt Scenarios, Exit Strategies, P&L Parser, OM Builder, Modeling Settings
+    // Analysis: Modeling Projects (Financial Model), Debt Scenarios, Exit Strategies, P&L Parser, OM Builder, Modeling Settings
     const isUnderwritingToolsPage = location.startsWith('/modeling/projects') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/om') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings');
     // Investor Services: Fund Management, LP Portal (GP only)
     const isInvestorServicesPage = location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal');

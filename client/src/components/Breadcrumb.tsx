@@ -21,7 +21,7 @@ const CATEGORIES = {
   OPERATIONS: { label: 'Operations', icon: SettingsIcon },
   DUE_DILIGENCE: { label: 'Due Diligence', href: '/dd/projects', icon: FolderKanban },
   VDR: { label: 'VDR', href: '/vdr', icon: FolderLock },
-  MODELING: { label: 'Valuator', href: '/modeling/projects', icon: TrendingUp },
+  MODELING: { label: 'Financial Model', href: '/modeling/projects', icon: TrendingUp },
   DOCKTALK: { label: 'DockTalk', href: '/docktalk', icon: MessageSquare },
   ANALYSIS: { label: 'Marinalytics', href: '/analysis/sales-comps', icon: BarChart3 },
   MARINAMATCH: { label: 'MarinaMatch', href: '/marinamatch', icon: Target },

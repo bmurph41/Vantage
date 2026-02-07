@@ -387,9 +387,9 @@ export default function ModelingSettings() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Export Valuator & Operations Code</CardTitle>
+          <CardTitle>Export Financial Model & Operations Code</CardTitle>
           <CardDescription>
-            Download a ZIP archive containing all Valuator workspace files, Operations modules,
+            Download a ZIP archive containing all Financial Model workspace files, Operations modules,
             Pro Forma engine, Document Intelligence pipeline, and a comprehensive guide on
             how everything connects.
           </CardDescription>

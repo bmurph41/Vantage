@@ -188,7 +188,7 @@ export function UseInValuatorModal({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Import Actuals to Valuator</DialogTitle>
+          <DialogTitle>Import Actuals to Financial Model</DialogTitle>
           <DialogDescription>
             Step {step} of 5: {
               step === 1 ? "Select Project" :
@@ -203,7 +203,7 @@ export function UseInValuatorModal({
         <div className="py-4">
           {step === 1 && (
             <div className="space-y-4">
-              <Label>Select a Valuator Project</Label>
+              <Label>Select a Financial Model Project</Label>
               <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choose a project..." />

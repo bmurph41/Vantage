@@ -359,7 +359,7 @@ export function NotificationSettings({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calculator className="h-5 w-5" />
-            Valuator Notifications
+            Financial Model Notifications
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">

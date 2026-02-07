@@ -140,7 +140,7 @@ const dealTypes = [
 const features = [
   { id: "crm", name: "CRM & Leads", description: "Track deals and contacts", icon: Users },
   { id: "dd", name: "Due Diligence", description: "Manage DD checklists", icon: ClipboardList },
-  { id: "modeling", name: "Valuator", description: "Financial modeling", icon: TrendingUp },
+  { id: "modeling", name: "Financial Model", description: "Financial modeling", icon: TrendingUp },
   { id: "operations", name: "Operations", description: "Manage marina ops", icon: Store },
   { id: "fuel", name: "Fuel Sales", description: "Track fuel revenue", icon: Fuel },
   { id: "documents", name: "Documents", description: "Virtual data room", icon: FileText },
@@ -289,8 +289,8 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
       toast({ 
         title: isPortfolio ? "Portfolio Created!" : "Deal Created!", 
         description: isPortfolio 
-          ? `${projectCount} marina${projectCount > 1 ? 's' : ''} added to CRM and Valuator.`
-          : `${state.marinaName} has been added to CRM and Valuator.` 
+          ? `${projectCount} marina${projectCount > 1 ? 's' : ''} added to CRM and Financial Model.`
+          : `${state.marinaName} has been added to CRM and Financial Model.` 
       });
       
       onOpenChange(false);
@@ -464,7 +464,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
         </div>
         <div className="text-center p-4 rounded-lg bg-muted/50">
           <TrendingUp className="h-6 w-6 mx-auto text-[#1E4FAB] mb-2" />
-          <p className="text-sm font-medium">Valuator</p>
+          <p className="text-sm font-medium">Financial Model</p>
         </div>
         <div className="text-center p-4 rounded-lg bg-muted/50">
           <ClipboardList className="h-6 w-6 mx-auto text-[#1E4FAB] mb-2" />

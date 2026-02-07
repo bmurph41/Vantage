@@ -59,7 +59,7 @@ const LANDING_PAGES = [
   { value: 'dashboard', label: 'Dashboard' },
   { value: 'deals', label: 'Deals' },
   { value: 'dataroom', label: 'Data Room' },
-  { value: 'valuator', label: 'Valuator' },
+  { value: 'valuator', label: 'Financial Model' },
   { value: 'crm', label: 'CRM' },
   { value: 'intel', label: 'Market Intel' },
 ];
