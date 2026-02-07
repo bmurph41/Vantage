@@ -251,12 +251,14 @@ function SidebarGroupComponent({
               <Icon className={cn("h-5 w-5 shrink-0", hasActiveChild && "text-primary")} />
               <span className={cn("truncate", hasActiveChild && "text-primary")}>{group.label}</span>
             </div>
-            <ChevronRight 
-              className={cn(
-                "h-4 w-4 shrink-0 transition-transform duration-200",
-                isExpanded && "rotate-90"
-              )} 
-            />
+            {hasChildren && (
+              <ChevronRight 
+                className={cn(
+                  "h-4 w-4 shrink-0 transition-transform duration-200",
+                  isExpanded && "rotate-90"
+                )} 
+              />
+            )}
           </button>
 
           {/* Children list with animation */}

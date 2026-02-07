@@ -166,43 +166,6 @@ export const sidebarConfig: SidebarGroup[] = [
   },
 
   // ─────────────────────────────────────────────────────────────
-  // DEAL ROOM
-  // ─────────────────────────────────────────────────────────────
-  {
-    id: 'deal-room',
-    label: 'Deal Room',
-    icon: FolderKanban,
-    matchRoutes: ['/deal-workspace', '/projects', '/dd-projects', '/data-room'],
-    requiredModules: [FEATURE_MODULES.DEALROOM_PROJECTS],
-    children: [
-      {
-        id: 'projects',
-        label: 'Projects',
-        href: '/deal-workspace/projects',
-        icon: FolderOpen,
-        matchRoutes: ['/deal-workspace/projects', '/projects'],
-        requiredModules: [FEATURE_MODULES.DEALROOM_PROJECTS],
-      },
-      {
-        id: 'dd-projects',
-        label: 'Due Diligence',
-        href: '/deal-workspace/dd-projects',
-        icon: FileCheck,
-        matchRoutes: ['/deal-workspace/dd-projects', '/dd-projects'],
-        requiredModules: [FEATURE_MODULES.DEALROOM_DD],
-      },
-      {
-        id: 'data-room',
-        label: 'Data Room',
-        href: '/deal-workspace/data-room',
-        icon: Database,
-        matchRoutes: ['/deal-workspace/data-room', '/data-room'],
-        requiredModules: [FEATURE_MODULES.DEALROOM_DATAROOM],
-      },
-    ],
-  },
-
-  // ─────────────────────────────────────────────────────────────
   // PROSPECTING
   // ─────────────────────────────────────────────────────────────
   {
@@ -235,6 +198,43 @@ export const sidebarConfig: SidebarGroup[] = [
         icon: Megaphone,
         matchRoutes: ['/prospecting/marketing', '/marketing'],
         requiredModules: [FEATURE_MODULES.PROSPECTING_MARKETING],
+      },
+    ],
+  },
+
+  // ─────────────────────────────────────────────────────────────
+  // DEAL ROOM
+  // ─────────────────────────────────────────────────────────────
+  {
+    id: 'deal-room',
+    label: 'Deal Room',
+    icon: FolderKanban,
+    matchRoutes: ['/deal-workspace', '/projects', '/dd-projects', '/data-room'],
+    requiredModules: [FEATURE_MODULES.DEALROOM_PROJECTS],
+    children: [
+      {
+        id: 'projects',
+        label: 'Projects',
+        href: '/deal-workspace/projects',
+        icon: FolderOpen,
+        matchRoutes: ['/deal-workspace/projects', '/projects'],
+        requiredModules: [FEATURE_MODULES.DEALROOM_PROJECTS],
+      },
+      {
+        id: 'dd-projects',
+        label: 'Due Diligence',
+        href: '/deal-workspace/dd-projects',
+        icon: FileCheck,
+        matchRoutes: ['/deal-workspace/dd-projects', '/dd-projects'],
+        requiredModules: [FEATURE_MODULES.DEALROOM_DD],
+      },
+      {
+        id: 'data-room',
+        label: 'Data Room',
+        href: '/deal-workspace/data-room',
+        icon: Database,
+        matchRoutes: ['/deal-workspace/data-room', '/data-room'],
+        requiredModules: [FEATURE_MODULES.DEALROOM_DATAROOM],
       },
     ],
   },
