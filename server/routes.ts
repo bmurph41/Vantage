@@ -7493,6 +7493,40 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  app.post("/api/crm/pending-companies", async (req: any, res) => {
+    try {
+      const { name, website, phone, address, city, state, zipCode, industry } = req.body;
+      
+      if (!name) {
+        return res.status(400).json({ error: "Company name is required" });
+      }
+
+      const pendingCompany = await storage.createPendingCompany({
+        orgId: req.user.orgId,
+        sourceType: 'prospecting',
+        sourceId: null,
+        name,
+        website: website || null,
+        phone: phone || null,
+        address: address || null,
+        city: city || null,
+        state: state || null,
+        zipCode: zipCode || null,
+        industry: industry || null,
+        status: 'pending',
+        sourceMetadata: {
+          createdFromProspecting: true,
+        },
+        createdBy: req.user.id,
+      });
+
+      res.json(pendingCompany);
+    } catch (error: any) {
+      console.error("Failed to create pending company:", error);
+      res.status(500).json({ error: "Failed to create pending company" });
+    }
+  });
+
   app.post("/api/crm/pending-companies/:id/accept", async (req: any, res) => {
     try {
       const { mode } = req.body;

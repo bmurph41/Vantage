@@ -38,7 +38,9 @@ import {
   Check,
   Search,
   MapPin,
-  X
+  X,
+  UserPlus,
+  Building2
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -396,6 +398,8 @@ export default function WeekProspectingModal({
     propertyId?: string;
     dealId?: string;
     callbackDay?: string;
+    newContact?: { firstName: string; lastName: string; email: string };
+    newCompany?: { name: string };
   }>({
     type: '',
     outcome: '',
@@ -407,6 +411,10 @@ export default function WeekProspectingModal({
   const [dealSearchOpen, setDealSearchOpen] = useState(false);
   const [contactSearchValue, setContactSearchValue] = useState("");
   const [dealSearchValue, setDealSearchValue] = useState("");
+  const [companySearchOpen, setCompanySearchOpen] = useState(false);
+  const [companySearchValue, setCompanySearchValue] = useState("");
+  const [showNewContactForm, setShowNewContactForm] = useState(false);
+  const [showNewCompanyForm, setShowNewCompanyForm] = useState(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -1158,6 +1166,44 @@ export default function WeekProspectingModal({
     let persistedId = existingBox?.persistedActivityId;
 
     try {
+      let finalContactId = boxActivityForm.contactId || null;
+      let finalCompanyId = boxActivityForm.companyId || null;
+
+      if (boxActivityForm.newContact && (boxActivityForm.newContact.firstName || boxActivityForm.newContact.lastName)) {
+        try {
+          const pendingRes = await apiRequest('POST', '/api/crm/pending-contacts', {
+            firstName: boxActivityForm.newContact.firstName || null,
+            lastName: boxActivityForm.newContact.lastName || null,
+            email: boxActivityForm.newContact.email || null,
+          });
+          const pendingContact = await pendingRes.json();
+          queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-contacts'] });
+          toast({
+            title: "New Contact Queued",
+            description: `${boxActivityForm.newContact.firstName} ${boxActivityForm.newContact.lastName} added to Pending Contacts for review.`,
+          });
+        } catch (err) {
+          console.error('Failed to create pending contact:', err);
+        }
+      }
+
+      if (boxActivityForm.newCompany && boxActivityForm.newCompany.name) {
+        try {
+          const pendingRes = await apiRequest('POST', '/api/crm/pending-companies', {
+            name: boxActivityForm.newCompany.name,
+          });
+          const pendingCompany = await pendingRes.json();
+          queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-companies'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/pending-companies'] });
+          toast({
+            title: "New Company Queued",
+            description: `${boxActivityForm.newCompany.name} added to Pending Companies for review.`,
+          });
+        } catch (err) {
+          console.error('Failed to create pending company:', err);
+        }
+      }
+
       const activityPayload = {
         prospectingEntryId: entry?.id || '',
         activityType: boxActivityForm.type,
@@ -1165,8 +1211,8 @@ export default function WeekProspectingModal({
         dayOfWeek: day,
         activityDate: activityDate.toISOString(),
         notes: boxActivityForm.notes || null,
-        contactId: boxActivityForm.contactId || null,
-        companyId: boxActivityForm.companyId || null,
+        contactId: finalContactId,
+        companyId: finalCompanyId,
         propertyId: boxActivityForm.propertyId || null,
         dealId: boxActivityForm.dealId || null,
       };
@@ -1222,6 +1268,10 @@ export default function WeekProspectingModal({
     
     setActivityBoxModal({ open: false, day: '', boxId: '' });
     setBoxActivityForm({ type: '', outcome: '', notes: '', callbackDay: '' });
+    setShowNewContactForm(false);
+    setShowNewCompanyForm(false);
+    setCompanySearchValue("");
+    setContactSearchValue("");
     
     // Notify parent that activity was added (clears pending activity)
     if (onActivityAdded) {
@@ -2010,74 +2060,139 @@ export default function WeekProspectingModal({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label className="text-sm font-medium mb-2 block">Link to Contact</Label>
-              <Popover open={contactSearchOpen} onOpenChange={setContactSearchOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={contactSearchOpen}
-                    className="h-11 w-full justify-between"
-                  >
-                    {boxActivityForm.contactId
-                      ? contacts.find(contact => contact.id === boxActivityForm.contactId)?.firstName + ' ' + contacts.find(contact => contact.id === boxActivityForm.contactId)?.lastName
-                      : "Search and select contact..."}
-                    <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-0">
-                  <Command>
-                    <CommandInput 
-                      placeholder="Type to search contacts..." 
-                      value={contactSearchValue}
-                      onValueChange={setContactSearchValue}
+              {showNewContactForm ? (
+                <div className="border rounded-lg p-3 space-y-2 bg-blue-50/50 dark:bg-blue-950/20">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-blue-700 dark:text-blue-400 flex items-center gap-1">
+                      <UserPlus className="w-3 h-3" /> New Contact (will be added to Pending)
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-5 w-5 p-0"
+                      onClick={() => {
+                        setShowNewContactForm(false);
+                        setBoxActivityForm({...boxActivityForm, newContact: undefined});
+                      }}
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      placeholder="First name"
+                      className="h-9 text-sm"
+                      value={boxActivityForm.newContact?.firstName || ''}
+                      onChange={(e) => setBoxActivityForm({
+                        ...boxActivityForm,
+                        newContact: { ...boxActivityForm.newContact!, firstName: e.target.value, lastName: boxActivityForm.newContact?.lastName || '', email: boxActivityForm.newContact?.email || '' }
+                      })}
                     />
-                    <CommandList className="max-h-[200px]">
-                      <CommandEmpty>No contacts found.</CommandEmpty>
-                      <CommandGroup>
-                        <CommandItem
-                          value="none"
-                          onSelect={() => {
-                            setBoxActivityForm({...boxActivityForm, contactId: "", dealId: ""});
-                            setContactSearchOpen(false);
-                            setContactSearchValue("");
-                            setDealSearchValue("");
-                          }}
-                        >
-                          <X className="mr-2 h-4 w-4" />
-                          No contact linked
-                        </CommandItem>
-                        {contacts
-                          .filter(contact => 
-                            `${contact.firstName} ${contact.lastName} ${contact.email}`.toLowerCase()
-                              .includes(contactSearchValue.toLowerCase())
-                          )
-                          .map(contact => (
+                    <Input
+                      placeholder="Last name"
+                      className="h-9 text-sm"
+                      value={boxActivityForm.newContact?.lastName || ''}
+                      onChange={(e) => setBoxActivityForm({
+                        ...boxActivityForm,
+                        newContact: { ...boxActivityForm.newContact!, lastName: e.target.value, firstName: boxActivityForm.newContact?.firstName || '', email: boxActivityForm.newContact?.email || '' }
+                      })}
+                    />
+                  </div>
+                  <Input
+                    placeholder="Email (optional)"
+                    type="email"
+                    className="h-9 text-sm"
+                    value={boxActivityForm.newContact?.email || ''}
+                    onChange={(e) => setBoxActivityForm({
+                      ...boxActivityForm,
+                      newContact: { ...boxActivityForm.newContact!, email: e.target.value, firstName: boxActivityForm.newContact?.firstName || '', lastName: boxActivityForm.newContact?.lastName || '' }
+                    })}
+                  />
+                </div>
+              ) : (
+                <Popover open={contactSearchOpen} onOpenChange={setContactSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={contactSearchOpen}
+                      className="h-11 w-full justify-between"
+                    >
+                      {boxActivityForm.contactId
+                        ? contacts.find(contact => contact.id === boxActivityForm.contactId)?.firstName + ' ' + contacts.find(contact => contact.id === boxActivityForm.contactId)?.lastName
+                        : "Search or add new contact..."}
+                      <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0">
+                    <Command>
+                      <CommandInput 
+                        placeholder="Type to search contacts..." 
+                        value={contactSearchValue}
+                        onValueChange={setContactSearchValue}
+                      />
+                      <CommandList className="max-h-[200px]">
+                        <CommandEmpty>No contacts found.</CommandEmpty>
+                        <CommandGroup>
                           <CommandItem
-                            key={contact.id}
-                            value={`${contact.firstName} ${contact.lastName}`}
+                            value="__add_new_contact__"
                             onSelect={() => {
-                              setBoxActivityForm({
-                                ...boxActivityForm, 
-                                contactId: contact.id,
-                                dealId: "" // Clear deal when contact changes
-                              });
+                              setShowNewContactForm(true);
+                              setBoxActivityForm({...boxActivityForm, contactId: "", dealId: "", newContact: { firstName: contactSearchValue || '', lastName: '', email: '' }});
                               setContactSearchOpen(false);
                               setContactSearchValue("");
                               setDealSearchValue("");
                             }}
                           >
-                            <div className="flex flex-col">
-                              <span className="font-medium">{contact.firstName} {contact.lastName}</span>
-                              <span className="text-sm text-gray-500">{contact.email}</span>
-                              {contact.position && <span className="text-xs text-gray-400">{contact.position}</span>}
-                            </div>
+                            <UserPlus className="mr-2 h-4 w-4 text-blue-600" />
+                            <span className="text-blue-600 font-medium">Add new contact{contactSearchValue ? ` "${contactSearchValue}"` : ''}...</span>
                           </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+                          <CommandItem
+                            value="none"
+                            onSelect={() => {
+                              setBoxActivityForm({...boxActivityForm, contactId: "", dealId: ""});
+                              setContactSearchOpen(false);
+                              setContactSearchValue("");
+                              setDealSearchValue("");
+                            }}
+                          >
+                            <X className="mr-2 h-4 w-4" />
+                            No contact linked
+                          </CommandItem>
+                          {contacts
+                            .filter(contact => 
+                              `${contact.firstName} ${contact.lastName} ${contact.email}`.toLowerCase()
+                                .includes(contactSearchValue.toLowerCase())
+                            )
+                            .map(contact => (
+                            <CommandItem
+                              key={contact.id}
+                              value={`${contact.firstName} ${contact.lastName}`}
+                              onSelect={() => {
+                                setBoxActivityForm({
+                                  ...boxActivityForm, 
+                                  contactId: contact.id,
+                                  newContact: undefined,
+                                  dealId: ""
+                                });
+                                setContactSearchOpen(false);
+                                setContactSearchValue("");
+                                setDealSearchValue("");
+                              }}
+                            >
+                              <div className="flex flex-col">
+                                <span className="font-medium">{contact.firstName} {contact.lastName}</span>
+                                <span className="text-sm text-gray-500">{contact.email}</span>
+                                {contact.position && <span className="text-xs text-gray-400">{contact.position}</span>}
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              )}
             </div>
             
             <div>
@@ -2177,22 +2292,109 @@ export default function WeekProspectingModal({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label className="text-sm font-medium mb-2 block">Link to Company</Label>
-              <Select
-                value={boxActivityForm.companyId || "none"}
-                onValueChange={(value) => setBoxActivityForm({...boxActivityForm, companyId: value === "none" ? "" : value})}
-              >
-                <SelectTrigger className="h-11">
-                  <SelectValue placeholder="Select company..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No company linked</SelectItem>
-                  {companies.map(company => (
-                    <SelectItem key={company.id} value={company.id}>
-                      {company.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {showNewCompanyForm ? (
+                <div className="border rounded-lg p-3 space-y-2 bg-green-50/50 dark:bg-green-950/20">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-green-700 dark:text-green-400 flex items-center gap-1">
+                      <Building2 className="w-3 h-3" /> New Company (will be added to Pending)
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-5 w-5 p-0"
+                      onClick={() => {
+                        setShowNewCompanyForm(false);
+                        setBoxActivityForm({...boxActivityForm, newCompany: undefined});
+                      }}
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                  <Input
+                    placeholder="Company name"
+                    className="h-9 text-sm"
+                    value={boxActivityForm.newCompany?.name || ''}
+                    onChange={(e) => setBoxActivityForm({
+                      ...boxActivityForm,
+                      newCompany: { name: e.target.value }
+                    })}
+                  />
+                </div>
+              ) : (
+                <Popover open={companySearchOpen} onOpenChange={setCompanySearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={companySearchOpen}
+                      className="h-11 w-full justify-between"
+                    >
+                      {boxActivityForm.companyId
+                        ? companies.find(c => c.id === boxActivityForm.companyId)?.name
+                        : "Search or add new company..."}
+                      <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0">
+                    <Command>
+                      <CommandInput 
+                        placeholder="Type to search companies..." 
+                        value={companySearchValue}
+                        onValueChange={setCompanySearchValue}
+                      />
+                      <CommandList className="max-h-[200px]">
+                        <CommandEmpty>No companies found.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="__add_new_company__"
+                            onSelect={() => {
+                              setShowNewCompanyForm(true);
+                              setBoxActivityForm({...boxActivityForm, companyId: "", newCompany: { name: companySearchValue || '' }});
+                              setCompanySearchOpen(false);
+                              setCompanySearchValue("");
+                            }}
+                          >
+                            <Building2 className="mr-2 h-4 w-4 text-green-600" />
+                            <span className="text-green-600 font-medium">Add new company{companySearchValue ? ` "${companySearchValue}"` : ''}...</span>
+                          </CommandItem>
+                          <CommandItem
+                            value="none"
+                            onSelect={() => {
+                              setBoxActivityForm({...boxActivityForm, companyId: ""});
+                              setCompanySearchOpen(false);
+                              setCompanySearchValue("");
+                            }}
+                          >
+                            <X className="mr-2 h-4 w-4" />
+                            No company linked
+                          </CommandItem>
+                          {companies
+                            .filter(company => 
+                              company.name.toLowerCase().includes(companySearchValue.toLowerCase())
+                            )
+                            .map(company => (
+                            <CommandItem
+                              key={company.id}
+                              value={company.name}
+                              onSelect={() => {
+                                setBoxActivityForm({
+                                  ...boxActivityForm,
+                                  companyId: company.id,
+                                  newCompany: undefined,
+                                });
+                                setCompanySearchOpen(false);
+                                setCompanySearchValue("");
+                              }}
+                            >
+                              <span className="font-medium">{company.name}</span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              )}
             </div>
             <div>
               <Label className="text-sm font-medium mb-2 block">Link to Property</Label>
