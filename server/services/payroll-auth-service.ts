@@ -258,10 +258,17 @@ export function filterCalcOutput(
 export function requirePayrollAccess(defaultScopeType: ScopeType = "ORG") {
   return async (req: any, res: any, next: any) => {
     try {
+      const rawRole = req.user?.orgRole ?? req.user?.role ?? "ORG_VIEWER";
+      const roleMap: Record<string, string> = {
+        owner: "ORG_OWNER",
+        admin: "ORG_ADMIN",
+        editor: "ORG_ADMIN",
+        viewer: "ORG_VIEWER",
+      };
       const auth: AuthContext = {
         userId: req.user?.id,
         orgId: req.user?.orgId ?? req.query.orgId ?? req.params.orgId,
-        orgRole: req.user?.orgRole ?? "ORG_VIEWER",
+        orgRole: roleMap[rawRole] ?? rawRole,
       };
 
       if (!auth.userId || !auth.orgId) {
