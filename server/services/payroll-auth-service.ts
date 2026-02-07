@@ -8,8 +8,8 @@
  */
 
 import { eq, and, or, inArray } from "drizzle-orm";
-import { db } from "../../db"; // adjust to your app's db
-import { payrollPermissionGrants } from "../../db/payroll-schema";
+import { db } from "../db"; // adjust to your app's db
+import { payrollPermissionGrants } from "@shared/payroll-schema";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

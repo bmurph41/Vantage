@@ -11,7 +11,7 @@
  */
 
 import { eq, and, gte, lte, inArray } from "drizzle-orm";
-import { db } from "../../db";
+import { db } from "../db";
 import {
   pnlActualsValues,
   valuatorPnlValues,
@@ -19,8 +19,8 @@ import {
   pnlDepartmentAllocations,
   payrollDepartments,
   pnlCategories,
-} from "../../db/payroll-schema";
-import { getPayrollByDepartment, type DeptPayrollTotals } from "./payroll-calculator.service";
+} from "@shared/payroll-schema";
+import { getPayrollByDepartment, type DeptPayrollTotals } from "./payroll-calculator-service";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

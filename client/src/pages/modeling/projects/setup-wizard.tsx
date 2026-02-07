@@ -151,6 +151,8 @@ interface WizardFormData {
   name: string;
   assetType: string;
   propertyName: string;
+  dealSource: string;
+  ebitda: string;
   location: {
     streetAddress: string;
     city: string;
@@ -188,6 +190,8 @@ interface WizardFormData {
     shipStore: { enabled: boolean; expectedRevenueBaseline: string };
     serviceDepartment: { enabled: boolean; numberOfBays: string };
     boatRentals: { enabled: boolean; fleetSize: string };
+    boatClub: { enabled: boolean; memberCapacity: string; monthlyDues: string };
+    boatSales: { enabled: boolean; expectedAnnualRevenue: string };
   };
   financialScope: {
     historicalYears: number[];
@@ -207,10 +211,22 @@ interface WizardFormData {
   };
 }
 
+const DEAL_SOURCES = [
+  { value: "broker", label: "Broker" },
+  { value: "direct", label: "Direct / Off-Market" },
+  { value: "listing", label: "Online Listing" },
+  { value: "auction", label: "Auction" },
+  { value: "referral", label: "Referral" },
+  { value: "marinamatch", label: "MarinaMatch" },
+  { value: "other", label: "Other" },
+];
+
 const DEFAULT_FORM_DATA: WizardFormData = {
   name: "",
   assetType: "MARINA",
   propertyName: "",
+  dealSource: "",
+  ebitda: "",
   location: {
     streetAddress: "",
     city: "",
@@ -248,6 +264,8 @@ const DEFAULT_FORM_DATA: WizardFormData = {
     shipStore: { enabled: false, expectedRevenueBaseline: "" },
     serviceDepartment: { enabled: false, numberOfBays: "" },
     boatRentals: { enabled: false, fleetSize: "" },
+    boatClub: { enabled: false, memberCapacity: "", monthlyDues: "" },
+    boatSales: { enabled: false, expectedAnnualRevenue: "" },
   },
   financialScope: {
     historicalYears: [],
@@ -314,12 +332,19 @@ function WelcomeSlide() {
 // ============================================
 
 function DealDetailsSlide({ payload, updatePayload, updateNestedPayload }: SlideProps) {
+  const computedDebt = payload.acquisition.purchasePrice && payload.acquisition.ltv
+    ? (parseFloat(payload.acquisition.purchasePrice) * parseFloat(payload.acquisition.ltv) / 100).toFixed(0)
+    : '';
+  const computedEquity = payload.acquisition.purchasePrice && computedDebt
+    ? (parseFloat(payload.acquisition.purchasePrice) - parseFloat(computedDebt)).toFixed(0)
+    : '';
+
   return (
     <div className="space-y-6">
       <div>
         <h3 className="text-xl font-semibold mb-2">Deal Details</h3>
         <p className="text-muted-foreground">
-          Enter basic project information and acquisition parameters.
+          Enter project information, acquisition parameters, and deal structure.
         </p>
       </div>
 
@@ -364,8 +389,8 @@ function DealDetailsSlide({ payload, updatePayload, updateNestedPayload }: Slide
                 </SelectContent>
               </Select>
             </div>
-            <div className="col-span-2">
-              <Label htmlFor="propertyName">Property Name (optional)</Label>
+            <div>
+              <Label htmlFor="propertyName">Property / Marina Name</Label>
               <Input
                 id="propertyName"
                 placeholder="e.g., Sunrise Marina"
@@ -373,6 +398,25 @@ function DealDetailsSlide({ payload, updatePayload, updateNestedPayload }: Slide
                 onChange={(e) => updatePayload("propertyName", e.target.value)}
                 className="mt-1.5"
               />
+            </div>
+            <div>
+              <Label htmlFor="dealSource">Deal Source</Label>
+              <Select
+                value={payload.dealSource || "none"}
+                onValueChange={(v) => updatePayload("dealSource", v === "none" ? "" : v)}
+              >
+                <SelectTrigger className="mt-1.5">
+                  <SelectValue placeholder="How did this deal originate?" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Select source...</SelectItem>
+                  {DEAL_SOURCES.map((src) => (
+                    <SelectItem key={src.value} value={src.value}>
+                      {src.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>
@@ -435,7 +479,7 @@ function DealDetailsSlide({ payload, updatePayload, updateNestedPayload }: Slide
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <DollarSign className="h-4 w-4" />
-            Acquisition Parameters
+            Acquisition & Capital Structure
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -462,6 +506,22 @@ function DealDetailsSlide({ payload, updatePayload, updateNestedPayload }: Slide
               />
             </div>
             <div>
+              <Label htmlFor="ebitda">Current EBITDA ($)</Label>
+              <Input
+                id="ebitda"
+                type="number"
+                placeholder="500,000"
+                value={payload.ebitda}
+                onChange={(e) => updatePayload("ebitda", e.target.value)}
+                className="mt-1.5"
+              />
+              {payload.acquisition.purchasePrice && payload.ebitda && parseFloat(payload.ebitda) > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Implied Cap Rate: {((parseFloat(payload.ebitda) / parseFloat(payload.acquisition.purchasePrice)) * 100).toFixed(2)}%
+                </p>
+              )}
+            </div>
+            <div>
               <Label htmlFor="closingCostsPercent">Closing Costs (%)</Label>
               <Input
                 id="closingCostsPercent"
@@ -484,7 +544,38 @@ function DealDetailsSlide({ payload, updatePayload, updateNestedPayload }: Slide
                 className="mt-1.5"
               />
             </div>
+            <div>
+              <Label htmlFor="closingCostsDollar">Closing Costs ($)</Label>
+              <Input
+                id="closingCostsDollar"
+                type="number"
+                placeholder="Auto-calculated or enter manually"
+                value={payload.acquisition.closingCostsDollar || (
+                  payload.acquisition.purchasePrice && payload.acquisition.closingCostsPercent
+                    ? (parseFloat(payload.acquisition.purchasePrice) * parseFloat(payload.acquisition.closingCostsPercent) / 100).toFixed(0)
+                    : ''
+                )}
+                onChange={(e) => updateNestedPayload("acquisition.closingCostsDollar", e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
           </div>
+
+          {payload.acquisition.purchasePrice && payload.acquisition.ltv && (
+            <div className="mt-3 p-3 bg-muted/50 rounded-lg">
+              <div className="text-sm font-medium mb-2">Capital Structure Summary</div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Debt Amount:</span>
+                  <span className="font-medium">${parseInt(computedDebt).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Equity Required:</span>
+                  <span className="font-medium">${parseInt(computedEquity).toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -791,6 +882,23 @@ function ProfitCentersSlide({ payload, updateNestedPayload }: SlideProps) {
       icon: Ship,
       description: "Charter & rental operations",
       fields: [{ key: "fleetSize", label: "Fleet Size", type: "number" }],
+    },
+    {
+      key: "boatClub",
+      label: "Boat Club",
+      icon: Anchor,
+      description: "Membership-based boat access",
+      fields: [
+        { key: "memberCapacity", label: "Member Capacity", type: "number" },
+        { key: "monthlyDues", label: "Monthly Dues ($)", type: "number" },
+      ],
+    },
+    {
+      key: "boatSales",
+      label: "Boat Sales",
+      icon: DollarSign,
+      description: "New & used boat sales",
+      fields: [{ key: "expectedAnnualRevenue", label: "Expected Annual Revenue ($)", type: "number" }],
     },
   ];
 
@@ -1160,12 +1268,60 @@ function ReviewSlide({
 
         <Card>
           <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Acquisition</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-lg font-semibold">
+              {payload.acquisition.purchasePrice
+                ? `$${parseInt(payload.acquisition.purchasePrice).toLocaleString()}`
+                : "Not set"}
+            </p>
+            {payload.ebitda && (
+              <p className="text-sm text-muted-foreground">EBITDA: ${parseInt(payload.ebitda).toLocaleString()}</p>
+            )}
+            {payload.acquisition.ltv && (
+              <p className="text-sm text-muted-foreground">LTV: {payload.acquisition.ltv}%</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Profit Centers</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-lg font-semibold">
               {Object.values(payload.profitCenters).filter((p) => p.enabled).length} enabled
             </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Financial Scope</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-lg font-semibold">
+              {payload.financialScope.historicalYears.length} year{payload.financialScope.historicalYears.length !== 1 ? 's' : ''} of P&L
+            </p>
+            {payload.financialScope.includeT12 && (
+              <Badge variant="secondary" className="text-xs mt-1">+ T12 Statement</Badge>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Underwriting</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm space-y-0.5">
+              <p>Revenue Growth: {payload.underwriting.revenueGrowthPercent || 3}%</p>
+              <p>Hold Period: {payload.underwriting.holdPeriodYears || 5} years</p>
+              {payload.underwriting.capRateExit && (
+                <p>Exit Cap: {payload.underwriting.capRateExit}%</p>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -1323,19 +1479,26 @@ export default function SetupWizard() {
         return isNaN(n) ? undefined : n;
       };
 
-      const input = {
-        name: payload.name,
-        assetType: payload.assetType,
-        projectType: "BOTH",
-        propertyName: payload.propertyName || undefined,
-        location: {
-          streetAddress: payload.location.streetAddress || undefined,
-          city: payload.location.city || undefined,
-          state: payload.location.state || undefined,
-          zipCode: payload.location.zipCode || undefined,
+      const totalUnits = payload.storageMix.items.reduce((sum, item) => sum + (item.count || 0), 0);
+
+      const input: Record<string, any> = {
+        marinaName: payload.name,
+        address: payload.location.streetAddress || undefined,
+        city: payload.location.city || undefined,
+        state: payload.location.state || undefined,
+        zipCode: payload.location.zipCode || undefined,
+        purchasePrice: payload.acquisition.purchasePrice || undefined,
+        ebitda: payload.ebitda || undefined,
+        dealSource: ["direct_to_seller", "broker", "owned_marina"].includes(payload.dealSource)
+          ? payload.dealSource
+          : payload.dealSource === "direct" ? "direct_to_seller" : undefined,
+        totalStorageUnits: totalUnits || undefined,
+        customMetrics: {
+          wizardVersion: 2,
+          assetType: payload.assetType,
+          propertyName: payload.propertyName || undefined,
+          dealSourceDetail: payload.dealSource || undefined,
           country: payload.location.country || undefined,
-        },
-        valuatorInputs: {
           storageMix: {
             items: payload.storageMix.items.map((item) => ({
               storageType: item.storageType,
@@ -1367,6 +1530,15 @@ export default function SetupWizard() {
               enabled: payload.profitCenters.boatRentals.enabled,
               fleetSize: parseNumber(payload.profitCenters.boatRentals.fleetSize),
             },
+            boatClub: {
+              enabled: payload.profitCenters.boatClub.enabled,
+              memberCapacity: parseNumber(payload.profitCenters.boatClub.memberCapacity),
+              monthlyDues: parseNumber(payload.profitCenters.boatClub.monthlyDues),
+            },
+            boatSales: {
+              enabled: payload.profitCenters.boatSales.enabled,
+              expectedAnnualRevenue: parseNumber(payload.profitCenters.boatSales.expectedAnnualRevenue),
+            },
           },
           seasonality: {
             profile: payload.seasonality.profile,
@@ -1391,9 +1563,10 @@ export default function SetupWizard() {
           },
           acquisition: {
             targetClosingDate: payload.acquisition.targetClosingDate || undefined,
-            purchasePrice: parseNumber(payload.acquisition.purchasePrice),
             closingCostsDollar: parseNumber(payload.acquisition.closingCostsDollar),
             closingCostsPercent: parseNumber(payload.acquisition.closingCostsPercent),
+            equityInvested: parseNumber(payload.acquisition.equityInvested),
+            debtAmount: parseNumber(payload.acquisition.debtAmount),
             ltv: parseNumber(payload.acquisition.ltv),
           },
           loanTerms: {
@@ -1405,7 +1578,7 @@ export default function SetupWizard() {
         },
       };
 
-      const response = await fetch("/api/projects", {
+      const response = await fetch("/api/modeling/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -1414,11 +1587,10 @@ export default function SetupWizard() {
 
       const result = await response.json();
 
-      if (!response.ok || !result.ok) {
-        throw new Error(result.error?.message || "Failed to create project");
+      if (!response.ok) {
+        throw new Error(result.error || result.details?.[0]?.message || "Failed to create project");
       }
 
-      // Clear draft on success
       await onWizardSubmitSuccess("newProject", user?.id || null);
       await clearDraft();
 
@@ -1427,9 +1599,8 @@ export default function SetupWizard() {
         description: `${payload.name} has been created successfully.`,
       });
 
-      // Redirect to the new project
-      if (result.project?.id) {
-        setLocation(`/modeling/projects/${result.project.id}`);
+      if (result.id) {
+        setLocation(`/modeling/projects/${result.id}`);
       } else {
         setLocation("/modeling/projects");
       }

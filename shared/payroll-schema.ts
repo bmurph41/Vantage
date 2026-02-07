@@ -1,3 +1,4 @@
+import { assetClassEnum } from "./analytics-schema";
 /**
  * MarinaMatch Payroll Module — Complete Drizzle Schema
  *
@@ -95,12 +96,6 @@ export const roleGroupEnum = pgEnum("role_group", [
   "OTHER",
 ]);
 
-export const assetClassEnum = pgEnum("asset_class", [
-  "MARINA",
-  "RETAIL",
-  "MULTIFAMILY",
-  "OTHER",
-]);
 
 export const workerTypeEnum = pgEnum("worker_type", [
   "W2",
@@ -268,7 +263,7 @@ export const payrollPositions = pgTable("payroll_positions", {
   defaultDepartmentId: uuid("default_department_id"),
   roleGroup: roleGroupEnum("role_group").notNull().default("OTHER"),
   isTemplate: boolean("is_template").notNull().default(false),
-  assetClass: assetClassEnum("asset_class").notNull().default("MARINA"),
+  assetClass: assetClassEnum("asset_class").notNull().default("marina"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

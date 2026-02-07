@@ -11,7 +11,7 @@
  */
 
 import { eq, and, gte, lte, asc } from "drizzle-orm";
-import { db } from "../../db";
+import { db } from "../db";
 import {
   payrollPlans,
   payrollPlanLines,
@@ -24,7 +24,7 @@ import {
   payrollDepartments,
   payrollEmployees,
   payrollPositions,
-} from "../../db/payroll-schema";
+} from "@shared/payroll-schema";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

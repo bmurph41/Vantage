@@ -3,7 +3,7 @@
  * Run after migration; requires an org_id parameter.
  */
 
-import { db } from "../db"; // adjust import to your app's db instance
+import { db } from "../server/db";
 import {
   payrollDepartments,
   payrollPositions,
@@ -11,7 +11,7 @@ import {
   seasonalityTemplates,
   pnlCategories,
   pnlLineItems,
-} from "./payroll-schema";
+} from "@shared/payroll-schema";
 
 export async function seedPayrollDefaults(orgId: string) {
   // ─── DEPARTMENTS ──────────────────────────────────────────────────────────
@@ -60,7 +60,7 @@ export async function seedPayrollDefaults(orgId: string) {
       defaultDepartmentId: deptMap[p.deptCode] ?? null,
       roleGroup: p.roleGroup,
       isTemplate: true,
-      assetClass: "MARINA" as const,
+      assetClass: "marina" as const,
     }))
   );
 
