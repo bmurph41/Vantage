@@ -474,7 +474,7 @@ export const SUBSCRIPTION_PACKAGES: SubscriptionPackage[] = [
       'Complete CRM & Pipeline',
       'Full Prospecting Suite',
       'Complete Deal Room',
-      'All Underwriting Tools',
+      'All Analysis Tools',
       'Full Analytics Suite',
       'Complete Operations Module',
       'All Integrations',

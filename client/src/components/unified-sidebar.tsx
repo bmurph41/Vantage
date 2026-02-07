@@ -83,8 +83,8 @@ const getWorkspaceSubNav = (workspaceId: string) => [
   { name: "Team", href: `/workspaces/${workspaceId}?tab=team` },
 ];
 
-// Underwriting Tools Navigation (all users - modeling, analysis, and document processing)
-const underwritingToolsNav = [
+// Analysis Navigation (all users - modeling, analysis, and document processing)
+const analysisNav = [
   { name: "Valuator", href: "/modeling/projects" },
   { name: "Debt Scenarios", href: "/modeling/debt-scenarios" },
   { name: "Exit Strategies", href: "/modeling/exit-strategies" },
@@ -136,7 +136,7 @@ export default function UnifiedSidebar() {
   const [pipelineExpanded, setPipelineExpanded] = useState(false); // Pipeline deals section
   const [prospectingExpanded, setProspectingExpanded] = useState(false); // Prospecting, Analytics
   const [dealWorkspaceExpanded, setDealWorkspaceExpanded] = useState(false); // Consolidated DD, VDR, Modeling
-  const [underwritingToolsExpanded, setUnderwritingToolsExpanded] = useState(false);
+  const [analysisExpanded, setAnalysisExpanded] = useState(false);
   const [investorServicesExpanded, setInvestorServicesExpanded] = useState(false);
   const [marketIntelExpanded, setMarketIntelExpanded] = useState(false);
   const [pendingExpanded, setPendingExpanded] = useState(false);
@@ -187,7 +187,7 @@ export default function UnifiedSidebar() {
   };
 
   // Helper function to check if user has access to Rent Roll (requires owner, investor, broker, operations, or modeling_tools pack)
-  // Operations pack and Underwriting Tools (modeling_tools) pack include Rent Roll as a bundled feature
+  // Operations pack and Analysis (modeling_tools) pack include Rent Roll as a bundled feature
   // In development mode, always show Rent Roll for testing
   const hasRentRollAccess = (): boolean => {
     const isDev = import.meta.env.DEV || import.meta.env.MODE === 'development';
@@ -241,7 +241,7 @@ export default function UnifiedSidebar() {
     const isProspectingPage = location === '/prospecting' || location.startsWith('/prospecting/');
     // Deal Workspace: consolidated DD, VDR pages (workspaces, DD projects, data room)
     const isDealWorkspacePage = location.startsWith('/workspaces') || location.startsWith('/projects') || location === '/progress-report' || location.startsWith('/vdr');
-    // Underwriting Tools: Modeling Projects (Valuator), Debt Scenarios, Exit Strategies, P&L Parser, OM Builder, Modeling Settings
+    // Analysis: Modeling Projects (Valuator), Debt Scenarios, Exit Strategies, P&L Parser, OM Builder, Modeling Settings
     const isUnderwritingToolsPage = location.startsWith('/modeling/projects') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/om') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings');
     // Investor Services: Fund Management, LP Portal (GP only)
     const isInvestorServicesPage = location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal');
@@ -256,7 +256,7 @@ export default function UnifiedSidebar() {
     setProspectingExpanded(isProspectingPage);
     setPendingExpanded(isPendingPage);
     setDealWorkspaceExpanded(isDealWorkspacePage);
-    setUnderwritingToolsExpanded(isUnderwritingToolsPage);
+    setAnalysisExpanded(isUnderwritingToolsPage);
     setInvestorServicesExpanded(isInvestorServicesPage);
     setMarketIntelExpanded(isMarketIntelPage);
   }, [location]);
@@ -673,17 +673,17 @@ export default function UnifiedSidebar() {
           </div>
         )}
         
-        {/* Underwriting Tools Section - Modeling Projects, Debt Scenarios, Exit Strategies, OM Builder (all users) */}
+        {/* Analysis Section - Modeling Projects, Debt Scenarios, Exit Strategies, OM Builder (all users) */}
         {canViewSection('modeling_tools') && (
           <div className="mb-2">
             <SectionHeader 
-              title="Underwriting Tools" 
+              title="Analysis" 
               icon={Calculator}
-              expanded={underwritingToolsExpanded} 
-              onToggle={() => setUnderwritingToolsExpanded(!underwritingToolsExpanded)}
+              expanded={analysisExpanded} 
+              onToggle={() => setAnalysisExpanded(!analysisExpanded)}
               isActive={location.startsWith('/modeling/projects') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/om') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings')}
             />
-            {underwritingToolsExpanded && underwritingToolsNav.map((item) => (
+            {analysisExpanded && analysisNav.map((item) => (
               <NavLink key={item.name} item={item} />
             ))}
           </div>
