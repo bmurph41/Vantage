@@ -721,7 +721,6 @@ export default function UnifiedSidebar() {
                   <FileText className="w-3.5 h-3.5" />
                   <span>Investment Materials</span>
                 </div>
-                <ChevronRight className="w-3 h-3" />
               </div>
             </Link>
           )}
