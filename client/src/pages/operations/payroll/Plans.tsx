@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,9 +64,10 @@ const PAY_TYPES = [
 ];
 
 export default function Plans() {
+  const { user } = useAuth();
   const { data: plans, isLoading } = usePayrollPlans({});
   const { data: departments } = useDepartments();
-  const { data: positions } = usePositions({});
+  const { data: positions } = usePositions(user?.orgId);
   const createPlan = useCreatePlan();
   const deletePlan = useDeletePlan();
   const createLine = useCreateLine();

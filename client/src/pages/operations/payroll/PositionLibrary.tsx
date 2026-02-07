@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,7 +44,8 @@ const ROLE_GROUPS = [
 ];
 
 export default function PositionLibrary() {
-  const { data: positions, isLoading } = usePositions({ templateOnly: true });
+  const { user } = useAuth();
+  const { data: positions, isLoading } = usePositions(user?.orgId, true);
   const { data: departments } = useDepartments();
   const [search, setSearch] = useState("");
   const [filterGroup, setFilterGroup] = useState<string>("all");

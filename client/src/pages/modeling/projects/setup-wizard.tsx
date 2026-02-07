@@ -1578,9 +1578,14 @@ export default function SetupWizard() {
         },
       };
 
+      const csrfMatch = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/);
+      const csrfToken = csrfMatch ? decodeURIComponent(csrfMatch[1]) : '';
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
+
       const response = await fetch("/api/modeling/projects", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         credentials: "include",
         body: JSON.stringify(input),
       });
