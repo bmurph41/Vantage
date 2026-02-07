@@ -229,6 +229,7 @@ const BenchmarksIndex = lazy(() => import("@/pages/analysis/benchmarks/Index"));
 const CapitalMarketsIndex = lazy(() => import("@/pages/analysis/capital-markets"));
 const DebtScenariosIndex = lazy(() => import("@/pages/modeling/debt-scenarios/Index"));
 const ExitStrategiesIndex = lazy(() => import("@/pages/modeling/exit-strategies"));
+const ScenariosIndex = lazy(() => import("@/pages/modeling/scenarios"));
 const SetupWizard = lazy(() => import("@/pages/modeling/projects/setup-wizard"));
 const ModelingProjectsIndex = lazy(() => import("@/pages/modeling/projects"));
 const ModelingPortfolio = lazy(() => import("@/pages/modeling/portfolio"));
@@ -2003,10 +2004,24 @@ function Router() {
         )}
       </Route>
       
+      <Route path="/modeling/scenarios/:rest*">
+        {() => (
+          <UnifiedLayout>
+            <ScenariosIndex />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/modeling/scenarios">
+        {() => (
+          <UnifiedLayout>
+            <ScenariosIndex />
+          </UnifiedLayout>
+        )}
+      </Route>
       <Route path="/modeling/debt-scenarios">
         {() => (
           <UnifiedLayout>
-            <DebtScenariosIndex />
+            <ScenariosIndex />
           </UnifiedLayout>
         )}
       </Route>
@@ -2046,7 +2061,7 @@ function Router() {
       <Route path="/modeling/exit-strategies">
         {() => (
           <UnifiedLayout>
-            <ExitStrategiesIndex />
+            <ScenariosIndex />
           </UnifiedLayout>
         )}
       </Route>

@@ -86,8 +86,7 @@ const getWorkspaceSubNav = (workspaceId: string) => [
 // Analysis Navigation (all users - modeling, analysis, and document processing)
 const analysisNav = [
   { name: "Financial Model", href: "/modeling/projects" },
-  { name: "Debt Scenarios", href: "/modeling/debt-scenarios" },
-  { name: "Exit Strategies", href: "/modeling/exit-strategies" },
+  { name: "Scenarios", href: "/modeling/scenarios" },
   { name: "OM Builder", href: "/om" },
   { name: "Modeling Settings", href: "/modeling/settings" },
 ];
@@ -242,7 +241,7 @@ export default function UnifiedSidebar() {
     // Deal Workspace: consolidated DD, VDR pages (workspaces, DD projects, data room)
     const isDealWorkspacePage = location.startsWith('/workspaces') || location.startsWith('/projects') || location === '/progress-report' || location.startsWith('/vdr');
     // Analysis: Modeling Projects (Financial Model), Debt Scenarios, Exit Strategies, P&L Parser, OM Builder, Modeling Settings
-    const isUnderwritingToolsPage = location.startsWith('/modeling/projects') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/om') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings');
+    const isUnderwritingToolsPage = location.startsWith('/modeling/projects') || location.startsWith('/modeling/scenarios') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/om') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings');
     // Investor Services: Fund Management, LP Portal (GP only)
     const isInvestorServicesPage = location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal');
     const isMarketIntelPage = location.startsWith('/analysis/');
@@ -681,7 +680,7 @@ export default function UnifiedSidebar() {
               icon={Calculator}
               expanded={analysisExpanded} 
               onToggle={() => setAnalysisExpanded(!analysisExpanded)}
-              isActive={location.startsWith('/modeling/projects') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/om') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings')}
+              isActive={location.startsWith('/modeling/projects') || location.startsWith('/modeling/scenarios') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/om') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings')}
             />
             {analysisExpanded && analysisNav.map((item) => (
               <NavLink key={item.name} item={item} />

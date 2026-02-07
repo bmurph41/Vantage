@@ -440,19 +440,7 @@ export default function DebtScenariosIndex() {
   });
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <Calculator className="w-8 h-8 text-primary" />
-          <h1 className="text-3xl font-bold" data-testid="text-debt-scenarios-title">
-            Debt Scenarios
-          </h1>
-        </div>
-        <p className="text-muted-foreground" data-testid="text-debt-scenarios-description">
-          Comprehensive debt modeling for marina acquisitions with underwriting metrics and amortization analysis
-        </p>
-      </div>
-
+    <div>
       {/* Scenario Management Card */}
       <Card className="mb-6 bg-primary/5">
         <CardContent className="pt-6">

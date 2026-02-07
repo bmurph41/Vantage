@@ -386,18 +386,9 @@ export default function ExitStrategiesPage() {
   };
 
   return (
-    <div className="flex-1 overflow-auto p-6">
+    <div className="flex-1 overflow-auto">
       <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="exit-strategies-title">
-              <Target className="h-6 w-6 text-primary" />
-              Exit Strategies
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Quick analysis tools for exit planning. For project-specific analysis, use the Exit Strategy tab within a modeling project.
-            </p>
-          </div>
+        <div className="flex items-center justify-end">
           <Button
             variant="outline"
             onClick={() => setIsLinkModalOpen(true)}
