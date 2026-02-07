@@ -22035,6 +22035,37 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       res.status(500).json({ error: 'Failed to reprocess document' });
     }
   });
+  // Retry parsing a stuck or errored document
+  app.post("/api/modeling/projects/:projectId/documents/:uploadId/retry", authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, uploadId } = req.params;
+
+      const upload = await docIntelService.getUpload(orgId, uploadId);
+      if (!upload || upload.modelingProjectId !== projectId) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+
+      res.json({ message: "Retrying parse", uploadId });
+
+      setImmediate(async () => {
+        try {
+          console.log(`[DocIntel] Retrying parse for upload ${uploadId}`);
+          const items = await docIntelService.retryParse(orgId, uploadId);
+          console.log(`[DocIntel] Retry parse complete for ${uploadId}, ${items.length} items extracted`);
+          await docIntelService.categorizeItems(orgId, uploadId);
+          console.log(`[DocIntel] Retry categorization complete for ${uploadId}`);
+          const { updateUpload } = docIntelService;
+          await docIntelService.updateUpload(orgId, uploadId, { status: "reviewing" });
+        } catch (parseError: any) {
+          console.error(`[DocIntel] Retry parse failed for ${uploadId}:`, parseError.message);
+        }
+      });
+    } catch (error: any) {
+      console.error("Failed to retry document:", error);
+      res.status(500).json({ error: "Failed to retry document parsing" });
+    }
+  });
   // Import Rent Roll document to Rent Roll module with customer creation and CRM linking
   app.post('/api/modeling/projects/:projectId/documents/:uploadId/import-rent-roll', authenticateUser, async (req: any, res) => {
     try {

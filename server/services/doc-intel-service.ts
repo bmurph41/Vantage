@@ -244,6 +244,37 @@ export const MARINA_DEFAULT_PATTERNS = [
 ];
 
 class DocIntelService {
+  async recoverStuckUploads(): Promise<number> {
+    const stuckUploads = await db
+      .update(docIntelUploads)
+      .set({ status: 'uploaded', updatedAt: new Date() })
+      .where(eq(docIntelUploads.status, 'processing'))
+      .returning();
+    
+    if (stuckUploads.length > 0) {
+      const names = stuckUploads.map(u => u.originalName).join(', ');
+      console.log(`[DocIntelService] Recovered ${stuckUploads.length} stuck document(s) from 'processing' back to 'uploaded': ${names}`);
+    }
+    return stuckUploads.length;
+  }
+
+  async retryParse(orgId: string, uploadId: string): Promise<DocIntelExtractedItem[]> {
+    const upload = await this.getUpload(orgId, uploadId);
+    if (!upload) {
+      throw new Error('Upload not found');
+    }
+
+    await db.delete(docIntelExtractedItems).where(
+      and(
+        eq(docIntelExtractedItems.uploadId, uploadId),
+        eq(docIntelExtractedItems.orgId, orgId)
+      )
+    );
+
+    await this.updateUpload(orgId, uploadId, { status: 'uploaded', errorMessage: null });
+    return this.parseAndExtract(orgId, uploadId);
+  }
+
   async seedDefaultCategories(orgId: string): Promise<PnlCategory[]> {
     const existingCategories = await db
       .select()

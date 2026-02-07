@@ -14,7 +14,8 @@ import {
   Loader2,
   Brain,
   Plus,
-  Eye
+  Eye,
+  RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -197,6 +198,20 @@ export function HoldingStation({ projectId, onReviewDocuments }: HoldingStationP
     mutationFn: async (id: string) => {
       await apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${id}/parse`);
       return id;
+    },
+  });
+
+  const retryParseMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${id}/retry`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", "holding"] });
+      toast({ title: "Retrying", description: "Document has been queued for re-processing." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Retry failed", description: error.message || "Could not retry parsing", variant: "destructive" });
     },
   });
 
@@ -702,6 +717,15 @@ export function HoldingStation({ projectId, onReviewDocuments }: HoldingStationP
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        {(doc.status === "uploaded" || doc.status === "processing" || doc.status === "error") && (
+                          <DropdownMenuItem 
+                            onClick={() => retryParseMutation.mutate(doc.id)}
+                            disabled={retryParseMutation.isPending}
+                          >
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Retry Processing
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={() => {
                           setDeleteConfirmId(doc.id);
                           setDeleteConfirmName(doc.originalName || "this document");

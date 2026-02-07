@@ -12,6 +12,7 @@ import { startMarinaMatchIntelCronJobs } from "./marinamatch/services/intel-cron
 import { startScheduler as startListingScheduler } from "./marinamatch/services/listing-scheduler";
 import { autoSeedGlobalBrokerSources } from "./marinamatch/services/global-broker-sources";
 import { seedIntegrations } from "./integrations";
+import { docIntelService } from "./services/doc-intel-service";
 
 import { configureSecurityMiddleware } from "./middleware/security";
 import { requestIdMiddleware, requestLoggingMiddleware } from "./middleware/logging";
@@ -105,6 +106,12 @@ app.use('/api', deprecationWarning('2027-06-01'));
       } catch (error) {
         log(`Failed to start deadline monitoring service: ${error}`);
       }
+
+      docIntelService.recoverStuckUploads().then(count => {
+        if (count > 0) log(`[DocIntel] Recovered ${count} stuck document(s)`);
+      }).catch(err => {
+        log(`[DocIntel] Recovery check failed: ${err.message}`);
+      });
 
       try {
         startDockTalkCronJobs(dockTalkStorage);
