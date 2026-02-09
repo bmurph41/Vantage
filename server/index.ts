@@ -23,6 +23,7 @@ import settingsRoutes from './routes/settings-routes';
 import leasesRouter from './routes/leases';
 import wizardDraftsRouter from './routes/wizard-drafts';
 import { workspaceRouter } from './routes/workspace-routes';
+import { ddChecklistRouter } from "./routes/dd-checklist-routes";
 import healthRoutes from './routes/health';
 import { deprecationWarning } from './routes/api-versioning';
 
@@ -69,6 +70,7 @@ app.use('/api', deprecationWarning('2027-06-01'));
     app.use('/api/settings', settingsRoutes);
     app.use('/api/valuator/:projectId/leases', leasesRouter);
     app.use('/api/wizard-drafts', wizardDraftsRouter);
+app.use(ddChecklistRouter);
     app.use(workspaceRouter);
 
     // Initialize DockTalk storage and register routes

@@ -186,7 +186,7 @@ export function useLinkWorkspaceEntities() {
 
 // ─── DD Provisioning ─────────────────────────────────────────────────────────
 
-export function useProvisionDDProject() {
+export function useCreateDDProject() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ workspaceId, ...data }: { workspaceId: string; ddExpirationDate?: string; closingDate?: string; projectName?: string }) => {

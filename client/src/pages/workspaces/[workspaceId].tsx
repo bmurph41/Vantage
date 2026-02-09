@@ -3,7 +3,7 @@ import { useParams, useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import {
   useWorkspaceOverview, useUpdateWorkspace, useLinkWorkspaceEntities,
-  useProvisionDDProject, useWorkspaceTasks, useUpdateTask,
+  useCreateDDProject, useWorkspaceTasks, useUpdateTask,
   useWorkspaceMembers, useInviteMember, useRevokeMember, useUpdateMemberPermissions,
   useCurrentAgreement, useExecuteAgreement,
   useVdrTree, useCreateVdrFolder,
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import DdChecklistPanel from "@/components/workspace/DdChecklistPanel";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
@@ -77,7 +78,7 @@ export default function WorkspaceDetailPage() {
   const [activeTab, setActiveTab] = useState(tabFromUrl);
 
   // Dialogs
-  const [showProvisionDialog, setShowProvisionDialog] = useState(false);
+  const [showCreateDDDialog, setShowCreateDDDialog] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [showCADialog, setShowCADialog] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
@@ -111,7 +112,7 @@ export default function WorkspaceDetailPage() {
   const { data: milestones = [] } = useWorkspaceMilestones(workspaceId);
 
   // ─── Mutations ───────────────────────────────────────────────────────────
-  const provisionDD = useProvisionDDProject();
+  const createDD = useCreateDDProject();
   const updateTask = useUpdateTask();
   const inviteMember = useInviteMember();
   const revokeMember = useRevokeMember();
@@ -121,16 +122,16 @@ export default function WorkspaceDetailPage() {
 
   // ─── Handlers ────────────────────────────────────────────────────────────
 
-  const handleProvisionDD = () => {
+  const handleCreateDD = () => {
     if (!workspaceId) return;
-    provisionDD.mutate(
+    createDD.mutate(
       { workspaceId, ddExpirationDate: ddExpiration || undefined, closingDate: closingDate || undefined },
       {
         onSuccess: (result) => {
-          toast({ title: 'DD Provisioned', description: `Created ${result.tasksCreated} tasks and ${result.foldersCreated} VDR folders.` });
-          setShowProvisionDialog(false);
+          toast({ title: 'Due Diligence Created', description: `Created ${result.tasksCreated} tasks and ${result.foldersCreated} VDR folders.` });
+          setShowCreateDDDialog(false);
         },
-        onError: () => { toast({ title: 'Error', description: 'Failed to provision DD project', variant: 'destructive' }); },
+        onError: () => { toast({ title: 'Error', description: 'Failed to create Due Diligence project', variant: 'destructive' }); },
       }
     );
   };
@@ -458,93 +459,22 @@ export default function WorkspaceDetailPage() {
 
         {/* ═══ DILIGENCE TAB ═══ */}
         <TabsContent value="diligence" className="mt-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div><CardTitle>Due Diligence</CardTitle><CardDescription>Tasks, checklists, and progress tracking</CardDescription></div>
-                {!hasDDProject && (
-                  <Button onClick={() => setShowProvisionDialog(true)}>
-                    <Plus className="h-4 w-4 mr-2" />Provision DD Project
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {hasDDProject ? (
-                <div className="space-y-6">
-                  {/* Stats row */}
-                  <div className="grid grid-cols-4 gap-4">
-                    <div className="text-center p-3 rounded-lg bg-muted">
-                      <div className="text-2xl font-bold text-green-600">{stats.dd.completed}</div>
-                      <div className="text-sm text-muted-foreground">Completed</div>
-                    </div>
-                    <div className="text-center p-3 rounded-lg bg-muted">
-                      <div className="text-2xl font-bold text-amber-600">{stats.dd.pending}</div>
-                      <div className="text-sm text-muted-foreground">Pending</div>
-                    </div>
-                    <div className="text-center p-3 rounded-lg bg-muted">
-                      <div className="text-2xl font-bold text-red-600">{stats.dd.overdue}</div>
-                      <div className="text-sm text-muted-foreground">Overdue</div>
-                    </div>
-                    <div className="text-center p-3 rounded-lg bg-muted">
-                      <div className="text-2xl font-bold">{stats.dd.total}</div>
-                      <div className="text-sm text-muted-foreground">Total</div>
-                    </div>
+          {!hasDDProject && (
+            <Card className="mb-4">
+              <CardContent className="py-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Due Diligence Project Not Created</p>
+                    <p className="text-xs text-muted-foreground">Create to set up tasks, data room, and milestones.</p>
                   </div>
-                  <Progress value={ddProgress} className="h-3" />
-
-                  {/* Tasks by ddCategory */}
-                  {Object.entries(tasksByCategory).map(([category, categoryTasks]) => (
-                    <div key={category}>
-                      <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                        <ClipboardList className="h-4 w-4" />{category}
-                        <Badge variant="secondary" className="text-xs">
-                          {categoryTasks.filter((t: any) => t.status === 'completed').length}/{categoryTasks.length}
-                        </Badge>
-                      </h4>
-                      <div className="space-y-1">
-                        {categoryTasks.map((task: any) => (
-                          <div key={task.id} className="flex items-center gap-3 p-2 rounded hover:bg-muted group">
-                            <Checkbox
-                              checked={task.status === 'completed'}
-                              onCheckedChange={() => handleTaskToggle(task.id, task.status)}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <div className={`text-sm ${task.status === 'completed' ? 'line-through text-muted-foreground' : ''}`}>
-                                {task.title}
-                              </div>
-                              {task.description && (
-                                <div className="text-xs text-muted-foreground truncate">{task.description}</div>
-                              )}
-                            </div>
-                            {task.deadline && (
-                              <span className={`text-xs ${new Date(task.deadline) < new Date() && task.status !== 'completed' ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
-                                {format(new Date(task.deadline), 'MMM d')}
-                              </span>
-                            )}
-                            <Badge variant="outline" className={`text-xs ${TASK_STATUS_COLORS[task.status] || ''}`}>
-                              {task.status.replace(/_/g, ' ')}
-                            </Badge>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <ClipboardList className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <h3 className="text-lg font-medium mb-2">No DD project provisioned</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Provision a DD project to create the standard checklist, data room, and milestones in one step.
-                  </p>
-                  <Button onClick={() => setShowProvisionDialog(true)}>
-                    <Plus className="h-4 w-4 mr-2" />Provision DD Project
+                  <Button size="sm" onClick={() => setShowCreateDDDialog(true)}>
+                    <Plus className="h-4 w-4 mr-2" />Create Due Diligence Project
                   </Button>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
+          <DdChecklistPanel workspaceId={workspaceId} />
         </TabsContent>
 
         {/* ═══ DOCUMENTS TAB ═══ */}
@@ -566,9 +496,9 @@ export default function WorkspaceDetailPage() {
               {!hasDDProject ? (
                 <div className="text-center py-12">
                   <FolderOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <h3 className="text-lg font-medium mb-2">No data room provisioned</h3>
-                  <p className="text-muted-foreground mb-4">Provision a DD project first to create the data room.</p>
-                  <Button variant="outline" onClick={() => { setActiveTab('diligence'); setShowProvisionDialog(true); }}>
+                  <h3 className="text-lg font-medium mb-2">No data room created</h3>
+                  <p className="text-muted-foreground mb-4">Create a Due Diligence project first to set up the data room.</p>
+                  <Button variant="outline" onClick={() => { setActiveTab('diligence'); setShowCreateDDDialog(true); }}>
                     Go to Diligence
                   </Button>
                 </div>
@@ -666,11 +596,11 @@ export default function WorkspaceDetailPage() {
         </TabsContent>
       </Tabs>
 
-      {/* ═══ PROVISION DD DIALOG ═══ */}
-      <Dialog open={showProvisionDialog} onOpenChange={setShowProvisionDialog}>
+      {/* ═══ CREATE DD DIALOG ═══ */}
+      <Dialog open={showCreateDDDialog} onOpenChange={setShowCreateDDDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Provision Due Diligence</DialogTitle>
+            <DialogTitle>Create Due Diligence Project</DialogTitle>
             <DialogDescription>
               This will create the standard DD checklist (28 tasks),
               VDR folder tree, confidentiality agreement, and milestones in one step.
@@ -687,10 +617,10 @@ export default function WorkspaceDetailPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowProvisionDialog(false)}>Cancel</Button>
-            <Button onClick={handleProvisionDD} disabled={provisionDD.isPending}>
-              {provisionDD.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Provision DD + Data Room
+            <Button variant="outline" onClick={() => setShowCreateDDDialog(false)}>Cancel</Button>
+            <Button onClick={handleCreateDD} disabled={createDD.isPending}>
+              {createDD.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Create DD + Data Room
             </Button>
           </DialogFooter>
         </DialogContent>
