@@ -43,7 +43,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
-import { useWizardDraft, onWizardSubmitSuccess } from "@/hooks/use-wizard-draft";
+import { useWizardDraft, onWizardSubmitSuccess } from "@/components/wizard/use-wizard-draft";
 import { ResumeDraftModal } from "@/components/wizard/resume-draft-modal";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
