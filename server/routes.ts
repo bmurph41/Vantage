@@ -1078,7 +1078,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json({ ...project, childProjects });
     } catch (error: any) {
-      res.status(400).json({ error: "Invalid project data" });
+      console.error("[DD Project] Creation error:", error?.message || error); res.status(400).json({ error: "Invalid project data", detail: error?.message });
     }
   });
 
