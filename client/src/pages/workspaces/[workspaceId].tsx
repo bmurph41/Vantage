@@ -1,44 +1,39 @@
 import { useState, useEffect } from 'react';
-import { useParams, useLocation, Link } from 'wouter';
+import { useParams, useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import { useWorkspaceOverview, useUpdateWorkspace, useLinkWorkspaceEntities } from '@/hooks/useDealWorkspaces';
+import {
+  useWorkspaceOverview, useUpdateWorkspace, useLinkWorkspaceEntities,
+  useProvisionDDProject, useWorkspaceTasks, useUpdateTask,
+  useWorkspaceMembers, useInviteMember, useRevokeMember, useUpdateMemberPermissions,
+  useCurrentAgreement, useExecuteAgreement,
+  useVdrTree, useCreateVdrFolder,
+  useWorkspaceMilestones, useCreateMilestone,
+} from '@/hooks/useDealWorkspaces';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  ArrowLeft,
-  Building2,
-  Calculator,
-  Calendar,
-  CheckCircle2,
-  ClipboardList,
-  Clock,
-  DollarSign,
-  FileText,
-  FolderOpen,
-  LayoutDashboard,
-  Link2,
-  Loader2,
-  MoreVertical,
-  Settings,
-  TrendingUp,
-  Users,
-  AlertCircle,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import {
+  ArrowLeft, Calculator, Calendar, CheckCircle2, ClipboardList, Clock,
+  DollarSign, Download, FileText, FolderOpen, FolderPlus, LayoutDashboard,
+  Link2, Loader2, Lock, MoreVertical, Plus, Settings, Shield, TrendingUp,
+  Upload, UserPlus, Users, AlertCircle, ChevronRight, ChevronDown,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
+// Matches existing workspace_status enum: active, pending, under_contract, due_diligence, closing, closed, dead, on_hold
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   active: { label: 'Active', color: 'bg-blue-500' },
   pending: { label: 'Pending', color: 'bg-gray-500' },
@@ -47,86 +42,168 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   closing: { label: 'Closing', color: 'bg-indigo-500' },
   closed: { label: 'Closed', color: 'bg-green-500' },
   dead: { label: 'Dead', color: 'bg-red-500' },
-  on_hold: { label: 'On Hold', color: 'bg-orange-500' },
+  on_hold: { label: 'On Hold', color: 'bg-gray-400' },
 };
 
 const ROLE_LABELS: Record<string, string> = {
-  buyer: 'Buyer',
-  seller: 'Seller',
-  broker: 'Broker',
-  lender: 'Lender',
-  consultant: 'Consultant',
+  owner_admin: 'Owner/Admin', internal_member: 'Internal', buyer: 'Buyer',
+  seller: 'Seller', broker: 'Broker', lender: 'Lender', attorney: 'Attorney',
+  accountant: 'Accountant', consultant: 'Consultant', viewer: 'Viewer',
 };
 
-interface DDProject {
-  id: string;
-  name: string;
-  status: string;
-  createdAt: string;
-}
+// Matches existing status enum: not_started, engaged, scheduled, in_progress, completed
+const TASK_STATUS_COLORS: Record<string, string> = {
+  not_started: 'bg-gray-100 text-gray-700',
+  engaged: 'bg-yellow-100 text-yellow-700',
+  scheduled: 'bg-blue-100 text-blue-700',
+  in_progress: 'bg-blue-100 text-blue-700',
+  completed: 'bg-green-100 text-green-700',
+};
+
+// Maps ddCategory enum values to friendly labels
+const DD_CATEGORY_LABELS: Record<string, string> = {
+  title: 'Title', survey: 'Survey', ESA: 'Environmental', appraisal: 'Appraisal',
+  inspection: 'Inspection / Physical', permits: 'Permits', zoning: 'Zoning',
+  financial: 'Financial', legal: 'Legal', insurance: 'Insurance', other: 'Other',
+};
 
 export default function WorkspaceDetailPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const [location, navigate] = useLocation();
   const { toast } = useToast();
-  
-  // Extract tab from query parameter (e.g., /workspaces/123?tab=financials)
+
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
   const tabFromUrl = urlParams.get('tab') || 'overview';
   const [activeTab, setActiveTab] = useState(tabFromUrl);
-  const [showLinkDDDialog, setShowLinkDDDialog] = useState(false);
-  const [selectedDDProjectId, setSelectedDDProjectId] = useState<string | null>(null);
-  
-  const { data: ddProjects = [], isLoading: isLoadingDDProjects } = useQuery<DDProject[]>({
-    queryKey: ['/api/projects'],
-    enabled: showLinkDDDialog,
-  });
-  
-  const linkEntities = useLinkWorkspaceEntities();
-  
-  // Sync tab state when URL changes
-  useEffect(() => {
-    setActiveTab(tabFromUrl);
-  }, [tabFromUrl]);
-  
-  // Handle tab change - update both state and URL for deep linking
+
+  // Dialogs
+  const [showProvisionDialog, setShowProvisionDialog] = useState(false);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [showCADialog, setShowCADialog] = useState(false);
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+
+  // Form state
+  const [ddExpiration, setDdExpiration] = useState('');
+  const [closingDate, setClosingDate] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('viewer');
+  const [inviteVdr, setInviteVdr] = useState('view_only');
+
+  useEffect(() => { setActiveTab(tabFromUrl); }, [tabFromUrl]);
+
   const handleTabChange = (newTab: string) => {
     setActiveTab(newTab);
-    // Update URL without full navigation (maintains scroll position)
-    const newUrl = newTab === 'overview' 
+    const newUrl = newTab === 'overview'
       ? `/workspaces/${workspaceId}`
       : `/workspaces/${workspaceId}?tab=${newTab}`;
     window.history.replaceState(null, '', newUrl);
   };
-  
-  const handleLinkDDProject = () => {
-    if (!selectedDDProjectId || !workspaceId) return;
-    
-    linkEntities.mutate(
-      { id: workspaceId, entities: { ddProjectId: selectedDDProjectId } },
+
+  // ─── Data queries ────────────────────────────────────────────────────────
+  const { data, isLoading, error } = useWorkspaceOverview(workspaceId);
+  const { data: taskList = [] } = useWorkspaceTasks(workspaceId);
+  const { data: members = [] } = useWorkspaceMembers(workspaceId);
+  const { data: agreementInfo } = useCurrentAgreement(workspaceId);
+  const { data: vdrTree, error: vdrError } = useVdrTree(
+    workspaceId,
+    activeTab === 'documents' && !!data?.workspace?.ddProjectId
+  );
+  const { data: milestones = [] } = useWorkspaceMilestones(workspaceId);
+
+  // ─── Mutations ───────────────────────────────────────────────────────────
+  const provisionDD = useProvisionDDProject();
+  const updateTask = useUpdateTask();
+  const inviteMember = useInviteMember();
+  const revokeMember = useRevokeMember();
+  const executeAgreement = useExecuteAgreement();
+  const createMilestone = useCreateMilestone();
+  const linkEntities = useLinkWorkspaceEntities();
+
+  // ─── Handlers ────────────────────────────────────────────────────────────
+
+  const handleProvisionDD = () => {
+    if (!workspaceId) return;
+    provisionDD.mutate(
+      { workspaceId, ddExpirationDate: ddExpiration || undefined, closingDate: closingDate || undefined },
       {
-        onSuccess: () => {
-          toast({ title: 'Success', description: 'DD Project linked successfully' });
-          setShowLinkDDDialog(false);
-          setSelectedDDProjectId(null);
+        onSuccess: (result) => {
+          toast({ title: 'DD Provisioned', description: `Created ${result.tasksCreated} tasks and ${result.foldersCreated} VDR folders.` });
+          setShowProvisionDialog(false);
         },
-        onError: () => {
-          toast({ title: 'Error', description: 'Failed to link DD project', variant: 'destructive' });
-        },
+        onError: () => { toast({ title: 'Error', description: 'Failed to provision DD project', variant: 'destructive' }); },
       }
     );
   };
 
-  const { data, isLoading, error } = useWorkspaceOverview(workspaceId);
+  const handleInvite = () => {
+    if (!workspaceId || !inviteEmail.trim()) return;
+    inviteMember.mutate(
+      { workspaceId, email: inviteEmail.trim(), role: inviteRole, vdrPermission: inviteVdr, ddPermission: 'view' },
+      {
+        onSuccess: () => {
+          toast({ title: 'Invited', description: `Invitation sent to ${inviteEmail}` });
+          setShowInviteDialog(false);
+          setInviteEmail('');
+        },
+        onError: () => { toast({ title: 'Error', description: 'Failed to send invite', variant: 'destructive' }); },
+      }
+    );
+  };
+
+  const handleExecuteCA = () => {
+    if (!workspaceId) return;
+    executeAgreement.mutate(
+      { workspaceId },
+      {
+        onSuccess: () => {
+          toast({ title: 'Agreement Executed', description: 'You now have access to the Data Room.' });
+          setShowCADialog(false);
+        },
+        onError: () => { toast({ title: 'Error', description: 'Failed to execute agreement', variant: 'destructive' }); },
+      }
+    );
+  };
+
+  const handleTaskToggle = (taskId: string, currentStatus: string) => {
+    if (!workspaceId) return;
+    const newStatus = currentStatus === 'completed' ? 'not_started' : 'completed';
+    updateTask.mutate({ workspaceId, taskId, status: newStatus });
+  };
+
+  const toggleFolder = (folderId: string) => {
+    setExpandedFolders(prev => {
+      const next = new Set(prev);
+      if (next.has(folderId)) next.delete(folderId);
+      else next.add(folderId);
+      return next;
+    });
+  };
+
+  const handleExportToc = () => {
+    window.open(`/api/workspaces/${workspaceId}/vdr/toc`, '_blank');
+  };
+
+  const handleExportIcs = async () => {
+    const response = await fetch(`/api/workspaces/${workspaceId}/calendar/ics`, {
+      method: 'POST', credentials: 'include',
+    });
+    if (response.ok) {
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `workspace-${workspaceId}-milestones.ics`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  // ─── Rendering ───────────────────────────────────────────────────────────
 
   const formatCurrency = (value: string | number | null | undefined) => {
     if (!value) return '-';
     const num = typeof value === 'string' ? parseFloat(value) : value;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 0,
-    }).format(num);
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(num);
   };
 
   if (isLoading) {
@@ -134,10 +211,7 @@ export default function WorkspaceDetailPage() {
       <div className="container mx-auto py-6 space-y-6">
         <div className="flex items-center gap-4">
           <Skeleton className="h-10 w-10" />
-          <div>
-            <Skeleton className="h-8 w-64" />
-            <Skeleton className="h-4 w-48 mt-2" />
-          </div>
+          <div><Skeleton className="h-8 w-64" /><Skeleton className="h-4 w-48 mt-2" /></div>
         </div>
         <Skeleton className="h-12 w-full" />
         <Skeleton className="h-64 w-full" />
@@ -148,19 +222,12 @@ export default function WorkspaceDetailPage() {
   if (error || !data) {
     return (
       <div className="container mx-auto py-6">
-        <Card>
-          <CardContent className="py-12 text-center">
-            <AlertCircle className="h-12 w-12 mx-auto mb-4 text-red-500" />
-            <h3 className="text-lg font-medium mb-2">Workspace not found</h3>
-            <p className="text-muted-foreground mb-4">
-              This workspace may have been archived or you don't have access.
-            </p>
-            <Button onClick={() => navigate('/workspaces')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Workspaces
-            </Button>
-          </CardContent>
-        </Card>
+        <Card><CardContent className="py-12 text-center">
+          <AlertCircle className="h-12 w-12 mx-auto mb-4 text-red-500" />
+          <h3 className="text-lg font-medium mb-2">Workspace not found</h3>
+          <p className="text-muted-foreground mb-4">This workspace may have been archived or you don't have access.</p>
+          <Button onClick={() => navigate('/workspaces')}><ArrowLeft className="h-4 w-4 mr-2" />Back to Workspaces</Button>
+        </CardContent></Card>
       </div>
     );
   }
@@ -168,9 +235,61 @@ export default function WorkspaceDetailPage() {
   const { workspace, stats } = data;
   const statusConfig = STATUS_CONFIG[workspace.status] || STATUS_CONFIG.active;
   const ddProgress = stats.dd.total > 0 ? (stats.dd.completed / stats.dd.total) * 100 : 0;
+  const hasDDProject = !!workspace.ddProjectId;
+
+  const needsCA = activeTab === 'documents' && agreementInfo && !agreementInfo.executed && agreementInfo.agreement;
+  const vdrIsCABlocked = vdrError && (vdrError as any)?.code === 'CA_REQUIRED';
+
+  // Group tasks by ddCategory (existing task field)
+  const tasksByCategory: Record<string, any[]> = {};
+  for (const t of taskList) {
+    const cat = DD_CATEGORY_LABELS[t.ddCategory] || t.ddCategory || 'Other';
+    if (!tasksByCategory[cat]) tasksByCategory[cat] = [];
+    tasksByCategory[cat].push(t);
+  }
+
+  // ─── Folder tree renderer ────────────────────────────────────────────────
+
+  function renderFolderTree(folders: any[], depth = 0) {
+    return folders.map((folder: any) => {
+      const isExpanded = expandedFolders.has(folder.id);
+      const hasChildren = folder.children?.length > 0 || folder.documents?.length > 0;
+      return (
+        <div key={folder.id} style={{ marginLeft: depth * 16 }}>
+          <div
+            className="flex items-center gap-2 py-1.5 px-2 hover:bg-muted rounded cursor-pointer"
+            onClick={() => toggleFolder(folder.id)}
+          >
+            {hasChildren ? (
+              isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            ) : <span className="w-4" />}
+            <FolderOpen className="h-4 w-4 text-amber-500" />
+            <span className="text-sm font-medium">{folder.name}</span>
+            {folder.securityLevel === 'restricted' && <Lock className="h-3 w-3 text-red-400" />}
+            <span className="text-xs text-muted-foreground ml-auto">
+              {(folder.documents?.length || 0)} files
+            </span>
+          </div>
+          {isExpanded && (
+            <>
+              {folder.documents?.map((doc: any) => (
+                <div key={doc.id} className="flex items-center gap-2 py-1 px-2 ml-8 hover:bg-muted/50 rounded" style={{ marginLeft: (depth + 1) * 16 + 16 }}>
+                  <FileText className="h-3.5 w-3.5 text-blue-500" />
+                  <span className="text-sm">{doc.filename}</span>
+                  <span className="text-xs text-muted-foreground ml-auto">{doc.mimeType || ''}</span>
+                </div>
+              ))}
+              {folder.children && renderFolderTree(folder.children, depth + 1)}
+            </>
+          )}
+        </div>
+      );
+    });
+  }
 
   return (
     <div className="container mx-auto py-6 space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate('/workspaces')}>
@@ -179,268 +298,154 @@ export default function WorkspaceDetailPage() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold" data-testid="workspace-title">{workspace.name}</h1>
-              <Badge className={`${statusConfig.color} text-white`}>
-                {statusConfig.label}
-              </Badge>
-              <Badge variant="outline">
-                {ROLE_LABELS[workspace.role] || workspace.role}
-              </Badge>
+              <Badge className={`${statusConfig.color} text-white`}>{statusConfig.label}</Badge>
+              {workspace.role && <Badge variant="outline">{ROLE_LABELS[workspace.role] || workspace.role}</Badge>}
             </div>
-            <p className="text-muted-foreground">
-              {workspace.description || 'No description'}
-            </p>
+            <p className="text-muted-foreground">{workspace.description || 'No description'}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleExportIcs}>
+            <Calendar className="h-4 w-4 mr-2" />Export .ics
+          </Button>
           <Button variant="outline" size="sm" onClick={() => navigate(`/workspaces/${workspaceId}/settings`)}>
-            <Settings className="h-4 w-4 mr-2" />
-            Settings
+            <Settings className="h-4 w-4 mr-2" />Settings
           </Button>
         </div>
       </div>
 
+      {/* Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:grid-cols-none lg:flex">
           <TabsTrigger value="overview" className="gap-2" data-testid="tab-overview">
-            <LayoutDashboard className="h-4 w-4" />
-            <span className="hidden sm:inline">Overview</span>
+            <LayoutDashboard className="h-4 w-4" /><span className="hidden sm:inline">Overview</span>
           </TabsTrigger>
           <TabsTrigger value="financials" className="gap-2" data-testid="tab-financials">
-            <Calculator className="h-4 w-4" />
-            <span className="hidden sm:inline">Financials</span>
+            <Calculator className="h-4 w-4" /><span className="hidden sm:inline">Financials</span>
           </TabsTrigger>
           <TabsTrigger value="diligence" className="gap-2" data-testid="tab-diligence">
-            <ClipboardList className="h-4 w-4" />
-            <span className="hidden sm:inline">Diligence</span>
+            <ClipboardList className="h-4 w-4" /><span className="hidden sm:inline">Diligence</span>
+            {stats.dd.overdue > 0 && <Badge variant="destructive" className="ml-1 h-5 px-1.5 text-xs">{stats.dd.overdue}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="documents" className="gap-2" data-testid="tab-documents">
-            <FolderOpen className="h-4 w-4" />
-            <span className="hidden sm:inline">Documents</span>
+            <FolderOpen className="h-4 w-4" /><span className="hidden sm:inline">Documents</span>
           </TabsTrigger>
           <TabsTrigger value="team" className="gap-2" data-testid="tab-team">
-            <Users className="h-4 w-4" />
-            <span className="hidden sm:inline">Team</span>
+            <Users className="h-4 w-4" /><span className="hidden sm:inline">Team</span>
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{stats.team?.members || 0}</Badge>
           </TabsTrigger>
         </TabsList>
 
+        {/* ═══ OVERVIEW TAB ═══ */}
         <TabsContent value="overview" className="mt-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-green-600" />
-                  Deal Value
-                </CardTitle>
-              </CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><DollarSign className="h-4 w-4 text-green-600" />Deal Value</CardTitle></CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
-                  {formatCurrency(workspace.targetPrice)}
-                </div>
+                <div className="text-2xl font-bold">{formatCurrency(workspace.targetPrice)}</div>
                 {workspace.expectedCloseDate && (
                   <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                    <Calendar className="h-3.5 w-3.5" />
-                    Expected close: {format(new Date(workspace.expectedCloseDate), 'MMM d, yyyy')}
+                    <Calendar className="h-3.5 w-3.5" />Expected close: {format(new Date(workspace.expectedCloseDate), 'MMM d, yyyy')}
                   </p>
                 )}
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <ClipboardList className="h-4 w-4 text-purple-600" />
-                  Due Diligence
-                </CardTitle>
-              </CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><ClipboardList className="h-4 w-4 text-purple-600" />Due Diligence</CardTitle></CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-2xl font-bold">{stats.dd.completed}/{stats.dd.total}</span>
                   <span className="text-sm text-muted-foreground">tasks</span>
                 </div>
                 <Progress value={ddProgress} className="h-2" />
-                {stats.dd.pending > 0 && (
-                  <p className="text-sm text-amber-600 mt-2 flex items-center gap-1">
-                    <Clock className="h-3.5 w-3.5" />
-                    {stats.dd.pending} pending
-                  </p>
+                {stats.dd.overdue > 0 && (
+                  <p className="text-sm text-red-600 mt-2 flex items-center gap-1"><AlertCircle className="h-3.5 w-3.5" />{stats.dd.overdue} overdue</p>
                 )}
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <FolderOpen className="h-4 w-4 text-blue-600" />
-                  Data Room
-                </CardTitle>
-              </CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><FolderOpen className="h-4 w-4 text-blue-600" />Data Room</CardTitle></CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-2xl font-bold">{stats.vdr.documents}</div>
-                    <p className="text-sm text-muted-foreground">documents</p>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold">{stats.vdr.folders}</div>
-                    <p className="text-sm text-muted-foreground">folders</p>
-                  </div>
+                  <div><div className="text-2xl font-bold">{stats.vdr.documents}</div><p className="text-sm text-muted-foreground">documents</p></div>
+                  <div><div className="text-2xl font-bold">{stats.vdr.folders}</div><p className="text-sm text-muted-foreground">folders</p></div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Linked Entities</CardTitle>
-                <CardDescription>Connected projects and records</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {workspace.modelingProject ? (
-                  <Link href={`/modeling/projects/${workspace.modelingProject.id}`}>
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-muted hover:bg-muted/80 cursor-pointer">
-                      <div className="flex items-center gap-3">
-                        <Calculator className="h-5 w-5 text-green-600" />
-                        <div>
-                          <div className="font-medium">Modeling Project</div>
-                          <div className="text-sm text-muted-foreground">{workspace.modelingProject.marinaName}</div>
-                        </div>
-                      </div>
-                      <CheckCircle2 className="h-5 w-5 text-green-500" />
-                    </div>
-                  </Link>
-                ) : (
-                  <div className="flex items-center justify-between p-3 rounded-lg border border-dashed">
-                    <div className="flex items-center gap-3">
-                      <Calculator className="h-5 w-5 text-muted-foreground" />
-                      <div>
-                        <div className="font-medium">Modeling Project</div>
-                        <div className="text-sm text-muted-foreground">Not linked</div>
-                      </div>
-                    </div>
-                    <Button size="sm" variant="outline">
-                      <Link2 className="h-4 w-4 mr-1" />
-                      Link
-                    </Button>
-                  </div>
-                )}
-
-                {workspace.ddProject ? (
-                  <Link href={`/projects/${workspace.ddProject.id}`}>
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-muted hover:bg-muted/80 cursor-pointer">
-                      <div className="flex items-center gap-3">
-                        <ClipboardList className="h-5 w-5 text-purple-600" />
-                        <div>
-                          <div className="font-medium">DD Project</div>
-                          <div className="text-sm text-muted-foreground">{workspace.ddProject.name}</div>
-                        </div>
-                      </div>
-                      <CheckCircle2 className="h-5 w-5 text-green-500" />
-                    </div>
-                  </Link>
-                ) : (
-                  <div className="flex items-center justify-between p-3 rounded-lg border border-dashed">
-                    <div className="flex items-center gap-3">
-                      <ClipboardList className="h-5 w-5 text-muted-foreground" />
-                      <div>
-                        <div className="font-medium">DD Project</div>
-                        <div className="text-sm text-muted-foreground">Not linked</div>
-                      </div>
-                    </div>
-                    <Button size="sm" variant="outline" onClick={() => setShowLinkDDDialog(true)}>
-                      <Link2 className="h-4 w-4 mr-1" />
-                      Link
-                    </Button>
-                  </div>
-                )}
-
-                {workspace.deal ? (
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted">
-                    <div className="flex items-center gap-3">
-                      <TrendingUp className="h-5 w-5 text-blue-600" />
-                      <div>
-                        <div className="font-medium">CRM Deal</div>
-                        <div className="text-sm text-muted-foreground">{workspace.deal.title}</div>
-                      </div>
-                    </div>
-                    <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between p-3 rounded-lg border border-dashed">
-                    <div className="flex items-center gap-3">
-                      <TrendingUp className="h-5 w-5 text-muted-foreground" />
-                      <div>
-                        <div className="font-medium">CRM Deal</div>
-                        <div className="text-sm text-muted-foreground">Not linked</div>
-                      </div>
-                    </div>
-                    <Button size="sm" variant="outline">
-                      <Link2 className="h-4 w-4 mr-1" />
-                      Link
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Recent Activity</CardTitle>
-                <CardDescription>Latest updates on this deal</CardDescription>
-              </CardHeader>
+          {/* Milestones */}
+          {milestones.length > 0 && (
+            <Card className="mt-6">
+              <CardHeader><CardTitle className="text-base">Milestones</CardTitle></CardHeader>
               <CardContent>
-                {workspace.lastActivityAt ? (
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-3">
-                      <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                        <FileText className="h-4 w-4 text-blue-600" />
+                <div className="space-y-2">
+                  {milestones.map((m: any) => (
+                    <div key={m.id} className="flex items-center justify-between p-2 rounded bg-muted">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium text-sm">{m.title}</span>
                       </div>
-                      <div>
-                        <div className="font-medium">{workspace.lastActivityType || 'Activity'}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {workspace.lastActivityDescription || 'No description'}
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {format(new Date(workspace.lastActivityAt), 'MMM d, yyyy h:mm a')}
-                        </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">{format(new Date(m.dueDate), 'MMM d, yyyy')}</span>
+                        <Badge variant={m.status === 'completed' ? 'default' : m.status === 'overdue' ? 'destructive' : 'outline'} className="text-xs">
+                          {m.status}
+                        </Badge>
                       </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-6 text-muted-foreground">
-                    <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p>No recent activity</p>
-                  </div>
-                )}
+                  ))}
+                </div>
               </CardContent>
             </Card>
-          </div>
+          )}
+
+          {/* Recent Activity (uses existing vdrAuditLogs fields) */}
+          <Card className="mt-6">
+            <CardHeader><CardTitle className="text-base">Recent Activity</CardTitle></CardHeader>
+            <CardContent>
+              {data.recentActivity && data.recentActivity.length > 0 ? (
+                <div className="space-y-3">
+                  {data.recentActivity.slice(0, 5).map((a: any) => (
+                    <div key={a.id} className="flex items-start gap-3 text-sm">
+                      <div className="h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                        <FileText className="h-3 w-3 text-blue-600" />
+                      </div>
+                      <div>
+                        <span className="font-medium capitalize">{a.eventType?.replace(/_/g, ' ')}</span>
+                        {a.metadata?.name && <span className="text-muted-foreground"> — {a.metadata.name}</span>}
+                        <div className="text-xs text-muted-foreground">{a.timestamp ? format(new Date(a.timestamp), 'MMM d, h:mm a') : ''}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" /><p>No recent activity</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
+        {/* ═══ FINANCIALS TAB ═══ */}
         <TabsContent value="financials" className="mt-6">
           <Card>
-            <CardHeader>
-              <CardTitle>Financial Modeling</CardTitle>
-              <CardDescription>
-                Valuation analysis, pro forma, and exit strategies
-              </CardDescription>
-            </CardHeader>
+            <CardHeader><CardTitle>Financial Modeling</CardTitle><CardDescription>Valuation analysis, pro forma, and exit strategies</CardDescription></CardHeader>
             <CardContent>
-              {workspace.modelingProject ? (
+              {workspace.modelingProjectId ? (
                 <div className="space-y-4">
-                  <p>Linked to: <strong>{workspace.modelingProject.marinaName}</strong></p>
-                  <Button onClick={() => navigate(`/modeling/projects/${workspace.modelingProject.id}`)}>
-                    <Calculator className="h-4 w-4 mr-2" />
-                    Open Modeling Project
+                  <p>Linked modeling project ID: <strong>{workspace.modelingProjectId}</strong></p>
+                  <Button onClick={() => navigate(`/modeling/projects/${workspace.modelingProjectId}`)}>
+                    <Calculator className="h-4 w-4 mr-2" />Open Modeling Project
                   </Button>
                 </div>
               ) : (
                 <div className="text-center py-12">
                   <Calculator className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
                   <h3 className="text-lg font-medium mb-2">No modeling project linked</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Create or link a modeling project to run valuations and scenarios.
-                  </p>
+                  <p className="text-muted-foreground mb-4">Create or link a modeling project to run valuations and scenarios.</p>
                   <div className="flex justify-center gap-2">
                     <Button variant="outline">Link Existing</Button>
                     <Button>Create New Project</Button>
@@ -451,180 +456,313 @@ export default function WorkspaceDetailPage() {
           </Card>
         </TabsContent>
 
+        {/* ═══ DILIGENCE TAB ═══ */}
         <TabsContent value="diligence" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Due Diligence</CardTitle>
-              <CardDescription>
-                Tasks, checklists, and fee tracking
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div><CardTitle>Due Diligence</CardTitle><CardDescription>Tasks, checklists, and progress tracking</CardDescription></div>
+                {!hasDDProject && (
+                  <Button onClick={() => setShowProvisionDialog(true)}>
+                    <Plus className="h-4 w-4 mr-2" />Provision DD Project
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
-              {workspace.ddProject ? (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="text-center p-4 rounded-lg bg-muted">
+              {hasDDProject ? (
+                <div className="space-y-6">
+                  {/* Stats row */}
+                  <div className="grid grid-cols-4 gap-4">
+                    <div className="text-center p-3 rounded-lg bg-muted">
                       <div className="text-2xl font-bold text-green-600">{stats.dd.completed}</div>
                       <div className="text-sm text-muted-foreground">Completed</div>
                     </div>
-                    <div className="text-center p-4 rounded-lg bg-muted">
+                    <div className="text-center p-3 rounded-lg bg-muted">
                       <div className="text-2xl font-bold text-amber-600">{stats.dd.pending}</div>
                       <div className="text-sm text-muted-foreground">Pending</div>
                     </div>
-                    <div className="text-center p-4 rounded-lg bg-muted">
+                    <div className="text-center p-3 rounded-lg bg-muted">
+                      <div className="text-2xl font-bold text-red-600">{stats.dd.overdue}</div>
+                      <div className="text-sm text-muted-foreground">Overdue</div>
+                    </div>
+                    <div className="text-center p-3 rounded-lg bg-muted">
                       <div className="text-2xl font-bold">{stats.dd.total}</div>
                       <div className="text-sm text-muted-foreground">Total</div>
                     </div>
                   </div>
-                  <Button onClick={() => navigate(`/projects/${workspace.ddProject.id}`)}>
-                    <ClipboardList className="h-4 w-4 mr-2" />
-                    Open DD Project
-                  </Button>
+                  <Progress value={ddProgress} className="h-3" />
+
+                  {/* Tasks by ddCategory */}
+                  {Object.entries(tasksByCategory).map(([category, categoryTasks]) => (
+                    <div key={category}>
+                      <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                        <ClipboardList className="h-4 w-4" />{category}
+                        <Badge variant="secondary" className="text-xs">
+                          {categoryTasks.filter((t: any) => t.status === 'completed').length}/{categoryTasks.length}
+                        </Badge>
+                      </h4>
+                      <div className="space-y-1">
+                        {categoryTasks.map((task: any) => (
+                          <div key={task.id} className="flex items-center gap-3 p-2 rounded hover:bg-muted group">
+                            <Checkbox
+                              checked={task.status === 'completed'}
+                              onCheckedChange={() => handleTaskToggle(task.id, task.status)}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className={`text-sm ${task.status === 'completed' ? 'line-through text-muted-foreground' : ''}`}>
+                                {task.title}
+                              </div>
+                              {task.description && (
+                                <div className="text-xs text-muted-foreground truncate">{task.description}</div>
+                              )}
+                            </div>
+                            {task.deadline && (
+                              <span className={`text-xs ${new Date(task.deadline) < new Date() && task.status !== 'completed' ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
+                                {format(new Date(task.deadline), 'MMM d')}
+                              </span>
+                            )}
+                            <Badge variant="outline" className={`text-xs ${TASK_STATUS_COLORS[task.status] || ''}`}>
+                              {task.status.replace(/_/g, ' ')}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="text-center py-12">
                   <ClipboardList className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <h3 className="text-lg font-medium mb-2">No DD project linked</h3>
+                  <h3 className="text-lg font-medium mb-2">No DD project provisioned</h3>
                   <p className="text-muted-foreground mb-4">
-                    Create or link a due diligence project to track tasks and progress.
+                    Provision a DD project to create the standard checklist, data room, and milestones in one step.
                   </p>
-                  <div className="flex justify-center gap-2">
-                    <Button variant="outline">Link Existing</Button>
-                    <Button>Create New Project</Button>
-                  </div>
+                  <Button onClick={() => setShowProvisionDialog(true)}>
+                    <Plus className="h-4 w-4 mr-2" />Provision DD Project
+                  </Button>
                 </div>
               )}
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* ═══ DOCUMENTS TAB ═══ */}
         <TabsContent value="documents" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Data Room</CardTitle>
-              <CardDescription>
-                Secure document storage and sharing
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div><CardTitle>Data Room</CardTitle><CardDescription>Secure document storage and sharing</CardDescription></div>
+                {hasDDProject && agreementInfo?.executed && (
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={handleExportToc}>
+                      <Download className="h-4 w-4 mr-2" />Export ToC
+                    </Button>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
-              {workspace.ddProject ? (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-4 rounded-lg bg-muted">
-                      <div className="text-2xl font-bold">{stats.vdr.documents}</div>
-                      <div className="text-sm text-muted-foreground">Documents</div>
-                    </div>
-                    <div className="text-center p-4 rounded-lg bg-muted">
-                      <div className="text-2xl font-bold">{stats.vdr.folders}</div>
-                      <div className="text-sm text-muted-foreground">Folders</div>
-                    </div>
-                  </div>
-                  <Button onClick={() => navigate(`/vdr/${workspace.ddProject.id}`)}>
-                    <FolderOpen className="h-4 w-4 mr-2" />
-                    Open Data Room
-                  </Button>
-                </div>
-              ) : (
+              {!hasDDProject ? (
                 <div className="text-center py-12">
                   <FolderOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <h3 className="text-lg font-medium mb-2">No data room linked</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Link a DD project to access its data room for document management.
-                  </p>
-                  <Button variant="outline" onClick={() => setShowLinkDDDialog(true)}>Link DD Project</Button>
+                  <h3 className="text-lg font-medium mb-2">No data room provisioned</h3>
+                  <p className="text-muted-foreground mb-4">Provision a DD project first to create the data room.</p>
+                  <Button variant="outline" onClick={() => { setActiveTab('diligence'); setShowProvisionDialog(true); }}>
+                    Go to Diligence
+                  </Button>
                 </div>
+              ) : needsCA || vdrIsCABlocked ? (
+                /* CA GATE */
+                <div className="text-center py-12">
+                  <Shield className="h-12 w-12 mx-auto mb-4 text-amber-500" />
+                  <h3 className="text-lg font-medium mb-2">Confidentiality Agreement Required</h3>
+                  <p className="text-muted-foreground mb-4">
+                    You must execute the Confidentiality Agreement before accessing the Data Room.
+                  </p>
+                  <Button onClick={() => setShowCADialog(true)}>
+                    <Lock className="h-4 w-4 mr-2" />Review & Execute Agreement
+                  </Button>
+                </div>
+              ) : vdrTree ? (
+                /* VDR TREE */
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="text-sm text-muted-foreground">
+                      {vdrTree.totalFolders} folders · {vdrTree.totalDocuments} documents
+                    </div>
+                  </div>
+                  <div className="border rounded-lg p-3 max-h-[500px] overflow-y-auto">
+                    {vdrTree.folders.length > 0 ? (
+                      renderFolderTree(vdrTree.folders)
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <FolderOpen className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p>Data room is empty</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <Skeleton className="h-64 w-full" />
               )}
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* ═══ TEAM TAB ═══ */}
         <TabsContent value="team" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Team & Collaborators</CardTitle>
-              <CardDescription>
-                Manage access and permissions
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div><CardTitle>Team & Collaborators</CardTitle><CardDescription>Manage access and permissions</CardDescription></div>
+                <Button onClick={() => setShowInviteDialog(true)}>
+                  <UserPlus className="h-4 w-4 mr-2" />Invite Member
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-12">
-                <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                <h3 className="text-lg font-medium mb-2">Team management coming soon</h3>
-                <p className="text-muted-foreground">
-                  Invite team members and external collaborators to this workspace.
-                </p>
-              </div>
+              {members.length > 0 ? (
+                <div className="space-y-2">
+                  {members.map((member: any) => (
+                    <div key={member.id} className="flex items-center justify-between p-3 rounded-lg bg-muted">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                          <Users className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div>
+                          <div className="font-medium text-sm">{member.displayName || member.email || `User ${member.userId?.slice(0, 8)}`}</div>
+                          <div className="text-xs text-muted-foreground">{member.email || 'Internal user'}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs">{ROLE_LABELS[member.role] || member.role}</Badge>
+                        <Badge variant="secondary" className="text-xs">VDR: {member.vdrPermission?.replace(/_/g, ' ')}</Badge>
+                        <Badge variant="secondary" className="text-xs">DD: {member.ddPermission}</Badge>
+                        {member.role !== 'owner_admin' && (
+                          <Button
+                            variant="ghost" size="sm" className="text-red-600 h-7 px-2"
+                            onClick={() => workspaceId && revokeMember.mutate({ workspaceId, memberId: member.id })}
+                          >
+                            Revoke
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                  <h3 className="text-lg font-medium mb-2">No team members yet</h3>
+                  <p className="text-muted-foreground mb-4">Invite team members to collaborate on this workspace.</p>
+                  <Button onClick={() => setShowInviteDialog(true)}>
+                    <UserPlus className="h-4 w-4 mr-2" />Invite First Member
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
-      
-      <Dialog open={showLinkDDDialog} onOpenChange={setShowLinkDDDialog}>
+
+      {/* ═══ PROVISION DD DIALOG ═══ */}
+      <Dialog open={showProvisionDialog} onOpenChange={setShowProvisionDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Link DD Project</DialogTitle>
+            <DialogTitle>Provision Due Diligence</DialogTitle>
             <DialogDescription>
-              Select a DD project to link to this workspace. This will enable access to its documents and data room.
+              This will create the standard DD checklist (28 tasks),
+              VDR folder tree, confidentiality agreement, and milestones in one step.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2 max-h-64 overflow-y-auto py-4">
-            {isLoadingDDProjects ? (
-              <div className="text-center py-8">
-                <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin text-muted-foreground" />
-                <p className="text-muted-foreground">Loading projects...</p>
-              </div>
-            ) : ddProjects.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <ClipboardList className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>No DD projects available</p>
-                <Button
-                  variant="link"
-                  className="mt-2"
-                  onClick={() => {
-                    setShowLinkDDDialog(false);
-                    navigate('/projects');
-                  }}
-                >
-                  Create a DD Project
-                </Button>
-              </div>
-            ) : (
-              ddProjects.map((project) => (
-                <div
-                  key={project.id}
-                  onClick={() => setSelectedDDProjectId(project.id)}
-                  className={`flex items-center justify-between p-3 rounded-lg cursor-pointer border transition-colors ${
-                    selectedDDProjectId === project.id
-                      ? 'border-primary bg-primary/5'
-                      : 'border-transparent hover:bg-muted'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <ClipboardList className="h-5 w-5 text-purple-600" />
-                    <div>
-                      <div className="font-medium">{project.name}</div>
-                      <div className="text-sm text-muted-foreground capitalize">
-                        {project.status?.replace(/_/g, ' ') || 'Active'}
-                      </div>
-                    </div>
-                  </div>
-                  {selectedDDProjectId === project.id && (
-                    <CheckCircle2 className="h-5 w-5 text-primary" />
-                  )}
-                </div>
-              ))
-            )}
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>DD Expiration Date</Label>
+              <Input type="date" value={ddExpiration} onChange={e => setDdExpiration(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Closing Date</Label>
+              <Input type="date" value={closingDate} onChange={e => setClosingDate(e.target.value)} />
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowLinkDDDialog(false)}>
-              Cancel
+            <Button variant="outline" onClick={() => setShowProvisionDialog(false)}>Cancel</Button>
+            <Button onClick={handleProvisionDD} disabled={provisionDD.isPending}>
+              {provisionDD.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Provision DD + Data Room
             </Button>
-            <Button
-              onClick={handleLinkDDProject}
-              disabled={!selectedDDProjectId || linkEntities.isPending}
-            >
-              {linkEntities.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Link Project
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══ INVITE MEMBER DIALOG ═══ */}
+      <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Invite Team Member</DialogTitle>
+            <DialogDescription>Add an internal user or external collaborator to this workspace.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Email Address</Label>
+              <Input placeholder="email@example.com" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Role</Label>
+                <Select value={inviteRole} onValueChange={setInviteRole}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(ROLE_LABELS).map(([val, lbl]) => (
+                      <SelectItem key={val} value={val}>{lbl}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Data Room Access</Label>
+                <Select value={inviteVdr} onValueChange={setInviteVdr}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="no_access">No Access</SelectItem>
+                    <SelectItem value="view_only">View Only</SelectItem>
+                    <SelectItem value="view_download">View & Download</SelectItem>
+                    <SelectItem value="view_download_print">View, Download & Print</SelectItem>
+                    <SelectItem value="full_access">Full Access</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowInviteDialog(false)}>Cancel</Button>
+            <Button onClick={handleInvite} disabled={!inviteEmail.trim() || inviteMember.isPending}>
+              {inviteMember.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Send Invite
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══ CA EXECUTION DIALOG ═══ */}
+      <Dialog open={showCADialog} onOpenChange={setShowCADialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{agreementInfo?.agreement?.title || 'Confidentiality Agreement'}</DialogTitle>
+            <DialogDescription>Please read and execute the following agreement to access the Data Room.</DialogDescription>
+          </DialogHeader>
+          {agreementInfo?.agreement?.bodyHtml && (
+            <div
+              className="border rounded-lg p-4 my-4 max-h-[400px] overflow-y-auto text-sm"
+              dangerouslySetInnerHTML={{ __html: agreementInfo.agreement.bodyHtml }}
+            />
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCADialog(false)}>Cancel</Button>
+            <Button onClick={handleExecuteCA} disabled={executeAgreement.isPending}>
+              {executeAgreement.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              <Shield className="h-4 w-4 mr-2" />I Agree & Execute
             </Button>
           </DialogFooter>
         </DialogContent>
