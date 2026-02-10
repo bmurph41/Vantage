@@ -132,7 +132,7 @@ function TaskOwnerSelector({ projectId, value, onChange }: {
 // Task Dependencies Selector Component — supports DD Tasks, DD Request Items, and Custom deps
 function TaskDependenciesSelector({ 
   projectId, 
-  value, 
+  value: externalValue, 
   onChange, 
   currentTaskId 
 }: { 
@@ -141,11 +141,23 @@ function TaskDependenciesSelector({
   onChange: (value: string[]) => void; 
   currentTaskId?: string; 
 }) {
+  // Use internal state to avoid re-render loops from form.watch/setValue cycle
+  const [selected, setSelected] = useState<string[]>(externalValue || []);
   const [isOpen, setIsOpen] = useState(false);
   const [depTab, setDepTab] = useState<"tasks" | "dd_requests" | "custom">("tasks");
   const [searchFilter, setSearchFilter] = useState("");
   const [customDeps, setCustomDeps] = useState<{name: string; priority: string; deadline: string; contact: string}[]>([]);
   const [newCustom, setNewCustom] = useState({ name: "", priority: "med", deadline: "", contact: "" });
+
+  // Sync external value in only on initial mount / when external value length changes
+  useEffect(() => {
+    if (JSON.stringify(externalValue) !== JSON.stringify(selected)) {
+      setSelected(externalValue || []);
+    }
+  }, [externalValue?.length]);
+
+  // Stable reference for value used throughout
+  const value = selected;
 
   // Fetch existing DD tasks
   const { data: projectData } = useProject(projectId);
@@ -164,14 +176,18 @@ function TaskDependenciesSelector({
   });
 
   const handleToggle = (id: string) => {
-    onChange(value.includes(id) ? value.filter(x => x !== id) : [...value, id]);
+    const next = value.includes(id) ? value.filter(x => x !== id) : [...value, id];
+    setSelected(next);
+    onChange(next);
   };
 
   const handleAddCustomDep = () => {
     if (!newCustom.name.trim()) return;
     const customId = `custom_${Date.now()}`;
     setCustomDeps(prev => [...prev, { ...newCustom }]);
-    onChange([...value, customId]);
+    const next = [...value, customId];
+    setSelected(next);
+    onChange(next);
     setNewCustom({ name: "", priority: "med", deadline: "", contact: "" });
   };
 
@@ -179,7 +195,9 @@ function TaskDependenciesSelector({
     setCustomDeps(prev => prev.filter((_, i) => i !== index));
     const customIds = value.filter(v => v.startsWith('custom_'));
     if (customIds[index]) {
-      onChange(value.filter(v => v !== customIds[index]));
+      const next = value.filter(v => v !== customIds[index]);
+      setSelected(next);
+      onChange(next);
     }
   };
 
@@ -262,7 +280,7 @@ function TaskDependenciesSelector({
           {totalSelected > 0 && (
             <Button type="button" variant="ghost" size="sm"
               className="h-5 w-5 p-0 hover:bg-destructive hover:text-destructive-foreground"
-              onClick={(e) => { e.stopPropagation(); onChange([]); setCustomDeps([]); }}>
+              onClick={(e) => { e.stopPropagation(); setSelected([]); onChange([]); setCustomDeps([]); }}>
               <XCircle className="h-3 w-3" />
             </Button>
           )}
