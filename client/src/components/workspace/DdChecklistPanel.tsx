@@ -91,8 +91,8 @@ export default function DdChecklistPanel({ workspaceId }: Props) {
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
   const [mergeStrategy, setMergeStrategy] = useState<string>('replace');
   const [newSectionTitle, setNewSectionTitle] = useState('');
-  const [activeItem, setActiveItem] = useState<DdChecklistItem | null>(null);
-  const [activeSection, setActiveSection] = useState<SectionType | null>(null);
+  const [activeItemId, setActiveItemId] = useState<string | null>(null);
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
   const [addingItemToSection, setAddingItemToSection] = useState<string | null>(null);
   const [newItemTitle, setNewItemTitle] = useState('');
 
@@ -101,6 +101,13 @@ export default function DdChecklistPanel({ workspaceId }: Props) {
   const stats = data?.stats;
   const hasChecklist = !!checklist;
   const approvedPct = stats && stats.total > 0 ? (stats.approved / stats.total) * 100 : 0;
+
+  const activeItem = activeItemId
+    ? sections.flatMap(s => s.items).find(i => i.id === activeItemId) ?? null
+    : null;
+  const activeSection = activeSectionId
+    ? sections.find(s => s.id === activeSectionId) ?? null
+    : null;
 
   const toggleSection = (id: string) => {
     setCollapsedSections(prev => {
@@ -344,7 +351,7 @@ export default function DdChecklistPanel({ workspaceId }: Props) {
                               ? 'bg-red-50/50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
                               : 'bg-card border-border hover:border-primary/30'
                         }`}
-                        onClick={() => { setActiveItem(item); setActiveSection(section); }}
+                        onClick={() => { setActiveItemId(item.id); setActiveSectionId(section.id); }}
                       >
                         {/* Top row: priority + status */}
                         <div className="flex items-center justify-between mb-2">
@@ -503,10 +510,10 @@ export default function DdChecklistPanel({ workspaceId }: Props) {
         item={activeItem}
         section={activeSection}
         workspaceId={workspaceId}
-        onClose={() => { setActiveItem(null); setActiveSection(null); }}
+        onClose={() => { setActiveItemId(null); setActiveSectionId(null); }}
         onStatusChange={handleStatusChange}
         onUpdate={(itemId, data) => updateItem.mutate({ itemId, workspaceId, ...data })}
-        onDelete={(itemId) => { deleteItem.mutate({ itemId, workspaceId }); setActiveItem(null); }}
+        onDelete={(itemId) => { deleteItem.mutate({ itemId, workspaceId }); setActiveItemId(null); }}
         onTogglePeriod={handleTogglePeriod}
       />
 
