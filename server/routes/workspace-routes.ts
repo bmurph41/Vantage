@@ -11,6 +11,7 @@ import {
   dealWorkspaces, projects, tasks, vdrFolders, vdrDocuments, vdrAuditLogs,
   workspaceMembers, confidentialityAgreements, agreementExecutions, ddMilestones,
   users, organizations, pendingContacts, projectPendingContacts,
+  contacts, projectContacts,
 } from '@shared/schema';
 import { eq, and, desc, asc, sql, ne, isNull } from 'drizzle-orm';
 import { CHECKLIST_TEMPLATE_DEFAULT, type ChecklistTaskTemplate } from '../templates/dd-templates';
@@ -628,6 +629,99 @@ workspaceRouter.post('/api/workspaces/:id/deal-team/quick-add', async (req: Requ
   } catch (error) {
     console.error('Error quick-adding deal team member:', error);
     res.status(500).json({ error: 'Failed to add deal team member' });
+  }
+});
+
+workspaceRouter.get('/api/workspaces/:id/deal-team-contacts', async (req: Request, res: Response) => {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+  const ws = await loadWorkspace(req, res, auth.orgId);
+  if (!ws) return;
+
+  try {
+    const result: Array<{
+      id: string;
+      type: 'contact' | 'pending' | 'member';
+      displayName: string;
+      email: string | null;
+      phone: string | null;
+      role: string;
+      isPrimary: boolean;
+      status: string;
+    }> = [];
+
+    const seenIds = new Set<string>();
+
+    if (ws.ddProjectId) {
+      const projContacts = await db.select()
+        .from(projectContacts)
+        .leftJoin(contacts, eq(projectContacts.contactId, contacts.id))
+        .where(eq(projectContacts.projectId, ws.ddProjectId))
+        .orderBy(projectContacts.role);
+
+      for (const row of projContacts) {
+        const c = row.contacts;
+        if (!c) continue;
+        const cId = `contact_${row.project_contacts.contactId}_${row.project_contacts.role}`;
+        seenIds.add(cId);
+        result.push({
+          id: cId,
+          type: 'contact',
+          displayName: c.name,
+          email: c.email || null,
+          phone: c.phone || null,
+          role: row.project_contacts.role || 'other',
+          isPrimary: row.project_contacts.isPrimary || false,
+          status: 'confirmed',
+        });
+      }
+
+      const projPending = await db.select()
+        .from(projectPendingContacts)
+        .leftJoin(pendingContacts, eq(projectPendingContacts.pendingContactId, pendingContacts.id))
+        .where(eq(projectPendingContacts.projectId, ws.ddProjectId))
+        .orderBy(projectPendingContacts.role);
+
+      for (const row of projPending) {
+        const pc = row.pending_contacts;
+        if (!pc) continue;
+        const pId = `pending_${pc.id}_${row.project_pending_contacts!.role}`;
+        seenIds.add(pId);
+        result.push({
+          id: pId,
+          type: 'pending',
+          displayName: pc.fullName || [pc.firstName, pc.lastName].filter(Boolean).join(' ') || 'Unknown',
+          email: pc.email || null,
+          phone: pc.phone || null,
+          role: row.project_pending_contacts!.role || 'other',
+          isPrimary: row.project_pending_contacts!.isPrimary || false,
+          status: pc.status || 'pending',
+        });
+      }
+    }
+
+    const wsMembers = await db.select().from(workspaceMembers)
+      .where(and(eq(workspaceMembers.workspaceId, ws.id), ne(workspaceMembers.inviteStatus, 'revoked')))
+      .orderBy(asc(workspaceMembers.createdAt));
+
+    for (const m of wsMembers) {
+      if (seenIds.has(m.id)) continue;
+      result.push({
+        id: m.id,
+        type: 'member',
+        displayName: m.displayName || m.email || 'Unknown',
+        email: m.email || null,
+        phone: null,
+        role: m.role || 'other',
+        isPrimary: false,
+        status: m.inviteStatus === 'pending' ? 'pending' : 'confirmed',
+      });
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching deal team contacts:', error);
+    res.status(500).json({ error: 'Failed to fetch deal team contacts' });
   }
 });
 

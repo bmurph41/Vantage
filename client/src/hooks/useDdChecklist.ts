@@ -310,6 +310,30 @@ export function useWorkspaceMembers(workspaceId: string | undefined) {
   });
 }
 
+// ─── Deal Team Contacts (from DD Project) ────────────────────────────────────
+
+export interface DealTeamContact {
+  id: string;
+  type: 'contact' | 'pending' | 'member';
+  displayName: string;
+  email: string | null;
+  phone: string | null;
+  role: string;
+  isPrimary: boolean;
+  status: string;
+}
+
+export function useDealTeamContacts(workspaceId: string | undefined) {
+  return useQuery<DealTeamContact[]>({
+    queryKey: ['deal-team-contacts', workspaceId],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/workspaces/${workspaceId}/deal-team-contacts`);
+      return res.json();
+    },
+    enabled: !!workspaceId,
+  });
+}
+
 export function useQuickAddDealTeamMember() {
   const qc = useQueryClient();
   return useMutation({
@@ -319,6 +343,7 @@ export function useQuickAddDealTeamMember() {
     },
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ['workspace-members', vars.workspaceId] });
+      qc.invalidateQueries({ queryKey: ['deal-team-contacts', vars.workspaceId] });
     },
   });
 }

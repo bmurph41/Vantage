@@ -10,8 +10,8 @@ import {
   useUpdateItem, useCreateSection, useCreateItem, useDeleteItem, useDeleteSection,
   useExportChecklist, useDdChecklistTemplates, useSeedTemplates, useItemComments,
   usePostComment, useItemHistory, useUpdateChecklistSettings, useTogglePeriodReceived,
-  useAddPeriods, useDeletePeriod, useWorkspaceMembers, useQuickAddDealTeamMember,
-  DdChecklistItem, DdChecklistSection as SectionType, DdChecklistItemPeriod, WorkspaceMemberInfo,
+  useAddPeriods, useDeletePeriod, useQuickAddDealTeamMember, useDealTeamContacts,
+  DdChecklistItem, DdChecklistSection as SectionType, DdChecklistItemPeriod, DealTeamContact,
 } from '@/hooks/useDdChecklist';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -619,7 +619,7 @@ function TeamMemberField({ label, placeholder, value, members, onSelect, onAddNe
   label: string;
   placeholder: string;
   value: string | null;
-  members: WorkspaceMemberInfo[];
+  members: DealTeamContact[];
   onSelect: (memberId: string | null) => void;
   onAddNew: (name: string) => void;
   isPending: boolean;
@@ -656,6 +656,12 @@ function TeamMemberField({ label, placeholder, value, members, onSelect, onAddNe
     setIsOpen(false);
   };
 
+  const roleLabels: Record<string, string> = {
+    seller: 'Seller', buyer: 'Buyer', attorney: 'Attorney', lender: 'Lender',
+    broker: 'Broker', inspector: 'Inspector', appraiser: 'Appraiser',
+    environmental: 'Env. Consultant', surveyor: 'Surveyor', other: 'Other',
+  };
+
   return (
     <div className="relative">
       <Label className="text-[11px] text-muted-foreground">{label}</Label>
@@ -676,7 +682,7 @@ function TeamMemberField({ label, placeholder, value, members, onSelect, onAddNe
             <X className="h-3 w-3" />
           </button>
         )}
-        {selectedMember?.inviteStatus === 'pending' && (
+        {selectedMember?.status === 'pending' && (
           <Badge variant="outline" className="absolute right-7 top-1/2 -translate-y-1/2 text-[9px] px-1 py-0 h-4 bg-amber-50 text-amber-700 border-amber-200">
             Pending
           </Badge>
@@ -696,12 +702,12 @@ function TeamMemberField({ label, placeholder, value, members, onSelect, onAddNe
               className={`w-full text-left px-3 py-1.5 text-xs hover:bg-muted flex items-center justify-between ${value === m.id ? 'bg-muted font-medium' : ''}`}
               onMouseDown={(e) => { e.preventDefault(); handleSelect(m.id); }}
             >
-              <span>{m.displayName || m.email || 'Unknown'}</span>
-              <span className="flex items-center gap-1">
-                {m.inviteStatus === 'pending' && (
+              <span className="truncate">{m.displayName || m.email || 'Unknown'}</span>
+              <span className="flex items-center gap-1 shrink-0 ml-1">
+                {m.status === 'pending' && (
                   <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-amber-50 text-amber-700 border-amber-200">Pending</Badge>
                 )}
-                <span className="text-[10px] text-muted-foreground">{m.role}</span>
+                <span className="text-[10px] text-muted-foreground">{roleLabels[m.role] || m.role}</span>
               </span>
             </button>
           ))}
@@ -716,7 +722,7 @@ function TeamMemberField({ label, placeholder, value, members, onSelect, onAddNe
             </button>
           )}
           {filtered.length === 0 && !inputValue.trim() && (
-            <div className="px-3 py-2 text-xs text-muted-foreground">No team members yet</div>
+            <div className="px-3 py-2 text-xs text-muted-foreground">No deal team contacts yet</div>
           )}
         </div>
       )}
@@ -736,7 +742,7 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
 
   const { data: comments = [] } = useItemComments(item?.id);
   const { data: history = [] } = useItemHistory(item?.id);
-  const { data: members = [] } = useWorkspaceMembers(workspaceId);
+  const { data: dealTeamContacts = [] } = useDealTeamContacts(workspaceId);
   const postComment = usePostComment();
   const addPeriods = useAddPeriods();
   const deletePeriod = useDeletePeriod();
@@ -766,8 +772,6 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
   const handleMarkComplete = () => {
     onStatusChange(item.id, 'approved');
   };
-
-  const getMemberLabel = (m: WorkspaceMemberInfo) => m.displayName || m.email || 'Unknown';
 
   return (
     <Sheet open={!!item} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -938,10 +942,13 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
                     label="Assigned To"
                     placeholder="Select or type a name..."
                     value={item.assignedToMemberId}
-                    members={members}
-                    onSelect={(memberId) => onUpdate(item.id, { assignedToMemberId: memberId })}
+                    members={dealTeamContacts}
+                    onSelect={(contactId) => onUpdate(item.id, { assignedToMemberId: contactId })}
                     onAddNew={(name) => quickAddMember.mutate({ workspaceId, fullName: name }, {
-                      onSuccess: (data) => onUpdate(item.id, { assignedToMemberId: data.member.id }),
+                      onSuccess: (data) => {
+                        const newId = `pending_${data.pendingContact.id}_other`;
+                        onUpdate(item.id, { assignedToMemberId: newId });
+                      },
                     })}
                     isPending={quickAddMember.isPending}
                   />
@@ -949,10 +956,13 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
                     label="Reviewer"
                     placeholder="Select or type a name..."
                     value={item.reviewerMemberId}
-                    members={members}
-                    onSelect={(memberId) => onUpdate(item.id, { reviewerMemberId: memberId })}
+                    members={dealTeamContacts}
+                    onSelect={(contactId) => onUpdate(item.id, { reviewerMemberId: contactId })}
                     onAddNew={(name) => quickAddMember.mutate({ workspaceId, fullName: name }, {
-                      onSuccess: (data) => onUpdate(item.id, { reviewerMemberId: data.member.id }),
+                      onSuccess: (data) => {
+                        const newId = `pending_${data.pendingContact.id}_other`;
+                        onUpdate(item.id, { reviewerMemberId: newId });
+                      },
                     })}
                     isPending={quickAddMember.isPending}
                   />
@@ -960,18 +970,21 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
                     label="Requested From"
                     placeholder="Select or type a name..."
                     value={item.requestedFromMemberId}
-                    members={members}
-                    onSelect={(memberId) => onUpdate(item.id, { requestedFromMemberId: memberId })}
+                    members={dealTeamContacts}
+                    onSelect={(contactId) => onUpdate(item.id, { requestedFromMemberId: contactId })}
                     onAddNew={(name) => quickAddMember.mutate({ workspaceId, fullName: name }, {
-                      onSuccess: (data) => onUpdate(item.id, { requestedFromMemberId: data.member.id }),
+                      onSuccess: (data) => {
+                        const newId = `pending_${data.pendingContact.id}_other`;
+                        onUpdate(item.id, { requestedFromMemberId: newId });
+                      },
                     })}
                     isPending={quickAddMember.isPending}
                   />
                 </div>
 
-                {members.length === 0 && (
+                {dealTeamContacts.length === 0 && (
                   <p className="text-[11px] text-muted-foreground">
-                    Type a name to add someone to the Deal Team, or invite members via workspace settings.
+                    Type a name to add someone to the Deal Team, or add contacts from the project's Deal Team section.
                   </p>
                 )}
               </div>
