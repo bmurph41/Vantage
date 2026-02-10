@@ -20517,6 +20517,154 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  app.get('/api/modeling/projects/:projectId/vdr-documents', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const ddProjectId = project.ddProjectId;
+      if (!ddProjectId) {
+        return res.json([]);
+      }
+
+      const { vdrDocuments, vdrFolders } = await import('@shared/schema');
+      const { isNull } = await import('drizzle-orm');
+
+      const documents = await db
+        .select({
+          id: vdrDocuments.id,
+          filename: vdrDocuments.filename,
+          originalFilename: vdrDocuments.originalFilename,
+          mimeType: vdrDocuments.mimeType,
+          size: vdrDocuments.size,
+          storagePath: vdrDocuments.storagePath,
+          folderName: vdrFolders.name,
+          folderPath: vdrFolders.path,
+          aiCategory: vdrDocuments.aiCategory,
+          tags: vdrDocuments.tags,
+          createdAt: vdrDocuments.createdAt,
+        })
+        .from(vdrDocuments)
+        .innerJoin(vdrFolders, eq(vdrDocuments.folderId, vdrFolders.id))
+        .where(and(
+          eq(vdrDocuments.projectId, ddProjectId),
+          eq(vdrDocuments.orgId, orgId),
+          eq(vdrDocuments.isCurrentVersion, true),
+          isNull(vdrDocuments.deletedAt)
+        ))
+        .orderBy(vdrDocuments.createdAt);
+
+      res.json(documents);
+    } catch (error: any) {
+      console.error('Failed to fetch VDR documents:', error);
+      res.status(500).json({ error: 'Failed to fetch VDR documents' });
+    }
+  });
+
+  app.post('/api/modeling/projects/:projectId/import-vdr-document', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const { vdrDocumentId, docType, year } = req.body;
+
+      if (!vdrDocumentId) {
+        return res.status(400).json({ error: 'vdrDocumentId is required' });
+      }
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { vdrDocuments } = await import('@shared/schema');
+
+      const [vdrDoc] = await db.select()
+        .from(vdrDocuments)
+        .where(and(
+          eq(vdrDocuments.id, vdrDocumentId),
+          eq(vdrDocuments.orgId, orgId)
+        ))
+        .limit(1);
+
+      if (!vdrDoc) {
+        return res.status(404).json({ error: 'VDR document not found' });
+      }
+
+      if (!project.ddProjectId || vdrDoc.projectId !== project.ddProjectId) {
+        return res.status(403).json({ error: 'Document does not belong to this project\'s linked Data Room' });
+      }
+
+      const fsModule = await import('fs');
+      const pathModule = await import('path');
+
+      const sourceExists = fsModule.existsSync(vdrDoc.storagePath);
+      if (!sourceExists) {
+        return res.status(404).json({ error: 'VDR document file not found on disk' });
+      }
+
+      const docIntelDir = pathModule.default.join(process.cwd(), 'server', 'uploads', 'doc-intel');
+      fsModule.mkdirSync(docIntelDir, { recursive: true });
+
+      const timestamp = Date.now();
+      const ext = pathModule.default.extname(vdrDoc.originalFilename);
+      const newFilename = `${timestamp}-vdr-${crypto.randomBytes(8).toString('hex')}${ext}`;
+      const destPath = pathModule.default.join(docIntelDir, newFilename);
+
+      fsModule.copyFileSync(vdrDoc.storagePath, destPath);
+
+      const stat = fsModule.statSync(destPath);
+
+      const result = await docIntelService.createUploadWithDuplicateCheck(
+        orgId,
+        {
+          modelingProjectId: projectId,
+          filename: newFilename,
+          originalName: vdrDoc.originalFilename,
+          storagePath: destPath,
+          mimeType: vdrDoc.mimeType,
+          fileSize: stat.size,
+          docType: docType || null,
+          year: year ? parseInt(year) : null,
+          uploadedBy: userId,
+          status: 'uploaded',
+          holdingStatus: 'staging',
+          holdingTags: null,
+          holdingNotes: `Imported from Data Room: ${vdrDoc.filename}`,
+        },
+        false
+      );
+
+      res.status(201).json({
+        ...result.upload,
+        isDuplicate: result.isDuplicate,
+        source: 'vdr',
+        vdrDocumentId: vdrDoc.id,
+      });
+
+      setImmediate(async () => {
+        try {
+          console.log(`[DocIntel] Starting automatic AI parsing for VDR import ${result.upload.id}`);
+          await docIntelService.parseAndExtract(orgId, result.upload.id);
+          console.log(`[DocIntel] Parsing complete for VDR import ${result.upload.id}, categorizing...`);
+          await docIntelService.categorizeItems(orgId, result.upload.id);
+          console.log(`[DocIntel] Categorization complete for VDR import ${result.upload.id}`);
+          await docIntelService.updateUpload(orgId, result.upload.id, { status: 'reviewing' });
+        } catch (parseError: any) {
+          console.error(`[DocIntel] Background parsing failed for VDR import ${result.upload.id}:`, parseError.message);
+        }
+      });
+    } catch (error: any) {
+      console.error('Failed to import VDR document:', error);
+      res.status(500).json({ error: 'Failed to import VDR document' });
+    }
+  });
+
   // ==================== MODELING EXCEL EXPORT ROUTES ====================
 
   // Export modeling project to Excel with multiple sheets

@@ -18,6 +18,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import {
   Upload,
   FileSpreadsheet,
   CheckCircle2,
@@ -30,7 +35,13 @@ import {
   BookKey,
   Settings,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  FolderOpen,
+  Import,
+  FileText,
+  ChevronDown,
+  ChevronRight,
+  Database,
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { UploadDropzone } from '@/pages/modeling/doc-intel/UploadDropzone';
@@ -54,12 +65,43 @@ interface UploadWithStats extends DocIntelUpload {
   };
 }
 
+interface VdrDocument {
+  id: string;
+  filename: string;
+  originalFilename: string;
+  mimeType: string;
+  size: number;
+  storagePath: string;
+  folderName: string;
+  folderPath: string;
+  aiCategory: string | null;
+  tags: string[] | null;
+  createdAt: string;
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getFileIcon(mimeType: string) {
+  if (mimeType === 'application/pdf') {
+    return <FileText className="h-5 w-5 text-red-500" />;
+  }
+  if (mimeType.includes('spreadsheet') || mimeType.includes('excel') || mimeType.includes('csv')) {
+    return <FileSpreadsheet className="h-5 w-5 text-green-600" />;
+  }
+  return <FileText className="h-5 w-5 text-muted-foreground" />;
+}
+
 export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUploadsProps) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState<string>("");
-  // Rotating AI processing messages
+  const [vdrSectionOpen, setVdrSectionOpen] = useState(true);
+  const [importingDocId, setImportingDocId] = useState<string | null>(null);
   const [processingMessageIndex, setProcessingMessageIndex] = useState(0);
   const processingMessages = [
     "Analyzing document structure...",
@@ -73,10 +115,14 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
   const { data: uploads = [], isLoading } = useQuery<UploadWithStats[]>({
     queryKey: ['/api/modeling/projects', projectId, 'documents'],
     enabled: !!projectId,
-    refetchInterval: 2000, // Poll every 2s to catch status updates
+    refetchInterval: 2000,
   });
 
-  // Rotate messages every 3 seconds when processing
+  const { data: vdrDocuments = [], isLoading: isLoadingVdr } = useQuery<VdrDocument[]>({
+    queryKey: ['/api/modeling/projects', projectId, 'vdr-documents'],
+    enabled: !!projectId,
+  });
+
   const hasProcessingUploads = uploads.some(u => u.status === "processing" || u.status === "uploaded");
   useEffect(() => {
     if (!hasProcessingUploads) return;
@@ -86,13 +132,11 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
     return () => clearInterval(interval);
   }, [hasProcessingUploads, processingMessages.length]);
   
-  // Auto-redirect to review when processing completes
   useEffect(() => {
     const readyUpload = uploads.find(u => 
       u.status === 'reviewing' || u.status === 'parsed'
     );
     if (readyUpload) {
-      // Small delay to show the status change, then redirect
       const timer = setTimeout(() => {
         navigate(`/modeling/projects/${projectId}/doc-intel?upload=${readyUpload.id}`);
       }, 1500);
@@ -120,11 +164,24 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
     onSuccess: (_, uploadId) => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'documents'] });
       toast({ title: 'Reprocessing', description: 'Document is being reprocessed. You will be redirected to review.' });
-      // Navigate to doc-intel review
       navigate(`/modeling/projects/${projectId}/doc-intel?upload=${uploadId}`);
     },
     onError: () => {
       toast({ title: 'Error', description: 'Failed to reprocess document.', variant: 'destructive' });
+    },
+  });
+
+  const importVdrMutation = useMutation({
+    mutationFn: (vdrDocumentId: string) => 
+      apiRequest('POST', `/api/modeling/projects/${projectId}/import-vdr-document`, { vdrDocumentId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'documents'] });
+      setImportingDocId(null);
+      toast({ title: 'Imported', description: 'Document imported from Data Room and queued for AI processing.' });
+    },
+    onError: () => {
+      setImportingDocId(null);
+      toast({ title: 'Error', description: 'Failed to import document from Data Room.', variant: 'destructive' });
     },
   });
 
@@ -145,6 +202,11 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
 
   const handleReview = (uploadId: string) => {
     navigate(`/modeling/projects/${projectId}/doc-intel?upload=${uploadId}`);
+  };
+
+  const handleImportVdrDoc = (docId: string) => {
+    setImportingDocId(docId);
+    importVdrMutation.mutate(docId);
   };
 
   const getStatusBadge = (status: string) => {
@@ -174,6 +236,13 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
 
   const completedUploads = uploads.filter(u => u.status === 'completed');
   const pendingUploads = uploads.filter(u => u.status !== 'completed');
+
+  const vdrDocsByFolder = vdrDocuments.reduce<Record<string, VdrDocument[]>>((acc, doc) => {
+    const folder = doc.folderName || 'Root';
+    if (!acc[folder]) acc[folder] = [];
+    acc[folder].push(doc);
+    return acc;
+  }, {});
 
   return (
     <div className="space-y-6">
@@ -216,6 +285,109 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
         projectId={projectId} 
         onUploadComplete={handleUploadComplete}
       />
+
+      {(vdrDocuments.length > 0 || isLoadingVdr) && (
+        <Collapsible open={vdrSectionOpen} onOpenChange={setVdrSectionOpen}>
+          <Card>
+            <CardHeader className="pb-3">
+              <CollapsibleTrigger asChild>
+                <div className="flex items-center justify-between cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <Database className="h-5 w-5 text-blue-500" />
+                    <CardTitle className="text-base">Data Room Documents</CardTitle>
+                    {vdrDocuments.length > 0 && (
+                      <Badge variant="secondary" className="ml-1">{vdrDocuments.length}</Badge>
+                    )}
+                  </div>
+                  {vdrSectionOpen ? (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </div>
+              </CollapsibleTrigger>
+              <CardDescription className="mt-1">
+                Documents from this deal's Data Room available for quick import
+              </CardDescription>
+            </CardHeader>
+            <CollapsibleContent>
+              <CardContent className="pt-0">
+                {isLoadingVdr ? (
+                  <div className="flex items-center gap-2 py-4 justify-center text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm">Loading Data Room documents...</span>
+                  </div>
+                ) : vdrDocuments.length === 0 ? (
+                  <div className="text-center py-4">
+                    <FolderOpen className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground">No documents found in the linked Data Room.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {Object.entries(vdrDocsByFolder).map(([folderName, docs]) => (
+                      <div key={folderName}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-medium text-muted-foreground">{folderName}</span>
+                        </div>
+                        <div className="space-y-2 ml-6">
+                          {docs.map((doc) => {
+                            const isImporting = importingDocId === doc.id && importVdrMutation.isPending;
+                            return (
+                              <div
+                                key={doc.id}
+                                className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                              >
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                  {getFileIcon(doc.mimeType)}
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-medium text-sm truncate" title={doc.filename}>
+                                      {doc.filename}
+                                    </p>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                      <span className="text-xs text-muted-foreground">
+                                        {formatFileSize(doc.size)}
+                                      </span>
+                                      {doc.aiCategory && (
+                                        <Badge variant="outline" className="text-xs px-1.5 py-0">
+                                          {doc.aiCategory}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="gap-1.5 ml-3 flex-shrink-0"
+                                  onClick={() => handleImportVdrDoc(doc.id)}
+                                  disabled={isImporting}
+                                >
+                                  {isImporting ? (
+                                    <>
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      Importing...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Import className="h-3.5 w-3.5" />
+                                      Import
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+      )}
 
       {pendingUploads.length > 0 && (
         <Card>
