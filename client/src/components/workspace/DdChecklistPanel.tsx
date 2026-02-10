@@ -10,7 +10,8 @@ import {
   useUpdateItem, useCreateSection, useCreateItem, useDeleteItem, useDeleteSection,
   useExportChecklist, useDdChecklistTemplates, useSeedTemplates, useItemComments,
   usePostComment, useItemHistory, useUpdateChecklistSettings, useTogglePeriodReceived,
-  DdChecklistItem, DdChecklistSection as SectionType, DdChecklistItemPeriod,
+  useAddPeriods, useDeletePeriod, useWorkspaceMembers,
+  DdChecklistItem, DdChecklistSection as SectionType, DdChecklistItemPeriod, WorkspaceMemberInfo,
 } from '@/hooks/useDdChecklist';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -38,7 +39,7 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   AlertCircle, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, Circle,
   ClipboardList, Download, FileText, Loader2, MessageSquare, MoreVertical,
-  Paperclip, Plus, Settings, Shield, X,
+  Paperclip, Plus, Settings, Shield, Trash2, UserPlus, Users, X,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -616,10 +617,15 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
   const [drawerTab, setDrawerTab] = useState('details');
   const [commentText, setCommentText] = useState('');
   const [commentVisibility, setCommentVisibility] = useState('all');
+  const [addYearInput, setAddYearInput] = useState('');
+  const [showAddYear, setShowAddYear] = useState(false);
 
   const { data: comments = [] } = useItemComments(item?.id);
   const { data: history = [] } = useItemHistory(item?.id);
+  const { data: members = [] } = useWorkspaceMembers(workspaceId);
   const postComment = usePostComment();
+  const addPeriods = useAddPeriods();
+  const deletePeriod = useDeletePeriod();
 
   if (!item) return null;
 
@@ -627,6 +633,21 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
   const isComplete = ['approved', 'waived'].includes(item.status);
   const periods = item.periods || [];
   const receivedCount = periods.filter(p => p.isReceived).length;
+  const allPeriodsReceived = periods.length > 0 && receivedCount === periods.length;
+
+  const handleAddYear = () => {
+    const val = addYearInput.trim();
+    if (!val) return;
+    addPeriods.mutate({ itemId: item.id, workspaceId, type: 'year', values: [val] });
+    setAddYearInput('');
+    setShowAddYear(false);
+  };
+
+  const handleMarkComplete = () => {
+    onStatusChange(item.id, 'approved');
+  };
+
+  const getMemberLabel = (m: WorkspaceMemberInfo) => m.displayName || m.email || 'Unknown';
 
   return (
     <Sheet open={!!item} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -637,6 +658,7 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
         </SheetHeader>
 
         <div className="mt-4 space-y-4">
+          {/* Status row + Mark Complete */}
           <div className="flex items-center gap-2">
             <Select value={item.status} onValueChange={(s) => onStatusChange(item.id, s)}>
               <SelectTrigger className="h-8 w-[140px]"><SelectValue /></SelectTrigger>
@@ -649,38 +671,97 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
             <Badge variant="outline" className={`${PRIORITY_CONFIG[item.priority]?.className}`}>
               P{item.priority}
             </Badge>
-            {item.dueDate && (
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Calendar className="h-3 w-3" />{format(new Date(item.dueDate), 'MMM d, yyyy')}
-              </span>
+            <div className="flex-1" />
+            {!isComplete ? (
+              <Button size="sm" className="h-8 bg-green-600 hover:bg-green-700 text-white" onClick={handleMarkComplete}>
+                <CheckCircle2 className="h-3.5 w-3.5 mr-1" />Mark Complete
+              </Button>
+            ) : (
+              <Badge className="bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-700">
+                <CheckCircle2 className="h-3 w-3 mr-1" />Completed
+              </Badge>
             )}
           </div>
 
-          {/* Period tracking in drawer */}
-          {periods.length > 0 && (
-            <div className="bg-muted/50 rounded-lg p-3">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium">Period Tracking</span>
-                <span className="text-xs text-muted-foreground">{receivedCount}/{periods.length} received</span>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {periods.map((period) => (
-                  <button
-                    key={period.id}
-                    className={`flex items-center gap-1.5 text-xs font-medium px-2 py-1.5 rounded-md transition-colors ${
-                      period.isReceived
-                        ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-700'
-                        : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:border-green-400'
-                    }`}
-                    onClick={() => onTogglePeriod(period)}
-                  >
-                    {period.isReceived ? <Check className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
-                    {period.periodLabel}
-                  </button>
-                ))}
+          {/* Year/Period tracking section */}
+          <div className="bg-muted/50 rounded-lg p-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5" />
+                Year / Period Tracking
+              </span>
+              <div className="flex items-center gap-2">
+                {periods.length > 0 && (
+                  <span className="text-[11px] text-muted-foreground">
+                    {receivedCount}/{periods.length} received
+                    {allPeriodsReceived && <Check className="inline h-3 w-3 ml-0.5 text-green-600" />}
+                  </span>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-[11px]"
+                  onClick={() => setShowAddYear(!showAddYear)}
+                >
+                  <Plus className="h-3 w-3 mr-0.5" />Add Year
+                </Button>
               </div>
             </div>
-          )}
+
+            {showAddYear && (
+              <div className="flex items-center gap-2 mb-3">
+                <Input
+                  autoFocus
+                  className="h-7 text-xs w-24"
+                  placeholder="e.g. 2024"
+                  value={addYearInput}
+                  onChange={e => setAddYearInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleAddYear(); if (e.key === 'Escape') setShowAddYear(false); }}
+                />
+                <Button size="sm" className="h-7 text-xs px-2" onClick={handleAddYear} disabled={!addYearInput.trim() || addPeriods.isPending}>
+                  {addPeriods.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Add'}
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => setShowAddYear(false)}>Cancel</Button>
+              </div>
+            )}
+
+            {periods.length > 0 ? (
+              <div className="grid grid-cols-3 gap-2">
+                {periods.map((period) => (
+                  <div key={period.id} className="relative group">
+                    <button
+                      className={`w-full flex items-center gap-1.5 text-xs font-medium px-2 py-1.5 rounded-md transition-colors ${
+                        period.isReceived
+                          ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-700'
+                          : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:border-green-400'
+                      }`}
+                      onClick={() => onTogglePeriod(period)}
+                    >
+                      {period.isReceived ? <Check className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
+                      {period.periodLabel}
+                    </button>
+                    <button
+                      className="absolute -top-1 -right-1 hidden group-hover:flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white"
+                      onClick={() => deletePeriod.mutate({ periodId: period.id, workspaceId })}
+                      title="Remove year"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground text-center py-2">
+                No years added yet. Click "Add Year" to select years to track.
+              </p>
+            )}
+
+            {periods.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-border/50">
+                <Progress value={periods.length > 0 ? (receivedCount / periods.length) * 100 : 0} className="h-1.5" />
+              </div>
+            )}
+          </div>
 
           <Tabs value={drawerTab} onValueChange={setDrawerTab}>
             <TabsList className="grid w-full grid-cols-3">
@@ -690,12 +771,23 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
             </TabsList>
 
             <TabsContent value="details" className="mt-3 space-y-4">
-              {item.requestText && (
-                <div>
-                  <Label className="text-xs text-muted-foreground">Request</Label>
-                  <p className="text-sm mt-1">{item.requestText}</p>
-                </div>
-              )}
+              <div>
+                <Label className="text-xs text-muted-foreground">Request</Label>
+                <Textarea
+                  className="mt-1 text-sm"
+                  rows={3}
+                  defaultValue={item.requestText || ''}
+                  onBlur={(e) => {
+                    if (e.target.value !== (item.requestText || '')) {
+                      onUpdate(item.id, { requestText: e.target.value });
+                    }
+                  }}
+                  placeholder="Describe what is being requested..."
+                />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  This description is visible to deal team members and sellers when shared.
+                </p>
+              </div>
 
               <div>
                 <Label className="text-xs text-muted-foreground">Seller Notes</Label>
@@ -712,22 +804,84 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
                 />
               </div>
 
-              {item.internalNotes !== undefined && (
-                <div>
-                  <Label className="text-xs text-muted-foreground">Internal Notes (not visible to external)</Label>
-                  <Textarea
-                    className="mt-1 text-sm"
-                    rows={3}
-                    defaultValue={item.internalNotes || ''}
-                    onBlur={(e) => {
-                      if (e.target.value !== (item.internalNotes || '')) {
-                        onUpdate(item.id, { internalNotes: e.target.value });
-                      }
-                    }}
-                    placeholder="Internal team notes..."
-                  />
+              <div>
+                <Label className="text-xs text-muted-foreground">Internal Notes (not visible to external)</Label>
+                <Textarea
+                  className="mt-1 text-sm"
+                  rows={3}
+                  defaultValue={item.internalNotes || ''}
+                  onBlur={(e) => {
+                    if (e.target.value !== (item.internalNotes || '')) {
+                      onUpdate(item.id, { internalNotes: e.target.value });
+                    }
+                  }}
+                  placeholder="Internal team notes..."
+                />
+              </div>
+
+              {/* Deal Team Members Section */}
+              <div className="bg-muted/30 rounded-lg p-3 space-y-3">
+                <div className="flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs font-semibold">Deal Team</span>
                 </div>
-              )}
+
+                <div className="grid grid-cols-1 gap-2">
+                  <div>
+                    <Label className="text-[11px] text-muted-foreground">Assigned To</Label>
+                    <Select
+                      value={item.assignedToMemberId || '__none'}
+                      onValueChange={(v) => onUpdate(item.id, { assignedToMemberId: v === '__none' ? null : v })}
+                    >
+                      <SelectTrigger className="h-8 text-xs mt-0.5"><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none">Unassigned</SelectItem>
+                        {members.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>{getMemberLabel(m)} ({m.role})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label className="text-[11px] text-muted-foreground">Reviewer</Label>
+                    <Select
+                      value={item.reviewerMemberId || '__none'}
+                      onValueChange={(v) => onUpdate(item.id, { reviewerMemberId: v === '__none' ? null : v })}
+                    >
+                      <SelectTrigger className="h-8 text-xs mt-0.5"><SelectValue placeholder="No reviewer" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none">No reviewer</SelectItem>
+                        {members.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>{getMemberLabel(m)} ({m.role})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label className="text-[11px] text-muted-foreground">Requested From</Label>
+                    <Select
+                      value={item.requestedFromMemberId || '__none'}
+                      onValueChange={(v) => onUpdate(item.id, { requestedFromMemberId: v === '__none' ? null : v })}
+                    >
+                      <SelectTrigger className="h-8 text-xs mt-0.5"><SelectValue placeholder="Not specified" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none">Not specified</SelectItem>
+                        {members.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>{getMemberLabel(m)} ({m.role})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {members.length === 0 && (
+                  <p className="text-[11px] text-muted-foreground">
+                    No deal team members yet. Invite members via the workspace settings to assign them here.
+                  </p>
+                )}
+              </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -774,7 +928,7 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
 
               <Button variant="destructive" size="sm" className="mt-4"
                 onClick={() => { if (confirm('Delete this item?')) onDelete(item.id); }}>
-                Delete Item
+                <Trash2 className="h-3.5 w-3.5 mr-1" />Delete Item
               </Button>
             </TabsContent>
 

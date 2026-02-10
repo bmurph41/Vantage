@@ -266,6 +266,50 @@ export function useTogglePeriodReceived() {
   });
 }
 
+export function useAddPeriods() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ itemId, workspaceId, type, values }: { itemId: string; workspaceId: string; type: string; values: string[] }) => {
+      const res = await apiRequest('POST', `/api/dd-items/${itemId}/periods`, { type, values });
+      return res.json();
+    },
+    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ['dd-checklist', vars.workspaceId] }),
+  });
+}
+
+export function useDeletePeriod() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ periodId, workspaceId }: { periodId: string; workspaceId: string }) => {
+      const res = await apiRequest('DELETE', `/api/dd-item-periods/${periodId}`);
+      return res.json();
+    },
+    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ['dd-checklist', vars.workspaceId] }),
+  });
+}
+
+// ─── Workspace Members ───────────────────────────────────────────────────────
+
+export interface WorkspaceMemberInfo {
+  id: string;
+  userId: string | null;
+  email: string | null;
+  displayName: string | null;
+  role: string;
+  inviteStatus: string;
+}
+
+export function useWorkspaceMembers(workspaceId: string | undefined) {
+  return useQuery<WorkspaceMemberInfo[]>({
+    queryKey: ['workspace-members', workspaceId],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/workspaces/${workspaceId}/members`);
+      return res.json();
+    },
+    enabled: !!workspaceId,
+  });
+}
+
 // ─── Comments ────────────────────────────────────────────────────────────────
 
 export function useItemComments(itemId: string | undefined) {
