@@ -324,7 +324,7 @@ export function ContactCardModal({ open, onOpenChange, contact, mode, projectId,
                   <FormControl>
                     <div className="relative">
                       <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input {...field} placeholder="Jessica Malchow" className="pl-10" data-testid="input-contact-name" />
+                      <Input {...field} placeholder="Full Name" className="pl-10" data-testid="input-contact-name" />
                     </div>
                   </FormControl>
                   <FormMessage />
@@ -341,7 +341,7 @@ export function ContactCardModal({ open, onOpenChange, contact, mode, projectId,
                   <FormControl>
                     <div className="relative">
                       <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input {...field} type="email" placeholder="jessica@example.com" className="pl-10" data-testid="input-contact-email" />
+                      <Input {...field} type="email" placeholder="email@example.com" className="pl-10" data-testid="input-contact-email" />
                     </div>
                   </FormControl>
                   <FormMessage />
