@@ -1116,3 +1116,23 @@ router.post('/api/workspaces/:id/dd-checklist/export/pdf', async (req: any, res:
 });
 
 export { router as ddChecklistRouter };
+
+// GET /api/projects/:projectId/workspace-link - find workspace linked to a DD project
+router.get('/api/projects/:projectId/workspace-link', async (req: any, res: Response) => {
+  try {
+    const db = await getDb();
+    const schema = await getSchema();
+    const { projectId } = req.params;
+
+    const [workspace] = await db
+      .select({ id: schema.dealWorkspaces.id, name: schema.dealWorkspaces.name })
+      .from(schema.dealWorkspaces)
+      .where(eq(schema.dealWorkspaces.ddProjectId, projectId))
+      .limit(1);
+
+    if (!workspace) return res.status(404).json({ error: 'No workspace linked to this project' });
+    res.json(workspace);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to lookup workspace' });
+  }
+});

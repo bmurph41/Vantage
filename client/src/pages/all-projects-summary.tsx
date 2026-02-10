@@ -503,7 +503,7 @@ export default function AllProjectsSummaryPage() {
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              window.location.href = `/vdr/projects/${summary.project.id}?tab=requests`;
+                              window.location.href = `/dd/projects/${summary.project.id}?tab=ddrequest`;
                             }}
                           >
                             DD Request

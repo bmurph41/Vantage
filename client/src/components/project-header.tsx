@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { format, parseISO, isAfter, addDays } from "date-fns";
 import { tzNow } from "@/lib/date-utils";
-import { Download, Share2, Calendar, FileText, Loader2, FileBarChart, CheckCircle2, X, FolderLock } from "lucide-react";
+import { Download, Share2, Calendar, FileText, Loader2, FileBarChart, CheckCircle2, X, FolderLock, ClipboardList } from "lucide-react";
 import type { Project, Task, ProjectSettings } from "@shared/schema";
 import { ddClient } from "@/lib/ddClient";
 import { useToast } from "@/hooks/use-toast";
@@ -191,6 +191,12 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
             <Button variant="outline" className="border-orange-500 text-orange-700 hover:bg-orange-50" data-testid="link-data-room">
               <FolderLock className="h-4 w-4 mr-2" />
               Data Room
+            </Button>
+          </a>
+          <a href={`/dd/projects/${project.id}?tab=ddrequest`}>
+            <Button variant="outline" className="border-purple-500 text-purple-700 hover:bg-purple-50" data-testid="link-dd-request">
+              <ClipboardList className="h-4 w-4 mr-2" />
+              DD Request
             </Button>
           </a>
           {project.status !== 'accepted' ? (

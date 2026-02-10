@@ -18,6 +18,7 @@ import { KpisOverview } from "@/components/kpis-overview";
 import { TemplatesView } from "@/components/templates-view";
 import { PortfolioPropertiesView } from "@/components/portfolio-properties-view";
 import NotificationSettingsPage from "@/pages/notification-settings";
+import DdChecklistProjectWrapper from "@/components/workspace/DdChecklistProjectWrapper";
 import { useProject } from "@/hooks/use-project";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
@@ -26,7 +27,8 @@ import type { DDTask, DDContact } from "@shared/schema";
 export default function ProjectPage() {
   const { id } = useParams();
   const [location] = useLocation();
-  const [activeTab, setActiveTab] = useState<string | null>(null);
+  const urlTab = new URLSearchParams(window.location.search).get('tab');
+  const [activeTab, setActiveTab] = useState<string | null>(urlTab);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<DDTask | null>(null);
   
@@ -56,7 +58,7 @@ export default function ProjectPage() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Project not found</h1>
-          <Link href="/">
+          <Link href="/dd/projects">
             <Button>Back to Dashboard</Button>
           </Link>
         </div>
@@ -95,6 +97,7 @@ export default function ProjectPage() {
   const baseTabs = [
     { id: "reports", label: "Tasks & Timeline" },
     { id: "documents", label: "Documents" },
+    { id: "ddrequest", label: "DD Request" },
     { id: "templates", label: "Templates" },
     { id: "setup", label: "Deal Details" },
     { id: "owners", label: "Task Owners" },
@@ -115,7 +118,7 @@ export default function ProjectPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
-              <Link href="/">
+              <Link href="/dd/projects">
                 <Button variant="ghost" size="sm" data-testid="link-back-dashboard">
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back to Dashboard
@@ -202,6 +205,9 @@ export default function ProjectPage() {
                 <DocumentsWorkspace projectId={project.id} />
               </div>
             </div>
+          )}
+          {effectiveActiveTab === "ddrequest" && (
+            <DdChecklistProjectWrapper projectId={project.id} projectName={project.name} />
           )}
           {effectiveActiveTab === "templates" && (
             <TemplatesView projectId={project.id} />
