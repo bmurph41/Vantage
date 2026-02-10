@@ -3312,17 +3312,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const contact = await storage.createContact(contactData);
 
-      // Skip audit log for now due to database constraint issue
-      // TODO: Fix audit_logs table to allow null projectId for org-level operations
-      // await storage.createAuditLog({
-        orgId: req.user.orgId,
-      //   projectId: null,
-      //   userId: req.user.id,
-      //   entityType: "contact",
-      //   entityId: contact.id,
-      //   action: "created",
-      //   after: contact,
-      // });
+      // Auto-create CRM pending contact for review
+      try {
+        const nameParts = contact.name.split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+
+        await storage.createPendingContact({
+          orgId: req.user.orgId,
+          sourceType: 'dd_project',
+          sourceId: req.body.projectId || null,
+          firstName,
+          lastName,
+          fullName: contact.name,
+          email: contact.email,
+          phone: contact.phone || null,
+          jobTitle: contact.role ? contact.role : null,
+          status: 'pending',
+          sourceMetadata: { ddContactId: contact.id, company: contact.company },
+          createdBy: req.user.id,
+        });
+      } catch (pendingErr) {
+        console.error("Failed to create CRM pending contact (non-fatal):", pendingErr);
+      }
 
       res.json(contact);
     } catch (error: any) {

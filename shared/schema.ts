@@ -231,6 +231,8 @@ export const packCatalog = pgTable("pack_catalog", {
   isActive: boolean("is_active").notNull().default(true), // Whether pack is available for purchase
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 // Organization Packs - Tracks purchased add-on packs per organization
@@ -255,6 +257,8 @@ export const organizationPacks = pgTable("organization_packs", {
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgPackIdx: index("org_packs_org_idx").on(table.orgId),
   packTypeIdx: index("org_packs_type_idx").on(table.packType),
@@ -284,6 +288,8 @@ export const ssoConfigurations = pgTable("sso_configurations", {
   lastTestedAt: timestamp("last_tested_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 // Users
@@ -415,6 +421,8 @@ export const dashboardCustomModules = pgTable("dashboard_custom_modules", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 // Persona Feature Flags - Global registry of persona capabilities
@@ -439,6 +447,8 @@ export const userPersonaAssignments = pgTable("user_persona_assignments", {
   featureOverrides: jsonb("feature_overrides").default(sql`'{}'`),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   uniqueUserOrg: unique().on(table.userId, table.orgId),
   userOrgIdx: index("user_persona_user_org_idx").on(table.userId, table.orgId),
@@ -631,6 +641,8 @@ export const dashboardCustomWidgets = pgTable("dashboard_custom_widgets", {
 
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   userOrgIdx: index("dashboard_custom_widgets_user_org_idx").on(table.userId, table.orgId),
   moduleIdx: index("dashboard_custom_widgets_module_idx").on(table.moduleKey),
@@ -669,6 +681,8 @@ export const dashboardSavedLayouts = pgTable("dashboard_saved_layouts", {
 
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   userOrgIdx: index("dashboard_saved_layouts_user_org_idx").on(table.userId, table.orgId),
   defaultIdx: index("dashboard_saved_layouts_default_idx").on(table.userId, table.orgId, table.isDefault),
@@ -772,6 +786,8 @@ export const projects = pgTable("projects", {
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 // Project Settings
@@ -863,6 +879,8 @@ export const tasks = pgTable("tasks", {
   syncedToCalendar: boolean("synced_to_calendar").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 // Task Files
@@ -883,6 +901,8 @@ export const taskFiles = pgTable("task_files", {
   notes: text("notes"), // Optional: user notes about the file
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 // Enhanced Task Dependencies (CPM support)
@@ -895,6 +915,8 @@ export const taskDependencies = pgTable("task_dependencies", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   // Unique constraint to prevent duplicate dependencies
   uniqueDependency: unique().on(table.successorId, table.predecessorId)
@@ -910,6 +932,8 @@ export const timelineNotes = pgTable("timeline_notes", {
   metadata: jsonb("metadata").default(sql`'{}'`), // For future CRM integration data
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 // Project Shares
@@ -1006,6 +1030,8 @@ export const risks = pgTable("risks", {
 
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 // Contacts
@@ -1108,6 +1134,8 @@ export const notificationSubscriptions = pgTable("notification_subscriptions", {
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => {
   return {
     // Performance indexes for critical query paths
@@ -1186,6 +1214,8 @@ export const ddAutomationRules = pgTable("dd_automation_rules", {
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   projectIdx: index("dd_automation_rules_project").on(table.projectId),
   orgIdx: index("dd_automation_rules_org").on(table.orgId),
@@ -1232,6 +1262,8 @@ export const ddChecklistTemplates = pgTable("dd_checklist_templates", {
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index("dd_checklist_templates_org").on(table.orgId),
   typeIdx: index("dd_checklist_templates_type").on(table.templateType),
@@ -1267,6 +1299,8 @@ export const calendarEvents = pgTable("calendar_events", {
 
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => {
   return {
     // Unique constraint to prevent duplicate task calendar events
@@ -1344,6 +1378,8 @@ export const documentRequirements = pgTable("document_requirements", {
   metadata: jsonb("metadata").default(sql`'{}'`), // Additional provider-specific data
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => {
   return {
     // Unique constraint on (taskId, requirementKey)
@@ -1370,6 +1406,8 @@ export const projectIntegrations = pgTable("project_integrations", {
   config: jsonb("config").notNull().default(sql`'{}'`), // Configuration data (webhookId, secret, baseUrl, lastSyncCursor, etc.)
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => {
   return {
     // Unique constraint to prevent duplicate integrations per project
@@ -1431,6 +1469,8 @@ export const kpis = pgTable("kpis", {
   category: text("category"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   projectIdx: index("kpis_project").on(table.projectId),
   sourceDocIdx: index("kpis_source_document").on(table.sourceDocumentId),
@@ -1448,6 +1488,8 @@ export const findings = pgTable("findings", {
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   projectIdx: index("findings_project").on(table.projectId),
   severityIdx: index("findings_severity").on(table.severity),
@@ -1464,6 +1506,8 @@ export const recommendations = pgTable("recommendations", {
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   projectIdx: index("recommendations_project").on(table.projectId),
   priorityIdx: index("recommendations_priority").on(table.priority),
@@ -1494,6 +1538,8 @@ export const cddReports = pgTable("cdd_reports", {
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   projectIdx: index("cdd_reports_project").on(table.projectId),
   versionIdx: index("cdd_reports_version").on(table.projectId, table.version),
@@ -1513,6 +1559,8 @@ export const comps = pgTable("comps", {
   capexNotes: text("capex_notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   projectIdx: index("comps_project").on(table.projectId),
 }));
@@ -1528,6 +1576,8 @@ export const checklistItems = pgTable("checklist_items", {
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   projectIdx: index("checklist_items_project").on(table.projectId),
   sectionIdx: index("checklist_items_section").on(table.projectId, table.section),
@@ -2549,6 +2599,8 @@ export const ownedAssets = pgTable("owned_assets", {
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgStatusIdx: index("owned_assets_org_status_idx").on(table.orgId, table.status),
   orgPropertyIdx: index("owned_assets_org_property_idx").on(table.orgId, table.propertyId),
@@ -2602,6 +2654,8 @@ export const marinaBudgets = pgTable("marina_budgets", {
   approvedAt: timestamp("approved_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgAssetYearIdx: index("marina_budgets_org_asset_year_idx").on(table.orgId, table.ownedAssetId, table.fiscalYear),
   rentRollIdx: index("marina_budgets_rent_roll_idx").on(table.rentRollId),
@@ -2630,6 +2684,8 @@ export const marinaBudgetLineItems = pgTable("marina_budget_line_items", {
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   budgetIdx: index("marina_budget_line_items_budget_idx").on(table.budgetId),
   categoryIdx: index("marina_budget_line_items_category_idx").on(table.budgetId, table.category),
@@ -2718,6 +2774,8 @@ export const rentRollSnapshots = pgTable("rent_roll_snapshots", {
   isAutoGenerated: boolean("is_auto_generated").default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index("rent_roll_snapshots_org_idx").on(table.orgId),
   rentRollIdx: index("rent_roll_snapshots_rent_roll_idx").on(table.rentRollId),
@@ -2762,6 +2820,8 @@ export const budgetRentRollBindings = pgTable("budget_rent_roll_bindings", {
 
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   budgetIdx: index("budget_rent_roll_bindings_budget_idx").on(table.budgetId),
   lineItemIdx: index("budget_rent_roll_bindings_line_item_idx").on(table.lineItemId),
@@ -4484,6 +4544,8 @@ export const vdrFolders = pgTable("vdr_folders", {
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
   deletedAt: timestamp("deleted_at"), // Soft delete support
 }, (table) => ({
   projectIdx: index("vdr_folders_project_idx").on(table.projectId),
@@ -4519,6 +4581,8 @@ export const vdrDocuments = pgTable("vdr_documents", {
   uploadedBy: varchar("uploaded_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
   deletedAt: timestamp("deleted_at"), // Soft delete support
 }, (table) => ({
   folderIdx: index("vdr_documents_folder_idx").on(table.folderId),
@@ -4547,6 +4611,8 @@ export const vdrDocumentPermissions = pgTable("vdr_document_permissions", {
   grantedBy: varchar("granted_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   documentIdx: index("vdr_permissions_document_idx").on(table.documentId),
   folderIdx: index("vdr_permissions_folder_idx").on(table.folderId),
@@ -4614,6 +4680,8 @@ export const vdrTemplates = pgTable("vdr_templates", {
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   categoryIdx: index("vdr_templates_category_idx").on(table.category),
   orgIdx: index("vdr_templates_org_idx").on(table.orgId),
@@ -4665,6 +4733,8 @@ export const diligenceRequests = pgTable("diligence_requests", {
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
   deletedAt: timestamp("deleted_at"), // Soft delete support
 }, (table) => ({
   projectIdx: index("diligence_requests_project_idx").on(table.projectId),
@@ -4699,6 +4769,8 @@ export const requestComments = pgTable("request_comments", {
   orgId: varchar("org_id").notNull().references(() => organizations.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   requestIdx: index("request_comments_request_idx").on(table.requestId),
   parentIdx: index("request_comments_parent_idx").on(table.parentCommentId),
@@ -4716,6 +4788,8 @@ export const requestTemplates = pgTable("request_templates", {
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   categoryIdx: index("request_templates_category_idx").on(table.category),
   orgIdx: index("request_templates_org_idx").on(table.orgId),
@@ -4736,6 +4810,8 @@ export const vdrDataRequestTemplates = pgTable("vdr_data_request_templates", {
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   categoryIdx: index("vdr_data_request_templates_category_idx").on(table.category),
   orgIdx: index("vdr_data_request_templates_org_idx").on(table.orgId),
@@ -4753,6 +4829,8 @@ export const vdrDiligenceCategories = pgTable("vdr_diligence_categories", {
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index("vdr_diligence_categories_org_idx").on(table.orgId),
   slugOrgIdx: unique("vdr_diligence_categories_slug_org_idx").on(table.slug, table.orgId),
@@ -4770,6 +4848,8 @@ export const vdrDueDatePresets = pgTable("vdr_due_date_presets", {
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index("vdr_due_date_presets_org_idx").on(table.orgId),
   slugOrgIdx: unique("vdr_due_date_presets_slug_org_idx").on(table.slug, table.orgId),
@@ -4799,6 +4879,8 @@ export const vdrDataRequestItems = pgTable("vdr_data_request_items", {
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   projectIdx: index("vdr_data_request_items_project_idx").on(table.projectId),
   statusIdx: index("vdr_data_request_items_status_idx").on(table.status),
@@ -6793,6 +6875,8 @@ export const salesComps = pgTable('sales_comps', {
   updatedBy: varchar('updated_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
   deletedAt: timestamp('deleted_at'),
 
   // Standardized core fields
@@ -7228,6 +7312,8 @@ export const compColumns = pgTable('comp_columns', {
   orderIndex: integer('order_index').default(0),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index('comp_columns_org_idx').on(table.orgId),
   orgKeyIdx: index('comp_columns_org_key_idx').on(table.orgId, table.key),
@@ -7306,6 +7392,8 @@ export const scValidationRules = pgTable('sc_validation_rules', {
   createdBy: varchar('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 
   name: text('name').notNull(),
   description: text('description'),
@@ -7365,6 +7453,8 @@ export const scCompAdjustments = pgTable('sc_comp_adjustments', {
   createdBy: varchar('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 
   // Links
   compId: varchar('comp_id').notNull().references(() => salesComps.id, { onDelete: 'cascade' }),
@@ -7415,6 +7505,8 @@ export const scProjects = pgTable('sc_projects', {
   updatedBy: varchar('updated_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
   deletedAt: timestamp('deleted_at'),
 
   // Project fields
@@ -7515,6 +7607,8 @@ export const scOrgPreferences = pgTable('sc_org_preferences', {
     geo: number;
   }>().default({ capacity: 0.40, financial: 0.35, profitCenters: 0.15, regional: 0.07, geo: 0.03 }),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index('sc_org_preferences_org_idx').on(table.orgId),
   uniqueSegment: unique('sc_org_preferences_unique_idx').on(table.orgId, table.segmentKey),
@@ -7528,6 +7622,8 @@ export const scSavedSearches = pgTable('sc_saved_searches', {
   updatedBy: varchar('updated_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
   deletedAt: timestamp('deleted_at'),
 
   // Search configuration
@@ -7561,6 +7657,8 @@ export const scPortfolios = pgTable('sc_portfolios', {
   updatedBy: varchar('updated_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
   deletedAt: timestamp('deleted_at'),
 
   // Portfolio fields
@@ -7595,6 +7693,8 @@ export const scAnalyticsFilterPresets = pgTable('sc_analytics_filter_presets', {
   userId: varchar('user_id').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 
   // Preset configuration
   name: text('name').notNull(),
@@ -7628,6 +7728,8 @@ export const docktalkDeals = pgTable('docktalk_deals', {
   updatedBy: varchar('updated_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
   deletedAt: timestamp('deleted_at'),
 
   // Origin tracking - Primary vs AI-discovered deals
@@ -7701,6 +7803,8 @@ export const docktalkEntities = pgTable('docktalk_entities', {
   metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index('docktalk_entities_org_idx').on(table.orgId),
   nameIdx: index('docktalk_entities_name_idx').on(table.name),
@@ -7722,6 +7826,8 @@ export const docktalkPortfolioCompanies = pgTable('docktalk_portfolio_companies'
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index('docktalk_portfolio_companies_org_idx').on(table.orgId),
   userIdx: index('docktalk_portfolio_companies_user_idx').on(table.userId),
@@ -7741,6 +7847,8 @@ export const docktalkSavedSearches = pgTable('docktalk_saved_searches', {
   isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index('docktalk_saved_searches_org_idx').on(table.orgId),
   userIdx: index('docktalk_saved_searches_user_idx').on(table.userId),
@@ -7759,6 +7867,8 @@ export const docktalkWatchlists = pgTable('docktalk_watchlists', {
   isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index('docktalk_watchlists_org_idx').on(table.orgId),
   userIdx: index('docktalk_watchlists_user_idx').on(table.userId),
@@ -7788,6 +7898,8 @@ export const docktalkUserPreferences = pgTable('docktalk_user_preferences', {
   favoriteSources: text('favorite_sources').array().default(sql`'{}'`),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index('docktalk_user_preferences_org_idx').on(table.orgId),
   userIdx: index('docktalk_user_preferences_user_idx').on(table.userId),
@@ -7828,6 +7940,8 @@ export const docktalkNotificationPreferences = pgTable('docktalk_notification_pr
   lastSentAt: timestamp('last_sent_at'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index('docktalk_notification_preferences_org_idx').on(table.orgId),
   userIdx: index('docktalk_notification_preferences_user_idx').on(table.userId),
@@ -8256,6 +8370,8 @@ export const scMetricSeries = pgTable('sc_metric_series', {
   createdBy: varchar('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 
   name: text('name').notNull(),
   description: text('description'),
@@ -8294,6 +8410,8 @@ export const scMetricAlerts = pgTable('sc_metric_alerts', {
   createdBy: varchar('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 
   name: text('name').notNull(),
   condition: text('condition').notNull(), // 'above', 'below', 'between', 'outside'
@@ -8398,6 +8516,8 @@ export const rateComps = pgTable('rate_comps', {
   updatedBy: varchar('updated_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
   deletedAt: timestamp('deleted_at'),
 
   // Standardized core fields
@@ -8602,6 +8722,8 @@ export const rateCompColumns = pgTable('rate_comp_columns', {
   orderIndex: integer('order_index').default(0),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index('rate_comp_columns_org_idx').on(table.orgId),
   orgKeyIdx: index('rate_comp_columns_org_key_idx').on(table.orgId, table.key),
@@ -8636,6 +8758,8 @@ export const rcProjects = pgTable('rc_projects', {
   updatedBy: varchar('updated_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
   deletedAt: timestamp('deleted_at'),
 
   // Project fields
@@ -8739,6 +8863,8 @@ export const rcOrgPreferences = pgTable('rc_org_preferences', {
     geo: number;
   }>().default({ capacity: 0.40, financial: 0.35, profitCenters: 0.15, regional: 0.07, geo: 0.03 }),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index('rc_org_preferences_org_idx').on(table.orgId),
   uniqueSegment: unique('rc_org_preferences_unique_idx').on(table.orgId, table.segmentKey),
@@ -8752,6 +8878,8 @@ export const rcSavedSearches = pgTable('rc_saved_searches', {
   updatedBy: varchar('updated_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
   deletedAt: timestamp('deleted_at'),
 
   // Search configuration
@@ -8785,6 +8913,8 @@ export const rcPortfolios = pgTable('rc_portfolios', {
   updatedBy: varchar('updated_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
   deletedAt: timestamp('deleted_at'),
 
   // Portfolio fields
@@ -8819,6 +8949,8 @@ export const rcMetricSeries = pgTable('rc_metric_series', {
   createdBy: varchar('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 
   name: text('name').notNull(),
   description: text('description'),
@@ -8857,6 +8989,8 @@ export const rcMetricAlerts = pgTable('rc_metric_alerts', {
   createdBy: varchar('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 
   name: text('name').notNull(),
   description: text('description'),
@@ -8906,6 +9040,8 @@ export const rateTiers = pgTable('rate_tiers', {
   updatedBy: varchar('updated_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 
   tierLabel: text('tier_label'),
   displayOrder: integer('display_order').default(0),
@@ -9066,6 +9202,8 @@ export const marinaRateDatabase = pgTable('marina_rate_database', {
   updatedBy: varchar('updated_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
   deletedAt: timestamp('deleted_at'),
 
   // Marina identification
@@ -9125,6 +9263,8 @@ export const marinaRates = pgTable('marina_rates', {
   updatedBy: varchar('updated_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 
   // Time period for this rate
   rateYear: integer('rate_year').notNull(), // e.g., 2023, 2024
@@ -12008,6 +12148,8 @@ export const marinaSubjects = pgTable('marina_subjects', {
   updatedBy: varchar('updated_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
   deletedAt: timestamp('deleted_at'),
 
   // Identity
@@ -12057,6 +12199,8 @@ export const compSets = pgTable('comp_sets', {
   updatedBy: varchar('updated_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
   deletedAt: timestamp('deleted_at'),
 
   // Identity
@@ -12569,6 +12713,8 @@ export const modelingProjectConfig = pgTable('modeling_project_config', {
   cashFlowGranularity: varchar('cash_flow_granularity', { length: 20 }).notNull().default('annual'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 export const insertModelingProjectConfigSchema = createInsertSchema(modelingProjectConfig).omit({
@@ -13252,6 +13398,8 @@ export const shipStoreProducts = pgTable("ship_store_products", {
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 export const insertCategorySchema = createInsertSchema(shipStoreCategories).omit({
@@ -13342,6 +13490,8 @@ export const shipStoreSettings = pgTable("ship_store_settings", {
   squareApplicationId: text("square_application_id"),
   quickbooksConnected: boolean("quickbooks_connected").default(false),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 export const shipStoreScenarios = pgTable("ship_store_scenarios", {
@@ -13352,6 +13502,8 @@ export const shipStoreScenarios = pgTable("ship_store_scenarios", {
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 export const shipStoreAssumptions = pgTable("ship_store_assumptions", {
@@ -13378,6 +13530,8 @@ export const shipStoreAssumptions = pgTable("ship_store_assumptions", {
   }>(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 export const shipStoreProjections = pgTable("ship_store_projections", {
@@ -17262,6 +17416,8 @@ export const demographicsCache = pgTable('demographics_cache', {
 
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index('demographics_cache_org_idx').on(table.orgId),
   stateIdx: index('demographics_cache_state_idx').on(table.stateCode),
@@ -17307,6 +17463,8 @@ export const regionalMarketStats = pgTable('regional_market_stats', {
 
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index('regional_market_stats_org_idx').on(table.orgId),
   stateIdx: index('regional_market_stats_state_idx').on(table.stateCode),
@@ -17410,6 +17568,8 @@ export const locationDemographicsCache = pgTable('location_demographics_cache', 
 
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index('loc_demo_cache_org_idx').on(table.orgId),
   coordsIdx: index('loc_demo_cache_coords_idx').on(table.latitude, table.longitude),
@@ -17450,6 +17610,8 @@ export const demographicProjectLocations = pgTable('demographic_project_location
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index('demo_proj_loc_org_idx').on(table.orgId),
   projectIdx: index('demo_proj_loc_project_idx').on(table.modelingProjectId),
@@ -17491,6 +17653,8 @@ export const backgroundJobs = pgTable('background_jobs', {
 
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   typeIdx: index('bg_jobs_type_idx').on(table.type),
   statusIdx: index('bg_jobs_status_idx').on(table.status),
@@ -17534,6 +17698,8 @@ export const dealSalesComps = pgTable('deal_sales_comps', {
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index('deal_sales_comps_org_idx').on(table.orgId),
   dealIdx: index('deal_sales_comps_deal_idx').on(table.dealId),
@@ -17570,6 +17736,8 @@ export const dealRateComps = pgTable('deal_rate_comps', {
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index('deal_rate_comps_org_idx').on(table.orgId),
   dealIdx: index('deal_rate_comps_deal_idx').on(table.dealId),
@@ -17859,6 +18027,8 @@ export const targetDemographics = pgTable('target_demographics', {
 
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index('target_demographics_org_idx').on(table.orgId),
   userIdx: index('target_demographics_user_idx').on(table.userId),
@@ -18356,6 +18526,8 @@ export const dealSources = pgTable("deal_sources", {
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index("deal_sources_org_idx").on(table.orgId),
   statusIdx: index("deal_sources_status_idx").on(table.status),
@@ -18402,6 +18574,8 @@ export const investmentMandates = pgTable("investment_mandates", {
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index("investment_mandates_org_idx").on(table.orgId),
   statusIdx: index("investment_mandates_status_idx").on(table.status),
@@ -18443,6 +18617,8 @@ export const brokerRelationships = pgTable("broker_relationships", {
   portalLastAccessedAt: timestamp("portal_last_accessed_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index("broker_relationships_org_idx").on(table.orgId),
   tierIdx: index("broker_relationships_tier_idx").on(table.tier),
@@ -18518,6 +18694,8 @@ export const sourcedDeals = pgTable("sourced_deals", {
   importedAt: timestamp("imported_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index("sourced_deals_org_idx").on(table.orgId),
   sourceIdx: index("sourced_deals_source_idx").on(table.dealSourceId),
@@ -18553,6 +18731,8 @@ export const dealAttributions = pgTable("deal_attributions", {
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index("deal_attributions_org_idx").on(table.orgId),
   dealIdx: index("deal_attributions_deal_idx").on(table.dealId),
@@ -18616,6 +18796,8 @@ export const brokerPortalSubmissions = pgTable("broker_portal_submissions", {
   submitterUserAgent: text("submitter_user_agent"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index("broker_portal_submissions_org_idx").on(table.orgId),
   brokerIdx: index("broker_portal_submissions_broker_idx").on(table.brokerId),
@@ -18657,6 +18839,8 @@ export const mandateCriteria = pgTable("mandate_criteria", {
   sortOrder: integer("sort_order").default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   mandateIdx: index("mandate_criteria_mandate_idx").on(table.mandateId),
   orgIdx: index("mandate_criteria_org_idx").on(table.orgId),
@@ -18793,6 +18977,8 @@ export const marinaListings = pgTable("marina_listings", {
   expiresAt: timestamp("expires_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index("marina_listings_org_idx").on(table.orgId),
   sourceIdx: index("marina_listings_source_idx").on(table.sourcePlatform),
@@ -18825,6 +19011,8 @@ export const investmentCriteriaProfiles = pgTable("investment_criteria_profiles"
   createdBy: varchar("created_by"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index("criteria_profiles_org_idx").on(table.orgId),
 }));
@@ -18847,6 +19035,8 @@ export const investmentCriteriaLocation = pgTable("investment_criteria_location"
 
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 export const investmentCriteriaFinancial = pgTable("investment_criteria_financial", {
@@ -18901,6 +19091,8 @@ export const investmentCriteriaFinancial = pgTable("investment_criteria_financia
 
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 export const investmentCriteriaOperational = pgTable("investment_criteria_operational", {
@@ -18918,6 +19110,8 @@ export const investmentCriteriaOperational = pgTable("investment_criteria_operat
   requireBoatRamp: boolean("require_boat_ramp").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 export const investmentCriteriaSize = pgTable("investment_criteria_size", {
@@ -18936,6 +19130,8 @@ export const investmentCriteriaSize = pgTable("investment_criteria_size", {
   maxWaterFrontage: numeric("max_water_frontage", { precision: 10, scale: 2 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 export const investmentCriteriaCapital = pgTable("investment_criteria_capital", {
@@ -18951,6 +19147,8 @@ export const investmentCriteriaCapital = pgTable("investment_criteria_capital", 
   targetHoldPeriod: integer("target_hold_period"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 export const investmentCriteriaInvolvement = pgTable("investment_criteria_involvement", {
@@ -18964,6 +19162,8 @@ export const investmentCriteriaInvolvement = pgTable("investment_criteria_involv
   hoursPerWeekAvailable: integer("hours_per_week_available"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 export const investmentCriteriaCapex = pgTable("investment_criteria_capex", {
@@ -18978,6 +19178,8 @@ export const investmentCriteriaCapex = pgTable("investment_criteria_capex", {
   environmentalIssuesOk: boolean("environmental_issues_ok").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 // ============================================================================
@@ -19003,6 +19205,8 @@ export const investmentCriteriaStorageMix = pgTable("investment_criteria_storage
 
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 // ============================================================================
@@ -19032,6 +19236,8 @@ export const investmentCriteriaDepartments = pgTable("investment_criteria_depart
 
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 // ============================================================================
@@ -19060,6 +19266,8 @@ export const investmentCriteriaStorageTypes = pgTable("investment_criteria_stora
 
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 export const marinaMatchGoals = pgTable("marina_match_goals", {
@@ -19080,6 +19288,8 @@ export const marinaMatchGoals = pgTable("marina_match_goals", {
   createdBy: varchar("created_by"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index("goals_org_idx").on(table.orgId),
 }));
@@ -19168,6 +19378,8 @@ export const marinaScrapeources = pgTable("marina_scrape_sources", {
 
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index("scrape_sources_org_idx").on(table.orgId),
 }));
@@ -19238,6 +19450,8 @@ export const marinaMatchAlerts = pgTable("marina_match_alerts", {
   lastSentAt: timestamp("last_sent_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index("alerts_org_idx").on(table.orgId),
 }));
@@ -19362,6 +19576,8 @@ export const marinaAiFilterPatterns = pgTable("marina_ai_filter_patterns", {
   createdFromFeedbackId: varchar("created_from_feedback_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   typeIdx: index("ai_pattern_type_idx").on(table.patternType),
   activeIdx: index("ai_pattern_active_idx").on(table.isActive),
@@ -19427,6 +19643,8 @@ export const oms = pgTable("oms", {
   updatedBy: varchar("updated_by"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   projectIdx: index("oms_project_idx").on(table.projectId),
   orgIdx: index("oms_org_idx").on(table.organizationId),
@@ -19451,6 +19669,8 @@ export const omPages = pgTable("om_pages", {
   }>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   omIdx: index("om_pages_om_idx").on(table.omId),
   layoutIdx: index("om_pages_layout_idx").on(table.layoutId),
@@ -19467,6 +19687,8 @@ export const omBlocks = pgTable("om_blocks", {
   aiMetadata: jsonb("ai_metadata"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   pageIdx: index("om_blocks_page_idx").on(table.pageId),
 }));
@@ -19482,6 +19704,8 @@ export const omTemplates = pgTable("om_templates", {
   createdBy: varchar("created_by"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   ownerIdx: index("om_templates_owner_idx").on(table.ownerType, table.ownerId),
   scopeIdx: index("om_templates_scope_idx").on(table.scope),
@@ -19499,6 +19723,8 @@ export const omDatasets = pgTable("om_datasets", {
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   projectIdx: index("om_datasets_project_idx").on(table.projectId),
   orgIdx: index("om_datasets_org_idx").on(table.organizationId),
@@ -19524,6 +19750,8 @@ export const omBrandKits = pgTable("om_brand_kits", {
   sourceScanData: jsonb("source_scan_data"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index("om_brand_kits_org_idx").on(table.organizationId),
   userIdx: index("om_brand_kits_user_idx").on(table.userId),
@@ -19568,6 +19796,8 @@ export const omDocuments = pgTable("om_documents", {
   }>().default({}),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   dealIdx: index("om_documents_deal_idx").on(table.dealId),
   templateIdx: index("om_documents_template_idx").on(table.templateId),
@@ -19680,6 +19910,8 @@ export const omThemes = pgTable("om_themes", {
   }>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   orgIdx: index("om_themes_org_idx").on(table.organizationId),
   userIdx: index("om_themes_user_idx").on(table.userId),
@@ -19731,6 +19963,8 @@ export const omPageLayouts = pgTable("om_page_layouts", {
   }>().notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   typeIdx: index("om_page_layouts_type_idx").on(table.layoutType),
   orgIdx: index("om_page_layouts_org_idx").on(table.organizationId),
@@ -21033,6 +21267,8 @@ export const marinalyticsOperatorProfiles = pgTable("marinalytics_operator_profi
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 // Metric snapshots - actual metric values for operators/properties
@@ -21075,6 +21311,8 @@ export const marinalyticsBenchmarkSets = pgTable("marinalytics_benchmark_sets", 
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 // Capital partners table - track institutional investors
@@ -21092,6 +21330,8 @@ export const marinalyticsCapitalPartners = pgTable("marinalytics_capital_partner
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 });
 
 // Relations
@@ -21541,6 +21781,8 @@ export const industryStandards = pgTable("industry_standards", {
   updatedBy: varchar("updated_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   categoryIdx: index("industry_standards_category_idx").on(table.category),
   scopeIdx: index("industry_standards_scope_idx").on(table.scope, table.requiredPack),
@@ -21609,6 +21851,8 @@ export const integrations = pgTable("integrations", {
   orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   keyIdx: index("integrations_key_idx").on(table.key),
   categoryIdx: index("integrations_category_idx").on(table.category),
@@ -21632,6 +21876,8 @@ export const userIntegrations = pgTable("user_integrations", {
   errorMessage: text("error_message"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   userIntegrationUnique: unique("user_integration_unique").on(table.userId, table.integrationKey),
   userIdx: index("user_integrations_user_idx").on(table.userId),
@@ -21710,6 +21956,8 @@ export const integrationSyncMetrics = pgTable("integration_sync_metrics", {
   averageSyncDurationMs: integer("average_sync_duration_ms").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   userIntegrationUnique: unique("sync_metrics_unique").on(table.userId, table.integrationKey, table.orgId),
   userIdx: index("sync_metrics_user_idx").on(table.userId),
@@ -22200,6 +22448,8 @@ export const analyticsReportSchedules = pgTable("analytics_report_schedules", {
   nextRunAt: timestamp("next_run_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   userIdx: index("analytics_report_schedules_user_idx").on(table.userId),
   orgIdx: index("analytics_report_schedules_org_idx").on(table.orgId),
@@ -23024,6 +23274,8 @@ export const lineItemLearningRules = pgTable('line_item_learning_rules', {
   lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   tenantIdIdx: index('line_item_rules_tenant_id_idx').on(table.tenantId),
   tenantMarinaIdx: index('line_item_rules_tenant_marina_idx').on(table.tenantId, table.marinaId),
@@ -23805,6 +24057,8 @@ export const ddMilestones = pgTable('dd_milestones', {
   calendarEventId: varchar('calendar_event_id', { length: 255 }),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   workspaceIdx: index('dm_workspace_idx').on(table.workspaceId),
   dueIdx: index('dm_due_idx').on(table.dueDate),
@@ -23853,6 +24107,8 @@ export const ddChecklists = pgTable('dd_checklists', {
   createdByUserId: varchar('created_by_user_id').notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   workspaceIdx: index('ddc_workspace_idx').on(table.workspaceId),
 }));
@@ -23868,6 +24124,8 @@ export const ddChecklistSections = pgTable('dd_checklist_sections', {
   isCollapsedByDefault: boolean('is_collapsed_by_default').notNull().default(false),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   checklistIdx: index('ddcs_checklist_idx').on(table.checklistId),
 }));
@@ -23898,6 +24156,8 @@ export const ddChecklistItems = pgTable('dd_checklist_items', {
   templateKey: varchar('template_key', { length: 100 }),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
 }, (table) => ({
   sectionIdx: index('ddci_section_idx').on(table.sectionId),
   statusIdx: index('ddci_status_idx').on(table.status),

@@ -10,7 +10,7 @@ import { TimelineView } from "@/components/timeline-view";
 import { TaskOwnersView } from "@/components/task-owners-view";
 import { ProjectIntegrationSettings } from "@/components/project-integration-settings";
 import { AddTaskModal } from "@/components/add-task-modal";
-import { ContactManagement } from "@/components/contact-management";
+import { KeyContactsSection } from "@/components/key-contacts-section";
 import { ArchiveView } from "@/components/archive-view";
 import { CddAdvisor } from "@/components/cdd-advisor";
 import { FindingsManager } from "@/components/findings-manager";
@@ -20,9 +20,8 @@ import { PortfolioPropertiesView } from "@/components/portfolio-properties-view"
 import NotificationSettingsPage from "@/pages/notification-settings";
 import DdChecklistProjectWrapper from "@/components/workspace/DdChecklistProjectWrapper";
 import { useProject } from "@/hooks/use-project";
-import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
-import type { DDTask, DDContact } from "@shared/schema";
+import type { DDTask } from "@shared/schema";
 
 export default function ProjectPage() {
   const { id } = useParams();
@@ -34,11 +33,6 @@ export default function ProjectPage() {
   
   const { data, isLoading, error } = useProject(id!);
   
-  // Fetch contacts for the Key Contacts tab
-  const { data: contacts = [], isLoading: contactsLoading } = useQuery<DDContact[]>({
-    queryKey: ['/api/dd/contacts'],
-    enabled: !!id,
-  });
 
   if (isLoading) {
     return (
@@ -219,11 +213,7 @@ export default function ProjectPage() {
             <TaskOwnersView tasks={tasks} projectId={project.id} />
           )}
           {effectiveActiveTab === "contacts" && (
-            <ContactManagement 
-              contacts={contacts} 
-              isLoading={contactsLoading} 
-              projectId={project.id} 
-            />
+            <KeyContactsSection projectId={project.id} />
           )}
           {effectiveActiveTab === "integrations" && (
             <ProjectIntegrationSettings projectId={project.id} />

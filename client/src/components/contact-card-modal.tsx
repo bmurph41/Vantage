@@ -89,11 +89,15 @@ export function ContactCardModal({ open, onOpenChange, contact, mode, projectId,
 
   const createContactMutation = useMutation({
     mutationFn: async (data: ContactFormValues) => {
-      const res = await apiRequest("POST", "/api/contacts", data);
+      const res = await apiRequest("POST", "/api/dd/contacts", { ...data, projectId });
       return await res.json();
     },
     onSuccess: (newContact) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dd/contacts"] });
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/dd/projects", projectId, "contacts"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/dd/projects", projectId, "pending-contacts"] });
+      }
       toast({
         title: "Contact created",
         description: `${newContact.name} has been added to your contacts.`,
@@ -112,13 +116,13 @@ export function ContactCardModal({ open, onOpenChange, contact, mode, projectId,
 
   const updateContactMutation = useMutation({
     mutationFn: async (data: ContactFormValues) => {
-      const res = await apiRequest("PUT", `/api/contacts/${contact?.id}`, data);
+      const res = await apiRequest("PUT", `/api/dd/contacts/${contact?.id}`, data);
       return await res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dd/contacts"] });
       if (projectId) {
-        queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "contacts"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/dd/projects", projectId, "contacts"] });
       }
       toast({
         title: "Contact updated",
@@ -137,12 +141,12 @@ export function ContactCardModal({ open, onOpenChange, contact, mode, projectId,
 
   const deleteContactMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("DELETE", `/api/contacts/${contact?.id}`);
+      await apiRequest("DELETE", `/api/dd/contacts/${contact?.id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dd/contacts"] });
       if (projectId) {
-        queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "contacts"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/dd/projects", projectId, "contacts"] });
       }
       toast({
         title: "Contact deleted",

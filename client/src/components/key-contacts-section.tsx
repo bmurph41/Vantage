@@ -11,13 +11,14 @@ import { ContactCardModal } from "./contact-card-modal";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { User, Plus, Search, Mail, Phone, Building2, UserPlus, Clock } from "lucide-react";
+import { User, Plus, Search, Mail, Phone, Building2, UserPlus, Clock, X, Link2 } from "lucide-react";
 import { 
   EntityAvatar, 
   RoleBadge, 
   ContactQuickActions,
   formatPhoneDisplay 
 } from "@/components/ui/enhanced-card";
+import { Textarea } from "@/components/ui/textarea";
 import type { Contact, ProjectContact, ProjectPendingContact, PendingContact } from "@shared/schema";
 
 interface KeyContactsSectionProps {
@@ -69,6 +70,12 @@ export function KeyContactsSection({ projectId }: KeyContactsSectionProps) {
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [quickAddName, setQuickAddName] = useState("");
   const [quickAddRole, setQuickAddRole] = useState("");
+  const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
+  const [linkContactId, setLinkContactId] = useState("");
+  const [linkRole, setLinkRole] = useState("");
+  const [linkCustomRole, setLinkCustomRole] = useState("");
+  const [linkNotes, setLinkNotes] = useState("");
+  const [linkIsPrimary, setLinkIsPrimary] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -121,8 +128,14 @@ export function KeyContactsSection({ projectId }: KeyContactsSectionProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/dd/projects", projectId, "contacts"] });
+      setIsLinkDialogOpen(false);
+      setLinkContactId("");
+      setLinkRole("");
+      setLinkCustomRole("");
+      setLinkNotes("");
+      setLinkIsPrimary(false);
       toast({
-        title: "Contact added",
+        title: "Contact linked",
         description: "Contact has been added to this project.",
       });
     },
@@ -130,6 +143,26 @@ export function KeyContactsSection({ projectId }: KeyContactsSectionProps) {
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to add contact to project",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const removeContactFromProjectMutation = useMutation({
+    mutationFn: async (data: { contactId: string; role: string }) => {
+      await apiRequest("DELETE", `/api/dd/projects/${projectId}/contacts/${data.contactId}/${data.role}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dd/projects", projectId, "contacts"] });
+      toast({
+        title: "Contact removed",
+        description: "Contact has been removed from this project.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to remove contact from project",
         variant: "destructive",
       });
     },
@@ -148,12 +181,42 @@ export function KeyContactsSection({ projectId }: KeyContactsSectionProps) {
   };
 
   const handleContactCreated = (newContact: Contact) => {
-    // Automatically add the new contact to the project
-    // User can set the role in a follow-up dialog
-    toast({
-      title: "Contact created",
-      description: "You can now assign this contact to a role on this project.",
+    queryClient.invalidateQueries({ queryKey: ["/api/dd/contacts"] });
+    setLinkContactId(newContact.id);
+    setIsLinkDialogOpen(true);
+  };
+
+  const openLinkDialog = (contactId: string) => {
+    setLinkContactId(contactId);
+    setLinkRole("");
+    setLinkCustomRole("");
+    setLinkNotes("");
+    setLinkIsPrimary(false);
+    setIsLinkDialogOpen(true);
+  };
+
+  const handleLinkSubmit = () => {
+    if (!linkRole) {
+      toast({
+        title: "Role required",
+        description: "Please select a role for this contact on the project.",
+        variant: "destructive",
+      });
+      return;
+    }
+    addContactToProjectMutation.mutate({
+      contactId: linkContactId,
+      role: linkRole,
+      customRole: linkRole === "other" ? linkCustomRole : undefined,
+      projectNotes: linkNotes || undefined,
+      isPrimary: linkIsPrimary,
     });
+  };
+
+  const handleRemoveFromProject = (contactId: string, role: string) => {
+    if (confirm("Remove this contact from the project?")) {
+      removeContactFromProjectMutation.mutate({ contactId, role });
+    }
   };
 
   const handleQuickAdd = () => {
@@ -316,11 +379,24 @@ contact.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
                             )}
                           </div>
                         </button>
-                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                           <ContactQuickActions
                             email={pc.contact.email}
                             phone={pc.contact.phone}
                           />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveFromProject(pc.contactId, pc.role);
+                            }}
+                            title="Remove from project"
+                            data-testid={`remove-contact-${pc.contact.id}`}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       </div>
                     ))}
@@ -392,11 +468,26 @@ contact.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
                             )}
                           </div>
                         </button>
-                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                           <ContactQuickActions
                             email={contact.email}
                             phone={contact.phone}
                           />
+                          {!isOnProject && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openLinkDialog(contact.id);
+                              }}
+                              title="Link to project"
+                              data-testid={`link-contact-${contact.id}`}
+                            >
+                              <Link2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                     );
@@ -477,6 +568,81 @@ contact.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
                 data-testid="button-submit-quick-add"
               >
                 {quickAddMutation.isPending ? "Adding..." : "Add to Pending"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Link Contact to Project Dialog */}
+      <Dialog open={isLinkDialogOpen} onOpenChange={setIsLinkDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign Contact to Project</DialogTitle>
+            <DialogDescription>
+              Select a role for this contact on the project.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="link-role">Role *</Label>
+              <Select value={linkRole} onValueChange={setLinkRole}>
+                <SelectTrigger id="link-role" data-testid="select-link-role">
+                  <SelectValue placeholder="Select a role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(roleLabels).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {linkRole === "other" && (
+              <div className="space-y-2">
+                <Label htmlFor="link-custom-role">Custom Role Title</Label>
+                <Input
+                  id="link-custom-role"
+                  placeholder="e.g., Marina Consultant"
+                  value={linkCustomRole}
+                  onChange={(e) => setLinkCustomRole(e.target.value)}
+                  data-testid="input-link-custom-role"
+                />
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="link-notes">Project Notes (optional)</Label>
+              <Textarea
+                id="link-notes"
+                placeholder="Notes about this contact's role on this specific project..."
+                value={linkNotes}
+                onChange={(e) => setLinkNotes(e.target.value)}
+                className="min-h-[60px]"
+                data-testid="textarea-link-notes"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="link-primary"
+                checked={linkIsPrimary}
+                onChange={(e) => setLinkIsPrimary(e.target.checked)}
+                className="rounded border-gray-300"
+                data-testid="checkbox-link-primary"
+              />
+              <Label htmlFor="link-primary" className="text-sm font-normal">Primary contact for this role</Label>
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setIsLinkDialogOpen(false)} data-testid="button-cancel-link">
+                Cancel
+              </Button>
+              <Button
+                onClick={handleLinkSubmit}
+                disabled={addContactToProjectMutation.isPending}
+                data-testid="button-submit-link"
+              >
+                {addContactToProjectMutation.isPending ? "Adding..." : "Add to Project"}
               </Button>
             </div>
           </div>
