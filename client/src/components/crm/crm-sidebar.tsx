@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { 
   BarChart3, Users, Building, Handshake, Calendar, 
   Bot, Bell, Mail, PieChart, TrendingUp, Settings,
-  LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight, ArrowLeft, Archive
+  LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight, ArrowLeft, Archive, Brain
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
@@ -37,6 +37,7 @@ const automationNav = [
 ];
 
 const reportingNav = [
+  { name: "Pipeline Insights", href: "/crm/pipeline-insights", icon: Brain },
   { name: "Lead Scoring", href: "/crm/scoring", icon: Target },
   { name: "Analytics", href: "/crm/analytics", icon: PieChart },
   { name: "Forecast", href: "/crm/forecast", icon: TrendingUp },

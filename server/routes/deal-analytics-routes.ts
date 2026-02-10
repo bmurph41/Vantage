@@ -501,4 +501,164 @@ router.get("/crm/emails/tracking-stats", async (req: Request, res: Response, nex
   }
 });
 
+router.get("/crm/analytics/pipeline-insights", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = (req as any).user?.orgId || (req as any).orgId || "org-1";
+
+    const deals = await db.select().from(crmDeals);
+    const engagementScores = await db.select().from(crmDealEngagementScores);
+    const scoreMap = new Map(engagementScores.map(s => [s.dealId, s]));
+
+    const totalDeals = deals.length;
+    let totalPipelineValue = 0;
+    let weightedPipelineValue = 0;
+    let atRiskCount = 0;
+    let healthyCount = 0;
+    const stageDistribution: Record<string, { count: number; value: number }> = {};
+    const priorityCounts: Record<string, number> = {};
+    const sourceCounts: Record<string, number> = {};
+    const recentDeals: any[] = [];
+    const staleDeals: any[] = [];
+    const now = new Date();
+
+    for (const deal of deals) {
+      const stage = deal.stage || "unknown";
+      const value = Number(deal.value) || 0;
+      const score = scoreMap.get(deal.id);
+      const probability = score?.winProbability || deal.probability || 10;
+
+      if (!stageDistribution[stage]) stageDistribution[stage] = { count: 0, value: 0 };
+      stageDistribution[stage].count++;
+      stageDistribution[stage].value += value;
+
+      totalPipelineValue += value;
+      weightedPipelineValue += value * (probability / 100);
+
+      if (score && score.engagementScore < 30) atRiskCount++;
+      else if (score && score.engagementScore >= 50) healthyCount++;
+
+      const prio = deal.priority || "medium";
+      priorityCounts[prio] = (priorityCounts[prio] || 0) + 1;
+
+      const src = deal.dealSource || deal.leadSource || "unknown";
+      sourceCounts[src] = (sourceCounts[src] || 0) + 1;
+
+      if (deal.createdAt && (now.getTime() - new Date(deal.createdAt).getTime()) < 30 * 86400000) {
+        recentDeals.push({ title: deal.title, stage, value, priority: deal.priority });
+      }
+
+      const daysInStage = deal.daysInCurrentStage || 0;
+      if (daysInStage > 30 && !["won", "lost", "closed"].includes(stage.toLowerCase())) {
+        staleDeals.push({ title: deal.title, stage, daysInStage, value });
+      }
+    }
+
+    const wonDeals = deals.filter(d => d.stage?.toLowerCase() === "won" || (d as any).outcome === "won");
+    const lostDeals = deals.filter(d => d.stage?.toLowerCase() === "lost" || (d as any).outcome === "lost");
+    const totalClosed = wonDeals.length + lostDeals.length;
+    const winRate = totalClosed > 0 ? Math.round((wonDeals.length / totalClosed) * 100) : 0;
+
+    const pipelineData = {
+      totalDeals,
+      totalPipelineValue: Math.round(totalPipelineValue),
+      weightedPipelineValue: Math.round(weightedPipelineValue),
+      atRiskDeals: atRiskCount,
+      healthyDeals: healthyCount,
+      winRate,
+      wonCount: wonDeals.length,
+      lostCount: lostDeals.length,
+      stageDistribution: Object.entries(stageDistribution).map(([s, d]) => ({ stage: s, count: d.count, value: Math.round(d.value) })),
+      priorityBreakdown: priorityCounts,
+      sourceBreakdown: sourceCounts,
+      recentDealsCount: recentDeals.length,
+      staleDeals: staleDeals.slice(0, 10).map(d => ({ title: d.title, stage: d.stage, daysInStage: d.daysInStage, value: d.value })),
+    };
+
+    let aiInsights = null;
+    try {
+      const OpenAI = (await import('openai')).default;
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+      const prompt = `You are a marina acquisition deal pipeline analyst. Analyze this pipeline data and provide actionable insights.
+
+Pipeline Data:
+${JSON.stringify(pipelineData, null, 2)}
+
+Respond with ONLY valid JSON in this exact structure:
+{
+  "healthScore": <number 0-100 representing overall pipeline health>,
+  "healthLabel": "<string: Excellent|Good|Fair|Needs Attention|Critical>",
+  "summary": "<2-3 sentence executive summary of pipeline state>",
+  "trends": [
+    {"title": "<trend name>", "description": "<detail>", "direction": "<up|down|stable>", "impact": "<positive|negative|neutral>"}
+  ],
+  "risks": [
+    {"title": "<risk name>", "description": "<detail>", "severity": "<high|medium|low>", "recommendation": "<action to take>"}
+  ],
+  "opportunities": [
+    {"title": "<opportunity name>", "description": "<detail>", "potentialValue": "<estimated impact>", "timeframe": "<short|medium|long>"}
+  ],
+  "recommendations": [
+    {"title": "<action item>", "description": "<detail>", "priority": "<high|medium|low>", "category": "<pipeline|deals|process|engagement>"}
+  ]
+}
+
+Provide 2-4 items for trends, risks, opportunities, and recommendations. Focus on marina acquisition-specific insights.`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: "You are a deal pipeline analyst for marina acquisitions. Always respond with valid JSON only." },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 2000,
+        response_format: { type: "json_object" },
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      if (content) {
+        aiInsights = JSON.parse(content);
+      }
+    } catch (aiError: any) {
+      console.error("[Pipeline Insights] AI analysis failed, using fallback:", aiError.message);
+    }
+
+    if (!aiInsights) {
+      const healthScore = Math.min(100, Math.max(0,
+        (healthyCount / Math.max(totalDeals, 1)) * 40 +
+        (winRate / 100) * 30 +
+        (1 - atRiskCount / Math.max(totalDeals, 1)) * 30
+      ));
+      aiInsights = {
+        healthScore: Math.round(healthScore),
+        healthLabel: healthScore >= 80 ? "Good" : healthScore >= 60 ? "Fair" : "Needs Attention",
+        summary: `Your pipeline has ${totalDeals} deals worth $${(totalPipelineValue / 1000000).toFixed(1)}M total, with ${atRiskCount} at-risk deals requiring attention.`,
+        trends: [
+          { title: "Pipeline Volume", description: `${totalDeals} active deals in the pipeline`, direction: "stable", impact: "neutral" },
+          { title: "Win Rate", description: `Current win rate is ${winRate}%`, direction: winRate >= 50 ? "up" : "down", impact: winRate >= 50 ? "positive" : "negative" },
+        ],
+        risks: staleDeals.slice(0, 3).map(d => ({
+          title: `Stale Deal: ${d.title}`,
+          description: `${d.daysInStage} days in ${d.stage} stage`,
+          severity: d.daysInStage > 60 ? "high" : "medium",
+          recommendation: "Review and update or archive this deal",
+        })),
+        opportunities: [],
+        recommendations: [
+          { title: "Review At-Risk Deals", description: `${atRiskCount} deals have low engagement scores`, priority: "high", category: "engagement" },
+        ],
+      };
+    }
+
+    res.json({
+      pipelineData,
+      insights: aiInsights,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

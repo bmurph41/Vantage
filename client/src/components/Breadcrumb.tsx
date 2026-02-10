@@ -96,6 +96,10 @@ const ROUTE_MAPPINGS: Record<string, BreadcrumbItem[]> = {
     CATEGORIES.OPERATIONS,
     { label: 'Marketing' },
   ],
+  '/crm/pipeline-insights': [
+    CATEGORIES.DEAL_MANAGEMENT,
+    { label: 'Pipeline Insights' },
+  ],
   '/crm/analytics': [
     CATEGORIES.DEAL_MANAGEMENT,
     { label: 'Analytics' },

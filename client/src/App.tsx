@@ -252,6 +252,7 @@ const MarketTargets = lazy(() => import("@/pages/prospecting/Markets"));
 const ProspectingCampaigns = lazy(() => import("@/pages/prospecting/Campaigns"));
 const ProspectingAnalytics = lazy(() => import("@/pages/prospecting/Analytics"));
 const DealAnalyticsPage = lazy(() => import("@/pages/crm/DealAnalyticsPage"));
+const PipelineInsights = lazy(() => import("@/pages/crm/PipelineInsights"));
 const MarinaMatchIndex = lazy(() => import("@/pages/marinamatch/Index"));
 const BrokerPortal = lazy(() => import("@/pages/BrokerPortal"));
 const ActivityLog = lazy(() => import("@/pages/activity"));
@@ -1448,6 +1449,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <DealAnalyticsPage />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/crm/pipeline-insights">
+        {() => (
+          <UnifiedLayout>
+            <PipelineInsights />
           </UnifiedLayout>
         )}
       </Route>
