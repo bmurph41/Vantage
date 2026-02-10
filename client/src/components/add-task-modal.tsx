@@ -129,7 +129,7 @@ function TaskOwnerSelector({ projectId, value, onChange }: {
   );
 }
 
-// Task Dependencies Selector Component
+// Task Dependencies Selector Component — supports DD Tasks, DD Request Items, and Custom deps
 function TaskDependenciesSelector({ 
   projectId, 
   value, 
@@ -142,142 +142,296 @@ function TaskDependenciesSelector({
   currentTaskId?: string; 
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [depTab, setDepTab] = useState<"tasks" | "dd_requests" | "custom">("tasks");
+  const [searchFilter, setSearchFilter] = useState("");
+  const [customDeps, setCustomDeps] = useState<{name: string; priority: string; deadline: string; contact: string}[]>([]);
+  const [newCustom, setNewCustom] = useState({ name: "", priority: "med", deadline: "", contact: "" });
 
-  // Fetch existing tasks for the project
+  // Fetch existing DD tasks
   const { data: projectData } = useProject(projectId);
   const availableTasks = projectData?.tasks || [];
+  const selectableTasks = availableTasks.filter((task: any) => task.id !== currentTaskId);
 
-  // Filter out the current task being edited to prevent circular dependencies
-  const selectableTasks = availableTasks.filter(task => task.id !== currentTaskId);
+  // Fetch DD Request checklist items
+  const { data: ddRequestItems = [] } = useQuery<any[]>({
+    queryKey: ['/api/projects', projectId, 'dd-request-items'],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}/dd-request-items`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!projectId,
+  });
 
-  const handleTaskToggle = (taskId: string) => {
-    const updatedDependencies = value.includes(taskId)
-      ? value.filter(id => id !== taskId)
-      : [...value, taskId];
-    onChange(updatedDependencies);
+  const handleToggle = (id: string) => {
+    onChange(value.includes(id) ? value.filter(x => x !== id) : [...value, id]);
   };
 
-  const removeAllDependencies = () => {
-    onChange([]);
+  const handleAddCustomDep = () => {
+    if (!newCustom.name.trim()) return;
+    const customId = `custom_${Date.now()}`;
+    setCustomDeps(prev => [...prev, { ...newCustom }]);
+    onChange([...value, customId]);
+    setNewCustom({ name: "", priority: "med", deadline: "", contact: "" });
   };
 
-  const getSelectedTaskNames = () => {
-    return value.map(taskId => {
-      const task = selectableTasks.find(t => t.id === taskId);
-      return task ? task.title : taskId;
+  const handleRemoveCustomDep = (index: number) => {
+    setCustomDeps(prev => prev.filter((_, i) => i !== index));
+    const customIds = value.filter(v => v.startsWith('custom_'));
+    if (customIds[index]) {
+      onChange(value.filter(v => v !== customIds[index]));
+    }
+  };
+
+  // Build display of selected items
+  const getSelectedItems = () => {
+    const items: { id: string; label: string; type: string }[] = [];
+    value.forEach(id => {
+      if (id.startsWith('custom_')) return;
+      const task = selectableTasks.find((t: any) => t.id === id);
+      if (task) { items.push({ id, label: task.title, type: 'task' }); return; }
+      const ddItem = ddRequestItems.find((d: any) => d.id === id);
+      if (ddItem) { items.push({ id, label: `${ddItem.sectionTitle}: ${ddItem.title}`, type: 'dd_request' }); return; }
+      items.push({ id, label: id, type: 'unknown' });
     });
+    return items;
   };
 
-  if (selectableTasks.length === 0) {
-    return (
-      <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
-        No existing tasks available for dependencies. {availableTasks.length > 0 ? 
-          `${availableTasks.length} task(s) exist but cannot be used as dependencies for this task.` : 
-          'Create some tasks first to set up dependencies.'
-        }
-      </div>
-    );
-  }
+  const selectedItems = getSelectedItems();
+  const totalSelected = selectedItems.length + customDeps.length;
+
+  // Filter lists
+  const filteredTasks = selectableTasks.filter((t: any) =>
+    !searchFilter || t.title?.toLowerCase().includes(searchFilter.toLowerCase())
+  );
+  const filteredDdItems = ddRequestItems.filter((d: any) =>
+    !searchFilter || d.title?.toLowerCase().includes(searchFilter.toLowerCase()) ||
+    d.sectionTitle?.toLowerCase().includes(searchFilter.toLowerCase()) ||
+    d.subCategory?.toLowerCase().includes(searchFilter.toLowerCase())
+  );
+
+  // Group DD items by section
+  const ddItemsBySection: Record<string, any[]> = {};
+  filteredDdItems.forEach((item: any) => {
+    const section = item.sectionTitle || 'Other';
+    if (!ddItemsBySection[section]) ddItemsBySection[section] = [];
+    ddItemsBySection[section].push(item);
+  });
+
+  const priorityColors: Record<string, string> = {
+    high: "bg-red-100 text-red-700", med: "bg-amber-100 text-amber-700", low: "bg-gray-100 text-gray-500"
+  };
+  const ddPriorityColors: Record<number, string> = {
+    1: "bg-red-100 text-red-700", 2: "bg-amber-100 text-amber-700", 3: "bg-gray-100 text-gray-500"
+  };
+  const statusBadge = (status: string) => {
+    if (status === 'approved') return 'bg-green-100 text-green-700';
+    if (status === 'provided') return 'bg-amber-100 text-amber-700';
+    if (status === 'in_progress') return 'bg-blue-100 text-blue-700';
+    return 'bg-gray-100 text-gray-600';
+  };
 
   return (
     <div className="space-y-2">
+      {/* Selected Dependencies Summary */}
       <Button
-        type="button"
-        variant="outline"
+        type="button" variant="outline"
         onClick={() => setIsOpen(!isOpen)}
         className="w-full justify-between h-auto min-h-10 p-3"
-        data-testid="button-select-dependencies"
       >
         <div className="flex flex-wrap gap-1">
-          {value.length === 0 ? (
-            <span className="text-muted-foreground">Select task dependencies...</span>
+          {totalSelected === 0 ? (
+            <span className="text-muted-foreground text-sm">Select dependencies...</span>
           ) : (
-            <div className="flex flex-wrap gap-1">
-              {getSelectedTaskNames().map((taskName, index) => (
-                <Badge key={index} variant="secondary" className="text-xs">
-                  {taskName}
+            <>
+              {selectedItems.map((item) => (
+                <Badge key={item.id} variant={item.type === 'dd_request' ? 'default' : 'secondary'} className="text-xs">
+                  {item.type === 'dd_request' && <span className="mr-1">📋</span>}
+                  {item.label}
                 </Badge>
               ))}
-            </div>
+              {customDeps.map((dep, i) => (
+                <Badge key={`custom-${i}`} variant="outline" className="text-xs border-dashed">
+                  ✏️ {dep.name}
+                </Badge>
+              ))}
+            </>
           )}
         </div>
-        <div className="flex items-center gap-2 ml-2">
-          {value.length > 0 && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
+        <div className="flex items-center gap-2 ml-2 shrink-0">
+          {totalSelected > 0 && (
+            <Button type="button" variant="ghost" size="sm"
               className="h-5 w-5 p-0 hover:bg-destructive hover:text-destructive-foreground"
-              onClick={(e) => {
-                e.stopPropagation();
-                removeAllDependencies();
-              }}
-              data-testid="button-clear-dependencies"
-            >
+              onClick={(e) => { e.stopPropagation(); onChange([]); setCustomDeps([]); }}>
               <XCircle className="h-3 w-3" />
             </Button>
           )}
-          <div className="text-xs text-muted-foreground">
-            {value.length}/{selectableTasks.length}
-          </div>
+          <span className="text-xs text-muted-foreground">{totalSelected}</span>
         </div>
       </Button>
 
+      {/* Expanded Selector */}
       {isOpen && (
         <Card className="border">
           <CardContent className="p-0">
-            <ScrollArea className="max-h-48">
-              <div className="p-2 space-y-1">
-                {selectableTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className="flex items-center space-x-2 p-2 hover:bg-muted rounded cursor-pointer"
-                    onClick={() => handleTaskToggle(task.id)}
-                    data-testid={`dependency-option-${task.id}`}
-                  >
-                    <Checkbox
-                      checked={value.includes(task.id)}
-                      className="pointer-events-none"
-                    />
-                    <div className="flex-1 space-y-1">
-                      <div className="text-sm font-medium">{task.title}</div>
-                      {task.assignee && (
-                        <div className="text-xs text-muted-foreground">
-                          Assigned to: {task.assignee}
+            {/* Tabs */}
+            <div className="flex border-b">
+              {[
+                { key: "tasks", label: `DD Tasks (${selectableTasks.length})` },
+                { key: "dd_requests", label: `DD Requests (${ddRequestItems.length})` },
+                { key: "custom", label: `Custom (${customDeps.length})` },
+              ].map(tab => (
+                <button key={tab.key} type="button"
+                  className={`flex-1 text-xs font-medium py-2 px-3 border-b-2 transition-colors ${
+                    depTab === tab.key ? 'border-blue-600 text-blue-700 bg-blue-50/50' : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}
+                  onClick={() => setDepTab(tab.key as any)}>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Search */}
+            {depTab !== "custom" && (
+              <div className="p-2 border-b">
+                <Input placeholder="Filter..." value={searchFilter} onChange={e => setSearchFilter(e.target.value)}
+                  className="h-7 text-xs" />
+              </div>
+            )}
+
+            {/* DD Tasks Tab */}
+            {depTab === "tasks" && (
+              <ScrollArea className="max-h-52">
+                <div className="p-2 space-y-1">
+                  {filteredTasks.length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-4">
+                      {selectableTasks.length === 0 ? 'No DD tasks created yet.' : 'No matches.'}
+                    </p>
+                  )}
+                  {filteredTasks.map((task: any) => (
+                    <div key={task.id}
+                      className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+                        value.includes(task.id) ? 'bg-blue-50 ring-1 ring-blue-200' : 'hover:bg-muted'
+                      }`}
+                      onClick={() => handleToggle(task.id)}>
+                      <Checkbox checked={value.includes(task.id)} className="pointer-events-none" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{task.title}</div>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className={`text-[10px] px-1.5 py-0 rounded ${priorityColors[task.priority] || priorityColors.med}`}>
+                            {task.priority}
+                          </span>
+                          <span className={`text-[10px] px-1.5 py-0 rounded ${statusBadge(task.status)}`}>
+                            {(task.status || '').replace('_', ' ')}
+                          </span>
+                          {task.assignee && <span className="text-[10px] text-muted-foreground">{task.assignee}</span>}
                         </div>
-                      )}
-                      <div className="flex items-center gap-2 text-xs">
-                        <Badge
-                          variant={
-                            task.priority === "high" ? "destructive" :
-                            task.priority === "med" ? "default" : "secondary"
-                          }
-                          className="text-xs"
-                        >
-                          {task.priority}
-                        </Badge>
-                        <Badge
-                          variant={
-                            task.status === "completed" ? "outline" :
-                            task.status === "in_progress" ? "default" : "secondary"
-                          }
-                          className="text-xs"
-                        >
-                          {task.status.replace('_', ' ')}
-                        </Badge>
                       </div>
                     </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+
+            {/* DD Request Items Tab */}
+            {depTab === "dd_requests" && (
+              <ScrollArea className="max-h-52">
+                <div className="p-2 space-y-2">
+                  {Object.keys(ddItemsBySection).length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-4">
+                      {ddRequestItems.length === 0 ? 'No DD Request checklist found. Create one in the DD Request tab.' : 'No matches.'}
+                    </p>
+                  )}
+                  {Object.entries(ddItemsBySection).map(([sectionTitle, items]) => (
+                    <div key={sectionTitle}>
+                      <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">
+                        {sectionTitle}
+                      </div>
+                      {items.map((item: any) => (
+                        <div key={item.id}
+                          className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+                            value.includes(item.id) ? 'bg-blue-50 ring-1 ring-blue-200' : 'hover:bg-muted'
+                          }`}
+                          onClick={() => handleToggle(item.id)}>
+                          <Checkbox checked={value.includes(item.id)} className="pointer-events-none" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">{item.title}</div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className={`text-[10px] px-1.5 py-0 rounded ${ddPriorityColors[item.priority] || ddPriorityColors[2]}`}>
+                                {item.priority === 1 ? 'High' : item.priority === 2 ? 'Med' : 'Low'}
+                              </span>
+                              <span className={`text-[10px] px-1.5 py-0 rounded ${statusBadge(item.status)}`}>
+                                {(item.status || 'open').replace('_', ' ')}
+                              </span>
+                              {item.subCategory && <span className="text-[10px] text-muted-foreground">{item.subCategory}</span>}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+
+            {/* Custom Dependencies Tab */}
+            {depTab === "custom" && (
+              <div className="p-3 space-y-3">
+                {customDeps.length > 0 && (
+                  <div className="space-y-1.5">
+                    {customDeps.map((dep, i) => (
+                      <div key={i} className="flex items-center gap-2 p-2 bg-muted/50 rounded text-sm">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate">{dep.name}</div>
+                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5">
+                            <span className={`px-1.5 py-0 rounded ${priorityColors[dep.priority] || priorityColors.med}`}>
+                              {dep.priority}
+                            </span>
+                            {dep.deadline && <span>Due: {dep.deadline}</span>}
+                            {dep.contact && <span>Contact: {dep.contact}</span>}
+                          </div>
+                        </div>
+                        <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-400 hover:text-red-600"
+                          onClick={() => handleRemoveCustomDep(i)}>
+                          <XCircle className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
+                <div className="space-y-2 pt-1 border-t">
+                  <div className="text-xs font-medium text-muted-foreground">Add Custom Dependency</div>
+                  <Input placeholder="Dependency name *" value={newCustom.name}
+                    onChange={e => setNewCustom(prev => ({ ...prev, name: e.target.value }))}
+                    className="h-8 text-sm" />
+                  <div className="grid grid-cols-3 gap-2">
+                    <select value={newCustom.priority}
+                      onChange={e => setNewCustom(prev => ({ ...prev, priority: e.target.value }))}
+                      className="h-8 text-xs rounded-md border px-2 bg-background">
+                      <option value="high">High</option>
+                      <option value="med">Medium</option>
+                      <option value="low">Low</option>
+                    </select>
+                    <Input type="date" value={newCustom.deadline}
+                      onChange={e => setNewCustom(prev => ({ ...prev, deadline: e.target.value }))}
+                      className="h-8 text-xs" />
+                    <Input placeholder="Contact" value={newCustom.contact}
+                      onChange={e => setNewCustom(prev => ({ ...prev, contact: e.target.value }))}
+                      className="h-8 text-xs" />
+                  </div>
+                  <Button type="button" size="sm" className="h-7 text-xs w-full"
+                    onClick={handleAddCustomDep} disabled={!newCustom.name.trim()}>
+                    + Add Dependency
+                  </Button>
+                </div>
               </div>
-            </ScrollArea>
+            )}
           </CardContent>
         </Card>
       )}
     </div>
   );
 }
-
 // Company Selector Component
 function CompanySelector({ value, onChange, onCompanySelect, manualValue }: { 
   value: string; 
@@ -976,7 +1130,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                 ? "Edit Task" 
                 : step === "browse" 
                   ? "Add Due Diligence Task" 
-                  : `Customize: ${selectedTemplate?.name}`
+                  : selectedTemplate ? `Customize: ${selectedTemplate.name}` : "Add Custom Task"
               }
             </DialogTitle>
           </div>

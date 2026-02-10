@@ -1138,6 +1138,71 @@ router.get('/api/projects/:projectId/workspace-link', async (req: any, res: Resp
     res.status(500).json({ error: 'Failed to lookup workspace' });
   }
 });
+
+// GET /api/projects/:projectId/dd-request-items - Get DD checklist items for dependency linking
+router.get('/api/projects/:projectId/dd-request-items', async (req: any, res: Response) => {
+  try {
+    const db = await getDb();
+    const schema = await getSchema();
+    const { projectId } = req.params;
+
+    // Find workspace linked to this project
+    const [workspace] = await db
+      .select({ id: schema.dealWorkspaces.id })
+      .from(schema.dealWorkspaces)
+      .where(eq(schema.dealWorkspaces.ddProjectId, projectId))
+      .limit(1);
+    if (!workspace) return res.json([]);
+
+    // Find active checklist
+    const [checklist] = await db
+      .select({ id: schema.ddChecklists.id })
+      .from(schema.ddChecklists)
+      .where(and(eq(schema.ddChecklists.workspaceId, workspace.id), eq(schema.ddChecklists.status, 'active')))
+      .limit(1);
+    if (!checklist) return res.json([]);
+
+    // Get all sections with items
+    const sections = await db
+      .select({
+        id: schema.ddChecklistSections.id,
+        title: schema.ddChecklistSections.title,
+      })
+      .from(schema.ddChecklistSections)
+      .where(eq(schema.ddChecklistSections.checklistId, checklist.id))
+      .orderBy(asc(schema.ddChecklistSections.sortOrder));
+
+    if (sections.length === 0) return res.json([]);
+
+    const sectionIds = sections.map(s => s.id);
+    const sectionMap = Object.fromEntries(sections.map(s => [s.id, s.title]));
+
+    const items = await db
+      .select({
+        id: schema.ddChecklistItems.id,
+        sectionId: schema.ddChecklistItems.sectionId,
+        title: schema.ddChecklistItems.title,
+        subCategory: schema.ddChecklistItems.subCategory,
+        status: schema.ddChecklistItems.status,
+        priority: schema.ddChecklistItems.priority,
+      })
+      .from(schema.ddChecklistItems)
+      .where(inArray(schema.ddChecklistItems.sectionId, sectionIds))
+      .orderBy(asc(schema.ddChecklistItems.sortOrder));
+
+    const result = items.map(item => ({
+      ...item,
+      sectionTitle: sectionMap[item.sectionId] || 'Unknown',
+      type: 'dd_request' as const,
+    }));
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('[DD] dd-request-items error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch DD request items' });
+  }
+});
+
 // ─── GET /api/dd-items/:id/periods ───────────────────────────────────────────
 // Returns all period slots for a checklist item
 router.get('/api/dd-items/:id/periods', async (req: any, res: Response) => {
