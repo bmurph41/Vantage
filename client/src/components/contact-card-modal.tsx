@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -88,6 +88,22 @@ export function ContactCardModal({ open, onOpenChange, contact, mode, projectId,
       timezone: contact?.timezone || "America/New_York",
     },
   });
+
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        name: contact?.name || "",
+        email: contact?.email || "",
+        phone: contact?.phone || "",
+        company: contact?.company || "",
+        role: contact?.role || undefined,
+        customRole: contact?.customRole || "",
+        dealTeamNotes: contact?.dealTeamNotes || "",
+        timezone: contact?.timezone || "America/New_York",
+      });
+      setIsEditing(mode === "create" || mode === "edit");
+    }
+  }, [open, contact, mode]);
 
   const createContactMutation = useMutation({
     mutationFn: async (data: ContactFormValues) => {
