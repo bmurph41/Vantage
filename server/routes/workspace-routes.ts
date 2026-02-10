@@ -11,7 +11,7 @@ import {
   dealWorkspaces, projects, tasks, vdrFolders, vdrDocuments, vdrAuditLogs,
   workspaceMembers, confidentialityAgreements, agreementExecutions, ddMilestones,
   users, organizations, pendingContacts, projectPendingContacts,
-  contacts, projectContacts,
+  contacts, projectContacts, ddChecklists, ddChecklistSections, ddChecklistItems,
 } from '@shared/schema';
 import { eq, and, desc, asc, sql, ne, isNull } from 'drizzle-orm';
 import { CHECKLIST_TEMPLATE_DEFAULT, type ChecklistTaskTemplate } from '../templates/dd-templates';
@@ -722,6 +722,85 @@ workspaceRouter.get('/api/workspaces/:id/deal-team-contacts', async (req: Reques
   } catch (error) {
     console.error('Error fetching deal team contacts:', error);
     res.status(500).json({ error: 'Failed to fetch deal team contacts' });
+  }
+});
+
+workspaceRouter.get('/api/workspaces/:id/deal-team-stats', async (req: Request, res: Response) => {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+  const ws = await loadWorkspace(req, res, auth.orgId);
+  if (!ws) return;
+
+  try {
+    const [checklist] = await db.select().from(ddChecklists)
+      .where(eq(ddChecklists.workspaceId, ws.id)).limit(1);
+    if (!checklist) return res.json([]);
+
+    const sections = await db.select({ id: ddChecklistSections.id })
+      .from(ddChecklistSections)
+      .where(eq(ddChecklistSections.checklistId, checklist.id));
+    if (sections.length === 0) return res.json([]);
+
+    const sectionIds = sections.map(s => s.id);
+    const allItems = await db.select({
+      id: ddChecklistItems.id,
+      status: ddChecklistItems.status,
+      assignedTo: ddChecklistItems.assignedToMemberId,
+      reviewer: ddChecklistItems.reviewerMemberId,
+      requestedFrom: ddChecklistItems.requestedFromMemberId,
+      dueDate: ddChecklistItems.dueDate,
+    }).from(ddChecklistItems)
+      .where(sql`${ddChecklistItems.sectionId} IN (${sql.join(sectionIds.map(id => sql`${id}`), sql`, `)})`);
+
+    const memberMap = new Map<string, {
+      id: string;
+      assignedCount: number;
+      assignedCompleted: number;
+      reviewerCount: number;
+      reviewerCompleted: number;
+      requestedFromCount: number;
+      requestedFromCompleted: number;
+      overdueCount: number;
+    }>();
+
+    const today = new Date().toISOString().slice(0, 10);
+    const completedStatuses = new Set(['approved', 'provided', 'waived']);
+
+    for (const item of allItems) {
+      const addTo = (memberId: string, role: 'assigned' | 'reviewer' | 'requestedFrom') => {
+        if (!memberMap.has(memberId)) {
+          memberMap.set(memberId, {
+            id: memberId,
+            assignedCount: 0, assignedCompleted: 0,
+            reviewerCount: 0, reviewerCompleted: 0,
+            requestedFromCount: 0, requestedFromCompleted: 0,
+            overdueCount: 0,
+          });
+        }
+        const entry = memberMap.get(memberId)!;
+        const done = completedStatuses.has(item.status);
+        if (role === 'assigned') {
+          entry.assignedCount++;
+          if (done) entry.assignedCompleted++;
+          if (!done && item.dueDate && item.dueDate < today) entry.overdueCount++;
+        } else if (role === 'reviewer') {
+          entry.reviewerCount++;
+          if (done) entry.reviewerCompleted++;
+        } else {
+          entry.requestedFromCount++;
+          if (done) entry.requestedFromCompleted++;
+        }
+      };
+
+      if (item.assignedTo) addTo(item.assignedTo, 'assigned');
+      if (item.reviewer) addTo(item.reviewer, 'reviewer');
+      if (item.requestedFrom) addTo(item.requestedFrom, 'requestedFrom');
+    }
+
+    res.json(Array.from(memberMap.values()));
+  } catch (error) {
+    console.error('Error fetching deal team stats:', error);
+    res.status(500).json({ error: 'Failed to fetch deal team stats' });
   }
 });
 

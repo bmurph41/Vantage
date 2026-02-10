@@ -11,7 +11,9 @@ import {
   useExportChecklist, useDdChecklistTemplates, useSeedTemplates, useItemComments,
   usePostComment, useItemHistory, useUpdateChecklistSettings, useTogglePeriodReceived,
   useAddPeriods, useDeletePeriod, useQuickAddDealTeamMember, useDealTeamContacts,
+  useDealTeamStats,
   DdChecklistItem, DdChecklistSection as SectionType, DdChecklistItemPeriod, DealTeamContact,
+  DealTeamMemberStats,
 } from '@/hooks/useDdChecklist';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -38,7 +40,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import {
   AlertCircle, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, Circle,
-  ClipboardList, Download, FileText, Loader2, MessageSquare, MoreVertical,
+  BarChart3, ClipboardList, Download, FileText, Loader2, MessageSquare, MoreVertical,
   Paperclip, Plus, Settings, Shield, Trash2, UserPlus, Users, X,
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -743,6 +745,7 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
   const { data: comments = [] } = useItemComments(item?.id);
   const { data: history = [] } = useItemHistory(item?.id);
   const { data: dealTeamContacts = [] } = useDealTeamContacts(workspaceId);
+  const { data: dealTeamStats = [] } = useDealTeamStats(workspaceId);
   const postComment = usePostComment();
   const addPeriods = useAddPeriods();
   const deletePeriod = useDeletePeriod();
@@ -987,6 +990,88 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
                     Type a name to add someone to the Deal Team, or add contacts from the project's Deal Team section.
                   </p>
                 )}
+
+                {(() => {
+                  const involvedIds = new Set([
+                    item.assignedToMemberId,
+                    item.reviewerMemberId,
+                    item.requestedFromMemberId,
+                  ].filter(Boolean) as string[]);
+                  if (involvedIds.size === 0) return null;
+
+                  const relevantStats = dealTeamStats.filter(s => involvedIds.has(s.id));
+                  if (relevantStats.length === 0) return null;
+
+                  const findName = (id: string) =>
+                    dealTeamContacts.find(c => c.id === id)?.displayName || 'Unknown';
+
+                  return (
+                    <div className="mt-2 space-y-2">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <BarChart3 className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Involvement Stats</span>
+                      </div>
+                      {relevantStats.map(s => {
+                        const totalTasks = s.assignedCount + s.reviewerCount + s.requestedFromCount;
+                        const totalCompleted = s.assignedCompleted + s.reviewerCompleted + s.requestedFromCompleted;
+                        const completionPct = totalTasks > 0 ? Math.round((totalCompleted / totalTasks) * 100) : 0;
+                        const roles: string[] = [];
+                        if (s.id === item.assignedToMemberId) roles.push('Assignee');
+                        if (s.id === item.reviewerMemberId) roles.push('Reviewer');
+                        if (s.id === item.requestedFromMemberId) roles.push('Req. From');
+
+                        return (
+                          <div key={s.id} className="bg-background border border-border rounded-md p-2.5">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <div className="flex items-center gap-1.5">
+                                <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
+                                  <span className="text-[9px] font-bold text-primary">
+                                    {findName(s.id).charAt(0).toUpperCase()}
+                                  </span>
+                                </div>
+                                <span className="text-[11px] font-medium truncate max-w-[120px]">{findName(s.id)}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                {roles.map(r => (
+                                  <Badge key={r} variant="secondary" className="text-[8px] px-1 py-0 h-3.5">{r}</Badge>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 mb-1.5">
+                              <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all ${completionPct >= 80 ? 'bg-green-500' : completionPct >= 50 ? 'bg-amber-500' : 'bg-blue-500'}`}
+                                  style={{ width: `${completionPct}%` }}
+                                />
+                              </div>
+                              <span className="text-[9px] font-mono text-muted-foreground w-7 text-right">{completionPct}%</span>
+                            </div>
+
+                            <div className="grid grid-cols-4 gap-1">
+                              <div className="text-center">
+                                <div className="text-[10px] font-semibold">{s.assignedCount}</div>
+                                <div className="text-[8px] text-muted-foreground">Assigned</div>
+                              </div>
+                              <div className="text-center">
+                                <div className="text-[10px] font-semibold">{s.reviewerCount}</div>
+                                <div className="text-[8px] text-muted-foreground">Reviews</div>
+                              </div>
+                              <div className="text-center">
+                                <div className="text-[10px] font-semibold">{s.requestedFromCount}</div>
+                                <div className="text-[8px] text-muted-foreground">Requests</div>
+                              </div>
+                              <div className="text-center">
+                                <div className={`text-[10px] font-semibold ${s.overdueCount > 0 ? 'text-red-600' : ''}`}>{s.overdueCount}</div>
+                                <div className="text-[8px] text-muted-foreground">Overdue</div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="grid grid-cols-2 gap-3">

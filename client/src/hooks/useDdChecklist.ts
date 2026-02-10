@@ -216,7 +216,28 @@ export function useUpdateItem() {
       const res = await apiRequest('PATCH', `/api/dd-items/${itemId}`, data);
       return res.json();
     },
-    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ['dd-checklist', vars.workspaceId] }),
+    onMutate: async (vars) => {
+      await qc.cancelQueries({ queryKey: ['dd-checklist', vars.workspaceId] });
+      const prev = qc.getQueryData<DdChecklistData>(['dd-checklist', vars.workspaceId]);
+      if (prev) {
+        const { itemId, workspaceId, ...updates } = vars;
+        qc.setQueryData<DdChecklistData>(['dd-checklist', workspaceId], {
+          ...prev,
+          sections: prev.sections.map(s => ({
+            ...s,
+            items: s.items.map(i => i.id === itemId ? { ...i, ...updates } : i),
+          })),
+        });
+      }
+      return { prev };
+    },
+    onError: (_err, vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['dd-checklist', vars.workspaceId], ctx.prev);
+    },
+    onSettled: (_, __, vars) => {
+      qc.invalidateQueries({ queryKey: ['dd-checklist', vars.workspaceId] });
+      qc.invalidateQueries({ queryKey: ['deal-team-stats', vars.workspaceId] });
+    },
   });
 }
 
@@ -328,6 +349,28 @@ export function useDealTeamContacts(workspaceId: string | undefined) {
     queryKey: ['deal-team-contacts', workspaceId],
     queryFn: async () => {
       const res = await apiRequest('GET', `/api/workspaces/${workspaceId}/deal-team-contacts`);
+      return res.json();
+    },
+    enabled: !!workspaceId,
+  });
+}
+
+export interface DealTeamMemberStats {
+  id: string;
+  assignedCount: number;
+  assignedCompleted: number;
+  reviewerCount: number;
+  reviewerCompleted: number;
+  requestedFromCount: number;
+  requestedFromCompleted: number;
+  overdueCount: number;
+}
+
+export function useDealTeamStats(workspaceId: string | undefined) {
+  return useQuery<DealTeamMemberStats[]>({
+    queryKey: ['deal-team-stats', workspaceId],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/workspaces/${workspaceId}/deal-team-stats`);
       return res.json();
     },
     enabled: !!workspaceId,
