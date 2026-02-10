@@ -38,7 +38,7 @@ The platform utilizes a dual-sourced data model separating "Universal/Global" cu
 
 ### Feature Specifications
 - **CRM**: Deals, leads, contacts, pipelines, activities, email sequences, marketing automation, property status tracking, entity relationship management, and Comment Threads.
-- **Due Diligence**: Project management, task tracking, template management, and DD Fees Tracker.
+- **Due Diligence**: Project management, task tracking, template management, DD Fees Tracker, and project-level contact management with CRM pending contacts integration.
 - **Rent Roll V2**: Marina-centric lease management with normalized schema, supporting seasonal/year-round operations and CRM/DD integrations.
 - **SalesComps**: Marina sales comparables with import/export, Google Maps integration, and validation.
 - **Modeling Projects**: Marina valuation, dynamic year selection, operations data sync, Exit Strategy Suite, AI-powered Document Intelligence, Scenario Versioning, Capital Stack Builder, Pro Forma Engine, Portfolio Roll-ups, Multi-Case Modeling, Addbacks System, and Excel Model Export.
