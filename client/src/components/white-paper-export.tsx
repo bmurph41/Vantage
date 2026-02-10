@@ -2472,9 +2472,9 @@ export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, setti
         </Text>
       </Page>
 
-      {/* Key Contacts */}
+      {/* Deal Team */}
       <Page size="LETTER" style={styles.page}>
-        <Text style={styles.header}>Key Contacts</Text>
+        <Text style={styles.header}>Deal Team</Text>
         
         <View style={styles.section}>
           {(project.seller && project.seller.length > 0) && (

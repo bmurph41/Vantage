@@ -258,7 +258,7 @@ contact.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>Key Contacts</CardTitle>
+          <CardTitle>Deal Team</CardTitle>
           <div className="flex items-center gap-2">
             <Button onClick={() => setIsQuickAddOpen(true)} size="sm" variant="outline" data-testid="button-quick-add-contact">
               <Plus className="h-4 w-4 mr-2" />

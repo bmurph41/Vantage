@@ -10,7 +10,7 @@ import { db } from '../db';
 import {
   dealWorkspaces, projects, tasks, vdrFolders, vdrDocuments, vdrAuditLogs,
   workspaceMembers, confidentialityAgreements, agreementExecutions, ddMilestones,
-  users, organizations,
+  users, organizations, pendingContacts, projectPendingContacts,
 } from '@shared/schema';
 import { eq, and, desc, asc, sql, ne, isNull } from 'drizzle-orm';
 import { CHECKLIST_TEMPLATE_DEFAULT, type ChecklistTaskTemplate } from '../templates/dd-templates';
@@ -578,6 +578,56 @@ workspaceRouter.get('/api/workspaces/:id/members', async (req: Request, res: Res
     res.json(members);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch members' });
+  }
+});
+
+workspaceRouter.post('/api/workspaces/:id/deal-team/quick-add', async (req: Request, res: Response) => {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+  const ws = await loadWorkspace(req, res, auth.orgId);
+  if (!ws) return;
+
+  try {
+    const { fullName, role } = req.body;
+    if (!fullName?.trim()) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+
+    const assignRole = role || 'other';
+
+    const [newPending] = await db.insert(pendingContacts).values({
+      orgId: auth.orgId,
+      fullName: fullName.trim(),
+      sourceType: 'dd_project',
+      sourceId: ws.ddProjectId || ws.id,
+      status: 'pending',
+      createdBy: auth.userId,
+    }).returning();
+
+    if (ws.ddProjectId) {
+      await db.insert(projectPendingContacts).values({
+        projectId: ws.ddProjectId,
+        pendingContactId: newPending.id,
+        role: assignRole,
+        isPrimary: false,
+        createdBy: auth.userId,
+      }).onConflictDoNothing();
+    }
+
+    const [asMember] = await db.insert(workspaceMembers).values({
+      workspaceId: ws.id,
+      email: null,
+      displayName: fullName.trim(),
+      role: assignRole,
+      inviteStatus: 'pending',
+      permissions: { canViewChecklist: true, canUploadFiles: false, canComment: false },
+      createdAt: new Date(),
+    }).returning();
+
+    res.status(201).json({ pendingContact: newPending, member: asMember });
+  } catch (error) {
+    console.error('Error quick-adding deal team member:', error);
+    res.status(500).json({ error: 'Failed to add deal team member' });
   }
 });
 

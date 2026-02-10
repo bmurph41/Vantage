@@ -95,7 +95,7 @@ export default function ProjectPage() {
     { id: "templates", label: "Templates" },
     { id: "setup", label: "Deal Details" },
     { id: "owners", label: "Task Owners" },
-    { id: "contacts", label: "Key Contacts" },
+    { id: "contacts", label: "Deal Team" },
     { id: "integrations", label: "Integrations" },
     { id: "notifications", label: "Notifications" },
     { id: "archive", label: "Archive" },

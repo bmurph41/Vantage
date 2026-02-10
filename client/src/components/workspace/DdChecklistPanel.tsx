@@ -10,7 +10,7 @@ import {
   useUpdateItem, useCreateSection, useCreateItem, useDeleteItem, useDeleteSection,
   useExportChecklist, useDdChecklistTemplates, useSeedTemplates, useItemComments,
   usePostComment, useItemHistory, useUpdateChecklistSettings, useTogglePeriodReceived,
-  useAddPeriods, useDeletePeriod, useWorkspaceMembers,
+  useAddPeriods, useDeletePeriod, useWorkspaceMembers, useQuickAddDealTeamMember,
   DdChecklistItem, DdChecklistSection as SectionType, DdChecklistItemPeriod, WorkspaceMemberInfo,
 } from '@/hooks/useDdChecklist';
 import { Button } from '@/components/ui/button';
@@ -615,6 +615,115 @@ function TemplatePickerDialog({ open, onClose, templates, selectedIds, onToggle,
   );
 }
 
+function TeamMemberField({ label, placeholder, value, members, onSelect, onAddNew, isPending }: {
+  label: string;
+  placeholder: string;
+  value: string | null;
+  members: WorkspaceMemberInfo[];
+  onSelect: (memberId: string | null) => void;
+  onAddNew: (name: string) => void;
+  isPending: boolean;
+}) {
+  const [inputValue, setInputValue] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+
+  const selectedMember = value ? members.find(m => m.id === value) : null;
+  const displayValue = selectedMember
+    ? (selectedMember.displayName || selectedMember.email || 'Unknown')
+    : '';
+
+  const filtered = inputValue.trim()
+    ? members.filter(m =>
+        (m.displayName || m.email || '').toLowerCase().includes(inputValue.toLowerCase())
+      )
+    : members;
+
+  const exactMatch = inputValue.trim() && members.some(m =>
+    (m.displayName || m.email || '').toLowerCase() === inputValue.toLowerCase()
+  );
+
+  const handleSelect = (memberId: string | null) => {
+    onSelect(memberId);
+    setInputValue('');
+    setIsOpen(false);
+  };
+
+  const handleAddNew = () => {
+    const name = inputValue.trim();
+    if (!name) return;
+    onAddNew(name);
+    setInputValue('');
+    setIsOpen(false);
+  };
+
+  return (
+    <div className="relative">
+      <Label className="text-[11px] text-muted-foreground">{label}</Label>
+      <div className="relative mt-0.5">
+        <Input
+          className="h-8 text-xs pr-8"
+          placeholder={selectedMember ? displayValue : placeholder}
+          value={isOpen ? inputValue : (selectedMember ? displayValue : '')}
+          onChange={(e) => { setInputValue(e.target.value); setIsOpen(true); }}
+          onFocus={() => setIsOpen(true)}
+          onBlur={() => setTimeout(() => setIsOpen(false), 200)}
+        />
+        {selectedMember && (
+          <button
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            onMouseDown={(e) => { e.preventDefault(); handleSelect(null); }}
+          >
+            <X className="h-3 w-3" />
+          </button>
+        )}
+        {selectedMember?.inviteStatus === 'pending' && (
+          <Badge variant="outline" className="absolute right-7 top-1/2 -translate-y-1/2 text-[9px] px-1 py-0 h-4 bg-amber-50 text-amber-700 border-amber-200">
+            Pending
+          </Badge>
+        )}
+      </div>
+      {isOpen && (
+        <div className="absolute z-50 mt-1 w-full bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-auto">
+          <button
+            className="w-full text-left px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"
+            onMouseDown={(e) => { e.preventDefault(); handleSelect(null); }}
+          >
+            — Unassigned —
+          </button>
+          {filtered.map((m) => (
+            <button
+              key={m.id}
+              className={`w-full text-left px-3 py-1.5 text-xs hover:bg-muted flex items-center justify-between ${value === m.id ? 'bg-muted font-medium' : ''}`}
+              onMouseDown={(e) => { e.preventDefault(); handleSelect(m.id); }}
+            >
+              <span>{m.displayName || m.email || 'Unknown'}</span>
+              <span className="flex items-center gap-1">
+                {m.inviteStatus === 'pending' && (
+                  <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-amber-50 text-amber-700 border-amber-200">Pending</Badge>
+                )}
+                <span className="text-[10px] text-muted-foreground">{m.role}</span>
+              </span>
+            </button>
+          ))}
+          {inputValue.trim() && !exactMatch && (
+            <button
+              className="w-full text-left px-3 py-1.5 text-xs text-primary hover:bg-muted flex items-center gap-1.5 border-t border-border"
+              onMouseDown={(e) => { e.preventDefault(); handleAddNew(); }}
+              disabled={isPending}
+            >
+              {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserPlus className="h-3 w-3" />}
+              Add "{inputValue.trim()}" to Deal Team
+            </button>
+          )}
+          {filtered.length === 0 && !inputValue.trim() && (
+            <div className="px-3 py-2 text-xs text-muted-foreground">No team members yet</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpdate, onDelete, onTogglePeriod }: {
   item: DdChecklistItem | null; section: SectionType | null; workspaceId: string;
   onClose: () => void; onStatusChange: (id: string, s: string) => void;
@@ -631,6 +740,7 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
   const postComment = usePostComment();
   const addPeriods = useAddPeriods();
   const deletePeriod = useDeletePeriod();
+  const quickAddMember = useQuickAddDealTeamMember();
 
   if (!item) return null;
 
@@ -824,58 +934,44 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
                 </div>
 
                 <div className="grid grid-cols-1 gap-2">
-                  <div>
-                    <Label className="text-[11px] text-muted-foreground">Assigned To</Label>
-                    <Select
-                      value={item.assignedToMemberId || '__none'}
-                      onValueChange={(v) => onUpdate(item.id, { assignedToMemberId: v === '__none' ? null : v })}
-                    >
-                      <SelectTrigger className="h-8 text-xs mt-0.5"><SelectValue placeholder="Unassigned" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none">Unassigned</SelectItem>
-                        {members.map((m) => (
-                          <SelectItem key={m.id} value={m.id}>{getMemberLabel(m)} ({m.role})</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label className="text-[11px] text-muted-foreground">Reviewer</Label>
-                    <Select
-                      value={item.reviewerMemberId || '__none'}
-                      onValueChange={(v) => onUpdate(item.id, { reviewerMemberId: v === '__none' ? null : v })}
-                    >
-                      <SelectTrigger className="h-8 text-xs mt-0.5"><SelectValue placeholder="No reviewer" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none">No reviewer</SelectItem>
-                        {members.map((m) => (
-                          <SelectItem key={m.id} value={m.id}>{getMemberLabel(m)} ({m.role})</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label className="text-[11px] text-muted-foreground">Requested From</Label>
-                    <Select
-                      value={item.requestedFromMemberId || '__none'}
-                      onValueChange={(v) => onUpdate(item.id, { requestedFromMemberId: v === '__none' ? null : v })}
-                    >
-                      <SelectTrigger className="h-8 text-xs mt-0.5"><SelectValue placeholder="Not specified" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none">Not specified</SelectItem>
-                        {members.map((m) => (
-                          <SelectItem key={m.id} value={m.id}>{getMemberLabel(m)} ({m.role})</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <TeamMemberField
+                    label="Assigned To"
+                    placeholder="Select or type a name..."
+                    value={item.assignedToMemberId}
+                    members={members}
+                    onSelect={(memberId) => onUpdate(item.id, { assignedToMemberId: memberId })}
+                    onAddNew={(name) => quickAddMember.mutate({ workspaceId, fullName: name }, {
+                      onSuccess: (data) => onUpdate(item.id, { assignedToMemberId: data.member.id }),
+                    })}
+                    isPending={quickAddMember.isPending}
+                  />
+                  <TeamMemberField
+                    label="Reviewer"
+                    placeholder="Select or type a name..."
+                    value={item.reviewerMemberId}
+                    members={members}
+                    onSelect={(memberId) => onUpdate(item.id, { reviewerMemberId: memberId })}
+                    onAddNew={(name) => quickAddMember.mutate({ workspaceId, fullName: name }, {
+                      onSuccess: (data) => onUpdate(item.id, { reviewerMemberId: data.member.id }),
+                    })}
+                    isPending={quickAddMember.isPending}
+                  />
+                  <TeamMemberField
+                    label="Requested From"
+                    placeholder="Select or type a name..."
+                    value={item.requestedFromMemberId}
+                    members={members}
+                    onSelect={(memberId) => onUpdate(item.id, { requestedFromMemberId: memberId })}
+                    onAddNew={(name) => quickAddMember.mutate({ workspaceId, fullName: name }, {
+                      onSuccess: (data) => onUpdate(item.id, { requestedFromMemberId: data.member.id }),
+                    })}
+                    isPending={quickAddMember.isPending}
+                  />
                 </div>
 
                 {members.length === 0 && (
                   <p className="text-[11px] text-muted-foreground">
-                    No deal team members yet. Invite members via the workspace settings to assign them here.
+                    Type a name to add someone to the Deal Team, or invite members via workspace settings.
                   </p>
                 )}
               </div>

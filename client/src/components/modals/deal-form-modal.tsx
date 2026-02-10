@@ -1543,9 +1543,9 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                       )}
                     </div>
 
-                    {/* Key Contacts */}
+                    {/* Deal Team */}
                     <div className="pt-4 border-t">
-                      <h4 className="font-semibold text-sm mb-3">Key Contacts</h4>
+                      <h4 className="font-semibold text-sm mb-3">Deal Team</h4>
                       <div className="space-y-4">
                         <div>
                           <Label className="text-sm mb-2 block">Seller(s)</Label>

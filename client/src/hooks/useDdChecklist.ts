@@ -310,6 +310,19 @@ export function useWorkspaceMembers(workspaceId: string | undefined) {
   });
 }
 
+export function useQuickAddDealTeamMember() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ workspaceId, fullName, role }: { workspaceId: string; fullName: string; role?: string }) => {
+      const res = await apiRequest('POST', `/api/workspaces/${workspaceId}/deal-team/quick-add`, { fullName, role });
+      return res.json();
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['workspace-members', vars.workspaceId] });
+    },
+  });
+}
+
 // ─── Comments ────────────────────────────────────────────────────────────────
 
 export function useItemComments(itemId: string | undefined) {

@@ -1118,13 +1118,13 @@ export default function CompanyDetailModal({
 
                 {/* Right Column - Sidebar */}
                 <div className="space-y-6">
-                  {/* Key Contacts */}
+                  {/* Deal Team */}
                   <Card>
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-base flex items-center gap-2">
                           <Users className="w-4 h-4" />
-                          Key Contacts
+                          Deal Team
                         </CardTitle>
                         <Badge variant="secondary">{companyContacts.length}</Badge>
                       </div>
