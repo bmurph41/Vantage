@@ -84,6 +84,8 @@ export interface DdChecklistTemplate {
   version: string;
   assetClass: string;
   isBuiltin: boolean;
+  description?: string;
+  data?: any;
 }
 
 // ─── Checklist ───────────────────────────────────────────────────────────────

@@ -485,7 +485,7 @@ function TemplatePickerDialog({ open, onClose, templates, selectedIds, onToggle,
                 <Checkbox checked={selectedIds.includes(tmpl.id)} />
                 <div className="flex-1">
                   <div className="text-sm font-medium">{tmpl.name}</div>
-                  <div className="text-xs text-muted-foreground">{tmpl.assetClass.replace(/_/g, ' ')} · v{tmpl.version}</div>
+                  <div className="text-xs text-muted-foreground">{tmpl.description} · {tmpl.data?.sections?.reduce((n: number, s: any) => n + (s.items?.length || 0), 0) || '?'} items</div>
                 </div>
                 {tmpl.isBuiltin && <Badge variant="secondary" className="text-xs">Built-in</Badge>}
               </div>

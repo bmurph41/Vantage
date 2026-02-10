@@ -240,7 +240,7 @@ export default function UnifiedSidebar() {
     // Prospecting section: Overview and Workroom
     const isProspectingPage = location === '/prospecting' || location.startsWith('/prospecting/');
     // Deal Workspace: consolidated DD, VDR pages (workspaces, DD projects, data room)
-    const isDealWorkspacePage = location.startsWith('/workspaces') || location.startsWith('/projects') || location === '/progress-report' || location.startsWith('/vdr');
+    const isDealWorkspacePage = location.startsWith('/workspaces') || location.startsWith('/projects') || location === '/progress-report' || location.startsWith('/vdr') || location.startsWith('/dd/');
     // Analysis: Modeling Projects (Financial Model), Debt Scenarios, Exit Strategies, P&L Parser, OM Builder, Modeling Settings
     const isUnderwritingToolsPage = location.startsWith('/modeling/projects') || location.startsWith('/modeling/returns-valuation') || location.startsWith('/modeling/scenarios') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings');
     const isOmBuilderPage = location.startsWith('/om');
