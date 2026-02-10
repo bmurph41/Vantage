@@ -23896,6 +23896,8 @@ export const ddChecklistItems = pgTable('dd_checklist_items', {
   sellerNotes: text('seller_notes'),
   internalNotes: text('internal_notes'),
   templateKey: varchar('template_key', { length: 100 }),
+  hasPeriods: boolean("has_periods").notNull().default(false),
+  periodConfig: jsonb("period_config"),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (table) => ({
@@ -23954,4 +23956,23 @@ export type DdChecklistItem = typeof ddChecklistItems.$inferSelect;
 export type DdChecklistItemFile = typeof ddChecklistItemFiles.$inferSelect;
 export type DdChecklistItemComment = typeof ddChecklistItemComments.$inferSelect;
 export type DdChecklistItemHistoryEntry = typeof ddChecklistItemHistory.$inferSelect;
+
+// ─── DD Checklist Item Periods ───────────────────────────────────────────────
+export const ddChecklistItemPeriods = pgTable("dd_checklist_item_periods", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  itemId: varchar("item_id").notNull().references(() => ddChecklistItems.id, { onDelete: "cascade" }),
+  periodType: varchar("period_type", { length: 20 }).notNull(),
+  periodLabel: text("period_label").notNull(),
+  periodSort: integer("period_sort").notNull().default(0),
+  isReceived: boolean("is_received").notNull().default(false),
+  receivedAt: timestamp("received_at"),
+  receivedBy: varchar("received_by").references(() => users.id),
+  fileId: varchar("file_id"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  itemIdx: index("ddcip_item_idx2").on(table.itemId),
+}));
+export type DdChecklistItemPeriod = typeof ddChecklistItemPeriods.$inferSelect;
 export type DdChecklistTemplate = typeof ddChecklistTemplates.$inferSelect;
