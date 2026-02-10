@@ -41,7 +41,7 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   AlertCircle, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, Circle,
   BarChart3, ClipboardList, Download, FileText, Loader2, MessageSquare, MoreVertical,
-  Paperclip, Plus, Settings, Shield, Trash2, UserPlus, Users, X,
+  Paperclip, Plus, Save, Settings, Shield, Trash2, UserPlus, Users, X,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -741,6 +741,7 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
   const [drawerTab, setDrawerTab] = useState('details');
   const [commentText, setCommentText] = useState('');
   const [commentVisibility, setCommentVisibility] = useState('all');
+  const [saveConfirmed, setSaveConfirmed] = useState(false);
 
   const { data: comments = [] } = useItemComments(item?.id);
   const { data: history = [] } = useItemHistory(item?.id);
@@ -888,6 +889,7 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
               <div>
                 <Label className="text-xs text-muted-foreground">Request</Label>
                 <Textarea
+                  data-field="requestText"
                   className="mt-1 text-sm"
                   rows={3}
                   defaultValue={item.requestText || ''}
@@ -906,6 +908,7 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
               <div>
                 <Label className="text-xs text-muted-foreground">Seller Notes</Label>
                 <Textarea
+                  data-field="sellerNotes"
                   className="mt-1 text-sm"
                   rows={3}
                   defaultValue={item.sellerNotes || ''}
@@ -921,6 +924,7 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
               <div>
                 <Label className="text-xs text-muted-foreground">Internal Notes (not visible to external)</Label>
                 <Textarea
+                  data-field="internalNotes"
                   className="mt-1 text-sm"
                   rows={3}
                   defaultValue={item.internalNotes || ''}
@@ -1117,10 +1121,40 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
                 <p className="text-xs text-muted-foreground mt-1">File linking available via VDR integration.</p>
               </div>
 
-              <Button variant="destructive" size="sm" className="mt-4"
-                onClick={() => { if (confirm('Delete this item?')) onDelete(item.id); }}>
-                <Trash2 className="h-3.5 w-3.5 mr-1" />Delete Item
-              </Button>
+              <div className="flex items-center gap-2 mt-6 pt-4 border-t border-border">
+                <Button
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => {
+                    const requestTextEl = document.querySelector<HTMLTextAreaElement>('[data-field="requestText"]');
+                    const sellerNotesEl = document.querySelector<HTMLTextAreaElement>('[data-field="sellerNotes"]');
+                    const internalNotesEl = document.querySelector<HTMLTextAreaElement>('[data-field="internalNotes"]');
+                    const updates: Record<string, any> = {};
+                    if (requestTextEl && requestTextEl.value !== (item.requestText || '')) updates.requestText = requestTextEl.value;
+                    if (sellerNotesEl && sellerNotesEl.value !== (item.sellerNotes || '')) updates.sellerNotes = sellerNotesEl.value;
+                    if (internalNotesEl && internalNotesEl.value !== (item.internalNotes || '')) updates.internalNotes = internalNotesEl.value;
+                    if (Object.keys(updates).length > 0) onUpdate(item.id, updates);
+                    setSaveConfirmed(true);
+                    setTimeout(() => setSaveConfirmed(false), 2500);
+                  }}
+                >
+                  {saveConfirmed ? (
+                    <>
+                      <CheckCircle2 className="h-3.5 w-3.5 mr-1.5 text-white" />
+                      Saved
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-3.5 w-3.5 mr-1.5" />
+                      Save Changes
+                    </>
+                  )}
+                </Button>
+                <Button variant="destructive" size="sm"
+                  onClick={() => { if (confirm('Delete this item?')) onDelete(item.id); }}>
+                  <Trash2 className="h-3.5 w-3.5 mr-1" />Delete
+                </Button>
+              </div>
             </TabsContent>
 
             <TabsContent value="comments" className="mt-3 space-y-3">
