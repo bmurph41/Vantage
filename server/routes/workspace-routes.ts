@@ -804,6 +804,199 @@ workspaceRouter.get('/api/workspaces/:id/deal-team-stats', async (req: Request, 
   }
 });
 
+workspaceRouter.get('/api/workspaces/:id/task-breakdown', async (req: Request, res: Response) => {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+  const ws = await loadWorkspace(req, res, auth.orgId);
+  if (!ws) return;
+
+  try {
+    const [checklist] = await db.select().from(ddChecklists)
+      .where(eq(ddChecklists.workspaceId, ws.id)).limit(1);
+    if (!checklist) return res.json({ byUser: [], unassigned: [] });
+
+    const secs = await db.select({ id: ddChecklistSections.id, title: ddChecklistSections.title })
+      .from(ddChecklistSections)
+      .where(eq(ddChecklistSections.checklistId, checklist.id));
+    if (secs.length === 0) return res.json({ byUser: [], unassigned: [] });
+
+    const secMap = new Map(secs.map(s => [s.id, s.title]));
+    const sectionIds = secs.map(s => s.id);
+    const allItems = await db.select().from(ddChecklistItems)
+      .where(sql`${ddChecklistItems.sectionId} IN (${sql.join(sectionIds.map(id => sql`${id}`), sql`, `)})`);
+
+    const today = new Date().toISOString().slice(0, 10);
+    const completedStatuses = new Set(['approved', 'provided', 'waived']);
+    const userMap = new Map<string, {
+      memberId: string;
+      tasks: Array<{ id: string; title: string; status: string; priority: number; dueDate: string | null; section: string; isOverdue: boolean }>;
+      totalCount: number;
+      completedCount: number;
+      overdueCount: number;
+    }>();
+    const unassigned: Array<{ id: string; title: string; status: string; priority: number; dueDate: string | null; section: string }> = [];
+
+    for (const item of allItems) {
+      const taskInfo = {
+        id: item.id,
+        title: item.title,
+        status: item.status,
+        priority: item.priority,
+        dueDate: item.dueDate,
+        section: secMap.get(item.sectionId) || 'Unknown',
+      };
+      const done = completedStatuses.has(item.status);
+      const isOverdue = !done && !!item.dueDate && item.dueDate < today;
+
+      if (!item.assignedToMemberId) {
+        unassigned.push(taskInfo);
+        continue;
+      }
+
+      const mid = item.assignedToMemberId;
+      if (!userMap.has(mid)) {
+        userMap.set(mid, { memberId: mid, tasks: [], totalCount: 0, completedCount: 0, overdueCount: 0 });
+      }
+      const entry = userMap.get(mid)!;
+      entry.tasks.push({ ...taskInfo, isOverdue });
+      entry.totalCount++;
+      if (done) entry.completedCount++;
+      if (isOverdue) entry.overdueCount++;
+    }
+
+    res.json({
+      byUser: Array.from(userMap.values()).sort((a, b) => b.totalCount - a.totalCount),
+      unassigned,
+    });
+  } catch (error) {
+    console.error('Error fetching task breakdown:', error);
+    res.status(500).json({ error: 'Failed to fetch task breakdown' });
+  }
+});
+
+workspaceRouter.get('/api/org/lifetime-task-stats', async (req: Request, res: Response) => {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+
+  try {
+    const checklists = await db.select({ id: ddChecklists.id, workspaceId: ddChecklists.workspaceId })
+      .from(ddChecklists)
+      .where(eq(ddChecklists.orgId, auth.orgId));
+
+    if (checklists.length === 0) return res.json({ byUser: [], projectCount: 0 });
+
+    const checklistIds = checklists.map(c => c.id);
+    const allSections = await db.select({ id: ddChecklistSections.id, checklistId: ddChecklistSections.checklistId })
+      .from(ddChecklistSections)
+      .where(sql`${ddChecklistSections.checklistId} IN (${sql.join(checklistIds.map(id => sql`${id}`), sql`, `)})`);
+
+    if (allSections.length === 0) return res.json({ byUser: [], projectCount: checklists.length });
+
+    const sectionIds = allSections.map(s => s.id);
+    const sectionToChecklist = new Map(allSections.map(s => [s.id, s.checklistId]));
+
+    const allItems = await db.select({
+      id: ddChecklistItems.id,
+      sectionId: ddChecklistItems.sectionId,
+      status: ddChecklistItems.status,
+      assignedTo: ddChecklistItems.assignedToMemberId,
+      dueDate: ddChecklistItems.dueDate,
+    }).from(ddChecklistItems)
+      .where(sql`${ddChecklistItems.sectionId} IN (${sql.join(sectionIds.map(id => sql`${id}`), sql`, `)})`);
+
+    const today = new Date().toISOString().slice(0, 10);
+    const completedStatuses = new Set(['approved', 'provided', 'waived']);
+
+    const workspaces = await db.select({ id: dealWorkspaces.id, name: dealWorkspaces.name })
+      .from(dealWorkspaces)
+      .where(eq(dealWorkspaces.orgId, auth.orgId));
+    const wsNameMap = new Map(workspaces.map(w => [w.id, w.name]));
+    const checklistToWs = new Map(checklists.map(c => [c.id, c.workspaceId]));
+
+    const userMap = new Map<string, {
+      memberId: string;
+      totalTasks: number;
+      completedTasks: number;
+      overdueTasks: number;
+      projectsInvolved: Set<string>;
+      projectBreakdown: Map<string, { name: string; total: number; completed: number; overdue: number }>;
+    }>();
+
+    for (const item of allItems) {
+      if (!item.assignedTo) continue;
+      const mid = item.assignedTo;
+      if (!userMap.has(mid)) {
+        userMap.set(mid, { memberId: mid, totalTasks: 0, completedTasks: 0, overdueTasks: 0, projectsInvolved: new Set(), projectBreakdown: new Map() });
+      }
+      const entry = userMap.get(mid)!;
+      const done = completedStatuses.has(item.status);
+      entry.totalTasks++;
+      if (done) entry.completedTasks++;
+      if (!done && item.dueDate && item.dueDate < today) entry.overdueTasks++;
+
+      const clId = sectionToChecklist.get(item.sectionId) || '';
+      const wsId = checklistToWs.get(clId) || '';
+      entry.projectsInvolved.add(wsId);
+
+      if (!entry.projectBreakdown.has(wsId)) {
+        entry.projectBreakdown.set(wsId, { name: wsNameMap.get(wsId) || 'Unknown', total: 0, completed: 0, overdue: 0 });
+      }
+      const pb = entry.projectBreakdown.get(wsId)!;
+      pb.total++;
+      if (done) pb.completed++;
+      if (!done && item.dueDate && item.dueDate < today) pb.overdue++;
+    }
+
+    const allContactsRaw = await db.select().from(contacts)
+      .where(eq(contacts.orgId, auth.orgId));
+    const allPendingRaw = await db.select().from(pendingContacts)
+      .where(eq(pendingContacts.orgId, auth.orgId));
+    const allMembersRaw = await db.select().from(workspaceMembers)
+      .where(eq(workspaceMembers.orgId, auth.orgId));
+
+    const nameMap = new Map<string, string>();
+    for (const c of allContactsRaw) {
+      nameMap.set(c.id, c.name || 'Contact');
+    }
+    for (const p of allPendingRaw) {
+      nameMap.set(p.id, p.fullName || 'Pending');
+    }
+    for (const m of allMembersRaw) {
+      nameMap.set(m.id, m.displayName || 'Member');
+    }
+
+    const resolveName = (memberId: string): string => {
+      const contactMatch = memberId.match(/^contact_([^_]+)_/);
+      if (contactMatch) return nameMap.get(contactMatch[1]) || 'Unknown';
+      const pendingMatch = memberId.match(/^pending_([^_]+)_/);
+      if (pendingMatch) return nameMap.get(pendingMatch[1]) || 'Unknown';
+      return nameMap.get(memberId) || 'Unknown';
+    };
+
+    const result = Array.from(userMap.values()).map(u => ({
+      memberId: u.memberId,
+      displayName: resolveName(u.memberId),
+      totalTasks: u.totalTasks,
+      completedTasks: u.completedTasks,
+      overdueTasks: u.overdueTasks,
+      completionRate: u.totalTasks > 0 ? Math.round((u.completedTasks / u.totalTasks) * 100) : 0,
+      projectCount: u.projectsInvolved.size,
+      projectBreakdown: Array.from(u.projectBreakdown.entries()).map(([wsId, pb]) => ({
+        workspaceId: wsId,
+        name: pb.name,
+        total: pb.total,
+        completed: pb.completed,
+        overdue: pb.overdue,
+      })),
+    })).sort((a, b) => b.totalTasks - a.totalTasks);
+
+    res.json({ byUser: result, projectCount: checklists.length });
+  } catch (error) {
+    console.error('Error fetching lifetime task stats:', error);
+    res.status(500).json({ error: 'Failed to fetch lifetime task stats' });
+  }
+});
+
 workspaceRouter.post('/api/workspaces/:id/members/invite', async (req: Request, res: Response) => {
   const auth = requireAuth(req, res);
   if (!auth) return;

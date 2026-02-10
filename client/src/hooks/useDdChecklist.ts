@@ -451,6 +451,76 @@ export function useSeedTemplates() {
   });
 }
 
+// ─── Task Breakdown ──────────────────────────────────────────────────────
+
+export interface TaskBreakdownTask {
+  id: string;
+  title: string;
+  status: string;
+  priority: number;
+  dueDate: string | null;
+  section: string;
+  isOverdue: boolean;
+}
+
+export interface TaskBreakdownUser {
+  memberId: string;
+  tasks: TaskBreakdownTask[];
+  totalCount: number;
+  completedCount: number;
+  overdueCount: number;
+}
+
+export interface TaskBreakdownResponse {
+  byUser: TaskBreakdownUser[];
+  unassigned: Array<Omit<TaskBreakdownTask, 'isOverdue'>>;
+}
+
+export function useTaskBreakdown(workspaceId: string | undefined) {
+  return useQuery<TaskBreakdownResponse>({
+    queryKey: ['task-breakdown', workspaceId],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/workspaces/${workspaceId}/task-breakdown`);
+      return res.json();
+    },
+    enabled: !!workspaceId,
+  });
+}
+
+export interface LifetimeProjectBreakdown {
+  workspaceId: string;
+  name: string;
+  total: number;
+  completed: number;
+  overdue: number;
+}
+
+export interface LifetimeUserStats {
+  memberId: string;
+  displayName: string;
+  totalTasks: number;
+  completedTasks: number;
+  overdueTasks: number;
+  completionRate: number;
+  projectCount: number;
+  projectBreakdown: LifetimeProjectBreakdown[];
+}
+
+export interface LifetimeStatsResponse {
+  byUser: LifetimeUserStats[];
+  projectCount: number;
+}
+
+export function useLifetimeTaskStats() {
+  return useQuery<LifetimeStatsResponse>({
+    queryKey: ['lifetime-task-stats'],
+    queryFn: async () => {
+      const res = await apiRequest('GET', '/api/org/lifetime-task-stats');
+      return res.json();
+    },
+  });
+}
+
 // ─── Export ──────────────────────────────────────────────────────────────────
 
 export function useExportChecklist() {
