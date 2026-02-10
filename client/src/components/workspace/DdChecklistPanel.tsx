@@ -716,6 +716,7 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
                             ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700'
                             : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-500 border border-dashed border-gray-300 dark:border-gray-600 hover:border-blue-400 hover:text-gray-700'
                       }`}
+                      disabled={addPeriods.isPending || deletePeriod.isPending}
                       onClick={() => {
                         if (isSelected && period) {
                           onTogglePeriod(period);
