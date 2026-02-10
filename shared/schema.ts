@@ -51,7 +51,7 @@ export const ddCategoryEnum = pgEnum("dd_category", ["title", "survey", "ESA", "
 export const calendarProviderEnum = pgEnum("calendar_provider", ["google", "outlook", "apple"]);
 export const emailTypeEnum = pgEnum("email_type", ["primary", "additional"]);
 export const guestStatusEnum = pgEnum("guest_status", ["pending", "accepted", "declined"]);
-export const contactRoleEnum = pgEnum("contact_role", ["seller", "attorney", "lender", "title_insurance", "inspector", "surveyor", "environmental", "appraiser", "broker", "insurance_agent", "other"]);
+export const contactRoleEnum = pgEnum("contact_role", ["seller", "buyer", "attorney", "lender", "title_insurance", "inspector", "surveyor", "environmental", "appraiser", "broker", "insurance_agent", "other"]);
 export const dashboardTypeEnum = pgEnum("dashboard_type", ["default", "investor", "owner", "attorney", "lender", "inspector", "third_party"]);
 export const parseStatusEnum = pgEnum("parse_status", ["pending", "parsing", "parsed", "failed"]);
 export const embeddingsStatusEnum = pgEnum("embeddings_status", ["pending", "processing", "completed", "failed"]);
@@ -1232,6 +1232,10 @@ export const ddChecklistTemplates = pgTable("dd_checklist_templates", {
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  assetClass: varchar("asset_class", { length: 50 }).notNull().default("general_cre"),
+  isBuiltin: boolean("is_builtin").notNull().default(false),
+  data: jsonb("data"),
+  version: text("version").default("1.0.0"),
 }, (table) => ({
   orgIdx: index("dd_checklist_templates_org").on(table.orgId),
   typeIdx: index("dd_checklist_templates_type").on(table.templateType),

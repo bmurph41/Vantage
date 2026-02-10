@@ -42,6 +42,7 @@ interface ContactCardModalProps {
 
 const roleLabels: Record<string, string> = {
   seller: "Seller",
+  buyer: "Buyer",
   attorney: "Attorney",
   lender: "Lender",
   title_insurance: "Title Insurance",
@@ -56,6 +57,7 @@ const roleLabels: Record<string, string> = {
 
 const roleColors: Record<string, string> = {
   seller: "bg-blue-100 text-blue-800 border-blue-200",
+  buyer: "bg-sky-100 text-sky-800 border-sky-200",
   attorney: "bg-purple-100 text-purple-800 border-purple-200",
   lender: "bg-green-100 text-green-800 border-green-200",
   title_insurance: "bg-amber-100 text-amber-800 border-amber-200",

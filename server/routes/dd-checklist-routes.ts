@@ -12,7 +12,7 @@
  * - Permission enforcement per workspace member role
  */
 import { Router, Request, Response } from 'express';
-import { eq, and, sql, desc, asc, inArray, count } from 'drizzle-orm';
+import { eq, and, or, sql, desc, asc, inArray, count } from 'drizzle-orm';
 
 const router = Router();
 
@@ -953,6 +953,8 @@ router.get('/api/dd-checklist-templates', async (req: any, res: Response) => {
 
     const templates = await db.select({
       id: schema.ddChecklistTemplates.id,
+      description: schema.ddChecklistTemplates.description,
+      data: schema.ddChecklistTemplates.data,
       name: schema.ddChecklistTemplates.name,
       version: schema.ddChecklistTemplates.version,
       assetClass: schema.ddChecklistTemplates.assetClass,
@@ -960,7 +962,7 @@ router.get('/api/dd-checklist-templates', async (req: any, res: Response) => {
       createdAt: schema.ddChecklistTemplates.createdAt,
     }).from(schema.ddChecklistTemplates)
       .where(
-        sql`${schema.ddChecklistTemplates.isBuiltin} = true OR ${schema.ddChecklistTemplates.orgId} = ${orgId}`
+        or(eq(schema.ddChecklistTemplates.isBuiltin, true), eq(schema.ddChecklistTemplates.orgId, orgId))
       )
       .orderBy(asc(schema.ddChecklistTemplates.name));
 
