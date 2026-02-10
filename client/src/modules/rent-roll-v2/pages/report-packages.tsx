@@ -122,7 +122,7 @@ export default function ReportPackagesPage() {
     if (createDialogOpen) {
       form.reset(getDefaultFormValues(), { keepDefaultValues: false });
     }
-  }, [createDialogOpen, form, getDefaultFormValues]);
+  }, [createDialogOpen, getDefaultFormValues]);
 
   const { data: packages, isLoading: packagesLoading } = useQuery<ReportPackage[]>({
     queryKey: ['/api/report-packages'],

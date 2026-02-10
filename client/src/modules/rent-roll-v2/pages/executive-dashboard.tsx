@@ -481,7 +481,7 @@ export default function ExecutiveDashboard() {
       form.reset();
       setAddDialogStep(1);
     }
-  }, [addDialogOpen, form]);
+  }, [addDialogOpen]);
 
   const filterQueryString = buildFilterQueryString();
   

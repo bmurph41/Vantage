@@ -379,7 +379,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
       const calculated = (amount * rate) / 100;
       form.setValue("commissionAmount", calculated.toFixed(2));
     }
-  }, [dealAmount, commissionRate, commissionType, form]);
+  }, [dealAmount, commissionRate, commissionType]);
 
   useEffect(() => {
     if (dealSource && commissionType === "percentage") {
@@ -388,7 +388,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
         form.setValue("commissionRate", sourceConfig.commissionRate.toString());
       }
     }
-  }, [dealSource, commissionType, form]);
+  }, [dealSource, commissionType]);
 
   // Auto-calculate DD Expiration Date
   useEffect(() => {
@@ -414,7 +414,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
         // Invalid date, don't update
       }
     }
-  }, [psaSignedDate, ddPeriodDays, hasExtensions, extensionDaysArray, useBusinessDays, holidayCalendar, form]);
+  }, [psaSignedDate, ddPeriodDays, hasExtensions, extensionDaysArray, useBusinessDays, holidayCalendar]);
 
   // Auto-calculate Closing Date
   useEffect(() => {
@@ -436,7 +436,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
         // Invalid date, don't update
       }
     }
-  }, [form.watch("ddExpirationDate"), daysToClosing, useBusinessDays, holidayCalendar, form]);
+  }, [form.watch("ddExpirationDate"), daysToClosing, useBusinessDays, holidayCalendar]);
 
   useEffect(() => {
     if (deal) {
@@ -589,7 +589,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
       setAttorneysArray([]);
       setLeases([]);
     }
-  }, [deal, defaultStage, form]);
+  }, [deal, defaultStage]);
 
   const createDealMutation = useMutation({
     mutationFn: async (data: any) => {

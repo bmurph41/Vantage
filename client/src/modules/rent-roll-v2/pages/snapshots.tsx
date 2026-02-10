@@ -76,7 +76,7 @@ export default function SnapshotsPage() {
     if (createDialogOpen) {
       form.reset(getDefaultFormValues(), { keepDefaultValues: false });
     }
-  }, [createDialogOpen, form, getDefaultFormValues]);
+  }, [createDialogOpen, getDefaultFormValues]);
 
   const { data: snapshots, isLoading: snapshotsLoading } = useQuery<Snapshot[]>({
     queryKey: ['/api/snapshots', selectedProject !== 'all' ? selectedProject : undefined].filter(Boolean),

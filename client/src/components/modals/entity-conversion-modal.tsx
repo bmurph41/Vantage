@@ -220,7 +220,7 @@ export default function EntityConversionModal({
         ...updates
       });
     }
-  }, [sourceEntity, sourceType, conversionType, isOpen, form]);
+  }, [sourceEntity, sourceType, conversionType, isOpen]);
 
   // Get pipeline stages for selected pipeline
   const selectedPipeline = form.watch("pipeline");
@@ -233,7 +233,7 @@ export default function EntityConversionModal({
     if (stage && stage.probability !== undefined) {
       form.setValue("probability", stage.probability);
     }
-  }, [selectedStage, availableStages, form]);
+  }, [selectedStage, availableStages]);
 
   // Conversion mutation
   const conversionMutation = useMutation({

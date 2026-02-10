@@ -123,7 +123,7 @@ export default function TaskFormModal({ isOpen, onClose, task }: TaskFormModalPr
         companyId: "none",
       });
     }
-  }, [task, form]);
+  }, [task]);
 
   const createTaskMutation = useMutation({
     mutationFn: async (data: any) => {

@@ -512,7 +512,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
       setArticleUrls([""]);
       setAdditionalAgents([]);
     }
-  }, [comp, form, isPortfolioMode]);
+  }, [comp, isPortfolioMode]);
 
   const createMutation = useMutation({
     mutationFn: salesCompsApi.createComp,

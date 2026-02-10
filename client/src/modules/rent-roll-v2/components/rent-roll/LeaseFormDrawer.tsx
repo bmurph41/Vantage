@@ -393,7 +393,7 @@ export default function LeaseFormDrawer({ open, onClose, leaseId, locationId, lo
         discountValue: existingLease.discountValue ? parseFloat(existingLease.discountValue) : ("" as any),
       });
     }
-  }, [open, isEditing, existingLease, form]);
+  }, [open, isEditing, existingLease]);
 
   const onSubmit = async (data: LeaseFormValues) => {
     let finalStorageType = data.storageType;

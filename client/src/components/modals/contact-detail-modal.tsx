@@ -373,7 +373,7 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
       setSaveStatus('idle');
       setActiveTab("overview");
     }
-  }, [contact, form]);
+  }, [contact]);
 
   // Autosave on form changes when editing
   useEffect(() => {
@@ -400,7 +400,7 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
         clearTimeout(autosaveTimerRef.current);
       }
     };
-  }, [isEditing, form]);
+  }, [isEditing]);
 
   if (!contact) {
     return null;

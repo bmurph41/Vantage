@@ -61,7 +61,7 @@ export function TemplateFormModal({ open, onClose, template }: TemplateFormModal
         category: "",
       });
     }
-  }, [template, form]);
+  }, [template]);
 
   const createMutation = useMutation({
     mutationFn: async (data: TemplateFormData) => {

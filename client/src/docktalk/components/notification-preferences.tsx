@@ -148,7 +148,7 @@ export default function NotificationPreferences({
         timezone: prefs?.timezone || "America/New_York",
       });
     }
-  }, [currentUser, form]);
+  }, [currentUser]);
 
   const updatePreferencesMutation = useMutation({
     mutationFn: async (data: EmailSettingsForm) => {

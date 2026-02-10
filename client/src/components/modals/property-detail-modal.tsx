@@ -362,7 +362,7 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
       setIsEditing(false);
       setSaveStatus('idle');
     }
-  }, [property, form]);
+  }, [property]);
 
   // Autosave on form changes when editing
   useEffect(() => {
@@ -389,7 +389,7 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
         clearTimeout(autosaveTimerRef.current);
       }
     };
-  }, [isEditing, form]);
+  }, [isEditing]);
 
   if (!property) {
     return null;

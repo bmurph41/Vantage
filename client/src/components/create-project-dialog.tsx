@@ -172,7 +172,7 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
         }
       }
     }
-  }, [watchedDealId, deals, form]);
+  }, [watchedDealId, deals]);
 
   useEffect(() => {
     if (watchedPropertyId && watchedPropertyId !== "_none") {
@@ -189,7 +189,7 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
         setAddressInputValue(property.address || `${property.city || ''}, ${property.state || ''}`);
       }
     }
-  }, [watchedPropertyId, properties, form]);
+  }, [watchedPropertyId, properties]);
 
   const handleAddressSelect = (addr: NormalizedAddress) => {
     form.setValue("address", addr.line1 || addr.formattedAddress || "", { shouldDirty: true });

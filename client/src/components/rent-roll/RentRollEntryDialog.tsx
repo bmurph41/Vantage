@@ -74,7 +74,7 @@ export function RentRollEntryDialog({ open, onOpenChange, rentRollId, entry }: R
         notes: "",
       });
     }
-  }, [entry, isEditing, form]);
+  }, [entry, isEditing]);
 
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {

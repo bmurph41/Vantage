@@ -130,7 +130,7 @@ export default function SavedSearchesPage() {
         timezone: prefs?.timezone || "America/New_York",
       });
     }
-  }, [currentUser, form]);
+  }, [currentUser]);
 
   const updatePreferencesMutation = useMutation({
     mutationFn: async (data: EmailSettingsForm) => {

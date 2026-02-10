@@ -162,7 +162,7 @@ export function LeadConversionWizard({
     if (lead.estimatedValue) {
       form.setValue("dealValue", String(lead.estimatedValue));
     }
-  }, [lead, contacts, companies, isOpen, form]);
+  }, [lead, contacts, companies, isOpen]);
 
   const convertMutation = useMutation({
     mutationFn: async (data: DealConfigFormData) => {

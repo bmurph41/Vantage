@@ -525,7 +525,7 @@ export default function CompanyDetailModal({
       setSaveStatus('idle');
       setActiveTab("overview");
     }
-  }, [company, form]);
+  }, [company]);
 
   // Autosave functionality
   useEffect(() => {
@@ -551,7 +551,7 @@ export default function CompanyDetailModal({
         clearTimeout(autosaveTimerRef.current);
       }
     };
-  }, [isEditing, company, form]);
+  }, [isEditing, company]);
 
   if (!company) {
     return null;

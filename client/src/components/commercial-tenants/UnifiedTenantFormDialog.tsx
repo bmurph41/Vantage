@@ -683,7 +683,7 @@ export function UnifiedTenantFormDialog({
     } else {
       form.reset(DEFAULT_VALUES);
     }
-  }, [tenant, context, form]);
+  }, [tenant, context]);
 
   // Reset to basic tab if advanced tabs become hidden
   useEffect(() => {

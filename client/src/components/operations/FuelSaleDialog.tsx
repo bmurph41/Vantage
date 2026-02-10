@@ -103,7 +103,7 @@ export default function FuelSaleDialog({ open, onOpenChange, fuelSale }: FuelSal
         });
       }
     }
-  }, [open, fuelSale, form]);
+  }, [open, fuelSale]);
 
   // Auto-calculate total when quantity or price changes
   const watchQuantity = form.watch("quantityGallons");
@@ -117,7 +117,7 @@ export default function FuelSaleDialog({ open, onOpenChange, fuelSale }: FuelSal
         form.setValue("totalAmount", (quantity * price).toFixed(2));
       }
     }
-  }, [watchQuantity, watchPrice, form]);
+  }, [watchQuantity, watchPrice]);
 
   // Create/Update mutation
   const mutation = useMutation({

@@ -54,7 +54,7 @@ export function SequenceFormModal({ open, onClose, sequence }: SequenceFormModal
         status: "draft",
       });
     }
-  }, [sequence, form]);
+  }, [sequence]);
 
   const createMutation = useMutation({
     mutationFn: async (data: SequenceFormData) => {

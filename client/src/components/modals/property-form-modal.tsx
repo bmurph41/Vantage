@@ -363,7 +363,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
       setStorageEntries([]);
       setTouched(false);
     }
-  }, [property, form, isOpen]);
+  }, [property, isOpen]);
 
   // Load storage entries from server when editing
   useEffect(() => {

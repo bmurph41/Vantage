@@ -390,7 +390,7 @@ function LocationFormDrawer({
         charge3Label: editProject?.charge3Label || "Charge 3",
       });
     }
-  }, [open, editProject, form]);
+  }, [open, editProject]);
 
   useEffect(() => {
     if (!editProject && projectName && !form.getValues("code")) {
@@ -399,7 +399,7 @@ function LocationFormDrawer({
         form.setValue("code", generatedCode);
       }
     }
-  }, [projectName, editProject, form, existingCodes]);
+  }, [projectName, editProject, existingCodes]);
 
   useEffect(() => {
     if (summerEndDate && summerStartDate) {
@@ -418,7 +418,7 @@ function LocationFormDrawer({
       form.setValue("winterStartDate", winterStart.toISOString().split('T')[0]);
       form.setValue("winterEndDate", winterEnd.toISOString().split('T')[0]);
     }
-  }, [summerEndDate, summerStartDate, form]);
+  }, [summerEndDate, summerStartDate]);
 
   const totalCapacity = storageMix.reduce((sum, item) => sum + (item.capacity || 0), 0);
 

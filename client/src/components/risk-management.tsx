@@ -157,7 +157,7 @@ export function RiskManagement({ projectId }: RiskManagementProps) {
         riskVelocity: editingRisk.riskVelocity || "stable",
       });
     }
-  }, [editingRisk, form]);
+  }, [editingRisk]);
 
   const onSubmit = async (data: any) => {
     if (editingRisk) {

@@ -140,7 +140,7 @@ export default function AddEditMarinaDialog({ open, onOpenChange, marina, onSucc
         isActive: true,
       });
     }
-  }, [marina, form]);
+  }, [marina]);
 
   const createMutation = useMutation({
     mutationFn: async (data: MarinaFormValues) => {

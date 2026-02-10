@@ -175,7 +175,7 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
         geoWeight: undefined,
       });
     }
-  }, [project, form]);
+  }, [project]);
 
   const handleSubmit = (data: ProjectFormData) => {
     // Build profile object

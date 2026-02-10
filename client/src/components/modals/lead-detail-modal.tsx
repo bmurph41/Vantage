@@ -199,7 +199,7 @@ export default function LeadDetailModal({ isOpen, onClose, lead }: LeadDetailMod
       setIsEditing(false);
       setSaveStatus('idle');
     }
-  }, [lead, form]);
+  }, [lead]);
 
   // Autosave on form changes when editing
   useEffect(() => {
@@ -228,7 +228,7 @@ export default function LeadDetailModal({ isOpen, onClose, lead }: LeadDetailMod
         clearTimeout(autosaveTimerRef.current);
       }
     };
-  }, [isEditing, form]);
+  }, [isEditing]);
 
   if (!lead) {
     return null;

@@ -141,7 +141,7 @@ export function TenantFormDialog({ open, onOpenChange, tenant }: TenantFormDialo
         leaseExpirationDate: "",
       });
     }
-  }, [tenant, form]);
+  }, [tenant]);
 
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {

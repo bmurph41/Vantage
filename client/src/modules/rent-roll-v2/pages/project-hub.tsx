@@ -450,7 +450,7 @@ export default function ProjectHub() {
       setDealSearch('');
       setPropertySearch('');
     }
-  }, [addDialogOpen, form]);
+  }, [addDialogOpen]);
 
   if (isLoading) {
     return (

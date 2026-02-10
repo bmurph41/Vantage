@@ -208,7 +208,7 @@ export function ProjectIntegrationSettings({ projectId }: ProjectIntegrationSett
     } else {
       form.reset();
     }
-  }, [editingIntegration, form]);
+  }, [editingIntegration]);
 
   const onSubmit = (data: IntegrationFormData) => {
     if (editingIntegration) {

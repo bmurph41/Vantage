@@ -196,7 +196,7 @@ export default function LocationFormDrawer({ open, onClose, locationId, projectI
         isActive: existingLocation.isActive,
       });
     }
-  }, [open, isEditing, existingLocation, form]);
+  }, [open, isEditing, existingLocation]);
 
   const onSubmit = (data: StorageLocationFormValues) => {
     const apiData = toApiData(data);

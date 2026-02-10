@@ -183,7 +183,7 @@ export default function ModelingProjectFormDialog({
     if (components.city) form.setValue("city", components.city);
     if (components.state) form.setValue("state", components.state);
     if (components.zipCode) form.setValue("zipCode", components.zipCode);
-  }, [form]);
+  }, []);
 
   useEffect(() => {
     if (open && project && mode === 'edit') {
@@ -227,7 +227,7 @@ export default function ModelingProjectFormDialog({
       setSelectedBrokerDisplay('');
       setBrokerSearch('');
     }
-  }, [open, project, mode, form]);
+  }, [open, project, mode]);
 
   useEffect(() => {
     if (dealSource !== 'broker') {
@@ -236,7 +236,7 @@ export default function ModelingProjectFormDialog({
       setSelectedBrokerDisplay('');
       setBrokerSearch('');
     }
-  }, [dealSource, form]);
+  }, [dealSource]);
 
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {

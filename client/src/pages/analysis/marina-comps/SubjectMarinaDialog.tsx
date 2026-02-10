@@ -95,7 +95,7 @@ export default function SubjectMarinaDialog({ open, onOpenChange, subject }: Sub
         notes: "",
       });
     }
-  }, [subject, form]);
+  }, [subject]);
 
   const createMutation = useMutation({
     mutationFn: async (data: SubjectFormValues) => {

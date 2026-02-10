@@ -110,7 +110,7 @@ export default function CompSetDialog({ open, onOpenChange, compSet, subjects }:
         },
       });
     }
-  }, [compSet, form]);
+  }, [compSet]);
 
   const createMutation = useMutation({
     mutationFn: async (data: CompSetFormValues) => {

@@ -65,7 +65,7 @@ export function RentRollDialog({ open, onOpenChange, rentRoll, defaultContext }:
         facilityId: "",
       });
     }
-  }, [rentRoll, defaultContext, isEditing, form]);
+  }, [rentRoll, defaultContext, isEditing]);
 
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {

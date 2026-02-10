@@ -284,7 +284,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
     setCreatedPendingContacts([]);
     // Reset active tab when opening modal
     setActiveTab("basic");
-  }, [company, form, isOpen]);
+  }, [company, isOpen]);
 
   const createCompanyMutation = useMutation({
     mutationFn: async (data: any) => {
