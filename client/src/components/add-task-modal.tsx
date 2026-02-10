@@ -1546,7 +1546,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   <TaskDependenciesSelector 
                     projectId={projectId}
                     value={form.getValues("dependencies") || []}
-                    onChange={(value) => form.setValue("dependencies", value)}
+                    onChange={(deps) => { setTimeout(() => form.setValue("dependencies", deps, { shouldDirty: true }), 0); }}
                     currentTaskId={editingTask?.id}
                   />
                   <p className="text-sm text-muted-foreground">
@@ -2264,7 +2264,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   <TaskDependenciesSelector 
                     projectId={projectId}
                     value={form.getValues("dependencies") || []}
-                    onChange={(value) => form.setValue("dependencies", value)}
+                    onChange={(deps) => { setTimeout(() => form.setValue("dependencies", deps, { shouldDirty: true }), 0); }}
                     currentTaskId={editingTask?.id}
                   />
                   <p className="text-sm text-muted-foreground">
