@@ -904,7 +904,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
         setStep("browse"); // Start with browse step for new tasks
       }
     }
-  }, [isOpen, editingTask, form]);
+  }, [isOpen, editingTask]);
 
 
 
