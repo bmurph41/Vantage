@@ -149,14 +149,7 @@ function TaskDependenciesSelector({
   const [customDeps, setCustomDeps] = useState<{name: string; priority: string; deadline: string; contact: string}[]>([]);
   const [newCustom, setNewCustom] = useState({ name: "", priority: "med", deadline: "", contact: "" });
 
-  // Sync external value in only on initial mount / when external value length changes
-  useEffect(() => {
-    if (JSON.stringify(externalValue) !== JSON.stringify(selected)) {
-      setSelected(externalValue || []);
-    }
-  }, [externalValue?.length]);
-
-  // Stable reference for value used throughout
+  // Use internal state as source of truth - no sync needed
   const value = selected;
 
   // Fetch existing DD tasks
@@ -1552,7 +1545,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   <Label htmlFor="dependencies">Task Dependencies</Label>
                   <TaskDependenciesSelector 
                     projectId={projectId}
-                    value={form.watch("dependencies") || []}
+                    value={form.getValues("dependencies") || []}
                     onChange={(value) => form.setValue("dependencies", value)}
                     currentTaskId={editingTask?.id}
                   />
@@ -2270,7 +2263,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   <Label htmlFor="dependencies">Task Dependencies</Label>
                   <TaskDependenciesSelector 
                     projectId={projectId}
-                    value={form.watch("dependencies") || []}
+                    value={form.getValues("dependencies") || []}
                     onChange={(value) => form.setValue("dependencies", value)}
                     currentTaskId={editingTask?.id}
                   />
