@@ -114,7 +114,7 @@ workspaceRouter.post('/api/workspaces', async (req: Request, res: Response) => {
   const auth = requireAuth(req, res);
   if (!auth) return;
   const { userId, orgId } = auth;
-  const { name, description, role, status, dealId, propertyId, targetPrice, expectedCloseDate } = req.body;
+  const { name, description, role, status, dealId, propertyId, targetPrice, expectedCloseDate, ddProjectId } = req.body;
 
   if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
 
@@ -130,6 +130,7 @@ workspaceRouter.post('/api/workspaces', async (req: Request, res: Response) => {
       targetPrice: targetPrice || null,
       expectedCloseDate: expectedCloseDate || null,
       createdBy: userId,
+      ddProjectId: ddProjectId || null,
     }).returning();
 
     // Auto-add creator as owner_admin member
@@ -472,6 +473,7 @@ workspaceRouter.post('/api/workspaces/:id/dd-project', async (req: Request, res:
           displayOrder: idx,
           orgId,
           createdBy: userId,
+      ddProjectId: ddProjectId || null,
           // New columns added by migration:
           workspaceId: ws.id,
           templateKey: node.key,
@@ -495,6 +497,7 @@ workspaceRouter.post('/api/workspaces/:id/dd-project', async (req: Request, res:
       displayOrder: 0,
       orgId,
       createdBy: userId,
+      ddProjectId: ddProjectId || null,
       workspaceId: ws.id,
       templateKey: 'root',
       securityLevel: 'confidential' as any,
@@ -513,6 +516,7 @@ workspaceRouter.post('/api/workspaces/:id/dd-project', async (req: Request, res:
       accessPolicy: 'auto_approve',
       isActive: true,
       createdBy: userId,
+      ddProjectId: ddProjectId || null,
     }).returning();
 
     // 8) Auto-execute CA for creator
