@@ -617,8 +617,6 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
   const [drawerTab, setDrawerTab] = useState('details');
   const [commentText, setCommentText] = useState('');
   const [commentVisibility, setCommentVisibility] = useState('all');
-  const [addYearInput, setAddYearInput] = useState('');
-  const [showAddYear, setShowAddYear] = useState(false);
 
   const { data: comments = [] } = useItemComments(item?.id);
   const { data: history = [] } = useItemHistory(item?.id);
@@ -635,12 +633,17 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
   const receivedCount = periods.filter(p => p.isReceived).length;
   const allPeriodsReceived = periods.length > 0 && receivedCount === periods.length;
 
-  const handleAddYear = () => {
-    const val = addYearInput.trim();
-    if (!val) return;
-    addPeriods.mutate({ itemId: item.id, workspaceId, type: 'year', values: [val] });
-    setAddYearInput('');
-    setShowAddYear(false);
+  const currentYear = new Date().getFullYear();
+  const yearOptions = ['T12', ...Array.from({ length: 5 }, (_, i) => String(currentYear - i))];
+  const existingLabels = new Set(periods.map(p => p.periodLabel));
+
+  const handleToggleYearCheckbox = (label: string) => {
+    if (existingLabels.has(label)) {
+      const period = periods.find(p => p.periodLabel === label);
+      if (period) deletePeriod.mutate({ periodId: period.id, workspaceId });
+    } else {
+      addPeriods.mutate({ itemId: item.id, workspaceId, type: label === 'T12' ? 'trailing' : 'year', values: [label] });
+    }
   };
 
   const handleMarkComplete = () => {
@@ -690,75 +693,61 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
                 <Calendar className="h-3.5 w-3.5" />
                 Year / Period Tracking
               </span>
-              <div className="flex items-center gap-2">
-                {periods.length > 0 && (
-                  <span className="text-[11px] text-muted-foreground">
-                    {receivedCount}/{periods.length} received
-                    {allPeriodsReceived && <Check className="inline h-3 w-3 ml-0.5 text-green-600" />}
-                  </span>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-[11px]"
-                  onClick={() => setShowAddYear(!showAddYear)}
-                >
-                  <Plus className="h-3 w-3 mr-0.5" />Add Year
-                </Button>
-              </div>
+              {periods.length > 0 && (
+                <span className="text-[11px] text-muted-foreground">
+                  {receivedCount}/{periods.length} received
+                  {allPeriodsReceived && <Check className="inline h-3 w-3 ml-0.5 text-green-600" />}
+                </span>
+              )}
             </div>
 
-            {showAddYear && (
-              <div className="flex items-center gap-2 mb-3">
-                <Input
-                  autoFocus
-                  className="h-7 text-xs w-24"
-                  placeholder="e.g. 2024"
-                  value={addYearInput}
-                  onChange={e => setAddYearInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleAddYear(); if (e.key === 'Escape') setShowAddYear(false); }}
-                />
-                <Button size="sm" className="h-7 text-xs px-2" onClick={handleAddYear} disabled={!addYearInput.trim() || addPeriods.isPending}>
-                  {addPeriods.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Add'}
-                </Button>
-                <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => setShowAddYear(false)}>Cancel</Button>
-              </div>
-            )}
-
-            {periods.length > 0 ? (
-              <div className="grid grid-cols-3 gap-2">
-                {periods.map((period) => (
-                  <div key={period.id} className="relative group">
+            <div className="grid grid-cols-3 gap-2 mb-2">
+              {yearOptions.map((label) => {
+                const isSelected = existingLabels.has(label);
+                const period = isSelected ? periods.find(p => p.periodLabel === label) : null;
+                const isReceived = period?.isReceived ?? false;
+                return (
+                  <div key={label} className="relative group">
                     <button
                       className={`w-full flex items-center gap-1.5 text-xs font-medium px-2 py-1.5 rounded-md transition-colors ${
-                        period.isReceived
+                        isReceived
                           ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-700'
-                          : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:border-green-400'
+                          : isSelected
+                            ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700'
+                            : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-500 border border-dashed border-gray-300 dark:border-gray-600 hover:border-blue-400 hover:text-gray-700'
                       }`}
-                      onClick={() => onTogglePeriod(period)}
+                      onClick={() => {
+                        if (isSelected && period) {
+                          onTogglePeriod(period);
+                        } else {
+                          handleToggleYearCheckbox(label);
+                        }
+                      }}
                     >
-                      {period.isReceived ? <Check className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
-                      {period.periodLabel}
+                      {isReceived
+                        ? <Check className="h-3 w-3" />
+                        : isSelected
+                          ? <Circle className="h-3 w-3" />
+                          : <Plus className="h-3 w-3 opacity-40" />}
+                      {label}
                     </button>
-                    <button
-                      className="absolute -top-1 -right-1 hidden group-hover:flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white"
-                      onClick={() => deletePeriod.mutate({ periodId: period.id, workspaceId })}
-                      title="Remove year"
-                    >
-                      <X className="h-2.5 w-2.5" />
-                    </button>
+                    {isSelected && (
+                      <button
+                        className="absolute -top-1 -right-1 hidden group-hover:flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white"
+                        onClick={() => handleToggleYearCheckbox(label)}
+                        title="Remove period"
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    )}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground text-center py-2">
-                No years added yet. Click "Add Year" to select years to track.
-              </p>
-            )}
+                );
+              })}
+            </div>
 
             {periods.length > 0 && (
-              <div className="mt-2 pt-2 border-t border-border/50">
-                <Progress value={periods.length > 0 ? (receivedCount / periods.length) * 100 : 0} className="h-1.5" />
+              <div className="mt-1 pt-2 border-t border-border/50">
+                <Progress value={(receivedCount / periods.length) * 100} className="h-1.5" />
               </div>
             )}
           </div>
