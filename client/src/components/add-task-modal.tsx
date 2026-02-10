@@ -141,7 +141,6 @@ function TaskDependenciesSelector({
   onChange: (value: string[]) => void; 
   currentTaskId?: string; 
 }) {
-  // Use internal state to avoid re-render loops from form.watch/setValue cycle
   const [selected, setSelected] = useState<string[]>(externalValue || []);
   const [isOpen, setIsOpen] = useState(false);
   const [depTab, setDepTab] = useState<"tasks" | "dd_requests" | "custom">("tasks");
@@ -149,7 +148,12 @@ function TaskDependenciesSelector({
   const [customDeps, setCustomDeps] = useState<{name: string; priority: string; deadline: string; contact: string}[]>([]);
   const [newCustom, setNewCustom] = useState({ name: "", priority: "med", deadline: "", contact: "" });
 
-  // Use internal state as source of truth - no sync needed
+  const externalValueKey = JSON.stringify(externalValue || []);
+  useEffect(() => {
+    const parsed = JSON.parse(externalValueKey) as string[];
+    setSelected(parsed);
+  }, [externalValueKey]);
+
   const value = selected;
 
   // Fetch existing DD tasks
@@ -1545,8 +1549,8 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   <Label htmlFor="dependencies">Task Dependencies</Label>
                   <TaskDependenciesSelector 
                     projectId={projectId}
-                    value={form.getValues("dependencies") || []}
-                    onChange={(deps) => { setTimeout(() => form.setValue("dependencies", deps, { shouldDirty: true }), 0); }}
+                    value={form.watch("dependencies") || []}
+                    onChange={(deps) => form.setValue("dependencies", deps, { shouldDirty: true })}
                     currentTaskId={editingTask?.id}
                   />
                   <p className="text-sm text-muted-foreground">
@@ -2263,8 +2267,8 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   <Label htmlFor="dependencies">Task Dependencies</Label>
                   <TaskDependenciesSelector 
                     projectId={projectId}
-                    value={form.getValues("dependencies") || []}
-                    onChange={(deps) => { setTimeout(() => form.setValue("dependencies", deps, { shouldDirty: true }), 0); }}
+                    value={form.watch("dependencies") || []}
+                    onChange={(deps) => form.setValue("dependencies", deps, { shouldDirty: true })}
                     currentTaskId={editingTask?.id}
                   />
                   <p className="text-sm text-muted-foreground">
