@@ -132,7 +132,7 @@ function TaskOwnerSelector({ projectId, value, onChange }: {
 // Task Dependencies Selector Component — supports DD Tasks, DD Request Items, and Custom deps
 function TaskDependenciesSelector({ 
   projectId, 
-  value: externalValue, 
+  value, 
   onChange, 
   currentTaskId 
 }: { 
@@ -141,27 +141,18 @@ function TaskDependenciesSelector({
   onChange: (value: string[]) => void; 
   currentTaskId?: string; 
 }) {
-  const [selected, setSelected] = useState<string[]>(externalValue || []);
   const [isOpen, setIsOpen] = useState(false);
   const [depTab, setDepTab] = useState<"tasks" | "dd_requests" | "custom">("tasks");
   const [searchFilter, setSearchFilter] = useState("");
   const [customDeps, setCustomDeps] = useState<{name: string; priority: string; deadline: string; contact: string}[]>([]);
   const [newCustom, setNewCustom] = useState({ name: "", priority: "med", deadline: "", contact: "" });
 
-  const externalValueKey = JSON.stringify(externalValue || []);
-  useEffect(() => {
-    const parsed = JSON.parse(externalValueKey) as string[];
-    setSelected(parsed);
-  }, [externalValueKey]);
+  const safeValue = value || [];
 
-  const value = selected;
-
-  // Fetch existing DD tasks
   const { data: projectData } = useProject(projectId);
   const availableTasks = projectData?.tasks || [];
   const selectableTasks = availableTasks.filter((task: any) => task.id !== currentTaskId);
 
-  // Fetch DD Request checklist items
   const { data: ddRequestItems = [] } = useQuery<any[]>({
     queryKey: ['/api/projects', projectId, 'dd-request-items'],
     queryFn: async () => {
@@ -173,8 +164,7 @@ function TaskDependenciesSelector({
   });
 
   const handleToggle = (id: string) => {
-    const next = value.includes(id) ? value.filter(x => x !== id) : [...value, id];
-    setSelected(next);
+    const next = safeValue.includes(id) ? safeValue.filter(x => x !== id) : [...safeValue, id];
     onChange(next);
   };
 
@@ -182,26 +172,21 @@ function TaskDependenciesSelector({
     if (!newCustom.name.trim()) return;
     const customId = `custom_${Date.now()}`;
     setCustomDeps(prev => [...prev, { ...newCustom }]);
-    const next = [...value, customId];
-    setSelected(next);
-    onChange(next);
+    onChange([...safeValue, customId]);
     setNewCustom({ name: "", priority: "med", deadline: "", contact: "" });
   };
 
   const handleRemoveCustomDep = (index: number) => {
     setCustomDeps(prev => prev.filter((_, i) => i !== index));
-    const customIds = value.filter(v => v.startsWith('custom_'));
+    const customIds = safeValue.filter(v => v.startsWith('custom_'));
     if (customIds[index]) {
-      const next = value.filter(v => v !== customIds[index]);
-      setSelected(next);
-      onChange(next);
+      onChange(safeValue.filter(v => v !== customIds[index]));
     }
   };
 
-  // Build display of selected items
   const getSelectedItems = () => {
     const items: { id: string; label: string; type: string }[] = [];
-    value.forEach(id => {
+    safeValue.forEach(id => {
       if (id.startsWith('custom_')) return;
       const task = selectableTasks.find((t: any) => t.id === id);
       if (task) { items.push({ id, label: task.title, type: 'task' }); return; }
@@ -277,7 +262,7 @@ function TaskDependenciesSelector({
           {totalSelected > 0 && (
             <Button type="button" variant="ghost" size="sm"
               className="h-5 w-5 p-0 hover:bg-destructive hover:text-destructive-foreground"
-              onClick={(e) => { e.stopPropagation(); setSelected([]); onChange([]); setCustomDeps([]); }}>
+              onClick={(e) => { e.stopPropagation(); onChange([]); setCustomDeps([]); }}>
               <XCircle className="h-3 w-3" />
             </Button>
           )}
@@ -326,10 +311,10 @@ function TaskDependenciesSelector({
                   {filteredTasks.map((task: any) => (
                     <div key={task.id}
                       className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
-                        value.includes(task.id) ? 'bg-blue-50 ring-1 ring-blue-200' : 'hover:bg-muted'
+                        safeValue.includes(task.id) ? 'bg-blue-50 ring-1 ring-blue-200' : 'hover:bg-muted'
                       }`}
                       onClick={() => handleToggle(task.id)}>
-                      <Checkbox checked={value.includes(task.id)} className="pointer-events-none" />
+                      <Checkbox checked={safeValue.includes(task.id)} className="pointer-events-none" />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium truncate">{task.title}</div>
                         <div className="flex items-center gap-1.5 mt-0.5">
@@ -365,10 +350,10 @@ function TaskDependenciesSelector({
                       {items.map((item: any) => (
                         <div key={item.id}
                           className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
-                            value.includes(item.id) ? 'bg-blue-50 ring-1 ring-blue-200' : 'hover:bg-muted'
+                            safeValue.includes(item.id) ? 'bg-blue-50 ring-1 ring-blue-200' : 'hover:bg-muted'
                           }`}
                           onClick={() => handleToggle(item.id)}>
-                          <Checkbox checked={value.includes(item.id)} className="pointer-events-none" />
+                          <Checkbox checked={safeValue.includes(item.id)} className="pointer-events-none" />
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-medium truncate">{item.title}</div>
                             <div className="flex items-center gap-1.5 mt-0.5">
