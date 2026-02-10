@@ -180,6 +180,24 @@ router.get('/api/workspaces/:id/dd-checklist', async (req: any, res: Response) =
     const commentCountMap: Record<string, number> = {};
     commentCounts.forEach((cc: any) => { commentCountMap[cc.itemId] = Number(cc.count); });
 
+    // Get periods for all items
+    const allPeriods = items.length > 0 ? await db
+      .select()
+      .from(schema.ddChecklistItemPeriods)
+      .where(
+        inArray(
+          schema.ddChecklistItemPeriods.itemId,
+          items.map((i: any) => i.id)
+        )
+      )
+      .orderBy(asc(schema.ddChecklistItemPeriods.periodSort)) : [];
+
+    const periodsMap: Record<string, any[]> = {};
+    allPeriods.forEach((p: any) => {
+      if (!periodsMap[p.itemId]) periodsMap[p.itemId] = [];
+      periodsMap[p.itemId].push(p);
+    });
+
     // Filter internal fields for external users
     const isInternalUser = isInternal(member);
     const enrichedItems = items.map((item: any) => ({
@@ -188,6 +206,7 @@ router.get('/api/workspaces/:id/dd-checklist', async (req: any, res: Response) =
       internalStatus: isInternalUser ? item.internalStatus : undefined,
       fileCount: fileCountMap[item.id] || 0,
       commentCount: commentCountMap[item.id] || 0,
+      periods: periodsMap[item.id] || [],
     }));
 
     // Build sections with items

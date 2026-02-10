@@ -7,6 +7,19 @@ import { apiRequest } from '@/lib/queryClient';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+export interface DdChecklistItemPeriod {
+  id: string;
+  itemId: string;
+  periodType: string;
+  periodLabel: string;
+  periodSort: number;
+  isReceived: boolean;
+  receivedAt: string | null;
+  receivedBy: string | null;
+  fileId: string | null;
+  notes: string | null;
+}
+
 export interface DdChecklistItem {
   id: string;
   sectionId: string;
@@ -28,6 +41,9 @@ export interface DdChecklistItem {
   sellerNotes: string | null;
   internalNotes: string | null;
   templateKey: string | null;
+  hasPeriods?: boolean;
+  periodConfig?: { type: string; values: string[] } | null;
+  periods: DdChecklistItemPeriod[];
   fileCount: number;
   commentCount: number;
   createdAt: string;
@@ -231,6 +247,19 @@ export function useLinkFile() {
   return useMutation({
     mutationFn: async ({ itemId, workspaceId, documentId }: { itemId: string; workspaceId: string; documentId: string }) => {
       const res = await apiRequest('POST', `/api/dd-items/${itemId}/link-file`, { documentId });
+      return res.json();
+    },
+    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ['dd-checklist', vars.workspaceId] }),
+  });
+}
+
+// ─── Periods ─────────────────────────────────────────────────────────────────
+
+export function useTogglePeriodReceived() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ periodId, workspaceId, isReceived }: { periodId: string; workspaceId: string; isReceived: boolean }) => {
+      const res = await apiRequest('PATCH', `/api/dd-item-periods/${periodId}`, { isReceived });
       return res.json();
     },
     onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ['dd-checklist', vars.workspaceId] }),

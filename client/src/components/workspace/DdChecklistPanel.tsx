@@ -9,8 +9,8 @@ import {
   useDdChecklist, useCreateDdChecklist, useCreateFromTemplate, useSetItemStatus,
   useUpdateItem, useCreateSection, useCreateItem, useDeleteItem, useDeleteSection,
   useExportChecklist, useDdChecklistTemplates, useSeedTemplates, useItemComments,
-  usePostComment, useItemHistory, useUpdateChecklistSettings,
-  DdChecklistItem, DdChecklistSection as SectionType,
+  usePostComment, useItemHistory, useUpdateChecklistSettings, useTogglePeriodReceived,
+  DdChecklistItem, DdChecklistSection as SectionType, DdChecklistItemPeriod,
 } from '@/hooks/useDdChecklist';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -21,6 +21,9 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from '@/components/ui/tooltip';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
@@ -33,30 +36,28 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  AlertCircle, Calendar, CheckCircle2, ChevronDown, ChevronRight, ClipboardList,
-  Download, FileText, Loader2, MessageSquare, MoreVertical, Paperclip, Plus,
-  Settings, Shield, X,
+  AlertCircle, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, Circle,
+  ClipboardList, Download, FileText, Loader2, MessageSquare, MoreVertical,
+  Paperclip, Plus, Settings, Shield, X,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
-// ─── Status config ───────────────────────────────────────────────────────────
-
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  open: { label: 'Open', bg: 'bg-gray-100', text: 'text-gray-700' },
-  requested: { label: 'Requested', bg: 'bg-blue-50', text: 'text-blue-700' },
-  in_progress: { label: 'In Progress', bg: 'bg-blue-100', text: 'text-blue-700' },
-  provided: { label: 'Provided', bg: 'bg-amber-100', text: 'text-amber-700' },
-  reviewing: { label: 'Reviewing', bg: 'bg-purple-100', text: 'text-purple-700' },
-  approved: { label: 'Approved', bg: 'bg-green-100', text: 'text-green-700' },
-  rejected: { label: 'Rejected', bg: 'bg-red-100', text: 'text-red-700' },
-  waived: { label: 'Waived', bg: 'bg-gray-100', text: 'text-gray-500' },
-  blocked: { label: 'Blocked', bg: 'bg-red-50', text: 'text-red-600' },
+  open: { label: 'Open', bg: 'bg-gray-100 dark:bg-gray-800', text: 'text-gray-700 dark:text-gray-300' },
+  requested: { label: 'Requested', bg: 'bg-blue-50 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-300' },
+  in_progress: { label: 'In Progress', bg: 'bg-blue-100 dark:bg-blue-900/40', text: 'text-blue-700 dark:text-blue-300' },
+  provided: { label: 'Provided', bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-300' },
+  reviewing: { label: 'Reviewing', bg: 'bg-purple-100 dark:bg-purple-900/30', text: 'text-purple-700 dark:text-purple-300' },
+  approved: { label: 'Approved', bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-300' },
+  rejected: { label: 'Rejected', bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-300' },
+  waived: { label: 'Waived', bg: 'bg-gray-100 dark:bg-gray-800', text: 'text-gray-500 dark:text-gray-400' },
+  blocked: { label: 'Blocked', bg: 'bg-red-50 dark:bg-red-900/20', text: 'text-red-600 dark:text-red-400' },
 };
 
 const PRIORITY_CONFIG: Record<number, { label: string; className: string }> = {
-  1: { label: 'High', className: 'bg-red-100 text-red-700' },
-  2: { label: 'Med', className: 'bg-amber-100 text-amber-700' },
-  3: { label: 'Low', className: 'bg-gray-100 text-gray-500' },
+  1: { label: 'High', className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' },
+  2: { label: 'Med', className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
+  3: { label: 'Low', className: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' },
 };
 
 const ALL_STATUSES = ['open', 'requested', 'in_progress', 'provided', 'reviewing', 'approved', 'rejected', 'waived', 'blocked'];
@@ -80,8 +81,8 @@ export default function DdChecklistPanel({ workspaceId }: Props) {
   const exportChecklist = useExportChecklist();
   const seedTemplates = useSeedTemplates();
   const updateSettings = useUpdateChecklistSettings();
+  const togglePeriod = useTogglePeriodReceived();
 
-  // UI State
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [showAddSectionDialog, setShowAddSectionDialog] = useState(false);
@@ -94,15 +95,11 @@ export default function DdChecklistPanel({ workspaceId }: Props) {
   const [addingItemToSection, setAddingItemToSection] = useState<string | null>(null);
   const [newItemTitle, setNewItemTitle] = useState('');
 
-  // ─── Derived ─────────────────────────────────────────────────────────────
-
   const checklist = data?.checklist;
   const sections = data?.sections || [];
   const stats = data?.stats;
   const hasChecklist = !!checklist;
   const approvedPct = stats && stats.total > 0 ? (stats.approved / stats.total) * 100 : 0;
-
-  // ─── Handlers ────────────────────────────────────────────────────────────
 
   const toggleSection = (id: string) => {
     setCollapsedSections(prev => {
@@ -164,12 +161,16 @@ export default function DdChecklistPanel({ workspaceId }: Props) {
     );
   };
 
-  // ─── Loading / Empty states ──────────────────────────────────────────────
+  const handleTogglePeriod = (period: DdChecklistItemPeriod) => {
+    togglePeriod.mutate({
+      periodId: period.id,
+      workspaceId,
+      isReceived: !period.isReceived,
+    });
+  };
 
   if (isLoading) return <Skeleton className="h-64 w-full" />;
   if (error) return <div className="text-red-500 p-4">Failed to load checklist</div>;
-
-  // ─── No checklist yet ────────────────────────────────────────────────────
 
   if (!hasChecklist) {
     return (
@@ -196,13 +197,12 @@ export default function DdChecklistPanel({ workspaceId }: Props) {
             </div>
           </div>
 
-          {/* Template Dialog */}
           <TemplatePickerDialog
             open={showTemplateDialog}
             onClose={() => setShowTemplateDialog(false)}
             templates={templates}
             selectedIds={selectedTemplateIds}
-            onToggle={(id) => setSelectedTemplateIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
+            onToggle={(id: string) => setSelectedTemplateIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
             mergeStrategy={mergeStrategy}
             onMergeChange={setMergeStrategy}
             onConfirm={handleCreateFromTemplate}
@@ -215,197 +215,289 @@ export default function DdChecklistPanel({ workspaceId }: Props) {
     );
   }
 
-  // ─── Main checklist UI ───────────────────────────────────────────────────
+  const totalItems = stats?.total || 0;
+  const completedItems = (stats?.approved || 0) + (stats?.waived || 0);
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                {checklist.name}
-                <Badge variant="secondary" className="text-xs">{stats?.total || 0} items</Badge>
-              </CardTitle>
-              <CardDescription>
-                {stats?.approved || 0} approved · {stats?.overdue || 0} overdue · {stats?.blocked || 0} blocked
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setShowTemplateDialog(true)}>
-                <Plus className="h-4 w-4 mr-1" />Template
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setShowAddSectionDialog(true)}>
-                <Plus className="h-4 w-4 mr-1" />Section
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => exportChecklist.mutate({ workspaceId, format: 'excel' })}>
-                <Download className="h-4 w-4 mr-1" />Excel
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => exportChecklist.mutate({ workspaceId, format: 'pdf' })}>
-                <Download className="h-4 w-4 mr-1" />PDF
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setShowSettingsDialog(true)}>
-                <Settings className="h-4 w-4" />
-              </Button>
+      <div className="space-y-6">
+        {/* Header bar */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight">{checklist.name}</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {completedItems} of {totalItems} items complete · {stats?.overdue || 0} overdue
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowTemplateDialog(true)}>
+              <Plus className="h-4 w-4 mr-1" />Template
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setShowAddSectionDialog(true)}>
+              <Plus className="h-4 w-4 mr-1" />Section
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => exportChecklist.mutate({ workspaceId, format: 'excel' })}>
+              <Download className="h-4 w-4 mr-1" />Export
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setShowSettingsDialog(true)}>
+              <Settings className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Overall progress */}
+        <div className="bg-card border rounded-xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium">{Math.round(approvedPct)}% Complete</span>
+            <div className="flex gap-3 text-xs text-muted-foreground">
+              {[
+                { key: 'open', statsKey: 'open', color: 'bg-gray-400' },
+                { key: 'in_progress', statsKey: 'inProgress', color: 'bg-blue-500' },
+                { key: 'provided', statsKey: 'provided', color: 'bg-amber-500' },
+                { key: 'approved', statsKey: 'approved', color: 'bg-green-500' },
+                { key: 'blocked', statsKey: 'blocked', color: 'bg-red-500' },
+              ].map(({ key, statsKey, color }) => (
+                <span key={key} className="flex items-center gap-1">
+                  <span className={`w-2 h-2 rounded-full ${color}`} />
+                  {stats?.[statsKey as keyof typeof stats] || 0} {STATUS_CONFIG[key]?.label}
+                </span>
+              ))}
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          {/* Progress bar */}
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-sm font-medium">{Math.round(approvedPct)}% Approved</span>
-              <div className="flex gap-2 text-xs text-muted-foreground">
-                {['open', 'in_progress', 'provided', 'approved', 'blocked'].map(s => (
-                  <span key={s} className="flex items-center gap-1">
-                    <span className={`w-2 h-2 rounded-full ${STATUS_CONFIG[s]?.bg || ''}`} />
-                    {stats?.[s as keyof typeof stats] || 0} {STATUS_CONFIG[s]?.label}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <Progress value={approvedPct} className="h-2" />
-          </div>
+          <Progress value={approvedPct} className="h-2" />
+        </div>
 
-          {/* Sections */}
-          <div className="space-y-4">
-            {sections.map((section) => {
-              const isCollapsed = collapsedSections.has(section.id);
-              const sectionApproved = section.items.filter(i => i.status === 'approved').length;
-              const sectionTotal = section.items.length;
-              const sectionOverdue = section.items.filter(i => i.dueDate && new Date(i.dueDate) < new Date() && !['approved', 'waived'].includes(i.status)).length;
+        {/* Sections with card grids */}
+        {sections.map((section) => {
+          const isCollapsed = collapsedSections.has(section.id);
+          const sectionApproved = section.items.filter(i => ['approved', 'waived'].includes(i.status)).length;
+          const sectionTotal = section.items.length;
+          const sectionPct = sectionTotal > 0 ? Math.round((sectionApproved / sectionTotal) * 100) : 0;
+          const sectionComplete = sectionPct === 100 && sectionTotal > 0;
 
-              return (
-                <div key={section.id} className="border rounded-lg">
-                  {/* Section header */}
-                  <div
-                    className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-muted/50"
-                    onClick={() => toggleSection(section.id)}
-                  >
-                    <div className="flex items-center gap-2">
-                      {isCollapsed ? <ChevronRight className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-                      <span className="font-semibold text-sm">{section.title}</span>
-                      <Badge variant="secondary" className="text-xs">{sectionApproved}/{sectionTotal}</Badge>
-                      {sectionOverdue > 0 && <Badge variant="destructive" className="text-xs">{sectionOverdue} overdue</Badge>}
-                    </div>
-                    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => { setAddingItemToSection(section.id); setNewItemTitle(''); }}>
-                        <Plus className="h-3 w-3 mr-1" />Item
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-red-500" onClick={() => {
-                        if (confirm(`Delete section "${section.title}" and all its items?`)) {
-                          deleteSection.mutate({ sectionId: section.id, workspaceId });
-                        }
-                      }}>
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
+          return (
+            <div key={section.id} className="space-y-3">
+              {/* Section header */}
+              <div
+                className={`flex items-center justify-between px-4 py-3 rounded-xl cursor-pointer transition-colors ${
+                  sectionComplete
+                    ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+                    : 'bg-muted/50 border border-border hover:bg-muted'
+                }`}
+                onClick={() => toggleSection(section.id)}
+              >
+                <div className="flex items-center gap-3">
+                  {isCollapsed
+                    ? <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  }
+                  <div>
+                    <span className="font-semibold text-sm">{section.title}</span>
+                    <span className="text-xs text-muted-foreground ml-2">
+                      {sectionApproved}/{sectionTotal}
+                    </span>
                   </div>
-
-                  {/* Items */}
-                  {!isCollapsed && (
-                    <div className="px-2 pb-2">
-                      {section.items.map((item) => {
-                        const sc = STATUS_CONFIG[item.status] || STATUS_CONFIG.open;
-                        const pc = PRIORITY_CONFIG[item.priority] || PRIORITY_CONFIG[2];
-                        const isOverdue = item.dueDate && new Date(item.dueDate) < new Date() && !['approved', 'waived'].includes(item.status);
-
-                        return (
-                          <div
-                            key={item.id}
-                            className="flex items-center gap-3 px-3 py-2 rounded hover:bg-muted/50 group cursor-pointer"
-                            onClick={() => { setActiveItem(item); setActiveSection(section); }}
-                          >
-                            {/* Priority */}
-                            <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${pc.className}`}>{pc.label}</Badge>
-
-                            {/* Title */}
-                            <div className="flex-1 min-w-0">
-                              <span className={`text-sm ${item.status === 'approved' ? 'line-through text-muted-foreground' : ''}`}>
-                                {item.title}
-                              </span>
-                              {item.subCategory && <span className="text-xs text-muted-foreground ml-2">({item.subCategory})</span>}
-                            </div>
-
-                            {/* Due date */}
-                            {item.dueDate && (
-                              <span className={`text-xs ${isOverdue ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
-                                {format(new Date(item.dueDate), 'MMM d')}
-                              </span>
-                            )}
-
-                            {/* Badges */}
-                            {item.fileCount > 0 && (
-                              <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-                                <Paperclip className="h-3 w-3" />{item.fileCount}
-                              </span>
-                            )}
-                            {item.commentCount > 0 && (
-                              <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-                                <MessageSquare className="h-3 w-3" />{item.commentCount}
-                              </span>
-                            )}
-
-                            {/* Status pill */}
-                            <Badge variant="outline" className={`text-[10px] ${sc.bg} ${sc.text}`}>{sc.label}</Badge>
-
-                            {/* Quick actions */}
-                            <div className="hidden group-hover:flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                              {item.status !== 'provided' && (
-                                <Button variant="ghost" size="sm" className="h-6 px-1.5 text-xs"
-                                  onClick={() => handleStatusChange(item.id, 'provided')}>
-                                  Mark Provided
-                                </Button>
-                              )}
-                              {item.status === 'provided' && (
-                                <Button variant="ghost" size="sm" className="h-6 px-1.5 text-xs text-green-600"
-                                  onClick={() => handleStatusChange(item.id, 'approved')}>
-                                  Approve
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-
-                      {/* Inline add item */}
-                      {addingItemToSection === section.id && (
-                        <div className="flex items-center gap-2 px-3 py-2" onClick={e => e.stopPropagation()}>
-                          <Input
-                            autoFocus
-                            placeholder="New item title..."
-                            value={newItemTitle}
-                            onChange={e => setNewItemTitle(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter') handleAddItem(section.id); if (e.key === 'Escape') setAddingItemToSection(null); }}
-                            className="h-8 text-sm"
-                          />
-                          <Button size="sm" className="h-8" onClick={() => handleAddItem(section.id)} disabled={!newItemTitle.trim()}>Add</Button>
-                          <Button variant="ghost" size="sm" className="h-8" onClick={() => setAddingItemToSection(null)}>Cancel</Button>
-                        </div>
-                      )}
-
-                      {section.items.length === 0 && addingItemToSection !== section.id && (
-                        <div className="text-center py-4 text-sm text-muted-foreground">
-                          No items. <button className="underline" onClick={() => { setAddingItemToSection(section.id); setNewItemTitle(''); }}>Add one</button>
-                        </div>
-                      )}
-                    </div>
+                  {sectionComplete && (
+                    <Badge className="bg-green-600 text-white text-[10px] px-1.5">
+                      <CheckCircle2 className="h-3 w-3 mr-0.5" />Done
+                    </Badge>
                   )}
                 </div>
-              );
-            })}
-          </div>
+                <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                  <div className="w-24">
+                    <Progress value={sectionPct} className="h-1.5" />
+                  </div>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => { setAddingItemToSection(section.id); setNewItemTitle(''); }}>
+                    <Plus className="h-3 w-3 mr-1" />Item
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-red-500" onClick={() => {
+                    if (confirm(`Delete section "${section.title}" and all its items?`)) {
+                      deleteSection.mutate({ sectionId: section.id, workspaceId });
+                    }
+                  }}>
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
 
-          {sections.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              <ClipboardList className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p>No sections yet. Add a section or create from a template.</p>
+              {/* Card grid */}
+              {!isCollapsed && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 pl-2">
+                  {section.items.map((item) => {
+                    const isComplete = ['approved', 'waived'].includes(item.status);
+                    const isOverdue = item.dueDate && new Date(item.dueDate) < new Date() && !isComplete;
+                    const sc = STATUS_CONFIG[item.status] || STATUS_CONFIG.open;
+                    const pc = PRIORITY_CONFIG[item.priority] || PRIORITY_CONFIG[2];
+                    const periods = item.periods || [];
+                    const totalPeriods = periods.length;
+                    const receivedPeriods = periods.filter(p => p.isReceived).length;
+                    const hasPeriods = totalPeriods > 0;
+
+                    return (
+                      <div
+                        key={item.id}
+                        className={`group relative rounded-xl border p-4 transition-all cursor-pointer hover:shadow-md ${
+                          isComplete
+                            ? 'bg-green-50 dark:bg-green-900/15 border-green-200 dark:border-green-800 shadow-sm'
+                            : isOverdue
+                              ? 'bg-red-50/50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
+                              : 'bg-card border-border hover:border-primary/30'
+                        }`}
+                        onClick={() => { setActiveItem(item); setActiveSection(section); }}
+                      >
+                        {/* Top row: priority + status */}
+                        <div className="flex items-center justify-between mb-2">
+                          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${pc.className}`}>
+                            {pc.label}
+                          </Badge>
+                          <Badge variant="outline" className={`text-[10px] ${sc.bg} ${sc.text}`}>
+                            {isComplete && <CheckCircle2 className="h-3 w-3 mr-0.5" />}
+                            {sc.label}
+                          </Badge>
+                        </div>
+
+                        {/* Title */}
+                        <h4 className={`text-sm font-medium leading-snug mb-1 line-clamp-2 ${
+                          isComplete ? 'text-green-800 dark:text-green-300' : ''
+                        }`}>
+                          {item.title}
+                        </h4>
+                        {item.subCategory && (
+                          <p className="text-[11px] text-muted-foreground mb-2">{item.subCategory}</p>
+                        )}
+
+                        {/* Period / Year pills */}
+                        {hasPeriods && (
+                          <div className="mt-2 mb-1">
+                            <div className="flex items-center gap-1 mb-1.5">
+                              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                                Years
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">
+                                ({receivedPeriods}/{totalPeriods})
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-1" onClick={e => e.stopPropagation()}>
+                              <TooltipProvider delayDuration={200}>
+                                {periods.map((period) => (
+                                  <Tooltip key={period.id}>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        className={`inline-flex items-center gap-0.5 text-[11px] font-medium px-1.5 py-0.5 rounded-md transition-colors ${
+                                          period.isReceived
+                                            ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-700'
+                                            : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                        }`}
+                                        onClick={() => handleTogglePeriod(period)}
+                                      >
+                                        {period.isReceived
+                                          ? <Check className="h-2.5 w-2.5" />
+                                          : <Circle className="h-2.5 w-2.5" />
+                                        }
+                                        {period.periodLabel}
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom" className="text-xs">
+                                      {period.isReceived
+                                        ? `Received${period.receivedAt ? ` on ${format(new Date(period.receivedAt), 'MMM d, yyyy')}` : ''}`
+                                        : 'Not received — click to mark received'
+                                      }
+                                    </TooltipContent>
+                                  </Tooltip>
+                                ))}
+                              </TooltipProvider>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Bottom row: metadata */}
+                        <div className="flex items-center gap-2 mt-3 pt-2 border-t border-border/50">
+                          {item.dueDate && (
+                            <span className={`text-[11px] flex items-center gap-0.5 ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-muted-foreground'}`}>
+                              <Calendar className="h-3 w-3" />
+                              {format(new Date(item.dueDate), 'MMM d')}
+                            </span>
+                          )}
+                          {item.fileCount > 0 && (
+                            <span className="text-[11px] text-muted-foreground flex items-center gap-0.5">
+                              <Paperclip className="h-3 w-3" />{item.fileCount}
+                            </span>
+                          )}
+                          {item.commentCount > 0 && (
+                            <span className="text-[11px] text-muted-foreground flex items-center gap-0.5">
+                              <MessageSquare className="h-3 w-3" />{item.commentCount}
+                            </span>
+                          )}
+                          <div className="flex-1" />
+                          {/* Quick action on hover */}
+                          <div className="hidden group-hover:flex items-center" onClick={e => e.stopPropagation()}>
+                            {!isComplete && item.status !== 'provided' && (
+                              <Button variant="ghost" size="sm" className="h-5 px-1.5 text-[10px]"
+                                onClick={() => handleStatusChange(item.id, 'provided')}>
+                                Mark Provided
+                              </Button>
+                            )}
+                            {item.status === 'provided' && (
+                              <Button variant="ghost" size="sm" className="h-5 px-1.5 text-[10px] text-green-600"
+                                onClick={() => handleStatusChange(item.id, 'approved')}>
+                                Approve
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Green check overlay for completed */}
+                        {isComplete && (
+                          <div className="absolute top-2 right-2 opacity-10">
+                            <CheckCircle2 className="h-12 w-12 text-green-600 dark:text-green-400" />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* Inline add item card */}
+                  {addingItemToSection === section.id && (
+                    <div className="rounded-xl border border-dashed border-primary/40 p-4 flex flex-col gap-2" onClick={e => e.stopPropagation()}>
+                      <Input
+                        autoFocus
+                        placeholder="New item title..."
+                        value={newItemTitle}
+                        onChange={e => setNewItemTitle(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleAddItem(section.id); if (e.key === 'Escape') setAddingItemToSection(null); }}
+                        className="h-8 text-sm"
+                      />
+                      <div className="flex gap-2">
+                        <Button size="sm" className="h-7 text-xs" onClick={() => handleAddItem(section.id)} disabled={!newItemTitle.trim()}>Add</Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setAddingItemToSection(null)}>Cancel</Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Add item placeholder card */}
+                  {section.items.length === 0 && addingItemToSection !== section.id && (
+                    <button
+                      className="rounded-xl border border-dashed border-muted-foreground/30 p-4 flex items-center justify-center text-sm text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors"
+                      onClick={() => { setAddingItemToSection(section.id); setNewItemTitle(''); }}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />Add item
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
-          )}
-        </CardContent>
-      </Card>
+          );
+        })}
 
-      {/* ═══ ITEM DRAWER ═══ */}
+        {sections.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            <ClipboardList className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <p>No sections yet. Add a section or create from a template.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Item Drawer */}
       <ItemDrawer
         item={activeItem}
         section={activeSection}
@@ -414,15 +506,15 @@ export default function DdChecklistPanel({ workspaceId }: Props) {
         onStatusChange={handleStatusChange}
         onUpdate={(itemId, data) => updateItem.mutate({ itemId, workspaceId, ...data })}
         onDelete={(itemId) => { deleteItem.mutate({ itemId, workspaceId }); setActiveItem(null); }}
+        onTogglePeriod={handleTogglePeriod}
       />
 
-      {/* ═══ TEMPLATE DIALOG ═══ */}
       <TemplatePickerDialog
         open={showTemplateDialog}
         onClose={() => setShowTemplateDialog(false)}
         templates={templates}
         selectedIds={selectedTemplateIds}
-        onToggle={(id) => setSelectedTemplateIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
+        onToggle={(id: string) => setSelectedTemplateIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
         mergeStrategy={mergeStrategy}
         onMergeChange={setMergeStrategy}
         onConfirm={handleCreateFromTemplate}
@@ -431,7 +523,6 @@ export default function DdChecklistPanel({ workspaceId }: Props) {
         isSeedPending={seedTemplates.isPending}
       />
 
-      {/* ═══ ADD SECTION DIALOG ═══ */}
       <Dialog open={showAddSectionDialog} onOpenChange={setShowAddSectionDialog}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Add Section</DialogTitle></DialogHeader>
@@ -446,7 +537,6 @@ export default function DdChecklistPanel({ workspaceId }: Props) {
         </DialogContent>
       </Dialog>
 
-      {/* ═══ SETTINGS DIALOG ═══ */}
       {checklist && (
         <SettingsDialog
           open={showSettingsDialog}
@@ -517,14 +607,13 @@ function TemplatePickerDialog({ open, onClose, templates, selectedIds, onToggle,
   );
 }
 
-function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpdate, onDelete }: {
+function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpdate, onDelete, onTogglePeriod }: {
   item: DdChecklistItem | null; section: SectionType | null; workspaceId: string;
   onClose: () => void; onStatusChange: (id: string, s: string) => void;
   onUpdate: (id: string, data: any) => void; onDelete: (id: string) => void;
+  onTogglePeriod: (period: DdChecklistItemPeriod) => void;
 }) {
   const [drawerTab, setDrawerTab] = useState('details');
-  const [editSellerNotes, setEditSellerNotes] = useState('');
-  const [editInternalNotes, setEditInternalNotes] = useState('');
   const [commentText, setCommentText] = useState('');
   const [commentVisibility, setCommentVisibility] = useState('all');
 
@@ -535,6 +624,9 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
   if (!item) return null;
 
   const sc = STATUS_CONFIG[item.status] || STATUS_CONFIG.open;
+  const isComplete = ['approved', 'waived'].includes(item.status);
+  const periods = item.periods || [];
+  const receivedCount = periods.filter(p => p.isReceived).length;
 
   return (
     <Sheet open={!!item} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -545,7 +637,6 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
         </SheetHeader>
 
         <div className="mt-4 space-y-4">
-          {/* Status + Priority row */}
           <div className="flex items-center gap-2">
             <Select value={item.status} onValueChange={(s) => onStatusChange(item.id, s)}>
               <SelectTrigger className="h-8 w-[140px]"><SelectValue /></SelectTrigger>
@@ -565,6 +656,32 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
             )}
           </div>
 
+          {/* Period tracking in drawer */}
+          {periods.length > 0 && (
+            <div className="bg-muted/50 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium">Period Tracking</span>
+                <span className="text-xs text-muted-foreground">{receivedCount}/{periods.length} received</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {periods.map((period) => (
+                  <button
+                    key={period.id}
+                    className={`flex items-center gap-1.5 text-xs font-medium px-2 py-1.5 rounded-md transition-colors ${
+                      period.isReceived
+                        ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-700'
+                        : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:border-green-400'
+                    }`}
+                    onClick={() => onTogglePeriod(period)}
+                  >
+                    {period.isReceived ? <Check className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
+                    {period.periodLabel}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <Tabs value={drawerTab} onValueChange={setDrawerTab}>
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="details" className="text-xs">Details</TabsTrigger>
@@ -572,9 +689,7 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
               <TabsTrigger value="history" className="text-xs">History</TabsTrigger>
             </TabsList>
 
-            {/* ─── Details ─── */}
             <TabsContent value="details" className="mt-3 space-y-4">
-              {/* Request Text */}
               {item.requestText && (
                 <div>
                   <Label className="text-xs text-muted-foreground">Request</Label>
@@ -582,7 +697,6 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
                 </div>
               )}
 
-              {/* Seller Notes */}
               <div>
                 <Label className="text-xs text-muted-foreground">Seller Notes</Label>
                 <Textarea
@@ -598,7 +712,6 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
                 />
               </div>
 
-              {/* Internal Notes */}
               {item.internalNotes !== undefined && (
                 <div>
                   <Label className="text-xs text-muted-foreground">Internal Notes (not visible to external)</Label>
@@ -616,7 +729,6 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
                 </div>
               )}
 
-              {/* Deadline controls */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-xs">Due Date</Label>
@@ -653,7 +765,6 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
                 </div>
               </div>
 
-              {/* Files */}
               <div>
                 <Label className="text-xs text-muted-foreground flex items-center gap-1">
                   <Paperclip className="h-3 w-3" />Linked Files ({item.fileCount})
@@ -661,14 +772,12 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
                 <p className="text-xs text-muted-foreground mt-1">File linking available via VDR integration.</p>
               </div>
 
-              {/* Delete */}
               <Button variant="destructive" size="sm" className="mt-4"
                 onClick={() => { if (confirm('Delete this item?')) onDelete(item.id); }}>
                 Delete Item
               </Button>
             </TabsContent>
 
-            {/* ─── Comments ─── */}
             <TabsContent value="comments" className="mt-3 space-y-3">
               {comments.map((c: any) => (
                 <div key={c.id} className="border rounded p-2">
@@ -707,7 +816,6 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
               </div>
             </TabsContent>
 
-            {/* ─── History ─── */}
             <TabsContent value="history" className="mt-3 space-y-2">
               {history.map((h: any) => (
                 <div key={h.id} className="flex items-start gap-2 text-xs">
