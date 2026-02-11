@@ -31,7 +31,6 @@ export function MarketRatesSummary({ compact = false, className }: MarketRatesSu
   const refreshMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/capital-markets/rates/refresh", { lookbackDays: 30 }),
     onSuccess: () => {
-      toast({ title: "Rates Updated", description: "Market rates have been refreshed" });
       queryClient.invalidateQueries({ queryKey: ["/api/capital-markets/rates/latest"] });
       queryClient.invalidateQueries({ queryKey: ["/api/capital-markets/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/capital-markets/forward-curve"] });
