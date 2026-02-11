@@ -67,8 +67,6 @@ export function inferDepartment(subcategory: string, category?: string): string 
     return 'Payroll';
   if (lower.includes('benefit') && !lower.includes('membership'))
     return 'Payroll';
-  if (lower.includes('payroll'))
-    return 'Payroll';
 
   if (lower.includes('launch') || lower.includes('haul') || lower.includes('electric') || lower.includes('power') || lower.includes('amenity') || lower.includes('dockside') || lower.includes('marina income'))
     return 'Marina & Amenities';

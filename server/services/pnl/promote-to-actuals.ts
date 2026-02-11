@@ -87,8 +87,8 @@ export async function promotePnlFactsToActuals(
         const subcategory = canonical.displayName;
         const pipelineDept = resolvedDeptMap[fact.canonicalLineItemId];
         const department = coaEntry?.department
-          || canonical.subcategoryGroup
           || pipelineDept
+          || canonical.subcategoryGroup
           || inferDepartment(fact.sourceLabel || subcategory, category);
 
         const year = fact.fiscalYear;
