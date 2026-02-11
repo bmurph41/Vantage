@@ -62,6 +62,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { useModelingAddbacks } from '@/hooks/useModelingAddbacks';
 import { AddbackEditor, AddbackSummaryPanel } from '@/components/modeling/AddbackEditor';
+import { useDepartmentOrder } from '@/hooks/useDepartmentOrder';
+import { DepartmentOrderSettings } from '@/components/modeling/DepartmentOrderSettings';
 
 interface WorkspaceHistoricalPLProps {
   projectId: string;
@@ -125,6 +127,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
   const [showMoM, setShowMoM] = useState(false);
   const [showNormalized, setShowNormalized] = useState(false);
   const [expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set());
+  const { departmentOrder, updateOrder, resetOrder, sortDepartments } = useDepartmentOrder();
 
   const { 
     addbacks: allAddbacks,
@@ -596,6 +599,12 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
             </TabsList>
           </Tabs>
           
+          <DepartmentOrderSettings
+            departmentOrder={departmentOrder}
+            onUpdateOrder={updateOrder}
+            onResetOrder={resetOrder}
+          />
+          
           {/* Sync button only shown for owned marinas, not for acquisitions/prospective deals */}
           {isOwnedMarina && (
             <Dialog open={showSyncDialog} onOpenChange={setShowSyncDialog}>
@@ -971,9 +980,12 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                         </TableCell>
                       </TableRow>
 
-                      {expandedCategories.has(category) && Object.entries(groupedData[category] || {})
-                        .sort(([a], [b]) => a.localeCompare(b))
-                        .map(([department, deptItems]) => (
+                      {expandedCategories.has(category) && (() => {
+                        const entries = Object.entries(groupedData[category] || {});
+                        const sortedDepts = sortDepartments(entries.map(([d]) => d));
+                        return sortedDepts.map(department => {
+                          const deptItems = (groupedData[category] || {})[department] || [];
+                          return (
                           <Fragment key={`${category}-${department}`}>
                             <TableRow 
                               className="cursor-pointer hover:bg-muted/50"
@@ -1125,8 +1137,9 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                               );
                             })}
                           </Fragment>
-                        ))
-                      }
+                        );
+                        });
+                      })()}
                     </Fragment>
                   ))}
 
@@ -1278,9 +1291,10 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           if (!deptGrouped[dept]) deptGrouped[dept] = [];
                           deptGrouped[dept].push(sub);
                         });
-                        return Object.entries(deptGrouped)
-                          .sort(([a], [b]) => a.localeCompare(b))
-                          .map(([department, deptSubcats]) => (
+                        const sortedDepts = sortDepartments(Object.keys(deptGrouped));
+                        return sortedDepts.map(department => {
+                          const deptSubcats = deptGrouped[department] || [];
+                          return (
                             <Fragment key={`${category}-${department}`}>
                               <TableRow
                                 className="cursor-pointer hover:bg-muted/50"
@@ -1330,7 +1344,8 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                 </TableRow>
                               ))}
                             </Fragment>
-                          ));
+                          );
+                        });
                       })()}
                     </Fragment>
                   ))}

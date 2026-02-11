@@ -42,6 +42,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
+import { useDepartmentOrder } from '@/hooks/useDepartmentOrder';
 
 interface WorkspaceProFormaProps {
   projectId: string;
@@ -139,6 +140,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
   const [selectedYear, setSelectedYear] = useState('2026');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['revenue']));
   const [expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set());
+  const { sortDepartments } = useDepartmentOrder();
   const toggleDepartment = (key: string) => {
     setExpandedDepartments(prev => {
       const next = new Set(prev);
@@ -1191,9 +1193,12 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                       </TableRow>
 
                       {/* Department-grouped Line Item Rows */}
-                      {expandedCategories.has(category) && Object.entries(departmentGroupedData[category] || {})
-                        .sort(([a], [b]) => a.localeCompare(b))
-                        .map(([department, deptItems]) => (
+                      {expandedCategories.has(category) && (() => {
+                        const deptEntries = Object.entries(departmentGroupedData[category] || {});
+                        const sortedDepts = sortDepartments(deptEntries.map(([d]) => d));
+                        return sortedDepts.map(department => {
+                          const deptItems = (departmentGroupedData[category] || {})[department] || {};
+                          return (
                           <Fragment key={`${category}-${department}`}>
                             <TableRow 
                               className="bg-slate-50 dark:bg-slate-900 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -1303,7 +1308,9 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                               );
                             })}
                           </Fragment>
-                        ))}
+                        );
+                        });
+                      })()}
                     </Fragment>
                   );
                 })}
