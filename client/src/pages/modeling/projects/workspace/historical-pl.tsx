@@ -871,8 +871,8 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
+        <CardContent className="p-0 sm:p-6">
+          <div className="overflow-x-auto relative isolate">
             {displayMode === 'monthly' ? (
               <Table className="table-fixed">
                 <colgroup>
