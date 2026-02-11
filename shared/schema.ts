@@ -23980,3 +23980,14 @@ export const ddChecklistItemPeriods = pgTable("dd_checklist_item_periods", {
 }));
 export type DdChecklistItemPeriod = typeof ddChecklistItemPeriods.$inferSelect;
 export type DdChecklistTemplate = typeof ddChecklistTemplates.$inferSelect;
+
+// ─── DD Section Defaults ────────────────────────────────────────────────────
+export const ddSectionDefaults = pgTable('dd_section_defaults', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  title: text('title').notNull(),
+  isBuiltin: boolean('is_builtin').notNull().default(false),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => ({
+  titleIdx: index('ddsd_title_idx').on(table.title),
+}));
+export type DdSectionDefault = typeof ddSectionDefaults.$inferSelect;

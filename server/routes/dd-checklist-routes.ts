@@ -1539,3 +1539,48 @@ router.get('/api/workspaces/:id/dd-checklist/progress', async (req: any, res: Re
     res.status(500).json({ error: 'Failed to compute progress' });
   }
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DD Section Defaults
+// ═══════════════════════════════════════════════════════════════════════════════
+
+router.get('/api/dd-section-defaults', async (_req: Request, res: Response) => {
+  try {
+    const db = await getDb();
+    const schema = await getSchema();
+    const defaults = await db
+      .select()
+      .from(schema.ddSectionDefaults)
+      .orderBy(asc(schema.ddSectionDefaults.title));
+    res.json(defaults);
+  } catch (err: any) {
+    console.error('Error fetching section defaults:', err);
+    res.status(500).json({ error: 'Failed to fetch section defaults' });
+  }
+});
+
+router.post('/api/dd-section-defaults', async (req: Request, res: Response) => {
+  try {
+    const { title } = req.body;
+    if (!title || typeof title !== 'string' || !title.trim()) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+    const db = await getDb();
+    const schema = await getSchema();
+    const existing = await db
+      .select()
+      .from(schema.ddSectionDefaults)
+      .where(eq(schema.ddSectionDefaults.title, title.trim()));
+    if (existing.length > 0) {
+      return res.json(existing[0]);
+    }
+    const [created] = await db
+      .insert(schema.ddSectionDefaults)
+      .values({ title: title.trim(), isBuiltin: false })
+      .returning();
+    res.json(created);
+  } catch (err: any) {
+    console.error('Error creating section default:', err);
+    res.status(500).json({ error: 'Failed to create section default' });
+  }
+});
