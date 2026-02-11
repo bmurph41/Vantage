@@ -12938,6 +12938,39 @@ Current context: Project ${req.params.projectId}`;
         }
       }
 
+      // Auto-create pending contacts for Seller Principal and Buyer Principal
+      const principalEntries = [
+        { name: (compData.sellerPrincipal || '').trim(), role: 'seller_principal' },
+        { name: (compData.buyerPrincipal || '').trim(), role: 'buyer_principal' },
+      ];
+      for (const entry of principalEntries) {
+        if (entry.name) {
+          try {
+            const parts = entry.name.split(' ');
+            const firstName = parts[0] || '';
+            const lastName = parts.slice(1).join(' ') || '';
+            const fullName = entry.name;
+
+            const similarContacts = await storage.findSimilarContacts(orgId, fullName);
+
+            await storage.createPendingContact({
+              orgId,
+              sourceType: 'sales_comp',
+              sourceId: comp.id,
+              firstName: firstName || undefined,
+              lastName: lastName || undefined,
+              fullName,
+              status: 'pending',
+              suggestedDuplicates: similarContacts.map((c: any) => c.id),
+              sourceMetadata: { salesCompId: comp.id, marina: compData.marina, role: entry.role },
+              createdBy: userId,
+            });
+          } catch (principalError) {
+            console.error('Error auto-creating pending ' + entry.role + ' contact:', principalError);
+          }
+        }
+      }
+
       // Auto-create pending property if marina/property data is provided but not linked to existing property
       if (!compData.propertyId && compData.marina) {
         try {
@@ -13143,6 +13176,39 @@ Current context: Project ${req.params.projectId}`;
           });
         } catch (contactError) {
           console.error('Error auto-creating pending contact:', contactError);
+        }
+      }
+
+      // Auto-create pending contacts for Seller Principal and Buyer Principal
+      const principalEntries = [
+        { name: (updates.sellerPrincipal || '').trim(), role: 'seller_principal' },
+        { name: (updates.buyerPrincipal || '').trim(), role: 'buyer_principal' },
+      ];
+      for (const entry of principalEntries) {
+        if (entry.name) {
+          try {
+            const parts = entry.name.split(' ');
+            const firstName = parts[0] || '';
+            const lastName = parts.slice(1).join(' ') || '';
+            const fullName = entry.name;
+
+            const similarContacts = await storage.findSimilarContacts(orgId, fullName);
+
+            await storage.createPendingContact({
+              orgId,
+              sourceType: 'sales_comp',
+              sourceId: req.params.id,
+              firstName: firstName || undefined,
+              lastName: lastName || undefined,
+              fullName,
+              status: 'pending',
+              suggestedDuplicates: similarContacts.map((c: any) => c.id),
+              sourceMetadata: { salesCompId: req.params.id, marina: updates.marina, role: entry.role },
+              createdBy: userId,
+            });
+          } catch (principalError) {
+            console.error('Error auto-creating pending ' + entry.role + ' contact:', principalError);
+          }
         }
       }
 
