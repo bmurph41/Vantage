@@ -1795,11 +1795,76 @@ Respond with JSON only:
         }
       }
       
-      // If we still don't have a valid tier, skip this item
+      // If we still don't have a valid tier, infer from raw text using marina-specific mapping
       if (!plCategory) {
-        console.log('[DocIntel Import] Skipping item with no valid tier:', item.id, item.rawText?.substring(0, 50));
-        skippedNoTier++;
-        continue;
+        const rawLower = (item.rawText || '').toLowerCase().trim();
+        subcategory = item.rawText?.substring(0, 100) || 'Uncategorized';
+
+        // Exact name whitelist (case-insensitive) — most reliable
+        const exactRevenueNames: Record<string, boolean> = {
+          'new boats': true, 'used boat sales': true, 'boat sales': true,
+          'gas dock fuel': true, 'new boat fuel': true, 'diesel fuel': true,
+          'summer dockage': true, 'winter storage': true, 'land storage': true,
+          'dockage': true, 'annual dockage': true, 'transient dockage': true,
+          'slip rental': true, 'wet slip rental': true, 'dry rack storage': true,
+          'bottom paint': true, 'bottom wash': true, 'shrink wrap': true,
+          'hauling': true, 'launch': true, 'lift service': true,
+          'brokerage commissions': true, 'finance commission': true,
+          'dockside electric': true, 'marina income': true, 'rental income': true,
+          'annual dockage/storage': true, 'net other income': true,
+          'service revenue': true, 'repair revenue': true,
+        };
+        const exactCogsNames: Record<string, boolean> = {
+          'cogs- parts': true, 'cogs-parts': true, 'equipment & supplies cogs': true,
+          'trade payoff': true, 'trade in': true,
+          'extended warranty': true, 'subcontracted repairs': true,
+        };
+        const exactExpenseNames: Record<string, boolean> = {
+          'advertising and promotion': true, 'automobile expense': true,
+          'bank service charges': true, 'labor': true, 'warranty': true,
+        };
+
+        if (exactRevenueNames[rawLower]) {
+          plCategory = 'Revenue';
+        } else if (exactCogsNames[rawLower]) {
+          plCategory = 'COGS';
+        } else if (exactExpenseNames[rawLower]) {
+          plCategory = 'Expenses';
+        } else {
+          // Pattern-based fallback — check COGS first (most specific prefixes)
+          const cogsPatterns = ['cogs', 'cost of goods', 'cost of sale'];
+          const revenuePatterns = [
+            'boat sale', 'fuel sale', 'fuel revenue', 'dock fuel',
+            'dockage', 'storage', 'slip rental', 'mooring',
+            'bottom paint', 'bottom wash', 'shrink wrap',
+            'hauling', 'launch fee', 'brokerage commission', 'finance commission',
+            'dockside', 'marina income', 'rental income',
+          ];
+
+          let matched = false;
+          for (const pat of cogsPatterns) {
+            if (rawLower.includes(pat)) {
+              plCategory = 'COGS';
+              matched = true;
+              break;
+            }
+          }
+          if (!matched) {
+            for (const pat of revenuePatterns) {
+              if (rawLower.includes(pat)) {
+                plCategory = 'Revenue';
+                matched = true;
+                break;
+              }
+            }
+          }
+          if (!matched) {
+            // Default unmatched items to Expenses (conservative — won't inflate revenue)
+            plCategory = 'Expenses';
+          }
+        }
+
+        console.log('[DocIntel Import] Inferred tier from raw text:', item.rawText?.substring(0, 50), '->', plCategory);
       }
 
       // Parse periodKey (YYYY-MM) or use fiscalYear
