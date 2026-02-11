@@ -834,19 +834,26 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
         <CardContent>
           <div className="overflow-x-auto">
             {displayMode === 'monthly' ? (
-              <Table>
+              <Table className="table-fixed">
+                <colgroup>
+                  <col className="w-[220px] min-w-[220px]" />
+                  {months.map((_, idx) => (
+                    <col key={idx} className="w-[90px] min-w-[90px]" />
+                  ))}
+                  <col className="w-[100px] min-w-[100px]" />
+                </colgroup>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="whitespace-nowrap sticky left-0 z-20 bg-background border-r">Category / Line Item</TableHead>
+                    <TableHead className="whitespace-nowrap sticky left-0 z-20 bg-background border-r w-[220px] min-w-[220px] max-w-[220px]">Category / Line Item</TableHead>
                     {months.map((month, idx) => (
                       <TableHead 
                         key={month} 
-                        className={`text-center w-24 font-bold underline ${!isSeasonalMonth(idx) ? 'bg-muted/30' : ''}`}
+                        className={`text-center px-1 font-bold underline ${!isSeasonalMonth(idx) ? 'bg-muted/30' : ''}`}
                       >
                         {month}
                       </TableHead>
                     ))}
-                    <TableHead className="text-center w-28 font-bold underline">Annual</TableHead>
+                    <TableHead className="text-center px-1 font-bold underline">Annual</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -856,7 +863,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                         className="bg-muted/50 cursor-pointer hover:bg-muted group"
                         onClick={() => toggleCategory(category)}
                       >
-                        <TableCell className="font-semibold whitespace-nowrap sticky left-0 z-10 bg-muted/50 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+                        <TableCell className="font-semibold whitespace-nowrap sticky left-0 z-10 bg-muted/50 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[220px] min-w-[220px] max-w-[220px] overflow-hidden text-ellipsis">
                           <div className="flex items-center gap-2">
                             {expandedCategories.has(category) ? (
                               <ChevronDown className="h-4 w-4" />
@@ -906,10 +913,10 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           return (
                             <TableCell 
                               key={month} 
-                              className={`text-right font-semibold ${!isSeasonalMonth(idx) ? 'bg-muted/30' : 'bg-background'}`}
+                              className={`text-right font-semibold whitespace-nowrap px-2 py-2 ${!isSeasonalMonth(idx) ? 'bg-muted/30' : 'bg-background'}`}
                             >
                               <div className="flex flex-col items-end">
-                                <span>{formatCurrency(value)}</span>
+                                <span className="text-xs">{formatCurrency(value)}</span>
                                 {showMoM && momChange !== null && idx > 0 && (
                                   <span className={`text-xs ${momChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                     {momChange >= 0 ? '+' : ''}{momChange.toFixed(0)}%
@@ -919,7 +926,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                             </TableCell>
                           );
                         })}
-                        <TableCell className="text-right font-bold bg-background">
+                        <TableCell className="text-right font-bold bg-background whitespace-nowrap px-2 py-2 text-xs">
                           {formatCurrency(getAdjustedCategoryAnnualTotal(category))}
                         </TableCell>
                       </TableRow>
@@ -928,7 +935,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                         const SourceIcon = item.dataSource ? dataSourceIcons[item.dataSource] : null;
                         return (
                           <TableRow key={item.id} className={`text-sm group ${(isLineItemAddedBack(item.subcategory) || isCategoryAddedBack(category)) && showNormalized ? 'opacity-50 line-through' : ''}`}>
-                            <TableCell className="pl-10 whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+                            <TableCell className="pl-10 whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[220px] min-w-[220px] max-w-[220px] overflow-hidden text-ellipsis">
                               <div className="flex items-center gap-2">
                                 {SourceIcon && (
                                   <SourceIcon className="h-3 w-3 text-muted-foreground" />
@@ -981,10 +988,10 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                               return (
                                 <TableCell 
                                   key={month} 
-                                  className={`text-right relative group/cell ${!isSeasonalMonth(idx) ? 'bg-muted/30 text-muted-foreground' : ''} ${isCellAddedBack ? 'bg-amber-50/70 dark:bg-amber-950/20' : ''}`}
+                                  className={`text-right relative group/cell whitespace-nowrap px-2 py-1 ${!isSeasonalMonth(idx) ? 'bg-muted/30 text-muted-foreground' : ''} ${isCellAddedBack ? 'bg-amber-50/70 dark:bg-amber-950/20' : ''}`}
                                 >
                                   <div className="flex items-center justify-end gap-0.5">
-                                    <span className={isCellAddedBack && displayValue !== rawValue ? 'text-amber-700 dark:text-amber-400 font-medium' : ''}>
+                                    <span className={`text-xs ${isCellAddedBack && displayValue !== rawValue ? 'text-amber-700 dark:text-amber-400 font-medium' : ''}`}>
                                       {formatCurrency(displayValue)}
                                     </span>
                                     {isCellAddedBack && (
@@ -1038,7 +1045,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                 </TableCell>
                               );
                             })}
-                            <TableCell className="text-right font-medium">
+                            <TableCell className="text-right font-medium whitespace-nowrap px-2 py-1 text-xs">
                               {formatCurrency(months.reduce((sum, month, idx) => sum + getAdjustedMonthlyValue(item, month, idx), 0))}
                             </TableCell>
                           </TableRow>
@@ -1048,24 +1055,24 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   ))}
 
                   <TableRow className="bg-muted font-bold border-t-2">
-                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">Gross Profit</TableCell>
+                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[220px] min-w-[220px] max-w-[220px]">Gross Profit</TableCell>
                     {months.map((month, idx) => {
                       const revenue = getAdjustedCategoryTotal('Revenue', month, idx);
                       const cogs = getAdjustedCategoryTotal('COGS', month, idx);
                       return (
                         <TableCell 
                           key={month} 
-                          className={`text-right ${!isSeasonalMonth(idx) ? 'bg-muted/70' : 'bg-muted'}`}
+                          className={`text-right whitespace-nowrap px-2 py-2 text-xs ${!isSeasonalMonth(idx) ? 'bg-muted/70' : 'bg-muted'}`}
                         >
                           {formatCurrency(revenue - cogs)}
                         </TableCell>
                       );
                     })}
-                    <TableCell className="text-right bg-muted">{formatCurrency(getAdjustedCategoryAnnualTotal('Revenue') - getAdjustedCategoryAnnualTotal('COGS'))}</TableCell>
+                    <TableCell className="text-right whitespace-nowrap px-2 py-2 text-xs bg-muted">{formatCurrency(getAdjustedCategoryAnnualTotal('Revenue') - getAdjustedCategoryAnnualTotal('COGS'))}</TableCell>
                   </TableRow>
 
                   <TableRow className="bg-muted/30">
-                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-muted/30 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-sm text-muted-foreground">Gross Profit Margin</TableCell>
+                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-muted/30 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-sm text-muted-foreground w-[220px] min-w-[220px] max-w-[220px]">Gross Profit Margin</TableCell>
                     {months.map((month, idx) => {
                       const revenue = getAdjustedCategoryTotal('Revenue', month, idx);
                       const cogs = getAdjustedCategoryTotal('COGS', month, idx);
@@ -1074,13 +1081,13 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                       return (
                         <TableCell 
                           key={month} 
-                          className={`text-right text-sm text-muted-foreground ${!isSeasonalMonth(idx) ? 'bg-muted/20' : 'bg-muted/30'}`}
+                          className={`text-right text-xs text-muted-foreground whitespace-nowrap px-2 py-1 ${!isSeasonalMonth(idx) ? 'bg-muted/20' : 'bg-muted/30'}`}
                         >
                           {formatPercent(margin)}
                         </TableCell>
                       );
                     })}
-                    <TableCell className="text-right text-sm text-muted-foreground bg-muted/30">
+                    <TableCell className="text-right text-xs text-muted-foreground whitespace-nowrap px-2 py-1 bg-muted/30">
                       {(() => {
                         const adjRev = getAdjustedCategoryAnnualTotal('Revenue');
                         const adjGP = adjRev - getAdjustedCategoryAnnualTotal('COGS');
@@ -1090,7 +1097,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   </TableRow>
 
                   <TableRow className="bg-primary/10 font-bold">
-                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-primary/10 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">{config?.bottomLineMetric === 'ebitda' ? 'EBITDA' : 'NOI'}</TableCell>
+                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-primary/10 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[220px] min-w-[220px] max-w-[220px]">{config?.bottomLineMetric === 'ebitda' ? 'EBITDA' : 'NOI'}</TableCell>
                     {months.map((month, idx) => {
                       const revenue = getAdjustedCategoryTotal('Revenue', month, idx);
                       const cogs = getAdjustedCategoryTotal('COGS', month, idx);
@@ -1099,7 +1106,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                       return (
                         <TableCell 
                           key={month} 
-                          className={`text-right bg-primary/10 ${noi >= 0 ? 'text-green-600' : 'text-red-600'} ${!isSeasonalMonth(idx) ? 'opacity-60' : ''}`}
+                          className={`text-right whitespace-nowrap px-2 py-2 text-xs bg-primary/10 ${noi >= 0 ? 'text-green-600' : 'text-red-600'} ${!isSeasonalMonth(idx) ? 'opacity-60' : ''}`}
                         >
                           {formatCurrency(noi)}
                         </TableCell>
@@ -1108,7 +1115,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                     {(() => {
                       const displayNOI = getAdjustedCategoryAnnualTotal('Revenue') - getAdjustedCategoryAnnualTotal('COGS') - getAdjustedCategoryAnnualTotal('Expenses');
                       return (
-                        <TableCell className={`text-right bg-primary/10 ${displayNOI >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <TableCell className={`text-right whitespace-nowrap px-2 py-2 text-xs bg-primary/10 ${displayNOI >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                           {formatCurrency(displayNOI)}
                         </TableCell>
                       );
@@ -1116,7 +1123,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   </TableRow>
 
                   <TableRow className="bg-primary/5">
-                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-primary/5 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-sm text-muted-foreground">Operating Margin</TableCell>
+                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-primary/5 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-sm text-muted-foreground w-[220px] min-w-[220px] max-w-[220px]">Operating Margin</TableCell>
                     {months.map((month, idx) => {
                       const revenue = getAdjustedCategoryTotal('Revenue', month, idx);
                       const cogs = getAdjustedCategoryTotal('COGS', month, idx);
@@ -1126,7 +1133,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                       return (
                         <TableCell 
                           key={month} 
-                          className={`text-right text-sm bg-primary/5 ${margin !== null && margin >= 0 ? 'text-green-600' : 'text-red-600'} ${!isSeasonalMonth(idx) ? 'opacity-60' : ''}`}
+                          className={`text-right text-xs whitespace-nowrap px-2 py-1 bg-primary/5 ${margin !== null && margin >= 0 ? 'text-green-600' : 'text-red-600'} ${!isSeasonalMonth(idx) ? 'opacity-60' : ''}`}
                         >
                           {formatPercent(margin)}
                         </TableCell>
@@ -1136,7 +1143,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                       const normRev = getAdjustedCategoryAnnualTotal('Revenue');
                       const displayNOI = normRev - getAdjustedCategoryAnnualTotal('COGS') - getAdjustedCategoryAnnualTotal('Expenses');
                       return (
-                        <TableCell className={`text-right text-sm bg-primary/5 ${displayNOI >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <TableCell className={`text-right text-xs whitespace-nowrap px-2 py-1 bg-primary/5 ${displayNOI >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                           {formatPercent(normRev !== 0 ? (displayNOI / normRev) * 100 : null)}
                         </TableCell>
                       );
@@ -1163,7 +1170,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                         className="bg-muted/50 cursor-pointer hover:bg-muted"
                         onClick={() => toggleCategory(category)}
                       >
-                        <TableCell className="font-semibold whitespace-nowrap sticky left-0 z-10 bg-muted/50 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+                        <TableCell className="font-semibold whitespace-nowrap sticky left-0 z-10 bg-muted/50 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[220px] min-w-[220px] max-w-[220px] overflow-hidden text-ellipsis">
                           <div className="flex items-center gap-2">
                             {expandedCategories.has(category) ? (
                               <ChevronDown className="h-4 w-4" />
@@ -1210,7 +1217,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   ))}
 
                   <TableRow className="bg-muted font-bold border-t-2">
-                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">Gross Profit</TableCell>
+                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[220px] min-w-[220px] max-w-[220px]">Gross Profit</TableCell>
                     {yearRange.map((year) => {
                       const revenue = getAnnualCategoryTotal('Revenue', year);
                       const cogs = getAnnualCategoryTotal('COGS', year);
@@ -1227,7 +1234,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   </TableRow>
 
                   <TableRow className="bg-muted/30">
-                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-muted/30 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-sm text-muted-foreground">Gross Profit Margin</TableCell>
+                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-muted/30 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-sm text-muted-foreground w-[220px] min-w-[220px] max-w-[220px]">Gross Profit Margin</TableCell>
                     {yearRange.map((year) => {
                       const revenue = getAnnualCategoryTotal('Revenue', year);
                       const cogs = getAnnualCategoryTotal('COGS', year);
@@ -1246,7 +1253,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   </TableRow>
 
                   <TableRow className="bg-primary/10 font-bold">
-                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-primary/10 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">{config?.bottomLineMetric === 'ebitda' ? 'EBITDA' : 'NOI'}</TableCell>
+                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-primary/10 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[220px] min-w-[220px] max-w-[220px]">{config?.bottomLineMetric === 'ebitda' ? 'EBITDA' : 'NOI'}</TableCell>
                     {yearRange.map((year) => {
                       const revenue = getAnnualCategoryTotal('Revenue', year);
                       const cogs = getAnnualCategoryTotal('COGS', year);
@@ -1265,7 +1272,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   </TableRow>
 
                   <TableRow className="bg-primary/5">
-                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-primary/5 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-sm text-muted-foreground">Operating Margin</TableCell>
+                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-primary/5 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-sm text-muted-foreground w-[220px] min-w-[220px] max-w-[220px]">Operating Margin</TableCell>
                     {yearRange.map((year) => {
                       const revenue = getAnnualCategoryTotal('Revenue', year);
                       const cogs = getAnnualCategoryTotal('COGS', year);
