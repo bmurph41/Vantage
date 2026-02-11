@@ -20036,8 +20036,6 @@ export const modelingAddbackValues = pgTable("modeling_addback_values", {
   year: integer("year").notNull(), // Year number (1-based for projection years, or actual year)
   month: integer("month"), // 1-12 for monthly, null for yearly
   amount: decimal("amount", { precision: 18, scale: 2 }).notNull().default("0"),
-
-  orgId: varchar("org_id").references(() => organizations.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

@@ -59,8 +59,10 @@ import {
   X
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { useModelingAddbacks } from '@/hooks/useModelingAddbacks';
+import { AddbackEditor, AddbackSummaryPanel } from '@/components/modeling/AddbackEditor';
 
 interface WorkspaceHistoricalPLProps {
   projectId: string;
@@ -124,13 +126,21 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
   const [showNormalized, setShowNormalized] = useState(false);
 
   const { 
+    addbacks: allAddbacks,
     isLineItemAddedBack,
     isCategoryAddedBack, 
     isMonthCellAddedBack,
     toggleLineItemAddback,
     toggleCategoryAddback,
     toggleMonthCellAddback,
+    getAnyAddback,
+    getAddbackForLineItem,
+    getAddbackForCategory,
+    getAddbackForMonthCell,
     activeAddbacks,
+    createOrUpdate: createOrUpdateAddback,
+    toggleAddback,
+    deleteAddback,
     isPending: addbackPending,
     getAddbacksSummary,
   } = useModelingAddbacks(projectId);
@@ -331,9 +341,27 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
   const getNormalizedMonthlyValue = (item: PLLineItem, month: string, monthIdx: number) => {
     const rawValue = item.monthlyData[month] || 0;
     if (!showNormalized) return rawValue;
+    const yearNum = parseInt(selectedYear);
+    const monthNum = monthIdx + 1;
     if (isCategoryAddedBack(item.category)) return 0;
-    if (isLineItemAddedBack(item.subcategory)) return 0;
-    if (isMonthCellAddedBack(item.subcategory, parseInt(selectedYear), monthIdx + 1)) return 0;
+    if (isLineItemAddedBack(item.subcategory)) {
+      const lineAddback = getAddbackForLineItem(item.subcategory);
+      if (lineAddback && lineAddback.values.length > 0) {
+        const yearValue = lineAddback.values.find(v => v.year === yearNum && v.month == null);
+        if (yearValue) {
+          const customAmount = parseFloat(yearValue.amount) || 0;
+          return customAmount / 12;
+        }
+      }
+      return 0;
+    }
+    if (isMonthCellAddedBack(item.subcategory, yearNum, monthNum)) {
+      const cellAddback = getAddbackForMonthCell(item.subcategory, yearNum, monthNum);
+      if (cellAddback && cellAddback.values.length > 0) {
+        return parseFloat(cellAddback.values[0].amount) || 0;
+      }
+      return 0;
+    }
     return rawValue;
   };
 
@@ -765,11 +793,32 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                       <TooltipContent>Toggle between raw and normalized (addback-adjusted) view</TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
-                  {activeAddbacks.length > 0 && (
-                    <Badge variant="secondary" className="gap-1">
-                      <ArrowUpCircle className="h-3 w-3" />
-                      {activeAddbacks.length} Addback{activeAddbacks.length !== 1 ? 's' : ''}
-                    </Badge>
+                  {allAddbacks.length > 0 && (
+                    <Sheet>
+                      <SheetTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
+                          <ArrowUpCircle className="h-3 w-3 text-amber-600" />
+                          {activeAddbacks.length} Addback{activeAddbacks.length !== 1 ? 's' : ''}
+                        </Button>
+                      </SheetTrigger>
+                      <SheetContent className="w-[380px] sm:w-[420px]">
+                        <SheetHeader>
+                          <SheetTitle className="flex items-center gap-2">
+                            <ArrowUpCircle className="h-5 w-5 text-amber-600" />
+                            Addbacks Manager
+                          </SheetTitle>
+                        </SheetHeader>
+                        <div className="mt-4">
+                          <AddbackSummaryPanel
+                            addbacks={allAddbacks}
+                            onToggle={(id, isActive) => toggleAddback({ addbackId: id, isActive })}
+                            onDelete={(id) => deleteAddback(id)}
+                            isPending={addbackPending}
+                            formatCurrency={formatCurrency}
+                          />
+                        </div>
+                      </SheetContent>
+                    </Sheet>
                   )}
                   <Badge variant="outline" className="gap-1">
                     <div className="w-2 h-2 rounded-full bg-blue-500" />
@@ -823,22 +872,32 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                 Added Back
                               </Badge>
                             )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0 ml-auto opacity-0 group-hover:opacity-100 hover:opacity-100"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleCategoryAddback(category);
-                              }}
-                              disabled={addbackPending}
-                            >
-                              {isCategoryAddedBack(category) ? (
-                                <X className="h-3.5 w-3.5 text-amber-600" />
-                              ) : (
-                                <ArrowUpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-                              )}
-                            </Button>
+                            <AddbackEditor
+                              scope="category"
+                              lineItemKey={category}
+                              lineItemLabel={`${category} (Entire Category)`}
+                              category={category}
+                              year={selectedYear ? parseInt(selectedYear) : undefined}
+                              existingAddback={getAnyAddback(category, 'category')}
+                              isActive={isCategoryAddedBack(category)}
+                              onSave={(data) => createOrUpdateAddback(data)}
+                              onToggle={() => toggleCategoryAddback(category)}
+                              onDelete={(id) => deleteAddback(id)}
+                              isPending={addbackPending}
+                              trigger={
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className={`h-6 w-6 p-0 ml-auto ${isCategoryAddedBack(category) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                >
+                                  {isCategoryAddedBack(category) ? (
+                                    <ArrowUpCircle className="h-3.5 w-3.5 text-amber-600" />
+                                  ) : (
+                                    <ArrowUpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                                  )}
+                                </Button>
+                              }
+                            />
                           </div>
                         </TableCell>
                         {months.map((month, idx) => {
@@ -886,41 +945,98 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                     Addback
                                   </Badge>
                                 )}
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-5 w-5 p-0 ml-auto opacity-0 group-hover:opacity-100 hover:opacity-100 shrink-0"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleLineItemAddback(item.subcategory, item.description, category);
-                                  }}
-                                  disabled={addbackPending}
-                                >
-                                  {isLineItemAddedBack(item.subcategory) ? (
-                                    <X className="h-3 w-3 text-amber-600" />
-                                  ) : (
-                                    <ArrowUpCircle className="h-3 w-3 text-muted-foreground" />
-                                  )}
-                                </Button>
+                                <AddbackEditor
+                                  scope="line_item"
+                                  lineItemKey={item.subcategory}
+                                  lineItemLabel={item.description}
+                                  category={category}
+                                  year={selectedYear ? parseInt(selectedYear) : undefined}
+                                  currentValue={item.annualTotal}
+                                  existingAddback={getAnyAddback(item.subcategory, 'line_item')}
+                                  isActive={isLineItemAddedBack(item.subcategory)}
+                                  onSave={(data) => createOrUpdateAddback(data)}
+                                  onToggle={() => toggleLineItemAddback(item.subcategory, item.description, category)}
+                                  onDelete={(id) => deleteAddback(id)}
+                                  isPending={addbackPending}
+                                  trigger={
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className={`h-5 w-5 p-0 ml-auto shrink-0 ${isLineItemAddedBack(item.subcategory) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                    >
+                                      {isLineItemAddedBack(item.subcategory) ? (
+                                        <ArrowUpCircle className="h-3 w-3 text-amber-600" />
+                                      ) : (
+                                        <ArrowUpCircle className="h-3 w-3 text-muted-foreground" />
+                                      )}
+                                    </Button>
+                                  }
+                                />
                               </div>
                             </TableCell>
                             {months.map((month, idx) => {
                               const rawValue = item.monthlyData[month] || 0;
                               const displayValue = showNormalized ? getNormalizedMonthlyValue(item, month, idx) : rawValue;
                               const isCellAddedBack = isMonthCellAddedBack(item.subcategory, parseInt(selectedYear), idx + 1);
+                              const yearNum = parseInt(selectedYear);
+                              const monthNum = idx + 1;
                               return (
                                 <TableCell 
                                   key={month} 
-                                  className={`text-right relative ${!isSeasonalMonth(idx) ? 'bg-muted/30 text-muted-foreground' : ''} ${isCellAddedBack ? 'bg-amber-50' : ''}`}
-                                  onDoubleClick={() => toggleMonthCellAddback(item.subcategory, item.description, category, parseInt(selectedYear), idx + 1)}
-                                  title={isCellAddedBack ? 'Double-click to remove month addback' : 'Double-click to add back this month'}
+                                  className={`text-right relative group/cell ${!isSeasonalMonth(idx) ? 'bg-muted/30 text-muted-foreground' : ''} ${isCellAddedBack ? 'bg-amber-50/70 dark:bg-amber-950/20' : ''}`}
                                 >
-                                  <span className={isCellAddedBack && showNormalized ? 'line-through opacity-50' : ''}>
-                                    {formatCurrency(displayValue)}
-                                  </span>
-                                  {isCellAddedBack && (
-                                    <Flag className="h-2.5 w-2.5 text-amber-500 absolute top-1 right-1" />
-                                  )}
+                                  <div className="flex items-center justify-end gap-0.5">
+                                    <span className={isCellAddedBack && showNormalized ? 'line-through opacity-50' : ''}>
+                                      {formatCurrency(displayValue)}
+                                    </span>
+                                    {isCellAddedBack && (
+                                      <Flag className="h-2.5 w-2.5 text-amber-500 shrink-0" />
+                                    )}
+                                    {!isCellAddedBack && rawValue !== 0 && (
+                                      <AddbackEditor
+                                        scope="month_cell"
+                                        lineItemKey={item.subcategory}
+                                        lineItemLabel={item.description}
+                                        category={category}
+                                        year={yearNum}
+                                        month={monthNum}
+                                        currentValue={rawValue}
+                                        existingAddback={getAnyAddback(item.subcategory, 'month_cell', yearNum, monthNum)}
+                                        isActive={false}
+                                        onSave={(data) => createOrUpdateAddback(data)}
+                                        onToggle={() => toggleMonthCellAddback(item.subcategory, item.description, category, yearNum, monthNum)}
+                                        onDelete={(id) => deleteAddback(id)}
+                                        isPending={addbackPending}
+                                        trigger={
+                                          <button className="h-3.5 w-3.5 p-0 opacity-0 group-hover/cell:opacity-60 hover:!opacity-100 shrink-0 transition-opacity">
+                                            <ArrowUpCircle className="h-3 w-3 text-muted-foreground" />
+                                          </button>
+                                        }
+                                      />
+                                    )}
+                                    {isCellAddedBack && (
+                                      <AddbackEditor
+                                        scope="month_cell"
+                                        lineItemKey={item.subcategory}
+                                        lineItemLabel={item.description}
+                                        category={category}
+                                        year={yearNum}
+                                        month={monthNum}
+                                        currentValue={rawValue}
+                                        existingAddback={getAnyAddback(item.subcategory, 'month_cell', yearNum, monthNum)}
+                                        isActive={true}
+                                        onSave={(data) => createOrUpdateAddback(data)}
+                                        onToggle={() => toggleMonthCellAddback(item.subcategory, item.description, category, yearNum, monthNum)}
+                                        onDelete={(id) => deleteAddback(id)}
+                                        isPending={addbackPending}
+                                        trigger={
+                                          <button className="h-3.5 w-3.5 p-0 shrink-0">
+                                            <ArrowUpCircle className="h-3 w-3 text-amber-600" />
+                                          </button>
+                                        }
+                                      />
+                                    )}
+                                  </div>
                                 </TableCell>
                               );
                             })}

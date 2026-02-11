@@ -66,6 +66,7 @@ export function useModelingAddbacks(projectId: string | undefined) {
       scope?: AddbackScope;
       addbackMonth?: number;
       addbackYear?: number;
+      amount?: string;
       values?: { year: number; month?: number; amount: string }[];
     }) => {
       const response = await apiRequest('POST', `/api/modeling/projects/${projectId}/addbacks`, data);
@@ -127,6 +128,17 @@ export function useModelingAddbacks(projectId: string | undefined) {
         && a.addbackMonth === month
         && a.isActive
     );
+  };
+
+  const getAnyAddback = (lineItemKey: string, scope: AddbackScope, year?: number, month?: number): Addback | undefined => {
+    return addbacksQuery.data?.find(a => {
+      const keyMatch = a.lineItemKey === lineItemKey || a.lineItemId === lineItemKey;
+      if (!keyMatch || a.scope !== scope) return false;
+      if (scope === 'month_cell') {
+        return a.addbackYear === year && a.addbackMonth === month;
+      }
+      return true;
+    });
   };
 
   const isLineItemAddedBack = (lineItemKey: string): boolean => {
@@ -204,6 +216,22 @@ export function useModelingAddbacks(projectId: string | undefined) {
     return (addbacksQuery.data || []).filter(a => a.isActive);
   };
 
+  const getAddbackAmountForCell = (lineItemKey: string, year: number, month: number): number => {
+    const cellAddback = getAddbackForMonthCell(lineItemKey, year, month);
+    if (cellAddback && cellAddback.values.length > 0) {
+      return parseFloat(cellAddback.values[0].amount) || 0;
+    }
+    return 0;
+  };
+
+  const getAddbackAmountForLineItem = (lineItemKey: string): number => {
+    const addback = getAddbackForLineItem(lineItemKey);
+    if (addback && addback.values.length > 0) {
+      return addback.values.reduce((sum, v) => sum + (parseFloat(v.amount) || 0), 0);
+    }
+    return 0;
+  };
+
   const getTotalAddbacksForPeriod = (year: number, month?: number): number => {
     if (!addbacksQuery.data) return 0;
     
@@ -247,12 +275,15 @@ export function useModelingAddbacks(projectId: string | undefined) {
     getAddbackForLineItem,
     getAddbackForCategory,
     getAddbackForMonthCell,
+    getAnyAddback,
     isLineItemAddedBack,
     isCategoryAddedBack,
     isMonthCellAddedBack,
     toggleLineItemAddback,
     toggleCategoryAddback,
     toggleMonthCellAddback,
+    getAddbackAmountForCell,
+    getAddbackAmountForLineItem,
     getTotalAddbacksForPeriod,
     getAddbacksSummary,
     isPending: createOrUpdateMutation.isPending || deleteAddbackMutation.isPending || toggleMutation.isPending,

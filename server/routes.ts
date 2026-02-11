@@ -17787,8 +17787,24 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const userId = req.user.id;
       const { projectId } = req.params;
-      const { lineItemKey, lineItemLabel, lineItemId, category, reason, notes, periodType, scope, addbackMonth, addbackYear, values } = req.body;
+      const { lineItemKey, lineItemLabel, lineItemId, category, reason, notes, periodType, scope, addbackMonth, addbackYear, amount, values } = req.body;
       
+      const resolvedScope = scope || 'line_item';
+      const resolvedKey = lineItemKey || lineItemId;
+      const resolvedLabel = lineItemLabel || lineItemId;
+
+      if (!resolvedKey || !resolvedLabel) {
+        return res.status(400).json({ error: 'lineItemKey and lineItemLabel are required' });
+      }
+
+      if (resolvedScope === 'month_cell' && (addbackMonth == null || addbackYear == null)) {
+        return res.status(400).json({ error: 'addbackMonth and addbackYear are required for month_cell scope' });
+      }
+
+      if (!['line_item', 'category', 'month_cell'].includes(resolvedScope)) {
+        return res.status(400).json({ error: 'scope must be line_item, category, or month_cell' });
+      }
+
       const project = await storage.getModelingProject(projectId, orgId);
       if (!project) {
         return res.status(404).json({ error: 'Project not found' });
@@ -17797,10 +17813,6 @@ Current context: Project ${req.params.projectId}`;
       const { modelingAddbacks, modelingAddbackValues } = await import('@shared/schema');
       const { eq, and } = await import('drizzle-orm');
 
-      const resolvedScope = scope || 'line_item';
-      const resolvedKey = lineItemKey || lineItemId || '';
-      const resolvedLabel = lineItemLabel || lineItemId || '';
-      
       const conditions: any[] = [
         eq(modelingAddbacks.projectId, projectId),
         eq(modelingAddbacks.lineItemKey, resolvedKey),
@@ -17820,7 +17832,14 @@ Current context: Project ${req.params.projectId}`;
       let addback;
       if (existing) {
         [addback] = await db.update(modelingAddbacks)
-          .set({ reason, notes, periodType, category, isActive: true, updatedAt: new Date() })
+          .set({ 
+            reason: reason || existing.reason, 
+            notes: notes !== undefined ? notes : existing.notes, 
+            periodType: periodType || existing.periodType, 
+            category: category || existing.category, 
+            isActive: true, 
+            updatedAt: new Date() 
+          })
           .where(eq(modelingAddbacks.id, existing.id))
           .returning();
         
@@ -17834,10 +17853,10 @@ Current context: Project ${req.params.projectId}`;
           category: category || null,
           reason: reason || null,
           notes: notes || null,
-          periodType: periodType || 'yearly',
+          periodType: periodType || (resolvedScope === 'month_cell' ? 'monthly' : 'yearly'),
           scope: resolvedScope,
-          addbackMonth: addbackMonth || null,
-          addbackYear: addbackYear || null,
+          addbackMonth: addbackMonth != null ? addbackMonth : null,
+          addbackYear: addbackYear != null ? addbackYear : null,
           isActive: true,
           createdBy: userId,
         }).returning();
@@ -17848,10 +17867,26 @@ Current context: Project ${req.params.projectId}`;
           values.map((v: any) => ({
             addbackId: addback.id,
             year: v.year,
-            month: v.month,
-            amount: v.amount,
+            month: v.month != null ? v.month : null,
+            amount: String(v.amount || '0'),
           }))
         );
+      } else if (amount != null && amount !== '' && amount !== '0') {
+        if (resolvedScope === 'month_cell' && addbackYear != null && addbackMonth != null) {
+          await db.insert(modelingAddbackValues).values({
+            addbackId: addback.id,
+            year: addbackYear,
+            month: addbackMonth,
+            amount: String(amount),
+          });
+        } else if (resolvedScope === 'line_item' || resolvedScope === 'category') {
+          await db.insert(modelingAddbackValues).values({
+            addbackId: addback.id,
+            year: addbackYear || new Date().getFullYear(),
+            month: null,
+            amount: String(amount),
+          });
+        }
       }
       
       const addbackValues = await db.select()
@@ -17864,7 +17899,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
       console.error('Failed to create/update addback:', error);
-      res.status(500).json({ error: 'Failed to create/update addback' });
+      res.status(500).json({ error: 'Failed to create/update addback', details: error.message });
     }
   });
 
