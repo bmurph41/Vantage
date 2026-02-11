@@ -337,12 +337,13 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
     );
   };
 
-  const getNormalizedMonthlyValue = (item: PLLineItem, month: string, monthIdx: number) => {
+  const getAdjustedMonthlyValue = (item: PLLineItem, month: string, monthIdx: number) => {
     const rawValue = item.monthlyData[month] || 0;
-    if (!showNormalized) return rawValue;
     const yearNum = parseInt(selectedYear);
     const monthNum = monthIdx + 1;
-    if (isCategoryAddedBack(item.category)) return 0;
+    if (isCategoryAddedBack(item.category)) {
+      return showNormalized ? 0 : rawValue;
+    }
     if (isLineItemAddedBack(item.subcategory)) {
       const lineAddback = getAddbackForLineItem(item.subcategory);
       if (lineAddback && lineAddback.values.length > 0) {
@@ -352,33 +353,31 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
           return customAmount / 12;
         }
       }
-      return 0;
+      return showNormalized ? 0 : rawValue;
     }
     if (isMonthCellAddedBack(item.subcategory, yearNum, monthNum)) {
       const cellAddback = getAddbackForMonthCell(item.subcategory, yearNum, monthNum);
       if (cellAddback && cellAddback.values.length > 0) {
         return parseFloat(cellAddback.values[0].amount) || 0;
       }
-      return 0;
+      return showNormalized ? 0 : rawValue;
     }
     return rawValue;
   };
 
-  const getNormalizedCategoryTotal = (category: string, month: string, monthIdx: number) => {
-    if (!showNormalized) return getCategoryTotal(category, month);
-    if (isCategoryAddedBack(category)) return 0;
+  const getAdjustedCategoryTotal = (category: string, month: string, monthIdx: number) => {
+    if (isCategoryAddedBack(category) && showNormalized) return 0;
     return (groupedData[category] || []).reduce((sum: number, item: PLLineItem) => {
-      return sum + getNormalizedMonthlyValue(item, month, monthIdx);
+      return sum + getAdjustedMonthlyValue(item, month, monthIdx);
     }, 0);
   };
 
-  const getNormalizedCategoryAnnualTotal = (category: string) => {
-    if (!showNormalized) return getCategoryAnnualTotal(category);
-    if (isCategoryAddedBack(category)) return 0;
+  const getAdjustedCategoryAnnualTotal = (category: string) => {
+    if (isCategoryAddedBack(category) && showNormalized) return 0;
     return (groupedData[category] || []).reduce((sum: number, item: PLLineItem) => {
       let itemTotal = 0;
       months.forEach((month, idx) => {
-        itemTotal += getNormalizedMonthlyValue(item, month, idx);
+        itemTotal += getAdjustedMonthlyValue(item, month, idx);
       });
       return sum + itemTotal;
     }, 0);
@@ -900,7 +899,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           </div>
                         </TableCell>
                         {months.map((month, idx) => {
-                          const value = showNormalized ? getNormalizedCategoryTotal(category, month, idx) : getCategoryTotal(category, month);
+                          const value = getAdjustedCategoryTotal(category, month, idx);
                           const prevMonth = idx > 0 ? months[idx - 1] : null;
                           const prevValue = prevMonth ? getCategoryTotal(category, prevMonth) : null;
                           const momChange = prevValue && prevValue !== 0 ? ((value - prevValue) / Math.abs(prevValue)) * 100 : null;
@@ -921,14 +920,14 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           );
                         })}
                         <TableCell className="text-right font-bold bg-background">
-                          {formatCurrency(showNormalized ? getNormalizedCategoryAnnualTotal(category) : getCategoryAnnualTotal(category))}
+                          {formatCurrency(getAdjustedCategoryAnnualTotal(category))}
                         </TableCell>
                       </TableRow>
 
                       {expandedCategories.has(category) && (groupedData[category] || []).map((item: PLLineItem) => {
                         const SourceIcon = item.dataSource ? dataSourceIcons[item.dataSource] : null;
                         return (
-                          <TableRow key={item.id} className={`text-sm group ${isLineItemAddedBack(item.subcategory) || isCategoryAddedBack(category) ? 'opacity-50 line-through' : ''}`}>
+                          <TableRow key={item.id} className={`text-sm group ${(isLineItemAddedBack(item.subcategory) || isCategoryAddedBack(category)) && showNormalized ? 'opacity-50 line-through' : ''}`}>
                             <TableCell className="pl-10 whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
                               <div className="flex items-center gap-2">
                                 {SourceIcon && (
@@ -975,7 +974,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                             </TableCell>
                             {months.map((month, idx) => {
                               const rawValue = item.monthlyData[month] || 0;
-                              const displayValue = showNormalized ? getNormalizedMonthlyValue(item, month, idx) : rawValue;
+                              const displayValue = getAdjustedMonthlyValue(item, month, idx);
                               const isCellAddedBack = isMonthCellAddedBack(item.subcategory, parseInt(selectedYear), idx + 1);
                               const yearNum = parseInt(selectedYear);
                               const monthNum = idx + 1;
@@ -985,7 +984,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                   className={`text-right relative group/cell ${!isSeasonalMonth(idx) ? 'bg-muted/30 text-muted-foreground' : ''} ${isCellAddedBack ? 'bg-amber-50/70 dark:bg-amber-950/20' : ''}`}
                                 >
                                   <div className="flex items-center justify-end gap-0.5">
-                                    <span className={isCellAddedBack && showNormalized ? 'line-through opacity-50' : ''}>
+                                    <span className={isCellAddedBack && displayValue !== rawValue ? 'text-amber-700 dark:text-amber-400 font-medium' : ''}>
                                       {formatCurrency(displayValue)}
                                     </span>
                                     {isCellAddedBack && (
@@ -1040,7 +1039,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                               );
                             })}
                             <TableCell className="text-right font-medium">
-                              {formatCurrency(showNormalized ? months.reduce((sum, month, idx) => sum + getNormalizedMonthlyValue(item, month, idx), 0) : item.annualTotal)}
+                              {formatCurrency(months.reduce((sum, month, idx) => sum + getAdjustedMonthlyValue(item, month, idx), 0))}
                             </TableCell>
                           </TableRow>
                         );
@@ -1051,8 +1050,8 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   <TableRow className="bg-muted font-bold border-t-2">
                     <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">Gross Profit</TableCell>
                     {months.map((month, idx) => {
-                      const revenue = showNormalized ? getNormalizedCategoryTotal('Revenue', month, idx) : getCategoryTotal('Revenue', month);
-                      const cogs = showNormalized ? getNormalizedCategoryTotal('COGS', month, idx) : getCategoryTotal('COGS', month);
+                      const revenue = getAdjustedCategoryTotal('Revenue', month, idx);
+                      const cogs = getAdjustedCategoryTotal('COGS', month, idx);
                       return (
                         <TableCell 
                           key={month} 
@@ -1062,14 +1061,14 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                         </TableCell>
                       );
                     })}
-                    <TableCell className="text-right bg-muted">{formatCurrency(showNormalized ? (getNormalizedCategoryAnnualTotal('Revenue') - getNormalizedCategoryAnnualTotal('COGS')) : grossProfit)}</TableCell>
+                    <TableCell className="text-right bg-muted">{formatCurrency(getAdjustedCategoryAnnualTotal('Revenue') - getAdjustedCategoryAnnualTotal('COGS'))}</TableCell>
                   </TableRow>
 
                   <TableRow className="bg-muted/30">
                     <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-muted/30 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-sm text-muted-foreground">Gross Profit Margin</TableCell>
                     {months.map((month, idx) => {
-                      const revenue = showNormalized ? getNormalizedCategoryTotal('Revenue', month, idx) : getCategoryTotal('Revenue', month);
-                      const cogs = showNormalized ? getNormalizedCategoryTotal('COGS', month, idx) : getCategoryTotal('COGS', month);
+                      const revenue = getAdjustedCategoryTotal('Revenue', month, idx);
+                      const cogs = getAdjustedCategoryTotal('COGS', month, idx);
                       const gp = revenue - cogs;
                       const margin = revenue !== 0 ? (gp / revenue) * 100 : null;
                       return (
@@ -1083,9 +1082,9 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                     })}
                     <TableCell className="text-right text-sm text-muted-foreground bg-muted/30">
                       {(() => {
-                        const normRev = showNormalized ? getNormalizedCategoryAnnualTotal('Revenue') : totalRevenue;
-                        const normGP = showNormalized ? (getNormalizedCategoryAnnualTotal('Revenue') - getNormalizedCategoryAnnualTotal('COGS')) : grossProfit;
-                        return formatPercent(normRev !== 0 ? (normGP / normRev) * 100 : null);
+                        const adjRev = getAdjustedCategoryAnnualTotal('Revenue');
+                        const adjGP = adjRev - getAdjustedCategoryAnnualTotal('COGS');
+                        return formatPercent(adjRev !== 0 ? (adjGP / adjRev) * 100 : null);
                       })()}
                     </TableCell>
                   </TableRow>
@@ -1093,9 +1092,9 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   <TableRow className="bg-primary/10 font-bold">
                     <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-primary/10 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">{config?.bottomLineMetric === 'ebitda' ? 'EBITDA' : 'NOI'}</TableCell>
                     {months.map((month, idx) => {
-                      const revenue = showNormalized ? getNormalizedCategoryTotal('Revenue', month, idx) : getCategoryTotal('Revenue', month);
-                      const cogs = showNormalized ? getNormalizedCategoryTotal('COGS', month, idx) : getCategoryTotal('COGS', month);
-                      const expenses = showNormalized ? getNormalizedCategoryTotal('Expenses', month, idx) : getCategoryTotal('Expenses', month);
+                      const revenue = getAdjustedCategoryTotal('Revenue', month, idx);
+                      const cogs = getAdjustedCategoryTotal('COGS', month, idx);
+                      const expenses = getAdjustedCategoryTotal('Expenses', month, idx);
                       const noi = revenue - cogs - expenses;
                       return (
                         <TableCell 
@@ -1107,8 +1106,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                       );
                     })}
                     {(() => {
-                      const normalizedNOI = getNormalizedCategoryAnnualTotal('Revenue') - getNormalizedCategoryAnnualTotal('COGS') - getNormalizedCategoryAnnualTotal('Expenses');
-                      const displayNOI = showNormalized ? normalizedNOI : netIncome;
+                      const displayNOI = getAdjustedCategoryAnnualTotal('Revenue') - getAdjustedCategoryAnnualTotal('COGS') - getAdjustedCategoryAnnualTotal('Expenses');
                       return (
                         <TableCell className={`text-right bg-primary/10 ${displayNOI >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                           {formatCurrency(displayNOI)}
@@ -1120,9 +1118,9 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   <TableRow className="bg-primary/5">
                     <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-primary/5 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-sm text-muted-foreground">Operating Margin</TableCell>
                     {months.map((month, idx) => {
-                      const revenue = showNormalized ? getNormalizedCategoryTotal('Revenue', month, idx) : getCategoryTotal('Revenue', month);
-                      const cogs = showNormalized ? getNormalizedCategoryTotal('COGS', month, idx) : getCategoryTotal('COGS', month);
-                      const expenses = showNormalized ? getNormalizedCategoryTotal('Expenses', month, idx) : getCategoryTotal('Expenses', month);
+                      const revenue = getAdjustedCategoryTotal('Revenue', month, idx);
+                      const cogs = getAdjustedCategoryTotal('COGS', month, idx);
+                      const expenses = getAdjustedCategoryTotal('Expenses', month, idx);
                       const noi = revenue - cogs - expenses;
                       const margin = revenue !== 0 ? (noi / revenue) * 100 : null;
                       return (
@@ -1135,9 +1133,8 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                       );
                     })}
                     {(() => {
-                      const normRev = showNormalized ? getNormalizedCategoryAnnualTotal('Revenue') : totalRevenue;
-                      const normalizedNOI = getNormalizedCategoryAnnualTotal('Revenue') - getNormalizedCategoryAnnualTotal('COGS') - getNormalizedCategoryAnnualTotal('Expenses');
-                      const displayNOI = showNormalized ? normalizedNOI : netIncome;
+                      const normRev = getAdjustedCategoryAnnualTotal('Revenue');
+                      const displayNOI = normRev - getAdjustedCategoryAnnualTotal('COGS') - getAdjustedCategoryAnnualTotal('Expenses');
                       return (
                         <TableCell className={`text-right text-sm bg-primary/5 ${displayNOI >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                           {formatPercent(normRev !== 0 ? (displayNOI / normRev) * 100 : null)}
