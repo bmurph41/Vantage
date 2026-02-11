@@ -497,17 +497,51 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
   }, [groupedData?.lineItems]);
 
   const confirmablePendingItems = useMemo(() => {
-    // Use grouped data for count - all pending items are confirmable in the grouped view
-    return pendingItemsFromGrouped;
-  }, [pendingItemsFromGrouped]);
+    if (!groupedData?.lineItems) return [];
+    const validIds: string[] = [];
+    for (const li of groupedData.lineItems) {
+      if (li.status === "confirmed" || li.status === "excluded") continue;
+      const firstItem = li.monthlyData[0];
+      if (!firstItem) continue;
+      const tier = (firstItem.categoryTierConfirmed || firstItem.categoryTierSuggested) as CategoryTier | null;
+      if (!tier) continue;
+      const dept = tier === "expense"
+        ? (firstItem.expenseDeptConfirmed || firstItem.expenseDeptSuggested)
+        : (firstItem.revenueCogsDeptConfirmed || firstItem.revenueCogsDeptSuggested);
+      if (!dept) continue;
+      for (const m of li.monthlyData) {
+        if (m.status === "pending" || m.status === "needs_review") {
+          validIds.push(m.id);
+        }
+      }
+    }
+    return validIds;
+  }, [groupedData?.lineItems]);
+
+  const skippedPendingCount = useMemo(() => {
+    return pendingItemsFromGrouped.length - confirmablePendingItems.length;
+  }, [pendingItemsFromGrouped, confirmablePendingItems]);
 
   const handleConfirmAllPending = () => {
-    if (confirmablePendingItems.length === 0) return;
+    if (confirmablePendingItems.length === 0) {
+      toast({
+        title: "Cannot Confirm",
+        description: "All pending items need both a Category and Department set before confirming.",
+        variant: "destructive",
+      });
+      return;
+    }
     bulkUpdateMutation.mutate({
-      itemIds: confirmablePendingItems, // Already an array of IDs
+      itemIds: confirmablePendingItems,
       updates: { status: "confirmed" },
-      silent: true, // Silent save for bulk operations from button
+      silent: true,
     });
+    if (skippedPendingCount > 0) {
+      toast({
+        title: "Partial Confirm",
+        description: `${confirmablePendingItems.length} items confirmed. ${skippedPendingCount} items skipped (missing Category or Department).`,
+      });
+    }
   };
 
   const handleExcludeAllPending = () => {
@@ -882,16 +916,30 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
             Refresh
           </Button>
           <Separator orientation="vertical" className="h-6" />
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleConfirmAllPending}
-            disabled={bulkUpdateMutation.isPending || confirmablePendingItems.length === 0}
-            className="text-green-600 hover:text-green-700 border-green-200 hover:border-green-300 hover:bg-green-50"
-          >
-            <Check className="h-4 w-4 mr-1" />
-            Confirm All ({confirmablePendingItems.length})
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleConfirmAllPending}
+                  disabled={bulkUpdateMutation.isPending || confirmablePendingItems.length === 0}
+                  className="text-green-600 hover:text-green-700 border-green-200 hover:border-green-300 hover:bg-green-50"
+                >
+                  <Check className="h-4 w-4 mr-1" />
+                  Confirm All ({confirmablePendingItems.length})
+                  {skippedPendingCount > 0 && (
+                    <span className="ml-1 text-amber-600">({skippedPendingCount} need classification)</span>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {skippedPendingCount > 0
+                  ? `${skippedPendingCount} items missing Category or Department will be skipped`
+                  : "Confirm all pending items that have Category and Department set"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <Button
             size="sm"
             variant="outline"
@@ -974,9 +1022,9 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
           </div>
         ) : (
           <>
-            {/* Bulk Action Bar - appears when rows are selected */}
+            {/* Bulk Action Bar - fixed at top of viewport when rows are selected */}
             {selectedRowKeys.size > 0 && (
-              <div className="sticky top-0 z-30 bg-primary text-primary-foreground p-3 rounded-lg mb-3 flex items-center justify-between gap-4 shadow-lg">
+              <div className="fixed top-0 left-0 right-0 z-50 bg-primary text-primary-foreground p-3 flex items-center justify-between gap-4 shadow-lg">
                 <div className="flex items-center gap-3">
                   <span className="font-medium">{selectedRowKeys.size} row{selectedRowKeys.size !== 1 ? 's' : ''} selected</span>
                   <Button

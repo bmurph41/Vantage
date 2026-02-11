@@ -379,14 +379,26 @@ export function MultiDocumentReview({
     }
 
     // Validate: items need both category AND department (Requirement G)
-    const validItems = pendingItemsByDoc.filter(({ item }) => 
-      (item.categoryConfirmed || item.categorySuggested) && 
-      (item.departmentConfirmed || item.departmentSuggested)
-    );
-    const invalidItems = pendingItemsByDoc.filter(({ item }) => 
-      !(item.categoryConfirmed || item.categorySuggested) || 
-      !(item.departmentConfirmed || item.departmentSuggested)
-    );
+    const validItems = pendingItemsByDoc.filter(({ item }) => {
+      const tier = item.categoryTierConfirmed || item.categoryTierSuggested || item.categoryConfirmed || item.categorySuggested;
+      if (!tier) return false;
+      const effectiveTier = item.categoryTierConfirmed || item.categoryTierSuggested;
+      if (effectiveTier === 'expense') {
+        return !!(item.expenseDeptConfirmed || item.expenseDeptSuggested);
+      } else {
+        return !!(item.revenueCogsDeptConfirmed || item.revenueCogsDeptSuggested);
+      }
+    });
+    const invalidItems = pendingItemsByDoc.filter(({ item }) => {
+      const tier = item.categoryTierConfirmed || item.categoryTierSuggested || item.categoryConfirmed || item.categorySuggested;
+      if (!tier) return true;
+      const effectiveTier = item.categoryTierConfirmed || item.categoryTierSuggested;
+      if (effectiveTier === 'expense') {
+        return !(item.expenseDeptConfirmed || item.expenseDeptSuggested);
+      } else {
+        return !(item.revenueCogsDeptConfirmed || item.revenueCogsDeptSuggested);
+      }
+    });
 
     if (validItems.length === 0) {
       toast({ 
@@ -412,11 +424,15 @@ export function MultiDocumentReview({
       }
 
       try {
+        const effectiveTier = item.categoryTierConfirmed || item.categoryTierSuggested;
+        const dept = effectiveTier === 'expense'
+          ? (item.expenseDeptConfirmed || item.expenseDeptSuggested)
+          : (item.revenueCogsDeptConfirmed || item.revenueCogsDeptSuggested);
         await confirmItemMutation.mutateAsync({
           uploadId,
           itemId: item.id,
           categoryId: item.categoryConfirmed || item.categorySuggested!,
-          department: item.departmentConfirmed || item.departmentSuggested || undefined,
+          department: dept || undefined,
         });
         confirmed++;
         setConfirmProgress(p => ({ ...p, current: confirmed }));
