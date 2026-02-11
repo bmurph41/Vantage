@@ -2,11 +2,12 @@ import { db } from '../../db';
 import {
   pnlFacts,
   pnlDocuments,
+  pnlParsedStatements,
 } from '@shared/pnl-pipeline-schema';
-import { modelingActuals, pnlCanonicalLineItems } from '@shared/schema';
+import { modelingActuals, pnlCanonicalLineItems, pnlJobs } from '@shared/schema';
 import { eq, sql } from 'drizzle-orm';
 import { MARINA_COA_SEED } from '../../scripts/seedMarinaCoa';
-import { sectionToCategory, majorGroupToCategory } from '../../utils/department-mapping';
+import { sectionToCategory, majorGroupToCategory, inferDepartment } from '../../utils/department-mapping';
 
 const coaLookup: Record<string, typeof MARINA_COA_SEED[0]> = {};
 for (const item of MARINA_COA_SEED) {
@@ -56,6 +57,21 @@ export async function promotePnlFactsToActuals(
       continue;
     }
 
+    const parsedStmts = await db.select()
+      .from(pnlParsedStatements)
+      .where(eq(pnlParsedStatements.documentId, docId));
+    const resolvedDeptMap: Record<string, string> = {};
+    for (const ps of parsedStmts) {
+      const pj = ps.parsedJson as any;
+      if (pj?.rows) {
+        for (const row of pj.rows) {
+          if (row.mapping?.resolvedDepartment && row.mapping?.canonicalLineItemId) {
+            resolvedDeptMap[row.mapping.canonicalLineItemId] = row.mapping.resolvedDepartment;
+          }
+        }
+      }
+    }
+
     for (const fact of facts) {
       try {
         const canonical = canonicalMap[fact.canonicalLineItemId];
@@ -69,7 +85,11 @@ export async function promotePnlFactsToActuals(
           ? sectionToCategory(coaEntry.section)
           : majorGroupToCategory(canonical.majorGroup);
         const subcategory = canonical.displayName;
-        const department = coaEntry?.department || canonical.subcategoryGroup || 'General';
+        const pipelineDept = resolvedDeptMap[fact.canonicalLineItemId];
+        const department = coaEntry?.department
+          || canonical.subcategoryGroup
+          || pipelineDept
+          || inferDepartment(fact.sourceLabel || subcategory, category);
 
         const year = fact.fiscalYear;
         const month = fact.fiscalPeriod || 1;
