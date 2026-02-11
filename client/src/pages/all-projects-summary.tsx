@@ -250,10 +250,10 @@ export default function AllProjectsSummaryPage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Print Header */}
         <div className="hidden print:block mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Portfolio Summary Report</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Portfolio Summary Report</h1>
           <p className="text-gray-600">Generated on {format(new Date(), 'MMMM dd, yyyy')}</p>
         </div>
 
@@ -325,7 +325,7 @@ export default function AllProjectsSummaryPage() {
         </div>
 
         {/* Overall Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
           <Card 
             className="border-l-4 border-l-blue-500 cursor-pointer hover:shadow-lg transition-shadow"
             onClick={() => setActiveModal("projects")}
@@ -416,7 +416,7 @@ export default function AllProjectsSummaryPage() {
         </div>
 
         {/* Individual Project Summaries */}
-        <Card className="mb-8">
+        <Card className="mb-6">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center">
               <FileText className="h-5 w-5 mr-2" />

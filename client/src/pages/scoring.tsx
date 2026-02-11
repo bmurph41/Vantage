@@ -280,7 +280,7 @@ export default function ScoringDashboard() {
     <div className="h-full flex flex-col p-6 bg-gray-50" data-testid="scoring-dashboard">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900" data-testid="text-dashboard-title">Lead Scoring Dashboard</h1>
+          <h1 className="text-2xl font-bold text-gray-900" data-testid="text-dashboard-title">Lead Scoring Dashboard</h1>
           <p className="text-gray-600">Monitor and optimize your lead scoring system</p>
         </div>
         <div className="flex space-x-2">

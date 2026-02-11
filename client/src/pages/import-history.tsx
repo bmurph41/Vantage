@@ -84,7 +84,7 @@ export default function ImportHistory() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto py-8 max-w-7xl">
+      <div className="container mx-auto py-6 px-6 max-w-7xl">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <Clock className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
@@ -96,10 +96,10 @@ export default function ImportHistory() {
   }
 
   return (
-    <div className="container mx-auto py-8 max-w-7xl">
-      <div className="mb-8 flex justify-between items-center">
+    <div className="container mx-auto py-6 px-6 max-w-7xl">
+      <div className="mb-6 flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold mb-2">Import History</h1>
+          <h1 className="text-2xl font-bold mb-2">Import History</h1>
           <p className="text-muted-foreground">
             View and manage your contact import history
           </p>

@@ -46,7 +46,7 @@ export default function NotificationSettingsPage({ projectId: propProjectId }: N
 
   if (isLoadingProject) {
     return (
-      <div className="p-8">
+      <div className="p-6">
         <div className="animate-pulse space-y-6">
           <div className="h-8 bg-muted rounded w-1/3"></div>
           <div className="h-4 bg-muted rounded w-2/3"></div>
@@ -58,7 +58,7 @@ export default function NotificationSettingsPage({ projectId: propProjectId }: N
 
   if (!projectData || typeof projectData !== 'object' || !('project' in projectData)) {
     return (
-      <div className="p-8">
+      <div className="p-6">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-foreground mb-2">Project Not Found</h2>
           <p className="text-muted-foreground">The notification settings for this project could not be loaded.</p>
@@ -81,7 +81,7 @@ export default function NotificationSettingsPage({ projectId: propProjectId }: N
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div>
-                <h1 className="text-3xl font-bold text-foreground mb-1" data-testid="page-title">
+                <h1 className="text-2xl font-bold text-foreground mb-1" data-testid="page-title">
                   Notification Settings
                 </h1>
                 <p className="text-lg text-muted-foreground" data-testid="project-name">

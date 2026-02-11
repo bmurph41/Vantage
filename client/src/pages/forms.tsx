@@ -195,7 +195,7 @@ export default function FormsPage() {
       {/* Header */}
       <div className="flex items-center justify-between p-6 border-b bg-white dark:bg-gray-900">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Forms</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Forms</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
             Create and manage lead capture forms for your marina business
           </p>

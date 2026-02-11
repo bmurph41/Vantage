@@ -92,7 +92,7 @@ export default function AuditLogsPage() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <Shield className="h-8 w-8 text-blue-600" />
             Audit Logs
           </h1>

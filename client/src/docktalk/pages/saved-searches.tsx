@@ -376,7 +376,7 @@ export default function SavedSearchesPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-3">
             <Bell className="h-8 w-8 text-primary" />
             Email Alerts
           </h1>

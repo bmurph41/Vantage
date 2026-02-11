@@ -627,9 +627,9 @@ export default function ImportContacts() {
   );
 
   return (
-    <div className="container mx-auto py-8 max-w-6xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Import Contacts</h1>
+    <div className="container mx-auto py-6 px-6 max-w-6xl">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold mb-2">Import Contacts</h1>
         <p className="text-muted-foreground">
           Import contacts from CSV files with automatic field mapping and duplicate detection
         </p>

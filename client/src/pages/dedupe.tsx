@@ -224,11 +224,11 @@ export default function DedupePage() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <main className="flex-1 overflow-y-auto bg-gray-50 p-8">
+      <main className="flex-1 overflow-y-auto bg-gray-50 p-6">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Dedupe Rules</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Dedupe Rules</h1>
               <p className="text-gray-600 mt-1">Configure rules to find and manage duplicate records</p>
             </div>
             <Button

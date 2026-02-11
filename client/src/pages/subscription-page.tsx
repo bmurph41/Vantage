@@ -90,7 +90,7 @@ export function SubscriptionPage() {
       {/* Header */}
       {/* ─────────────────────────────────────────────────────── */}
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold mb-2">Choose Your Plan</h1>
+        <h1 className="text-2xl font-bold mb-2">Choose Your Plan</h1>
         <p className="text-muted-foreground">
           {step === 'persona' && "Tell us about yourself so we can recommend the best plan"}
           {step === 'packages' && "Select a plan that fits your needs"}

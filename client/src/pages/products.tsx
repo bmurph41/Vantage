@@ -98,11 +98,11 @@ export default function ProductsPage() {
   const inactiveProducts = products.filter(p => !p.isActive);
 
   return (
-    <div className="h-full overflow-auto bg-gray-50 p-8">
+    <div className="h-full overflow-auto bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
               <Package className="h-8 w-8" />
               Products
             </h1>

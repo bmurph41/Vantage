@@ -208,10 +208,10 @@ export default function CRMDashboard() {
   };
 
   return (
-    <div className="p-8 space-y-8">
+    <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">CRM Dashboard</h1>
+          <h1 className="text-2xl font-bold">CRM Dashboard</h1>
           <p className="text-muted-foreground mt-1">
             Manage your marina acquisition pipeline
           </p>

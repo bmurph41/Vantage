@@ -842,7 +842,7 @@ function DDProgressReport({
       </div>
 
       {/* Main Content */}
-      <div className="p-8 space-y-8">
+      <div className="p-6 space-y-6">
         {/* Executive Summary Cards - 4-Card Grid */}
         <div className="space-y-6">
           <div className="flex items-center space-x-2 mb-6">
@@ -851,7 +851,7 @@ function DDProgressReport({
           </div>
           
           {/* 4-Card Executive Metrics Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
             {/* Card 1: Tasks Completed */}
             <Card 
               className="bg-white shadow-lg border-0 hover:shadow-xl transition-shadow cursor-pointer"
@@ -1176,7 +1176,7 @@ function DDProgressReport({
           </h2>
 
           {/* Enhanced Progress Visualization */}
-          <div className="grid lg:grid-cols-2 gap-8 mb-8">
+          <div className="grid lg:grid-cols-2 gap-6 mb-6">
             <Card className="bg-white shadow-lg border-0">
               <CardHeader className="pb-4">
                 <CardTitle className="text-lg font-semibold flex items-center text-gray-900">
@@ -1254,7 +1254,7 @@ function DDProgressReport({
           </div>
           
           {/* Task Status Breakdown */}
-          <Card className="bg-white shadow-lg border-0 mb-8">
+          <Card className="bg-white shadow-lg border-0 mb-6">
             <CardHeader className="pb-4">
               <CardTitle className="text-lg font-semibold flex items-center text-gray-900">
                 <BarChart3 className="h-5 w-5 mr-3 text-gray-600" />
