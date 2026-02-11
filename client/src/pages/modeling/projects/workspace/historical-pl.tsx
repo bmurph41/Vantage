@@ -990,7 +990,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                     {isCellAddedBack && (
                                       <Flag className="h-2.5 w-2.5 text-amber-500 shrink-0" />
                                     )}
-                                    {!isCellAddedBack && rawValue !== 0 && (
+                                    {!isCellAddedBack && (
                                       <AddbackEditor
                                         scope="month_cell"
                                         lineItemKey={item.subcategory}
