@@ -92,7 +92,7 @@ export function GrowthRatesTab({
     (storageGrowth.universalRates || []).forEach(r => {
       if (Math.abs(r - defaultStorageRate) > 0.001) count++;
     });
-    Object.values(storageGrowth.typeRates || {}).forEach(rates => {
+    Object.values(storageGrowth.typeRatesByYear || {}).forEach(rates => {
       (rates || []).forEach(r => {
         if (Math.abs(r - defaultStorageRate) > 0.001) count++;
       });
