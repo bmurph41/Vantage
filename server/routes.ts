@@ -11043,6 +11043,34 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+
+  app.get("/api/companies/:id/brokered-comps", async (req: any, res) => {
+    try {
+      const { orgId } = req.user || {};
+      if (!orgId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const comps = await storage.getSalesCompsByBrokerageCompany(orgId, req.params.id);
+      res.json(comps);
+    } catch (error: any) {
+      console.error("Failed to get brokered comps:", error);
+      res.status(500).json({ error: "Failed to retrieve brokered comps" });
+    }
+  });
+
+  app.get("/api/contacts/:contactId/brokered-comps", async (req: any, res) => {
+    try {
+      const { orgId } = req.user || {};
+      if (!orgId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const comps = await storage.getSalesCompsByAgentContact(orgId, req.params.contactId);
+      res.json(comps);
+    } catch (error: any) {
+      console.error("Failed to get agent brokered comps:", error);
+      res.status(500).json({ error: "Failed to retrieve agent brokered comps" });
+    }
+  });
   // Company-Property Links
   app.get("/api/companies/:id/properties", async (req: any, res) => {
     try {
@@ -12904,6 +12932,23 @@ Current context: Project ${req.params.projectId}`;
         }
       }
 
+      // Auto-create pending company for brokerage if brokerage name was provided but no brokerageCompanyId linked
+      if (compData.brokerage && !compData.brokerageCompanyId) {
+        try {
+          await storage.autoCreatePendingCompanyFromSalesComp({
+            salesCompId: comp.id,
+            orgId,
+            userId,
+            companyName: compData.brokerage,
+            role: 'brokerage',
+            city: compData.city,
+            state: compData.state,
+          });
+        } catch (companyError) {
+          console.error('Error auto-creating pending brokerage company:', companyError);
+        }
+      }
+
       // Auto-create pending contact if agent info was provided
       if (compData.agentFirstName || compData.agentLastName) {
         try {
@@ -13140,6 +13185,23 @@ Current context: Project ${req.params.projectId}`;
           });
         } catch (companyError) {
           console.error('Error auto-creating pending seller company:', companyError);
+        }
+      }
+
+      // Auto-create pending company for brokerage if brokerage name was provided but no brokerageCompanyId linked
+      if (updates.brokerage && !updates.brokerageCompanyId) {
+        try {
+          await storage.autoCreatePendingCompanyFromSalesComp({
+            salesCompId: req.params.id,
+            orgId,
+            userId,
+            companyName: updates.brokerage,
+            role: 'brokerage',
+            city: updates.city,
+            state: updates.state,
+          });
+        } catch (companyError) {
+          console.error('Error auto-creating pending brokerage company:', companyError);
         }
       }
 

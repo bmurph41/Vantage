@@ -28,6 +28,10 @@ import serviceRouter from "./service-router";
 import boatRentalsRouter from "./boat-rentals-router";
 import boatClubRouter from "./boat-club-router";
 import boatSalesRouter from "./boat-sales-router";
+import { payrollRouter } from "./routes/payroll-routes";
+import { permissionsRouter } from "./routes/payroll-permissions-routes";
+import { valuatorPayrollRouter } from "./routes/valuator-payroll-routes";
+import { deptPnlRouter } from "./routes/dept-pnl-routes";
 import integrationRouter from "./integration-routes";
 import { integrationsRouter } from "./integrations";
 import marinamatchRouter from "./marinamatch/routes";
@@ -38,6 +42,7 @@ import scraperV2Routes from "./docktalk/scraper_v2/routes";
 import { liv2Routes } from "./listings/ingestion_v2";
 import marketplaceRoutes from "./routes/marketplace-routes";
 import pnlRouter from "./services/pnl/routes";
+import valuatorExportRoutes from "./routes/valuator-export-routes";
 import capitalMarketsRouter from "./services/capital-markets/routes";
 import rraRoutes from "./routes/rra-routes";
 import modelingRentRollRoutes from "./routes/modeling-rent-roll-routes";
@@ -71,12 +76,15 @@ import marinaCompRoutes from "./routes/marina-comp-routes";
 import valuationTimelineRoutes from "./routes/valuation-timeline-routes";
 import dealAnalyticsRoutes from "./routes/deal-analytics-routes";
 import commercialTenantsRoutes from "./routes/commercial-tenants-routes";
+import commercialLeaseRoutes from "./routes/commercial-lease-routes";
+import unifiedLeaseRoutes from "./routes/unified-lease-routes";
 import tourProgressRoutes from "./routes/tour-progress-routes";
 import operationsSyncRoutes from "./routes/operations-sync-routes";
 import ddAutomationRoutes from "./routes/dd-automation-routes";
 import modelingValidationRoutes from "./routes/modeling-validation-routes";
+import enhancedDebtRoutes from "./routes/enhanced-debt-routes";
 import operationsContextRoutes from "./routes/operations-context-routes";
-import { userSessions, insertProspectingEntrySchema, users, salesComps, rateComps, industryStandards, modelingProjectConfig } from "@shared/schema";
+import { userSessions, insertProspectingEntrySchema, users, salesComps, rateComps, industryStandards, modelingProjectConfig, insertPendingSalesCompSchema } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { initializeVdrForProject } from "./services/vdr-initialization-service";
 import { rentRollService } from "./services/rent-roll-service";
@@ -241,6 +249,7 @@ import { z } from "zod";
 import crypto from "crypto";
 import { WebhookSecurity, type WebhookEvent } from "./webhook-security";
 import multer from "multer";
+import { validateFileUpload } from "./middleware/file-upload-security";
 import path from "path";
 import fs from "fs-extra";
 
@@ -408,8 +417,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/modeling/scenario-templates", authenticateUser, scenarioTemplateRoutes);
   app.use("/api/modeling", authenticateUser, modelingValidationRoutes);
   app.use("/api/marinalytics", authenticateUser, marinalyticsRoutes);
+  app.use("/api/debt", authenticateUser, enhancedDebtRoutes);
   app.use("/api/commercial-tenants", authenticateUser, commercialTenantsRoutes);
+  app.use("/api/commercial-leases", authenticateUser, commercialLeaseRoutes);
+  app.use("/api/commercial-leases", authenticateUser, unifiedLeaseRoutes);
   app.use(authenticateUser, tourProgressRoutes);
+  // Payroll module routes
+  app.use("/api/payroll", authenticateUser, payrollRouter);
+  app.use("/api/payroll/permissions", authenticateUser, permissionsRouter);
+  app.use("/api/valuator", authenticateUser, valuatorPayrollRouter);
+  app.use("/api/dept-pnl", authenticateUser, deptPnlRouter);
   app.use("/api/dd/automation", authenticateUser, ddAutomationRoutes);
   // Apply authentication to CRM route aliases
   app.use("/api/leads", authenticateUser, enforceTenant);
@@ -441,6 +458,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/docktalk/v2", authenticateUser, enforceTenant, scraperV2Routes);
   app.use("/api/pnl", authenticateUser, enforceTenant, pnlRouter);
   app.use("/api/rent-roll", authenticateUser, enforceTenant, requireRentRoll(), rraRoutes);
+  app.use("/api/valuator-export", authenticateUser, valuatorExportRoutes);
   app.use("/api/modeling-rent-roll", authenticateUser, enforceTenant, modelingRentRollRoutes);
   app.use("/api/marina-integrations", authenticateUser, enforceTenant, marinaIntegrationsRoutes);
   app.use("/api/executive-dashboard", authenticateUser, enforceTenant, requireRentRoll(), executiveDashboardRoutes);
@@ -939,7 +957,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const newProperty = await storage.createCrmProperty({
             orgId: req.user.orgId,
-            title: req.body.name?.replace(/ DD$/, '') || "New Property",
+            title: req.body.marinaName || req.body.name?.replace(/ DD$/, '') || "New Property",
             type: "marina",
             status: "pending",
             address: req.body.address,
@@ -958,12 +976,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const projectData = insertProjectSchema.parse({
-        ...req.body,
-        propertyId: propertyId || req.body.propertyId,
+        name: req.body.name,
+        description: req.body.description || undefined,
+        projectType: req.body.projectType,
+        dealId: req.body.dealId || undefined,
+        propertyId: propertyId || req.body.propertyId || undefined,
+        address: req.body.address || undefined,
+        city: req.body.city || undefined,
+        state: req.body.state || undefined,
+        zipCode: req.body.zipCode || undefined,
+        placeId: req.body.placeId || undefined,
+        coordinates: req.body.coordinates || undefined,
         orgId: req.user.orgId,
         createdBy: req.user.id,
       });
-      
+
       const project = await storage.createProject(projectData);
       
       // Create default project settings
@@ -993,9 +1020,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("[DD Project] Failed to initialize VDR:", vdrError);
       }
 
-      res.json(project);
+      // Create child projects for portfolio properties
+      const childProjects: any[] = [];
+      if (req.body.projectType === "portfolio" && Array.isArray(req.body.portfolioProperties)) {
+        for (const prop of req.body.portfolioProperties) {
+          if (!prop.name) continue;
+          try {
+            let childPropertyId = null;
+            try {
+              const newProperty = await storage.createCrmProperty({
+                orgId: req.user.orgId,
+                title: prop.name,
+                type: "marina",
+                status: "pending",
+                address: prop.address,
+                city: prop.city,
+                state: prop.state,
+                zipCode: prop.zipCode,
+                coordinates: prop.coordinates,
+                ownerId: req.user.id,
+                pipelineStage: "lead",
+              });
+              childPropertyId = newProperty.id;
+            } catch (propError) {
+              console.error("[Portfolio] Failed to auto-create property:", propError);
+            }
+            const childProjectData = insertProjectSchema.parse({
+              name: prop.name,
+              projectType: "single",
+              parentProjectId: project.id,
+              propertyId: childPropertyId,
+              address: prop.address,
+              city: prop.city,
+              state: prop.state,
+              zipCode: prop.zipCode,
+              orgId: req.user.orgId,
+              createdBy: req.user.id,
+            });
+            const childProject = await storage.createProject(childProjectData);
+            childProjects.push(childProject);
+            await storage.createProjectSettings({
+              projectId: childProject.id,
+              useBusinessDays: false,
+              holidayCalendar: "us_federal",
+              notificationsJson: {},
+              ndaRequired: false,
+            });
+            try {
+              await initializeVdrForProject(childProject.id, req.user.orgId, req.user.id);
+            } catch (vdrError) {
+              console.error("[Portfolio] Failed to init VDR:", vdrError);
+            }
+          } catch (childError) {
+            console.error("[Portfolio] Failed to create child:", childError);
+          }
+        }
+      }
+      res.json({ ...project, childProjects });
     } catch (error: any) {
-      res.status(400).json({ error: "Invalid project data" });
+      console.error("[DD Project] Creation error:", error?.message || error); res.status(400).json({ error: "Invalid project data", detail: error?.message });
+    }
+  });
 
   // Portfolio Management Routes
   
@@ -1122,8 +1207,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error adding property to portfolio:", error);
       res.status(500).json({ error: "Failed to add property to portfolio" });
-    }
-  });
     }
   });
 
@@ -2427,7 +2510,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Task File Management
-  app.post("/api/dd/tasks/:taskId/files", upload.single('file'), async (req: any, res) => {
+  app.post("/api/dd/tasks/:taskId/files", upload.single('file'), validateFileUpload({ maxSize: 20 * 1024 * 1024 }), async (req: any, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
@@ -2635,8 +2718,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to delete note" });
     }
   });
-
-
   // Project Templates
   app.get("/api/dd/project-templates", async (req: any, res) => {
     try {
@@ -3229,17 +3310,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const contact = await storage.createContact(contactData);
 
-      // Skip audit log for now due to database constraint issue
-      // TODO: Fix audit_logs table to allow null projectId for org-level operations
-      // await storage.createAuditLog({
-        orgId: req.user.orgId,
-      //   projectId: null,
-      //   userId: req.user.id,
-      //   entityType: "contact",
-      //   entityId: contact.id,
-      //   action: "created",
-      //   after: contact,
-      // });
+      // Auto-create CRM pending contact for review
+      try {
+        const nameParts = contact.name.split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+
+        await storage.createPendingContact({
+          orgId: req.user.orgId,
+          sourceType: 'dd_project',
+          sourceId: req.body.projectId || null,
+          firstName,
+          lastName,
+          fullName: contact.name,
+          email: contact.email,
+          phone: contact.phone || null,
+          jobTitle: contact.role ? contact.role : null,
+          status: 'pending',
+          sourceMetadata: { ddContactId: contact.id, company: contact.company },
+          createdBy: req.user.id,
+        });
+      } catch (pendingErr) {
+        console.error("Failed to create CRM pending contact (non-fatal):", pendingErr);
+      }
 
       res.json(contact);
     } catch (error: any) {
@@ -5011,8 +5104,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
-
-
   // DD Project by ID (for breadcrumb resolution)
   app.get("/api/dd/projects/:id", async (req: any, res) => {
     try {
@@ -5020,7 +5111,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!project) {
         return res.status(404).json({ error: "DD Project not found" });
       }
-      res.json(project);
+      // Create child projects for portfolio properties
+      const childProjects: any[] = [];
+      if (req.body.projectType === "portfolio" && Array.isArray(req.body.portfolioProperties)) {
+        for (const prop of req.body.portfolioProperties) {
+          if (!prop.name) continue;
+          try {
+            let childPropertyId = null;
+            try {
+              const newProperty = await storage.createCrmProperty({
+                orgId: req.user.orgId,
+                title: prop.name,
+                type: "marina",
+                status: "pending",
+                address: prop.address,
+                city: prop.city,
+                state: prop.state,
+                zipCode: prop.zipCode,
+                coordinates: prop.coordinates,
+                ownerId: req.user.id,
+                pipelineStage: "lead",
+              });
+              childPropertyId = newProperty.id;
+            } catch (propError) {
+              console.error("[Portfolio] Failed to auto-create property:", propError);
+            }
+            const childProjectData = insertProjectSchema.parse({
+              name: prop.name,
+              projectType: "single",
+              parentProjectId: project.id,
+              propertyId: childPropertyId,
+              address: prop.address,
+              city: prop.city,
+              state: prop.state,
+              zipCode: prop.zipCode,
+              orgId: req.user.orgId,
+              createdBy: req.user.id,
+            });
+            const childProject = await storage.createProject(childProjectData);
+            childProjects.push(childProject);
+            await storage.createProjectSettings({
+              projectId: childProject.id,
+              useBusinessDays: false,
+              holidayCalendar: "us_federal",
+              notificationsJson: {},
+              ndaRequired: false,
+            });
+            try {
+              await initializeVdrForProject(childProject.id, req.user.orgId, req.user.id);
+            } catch (vdrError) {
+              console.error("[Portfolio] Failed to init VDR:", vdrError);
+            }
+          } catch (childError) {
+            console.error("[Portfolio] Failed to create child:", childError);
+          }
+        }
+      }
+      res.json({ ...project, childProjects });
     } catch (error: any) {
       console.error("Failed to get DD project:", error);
       res.status(500).json({ error: "Failed to retrieve DD project" });
@@ -5138,7 +5285,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Upload CDD Document
-  app.post("/api/dd/projects/:projectId/cdd-documents", cddUpload.single('file'), async (req: any, res) => {
+  app.post("/api/dd/projects/:projectId/cdd-documents", cddUpload.single('file'), validateFileUpload({ maxSize: 50 * 1024 * 1024 }), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const { inArray } = await import('drizzle-orm');
@@ -5596,8 +5743,6 @@ Current context: Project ${req.params.projectId}`;
           for (const toolCall of assistantMessage.tool_calls) {
             const toolName = toolCall.function.name;
             const toolArgs = JSON.parse(toolCall.function.arguments);
-
-
             // Execute the tool with context
             const toolResult = await executeAdvisorTool(
               toolName,
@@ -6205,8 +6350,6 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: "Failed to delete report" });
     }
   });
-
-
   // Organization-level Audit Logs
   app.get("/api/audit-logs", async (req: any, res) => {
     try {
@@ -6227,8 +6370,6 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: "Failed to retrieve audit logs" });
     }
   });
-
-
   // ==================== DEAL WORKSPACE ROUTES ====================
 
   // Get all deal workspaces for the organization
@@ -7113,8 +7254,6 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: "Failed to search companies" });
     }
   });
-
-
   app.post("/api/crm/companies", async (req: any, res) => {
     try {
       // Ensure required fields have values (database has notNull constraints)
@@ -7369,6 +7508,40 @@ Current context: Project ${req.params.projectId}`;
     } catch (error: any) {
       console.error("Failed to get pending company:", error);
       res.status(500).json({ error: "Failed to retrieve pending company" });
+    }
+  });
+
+  app.post("/api/crm/pending-companies", async (req: any, res) => {
+    try {
+      const { name, website, phone, address, city, state, zipCode, industry } = req.body;
+      
+      if (!name) {
+        return res.status(400).json({ error: "Company name is required" });
+      }
+
+      const pendingCompany = await storage.createPendingCompany({
+        orgId: req.user.orgId,
+        sourceType: 'prospecting',
+        sourceId: null,
+        name,
+        website: website || null,
+        phone: phone || null,
+        address: address || null,
+        city: city || null,
+        state: state || null,
+        zipCode: zipCode || null,
+        industry: industry || null,
+        status: 'pending',
+        sourceMetadata: {
+          createdFromProspecting: true,
+        },
+        createdBy: req.user.id,
+      });
+
+      res.json(pendingCompany);
+    } catch (error: any) {
+      console.error("Failed to create pending company:", error);
+      res.status(500).json({ error: "Failed to create pending company" });
     }
   });
 
@@ -8110,7 +8283,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Upload file
-  app.post("/api/crm/files", crmFileUpload.single('file'), async (req: any, res) => {
+  app.post("/api/crm/files", crmFileUpload.single('file'), validateFileUpload({ maxSize: 10 * 1024 * 1024 }), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const { inArray } = await import('drizzle-orm');
@@ -9292,6 +9465,73 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // ===================================================================
+  // ===================================================================
+  // CRM Prospecting Activities (persisted daily tracking)
+  // ===================================================================
+
+  app.post("/api/prospecting/activities", async (req: any, res) => {
+    try {
+      const { id, createdAt, updatedAt, ...body } = req.body;
+      const activity = await storage.createProspectingActivity({
+        ...body,
+        userId: req.user.id,
+        activityDate: body.activityDate ? new Date(body.activityDate) : new Date(),
+      });
+      res.json(activity);
+    } catch (error: any) {
+      console.error("Failed to create prospecting activity:", error);
+      res.status(500).json({ error: "Failed to create prospecting activity" });
+    }
+  });
+
+  app.patch("/api/prospecting/activities/:id", async (req: any, res) => {
+    try {
+      const { activityType, outcome, dayOfWeek, activityDate: rawDate, notes, contactId, companyId, propertyId, dealId } = req.body;
+      const body: any = {};
+      if (activityType !== undefined) body.activityType = activityType;
+      if (outcome !== undefined) body.outcome = outcome;
+      if (dayOfWeek !== undefined) body.dayOfWeek = dayOfWeek;
+      if (rawDate !== undefined) body.activityDate = new Date(rawDate);
+      if (notes !== undefined) body.notes = notes;
+      if (contactId !== undefined) body.contactId = contactId;
+      if (companyId !== undefined) body.companyId = companyId;
+      if (propertyId !== undefined) body.propertyId = propertyId;
+      if (dealId !== undefined) body.dealId = dealId;
+      const activity = await storage.updateProspectingActivity(req.params.id, body, req.user.orgId);
+      res.json(activity);
+    } catch (error: any) {
+      console.error("Failed to update prospecting activity:", error);
+      res.status(500).json({ error: "Failed to update prospecting activity" });
+    }
+  });
+
+  app.get("/api/prospecting/activities", async (req: any, res) => {
+    try {
+      const filters: any = {};
+      if (req.query.contactId) filters.contactId = req.query.contactId;
+      if (req.query.companyId) filters.companyId = req.query.companyId;
+      if (req.query.propertyId) filters.propertyId = req.query.propertyId;
+      if (req.query.dealId) filters.dealId = req.query.dealId;
+      if (req.query.prospectingEntryId) filters.prospectingEntryId = req.query.prospectingEntryId;
+      if (req.query.userId) filters.userId = req.query.userId;
+      const activities = await storage.getProspectingActivities(req.user.orgId, filters);
+      res.json(activities);
+    } catch (error: any) {
+      console.error("Failed to get prospecting activities:", error);
+      res.status(500).json({ error: "Failed to retrieve prospecting activities" });
+    }
+  });
+
+  app.delete("/api/prospecting/activities/:id", async (req: any, res) => {
+    try {
+      await storage.deleteProspectingActivity(req.params.id, req.user.orgId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Failed to delete prospecting activity:", error);
+      res.status(500).json({ error: "Failed to delete prospecting activity" });
+    }
+  });
+
   // CRM Prospecting Settings
   // ===================================================================
 
@@ -10057,8 +10297,6 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: "Failed to create company" });
     }
   });
-
-
   // Get companies KPI stats (for computed metrics) - Must be before :id routes
   app.get('/api/companies/kpi-stats', authenticateUser, async (req: any, res) => {
     try {
@@ -10373,8 +10611,6 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: "Failed to get property aggregate data" });
     }
   });
-
-
   // PATCH route for property updates (used by detail modal)
   app.patch("/api/properties/:id", async (req: any, res) => {
     try {
@@ -12310,8 +12546,6 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ message: "Failed to fetch comps" });
     }
   });
-
-
   app.get('/api/sales-comps/ids', async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
@@ -12686,10 +12920,151 @@ Current context: Project ${req.params.projectId}`;
         }
       }
 
-      // NOTE: Pending property profiles are NOT auto-created from sales comps.
-      // Sales comps are the source of truth for transaction data.
-      // Pending sales comps are only created when users add transaction data to CRM Properties.
+      // Auto-create pending contacts for Seller Principal and Buyer Principal
+      const principalEntries = [
+        { name: (compData.sellerPrincipal || '').trim(), role: 'seller_principal' },
+        { name: (compData.buyerPrincipal || '').trim(), role: 'buyer_principal' },
+      ];
+      for (const entry of principalEntries) {
+        if (entry.name) {
+          try {
+            const parts = entry.name.split(' ');
+            const firstName = parts[0] || '';
+            const lastName = parts.slice(1).join(' ') || '';
+            const fullName = entry.name;
 
+            const similarContacts = await storage.findSimilarContacts(orgId, fullName);
+
+            await storage.createPendingContact({
+              orgId,
+              sourceType: 'sales_comp',
+              sourceId: comp.id,
+              firstName: firstName || undefined,
+              lastName: lastName || undefined,
+              fullName,
+              status: 'pending',
+              suggestedDuplicates: similarContacts.map((c: any) => c.id),
+              sourceMetadata: { salesCompId: comp.id, marina: compData.marina, role: entry.role },
+              createdBy: userId,
+            });
+          } catch (principalError) {
+            console.error('Error auto-creating pending ' + entry.role + ' contact:', principalError);
+          }
+        }
+      }
+
+      // Auto-create pending property if marina/property data is provided but not linked to existing property
+      if (!compData.propertyId && compData.marina) {
+        try {
+          // Check if a pending property already exists for this sales comp
+          const existingPending = await storage.getPendingProperties(orgId, 'pending');
+          const alreadyExists = existingPending.some((p: any) => 
+            p.sourceType === 'sales_comp' && p.compId === comp.id
+          );
+          
+          if (!alreadyExists) {
+            // Find similar properties to suggest as duplicates
+            const similarProperties = await storage.findSimilarProperties(
+              orgId, 
+              compData.marina, 
+              compData.city, 
+              compData.state
+            );
+            
+            await storage.createPendingProperty({
+              orgId,
+              sourceType: 'sales_comp',
+              compId: comp.id,
+              marinaName: compData.marina,
+              city: compData.city || null,
+              state: compData.state || null,
+              address: compData.address || null,
+              salePrice: compData.salePrice ? Number(compData.salePrice) : null,
+              status: 'pending',
+              suggestedDuplicates: similarProperties.map((p: any) => p.id),
+              compMetadata: {
+                wetSlips: compData.wetSlips,
+                drySlips: compData.drySlips,
+                buyer: compData.buyerCompany,
+                seller: compData.sellerCompany,
+                saleDate: compData.saleDate,
+              },
+              createdBy: userId,
+            });
+            console.log('[SalesComps] Created pending property for "' + compData.marina + '"');
+          }
+        } catch (propertyError) {
+          console.error('Error auto-creating pending property:', propertyError);
+        }
+      }
+
+      // Auto-create pending brokerage company if brokerage name is provided but not linked
+      if (!compData.brokerageCompanyId && compData.brokerage && compData.brokerage.trim()) {
+        try {
+          await storage.autoCreatePendingCompanyFromSalesComp({
+            salesCompId: comp.id,
+            orgId,
+            userId,
+            companyName: compData.brokerage.trim(),
+            role: 'brokerage' as any,
+            city: compData.city,
+            state: compData.state,
+          });
+          console.log('[SalesComps] Created pending brokerage company "' + compData.brokerage + '"');
+        } catch (brokerageError) {
+          console.error('Error auto-creating pending brokerage company:', brokerageError);
+        }
+      }
+
+      // Auto-create pending contacts for additional agents
+      if (compData.additionalAgents && Array.isArray(compData.additionalAgents)) {
+        for (let i = 0; i < compData.additionalAgents.length; i++) {
+          const agent = compData.additionalAgents[i];
+          // Only create pending contact if agent has a name but no linked contactId
+          if (agent && agent.name && agent.name.trim() && !agent.contactId) {
+            try {
+              // Parse the name into first and last name
+              const nameParts = agent.name.trim().split(' ');
+              const firstName = nameParts[0] || '';
+              const lastName = nameParts.slice(1).join(' ') || '';
+              
+              // Use a unique sourceId for each additional agent
+              const agentSourceId = comp.id + ':agent:' + i;
+              
+              // Check if pending contact already exists for this agent
+              const existingPending = await storage.getPendingContacts(orgId, 'pending');
+              const alreadyExists = existingPending.some((c: any) => 
+                c.sourceType === 'sales_comp' && c.sourceId === agentSourceId
+              );
+              
+              if (!alreadyExists) {
+                const similarContacts = await storage.findSimilarContacts(orgId, firstName, lastName);
+                
+                await storage.createPendingContact({
+                  orgId,
+                  sourceType: 'sales_comp',
+                  sourceId: agentSourceId,
+                  fullName: agent.name.trim(),
+                  status: 'pending',
+                  suggestedDuplicates: similarContacts.map((c: any) => c.id),
+                  sourceMetadata: {
+                    salesCompId: comp.id,
+                    agentFirstName: firstName,
+                    agentLastName: lastName,
+                    brokerage: compData.brokerage,
+                    isAdditionalAgent: true,
+                    agentIndex: i,
+                  },
+                  createdBy: userId,
+                });
+                console.log('[SalesComps] Created pending contact for additional agent "' + agent.name + '"');
+              }
+            } catch (agentError) {
+              console.error('Error auto-creating pending contact for additional agent "' + agent.name + '":', agentError);
+            }
+          }
+        }
+      }
       res.status(201).json(comp);
     } catch (error: any) {
       console.error("Error creating comp:", error);
@@ -12781,6 +13156,142 @@ Current context: Project ${req.params.projectId}`;
           });
         } catch (contactError) {
           console.error('Error auto-creating pending contact:', contactError);
+        }
+      }
+
+      // Auto-create pending contacts for Seller Principal and Buyer Principal
+      const principalEntries = [
+        { name: (updates.sellerPrincipal || '').trim(), role: 'seller_principal' },
+        { name: (updates.buyerPrincipal || '').trim(), role: 'buyer_principal' },
+      ];
+      for (const entry of principalEntries) {
+        if (entry.name) {
+          try {
+            const parts = entry.name.split(' ');
+            const firstName = parts[0] || '';
+            const lastName = parts.slice(1).join(' ') || '';
+            const fullName = entry.name;
+
+            const similarContacts = await storage.findSimilarContacts(orgId, fullName);
+
+            await storage.createPendingContact({
+              orgId,
+              sourceType: 'sales_comp',
+              sourceId: req.params.id,
+              firstName: firstName || undefined,
+              lastName: lastName || undefined,
+              fullName,
+              status: 'pending',
+              suggestedDuplicates: similarContacts.map((c: any) => c.id),
+              sourceMetadata: { salesCompId: req.params.id, marina: updates.marina, role: entry.role },
+              createdBy: userId,
+            });
+          } catch (principalError) {
+            console.error('Error auto-creating pending ' + entry.role + ' contact:', principalError);
+          }
+        }
+      }
+
+      // Auto-create pending property if marina/property data is updated but not linked to existing property
+      if (!updates.propertyId && updates.marina) {
+        try {
+          const existingPending = await storage.getPendingProperties(orgId, 'pending');
+          const alreadyExists = existingPending.some((p: any) => 
+            p.sourceType === 'sales_comp' && p.compId === req.params.id
+          );
+          
+          if (!alreadyExists) {
+            const similarProperties = await storage.findSimilarProperties(
+              orgId, 
+              updates.marina, 
+              updates.city, 
+              updates.state
+            );
+            
+            await storage.createPendingProperty({
+              orgId,
+              sourceType: 'sales_comp',
+              compId: req.params.id,
+              marinaName: updates.marina,
+              city: updates.city || null,
+              state: updates.state || null,
+              address: updates.address || null,
+              salePrice: updates.salePrice ? Number(updates.salePrice) : null,
+              status: 'pending',
+              suggestedDuplicates: similarProperties.map((p: any) => p.id),
+              compMetadata: {
+                wetSlips: updates.wetSlips,
+                drySlips: updates.drySlips,
+                buyer: updates.buyerCompany,
+                seller: updates.sellerCompany,
+                saleDate: updates.saleDate,
+              },
+              createdBy: userId,
+            });
+          }
+        } catch (propertyError) {
+          console.error('Error auto-creating pending property on update:', propertyError);
+        }
+      }
+
+      // Auto-create pending brokerage company if brokerage name is updated but not linked
+      if (!updates.brokerageCompanyId && updates.brokerage && updates.brokerage.trim()) {
+        try {
+          await storage.autoCreatePendingCompanyFromSalesComp({
+            salesCompId: req.params.id,
+            orgId,
+            userId,
+            companyName: updates.brokerage.trim(),
+            role: 'brokerage' as any,
+            city: updates.city,
+            state: updates.state,
+          });
+        } catch (brokerageError) {
+          console.error('Error auto-creating pending brokerage company on update:', brokerageError);
+        }
+      }
+
+      // Auto-create pending contacts for additional agents on update
+      if (updates.additionalAgents && Array.isArray(updates.additionalAgents)) {
+        for (let i = 0; i < updates.additionalAgents.length; i++) {
+          const agent = updates.additionalAgents[i];
+          if (agent && agent.name && agent.name.trim() && !agent.contactId) {
+            try {
+              const nameParts = agent.name.trim().split(' ');
+              const firstName = nameParts[0] || '';
+              const lastName = nameParts.slice(1).join(' ') || '';
+              const agentSourceId = req.params.id + ':agent:' + i;
+              
+              const existingPending = await storage.getPendingContacts(orgId, 'pending');
+              const alreadyExists = existingPending.some((c: any) => 
+                c.sourceType === 'sales_comp' && c.sourceId === agentSourceId
+              );
+              
+              if (!alreadyExists) {
+                const similarContacts = await storage.findSimilarContacts(orgId, firstName, lastName);
+                
+                await storage.createPendingContact({
+                  orgId,
+                  sourceType: 'sales_comp',
+                  sourceId: agentSourceId,
+                  fullName: agent.name.trim(),
+                  status: 'pending',
+                  suggestedDuplicates: similarContacts.map((c: any) => c.id),
+                  sourceMetadata: {
+                    salesCompId: req.params.id,
+                    agentFirstName: firstName,
+                    agentLastName: lastName,
+                    brokerage: updates.brokerage,
+                    isAdditionalAgent: true,
+                    agentIndex: i,
+                  },
+                  createdBy: userId,
+                });
+              }
+            } catch (agentError) {
+              console.error('Error auto-creating pending contact for additional agent on update:', agentError);
+            }
+          }
         }
       }
 
@@ -13023,6 +13534,173 @@ Current context: Project ${req.params.projectId}`;
     } catch (error: any) {
       console.error("Error fetching import status:", error);
       res.status(500).json({ message: "Failed to fetch import status" });
+    }
+  });
+  app.post('/api/sales-comps/import/:importId/submit-reviewed', async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const orgId = req.user.orgId;
+      const { reviewedRows, parentPortfolioId } = req.body;
+
+      if (!reviewedRows || !Array.isArray(reviewedRows)) {
+        return res.status(400).json({ message: "reviewedRows array is required" });
+      }
+
+      const results = {
+        successCount: 0,
+        errorCount: 0,
+        errors: [] as Array<{ row: number; message: string }>,
+      };
+
+      for (let i = 0; i < reviewedRows.length; i++) {
+        const row = reviewedRows[i];
+        try {
+          if (!row.marina || !String(row.marina).trim()) {
+            results.errors.push({ row: i + 1, message: 'Marina name is still missing' });
+            results.errorCount++;
+            continue;
+          }
+
+          const insertData: any = {
+            orgId,
+            createdBy: userId,
+            updatedBy: userId,
+            marina: row.marina,
+            salePrice: row.salePrice || undefined,
+            isPriceDisclosed: Boolean(row.salePrice),
+            capRate: row.capRate || undefined,
+            isCapRateDisclosed: Boolean(row.capRate),
+            noi: row.noi || undefined,
+            isNoiDisclosed: Boolean(row.noi),
+            saleMonth: row.saleMonth || undefined,
+            saleYear: row.saleYear || undefined,
+            state: row.state || undefined,
+            city: row.city || undefined,
+            region: row.region || undefined,
+            wetSlips: row.wetSlips || undefined,
+            dryRacks: row.dryRacks || undefined,
+            ioBoth: row.ioBoth || undefined,
+            bodyOfWater: row.bodyOfWater || undefined,
+            waterfront: row.waterfront || undefined,
+            saleCondition: row.saleCondition || undefined,
+            daysOnMarket: row.daysOnMarket || undefined,
+            broker: row.broker || undefined,
+            agentFirstName: row.agentFirstName || undefined,
+            agentLastName: row.agentLastName || undefined,
+            brokerage: row.brokerage || undefined,
+            address: row.address || undefined,
+            zip: row.zip || undefined,
+            seller: row.seller || undefined,
+            company: row.company || undefined,
+            owner: row.owner || undefined,
+            listPrice: row.listPrice || undefined,
+            acres: row.acres || undefined,
+            occupancy: row.occupancy || undefined,
+            yearBuilt: row.yearBuilt || undefined,
+            notes: row.notes || undefined,
+            articleUrls: row.articleUrls || [],
+            parentPortfolioId: parentPortfolioId || undefined,
+          };
+
+          const createdComp = await storage.createComp(insertData);
+          results.successCount++;
+
+          // Create pending entities from reviewed rows
+          if (createdComp) {
+            // Pending Property - only when no existing property match found
+            const matchedProperty = await storage.findPropertyByLocation(orgId, String(row.marina).trim(), row.city, row.state).catch(() => null);
+            if (row.marina && String(row.marina).trim() && !matchedProperty) {
+              try {
+                const propDuplicates = await DuplicateDetectionService.findPropertyDuplicates({
+                  title: String(row.marina).trim(),
+                  city: row.city,
+                  state: row.state,
+                  address: row.address,
+                }, orgId);
+                await storage.createPendingProperty({
+                  orgId,
+                  sourceType: 'sales_comp',
+                  compId: createdComp.id,
+                  marinaName: String(row.marina).trim(),
+                  city: row.city || undefined,
+                  state: row.state || undefined,
+                  address: row.address || undefined,
+                  salePrice: row.salePrice ? parseInt(row.salePrice) : undefined,
+                  status: 'pending',
+                  suggestedDuplicates: propDuplicates.matches.map((m: any) => m.existingEntity.id),
+                  compMetadata: { salesCompId: createdComp.id },
+                  createdBy: userId,
+                });
+              } catch (err) { console.error('Error creating pending property from review:', err); }
+            }
+
+            // Pending Companies: Seller Company, Buyer Company, Brokerage
+            const companyEntries = [
+              { name: (row.sellerCompany || row.seller || '').trim(), role: 'seller' },
+              { name: (row.buyerCompany || row.company || '').trim(), role: 'buyer' },
+              { name: (row.brokerage || '').trim(), role: 'brokerage' },
+            ];
+            for (const entry of companyEntries) {
+              if (entry.name) {
+                try {
+                  const dupes = await DuplicateDetectionService.findCompanyDuplicates({ name: entry.name }, orgId);
+                  await storage.createPendingCompany({
+                    orgId,
+                    name: entry.name,
+                    city: row.city || undefined,
+                    state: row.state || undefined,
+                    status: 'pending',
+                    suggestedDuplicates: dupes.matches.map((m: any) => m.existingEntity.id),
+                    sourceMetadata: { salesCompId: createdComp.id, role: entry.role },
+                    createdBy: userId,
+                  });
+                } catch (err) { console.error('Error creating pending ' + entry.role + ' company from review:', err); }
+              }
+            }
+
+            // Pending Contacts: Seller Principal, Buyer Principal, Agent
+            const contactEntries: Array<{name: string; role: string}> = [
+              { name: (row.sellerPrincipal || '').trim(), role: 'seller_principal' },
+              { name: (row.buyerPrincipal || '').trim(), role: 'buyer_principal' },
+            ];
+            const agentName = (row.agentFirstName && row.agentLastName)
+              ? (row.agentFirstName.trim() + ' ' + row.agentLastName.trim())
+              : (row.broker || '').trim();
+            if (agentName) contactEntries.push({ name: agentName, role: 'agent' });
+
+            for (const entry of contactEntries) {
+              if (entry.name) {
+                try {
+                  const parts = entry.name.split(' ');
+                  const firstName = parts[0] || '';
+                  const lastName = parts.slice(1).join(' ') || '';
+                  const dupes = await DuplicateDetectionService.findContactDuplicates({ firstName, lastName, fullName: entry.name }, orgId);
+                  await storage.createPendingContact({
+                    orgId,
+                    sourceType: 'sales_comp',
+                    sourceId: createdComp.id,
+                    firstName: firstName || undefined,
+                    lastName: lastName || undefined,
+                    fullName: entry.name,
+                    status: 'pending',
+                    suggestedDuplicates: dupes.matches.map((m: any) => m.existingEntity.id),
+                    sourceMetadata: { compId: createdComp.id, marina: row.marina, role: entry.role },
+                    createdBy: userId,
+                  });
+                } catch (err) { console.error('Error creating pending ' + entry.role + ' contact from review:', err); }
+              }
+            }
+          }
+        } catch (error) {
+          results.errors.push({ row: i + 1, message: (error as Error).message });
+          results.errorCount++;
+        }
+      }
+
+      res.json(results);
+    } catch (error: any) {
+      console.error("Error submitting reviewed records:", error);
+      res.status(500).json({ message: "Failed to submit reviewed records" });
     }
   });
 
@@ -14696,8 +15374,6 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ message: "Failed to get summary" });
     }
   });
-
-
   // ========================================
   // CUSTOMER ANALYTICS ENDPOINTS
   // ========================================
@@ -14887,8 +15563,6 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: 'Failed to fetch portfolio marinas', details: error?.message || String(error) });
     }
   });
-
-
 
   // Get single portfolio marina by ID
   app.get('/api/portfolio/marinas/:id', authenticateUser, async (req: any, res) => {
@@ -15088,8 +15762,6 @@ Current context: Project ${req.params.projectId}`;
   app.get('/api/operations/owned-marinas', authenticateUser, async (req: any, res) => {
     res.redirect(301, '/api/portfolio/marinas');
   });
-
-
   // ========================================
   // RENT ROLL ENDPOINTS
 
@@ -16320,7 +16992,68 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
-  // Get all modeling projects for organization
+  // Returns & Valuation - aggregate view of all projects with latest valuation snapshots
+  app.get('/api/modeling/returns-valuation', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { modelingProjects, valuationSnapshots, modelingFinancialPeriods } = await import('@shared/schema');
+
+      const rows = await db.execute(sql`
+        SELECT
+          p.id, p.marina_name, p.city, p.state, p.purchase_price, p.year_1_cap_rate,
+          p.ebitda, p.total_storage_units, p.deal_outcome, p.updated_at,
+          fp.noi AS t12_noi,
+          vs.indicated_value, vs.cap_rate AS snap_cap_rate, vs.noi AS snap_noi,
+          vs.ebitda AS snap_ebitda, vs.irr, vs.equity_multiple, vs.cash_on_cash,
+          vs.gross_revenue, vs.snapshot_date
+        FROM modeling_projects p
+        LEFT JOIN LATERAL (
+          SELECT * FROM valuation_snapshots s
+          WHERE s.modeling_project_id = p.id AND s.org_id = ${orgId}
+          ORDER BY s.snapshot_date DESC
+          LIMIT 1
+        ) vs ON true
+        LEFT JOIN modeling_financial_periods fp
+          ON fp.modeling_project_id = p.id AND fp.org_id = ${orgId} AND fp.period_type = 't12'
+        WHERE p.org_id = ${orgId}
+        ORDER BY p.updated_at DESC
+      `);
+
+      const toNum = (v: any) => v != null ? parseFloat(v) : null;
+
+      const results = rows.rows.map((r: any) => ({
+        id: r.id,
+        marinaName: r.marina_name,
+        city: r.city,
+        state: r.state,
+        purchasePrice: toNum(r.purchase_price),
+        year1CapRate: toNum(r.year_1_cap_rate),
+        ebitda: toNum(r.ebitda),
+        totalStorageUnits: r.total_storage_units,
+        dealOutcome: r.deal_outcome,
+        updatedAt: r.updated_at,
+        t12Noi: toNum(r.t12_noi),
+        snapshot: r.snapshot_date ? {
+          indicatedValue: toNum(r.indicated_value),
+          capRate: toNum(r.snap_cap_rate),
+          noi: toNum(r.snap_noi),
+          ebitda: toNum(r.snap_ebitda),
+          irr: toNum(r.irr),
+          equityMultiple: toNum(r.equity_multiple),
+          cashOnCash: toNum(r.cash_on_cash),
+          grossRevenue: toNum(r.gross_revenue),
+          snapshotDate: r.snapshot_date,
+        } : null,
+      }));
+
+      res.json(results);
+    } catch (error: any) {
+      console.error('Failed to fetch returns & valuation data:', error);
+      res.status(500).json({ error: 'Failed to fetch returns & valuation data' });
+    }
+  });
+
+    // Get all modeling projects for organization
   app.get('/api/modeling/projects', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
@@ -16366,7 +17099,63 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Modeling project not found' });
       }
       
-      res.json(project);
+      // Create child projects for portfolio properties
+      const childProjects: any[] = [];
+      if (req.body.projectType === "portfolio" && Array.isArray(req.body.portfolioProperties)) {
+        for (const prop of req.body.portfolioProperties) {
+          if (!prop.name) continue;
+          try {
+            let childPropertyId = null;
+            try {
+              const newProperty = await storage.createCrmProperty({
+                orgId: req.user.orgId,
+                title: prop.name,
+                type: "marina",
+                status: "pending",
+                address: prop.address,
+                city: prop.city,
+                state: prop.state,
+                zipCode: prop.zipCode,
+                coordinates: prop.coordinates,
+                ownerId: req.user.id,
+                pipelineStage: "lead",
+              });
+              childPropertyId = newProperty.id;
+            } catch (propError) {
+              console.error("[Portfolio] Failed to auto-create property:", propError);
+            }
+            const childProjectData = insertProjectSchema.parse({
+              name: prop.name,
+              projectType: "single",
+              parentProjectId: project.id,
+              propertyId: childPropertyId,
+              address: prop.address,
+              city: prop.city,
+              state: prop.state,
+              zipCode: prop.zipCode,
+              orgId: req.user.orgId,
+              createdBy: req.user.id,
+            });
+            const childProject = await storage.createProject(childProjectData);
+            childProjects.push(childProject);
+            await storage.createProjectSettings({
+              projectId: childProject.id,
+              useBusinessDays: false,
+              holidayCalendar: "us_federal",
+              notificationsJson: {},
+              ndaRequired: false,
+            });
+            try {
+              await initializeVdrForProject(childProject.id, req.user.orgId, req.user.id);
+            } catch (vdrError) {
+              console.error("[Portfolio] Failed to init VDR:", vdrError);
+            }
+          } catch (childError) {
+            console.error("[Portfolio] Failed to create child:", childError);
+          }
+        }
+      }
+      res.json({ ...project, childProjects });
     } catch (error: any) {
       console.error('Failed to fetch modeling project:', error);
       res.status(500).json({ error: 'Failed to fetch modeling project' });
@@ -16495,7 +17284,63 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Modeling project not found' });
       }
       
-      res.json(project);
+      // Create child projects for portfolio properties
+      const childProjects: any[] = [];
+      if (req.body.projectType === "portfolio" && Array.isArray(req.body.portfolioProperties)) {
+        for (const prop of req.body.portfolioProperties) {
+          if (!prop.name) continue;
+          try {
+            let childPropertyId = null;
+            try {
+              const newProperty = await storage.createCrmProperty({
+                orgId: req.user.orgId,
+                title: prop.name,
+                type: "marina",
+                status: "pending",
+                address: prop.address,
+                city: prop.city,
+                state: prop.state,
+                zipCode: prop.zipCode,
+                coordinates: prop.coordinates,
+                ownerId: req.user.id,
+                pipelineStage: "lead",
+              });
+              childPropertyId = newProperty.id;
+            } catch (propError) {
+              console.error("[Portfolio] Failed to auto-create property:", propError);
+            }
+            const childProjectData = insertProjectSchema.parse({
+              name: prop.name,
+              projectType: "single",
+              parentProjectId: project.id,
+              propertyId: childPropertyId,
+              address: prop.address,
+              city: prop.city,
+              state: prop.state,
+              zipCode: prop.zipCode,
+              orgId: req.user.orgId,
+              createdBy: req.user.id,
+            });
+            const childProject = await storage.createProject(childProjectData);
+            childProjects.push(childProject);
+            await storage.createProjectSettings({
+              projectId: childProject.id,
+              useBusinessDays: false,
+              holidayCalendar: "us_federal",
+              notificationsJson: {},
+              ndaRequired: false,
+            });
+            try {
+              await initializeVdrForProject(childProject.id, req.user.orgId, req.user.id);
+            } catch (vdrError) {
+              console.error("[Portfolio] Failed to init VDR:", vdrError);
+            }
+          } catch (childError) {
+            console.error("[Portfolio] Failed to create child:", childError);
+          }
+        }
+      }
+      res.json({ ...project, childProjects });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
@@ -16908,69 +17753,114 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
-  // Create or update addback for a line item
+  // Create or update addback (supports line_item, category, month_cell scopes)
   app.post('/api/modeling/projects/:projectId/addbacks', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const userId = req.user.id;
       const { projectId } = req.params;
-      const { lineItemId, reason, notes, periodType, values } = req.body;
+      const { lineItemKey, lineItemLabel, lineItemId, category, reason, notes, periodType, scope, addbackMonth, addbackYear, amount, values } = req.body;
       
+      const resolvedScope = scope || 'line_item';
+      const resolvedKey = lineItemKey || lineItemId;
+      const resolvedLabel = lineItemLabel || lineItemId;
+
+      if (!resolvedKey || !resolvedLabel) {
+        return res.status(400).json({ error: 'lineItemKey and lineItemLabel are required' });
+      }
+
+      if (resolvedScope === 'month_cell' && (addbackMonth == null || addbackYear == null)) {
+        return res.status(400).json({ error: 'addbackMonth and addbackYear are required for month_cell scope' });
+      }
+
+      if (!['line_item', 'category', 'month_cell'].includes(resolvedScope)) {
+        return res.status(400).json({ error: 'scope must be line_item, category, or month_cell' });
+      }
+
       const project = await storage.getModelingProject(projectId, orgId);
       if (!project) {
         return res.status(404).json({ error: 'Project not found' });
       }
       
-      const { modelingAddbacks, modelingAddbackValues, insertModelingAddbackSchema } = await import('@shared/schema');
+      const { modelingAddbacks, modelingAddbackValues } = await import('@shared/schema');
       const { eq, and } = await import('drizzle-orm');
-      
-      // Check if addback already exists for this line item
+
+      const conditions: any[] = [
+        eq(modelingAddbacks.projectId, projectId),
+        eq(modelingAddbacks.lineItemKey, resolvedKey),
+        eq(modelingAddbacks.orgId, orgId),
+        eq(modelingAddbacks.scope, resolvedScope),
+      ];
+
+      if (resolvedScope === 'month_cell' && addbackMonth != null && addbackYear != null) {
+        conditions.push(eq(modelingAddbacks.addbackMonth, addbackMonth));
+        conditions.push(eq(modelingAddbacks.addbackYear, addbackYear));
+      }
+
       const [existing] = await db.select()
         .from(modelingAddbacks)
-        .where(and(
-          eq(modelingAddbacks.projectId, projectId),
-          eq(modelingAddbacks.lineItemId, lineItemId),
-          eq(modelingAddbacks.orgId, orgId)
-        ));
+        .where(and(...conditions));
       
       let addback;
       if (existing) {
-        // Update existing
         [addback] = await db.update(modelingAddbacks)
-          .set({ reason, notes, periodType, updatedAt: new Date() })
+          .set({ 
+            reason: reason || existing.reason, 
+            notes: notes !== undefined ? notes : existing.notes, 
+            periodType: periodType || existing.periodType, 
+            category: category || existing.category, 
+            isActive: true, 
+            updatedAt: new Date() 
+          })
           .where(eq(modelingAddbacks.id, existing.id))
           .returning();
         
-        // Delete and recreate values
         await db.delete(modelingAddbackValues).where(eq(modelingAddbackValues.addbackId, existing.id));
       } else {
-        // Create new
-        const validated = insertModelingAddbackSchema.parse({
+        [addback] = await db.insert(modelingAddbacks).values({
           projectId,
           orgId,
-          lineItemId,
-          reason,
-          notes,
-          periodType: periodType || 'yearly',
+          lineItemKey: resolvedKey,
+          lineItemLabel: resolvedLabel,
+          category: category || null,
+          reason: reason || null,
+          notes: notes || null,
+          periodType: periodType || (resolvedScope === 'month_cell' ? 'monthly' : 'yearly'),
+          scope: resolvedScope,
+          addbackMonth: addbackMonth != null ? addbackMonth : null,
+          addbackYear: addbackYear != null ? addbackYear : null,
+          isActive: true,
           createdBy: userId,
-        });
-        
-        [addback] = await db.insert(modelingAddbacks).values(validated).returning();
+        }).returning();
       }
       
-      // Insert values
       if (values && values.length > 0) {
         await db.insert(modelingAddbackValues).values(
           values.map((v: any) => ({
             addbackId: addback.id,
             year: v.year,
-            month: v.month,
-            amount: v.amount,
+            month: v.month != null ? v.month : null,
+            amount: String(v.amount || '0'),
           }))
         );
+      } else if (amount != null && amount !== '' && amount !== '0') {
+        if (resolvedScope === 'month_cell' && addbackYear != null && addbackMonth != null) {
+          await db.insert(modelingAddbackValues).values({
+            addbackId: addback.id,
+            year: addbackYear,
+            month: addbackMonth,
+            amount: String(amount),
+          });
+        } else if (resolvedScope === 'line_item' || resolvedScope === 'category') {
+          await db.insert(modelingAddbackValues).values({
+            addbackId: addback.id,
+            year: addbackYear || new Date().getFullYear(),
+            month: null,
+            amount: String(amount),
+          });
+        }
       }
       
-      // Fetch values for response
       const addbackValues = await db.select()
         .from(modelingAddbackValues)
         .where(eq(modelingAddbackValues.addbackId, addback.id));
@@ -16981,7 +17871,33 @@ Current context: Project ${req.params.projectId}`;
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
       console.error('Failed to create/update addback:', error);
-      res.status(500).json({ error: 'Failed to create/update addback' });
+      res.status(500).json({ error: 'Failed to create/update addback', details: error.message });
+    }
+  });
+
+  // Toggle addback active/inactive (for inline P&L toggling)
+  app.patch('/api/modeling/addbacks/:addbackId/toggle', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { addbackId } = req.params;
+      const { isActive } = req.body;
+      
+      const { modelingAddbacks } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      const [updated] = await db.update(modelingAddbacks)
+        .set({ isActive: isActive !== undefined ? isActive : true, updatedAt: new Date() })
+        .where(and(eq(modelingAddbacks.id, addbackId), eq(modelingAddbacks.orgId, orgId)))
+        .returning();
+      
+      if (!updated) {
+        return res.status(404).json({ error: 'Addback not found' });
+      }
+      
+      res.json(updated);
+    } catch (error: any) {
+      console.error('Failed to toggle addback:', error);
+      res.status(500).json({ error: 'Failed to toggle addback' });
     }
   });
 
@@ -17009,6 +17925,140 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+
+  // ============================================================================
+  // DISPLAY NAME OVERRIDES - Project-level and org-level name customization
+  // ============================================================================
+
+  // Get all name overrides for a project (includes org defaults for unset items)
+  app.get('/api/modeling/projects/:projectId/name-overrides', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const { modelingNameOverrides, orgPnlDisplayDefaults } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      const overrides = await db.select()
+        .from(modelingNameOverrides)
+        .where(and(eq(modelingNameOverrides.projectId, projectId), eq(modelingNameOverrides.orgId, orgId)));
+      
+      const orgDefaults = await db.select()
+        .from(orgPnlDisplayDefaults)
+        .where(and(eq(orgPnlDisplayDefaults.orgId, orgId), eq(orgPnlDisplayDefaults.isActive, true)));
+      
+      res.json({ overrides, orgDefaults });
+    } catch (error: any) {
+      console.error('Failed to fetch name overrides:', error);
+      res.status(500).json({ error: 'Failed to fetch name overrides' });
+    }
+  });
+
+  // Create or update a name override (also upserts org default)
+  app.post('/api/modeling/projects/:projectId/name-overrides', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const { scope, originalName, displayName, category, department } = req.body;
+      
+      if (!scope || !originalName || !displayName) {
+        return res.status(400).json({ error: 'scope, originalName, and displayName are required' });
+      }
+      
+      const { modelingNameOverrides, orgPnlDisplayDefaults } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      const overrideConditions = [
+        eq(modelingNameOverrides.projectId, projectId),
+        eq(modelingNameOverrides.orgId, orgId),
+        eq(modelingNameOverrides.scope, scope),
+        eq(modelingNameOverrides.originalName, originalName),
+      ];
+      if (scope === 'line_item' && category) {
+        overrideConditions.push(eq(modelingNameOverrides.category, category));
+      }
+      const [existing] = await db.select()
+        .from(modelingNameOverrides)
+        .where(and(...overrideConditions));
+      
+      let override;
+      if (existing) {
+        [override] = await db.update(modelingNameOverrides)
+          .set({ displayName, category, department, updatedAt: new Date() })
+          .where(eq(modelingNameOverrides.id, existing.id))
+          .returning();
+      } else {
+        [override] = await db.insert(modelingNameOverrides).values({
+          orgId,
+          projectId,
+          scope,
+          originalName,
+          displayName,
+          category: category || null,
+          department: department || null,
+          createdBy: userId,
+        }).returning();
+      }
+      
+      // Upsert org-level default
+      const [existingDefault] = await db.select()
+        .from(orgPnlDisplayDefaults)
+        .where(and(
+          eq(orgPnlDisplayDefaults.orgId, orgId),
+          eq(orgPnlDisplayDefaults.scope, scope),
+          eq(orgPnlDisplayDefaults.originalName, originalName)
+        ));
+      
+      if (existingDefault) {
+        await db.update(orgPnlDisplayDefaults)
+          .set({
+            displayName,
+            timesUsed: (existingDefault.timesUsed || 0) + 1,
+            updatedAt: new Date(),
+          })
+          .where(eq(orgPnlDisplayDefaults.id, existingDefault.id));
+      } else {
+        await db.insert(orgPnlDisplayDefaults).values({
+          orgId,
+          scope,
+          originalName,
+          displayName,
+          category: category || null,
+          department: department || null,
+        });
+      }
+      
+      res.json(override);
+    } catch (error: any) {
+      console.error('Failed to save name override:', error);
+      res.status(500).json({ error: 'Failed to save name override' });
+    }
+  });
+
+  // Delete a name override (reverts to original name for this project)
+  app.delete('/api/modeling/projects/:projectId/name-overrides/:overrideId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { overrideId } = req.params;
+      
+      const { modelingNameOverrides } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      const [deleted] = await db.delete(modelingNameOverrides)
+        .where(and(eq(modelingNameOverrides.id, overrideId), eq(modelingNameOverrides.orgId, orgId)))
+        .returning();
+      
+      if (!deleted) {
+        return res.status(404).json({ error: 'Override not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Failed to delete name override:', error);
+      res.status(500).json({ error: 'Failed to delete name override' });
+    }
+  });
   // ============================================================================
   // MODELING FINANCIAL PERIODS - Year-based financial data for pricing/yields
   // ============================================================================
@@ -17632,8 +18682,6 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: 'Failed to set project seasonality' });
     }
   });
-
-
   // ============================================
   // SCENARIO GOVERNANCE (Phase 5)
   // ============================================
@@ -18599,31 +19647,101 @@ Current context: Project ${req.params.projectId}`;
       );
 
       // Group by category and subcategory for P&L display
+      const { inferDepartment } = await import('./utils/department-mapping');
       const grouped = actuals.reduce((acc: any, item) => {
         const key = `${item.category}-${item.subcategory}`;
         if (!acc[key]) {
           acc[key] = {
             category: item.category,
             subcategory: item.subcategory,
+            department: inferDepartment(item.subcategory || '', item.category),
             monthlyData: {},
             annualTotal: 0
           };
         }
-        const monthKey = new Date(item.year, item.month - 1).toLocaleString('default', { month: 'short' });
+        const MONTH_KEYS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']; const monthKey = MONTH_KEYS[(item.month - 1) % 12];
         const amount = parseFloat(item.amount);
         acc[key].monthlyData[monthKey] = (acc[key].monthlyData[monthKey] || 0) + amount;
         acc[key].annualTotal += amount;
         return acc;
       }, {});
-
       res.json({
         raw: actuals,
         grouped: Object.values(grouped),
-        year: year ? parseInt(year as string) : null
+        year: year ? parseInt(year as string) : undefined
       });
+
     } catch (error: any) {
       console.error('Failed to fetch actuals:', error);
       res.status(500).json({ error: 'Failed to fetch actuals' });
+    }
+  });
+
+  // Get available years for actuals data
+  app.get('/api/modeling/projects/:projectId/actuals/years', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { operationsDataSyncService } = await import('./services/operations-data-sync-service');
+      const years = await operationsDataSyncService.getAvailableYears(projectId);
+
+      res.json({ years });
+    } catch (error: any) {
+      console.error('Failed to fetch available years:', error);
+      res.status(500).json({ error: 'Failed to fetch available years' });
+    }
+  });
+
+  // Get actuals for multiple years for comparison
+  app.get('/api/modeling/projects/:projectId/actuals/multi-year', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { years } = req.query;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { operationsDataSyncService } = await import('./services/operations-data-sync-service');
+      const yearList = years ? String(years).split(',').map(Number) : [];
+      const actualsData = await operationsDataSyncService.getActualsForMultipleYears(projectId, yearList);
+
+      const { inferDepartment: inferDepartmentFn } = await import('./utils/department-mapping');
+      // Group each year's data
+      const groupedByYear: Record<number, any> = {};
+      for (const [year, actuals] of Object.entries(actualsData)) {
+        const grouped = (actuals as any[]).reduce((acc: any, item) => {
+          const key = `${item.category}-${item.subcategory}`;
+          if (!acc[key]) {
+            acc[key] = {
+              category: item.category,
+              subcategory: item.subcategory,
+              department: inferDepartmentFn(item.subcategory || '', item.category),
+              monthlyData: {},
+              annualTotal: 0
+            };
+          }
+          const MONTH_KEYS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']; const monthKey = MONTH_KEYS[(item.month - 1) % 12];
+          const amount = parseFloat(item.amount);
+          acc[key].monthlyData[monthKey] = (acc[key].monthlyData[monthKey] || 0) + amount;
+          acc[key].annualTotal += amount;
+          return acc;
+        }, {});
+        groupedByYear[Number(year)] = Object.values(grouped);
+      }
+
+      res.json({ byYear: groupedByYear, years: yearList });
+    } catch (error: any) {
+      console.error('Failed to fetch multi-year actuals:', error);
+      res.status(500).json({ error: 'Failed to fetch multi-year actuals' });
     }
   });
 
@@ -19653,6 +20771,154 @@ Current context: Project ${req.params.projectId}`;
     } catch (error: any) {
       console.error('Failed to get VDR export history:', error);
       res.status(500).json({ error: 'Failed to get VDR export history' });
+    }
+  });
+
+  app.get('/api/modeling/projects/:projectId/vdr-documents', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const ddProjectId = project.ddProjectId;
+      if (!ddProjectId) {
+        return res.json([]);
+      }
+
+      const { vdrDocuments, vdrFolders } = await import('@shared/schema');
+      const { isNull } = await import('drizzle-orm');
+
+      const documents = await db
+        .select({
+          id: vdrDocuments.id,
+          filename: vdrDocuments.filename,
+          originalFilename: vdrDocuments.originalFilename,
+          mimeType: vdrDocuments.mimeType,
+          size: vdrDocuments.size,
+          storagePath: vdrDocuments.storagePath,
+          folderName: vdrFolders.name,
+          folderPath: vdrFolders.path,
+          aiCategory: vdrDocuments.aiCategory,
+          tags: vdrDocuments.tags,
+          createdAt: vdrDocuments.createdAt,
+        })
+        .from(vdrDocuments)
+        .innerJoin(vdrFolders, eq(vdrDocuments.folderId, vdrFolders.id))
+        .where(and(
+          eq(vdrDocuments.projectId, ddProjectId),
+          eq(vdrDocuments.orgId, orgId),
+          eq(vdrDocuments.isCurrentVersion, true),
+          isNull(vdrDocuments.deletedAt)
+        ))
+        .orderBy(vdrDocuments.createdAt);
+
+      res.json(documents);
+    } catch (error: any) {
+      console.error('Failed to fetch VDR documents:', error);
+      res.status(500).json({ error: 'Failed to fetch VDR documents' });
+    }
+  });
+
+  app.post('/api/modeling/projects/:projectId/import-vdr-document', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const { vdrDocumentId, docType, year } = req.body;
+
+      if (!vdrDocumentId) {
+        return res.status(400).json({ error: 'vdrDocumentId is required' });
+      }
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { vdrDocuments } = await import('@shared/schema');
+
+      const [vdrDoc] = await db.select()
+        .from(vdrDocuments)
+        .where(and(
+          eq(vdrDocuments.id, vdrDocumentId),
+          eq(vdrDocuments.orgId, orgId)
+        ))
+        .limit(1);
+
+      if (!vdrDoc) {
+        return res.status(404).json({ error: 'VDR document not found' });
+      }
+
+      if (!project.ddProjectId || vdrDoc.projectId !== project.ddProjectId) {
+        return res.status(403).json({ error: 'Document does not belong to this project\'s linked Data Room' });
+      }
+
+      const fsModule = await import('fs');
+      const pathModule = await import('path');
+
+      const sourceExists = fsModule.existsSync(vdrDoc.storagePath);
+      if (!sourceExists) {
+        return res.status(404).json({ error: 'VDR document file not found on disk' });
+      }
+
+      const docIntelDir = pathModule.default.join(process.cwd(), 'server', 'uploads', 'doc-intel');
+      fsModule.mkdirSync(docIntelDir, { recursive: true });
+
+      const timestamp = Date.now();
+      const ext = pathModule.default.extname(vdrDoc.originalFilename);
+      const newFilename = `${timestamp}-vdr-${crypto.randomBytes(8).toString('hex')}${ext}`;
+      const destPath = pathModule.default.join(docIntelDir, newFilename);
+
+      fsModule.copyFileSync(vdrDoc.storagePath, destPath);
+
+      const stat = fsModule.statSync(destPath);
+
+      const result = await docIntelService.createUploadWithDuplicateCheck(
+        orgId,
+        {
+          modelingProjectId: projectId,
+          filename: newFilename,
+          originalName: vdrDoc.originalFilename,
+          storagePath: destPath,
+          mimeType: vdrDoc.mimeType,
+          fileSize: stat.size,
+          docType: docType || null,
+          year: year ? parseInt(year) : null,
+          uploadedBy: userId,
+          status: 'uploaded',
+          holdingStatus: 'staging',
+          holdingTags: null,
+          holdingNotes: `Imported from Data Room: ${vdrDoc.filename}`,
+        },
+        false
+      );
+
+      res.status(201).json({
+        ...result.upload,
+        isDuplicate: result.isDuplicate,
+        source: 'vdr',
+        vdrDocumentId: vdrDoc.id,
+      });
+
+      setImmediate(async () => {
+        try {
+          console.log(`[DocIntel] Starting automatic AI parsing for VDR import ${result.upload.id}`);
+          await docIntelService.parseAndExtract(orgId, result.upload.id);
+          console.log(`[DocIntel] Parsing complete for VDR import ${result.upload.id}, categorizing...`);
+          await docIntelService.categorizeItems(orgId, result.upload.id);
+          console.log(`[DocIntel] Categorization complete for VDR import ${result.upload.id}`);
+          await docIntelService.updateUpload(orgId, result.upload.id, { status: 'reviewing' });
+        } catch (parseError: any) {
+          console.error(`[DocIntel] Background parsing failed for VDR import ${result.upload.id}:`, parseError.message);
+        }
+      });
+    } catch (error: any) {
+      console.error('Failed to import VDR document:', error);
+      res.status(500).json({ error: 'Failed to import VDR document' });
     }
   });
 
@@ -20731,7 +21997,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   });
 
   // Upload new document for processing (with SHA-256 duplicate detection)
-  app.post('/api/modeling/projects/:projectId/documents', authenticateUser, docIntelUpload.single('file'), async (req: any, res) => {
+  app.post('/api/modeling/projects/:projectId/documents', authenticateUser, docIntelUpload.single('file'), validateFileUpload({ maxSize: 50 * 1024 * 1024 }), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const userId = req.user.id;
@@ -21150,15 +22416,15 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const { projectId, uploadId } = req.params;
       const { fiscalYear } = req.body;
       
+      console.log("[Doc Intel Import] projectId:", projectId, "uploadId:", uploadId, "fiscalYear:", fiscalYear);
       const lines = await docIntelService.importConfirmedItems(orgId, uploadId, projectId, userId, fiscalYear);
       res.json({ imported: lines.length, lines });
+      console.log("[Doc Intel Import] Result - imported lines:", lines.length);
     } catch (error: any) {
       console.error('Failed to import items:', error);
       res.status(500).json({ error: 'Failed to import items' });
     }
   });
-
-
   // Reprocess a completed document - reset to review state
   app.post('/api/modeling/projects/:projectId/documents/:uploadId/reprocess', authenticateUser, async (req: any, res) => {
     try {
@@ -21170,6 +22436,37 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     } catch (error: any) {
       console.error('Failed to reprocess document:', error);
       res.status(500).json({ error: 'Failed to reprocess document' });
+    }
+  });
+  // Retry parsing a stuck or errored document
+  app.post("/api/modeling/projects/:projectId/documents/:uploadId/retry", authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, uploadId } = req.params;
+
+      const upload = await docIntelService.getUpload(orgId, uploadId);
+      if (!upload || upload.modelingProjectId !== projectId) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+
+      res.json({ message: "Retrying parse", uploadId });
+
+      setImmediate(async () => {
+        try {
+          console.log(`[DocIntel] Retrying parse for upload ${uploadId}`);
+          const items = await docIntelService.retryParse(orgId, uploadId);
+          console.log(`[DocIntel] Retry parse complete for ${uploadId}, ${items.length} items extracted`);
+          await docIntelService.categorizeItems(orgId, uploadId);
+          console.log(`[DocIntel] Retry categorization complete for ${uploadId}`);
+          const { updateUpload } = docIntelService;
+          await docIntelService.updateUpload(orgId, uploadId, { status: "reviewing" });
+        } catch (parseError: any) {
+          console.error(`[DocIntel] Retry parse failed for ${uploadId}:`, parseError.message);
+        }
+      });
+    } catch (error: any) {
+      console.error("Failed to retry document:", error);
+      res.status(500).json({ error: "Failed to retry document parsing" });
     }
   });
   // Import Rent Roll document to Rent Roll module with customer creation and CRM linking
@@ -24347,7 +25644,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         },
         {
           key: 'docktalk',
-          name: 'DockTalk Intelligence',
+          name: 'The Docket Intelligence',
           icon: 'Radio',
           metrics: [
             { key: 'total_deals', label: 'M&A Deals', type: 'count', format: 'number', description: 'Total tracked M&A deals' },
@@ -25209,8 +26506,8 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
 
       res.json(deals);
     } catch (error: any) {
-      console.error('Failed to fetch recent DockTalk deals:', error);
-      res.status(500).json({ error: 'Failed to fetch recent DockTalk deals' });
+      console.error('Failed to fetch recent Docket deals:', error);
+      res.status(500).json({ error: 'Failed to fetch recent Docket deals' });
     }
   });
 
@@ -26408,6 +27705,113 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       res.status(500).json({ message: "Failed to create portfolio", error: error instanceof Error ? error.message : String(error) });
     }
   });
+  // Pending Sales Comps routes
+  app.get('/api/pending-sales-comps', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const comps = await storage.getPendingSalesComps(orgId);
+      res.json(comps);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to get pending sales comps", error: error.message });
+    }
+  });
+
+  app.get('/api/pending-sales-comps/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const comp = await storage.getPendingSalesComp(req.params.id, orgId);
+      if (!comp) return res.status(404).json({ message: "Pending sales comp not found" });
+      res.json(comp);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to get pending sales comp", error: error.message });
+    }
+  });
+
+  app.post('/api/pending-sales-comps', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const validated = insertPendingSalesCompSchema.parse({
+        ...req.body,
+        orgId,
+        createdBy: userId,
+      });
+      const comp = await storage.createPendingSalesComp(validated);
+      res.status(201).json(comp);
+    } catch (error: any) {
+      if (error?.name === 'ZodError') {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create pending sales comp", error: error.message });
+    }
+  });
+
+  app.patch('/api/pending-sales-comps/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const comp = await storage.updatePendingSalesComp(req.params.id, req.body, orgId);
+      if (!comp) return res.status(404).json({ message: "Pending sales comp not found" });
+      res.json(comp);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to update pending sales comp", error: error.message });
+    }
+  });
+
+  app.delete('/api/pending-sales-comps/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const deleted = await storage.deletePendingSalesComp(req.params.id, orgId);
+      if (!deleted) return res.status(404).json({ message: "Pending sales comp not found" });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to delete pending sales comp", error: error.message });
+    }
+  });
+
+  app.post('/api/pending-sales-comps/:id/accept', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const pending = await storage.getPendingSalesComp(req.params.id, orgId);
+      if (!pending) return res.status(404).json({ message: "Pending sales comp not found" });
+
+      const salesComp = await storage.createSalesComp({
+        orgId,
+        marina: pending.marina || '',
+        address: pending.address || '',
+        city: pending.city || '',
+        state: pending.state || '',
+        salePrice: pending.salePrice,
+        saleMonth: pending.saleMonth,
+        saleYear: pending.saleYear,
+        capRate: pending.capRate,
+        sellerName: pending.sellerName,
+        buyerName: pending.buyerName,
+        brokerName: pending.brokerName,
+        transactionType: pending.transactionType || 'sale',
+        notes: pending.notes,
+        createdBy: userId,
+        source: 'property_history',
+      });
+
+      const updated = await storage.acceptPendingSalesComp(req.params.id, orgId, userId, salesComp.id);
+      res.json({ pendingSalesComp: updated, salesComp });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to accept pending sales comp", error: error.message });
+    }
+  });
+
+  app.post('/api/pending-sales-comps/:id/reject', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const comp = await storage.rejectPendingSalesComp(req.params.id, orgId, userId);
+      if (!comp) return res.status(404).json({ message: "Pending sales comp not found" });
+      res.json(comp);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to reject pending sales comp", error: error.message });
+    }
+  });
 
   // SC Projects routes
   app.get('/api/sc-projects', async (req: any, res) => {
@@ -26430,7 +27834,63 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const project = await storage.getScProject(req.params.id, orgId);
       if (!project) return res.status(404).json({ message: "Project not found" });
 
-      res.json(project);
+      // Create child projects for portfolio properties
+      const childProjects: any[] = [];
+      if (req.body.projectType === "portfolio" && Array.isArray(req.body.portfolioProperties)) {
+        for (const prop of req.body.portfolioProperties) {
+          if (!prop.name) continue;
+          try {
+            let childPropertyId = null;
+            try {
+              const newProperty = await storage.createCrmProperty({
+                orgId: req.user.orgId,
+                title: prop.name,
+                type: "marina",
+                status: "pending",
+                address: prop.address,
+                city: prop.city,
+                state: prop.state,
+                zipCode: prop.zipCode,
+                coordinates: prop.coordinates,
+                ownerId: req.user.id,
+                pipelineStage: "lead",
+              });
+              childPropertyId = newProperty.id;
+            } catch (propError) {
+              console.error("[Portfolio] Failed to auto-create property:", propError);
+            }
+            const childProjectData = insertProjectSchema.parse({
+              name: prop.name,
+              projectType: "single",
+              parentProjectId: project.id,
+              propertyId: childPropertyId,
+              address: prop.address,
+              city: prop.city,
+              state: prop.state,
+              zipCode: prop.zipCode,
+              orgId: req.user.orgId,
+              createdBy: req.user.id,
+            });
+            const childProject = await storage.createProject(childProjectData);
+            childProjects.push(childProject);
+            await storage.createProjectSettings({
+              projectId: childProject.id,
+              useBusinessDays: false,
+              holidayCalendar: "us_federal",
+              notificationsJson: {},
+              ndaRequired: false,
+            });
+            try {
+              await initializeVdrForProject(childProject.id, req.user.orgId, req.user.id);
+            } catch (vdrError) {
+              console.error("[Portfolio] Failed to init VDR:", vdrError);
+            }
+          } catch (childError) {
+            console.error("[Portfolio] Failed to create child:", childError);
+          }
+        }
+      }
+      res.json({ ...project, childProjects });
     } catch (error: any) {
       console.error("Error fetching SC project:", error);
       res.status(500).json({ message: "Failed to fetch SC project" });
@@ -27181,8 +28641,6 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       res.status(500).json({ message: "Failed to fetch rate comps" });
     }
   });
-
-
 
   // Industry Standards - Public API (pack-gated access)
   // Industry Standards - Public API (pack-gated access)
@@ -29005,7 +30463,63 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const project = await storage.getRcProject(req.params.id, orgId);
       if (!project) return res.status(404).json({ message: "Project not found" });
 
-      res.json(project);
+      // Create child projects for portfolio properties
+      const childProjects: any[] = [];
+      if (req.body.projectType === "portfolio" && Array.isArray(req.body.portfolioProperties)) {
+        for (const prop of req.body.portfolioProperties) {
+          if (!prop.name) continue;
+          try {
+            let childPropertyId = null;
+            try {
+              const newProperty = await storage.createCrmProperty({
+                orgId: req.user.orgId,
+                title: prop.name,
+                type: "marina",
+                status: "pending",
+                address: prop.address,
+                city: prop.city,
+                state: prop.state,
+                zipCode: prop.zipCode,
+                coordinates: prop.coordinates,
+                ownerId: req.user.id,
+                pipelineStage: "lead",
+              });
+              childPropertyId = newProperty.id;
+            } catch (propError) {
+              console.error("[Portfolio] Failed to auto-create property:", propError);
+            }
+            const childProjectData = insertProjectSchema.parse({
+              name: prop.name,
+              projectType: "single",
+              parentProjectId: project.id,
+              propertyId: childPropertyId,
+              address: prop.address,
+              city: prop.city,
+              state: prop.state,
+              zipCode: prop.zipCode,
+              orgId: req.user.orgId,
+              createdBy: req.user.id,
+            });
+            const childProject = await storage.createProject(childProjectData);
+            childProjects.push(childProject);
+            await storage.createProjectSettings({
+              projectId: childProject.id,
+              useBusinessDays: false,
+              holidayCalendar: "us_federal",
+              notificationsJson: {},
+              ndaRequired: false,
+            });
+            try {
+              await initializeVdrForProject(childProject.id, req.user.orgId, req.user.id);
+            } catch (vdrError) {
+              console.error("[Portfolio] Failed to init VDR:", vdrError);
+            }
+          } catch (childError) {
+            console.error("[Portfolio] Failed to create child:", childError);
+          }
+        }
+      }
+      res.json({ ...project, childProjects });
     } catch (error: any) {
       console.error("Error fetching RC project:", error);
       res.status(500).json({ message: "Failed to fetch RC project" });
@@ -31280,7 +32794,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   });
 
   // Parse uploaded file and return headers, sample rows, and suggested mappings
-  app.post('/api/import/parse', importWizardUpload.single('file'), async (req: any, res) => {
+  app.post('/api/import/parse', importWizardUpload.single('file'), validateFileUpload({ maxSize: 25 * 1024 * 1024 }), async (req: any, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded' });

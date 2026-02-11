@@ -199,6 +199,12 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
     enabled: isOpen && !!contact?.id,
   });
 
+  // Fetch brokered transactions (where this contact is the agent on a sales comp)
+  const { data: brokeredComps = [] } = useQuery<any[]>({
+    queryKey: ['/api/contacts', contact?.id, 'brokered-comps'],
+    enabled: isOpen && !!contact?.id,
+  });
+
   // Fetch all companies for linking
   const { data: allCompanies = [] } = useQuery<Company[]>({
     queryKey: ['/api/companies'],
@@ -906,6 +912,56 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
 
                 {/* Right Column - Sidebar */}
                 <div className="space-y-6">
+                  {/* Brokered Transactions */}
+                  {brokeredComps.length > 0 && (
+                    <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-900 border-blue-200 dark:border-blue-800">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <Anchor className="w-4 h-4 text-blue-600" />
+                            Brokered Transactions
+                          </CardTitle>
+                          <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                            {brokeredComps.length} Total
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          {brokeredComps.slice(0, 5).map((comp: any) => (
+                            <div key={comp.id} className="flex items-start justify-between p-2 rounded-lg border border-blue-200/50 dark:border-blue-700/50 bg-white/50 dark:bg-blue-950/50">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm text-blue-800 dark:text-blue-200 truncate">{comp.marina || 'Unnamed Property'}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  {comp.city && comp.state ? `${comp.city}, ${comp.state}` : comp.state || ''}
+                                  {(comp.city || comp.state) && comp.saleYear ? ' · ' : ''}
+                                  {comp.saleMonth && comp.saleYear 
+                                    ? `${new Date(comp.saleYear, comp.saleMonth - 1).toLocaleString('default', { month: 'short' })} ${comp.saleYear}`
+                                    : comp.saleYear ? `${comp.saleYear}` : ''}
+                                </p>
+                                {comp.brokerage && (
+                                  <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                                    <Building className="w-3 h-3" /> {comp.brokerage}
+                                  </p>
+                                )}
+                              </div>
+                              {comp.salePrice && (
+                                <Badge variant="outline" className="ml-2 text-xs whitespace-nowrap border-blue-300 dark:border-blue-600">
+                                  ${Number(comp.salePrice).toLocaleString()}
+                                </Badge>
+                              )}
+                            </div>
+                          ))}
+                          {brokeredComps.length > 5 && (
+                            <p className="text-xs text-center text-muted-foreground">
+                              +{brokeredComps.length - 5} more transactions
+                            </p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
                   {/* Open Tasks */}
                   <Card>
                     <CardHeader className="pb-3">

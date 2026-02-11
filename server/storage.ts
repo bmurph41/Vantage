@@ -426,6 +426,8 @@ export interface IStorage {
   getCompanyProperties(companyId: string): Promise<Array<{ id: string; companyId: string; propertyId: string; relationship?: string | null; property?: any }>>;
   unlinkCompanyFromProperty(linkId: string): Promise<void>;
   getSalesCompsByBuyerCompany(orgId: string, companyId: string): Promise<any[]>;
+  getSalesCompsByBrokerageCompany(orgId: string, companyId: string): Promise<any[]>;
+  getSalesCompsByAgentContact(orgId: string, contactId: string): Promise<any[]>;
 
   // CRM - Pending Contacts
   getPendingContact(id: string): Promise<PendingContact | undefined>;
@@ -3526,6 +3528,32 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(salesComps.orgId, orgId),
           eq(salesComps.buyerCompanyId, companyId)
+        )
+      )
+      .orderBy(desc(salesComps.saleYear), desc(salesComps.saleMonth));
+    return results;
+  }
+
+  async getSalesCompsByBrokerageCompany(orgId: string, companyId: string): Promise<any[]> {
+    const results = await db.select()
+      .from(salesComps)
+      .where(
+        and(
+          eq(salesComps.orgId, orgId),
+          eq(salesComps.brokerageCompanyId, companyId)
+        )
+      )
+      .orderBy(desc(salesComps.saleYear), desc(salesComps.saleMonth));
+    return results;
+  }
+
+  async getSalesCompsByAgentContact(orgId: string, contactId: string): Promise<any[]> {
+    const results = await db.select()
+      .from(salesComps)
+      .where(
+        and(
+          eq(salesComps.orgId, orgId),
+          eq(salesComps.agentContactId, contactId)
         )
       )
       .orderBy(desc(salesComps.saleYear), desc(salesComps.saleMonth));
