@@ -19531,6 +19531,11 @@ Current context: Project ${req.params.projectId}`;
         acc[key].annualTotal += amount;
         return acc;
       }, {});
+      res.json({
+        raw: actuals,
+        grouped: Object.values(grouped),
+        year: year ? parseInt(year as string) : undefined
+      });
 
     } catch (error: any) {
       console.error('Failed to fetch actuals:', error);
