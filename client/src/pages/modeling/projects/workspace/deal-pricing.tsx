@@ -298,7 +298,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   const [useNormalizedData, setUseNormalizedData] = useState<boolean>(true);
   
   // Two-way linking: tracks which field was last edited to drive calculation direction
-  const [pricingDriver, setPricingDriver] = useState<'price' | 'exitCap' | 'targetIRR' | 'goingInCap'>('price');
+  const [pricingDriver, setPricingDriver] = useState<'price' | 'exitCap' | 'targetIRR' | 'goingInCap'>('targetIRR');
   const [isLinked, setIsLinked] = useState<boolean>(true);
 
   const { data: project } = useQuery<ModelingProject>({
