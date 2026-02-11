@@ -61,7 +61,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { useModelingAddbacks } from '@/hooks/useModelingAddbacks';
-import { AddbackEditor, AddbackSummaryPanel } from '@/components/modeling/AddbackEditor';
+import { AddbackEditor } from '@/components/modeling/AddbackEditor';
+import { AddbacksTrackerPanel } from '@/components/modeling/AddbacksTracker';
 import { useDepartmentOrder } from '@/hooks/useDepartmentOrder';
 import { DepartmentOrderSettings } from '@/components/modeling/DepartmentOrderSettings';
 
@@ -906,12 +907,11 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           </SheetTitle>
                         </SheetHeader>
                         <div className="mt-4">
-                          <AddbackSummaryPanel
+                          <AddbacksTrackerPanel
                             addbacks={allAddbacks}
                             onToggle={(id, isActive) => toggleAddback({ addbackId: id, isActive })}
                             onDelete={(id) => deleteAddback(id)}
                             isPending={addbackPending}
-                            formatCurrency={formatCurrency}
                           />
                         </div>
                       </SheetContent>
