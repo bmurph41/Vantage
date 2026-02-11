@@ -55,8 +55,7 @@ import {
   ArrowUpCircle,
   Eye,
   EyeOff,
-  Flag,
-  X
+  Flag
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';

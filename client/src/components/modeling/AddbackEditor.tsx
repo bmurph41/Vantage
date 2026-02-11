@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ArrowUpCircle, X, DollarSign, Trash2, Check } from 'lucide-react';
+import { ArrowUpCircle, Undo2, DollarSign, Trash2, Check } from 'lucide-react';
 import { ADDBACK_REASONS, type AddbackScope, type Addback } from '@/hooks/useModelingAddbacks';
 
 interface AddbackEditorProps {
@@ -110,10 +110,11 @@ export function AddbackEditor({
     setOpen(false);
   };
 
-  const handleQuickToggle = async (e: React.MouseEvent) => {
+  const handleRevert = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isActive && existingAddback) {
       await onToggle();
+      setOpen(false);
     }
   };
 
@@ -131,6 +132,10 @@ export function AddbackEditor({
   };
 
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  const formattedCurrentValue = currentValue != null && currentValue !== 0
+    ? `$${Math.abs(currentValue).toLocaleString()}`
+    : null;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -159,6 +164,11 @@ export function AddbackEditor({
             {scope === 'category' && (
               <div>All items in {category}</div>
             )}
+            {formattedCurrentValue && (
+              <div className="mt-0.5">
+                Original value: <span className="font-medium text-foreground">{formattedCurrentValue}</span>
+              </div>
+            )}
           </div>
 
           <Separator />
@@ -183,7 +193,7 @@ export function AddbackEditor({
 
           <div className="space-y-2">
             <Label className="text-xs font-medium">
-              Custom Amount <span className="text-muted-foreground">(optional)</span>
+              Adjusted Value <span className="text-muted-foreground">(replaces original)</span>
             </Label>
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
@@ -207,15 +217,19 @@ export function AddbackEditor({
                   className="h-8 text-[10px] whitespace-nowrap shrink-0"
                   onClick={() => setUseCurrentValue(!useCurrentValue)}
                 >
-                  Use ${Math.abs(currentValue).toLocaleString()}
+                  Keep Original
                 </Button>
               )}
             </div>
-            <p className="text-[10px] text-muted-foreground">
-              {scope === 'month_cell' 
-                ? 'Leave blank to zero out this month in normalized view' 
-                : 'Leave blank to exclude the entire item from normalized view'}
-            </p>
+            <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded px-2 py-1.5">
+              <p className="text-[10px] text-blue-700 dark:text-blue-400 leading-relaxed">
+                {scope === 'month_cell'
+                  ? 'This value will replace the original amount for this month in the normalized view. Leave blank to zero it out.'
+                  : scope === 'category'
+                    ? 'This value will replace the original total for the entire category in the normalized view. Leave blank to zero it out.'
+                    : 'This value will replace the original annual total for this line item in the normalized view. Leave blank to zero it out.'}
+              </p>
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -240,7 +254,7 @@ export function AddbackEditor({
               disabled={isPending}
             >
               <Check className="h-3 w-3 mr-1" />
-              {isActive ? 'Update' : 'Add Back'}
+              {isActive ? 'Update' : 'Apply Addback'}
             </Button>
             {isActive && existingAddback && (
               <>
@@ -248,11 +262,11 @@ export function AddbackEditor({
                   variant="outline"
                   size="sm"
                   className="h-8 text-xs"
-                  onClick={handleQuickToggle}
+                  onClick={handleRevert}
                   disabled={isPending}
                 >
-                  <X className="h-3 w-3 mr-1" />
-                  Disable
+                  <Undo2 className="h-3 w-3 mr-1" />
+                  Revert
                 </Button>
                 {onDelete && (
                   <Button
@@ -331,7 +345,7 @@ export function AddbackSummaryPanel({
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Badge variant="secondary" className="text-[10px]">{activeAddbacks.length} Active</Badge>
         {inactiveAddbacks.length > 0 && (
-          <Badge variant="outline" className="text-[10px]">{inactiveAddbacks.length} Disabled</Badge>
+          <Badge variant="outline" className="text-[10px]">{inactiveAddbacks.length} Reverted</Badge>
         )}
       </div>
 
@@ -368,12 +382,13 @@ export function AddbackSummaryPanel({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 w-6 p-0"
+                className="h-6 px-2 text-xs"
                 onClick={() => onToggle(addback.id, false)}
                 disabled={isPending}
-                title="Disable addback"
+                title="Revert to original value"
               >
-                <X className="h-3 w-3 text-muted-foreground" />
+                <Undo2 className="h-3 w-3 mr-1" />
+                Revert
               </Button>
               <Button
                 variant="ghost"
@@ -392,7 +407,7 @@ export function AddbackSummaryPanel({
         {inactiveAddbacks.length > 0 && (
           <>
             <Separator className="my-2" />
-            <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider px-2 py-1">Disabled</div>
+            <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider px-2 py-1">Reverted</div>
             {inactiveAddbacks.map((addback) => (
               <div key={addback.id} className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 group opacity-50 border border-transparent hover:border-border">
                 <div className="flex-1 min-w-0">
@@ -411,7 +426,7 @@ export function AddbackSummaryPanel({
                     onClick={() => onToggle(addback.id, true)}
                     disabled={isPending}
                   >
-                    Re-enable
+                    Re-apply
                   </Button>
                   <Button
                     variant="ghost"
