@@ -20331,6 +20331,63 @@ export const insertModelingAddbackValueSchema = createInsertSchema(modelingAddba
 export type ModelingAddbackValue = typeof modelingAddbackValues.$inferSelect;
 export type InsertModelingAddbackValue = z.infer<typeof insertModelingAddbackValueSchema>;
 
+// ============================================================================
+// DISPLAY NAME OVERRIDES - Project-level and org-level name customization
+// ============================================================================
+
+export const nameOverrideScopeEnum = pgEnum("name_override_scope", ["department", "line_item"]);
+
+export const modelingNameOverrides = pgTable("modeling_name_overrides", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  projectId: varchar("project_id").notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  scope: nameOverrideScopeEnum("scope").notNull(),
+  originalName: text("original_name").notNull(),
+  displayName: text("display_name").notNull(),
+  category: text("category"),
+  department: text("department"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  projectIdx: index("name_overrides_project_idx").on(table.projectId),
+  orgIdx: index("name_overrides_org_idx").on(table.orgId),
+  lookupIdx: index("name_overrides_lookup_idx").on(table.projectId, table.scope, table.originalName),
+}));
+
+export const orgPnlDisplayDefaults = pgTable("org_pnl_display_defaults", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  scope: nameOverrideScopeEnum("scope").notNull(),
+  originalName: text("original_name").notNull(),
+  displayName: text("display_name").notNull(),
+  category: text("category"),
+  department: text("department"),
+  isActive: boolean("is_active").default(true).notNull(),
+  timesUsed: integer("times_used").default(1),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("org_display_defaults_org_idx").on(table.orgId),
+  lookupIdx: index("org_display_defaults_lookup_idx").on(table.orgId, table.scope, table.originalName),
+}));
+
+export const insertModelingNameOverrideSchema = createInsertSchema(modelingNameOverrides).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type ModelingNameOverride = typeof modelingNameOverrides.$inferSelect;
+export type InsertModelingNameOverride = z.infer<typeof insertModelingNameOverrideSchema>;
+
+export const insertOrgPnlDisplayDefaultSchema = createInsertSchema(orgPnlDisplayDefaults).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type OrgPnlDisplayDefault = typeof orgPnlDisplayDefaults.$inferSelect;
+export type InsertOrgPnlDisplayDefault = z.infer<typeof insertOrgPnlDisplayDefaultSchema>;
+
 export const insertCrmListSchema = createInsertSchema(crmLists).omit({
   id: true,
   createdAt: true,
