@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
+import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,6 +39,10 @@ import {
   AlertTriangle,
   Link2,
   Unlink,
+  Minus,
+  Plus,
+  Calendar,
+  BarChart3,
 } from 'lucide-react';
 import type { ModelingProject, ModelingFinancialPeriod } from '@shared/schema';
 import debounce from 'lodash.debounce';
@@ -112,6 +117,174 @@ const parsePercentInput = (value: string): number => {
   const num = value.replace(/[^0-9.-]/g, '');
   return parseFloat(num) || 0;
 };
+
+interface PercentStepperProps {
+  value: string;
+  onChange: (value: string) => void;
+  label: string;
+  icon: typeof DollarSign;
+  step?: number;
+  min?: number;
+  max?: number;
+  isActive?: boolean;
+  activeBadge?: string;
+  activeColor?: string;
+  'data-testid'?: string;
+}
+
+function PercentStepper({ 
+  value, label, icon: Icon, onChange, step = 0.5, min = -100, max = 100,
+  isActive, activeBadge, activeColor = 'blue',
+  ...props
+}: PercentStepperProps) {
+  const numVal = parsePercentInput(value);
+  const decrement = () => onChange(Math.max(min, +(numVal - step).toFixed(2)).toString());
+  const increment = () => onChange(Math.min(max, +(numVal + step).toFixed(2)).toString());
+  
+  const colorMap: Record<string, { ring: string; badge: string; iconBg: string; iconText: string }> = {
+    blue: { ring: 'ring-blue-500/40 border-blue-300 dark:border-blue-700', badge: 'bg-blue-600', iconBg: 'bg-blue-50 dark:bg-blue-950/50', iconText: 'text-blue-600 dark:text-blue-400' },
+    green: { ring: 'ring-green-500/40 border-green-300 dark:border-green-700', badge: 'bg-green-600', iconBg: 'bg-green-50 dark:bg-green-950/50', iconText: 'text-green-600 dark:text-green-400' },
+    purple: { ring: 'ring-purple-500/40 border-purple-300 dark:border-purple-700', badge: 'bg-purple-600', iconBg: 'bg-purple-50 dark:bg-purple-950/50', iconText: 'text-purple-600 dark:text-purple-400' },
+    slate: { ring: 'ring-slate-400/40 border-slate-300 dark:border-slate-600', badge: 'bg-slate-600', iconBg: 'bg-slate-100 dark:bg-slate-800', iconText: 'text-slate-500 dark:text-slate-400' },
+  };
+  const colors = colorMap[activeColor] || colorMap.blue;
+  
+  return (
+    <div className={cn(
+      "flex items-center justify-between py-2 px-3 rounded-lg transition-all duration-150 border",
+      isActive 
+        ? `ring-2 ${colors.ring}` 
+        : "bg-white dark:bg-slate-800/50 border-slate-100 dark:border-slate-700/50 hover:border-slate-200 dark:hover:border-slate-600"
+    )}>
+      <div className="flex items-center gap-2 min-w-0">
+        <div className={cn("w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0", colors.iconBg, colors.iconText)}>
+          <Icon className="w-3.5 h-3.5" />
+        </div>
+        <span className="text-[13px] font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">{label}</span>
+        {isActive && activeBadge && (
+          <Badge className={cn("text-white text-[8px] px-1.5 py-0 h-4 flex-shrink-0", colors.badge)}>
+            {activeBadge}
+          </Badge>
+        )}
+      </div>
+      <div className="flex items-center gap-1.5 flex-shrink-0 ml-3">
+        <button
+          onClick={decrement}
+          className="w-6 h-6 rounded flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+          tabIndex={-1}
+        >
+          <Minus className="w-3 h-3" />
+        </button>
+        <div className="flex items-center bg-slate-50 dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-600 overflow-hidden">
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => {
+              const raw = e.target.value.replace(/[^0-9.\-]/g, '');
+              onChange(raw);
+            }}
+            onBlur={() => {
+              const v = parsePercentInput(value);
+              onChange(Math.min(max, Math.max(min, v)).toString());
+            }}
+            className="w-14 text-center text-[13px] font-mono py-1 bg-transparent outline-none text-slate-700 dark:text-slate-300"
+            data-testid={props['data-testid']}
+          />
+          <span className="text-[11px] text-slate-400 dark:text-slate-500 pr-2 font-medium select-none">%</span>
+        </div>
+        <button
+          onClick={increment}
+          className="w-6 h-6 rounded flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+          tabIndex={-1}
+        >
+          <Plus className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+interface CurrencyStepperProps {
+  value: string;
+  onChange: (value: string) => void;
+  label: string;
+  icon: typeof DollarSign;
+  step?: number;
+  isActive?: boolean;
+  activeBadge?: string;
+  activeColor?: string;
+  'data-testid'?: string;
+}
+
+function CurrencyStepper({
+  value, label, icon: Icon, onChange, step = 500000,
+  isActive, activeBadge, activeColor = 'blue',
+  ...props
+}: CurrencyStepperProps) {
+  const numVal = parseCurrencyInput(value) || 0;
+  const decrement = () => {
+    const newVal = Math.max(0, numVal - step);
+    onChange(newVal.toLocaleString());
+  };
+  const increment = () => {
+    const newVal = numVal + step;
+    onChange(newVal.toLocaleString());
+  };
+
+  const colorMap: Record<string, { ring: string; badge: string; iconBg: string; iconText: string }> = {
+    blue: { ring: 'ring-blue-500/40 border-blue-300 dark:border-blue-700', badge: 'bg-blue-600', iconBg: 'bg-blue-50 dark:bg-blue-950/50', iconText: 'text-blue-600 dark:text-blue-400' },
+    primary: { ring: 'ring-primary/40 border-primary/50', badge: 'bg-primary', iconBg: 'bg-primary/10', iconText: 'text-primary' },
+  };
+  const colors = colorMap[activeColor] || colorMap.primary;
+
+  return (
+    <div className={cn(
+      "flex items-center justify-between py-2 px-3 rounded-lg transition-all duration-150 border",
+      isActive
+        ? `ring-2 ${colors.ring}`
+        : "bg-white dark:bg-slate-800/50 border-slate-100 dark:border-slate-700/50 hover:border-slate-200 dark:hover:border-slate-600"
+    )}>
+      <div className="flex items-center gap-2 min-w-0">
+        <div className={cn("w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0", colors.iconBg, colors.iconText)}>
+          <Icon className="w-3.5 h-3.5" />
+        </div>
+        <span className="text-[13px] font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">{label}</span>
+        {isActive && activeBadge && (
+          <Badge className={cn("text-white text-[8px] px-1.5 py-0 h-4 flex-shrink-0", colors.badge)}>
+            {activeBadge}
+          </Badge>
+        )}
+      </div>
+      <div className="flex items-center gap-1.5 flex-shrink-0 ml-3">
+        <button
+          onClick={decrement}
+          className="w-6 h-6 rounded flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+          tabIndex={-1}
+        >
+          <Minus className="w-3 h-3" />
+        </button>
+        <div className="flex items-center bg-slate-50 dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-600 overflow-hidden">
+          <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-2 font-medium select-none">$</span>
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value.replace(/^\$/, ''))}
+            className="w-28 text-center text-[13px] font-mono py-1 bg-transparent outline-none text-slate-700 dark:text-slate-300"
+            placeholder="10,000,000"
+            data-testid={props['data-testid']}
+          />
+        </div>
+        <button
+          onClick={increment}
+          className="w-6 h-6 rounded flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+          tabIndex={-1}
+        >
+          <Plus className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function DealPricing({ projectId, onTabChange }: DealPricingProps) {
   const { toast } = useToast();
@@ -534,54 +707,66 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
         </Card>
       )}
 
-      <div className="flex flex-wrap items-end gap-3 p-3 bg-muted/30 rounded-lg border">
-        <div className="flex-shrink-0">
-          <Label className="text-xs text-muted-foreground mb-1 block">Hold Period</Label>
-          <Select value={holdPeriod} onValueChange={setHoldPeriod}>
-            <SelectTrigger className="w-24 h-9" data-testid="select-hold-period">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {[3, 5, 7, 10].map(y => (
-                <SelectItem key={y} value={String(y)}>{y} Years</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className={`flex-shrink-0 ${pricingDriver === 'exitCap' && isLinked ? 'ring-2 ring-purple-500/50 rounded-md p-1 -m-1' : ''}`}>
-          <div className="flex items-center gap-1 mb-1">
-            <Label className="text-xs text-muted-foreground">Exit Cap</Label>
-            {pricingDriver === 'exitCap' && isLinked && (
-              <Badge className="bg-purple-600 text-white text-[8px] px-1 py-0 h-4">Drive</Badge>
-            )}
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 border-l-4 border-l-slate-400 overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2.5">
+          <div className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+            <SlidersHorizontal className="w-4 h-4" />
           </div>
-          <Input
-            value={exitCapRate ? `${exitCapRate}%` : ''}
-            onChange={(e) => handleExitCapRateChange(e.target.value.replace('%', ''))}
-            className="w-24 h-9 text-sm"
-            placeholder="7.5%"
-            data-testid="input-exit-cap-rate"
-          />
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Assumptions</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Hold period, cap rates, and growth rates</p>
+          </div>
         </div>
-        <div className="flex-shrink-0">
-          <Label className="text-xs text-muted-foreground mb-1 block">Rev Growth</Label>
-          <Input
-            value={revenueGrowthRate ? `${revenueGrowthRate}%` : ''}
-            onChange={(e) => setRevenueGrowthRate(e.target.value.replace('%', ''))}
-            className="w-24 h-9 text-sm"
-            placeholder="3.0%"
-            data-testid="input-revenue-growth"
-          />
-        </div>
-        <div className="flex-shrink-0">
-          <Label className="text-xs text-muted-foreground mb-1 block">Exp Growth</Label>
-          <Input
-            value={expenseGrowthRate ? `${expenseGrowthRate}%` : ''}
-            onChange={(e) => setExpenseGrowthRate(e.target.value.replace('%', ''))}
-            className="w-24 h-9 text-sm"
-            placeholder="2.0%"
-            data-testid="input-expense-growth"
-          />
+        <div className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-1.5">
+            <div className="flex items-center justify-between py-2 px-3 rounded-lg transition-all duration-150 border bg-white dark:bg-slate-800/50 border-slate-100 dark:border-slate-700/50 hover:border-slate-200 dark:hover:border-slate-600">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                  <Calendar className="w-3.5 h-3.5" />
+                </div>
+                <span className="text-[13px] font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">Hold Period</span>
+              </div>
+              <Select value={holdPeriod} onValueChange={setHoldPeriod}>
+                <SelectTrigger className="w-[90px] h-8 text-[13px] font-mono bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-600" data-testid="select-hold-period">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[3, 5, 7, 10].map(y => (
+                    <SelectItem key={y} value={String(y)}>{y} Years</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <PercentStepper
+              label="Exit Cap"
+              icon={TrendingUp}
+              value={exitCapRate}
+              onChange={handleExitCapRateChange}
+              step={0.25}
+              isActive={pricingDriver === 'exitCap' && isLinked}
+              activeBadge="Driving"
+              activeColor="purple"
+              data-testid="input-exit-cap-rate"
+            />
+            <PercentStepper
+              label="Rev Growth"
+              icon={TrendingUp}
+              value={revenueGrowthRate}
+              onChange={setRevenueGrowthRate}
+              step={0.5}
+              activeColor="green"
+              data-testid="input-revenue-growth"
+            />
+            <PercentStepper
+              label="Exp Growth"
+              icon={BarChart3}
+              value={expenseGrowthRate}
+              onChange={setExpenseGrowthRate}
+              step={0.5}
+              activeColor="slate"
+              data-testid="input-expense-growth"
+            />
+          </div>
         </div>
       </div>
 
@@ -626,7 +811,10 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
       )}
 
       <div className="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-4">
-        <Card className={`border ${pricingDriver === 'price' && isLinked ? 'border-primary ring-2 ring-primary/30' : ''}`}>
+        <Card className={cn(
+          "border overflow-hidden",
+          pricingDriver === 'price' && isLinked ? 'border-primary ring-2 ring-primary/30' : ''
+        )}>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm flex items-center gap-1.5">
@@ -665,16 +853,16 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
             </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
-            <div>
-              <Label className="text-xs text-muted-foreground">Purchase Price</Label>
-              <Input
-                value={manualPurchasePrice ? `$${manualPurchasePrice}` : ''}
-                onChange={(e) => handlePurchasePriceChange(e.target.value.replace(/^\$/, ''))}
-                placeholder="$10,000,000"
-                className="h-9 w-36 mt-1"
-                data-testid="input-purchase-price"
-              />
-            </div>
+            <CurrencyStepper
+              label="Purchase Price"
+              icon={DollarSign}
+              value={manualPurchasePrice}
+              onChange={handlePurchasePriceChange}
+              step={500000}
+              isActive={pricingDriver === 'price' && isLinked}
+              activeColor="primary"
+              data-testid="input-purchase-price"
+            />
 
             {calculateMutation.isPending ? (
               <div className="space-y-2">
@@ -738,7 +926,10 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
           </CardContent>
         </Card>
 
-        <Card className={`border ${pricingDriver === 'targetIRR' && isLinked ? 'border-green-500 ring-2 ring-green-500/30' : ''}`}>
+        <Card className={cn(
+          "border overflow-hidden",
+          pricingDriver === 'targetIRR' && isLinked ? 'border-green-500 ring-2 ring-green-500/30' : ''
+        )}>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm flex items-center gap-1.5">
@@ -753,16 +944,17 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
             </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
-            <div>
-              <Label className="text-xs text-muted-foreground">Target IRR</Label>
-              <Input
-                value={targetIRR ? `${targetIRR}%` : ''}
-                onChange={(e) => handleTargetIRRChange(e.target.value.replace('%', ''))}
-                placeholder="15.0%"
-                className="h-9 w-24 mt-1"
-                data-testid="input-target-irr"
-              />
-            </div>
+            <PercentStepper
+              label="Target IRR"
+              icon={Target}
+              value={targetIRR}
+              onChange={handleTargetIRRChange}
+              step={0.5}
+              isActive={pricingDriver === 'targetIRR' && isLinked}
+              activeBadge="Driving"
+              activeColor="green"
+              data-testid="input-target-irr"
+            />
 
             {calculateMutation.isPending ? (
               <Skeleton className="h-24 w-full" />
@@ -810,8 +1002,11 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
           </CardContent>
         </Card>
 
-        <Card className={`border-2 ${pricingDriver === 'goingInCap' && isLinked ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-blue-500/20'}`}>
-          <CardHeader>
+        <Card className={cn(
+          "border overflow-hidden",
+          pricingDriver === 'goingInCap' && isLinked ? 'border-blue-500 ring-2 ring-blue-500/30' : ''
+        )}>
+          <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm flex items-center gap-1.5">
                 <Percent className="h-4 w-4 text-blue-600" />
@@ -825,16 +1020,17 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
             </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
-            <div>
-              <Label className="text-xs text-muted-foreground">Cap Rate (Year 1)</Label>
-              <Input
-                value={goingInCapRate ? `${goingInCapRate}%` : ''}
-                onChange={(e) => handleGoingInCapRateChange(e.target.value.replace('%', ''))}
-                placeholder="7.5%"
-                className="h-9 w-24 mt-1"
-                data-testid="input-going-in-cap"
-              />
-            </div>
+            <PercentStepper
+              label="Cap Rate (Year 1)"
+              icon={Percent}
+              value={goingInCapRate}
+              onChange={handleGoingInCapRateChange}
+              step={0.25}
+              isActive={pricingDriver === 'goingInCap' && isLinked}
+              activeBadge="Driving"
+              activeColor="blue"
+              data-testid="input-going-in-cap"
+            />
 
             {calculateMutation.isPending ? (
               <Skeleton className="h-24 w-full" />
@@ -882,7 +1078,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
           </CardContent>
         </Card>
 
-        <Card className="border">
+        <Card className="border overflow-hidden">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-1.5">
               <TrendingUp className="h-4 w-4 text-purple-600" />
@@ -890,11 +1086,16 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
-            <div className="flex items-end gap-3">
-              <div>
-                <Label className="text-xs text-muted-foreground">Year</Label>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg transition-all duration-150 border bg-white dark:bg-slate-800/50 border-slate-100 dark:border-slate-700/50 hover:border-slate-200 dark:hover:border-slate-600">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400">
+                    <Calendar className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="text-[13px] font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">Year</span>
+                </div>
                 <Select value={targetYear} onValueChange={setTargetYear}>
-                  <SelectTrigger className="mt-1 w-24 h-9" data-testid="select-target-year">
+                  <SelectTrigger className="w-[90px] h-8 text-[13px] font-mono bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-600" data-testid="select-target-year">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -904,16 +1105,15 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Cap Rate</Label>
-                <Input
-                  value={targetYearCapRate ? `${targetYearCapRate}%` : ''}
-                  onChange={(e) => setTargetYearCapRate(e.target.value.replace('%', ''))}
-                  placeholder="7.0%"
-                  className="h-9 w-24 mt-1"
-                  data-testid="input-target-year-cap"
-                />
-              </div>
+              <PercentStepper
+                label="Cap Rate"
+                icon={Percent}
+                value={targetYearCapRate}
+                onChange={setTargetYearCapRate}
+                step={0.25}
+                activeColor="purple"
+                data-testid="input-target-year-cap"
+              />
             </div>
 
             {calculateMutation.isPending ? (
