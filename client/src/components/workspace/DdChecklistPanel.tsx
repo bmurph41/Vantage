@@ -5,6 +5,8 @@
  * Usage: <DdChecklistPanel workspaceId={workspaceId} />
  */
 import { useState } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 import {
   useDdChecklist, useCreateDdChecklist, useCreateFromTemplate, useSetItemStatus,
   useUpdateItem, useCreateSection, useCreateItem, useDeleteItem, useDeleteSection,
@@ -93,6 +95,24 @@ export default function DdChecklistPanel({ workspaceId }: Props) {
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
   const [mergeStrategy, setMergeStrategy] = useState<string>('replace');
   const [newSectionTitle, setNewSectionTitle] = useState('');
+  const [showCustomSectionInput, setShowCustomSectionInput] = useState(false);
+
+  const { data: sectionDefaults = [] } = useQuery<{ id: string; title: string; isBuiltin: boolean }[]>({
+    queryKey: ['/api/dd-section-defaults'],
+  });
+
+  const createSectionDefault = useMutation({
+    mutationFn: async (title: string) => {
+      return await apiRequest('/api/dd-section-defaults', {
+        method: 'POST',
+        body: JSON.stringify({ title }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dd-section-defaults'] });
+    },
+  });
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
   const [addingItemToSection, setAddingItemToSection] = useState<string | null>(null);
@@ -552,16 +572,70 @@ export default function DdChecklistPanel({ workspaceId }: Props) {
         isSeedPending={seedTemplates.isPending}
       />
 
-      <Dialog open={showAddSectionDialog} onOpenChange={setShowAddSectionDialog}>
+      <Dialog open={showAddSectionDialog} onOpenChange={(open) => {
+        setShowAddSectionDialog(open);
+        if (!open) { setNewSectionTitle(''); setShowCustomSectionInput(false); }
+      }}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Add Section</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
-            <Input placeholder="Section title" value={newSectionTitle} onChange={e => setNewSectionTitle(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleAddSection(); }} />
+            {!showCustomSectionInput ? (
+              <>
+                <Label>Choose a section</Label>
+                <Select
+                  value={newSectionTitle}
+                  onValueChange={(val) => {
+                    if (val === '__other__') {
+                      setNewSectionTitle('');
+                      setShowCustomSectionInput(true);
+                    } else {
+                      setNewSectionTitle(val);
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a section..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sectionDefaults
+                      .filter(d => !sections.some(s => s.title.toLowerCase() === d.title.toLowerCase()))
+                      .map(d => (
+                        <SelectItem key={d.id} value={d.title}>{d.title}</SelectItem>
+                      ))}
+                    <SelectItem value="__other__">Other (custom name)...</SelectItem>
+                  </SelectContent>
+                </Select>
+              </>
+            ) : (
+              <>
+                <Label>Custom section name</Label>
+                <Input
+                  placeholder="Enter section name"
+                  value={newSectionTitle}
+                  onChange={e => setNewSectionTitle(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleAddSection(); }}
+                  autoFocus
+                />
+                <Button variant="link" size="sm" className="px-0 h-auto text-xs" onClick={() => {
+                  setShowCustomSectionInput(false);
+                  setNewSectionTitle('');
+                }}>
+                  Back to list
+                </Button>
+              </>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddSectionDialog(false)}>Cancel</Button>
-            <Button onClick={handleAddSection} disabled={!newSectionTitle.trim() || createSection.isPending}>Add Section</Button>
+            <Button variant="outline" onClick={() => { setShowAddSectionDialog(false); setNewSectionTitle(''); setShowCustomSectionInput(false); }}>Cancel</Button>
+            <Button onClick={() => {
+              if (showCustomSectionInput && newSectionTitle.trim()) {
+                createSectionDefault.mutate(newSectionTitle.trim(), {
+                  onSettled: () => handleAddSection(),
+                });
+              } else {
+                handleAddSection();
+              }
+            }} disabled={!newSectionTitle.trim() || createSection.isPending || createSectionDefault.isPending}>Add Section</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
