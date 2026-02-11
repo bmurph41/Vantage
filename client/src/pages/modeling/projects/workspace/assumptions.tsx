@@ -174,6 +174,7 @@ interface Scenario {
 }
 
 type GrowthRates = Record<string, number>;
+type YearlyGrowthRates = Record<string, number[]>;
 type OccupancyData = Record<string, Record<string, number>>;
 type MarginData = Record<string, { historical: number; projected: number }>;
 type StorageGrowthMode = 'universal' | 'per_type' | 'granular';
@@ -187,8 +188,72 @@ interface StorageLocation {
 interface StorageGrowthData {
   mode: StorageGrowthMode;
   universalRate: number;
+  universalRates: number[];
   typeRates: Record<string, number>;
+  typeRatesByYear: Record<string, number[]>;
   locationRates: Record<string, number>;
+}
+
+function normalizeToYearlyArray(ratesOrNumber: number | number[] | undefined, holdPeriod: number, defaultRate: number): number[] {
+  if (Array.isArray(ratesOrNumber)) {
+    if (ratesOrNumber.length >= holdPeriod) return ratesOrNumber.slice(0, holdPeriod);
+    return [...ratesOrNumber, ...Array(holdPeriod - ratesOrNumber.length).fill(ratesOrNumber[ratesOrNumber.length - 1] ?? defaultRate)];
+  }
+  if (typeof ratesOrNumber === 'number') return Array(holdPeriod).fill(ratesOrNumber);
+  return Array(holdPeriod).fill(defaultRate);
+}
+
+function convertFlatToYearly(flatRates: Record<string, number>, holdPeriod: number, defaultRate: number): YearlyGrowthRates {
+  const result: YearlyGrowthRates = {};
+  for (const [key, val] of Object.entries(flatRates)) {
+    result[key] = Array(holdPeriod).fill(val);
+  }
+  return result;
+}
+
+function convertYearlyToFlat(yearlyRates: YearlyGrowthRates): GrowthRates {
+  const result: GrowthRates = {};
+  for (const [key, arr] of Object.entries(yearlyRates)) {
+    result[key] = arr[0] ?? 0;
+  }
+  return result;
+}
+
+function buildYearlyGrowthRatesForEngine(
+  growthRates: YearlyGrowthRates,
+  expenseGrowth: YearlyGrowthRates,
+  storageGrowth: StorageGrowthData,
+  years: number[],
+): { revenue: Record<string, Record<string, number>>; expenses: Record<string, Record<string, number>> } {
+  const revenue: Record<string, Record<string, number>> = {};
+  const expenses: Record<string, Record<string, number>> = {};
+
+  years.forEach((year, idx) => {
+    const yearKey = String(year);
+    revenue[yearKey] = {};
+    expenses[yearKey] = {};
+
+    for (const [catId, rates] of Object.entries(growthRates)) {
+      revenue[yearKey][catId] = rates[idx] ?? rates[0] ?? 0;
+    }
+
+    if (storageGrowth.mode === 'universal') {
+      const universalRate = storageGrowth.universalRates?.[idx] ?? storageGrowth.universalRate ?? 3;
+      for (const [typeId] of Object.entries(storageGrowth.typeRatesByYear || storageGrowth.typeRates || {})) {
+        revenue[yearKey][typeId] = universalRate;
+      }
+    } else {
+      for (const [typeId, rates] of Object.entries(storageGrowth.typeRatesByYear || {})) {
+        revenue[yearKey][typeId] = rates[idx] ?? (storageGrowth.typeRates?.[typeId] ?? storageGrowth.universalRate ?? 3);
+      }
+    }
+
+    for (const [catId, rates] of Object.entries(expenseGrowth)) {
+      expenses[yearKey][catId] = rates[idx] ?? rates[0] ?? 0;
+    }
+  });
+
+  return { revenue, expenses };
 }
 
 const storageTypesConfig = [
@@ -419,14 +484,16 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
       }));
   }, [config]);
 
-  const [growthRates, setGrowthRates] = useState<GrowthRates>({});
-  const [expenseGrowth, setExpenseGrowth] = useState<GrowthRates>({});
+  const [growthRates, setGrowthRates] = useState<YearlyGrowthRates>({});
+  const [expenseGrowth, setExpenseGrowth] = useState<YearlyGrowthRates>({});
   const [occupancy, setOccupancy] = useState<OccupancyData>({});
   const [margins, setMargins] = useState<MarginData>({});
   const [storageGrowth, setStorageGrowth] = useState<StorageGrowthData>({
     mode: 'universal',
     universalRate: 3,
+    universalRates: Array(holdPeriod).fill(3),
     typeRates: {},
+    typeRatesByYear: {},
     locationRates: {},
   });
   const [belowTheLine, setBelowTheLine] = useState({
@@ -519,11 +586,47 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
   useEffect(() => {
     if (activeScenario?.assumptions) {
       const assumptions = activeScenario.assumptions;
-      setGrowthRates(assumptions.growthRates || getDefaultGrowthRates(activeScenarioType));
-      setExpenseGrowth(assumptions.expenseGrowth || getDefaultExpenseGrowth(activeScenarioType));
+      const loadedGrowth = assumptions.growthRatesByYear || assumptions.growthRates || getDefaultGrowthRates(activeScenarioType);
+      const loadedExpense = assumptions.expenseGrowthByYear || assumptions.expenseGrowth || getDefaultExpenseGrowth(activeScenarioType);
+
+      if (loadedGrowth && typeof Object.values(loadedGrowth)[0] === 'number') {
+        setGrowthRates(convertFlatToYearly(loadedGrowth as Record<string, number>, holdPeriod, getDefaultGrowthRateValue(activeScenarioType)));
+      } else {
+        const yearly = loadedGrowth as YearlyGrowthRates;
+        const normalized: YearlyGrowthRates = {};
+        for (const [key, val] of Object.entries(yearly)) {
+          normalized[key] = normalizeToYearlyArray(val, holdPeriod, getDefaultGrowthRateValue(activeScenarioType));
+        }
+        setGrowthRates(normalized);
+      }
+
+      if (loadedExpense && typeof Object.values(loadedExpense)[0] === 'number') {
+        setExpenseGrowth(convertFlatToYearly(loadedExpense as Record<string, number>, holdPeriod, getDefaultExpenseRateValue(activeScenarioType)));
+      } else {
+        const yearly = loadedExpense as YearlyGrowthRates;
+        const normalized: YearlyGrowthRates = {};
+        for (const [key, val] of Object.entries(yearly)) {
+          normalized[key] = normalizeToYearlyArray(val, holdPeriod, getDefaultExpenseRateValue(activeScenarioType));
+        }
+        setExpenseGrowth(normalized);
+      }
+
       setOccupancy(assumptions.occupancy || getDefaultOccupancy(years));
       setMargins(assumptions.margins || getDefaultMargins());
-      setStorageGrowth(assumptions.storageGrowth || getDefaultStorageGrowth(activeScenarioType));
+
+      const loadedStorage = assumptions.storageGrowth || getDefaultStorageGrowth(activeScenarioType);
+      const defaultStorageVal = getDefaultStorageRateValue(activeScenarioType);
+      setStorageGrowth({
+        ...loadedStorage,
+        universalRates: normalizeToYearlyArray(loadedStorage.universalRates ?? loadedStorage.universalRate, holdPeriod, defaultStorageVal),
+        typeRatesByYear: Object.fromEntries(
+          Object.entries(loadedStorage.typeRatesByYear || loadedStorage.typeRates || {}).map(([k, v]: [string, any]) => [
+            k,
+            normalizeToYearlyArray(v, holdPeriod, defaultStorageVal),
+          ])
+        ),
+      });
+
       setBelowTheLine(assumptions.belowTheLine || { managementFeePct: 0, capexPct: 2, capexAmount: 0, reservesPct: 0, reservesAmount: 0 });
       setExitAssumptions(assumptions.exitAssumptions || { sellingFeePct: 2, loanExitFeePct: 0, workingCapitalRecoveryPct: 100, workingCapitalAmount: 0 });
       setHasChanges(false);
@@ -539,29 +642,32 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
     }
   }, [activeScenario, activeScenarioType, holdPeriod]);
 
-  function getDefaultGrowthRates(scenarioType: ScenarioType): GrowthRates {
-    const baseRates: Record<ScenarioType, number> = {
-      base: 3,
-      aggressive: 5,
-      conservative: 1.5,
-      custom: 3,
-    };
-    const rate = baseRates[scenarioType];
-    const defaultGrowth: GrowthRates = {};
-    allRevenueCategories.forEach(cat => { defaultGrowth[cat.id] = rate; });
+  function getDefaultGrowthRateValue(scenarioType: ScenarioType): number {
+    const baseRates: Record<ScenarioType, number> = { base: 3, aggressive: 5, conservative: 1.5, custom: 3 };
+    return baseRates[scenarioType];
+  }
+
+  function getDefaultExpenseRateValue(scenarioType: ScenarioType): number {
+    const baseRates: Record<ScenarioType, number> = { base: 2.5, aggressive: 2, conservative: 3, custom: 2.5 };
+    return baseRates[scenarioType];
+  }
+
+  function getDefaultStorageRateValue(scenarioType: ScenarioType): number {
+    const baseRates: Record<ScenarioType, number> = { base: 3, aggressive: 5, conservative: 1.5, custom: 3 };
+    return baseRates[scenarioType];
+  }
+
+  function getDefaultGrowthRates(scenarioType: ScenarioType): YearlyGrowthRates {
+    const rate = getDefaultGrowthRateValue(scenarioType);
+    const defaultGrowth: YearlyGrowthRates = {};
+    allRevenueCategories.forEach(cat => { defaultGrowth[cat.id] = Array(holdPeriod).fill(rate); });
     return defaultGrowth;
   }
 
-  function getDefaultExpenseGrowth(scenarioType: ScenarioType): GrowthRates {
-    const baseRates: Record<ScenarioType, number> = {
-      base: 2.5,
-      aggressive: 2,
-      conservative: 3,
-      custom: 2.5,
-    };
-    const rate = baseRates[scenarioType];
-    const defaultExpenseGrowth: GrowthRates = {};
-    expenseCategories.forEach(cat => { defaultExpenseGrowth[cat.id] = rate; });
+  function getDefaultExpenseGrowth(scenarioType: ScenarioType): YearlyGrowthRates {
+    const rate = getDefaultExpenseRateValue(scenarioType);
+    const defaultExpenseGrowth: YearlyGrowthRates = {};
+    expenseCategories.forEach(cat => { defaultExpenseGrowth[cat.id] = Array(holdPeriod).fill(rate); });
     return defaultExpenseGrowth;
   }
 
@@ -584,18 +690,14 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
   }
 
   function getDefaultStorageGrowth(scenarioType: ScenarioType): StorageGrowthData {
-    const baseRates: Record<ScenarioType, number> = {
-      base: 3,
-      aggressive: 5,
-      conservative: 1.5,
-      custom: 3,
-    };
-    const rate = baseRates[scenarioType];
+    const rate = getDefaultStorageRateValue(scenarioType);
     const typeRates: Record<string, number> = {};
+    const typeRatesByYear: Record<string, number[]> = {};
     const locationRates: Record<string, number> = {};
     
     storageTypesConfig.forEach(type => {
       typeRates[type.id] = rate;
+      typeRatesByYear[type.id] = Array(holdPeriod).fill(rate);
       type.locations.forEach(loc => {
         locationRates[loc.id] = rate;
       });
@@ -604,7 +706,9 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
     return {
       mode: 'universal',
       universalRate: rate,
+      universalRates: Array(holdPeriod).fill(rate),
       typeRates,
+      typeRatesByYear,
       locationRates,
     };
   }
@@ -627,17 +731,34 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
         setAutosaveStatus('saving');
         changesSinceSaveRef.current = false;
       }
+      const flatGrowth = convertYearlyToFlat(growthRates);
+      const flatExpense = convertYearlyToFlat(expenseGrowth);
+      const avgRevenue = Object.values(flatGrowth).length > 0 ? Object.values(flatGrowth).reduce((a, b) => a + b, 0) / Object.values(flatGrowth).length : 3;
+      const avgExpense = Object.values(flatExpense).length > 0 ? Object.values(flatExpense).reduce((a, b) => a + b, 0) / Object.values(flatExpense).length : 2.5;
+      const yearlyGrowthRatesForEngine = buildYearlyGrowthRatesForEngine(growthRates, expenseGrowth, storageGrowth, years);
+      const assumptions = {
+        growthRates: flatGrowth,
+        growthRatesByYear: growthRates,
+        expenseGrowth: flatExpense,
+        expenseGrowthByYear: expenseGrowth,
+        occupancy,
+        margins,
+        storageGrowth,
+        belowTheLine,
+        exitAssumptions,
+        yearlyGrowthRates: yearlyGrowthRatesForEngine,
+      };
       if (!activeScenario) {
         return apiRequest('POST', `/api/modeling/projects/${projectId}/scenarios`, {
           scenarioType: activeScenarioType,
           name: getLabel(activeScenarioType as CaseType),
-          revenueGrowthRate: Object.values(growthRates).reduce((a, b) => a + b, 0) / Object.values(growthRates).length,
-          expenseGrowthRate: Object.values(expenseGrowth).reduce((a, b) => a + b, 0) / Object.values(expenseGrowth).length,
-          assumptions: { growthRates, expenseGrowth, occupancy, margins, storageGrowth, belowTheLine, exitAssumptions },
+          revenueGrowthRate: avgRevenue,
+          expenseGrowthRate: avgExpense,
+          assumptions,
         });
       }
       return apiRequest('PATCH', `/api/modeling/projects/${projectId}/scenarios/${activeScenario.id}`, {
-        assumptions: { growthRates, expenseGrowth, occupancy, margins, storageGrowth, belowTheLine, exitAssumptions },
+        assumptions,
         createNewVersion,
       });
     },
@@ -813,15 +934,33 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
     saveMutation.mutate({ createNewVersion });
   };
 
-  const updateGrowthRate = (categoryId: string, value: string) => {
-    const numValue = parseFloat(value) || 0;
-    setGrowthRates(prev => ({ ...prev, [categoryId]: numValue }));
+  const updateGrowthRate = (categoryId: string, yearIndex: number, value: number) => {
+    setGrowthRates(prev => {
+      const existing = prev[categoryId] || Array(holdPeriod).fill(getDefaultGrowthRateValue(activeScenarioType));
+      const updated = [...existing];
+      updated[yearIndex] = value;
+      return { ...prev, [categoryId]: updated };
+    });
     setHasChanges(true);
   };
 
-  const updateExpenseGrowth = (categoryId: string, value: string) => {
-    const numValue = parseFloat(value) || 0;
-    setExpenseGrowth(prev => ({ ...prev, [categoryId]: numValue }));
+  const updateGrowthRateAllYears = (categoryId: string, value: number) => {
+    setGrowthRates(prev => ({ ...prev, [categoryId]: Array(holdPeriod).fill(value) }));
+    setHasChanges(true);
+  };
+
+  const updateExpenseGrowth = (categoryId: string, yearIndex: number, value: number) => {
+    setExpenseGrowth(prev => {
+      const existing = prev[categoryId] || Array(holdPeriod).fill(getDefaultExpenseRateValue(activeScenarioType));
+      const updated = [...existing];
+      updated[yearIndex] = value;
+      return { ...prev, [categoryId]: updated };
+    });
+    setHasChanges(true);
+  };
+
+  const updateExpenseGrowthAllYears = (categoryId: string, value: number) => {
+    setExpenseGrowth(prev => ({ ...prev, [categoryId]: Array(holdPeriod).fill(value) }));
     setHasChanges(true);
   };
 
@@ -854,61 +993,75 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
     setHasChanges(true);
   };
 
-  const updateStorageUniversalRate = (value: string) => {
-    const numValue = parseFloat(value) || 0;
+  const updateStorageUniversalRate = (yearIndex: number, value: number) => {
     setStorageGrowth(prev => {
-      const typeRates: Record<string, number> = {};
-      const locationRates: Record<string, number> = {};
+      const newUniversalRates = [...(prev.universalRates || Array(holdPeriod).fill(prev.universalRate))];
+      newUniversalRates[yearIndex] = value;
+      const newTypeRatesByYear = { ...prev.typeRatesByYear };
       storageTypesConfig.forEach(type => {
-        typeRates[type.id] = numValue;
-        type.locations.forEach(loc => {
-          locationRates[loc.id] = numValue;
-        });
+        const existing = newTypeRatesByYear[type.id] || Array(holdPeriod).fill(prev.universalRate);
+        const updated = [...existing];
+        updated[yearIndex] = value;
+        newTypeRatesByYear[type.id] = updated;
       });
       return {
         ...prev,
-        universalRate: numValue,
+        universalRate: newUniversalRates[0],
+        universalRates: newUniversalRates,
+        typeRatesByYear: newTypeRatesByYear,
+      };
+    });
+    setHasChanges(true);
+  };
+
+  const updateStorageUniversalRateAllYears = (value: number) => {
+    setStorageGrowth(prev => {
+      const typeRates: Record<string, number> = {};
+      const typeRatesByYear: Record<string, number[]> = {};
+      const locationRates: Record<string, number> = {};
+      storageTypesConfig.forEach(type => {
+        typeRates[type.id] = value;
+        typeRatesByYear[type.id] = Array(holdPeriod).fill(value);
+        type.locations.forEach(loc => { locationRates[loc.id] = value; });
+      });
+      return {
+        ...prev,
+        universalRate: value,
+        universalRates: Array(holdPeriod).fill(value),
         typeRates,
+        typeRatesByYear,
         locationRates,
       };
     });
     setHasChanges(true);
   };
 
-  const updateStorageTypeRate = (typeId: string, value: string) => {
-    const numValue = parseFloat(value) || 0;
+  const updateStorageTypeRate = (typeId: string, yearIndex: number, value: number) => {
+    setStorageGrowth(prev => {
+      const existing = prev.typeRatesByYear?.[typeId] || Array(holdPeriod).fill(prev.typeRates?.[typeId] ?? prev.universalRate);
+      const updated = [...existing];
+      updated[yearIndex] = value;
+      return {
+        ...prev,
+        typeRates: { ...prev.typeRates, [typeId]: updated[0] },
+        typeRatesByYear: { ...prev.typeRatesByYear, [typeId]: updated },
+      };
+    });
+    setHasChanges(true);
+  };
+
+  const updateStorageTypeRateAllYears = (typeId: string, value: number) => {
     setStorageGrowth(prev => {
       const newLocationRates = { ...prev.locationRates };
       const storageType = storageTypesConfig.find(t => t.id === typeId);
       if (storageType) {
-        storageType.locations.forEach(loc => {
-          newLocationRates[loc.id] = numValue;
-        });
+        storageType.locations.forEach(loc => { newLocationRates[loc.id] = value; });
       }
       return {
         ...prev,
-        typeRates: { ...prev.typeRates, [typeId]: numValue },
+        typeRates: { ...prev.typeRates, [typeId]: value },
+        typeRatesByYear: { ...prev.typeRatesByYear, [typeId]: Array(holdPeriod).fill(value) },
         locationRates: newLocationRates,
-      };
-    });
-    setHasChanges(true);
-  };
-
-  const reapplyUniversalRate = () => {
-    const universalValue = storageGrowth.universalRate;
-    setStorageGrowth(prev => {
-      const typeRates: Record<string, number> = {};
-      const locationRates: Record<string, number> = {};
-      storageTypesConfig.forEach(type => {
-        typeRates[type.id] = universalValue;
-        type.locations.forEach(loc => {
-          locationRates[loc.id] = universalValue;
-        });
-      });
-      return {
-        ...prev,
-        typeRates,
-        locationRates,
       };
     });
     setHasChanges(true);
@@ -1189,45 +1342,26 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
 
         <TabsContent value="growth" className="space-y-6">
           <GrowthRatesTab
+            years={years}
             growthRates={growthRates}
             expenseGrowth={expenseGrowth}
             storageGrowth={storageGrowth}
             updateGrowthRate={updateGrowthRate}
+            updateGrowthRateAllYears={updateGrowthRateAllYears}
             updateExpenseGrowth={updateExpenseGrowth}
+            updateExpenseGrowthAllYears={updateExpenseGrowthAllYears}
             updateStorageGrowthMode={updateStorageGrowthMode}
             updateStorageUniversalRate={updateStorageUniversalRate}
+            updateStorageUniversalRateAllYears={updateStorageUniversalRateAllYears}
             updateStorageTypeRate={updateStorageTypeRate}
+            updateStorageTypeRateAllYears={updateStorageTypeRateAllYears}
             storageRevenueCategories={storageRevenueCategories}
             nonStorageRevenueCategories={nonStorageRevenueCategories}
             expenseCategories={expenseCategories}
             segmentExpenseCategories={segmentExpenseCategories}
-            getDefaultGrowthRate={() => {
-              const baseRates: Record<ScenarioType, number> = {
-                base: 3,
-                aggressive: 5,
-                conservative: 1.5,
-                custom: 3,
-              };
-              return baseRates[activeScenarioType];
-            }}
-            getDefaultExpenseRate={() => {
-              const baseRates: Record<ScenarioType, number> = {
-                base: 2.5,
-                aggressive: 2,
-                conservative: 3,
-                custom: 2.5,
-              };
-              return baseRates[activeScenarioType];
-            }}
-            getDefaultStorageRate={() => {
-              const baseRates: Record<ScenarioType, number> = {
-                base: 3,
-                aggressive: 5,
-                conservative: 1.5,
-                custom: 3,
-              };
-              return baseRates[activeScenarioType];
-            }}
+            getDefaultGrowthRate={() => getDefaultGrowthRateValue(activeScenarioType)}
+            getDefaultExpenseRate={() => getDefaultExpenseRateValue(activeScenarioType)}
+            getDefaultStorageRate={() => getDefaultStorageRateValue(activeScenarioType)}
             triggerAutosave={triggerAutosave}
           />
         </TabsContent>

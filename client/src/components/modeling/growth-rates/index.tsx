@@ -6,8 +6,14 @@ import {
   Caravan, Hotel, MoreHorizontal, Briefcase, Scale, Zap, Shield, Building,
   CreditCard, Key, Megaphone, RotateCcw, ChevronDown, ChevronUp, TrendingUp, 
   Receipt, PieChart, Globe, Layers, Sparkles, LucideIcon, Container, MapPin,
-  Minus, Plus
+  Minus, Plus, Copy, ArrowRight
 } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface RateInputProps {
   label: string;
@@ -115,6 +121,161 @@ export function RateInput({
   );
 }
 
+interface CompactYearRateInputProps {
+  value: number;
+  defaultValue: number;
+  onChange: (value: number) => void;
+  year: number;
+  min?: number;
+  max?: number;
+  step?: number;
+}
+
+export function CompactYearRateInput({
+  value,
+  defaultValue,
+  onChange,
+  year,
+  min = -100,
+  max = 100,
+  step = 0.5,
+}: CompactYearRateInputProps) {
+  const isModified = Math.abs(value - defaultValue) > 0.001;
+
+  return (
+    <div className="flex items-center">
+      <div className={cn(
+        "flex items-center rounded-md border overflow-hidden",
+        isModified
+          ? "border-amber-300 dark:border-amber-700 bg-amber-50/60 dark:bg-amber-950/30"
+          : "border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800"
+      )}>
+        <input
+          type="number"
+          value={value}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            if (!isNaN(v)) onChange(Math.min(max, Math.max(min, v)));
+          }}
+          step={step}
+          min={min}
+          max={max}
+          className={cn(
+            "w-[52px] text-center text-[12px] font-mono py-1 bg-transparent outline-none",
+            "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+            isModified
+              ? "text-amber-700 dark:text-amber-300 font-semibold"
+              : "text-slate-600 dark:text-slate-300"
+          )}
+        />
+        <span className="text-[10px] text-slate-400 dark:text-slate-500 pr-1.5 font-medium select-none">%</span>
+      </div>
+    </div>
+  );
+}
+
+interface YearlyRateRowProps {
+  label: string;
+  icon: LucideIcon;
+  years: number[];
+  rates: number[];
+  defaultRate: number;
+  onChangeYear: (yearIndex: number, value: number) => void;
+  onApplyToAll: (value: number) => void;
+}
+
+export function YearlyRateRow({
+  label,
+  icon: Icon,
+  years,
+  rates,
+  defaultRate,
+  onChangeYear,
+  onApplyToAll,
+}: YearlyRateRowProps) {
+  const allSame = rates.every(r => Math.abs(r - rates[0]) < 0.001);
+  const anyModified = rates.some(r => Math.abs(r - defaultRate) > 0.001);
+
+  return (
+    <div className={cn(
+      "flex items-center gap-2 py-2 px-3 rounded-lg transition-all duration-150 border",
+      anyModified
+        ? "bg-amber-50/40 dark:bg-amber-950/15 border-amber-200/70 dark:border-amber-800/50"
+        : "bg-white dark:bg-slate-800/50 border-slate-100 dark:border-slate-700/50"
+    )}>
+      <div className="flex items-center gap-2 min-w-0 w-[140px] flex-shrink-0">
+        <div className={cn(
+          "w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0",
+          anyModified
+            ? "bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400"
+            : "bg-slate-50 dark:bg-slate-700/60 text-slate-400 dark:text-slate-500"
+        )}>
+          <Icon className="w-3 h-3" />
+        </div>
+        <span className="text-[12px] font-medium text-slate-700 dark:text-slate-300 truncate" title={label}>
+          {label}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-1.5 flex-1 justify-end flex-wrap">
+        {years.map((year, idx) => (
+          <CompactYearRateInput
+            key={year}
+            value={rates[idx] ?? defaultRate}
+            defaultValue={defaultRate}
+            onChange={(val) => onChangeYear(idx, val)}
+            year={year}
+          />
+        ))}
+
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => onApplyToAll(rates[0])}
+                className={cn(
+                  "w-6 h-6 rounded flex items-center justify-center transition-colors ml-0.5",
+                  allSame
+                    ? "text-slate-300 dark:text-slate-600"
+                    : "text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                )}
+                disabled={allSame}
+                tabIndex={-1}
+              >
+                <Copy className="w-3 h-3" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-xs">
+              Apply Year 1 rate to all years
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        {anyModified && (
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => {
+                    years.forEach((_, idx) => onChangeYear(idx, defaultRate));
+                  }}
+                  className="w-6 h-6 rounded flex items-center justify-center text-amber-500 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors"
+                  tabIndex={-1}
+                >
+                  <RotateCcw className="w-3 h-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                Reset all years to {defaultRate}%
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+      </div>
+    </div>
+  );
+}
+
 type AccentColor = 'blue' | 'emerald' | 'slate' | 'purple';
 
 interface SectionCardProps {
@@ -190,7 +351,7 @@ export function SectionCard({
 interface CategoryGroupProps {
   title: string;
   children: React.ReactNode;
-  columns?: 2 | 3;
+  columns?: 1 | 2 | 3;
 }
 
 export function CategoryGroup({ title, children, columns = 2 }: CategoryGroupProps) {
@@ -202,7 +363,7 @@ export function CategoryGroup({ title, children, columns = 2 }: CategoryGroupPro
       </div>
       <div className={cn(
         "grid gap-1.5",
-        columns === 3 ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1 md:grid-cols-2"
+        columns === 3 ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : columns === 1 ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2"
       )}>
         {children}
       </div>
@@ -314,6 +475,26 @@ export function QuickActionsBar({ modifiedCount, totalCount, onReset, onPreset }
           <RotateCcw className="w-3.5 h-3.5" />
           Reset All
         </button>
+      </div>
+    </div>
+  );
+}
+
+export function YearHeaders({ years }: { years: number[] }) {
+  return (
+    <div className="flex items-center gap-2 py-1 px-3 mb-1">
+      <div className="w-[140px] flex-shrink-0" />
+      <div className="flex items-center gap-1.5 flex-1 justify-end flex-wrap">
+        {years.map((year, idx) => (
+          <div key={year} className="w-[68px] text-center">
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+              Yr {idx + 1}
+            </span>
+            <div className="text-[9px] text-slate-300 dark:text-slate-600">{year}</div>
+          </div>
+        ))}
+        <div className="w-6 ml-0.5" />
+        <div className="w-6" />
       </div>
     </div>
   );
