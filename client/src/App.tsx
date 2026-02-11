@@ -211,6 +211,7 @@ const SalesCompsCompare = lazy(() => import("@/pages/analysis/sales-comps/Compar
 const SalesCompsBulkEdit = lazy(() => import("@/pages/analysis/sales-comps/BulkEdit"));
 const SalesCompsColumnManager = lazy(() => import("@/pages/analysis/sales-comps/ColumnManager"));
 const SalesCompsPendingProfiles = lazy(() => import("@/pages/analysis/sales-comps/PendingProfiles"));
+const SalesCompsPendingComps = lazy(() => import("@/pages/analysis/sales-comps/PendingComps"));
 const ScProjectsIndex = lazy(() => import("@/pages/analysis/projects/Index"));
 const ScProjectsReport = lazy(() => import("@/pages/analysis/projects/Report"));
 const RateCompsIndex = lazy(() => import("@/pages/analysis/rate-comps/Index"));
@@ -1696,6 +1697,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <SalesCompsPendingProfiles />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/sales-comps/pending-comps">
+        {() => (
+          <UnifiedLayout>
+            <SalesCompsPendingComps />
           </UnifiedLayout>
         )}
       </Route>

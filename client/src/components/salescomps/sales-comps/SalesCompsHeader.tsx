@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Search, Upload as UploadIcon, Plus, Columns, Download, Table, TrendingUp, FolderKanban, HelpCircle, Map } from "lucide-react";
+import { Search, Upload as UploadIcon, Plus, Columns, Download, Table, TrendingUp, FolderKanban, HelpCircle, Map, Clock } from "lucide-react";
 import { Link, useLocation } from "wouter";
 
 interface SalesCompsHeaderProps {
@@ -183,6 +183,16 @@ export default function SalesCompsHeader({
             >
               <Map className="h-4 w-4" />
               Map
+            </Button>
+          </Link>
+          <Link href="/analysis/sales-comps/pending-comps">
+            <Button 
+              variant="ghost" 
+              className={`flex items-center gap-2 ${isActive('/analysis/sales-comps/pending-comps') ? 'bg-muted' : ''}`}
+              data-testid="nav-pending-comps"
+            >
+              <Clock className="h-4 w-4" />
+              Pending
             </Button>
           </Link>
         </div>

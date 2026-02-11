@@ -25,7 +25,7 @@ import {
 import { 
   User, Building, MapPin, DollarSign, Phone, Mail,
   Edit, X, Clock, Check, Loader2, Anchor, Home, Link2,
-  TrendingUp, Calendar, Briefcase, FolderOpen, BarChart3, History
+  TrendingUp, Calendar, Briefcase, FolderOpen, BarChart3, History, Send
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -334,6 +334,39 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
         description: error?.message || "An error occurred",
         variant: "destructive" 
       });
+    },
+  });
+
+  const [sentToComps, setSentToComps] = useState<Set<string>>(new Set());
+
+  const createPendingCompMutation = useMutation({
+    mutationFn: async (comp: SalesHistoryMatch) => {
+      const response = await apiRequest('POST', '/api/pending-sales-comps', {
+        sourceType: 'property_history',
+        sourcePropertyId: property?.id,
+        marina: comp.marina,
+        address: comp.address,
+        city: comp.city,
+        state: comp.state,
+        salePrice: comp.salePrice,
+        saleMonth: comp.saleMonth,
+        saleYear: comp.saleYear,
+        capRate: comp.capRate,
+        sellerName: comp.sellerName || comp.sellerContactName || comp.sellerCompanyName,
+        buyerName: comp.buyerName || comp.buyerContactName || comp.buyerCompanyName,
+        brokerName: comp.brokerName,
+        transactionType: comp.transactionType || 'sale',
+        notes: comp.notes,
+      });
+      return response.json();
+    },
+    onSuccess: (_data, comp) => {
+      setSentToComps(prev => new Set(prev).add(comp.id));
+      queryClient.invalidateQueries({ queryKey: ['/api/pending-sales-comps'] });
+      toast({ title: "Sent to pending comps for review" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to create pending comp", description: error?.message, variant: "destructive" });
     },
   });
 
@@ -800,6 +833,7 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
                               <th className="px-3 py-2 text-right font-medium text-gray-700">Sale Price</th>
                               <th className="px-3 py-2 text-left font-medium text-gray-700">Buyer</th>
                               <th className="px-3 py-2 text-left font-medium text-gray-700">Seller</th>
+                              <th className="px-3 py-2 text-center font-medium text-gray-700">Action</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
@@ -865,6 +899,24 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
                                       <span className="text-gray-400 italic text-xs">—</span>
                                     )}
                                   </div>
+                                </td>
+                                <td className="px-3 py-3 text-center">
+                                  {sentToComps.has(comp.id) ? (
+                                    <Badge variant="secondary" className="text-xs bg-green-50 text-green-700 border-green-200">
+                                      <Check className="w-3 h-3 mr-1" /> Sent
+                                    </Badge>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-xs h-7 px-2"
+                                      disabled={createPendingCompMutation.isPending}
+                                      onClick={() => createPendingCompMutation.mutate(comp)}
+                                    >
+                                      <Send className="w-3 h-3 mr-1" />
+                                      Send to Comps
+                                    </Button>
+                                  )}
                                 </td>
                               </tr>
                             ))}

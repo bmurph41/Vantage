@@ -3722,6 +3722,43 @@ export const pendingCompanies = pgTable("pending_companies", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Pending Sales Comps - Review queue for sales comps suggested from property sales history
+export const pendingSalesComps = pgTable("pending_sales_comps", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  sourceType: text("source_type").notNull().default('property_history'), // 'property_history', 'manual'
+  sourcePropertyId: varchar("source_property_id").references(() => crmProperties.id, { onDelete: 'set null' }),
+
+  // Transaction data from property sales history
+  marina: text("marina"),
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  salePrice: integer("sale_price"),
+  saleMonth: integer("sale_month"),
+  saleYear: integer("sale_year"),
+  capRate: text("cap_rate"),
+  sellerName: text("seller_name"),
+  buyerName: text("buyer_name"),
+  brokerName: text("broker_name"),
+  transactionType: text("transaction_type").default('sale'),
+  notes: text("notes"),
+
+  // Review status
+  status: pendingPropertyStatusEnum("status").notNull().default("pending"),
+
+  // Suggested duplicate matches against existing sales comps
+  suggestedDuplicates: jsonb("suggested_duplicates").default([]),
+
+  // Created sales comp ID when accepted
+  createdSalesCompId: varchar("created_sales_comp_id"),
+
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Property Ownership History - Tracks all ownership changes/sales for properties
 export const propertyOwnershipHistory = pgTable("property_ownership_history", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -6554,6 +6591,16 @@ export const insertPendingCompanySchema = createInsertSchema(pendingCompanies).o
 });
 export type InsertPendingCompany = z.infer<typeof insertPendingCompanySchema>;
 export type PendingCompany = typeof pendingCompanies.$inferSelect;
+
+// Pending Sales Comp schema
+export const insertPendingSalesCompSchema = createInsertSchema(pendingSalesComps).omit({
+  id: true,
+  createdAt: true,
+  reviewedAt: true,
+  createdSalesCompId: true,
+});
+export type InsertPendingSalesComp = z.infer<typeof insertPendingSalesCompSchema>;
+export type PendingSalesComp = typeof pendingSalesComps.$inferSelect;
 
 // Property Ownership History schema
 export const insertPropertyOwnershipHistorySchema = createInsertSchema(propertyOwnershipHistory).omit({

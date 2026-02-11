@@ -84,7 +84,7 @@ import ddAutomationRoutes from "./routes/dd-automation-routes";
 import modelingValidationRoutes from "./routes/modeling-validation-routes";
 import enhancedDebtRoutes from "./routes/enhanced-debt-routes";
 import operationsContextRoutes from "./routes/operations-context-routes";
-import { userSessions, insertProspectingEntrySchema, users, salesComps, rateComps, industryStandards, modelingProjectConfig } from "@shared/schema";
+import { userSessions, insertProspectingEntrySchema, users, salesComps, rateComps, industryStandards, modelingProjectConfig, insertPendingSalesCompSchema } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { initializeVdrForProject } from "./services/vdr-initialization-service";
 import { rentRollService } from "./services/rent-roll-service";
@@ -27526,6 +27526,115 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       }
       
       res.status(500).json({ message: "Failed to create portfolio", error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+
+  // Pending Sales Comps routes
+  app.get('/api/pending-sales-comps', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const comps = await storage.getPendingSalesComps(orgId);
+      res.json(comps);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to get pending sales comps", error: error.message });
+    }
+  });
+
+  app.get('/api/pending-sales-comps/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const comp = await storage.getPendingSalesComp(req.params.id, orgId);
+      if (!comp) return res.status(404).json({ message: "Pending sales comp not found" });
+      res.json(comp);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to get pending sales comp", error: error.message });
+    }
+  });
+
+  app.post('/api/pending-sales-comps', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const validated = insertPendingSalesCompSchema.parse({
+        ...req.body,
+        orgId,
+        createdBy: userId,
+      });
+      const comp = await storage.createPendingSalesComp(validated);
+      res.status(201).json(comp);
+    } catch (error: any) {
+      if (error?.name === 'ZodError') {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create pending sales comp", error: error.message });
+    }
+  });
+
+  app.patch('/api/pending-sales-comps/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const comp = await storage.updatePendingSalesComp(req.params.id, req.body, orgId);
+      if (!comp) return res.status(404).json({ message: "Pending sales comp not found" });
+      res.json(comp);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to update pending sales comp", error: error.message });
+    }
+  });
+
+  app.delete('/api/pending-sales-comps/:id', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const deleted = await storage.deletePendingSalesComp(req.params.id, orgId);
+      if (!deleted) return res.status(404).json({ message: "Pending sales comp not found" });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to delete pending sales comp", error: error.message });
+    }
+  });
+
+  app.post('/api/pending-sales-comps/:id/accept', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const pending = await storage.getPendingSalesComp(req.params.id, orgId);
+      if (!pending) return res.status(404).json({ message: "Pending sales comp not found" });
+
+      const salesComp = await storage.createSalesComp({
+        orgId,
+        marina: pending.marina || '',
+        address: pending.address || '',
+        city: pending.city || '',
+        state: pending.state || '',
+        salePrice: pending.salePrice,
+        saleMonth: pending.saleMonth,
+        saleYear: pending.saleYear,
+        capRate: pending.capRate,
+        sellerName: pending.sellerName,
+        buyerName: pending.buyerName,
+        brokerName: pending.brokerName,
+        transactionType: pending.transactionType || 'sale',
+        notes: pending.notes,
+        createdBy: userId,
+        source: 'property_history',
+      });
+
+      const updated = await storage.acceptPendingSalesComp(req.params.id, orgId, userId, salesComp.id);
+      res.json({ pendingSalesComp: updated, salesComp });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to accept pending sales comp", error: error.message });
+    }
+  });
+
+  app.post('/api/pending-sales-comps/:id/reject', async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const comp = await storage.rejectPendingSalesComp(req.params.id, orgId, userId);
+      if (!comp) return res.status(404).json({ message: "Pending sales comp not found" });
+      res.json(comp);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to reject pending sales comp", error: error.message });
     }
   });
 

@@ -77,7 +77,8 @@ import {
   type ExitWaterfallStructure, type InsertExitWaterfallStructure, type UpdateExitWaterfallStructure,
   type ExitInvestor, type InsertExitInvestor, type UpdateExitInvestor,
   type ExitCashFlow, type InsertExitCashFlow,
-  type ExitActivity, type InsertExitActivity
+  type ExitActivity, type InsertExitActivity,
+  pendingSalesComps, type PendingSalesComp, type InsertPendingSalesComp
 } from "@shared/schema";
 import { organizationFeatures, type OrganizationFeature } from "@shared/docktalk-schema";
 import { db } from "./db";
@@ -586,6 +587,15 @@ export interface IStorage {
   // SalesComps - Duplicate Detection
   findPotentialDuplicates(orgId: string, marina: string, state?: string, saleYear?: number): Promise<SalesComp[]>;
   bulkFindCompsByLocation(orgId: string, rows: Array<{ marina?: string; city?: string; state?: string }>): Promise<SalesComp[]>;
+
+  // Pending Sales Comps
+  getPendingSalesComps(orgId: string): Promise<PendingSalesComp[]>;
+  getPendingSalesComp(id: string, orgId: string): Promise<PendingSalesComp | undefined>;
+  createPendingSalesComp(data: InsertPendingSalesComp): Promise<PendingSalesComp>;
+  updatePendingSalesComp(id: string, updates: Partial<InsertPendingSalesComp>, orgId: string): Promise<PendingSalesComp | undefined>;
+  deletePendingSalesComp(id: string, orgId: string): Promise<boolean>;
+  acceptPendingSalesComp(id: string, orgId: string, reviewedBy: string, salesCompId: string): Promise<PendingSalesComp | undefined>;
+  rejectPendingSalesComp(id: string, orgId: string, reviewedBy: string): Promise<PendingSalesComp | undefined>;
 
   // SalesComps - Project Operations
   getScProjects(orgId: string, userId: string): Promise<ScProject[]>;
@@ -4604,6 +4614,54 @@ export class DatabaseStorage implements IStorage {
       ));
 
     return allComps;
+  }
+
+  // Pending Sales Comps
+  async getPendingSalesComps(orgId: string): Promise<PendingSalesComp[]> {
+    return await db.select().from(pendingSalesComps)
+      .where(eq(pendingSalesComps.orgId, orgId))
+      .orderBy(desc(pendingSalesComps.createdAt));
+  }
+
+  async getPendingSalesComp(id: string, orgId: string): Promise<PendingSalesComp | undefined> {
+    const [comp] = await db.select().from(pendingSalesComps)
+      .where(and(eq(pendingSalesComps.id, id), eq(pendingSalesComps.orgId, orgId)));
+    return comp;
+  }
+
+  async createPendingSalesComp(data: InsertPendingSalesComp): Promise<PendingSalesComp> {
+    const [comp] = await db.insert(pendingSalesComps).values(data).returning();
+    return comp;
+  }
+
+  async updatePendingSalesComp(id: string, updates: Partial<InsertPendingSalesComp>, orgId: string): Promise<PendingSalesComp | undefined> {
+    const [comp] = await db.update(pendingSalesComps)
+      .set(updates)
+      .where(and(eq(pendingSalesComps.id, id), eq(pendingSalesComps.orgId, orgId)))
+      .returning();
+    return comp;
+  }
+
+  async deletePendingSalesComp(id: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(pendingSalesComps)
+      .where(and(eq(pendingSalesComps.id, id), eq(pendingSalesComps.orgId, orgId)));
+    return (result as any).rowCount > 0;
+  }
+
+  async acceptPendingSalesComp(id: string, orgId: string, reviewedBy: string, salesCompId: string): Promise<PendingSalesComp | undefined> {
+    const [comp] = await db.update(pendingSalesComps)
+      .set({ status: 'accepted' as any, reviewedBy, reviewedAt: new Date(), createdSalesCompId: salesCompId })
+      .where(and(eq(pendingSalesComps.id, id), eq(pendingSalesComps.orgId, orgId)))
+      .returning();
+    return comp;
+  }
+
+  async rejectPendingSalesComp(id: string, orgId: string, reviewedBy: string): Promise<PendingSalesComp | undefined> {
+    const [comp] = await db.update(pendingSalesComps)
+      .set({ status: 'rejected' as any, reviewedBy, reviewedAt: new Date() })
+      .where(and(eq(pendingSalesComps.id, id), eq(pendingSalesComps.orgId, orgId)))
+      .returning();
+    return comp;
   }
 
   // SC Project Operations
