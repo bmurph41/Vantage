@@ -5,7 +5,8 @@ import {
   DollarSign, Calculator, Handshake, Users, FileSignature, UtensilsCrossed,
   Caravan, Hotel, MoreHorizontal, Briefcase, Scale, Zap, Shield, Building,
   CreditCard, Key, Megaphone, RotateCcw, ChevronDown, ChevronUp, TrendingUp, 
-  Receipt, PieChart, Globe, Layers, Sparkles, LucideIcon, Container, MapPin
+  Receipt, PieChart, Globe, Layers, Sparkles, LucideIcon, Container, MapPin,
+  Minus, Plus
 } from 'lucide-react';
 
 interface RateInputProps {
@@ -32,70 +33,84 @@ export function RateInput({
   size = 'default'
 }: RateInputProps) {
   const isModified = Math.abs(value - defaultValue) > 0.001;
-  const clampedMin = Math.max(min, -10);
-  const clampedMax = Math.min(max, 15);
-  const percentage = ((value - clampedMin) / (clampedMax - clampedMin)) * 100;
+  
+  const decrement = () => onChange(Math.max(min, +(value - step).toFixed(2)));
+  const increment = () => onChange(Math.min(max, +(value + step).toFixed(2)));
   
   return (
     <div className={cn(
-      "flex items-center gap-2 py-1.5 px-2.5 rounded-md transition-all duration-150 group",
-      isModified ? "bg-amber-50 dark:bg-amber-950/30 ring-1 ring-amber-200 dark:ring-amber-800" : "hover:bg-white dark:hover:bg-slate-800"
+      "flex items-center justify-between py-2 px-3 rounded-lg transition-all duration-150 border",
+      isModified 
+        ? "bg-amber-50/60 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/60" 
+        : "bg-white dark:bg-slate-800/50 border-slate-100 dark:border-slate-700/50 hover:border-slate-200 dark:hover:border-slate-600"
     )}>
-      <Icon className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 flex-shrink-0" />
-      <span className={cn(
-        "text-[13px] font-medium text-slate-700 dark:text-slate-300 truncate min-w-0",
-        size === 'large' ? "w-40" : "w-28 flex-shrink-0"
-      )} title={label}>
-        {label}
-      </span>
-      
-      <div className="flex-1 relative h-5 flex items-center min-w-[60px] hidden sm:flex">
-        <input
-          type="range"
-          min={clampedMin}
-          max={clampedMax}
-          step={step}
-          value={Math.max(clampedMin, Math.min(clampedMax, value))}
-          onChange={(e) => onChange(parseFloat(e.target.value))}
-          className="w-full h-1 rounded-full appearance-none cursor-pointer range-slider"
-          style={{
-            background: `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${percentage}%, hsl(var(--border)) ${percentage}%, hsl(var(--border)) 100%)`
-          }}
-        />
-      </div>
-
-      <div className="relative flex-shrink-0">
-        <input
-          type="number"
-          value={value}
-          onChange={(e) => onChange(Math.min(max, Math.max(min, parseFloat(e.target.value) || 0)))}
-          step={step}
-          min={min}
-          max={max}
-          className={cn(
-            "w-16 text-right text-[13px] font-mono rounded-md px-1.5 py-1 pr-5 outline-none transition-all",
-            "border bg-white dark:bg-slate-800",
-            isModified 
-              ? "border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 focus:ring-1 focus:ring-amber-400" 
-              : "border-slate-200 dark:border-slate-600 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-          )}
-        />
-        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 text-xs pointer-events-none">
-          %
+      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+        <div className={cn(
+          "w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0",
+          isModified
+            ? "bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400"
+            : "bg-slate-50 dark:bg-slate-700/60 text-slate-400 dark:text-slate-500"
+        )}>
+          <Icon className="w-3.5 h-3.5" />
+        </div>
+        <span className="text-[13px] font-medium text-slate-700 dark:text-slate-300 truncate" title={label}>
+          {label}
         </span>
       </div>
       
-      {isModified ? (
+      <div className="flex items-center gap-1.5 flex-shrink-0 ml-3">
         <button
-          onClick={() => onChange(defaultValue)}
-          className="p-1 text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50 rounded transition-colors flex-shrink-0"
-          title="Reset to default"
+          onClick={decrement}
+          className="w-6 h-6 rounded flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+          tabIndex={-1}
         >
-          <RotateCcw className="w-3 h-3" />
+          <Minus className="w-3 h-3" />
         </button>
-      ) : (
-        <div className="w-5 flex-shrink-0" />
-      )}
+        
+        <div className="flex items-center bg-slate-50 dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-600 overflow-hidden">
+          <input
+            type="number"
+            value={value}
+            onChange={(e) => {
+              const v = parseFloat(e.target.value);
+              if (!isNaN(v)) onChange(Math.min(max, Math.max(min, v)));
+            }}
+            step={step}
+            min={min}
+            max={max}
+            className={cn(
+              "w-14 text-center text-[13px] font-mono py-1 bg-transparent outline-none",
+              "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+              isModified 
+                ? "text-amber-700 dark:text-amber-300 font-semibold" 
+                : "text-slate-700 dark:text-slate-300"
+            )}
+          />
+          <span className="text-[11px] text-slate-400 dark:text-slate-500 pr-2 font-medium select-none">
+            %
+          </span>
+        </div>
+        
+        <button
+          onClick={increment}
+          className="w-6 h-6 rounded flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+          tabIndex={-1}
+        >
+          <Plus className="w-3 h-3" />
+        </button>
+        
+        {isModified ? (
+          <button
+            onClick={() => onChange(defaultValue)}
+            className="w-6 h-6 rounded flex items-center justify-center text-amber-500 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors"
+            title={`Reset to ${defaultValue}%`}
+          >
+            <RotateCcw className="w-3 h-3" />
+          </button>
+        ) : (
+          <div className="w-6" />
+        )}
+      </div>
     </div>
   );
 }
@@ -113,11 +128,11 @@ interface SectionCardProps {
   children: React.ReactNode;
 }
 
-const accentStyles: Record<AccentColor, { border: string; iconBg: string }> = {
-  blue: { border: 'border-l-blue-500', iconBg: 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400' },
-  emerald: { border: 'border-l-emerald-500', iconBg: 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400' },
-  slate: { border: 'border-l-slate-400', iconBg: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' },
-  purple: { border: 'border-l-purple-500', iconBg: 'bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400' },
+const accentStyles: Record<AccentColor, { border: string; iconBg: string; badge: string }> = {
+  blue: { border: 'border-l-blue-500', iconBg: 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400', badge: 'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300' },
+  emerald: { border: 'border-l-emerald-500', iconBg: 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400', badge: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' },
+  slate: { border: 'border-l-slate-400', iconBg: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400', badge: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' },
+  purple: { border: 'border-l-purple-500', iconBg: 'bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400', badge: 'bg-purple-50 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300' },
 };
 
 export function SectionCard({ 
@@ -138,7 +153,13 @@ export function SectionCard({
       "bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 border-l-4 overflow-hidden",
       style.border
     )}>
-      <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+      <div 
+        className={cn(
+          "px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between",
+          collapsible && "cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors"
+        )}
+        onClick={collapsible ? () => setIsExpanded(!isExpanded) : undefined}
+      >
         <div className="flex items-center gap-2.5">
           <div className={cn("p-1.5 rounded-lg", style.iconBg)}>
             <Icon className="w-4 h-4" />
@@ -148,7 +169,7 @@ export function SectionCard({
             <p className="text-xs text-slate-500 dark:text-slate-400">{description}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
           {headerAction}
           {collapsible && (
             <button
@@ -161,7 +182,7 @@ export function SectionCard({
         </div>
       </div>
       
-      {isExpanded && <div className="px-4 py-3">{children}</div>}
+      {isExpanded && <div className="p-4">{children}</div>}
     </div>
   );
 }
@@ -174,13 +195,14 @@ interface CategoryGroupProps {
 
 export function CategoryGroup({ title, children, columns = 2 }: CategoryGroupProps) {
   return (
-    <div className="mb-3 last:mb-0">
-      <div className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1 px-1">
-        {title}
+    <div className="mb-4 last:mb-0">
+      <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5 px-1 flex items-center gap-2">
+        <span>{title}</span>
+        <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
       </div>
       <div className={cn(
-        "bg-slate-50 dark:bg-slate-800/50 rounded-lg p-1 grid gap-x-1 gap-y-0",
-        columns === 3 ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1 md:grid-cols-2"
+        "grid gap-1.5",
+        columns === 3 ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1 md:grid-cols-2"
       )}>
         {children}
       </div>
@@ -197,7 +219,7 @@ export function SetAllDropdown({ onSetAll }: SetAllDropdownProps) {
     <select
       onChange={(e) => e.target.value && onSetAll(parseFloat(e.target.value))}
       defaultValue=""
-      className="text-xs border border-slate-200 dark:border-slate-600 rounded-md px-2 py-1 text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer focus:ring-1 focus:ring-blue-500 outline-none"
+      className="text-xs border border-slate-200 dark:border-slate-600 rounded-md px-2.5 py-1.5 text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer focus:ring-1 focus:ring-blue-500 outline-none"
     >
       <option value="" disabled>Set all to...</option>
       <option value="1.0">1.0%</option>
@@ -219,29 +241,29 @@ interface ModeToggleProps {
 
 export function ModeToggle({ value, onChange }: ModeToggleProps) {
   return (
-    <div className="flex bg-slate-100 dark:bg-slate-800 rounded-md p-0.5">
+    <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5">
       <button
         onClick={() => onChange('universal')}
         className={cn(
-          "flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-all",
+          "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all",
           value === 'universal' 
             ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm" 
             : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
         )}
       >
-        <Globe className="w-3 h-3" />
+        <Globe className="w-3.5 h-3.5" />
         Universal
       </button>
       <button
         onClick={() => onChange('perProfitCenter')}
         className={cn(
-          "flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-all",
+          "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all",
           value === 'perProfitCenter' 
             ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm" 
             : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
         )}
       >
-        <Layers className="w-3 h-3" />
+        <Layers className="w-3.5 h-3.5" />
         Per Type
       </button>
     </div>
@@ -257,10 +279,11 @@ interface QuickActionsBarProps {
 
 export function QuickActionsBar({ modifiedCount, totalCount, onReset, onPreset }: QuickActionsBarProps) {
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 px-4 py-2 flex flex-wrap items-center justify-between gap-3">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center gap-2.5">
         <Sparkles className="w-4 h-4 text-blue-500" />
-        <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Presets:</span>
+        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Presets</span>
+        <div className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
         <div className="flex gap-1.5">
           {[
             { label: 'Conservative', value: 1.5 },
@@ -270,9 +293,9 @@ export function QuickActionsBar({ modifiedCount, totalCount, onReset, onPreset }
             <button
               key={value}
               onClick={() => onPreset(value)}
-              className="px-2.5 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 hover:border-slate-300 dark:hover:border-slate-500 transition-colors text-slate-700 dark:text-slate-300"
+              className="px-3 py-1.5 text-xs font-medium bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:border-blue-200 dark:hover:border-blue-800 hover:text-blue-700 dark:hover:text-blue-300 transition-all text-slate-600 dark:text-slate-300"
             >
-              {label} ({value}%)
+              {label} <span className="text-slate-400 dark:text-slate-500 ml-0.5">{value}%</span>
             </button>
           ))}
         </div>
@@ -280,16 +303,16 @@ export function QuickActionsBar({ modifiedCount, totalCount, onReset, onPreset }
       
       <div className="flex items-center gap-3">
         {modifiedCount > 0 && (
-          <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
-            {modifiedCount} modified
+          <span className="text-[11px] bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 font-semibold px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
+            {modifiedCount} customized
           </span>
         )}
         <button
           onClick={onReset}
-          className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 flex items-center gap-1 px-2 py-1 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-md transition-colors"
+          className="text-xs text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-all font-medium"
         >
-          <RotateCcw className="w-3 h-3" />
-          Reset
+          <RotateCcw className="w-3.5 h-3.5" />
+          Reset All
         </button>
       </div>
     </div>

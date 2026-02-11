@@ -172,9 +172,9 @@ export function GrowthRatesTab({
         }
       >
         {storageMode === 'universal' ? (
-          <div className="max-w-xs">
+          <div className="max-w-sm">
             <RateInput
-              label="Universal Growth Rate"
+              label="All Storage Types"
               icon={Globe}
               value={storageGrowth.universalRate}
               defaultValue={defaultStorageRate}
@@ -186,7 +186,7 @@ export function GrowthRatesTab({
             />
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-1 gap-y-0 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-1.5">
             {storageRevenueCategories.map((category) => {
               const storageCategory = STORAGE_CATEGORIES.find(s => s.id === category.id);
               const IconComponent = storageCategory?.icon || Anchor;
@@ -315,7 +315,7 @@ export function GrowthRatesTab({
         collapsible
         headerAction={<SetAllDropdown onSetAll={handleSetAllOpex} />}
       >
-        <CategoryGroup title="Labor & Admin" columns={2}>
+        <CategoryGroup title="Labor & Administration" columns={2}>
           {OPEX_CATEGORIES.laborAndAdmin.map((cat) => {
             const isEnabled = expenseCategories.some(c => c.id === cat.id);
             if (!isEnabled) return null;
@@ -404,7 +404,7 @@ export function GrowthRatesTab({
         collapsible
         headerAction={<SetAllDropdown onSetAll={handleSetAllDepartmental} />}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-1 gap-y-0 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-1">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-1.5">
           {DEPARTMENTAL_EXPENSE_CATEGORIES.map((cat) => {
             const isEnabled = segmentExpenseCategories.some(c => c.id === cat.id);
             if (!isEnabled) return null;
