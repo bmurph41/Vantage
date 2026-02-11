@@ -93,16 +93,6 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
   
   // Validation state
   const [touched, setTouched] = useState(false);
-  
-  // Address field errors
-  const errors = useMemo(() => {
-    const e: Record<string, string> = {};
-    if (!address.trim()) e.address = "Street address is required";
-    if (!city.trim()) e.city = "City is required";
-    if (!state.trim()) e.state = "State is required";
-    if (!zipCode.trim()) e.zipCode = "Zip code is required";
-    return e;
-  }, [address, city, state, zipCode]);
 
   // Fetch existing storage entries (for edit mode)
   const { data: existingStorageEntries = [] } = useQuery<CrmPropertyStorageEntry[]>({
@@ -266,6 +256,16 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [zipCode, setZipCode] = useState("");
+
+  // Address field errors
+  const errors = useMemo(() => {
+    const e: Record<string, string> = {};
+    if (!address.trim()) e.address = "Street address is required";
+    if (!city.trim()) e.city = "City is required";
+    if (!state.trim()) e.state = "State is required";
+    if (!zipCode.trim()) e.zipCode = "Zip code is required";
+    return e;
+  }, [address, city, state, zipCode]);
 
   // Additional marina property fields
   const [wetSlips, setWetSlips] = useState("");
