@@ -3,7 +3,26 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, X } from "lucide-react";
 import { Link } from "wouter";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+
+const DISMISSED_STORAGE_KEY = 'marinamatch-dismissed-pending-notifications';
+
+function loadDismissed(): Set<string> {
+  try {
+    const stored = localStorage.getItem(DISMISSED_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) return new Set(parsed);
+    }
+  } catch {}
+  return new Set();
+}
+
+function saveDismissed(dismissed: Set<string>) {
+  try {
+    localStorage.setItem(DISMISSED_STORAGE_KEY, JSON.stringify([...dismissed]));
+  } catch {}
+}
 
 type PendingItem = {
   id: string;
@@ -19,7 +38,7 @@ type PendingPropertyProfile = {
 };
 
 export default function PendingNotificationsBanner() {
-  const [dismissedNotifications, setDismissedNotifications] = useState<Set<string>>(new Set());
+  const [dismissedNotifications, setDismissedNotifications] = useState<Set<string>>(loadDismissed);
 
   // Fetch all pending items - use longer stale time to reduce unnecessary refetches
   const { data: pendingProperties = [] } = useQuery<PendingItem[]>({
@@ -93,9 +112,13 @@ export default function PendingNotificationsBanner() {
     n => n.count > 0 && !dismissedNotifications.has(n.id)
   );
 
-  const handleDismiss = (notificationId: string) => {
-    setDismissedNotifications(prev => new Set([...prev, notificationId]));
-  };
+  const handleDismiss = useCallback((notificationId: string) => {
+    setDismissedNotifications(prev => {
+      const next = new Set([...prev, notificationId]);
+      saveDismissed(next);
+      return next;
+    });
+  }, []);
 
   if (activeNotifications.length === 0) {
     return null;
