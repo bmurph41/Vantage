@@ -167,7 +167,7 @@ function PercentStepper({
           </Badge>
         )}
       </div>
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 justify-center">
         <button
           onClick={decrement}
           className="w-7 h-7 rounded-md flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-600 flex-shrink-0"
@@ -175,7 +175,7 @@ function PercentStepper({
         >
           <Minus className="w-3 h-3" />
         </button>
-        <div className="flex items-center bg-slate-50 dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-600 overflow-hidden flex-1 min-w-0">
+        <div className="flex items-center bg-slate-50 dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-600 overflow-hidden">
           <input
             type="text"
             value={value}
@@ -187,10 +187,10 @@ function PercentStepper({
               const v = parsePercentInput(value);
               onChange(Math.min(max, Math.max(min, v)).toString());
             }}
-            className="w-full text-center text-[13px] font-mono py-1.5 bg-transparent outline-none text-slate-700 dark:text-slate-300"
+            className="w-14 text-center text-[13px] font-mono py-1 bg-transparent outline-none text-slate-700 dark:text-slate-300"
             data-testid={props['data-testid']}
           />
-          <span className="text-[11px] text-slate-400 dark:text-slate-500 pr-2.5 font-medium select-none flex-shrink-0">%</span>
+          <span className="text-[11px] text-slate-400 dark:text-slate-500 pr-2 font-medium select-none flex-shrink-0">%</span>
         </div>
         <button
           onClick={increment}
