@@ -17925,6 +17925,140 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+
+  // ============================================================================
+  // DISPLAY NAME OVERRIDES - Project-level and org-level name customization
+  // ============================================================================
+
+  // Get all name overrides for a project (includes org defaults for unset items)
+  app.get('/api/modeling/projects/:projectId/name-overrides', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const { modelingNameOverrides, orgPnlDisplayDefaults } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      const overrides = await db.select()
+        .from(modelingNameOverrides)
+        .where(and(eq(modelingNameOverrides.projectId, projectId), eq(modelingNameOverrides.orgId, orgId)));
+      
+      const orgDefaults = await db.select()
+        .from(orgPnlDisplayDefaults)
+        .where(and(eq(orgPnlDisplayDefaults.orgId, orgId), eq(orgPnlDisplayDefaults.isActive, true)));
+      
+      res.json({ overrides, orgDefaults });
+    } catch (error: any) {
+      console.error('Failed to fetch name overrides:', error);
+      res.status(500).json({ error: 'Failed to fetch name overrides' });
+    }
+  });
+
+  // Create or update a name override (also upserts org default)
+  app.post('/api/modeling/projects/:projectId/name-overrides', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const { scope, originalName, displayName, category, department } = req.body;
+      
+      if (!scope || !originalName || !displayName) {
+        return res.status(400).json({ error: 'scope, originalName, and displayName are required' });
+      }
+      
+      const { modelingNameOverrides, orgPnlDisplayDefaults } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      const overrideConditions = [
+        eq(modelingNameOverrides.projectId, projectId),
+        eq(modelingNameOverrides.orgId, orgId),
+        eq(modelingNameOverrides.scope, scope),
+        eq(modelingNameOverrides.originalName, originalName),
+      ];
+      if (scope === 'line_item' && category) {
+        overrideConditions.push(eq(modelingNameOverrides.category, category));
+      }
+      const [existing] = await db.select()
+        .from(modelingNameOverrides)
+        .where(and(...overrideConditions));
+      
+      let override;
+      if (existing) {
+        [override] = await db.update(modelingNameOverrides)
+          .set({ displayName, category, department, updatedAt: new Date() })
+          .where(eq(modelingNameOverrides.id, existing.id))
+          .returning();
+      } else {
+        [override] = await db.insert(modelingNameOverrides).values({
+          orgId,
+          projectId,
+          scope,
+          originalName,
+          displayName,
+          category: category || null,
+          department: department || null,
+          createdBy: userId,
+        }).returning();
+      }
+      
+      // Upsert org-level default
+      const [existingDefault] = await db.select()
+        .from(orgPnlDisplayDefaults)
+        .where(and(
+          eq(orgPnlDisplayDefaults.orgId, orgId),
+          eq(orgPnlDisplayDefaults.scope, scope),
+          eq(orgPnlDisplayDefaults.originalName, originalName)
+        ));
+      
+      if (existingDefault) {
+        await db.update(orgPnlDisplayDefaults)
+          .set({
+            displayName,
+            timesUsed: (existingDefault.timesUsed || 0) + 1,
+            updatedAt: new Date(),
+          })
+          .where(eq(orgPnlDisplayDefaults.id, existingDefault.id));
+      } else {
+        await db.insert(orgPnlDisplayDefaults).values({
+          orgId,
+          scope,
+          originalName,
+          displayName,
+          category: category || null,
+          department: department || null,
+        });
+      }
+      
+      res.json(override);
+    } catch (error: any) {
+      console.error('Failed to save name override:', error);
+      res.status(500).json({ error: 'Failed to save name override' });
+    }
+  });
+
+  // Delete a name override (reverts to original name for this project)
+  app.delete('/api/modeling/projects/:projectId/name-overrides/:overrideId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { overrideId } = req.params;
+      
+      const { modelingNameOverrides } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      const [deleted] = await db.delete(modelingNameOverrides)
+        .where(and(eq(modelingNameOverrides.id, overrideId), eq(modelingNameOverrides.orgId, orgId)))
+        .returning();
+      
+      if (!deleted) {
+        return res.status(404).json({ error: 'Override not found' });
+      }
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Failed to delete name override:', error);
+      res.status(500).json({ error: 'Failed to delete name override' });
+    }
+  });
   // ============================================================================
   // MODELING FINANCIAL PERIODS - Year-based financial data for pricing/yields
   // ============================================================================

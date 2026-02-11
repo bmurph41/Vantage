@@ -64,7 +64,9 @@ import { useModelingAddbacks } from '@/hooks/useModelingAddbacks';
 import { AddbackEditor } from '@/components/modeling/AddbackEditor';
 import { AddbacksTrackerPanel } from '@/components/modeling/AddbacksTracker';
 import { useDepartmentOrder } from '@/hooks/useDepartmentOrder';
+import { useDisplayOverrides } from '@/hooks/useDisplayOverrides';
 import { DepartmentOrderSettings } from '@/components/modeling/DepartmentOrderSettings';
+import { InlineEditableName } from '@/components/modeling/InlineEditableName';
 
 interface WorkspaceHistoricalPLProps {
   projectId: string;
@@ -149,6 +151,16 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
     isPending: addbackPending,
     getAddbacksSummary,
   } = useModelingAddbacks(projectId);
+
+  const {
+    getDisplayName,
+    getOverride,
+    hasOverride,
+    getOrgDefaultSuggestion,
+    saveOverride,
+    deleteOverride,
+    isPending: overridePending,
+  } = useDisplayOverrides(projectId);
 
   const { data: availableYearsData } = useQuery<{ years: number[] }>({
     queryKey: [`/api/modeling/projects/${projectId}/actuals/years`],
@@ -1048,7 +1060,21 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                   ) : (
                                     <ChevronRight className="h-3 w-3 shrink-0" />
                                   )}
-                                  <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{department}</span>
+                                  <InlineEditableName
+                                    originalName={department}
+                                    displayName={getDisplayName(department, 'department')}
+                                    isOverridden={hasOverride(department, 'department')}
+                                    suggestion={getOrgDefaultSuggestion(department, 'department')}
+                                    isPending={overridePending}
+                                    className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+                                    onSave={async (newName) => {
+                                      await saveOverride({ scope: 'department', originalName: department, displayName: newName, category });
+                                    }}
+                                    onRevert={hasOverride(department, 'department') ? async () => {
+                                      const override = getOverride(department, 'department');
+                                      if (override) await deleteOverride(override.id);
+                                    } : undefined}
+                                  />
                                 </div>
                               </TableCell>
                               {months.map((month, idx) => {
@@ -1076,8 +1102,23 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                         <SourceIcon className="h-3 w-3 text-muted-foreground" />
                                       )}
                                       <div className="flex flex-col">
-                                        <span>{item.description}</span>
-                                        <span className="text-xs text-muted-foreground">{item.subcategory}</span>
+                                        <InlineEditableName
+                                          originalName={item.subcategory}
+                                          displayName={getDisplayName(item.subcategory, 'line_item', category, department)}
+                                          isOverridden={hasOverride(item.subcategory, 'line_item', category, department)}
+                                          suggestion={getOrgDefaultSuggestion(item.subcategory, 'line_item')}
+                                          isPending={overridePending}
+                                          onSave={async (newName) => {
+                                            await saveOverride({ scope: 'line_item', originalName: item.subcategory, displayName: newName, category, department });
+                                          }}
+                                          onRevert={hasOverride(item.subcategory, 'line_item', category, department) ? async () => {
+                                            const override = getOverride(item.subcategory, 'line_item', category, department);
+                                            if (override) await deleteOverride(override.id);
+                                          } : undefined}
+                                        />
+                                        {hasOverride(item.subcategory, 'line_item', category, department) && (
+                                          <span className="text-[10px] text-muted-foreground/60">{item.subcategory}</span>
+                                        )}
                                       </div>
                                       {isLineItemAddedBack(item.subcategory) && (
                                         <Badge variant="outline" className="ml-1 text-[10px] h-5 bg-amber-50 text-amber-700 border-amber-300">
@@ -1364,7 +1405,21 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                     ) : (
                                       <ChevronRight className="h-3 w-3 shrink-0" />
                                     )}
-                                    <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{department}</span>
+                                    <InlineEditableName
+                                      originalName={department}
+                                      displayName={getDisplayName(department, 'department')}
+                                      isOverridden={hasOverride(department, 'department')}
+                                      suggestion={getOrgDefaultSuggestion(department, 'department')}
+                                      isPending={overridePending}
+                                      className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+                                      onSave={async (newName) => {
+                                        await saveOverride({ scope: 'department', originalName: department, displayName: newName, category });
+                                      }}
+                                      onRevert={hasOverride(department, 'department') ? async () => {
+                                        const override = getOverride(department, 'department');
+                                        if (override) await deleteOverride(override.id);
+                                      } : undefined}
+                                    />
                                   </div>
                                 </TableCell>
                                 {yearRange.map((year) => {
@@ -1384,7 +1439,25 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                               {expandedDepartments.has(`${category}-${department}`) && deptSubcats.map((subcategory: string) => (
                                 <TableRow key={`${category}-${subcategory}`}>
                                   <TableCell className="pl-9 whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] px-2 py-1 text-xs truncate">
-                                    {subcategory}
+                                    <div className="flex flex-col">
+                                      <InlineEditableName
+                                        originalName={subcategory}
+                                        displayName={getDisplayName(subcategory, 'line_item', category, department)}
+                                        isOverridden={hasOverride(subcategory, 'line_item', category, department)}
+                                        suggestion={getOrgDefaultSuggestion(subcategory, 'line_item')}
+                                        isPending={overridePending}
+                                        onSave={async (newName) => {
+                                          await saveOverride({ scope: 'line_item', originalName: subcategory, displayName: newName, category, department });
+                                        }}
+                                        onRevert={hasOverride(subcategory, 'line_item', category, department) ? async () => {
+                                          const override = getOverride(subcategory, 'line_item', category, department);
+                                          if (override) await deleteOverride(override.id);
+                                        } : undefined}
+                                      />
+                                      {hasOverride(subcategory, 'line_item', category, department) && (
+                                        <span className="text-[10px] text-muted-foreground/60">{subcategory}</span>
+                                      )}
+                                    </div>
                                   </TableCell>
                                   {yearRange.map((year) => {
                                     const amount = getAnnualSubcategoryAmount(category, subcategory, year);
