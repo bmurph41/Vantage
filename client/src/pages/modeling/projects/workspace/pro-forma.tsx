@@ -138,6 +138,15 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
   const [viewMode, setViewMode] = useState<'monthly' | 'annual'>('annual');
   const [selectedYear, setSelectedYear] = useState('2026');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['revenue']));
+  const [expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set());
+  const toggleDepartment = (key: string) => {
+    setExpandedDepartments(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
   const [showHistorical, setShowHistorical] = useState(true);
   const [selectedKPI, setSelectedKPI] = useState<KPIDrilldownType>(null);
   const { toast } = useToast();
@@ -296,6 +305,27 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
 
   const isSeasonalMonth = (monthIndex: number) => seasonMonths.includes(monthIndex + 1);
 
+  const inferDepartmentClient = (subcategory: string, category?: string): string => {
+    const lower = subcategory.toLowerCase();
+    if (lower.includes('slip') || lower.includes('dock') || lower.includes('berth') || lower.includes('mooring') || lower.includes('storage') || lower.includes('winter') || lower.includes('land storage'))
+      return 'Storage';
+    if (lower.includes('fuel') || lower.includes('gas') || lower.includes('diesel'))
+      return 'Fuel';
+    if (lower.includes('store') || lower.includes('merchandise') || lower.includes('retail') || lower.includes('chandlery'))
+      return "Ship's Store";
+    if (lower.includes('service') || lower.includes('repair') || lower.includes('bottom paint') || lower.includes('bottom wash') || lower.includes('shrink wrap') || lower.includes('hauling'))
+      return 'Service';
+    if (lower.includes('new boat') || lower.includes('used boat') || lower.includes('boat sale') || lower.includes('trade'))
+      return 'Boat Sales';
+    if (lower.includes('brokerage') || lower.includes('finance commission'))
+      return 'Boat Brokerage';
+    if (lower.includes('payroll') || lower.includes('wage') || lower.includes('salary') || lower.includes('benefit') || lower.includes('workers comp') || lower.includes('soc security') || lower.includes('futa') || lower.includes('disability') || lower.includes('family leave') || lower.includes('medical insurance'))
+      return 'Payroll';
+    if (lower.includes('launch') || lower.includes('haul') || lower.includes('electric') || lower.includes('dockside'))
+      return 'Marina & Amenities';
+    return 'General';
+  };
+
   // Get monthly periods for the selected year
   const selectedYearInt = parseInt(selectedYear);
   const getMonthKey = (year: number, month: number) => {
@@ -345,6 +375,21 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
 
     return data;
   }, [actualsData, proFormaData, baselinePeriod, holdPeriod]);
+
+  const departmentGroupedData = useMemo(() => {
+    const result: Record<string, Record<string, Record<string, { historical: Record<string, number>; projected: number[] }>>> = {};
+    for (const [category, items] of Object.entries(tableData)) {
+      result[category] = {};
+      for (const [itemName, values] of Object.entries(items)) {
+        const dept = inferDepartmentClient(itemName, category);
+        if (!result[category][dept]) {
+          result[category][dept] = {};
+        }
+        result[category][dept][itemName] = values;
+      }
+    }
+    return result;
+  }, [tableData]);
 
   // Calculate totals for each category and period
   const getCategoryTotal = (category: string, periodId: string) => {
@@ -1076,11 +1121,11 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                     <Fragment key={category}>
                       {/* Category Header Row */}
                       <TableRow 
-                        className="bg-muted/50 cursor-pointer hover:bg-muted"
+                        className="bg-muted cursor-pointer hover:bg-muted"
                         onClick={() => toggleCategory(category)}
                         data-testid={`row-category-${category.toLowerCase()}`}
                       >
-                        <TableCell className="font-semibold sticky left-0 bg-muted/50 z-10">
+                        <TableCell className="font-semibold sticky left-0 bg-muted z-10">
                           <div className="flex items-center gap-2">
                             {expandedCategories.has(category) ? (
                               <ChevronDown className="h-4 w-4" />
@@ -1145,69 +1190,120 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                         </TableCell>
                       </TableRow>
 
-                      {/* Line Item Rows */}
-                      {expandedCategories.has(category) && Object.entries(items).map(([itemName, values]) => {
-                        const baselineValue = baselinePeriod ? (values.historical[baselinePeriod.id] || 0) : 0;
-                        return (
-                          <TableRow key={itemName} className="text-sm">
-                            <TableCell className="pl-10 sticky left-0 bg-background z-10">
-                              {itemName}
-                            </TableCell>
-
-                            {/* Historical values - blue tint for actuals */}
-                            {showHistorical && priorPeriods.map(period => (
-                              <TableCell key={period.id} className="text-right bg-blue-50/60 dark:bg-blue-950/20 text-blue-900 dark:text-blue-100">
-                                {formatCurrency(values.historical[period.id])}
+                      {/* Department-grouped Line Item Rows */}
+                      {expandedCategories.has(category) && Object.entries(departmentGroupedData[category] || {})
+                        .sort(([a], [b]) => a.localeCompare(b))
+                        .map(([department, deptItems]) => (
+                          <Fragment key={`${category}-${department}`}>
+                            <TableRow 
+                              className="bg-slate-50 dark:bg-slate-900 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+                              onClick={() => toggleDepartment(`${category}-${department}`)}
+                            >
+                              <TableCell className="pl-6 font-medium sticky left-0 bg-slate-50 dark:bg-slate-900 z-10">
+                                <div className="flex items-center gap-1.5">
+                                  {expandedDepartments.has(`${category}-${department}`) ? (
+                                    <ChevronDown className="h-3.5 w-3.5" />
+                                  ) : (
+                                    <ChevronRight className="h-3.5 w-3.5" />
+                                  )}
+                                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{department}</span>
+                                </div>
                               </TableCell>
-                            ))}
 
-                            {/* Baseline value */}
-                            <TableCell className="text-right bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">
-                              {formatCurrency(baselineValue)}
-                            </TableCell>
-
-                            {/* Projected values - Monthly or Annual */}
-                            {viewMode === 'monthly' ? (
-                              // Monthly values for selected year
-                              months.map((_, monthIndex) => {
-                                const monthValue = getLineItemMonthlyValue(category, itemName, selectedYearInt, monthIndex);
+                              {showHistorical && priorPeriods.map(period => {
+                                const deptHistTotal = Object.values(deptItems).reduce((sum, v) => sum + (v.historical[period.id] || 0), 0);
                                 return (
-                                  <TableCell 
-                                    key={monthIndex} 
-                                    className={`text-right ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}
-                                  >
-                                    {formatCurrency(monthValue)}
+                                  <TableCell key={period.id} className="text-right text-xs font-medium text-muted-foreground bg-blue-50/60 dark:bg-blue-950/20">
+                                    {formatCurrency(deptHistTotal)}
                                   </TableCell>
                                 );
-                              })
-                            ) : (
-                              // Annual values
-                              values.projected.map((value: number, i: number) => (
-                                <TableCell key={i} className="text-right">
-                                  {formatCurrency(value)}
-                                </TableCell>
-                              ))
-                            )}
+                              })}
 
-                            {/* Line item CAGR or Annual Total */}
-                            <TableCell className="text-right text-xs text-muted-foreground">
+                              <TableCell className="text-right text-xs font-medium text-muted-foreground bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">
+                                {formatCurrency(baselinePeriod ? Object.values(deptItems).reduce((sum, v) => sum + (v.historical[baselinePeriod.id] || 0), 0) : 0)}
+                              </TableCell>
+
                               {viewMode === 'monthly' ? (
-                                // Show annual total for the line item
-                                formatCurrency(
-                                  months.reduce((sum, _, monthIndex) => 
-                                    sum + getLineItemMonthlyValue(category, itemName, selectedYearInt, monthIndex), 0)
-                                )
+                                months.map((_, monthIndex) => {
+                                  const deptMonthTotal = Object.keys(deptItems).reduce((sum, itemName) => 
+                                    sum + getLineItemMonthlyValue(category, itemName, selectedYearInt, monthIndex), 0);
+                                  return (
+                                    <TableCell key={monthIndex} className={`text-right text-xs font-medium text-muted-foreground ${isSeasonalMonth(monthIndex) ? 'bg-green-50/60 dark:bg-green-950/20' : ''}`}>
+                                      {formatCurrency(deptMonthTotal)}
+                                    </TableCell>
+                                  );
+                                })
                               ) : (
-                                formatPercent(calculateCAGR(
-                                  values.projected[0],
-                                  values.projected[holdPeriod - 1],
-                                  holdPeriod - 1
-                                ))
+                                years.map((_, i) => {
+                                  const deptYearTotal = Object.values(deptItems).reduce((sum, v) => sum + (v.projected[i] || 0), 0);
+                                  return (
+                                    <TableCell key={i} className="text-right text-xs font-medium text-muted-foreground">
+                                      {formatCurrency(deptYearTotal)}
+                                    </TableCell>
+                                  );
+                                })
                               )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
+
+                              <TableCell className="text-right text-xs text-muted-foreground">-</TableCell>
+                            </TableRow>
+
+                            {expandedDepartments.has(`${category}-${department}`) && Object.entries(deptItems).map(([itemName, values]) => {
+                              const baselineValue = baselinePeriod ? (values.historical[baselinePeriod.id] || 0) : 0;
+                              return (
+                                <TableRow key={itemName} className="text-sm">
+                                  <TableCell className="pl-10 sticky left-0 bg-background z-10">
+                                    {itemName}
+                                  </TableCell>
+
+                                  {showHistorical && priorPeriods.map(period => (
+                                    <TableCell key={period.id} className="text-right bg-blue-50/60 dark:bg-blue-950/20 text-blue-900 dark:text-blue-100">
+                                      {formatCurrency(values.historical[period.id])}
+                                    </TableCell>
+                                  ))}
+
+                                  <TableCell className="text-right bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">
+                                    {formatCurrency(baselineValue)}
+                                  </TableCell>
+
+                                  {viewMode === 'monthly' ? (
+                                    months.map((_, monthIndex) => {
+                                      const monthValue = getLineItemMonthlyValue(category, itemName, selectedYearInt, monthIndex);
+                                      return (
+                                        <TableCell 
+                                          key={monthIndex} 
+                                          className={`text-right ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}
+                                        >
+                                          {formatCurrency(monthValue)}
+                                        </TableCell>
+                                      );
+                                    })
+                                  ) : (
+                                    values.projected.map((value: number, i: number) => (
+                                      <TableCell key={i} className="text-right">
+                                        {formatCurrency(value)}
+                                      </TableCell>
+                                    ))
+                                  )}
+
+                                  <TableCell className="text-right text-xs text-muted-foreground">
+                                    {viewMode === 'monthly' ? (
+                                      formatCurrency(
+                                        months.reduce((sum, _, monthIndex) => 
+                                          sum + getLineItemMonthlyValue(category, itemName, selectedYearInt, monthIndex), 0)
+                                      )
+                                    ) : (
+                                      formatPercent(calculateCAGR(
+                                        values.projected[0],
+                                        values.projected[holdPeriod - 1],
+                                        holdPeriod - 1
+                                      ))
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </Fragment>
+                        ))}
                     </Fragment>
                   );
                 })}

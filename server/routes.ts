@@ -2718,8 +2718,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to delete note" });
     }
   });
-
-
   // Project Templates
   app.get("/api/dd/project-templates", async (req: any, res) => {
     try {
@@ -5106,8 +5104,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
-
-
   // DD Project by ID (for breadcrumb resolution)
   app.get("/api/dd/projects/:id", async (req: any, res) => {
     try {
@@ -5747,8 +5743,6 @@ Current context: Project ${req.params.projectId}`;
           for (const toolCall of assistantMessage.tool_calls) {
             const toolName = toolCall.function.name;
             const toolArgs = JSON.parse(toolCall.function.arguments);
-
-
             // Execute the tool with context
             const toolResult = await executeAdvisorTool(
               toolName,
@@ -6356,8 +6350,6 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: "Failed to delete report" });
     }
   });
-
-
   // Organization-level Audit Logs
   app.get("/api/audit-logs", async (req: any, res) => {
     try {
@@ -6378,8 +6370,6 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: "Failed to retrieve audit logs" });
     }
   });
-
-
   // ==================== DEAL WORKSPACE ROUTES ====================
 
   // Get all deal workspaces for the organization
@@ -7264,8 +7254,6 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: "Failed to search companies" });
     }
   });
-
-
   app.post("/api/crm/companies", async (req: any, res) => {
     try {
       // Ensure required fields have values (database has notNull constraints)
@@ -10309,8 +10297,6 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: "Failed to create company" });
     }
   });
-
-
   // Get companies KPI stats (for computed metrics) - Must be before :id routes
   app.get('/api/companies/kpi-stats', authenticateUser, async (req: any, res) => {
     try {
@@ -10625,8 +10611,6 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: "Failed to get property aggregate data" });
     }
   });
-
-
   // PATCH route for property updates (used by detail modal)
   app.patch("/api/properties/:id", async (req: any, res) => {
     try {
@@ -12562,8 +12546,6 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ message: "Failed to fetch comps" });
     }
   });
-
-
   app.get('/api/sales-comps/ids', async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
@@ -13083,8 +13065,6 @@ Current context: Project ${req.params.projectId}`;
           }
         }
       }
-
-
       res.status(201).json(comp);
     } catch (error: any) {
       console.error("Error creating comp:", error);
@@ -13556,8 +13536,6 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ message: "Failed to fetch import status" });
     }
   });
-
-
   app.post('/api/sales-comps/import/:importId/submit-reviewed', async (req: any, res) => {
     try {
       const userId = req.user.id;
@@ -15396,8 +15374,6 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ message: "Failed to get summary" });
     }
   });
-
-
   // ========================================
   // CUSTOMER ANALYTICS ENDPOINTS
   // ========================================
@@ -15587,8 +15563,6 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: 'Failed to fetch portfolio marinas', details: error?.message || String(error) });
     }
   });
-
-
 
   // Get single portfolio marina by ID
   app.get('/api/portfolio/marinas/:id', authenticateUser, async (req: any, res) => {
@@ -15788,8 +15762,6 @@ Current context: Project ${req.params.projectId}`;
   app.get('/api/operations/owned-marinas', authenticateUser, async (req: any, res) => {
     res.redirect(301, '/api/portfolio/marinas');
   });
-
-
   // ========================================
   // RENT ROLL ENDPOINTS
 
@@ -18576,8 +18548,6 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: 'Failed to set project seasonality' });
     }
   });
-
-
   // ============================================
   // SCENARIO GOVERNANCE (Phase 5)
   // ============================================
@@ -19543,12 +19513,14 @@ Current context: Project ${req.params.projectId}`;
       );
 
       // Group by category and subcategory for P&L display
+      const { inferDepartment } = await import('./utils/department-mapping');
       const grouped = actuals.reduce((acc: any, item) => {
         const key = `${item.category}-${item.subcategory}`;
         if (!acc[key]) {
           acc[key] = {
             category: item.category,
             subcategory: item.subcategory,
+            department: inferDepartment(item.subcategory || '', item.category),
             monthlyData: {},
             annualTotal: 0
           };
@@ -19560,11 +19532,6 @@ Current context: Project ${req.params.projectId}`;
         return acc;
       }, {});
 
-      res.json({
-        raw: actuals,
-        grouped: Object.values(grouped),
-        year: year ? parseInt(year as string) : null
-      });
     } catch (error: any) {
       console.error('Failed to fetch actuals:', error);
       res.status(500).json({ error: 'Failed to fetch actuals' });
@@ -19608,6 +19575,7 @@ Current context: Project ${req.params.projectId}`;
       const yearList = years ? String(years).split(',').map(Number) : [];
       const actualsData = await operationsDataSyncService.getActualsForMultipleYears(projectId, yearList);
 
+      const { inferDepartment: inferDepartmentFn } = await import('./utils/department-mapping');
       // Group each year's data
       const groupedByYear: Record<number, any> = {};
       for (const [year, actuals] of Object.entries(actualsData)) {
@@ -19617,6 +19585,7 @@ Current context: Project ${req.params.projectId}`;
             acc[key] = {
               category: item.category,
               subcategory: item.subcategory,
+              department: inferDepartmentFn(item.subcategory || '', item.category),
               monthlyData: {},
               annualTotal: 0
             };
@@ -22317,8 +22286,6 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       res.status(500).json({ error: 'Failed to import items' });
     }
   });
-
-
   // Reprocess a completed document - reset to review state
   app.post('/api/modeling/projects/:projectId/documents/:uploadId/reprocess', authenticateUser, async (req: any, res) => {
     try {
@@ -27599,8 +27566,6 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       res.status(500).json({ message: "Failed to create portfolio", error: error instanceof Error ? error.message : String(error) });
     }
   });
-
-
   // Pending Sales Comps routes
   app.get('/api/pending-sales-comps', async (req: any, res) => {
     try {
@@ -28537,8 +28502,6 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       res.status(500).json({ message: "Failed to fetch rate comps" });
     }
   });
-
-
 
   // Industry Standards - Public API (pack-gated access)
   // Industry Standards - Public API (pack-gated access)

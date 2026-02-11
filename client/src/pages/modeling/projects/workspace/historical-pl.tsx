@@ -77,6 +77,7 @@ type PLLineItem = {
   monthlyData: Record<string, number>;
   annualTotal: number;
   dataSource?: string;
+  department?: string;
 };
 
 type DataSourceSummary = {
@@ -123,6 +124,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
   const [displayMode, setDisplayMode] = useState<'monthly' | 'annual'>('monthly');
   const [showMoM, setShowMoM] = useState(false);
   const [showNormalized, setShowNormalized] = useState(false);
+  const [expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set());
 
   const { 
     addbacks: allAddbacks,
@@ -283,6 +285,15 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
     });
   };
 
+  const toggleDepartment = (key: string) => {
+    setExpandedDepartments(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
   const formatCurrency = (value: number | null | undefined) => {
     if (value === null || value === undefined) return '-';
     return new Intl.NumberFormat('en-US', {
@@ -313,26 +324,55 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
         type: item.category === 'Revenue' ? 'revenue' : item.category === 'COGS' ? 'cogs' : 'expense',
         monthlyData: item.monthlyData,
         annualTotal: item.annualTotal,
-        dataSource: actualsData.raw?.[0]?.dataSource
+        dataSource: actualsData.raw?.[0]?.dataSource,
+        department: item.department || 'General'
       }))
     : (plData?.lineItems || emptyData);
 
-  const groupedData = lineItems.reduce((acc: Record<string, PLLineItem[]>, item: PLLineItem) => {
+  const groupedData = lineItems.reduce((acc: Record<string, Record<string, PLLineItem[]>>, item: PLLineItem) => {
+    const dept = item.department || 'General';
     if (!acc[item.category]) {
-      acc[item.category] = [];
+      acc[item.category] = {};
     }
-    acc[item.category].push(item);
+    if (!acc[item.category][dept]) {
+      acc[item.category][dept] = [];
+    }
+    acc[item.category][dept].push(item);
     return acc;
-  }, {} as Record<string, PLLineItem[]>);
+  }, {} as Record<string, Record<string, PLLineItem[]>>);
+
+  const getCategoryItems = (category: string): PLLineItem[] =>
+    Object.values(groupedData[category] || {}).flat();
+
+  const inferDepartmentClient = (subcategory: string, _category?: string): string => {
+    const lower = subcategory.toLowerCase();
+    if (lower.includes('slip') || lower.includes('dock') || lower.includes('berth') || lower.includes('mooring') || lower.includes('storage') || lower.includes('winter') || lower.includes('land storage'))
+      return 'Storage';
+    if (lower.includes('fuel') || lower.includes('gas') || lower.includes('diesel'))
+      return 'Fuel';
+    if (lower.includes('store') || lower.includes('merchandise') || lower.includes('retail') || lower.includes('chandlery'))
+      return "Ship's Store";
+    if (lower.includes('service') || lower.includes('repair') || lower.includes('bottom paint') || lower.includes('bottom wash') || lower.includes('shrink wrap') || lower.includes('hauling'))
+      return 'Service';
+    if (lower.includes('new boat') || lower.includes('used boat') || lower.includes('boat sale') || lower.includes('trade'))
+      return 'Boat Sales';
+    if (lower.includes('brokerage') || lower.includes('finance commission'))
+      return 'Boat Brokerage';
+    if (lower.includes('payroll') || lower.includes('wage') || lower.includes('salary') || lower.includes('benefit') || lower.includes('workers comp') || lower.includes('soc security') || lower.includes('futa') || lower.includes('disability') || lower.includes('family leave') || lower.includes('medical insurance'))
+      return 'Payroll';
+    if (lower.includes('launch') || lower.includes('haul') || lower.includes('electric') || lower.includes('dockside'))
+      return 'Marina & Amenities';
+    return 'General';
+  };
 
   const getCategoryTotal = (category: string, month: string) => {
-    return (groupedData[category] || []).reduce((sum: number, item: PLLineItem) => 
+    return getCategoryItems(category).reduce((sum: number, item: PLLineItem) => 
       sum + (item.monthlyData[month] || 0), 0
     );
   };
 
   const getCategoryAnnualTotal = (category: string) => {
-    return (groupedData[category] || []).reduce((sum: number, item: PLLineItem) => 
+    return getCategoryItems(category).reduce((sum: number, item: PLLineItem) => 
       sum + item.annualTotal, 0
     );
   };
@@ -367,14 +407,14 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
 
   const getAdjustedCategoryTotal = (category: string, month: string, monthIdx: number) => {
     if (isCategoryAddedBack(category) && showNormalized) return 0;
-    return (groupedData[category] || []).reduce((sum: number, item: PLLineItem) => {
+    return getCategoryItems(category).reduce((sum: number, item: PLLineItem) => {
       return sum + getAdjustedMonthlyValue(item, month, monthIdx);
     }, 0);
   };
 
   const getAdjustedCategoryAnnualTotal = (category: string) => {
     if (isCategoryAddedBack(category) && showNormalized) return 0;
-    return (groupedData[category] || []).reduce((sum: number, item: PLLineItem) => {
+    return getCategoryItems(category).reduce((sum: number, item: PLLineItem) => {
       let itemTotal = 0;
       months.forEach((month, idx) => {
         itemTotal += getAdjustedMonthlyValue(item, month, idx);
@@ -931,126 +971,162 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                         </TableCell>
                       </TableRow>
 
-                      {expandedCategories.has(category) && (groupedData[category] || []).map((item: PLLineItem) => {
-                        const SourceIcon = item.dataSource ? dataSourceIcons[item.dataSource] : null;
-                        return (
-                          <TableRow key={item.id} className={`text-sm group ${(isLineItemAddedBack(item.subcategory) || isCategoryAddedBack(category)) && showNormalized ? 'opacity-50 line-through' : ''}`}>
-                            <TableCell className="pl-10 whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[220px] min-w-[220px] max-w-[220px] overflow-hidden text-ellipsis">
-                              <div className="flex items-center gap-2">
-                                {SourceIcon && (
-                                  <SourceIcon className="h-3 w-3 text-muted-foreground" />
-                                )}
-                                <div className="flex flex-col">
-                                  <span>{item.description}</span>
-                                  <span className="text-xs text-muted-foreground">{item.subcategory}</span>
+                      {expandedCategories.has(category) && Object.entries(groupedData[category] || {})
+                        .sort(([a], [b]) => a.localeCompare(b))
+                        .map(([department, deptItems]) => (
+                          <Fragment key={`${category}-${department}`}>
+                            <TableRow 
+                              className="cursor-pointer hover:bg-muted/50"
+                              onClick={() => toggleDepartment(`${category}-${department}`)}
+                            >
+                              <TableCell className="pl-6 font-medium whitespace-nowrap sticky left-0 z-10 bg-slate-50 dark:bg-slate-900 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[220px] min-w-[220px] max-w-[220px]">
+                                <div className="flex items-center gap-1.5">
+                                  {expandedDepartments.has(`${category}-${department}`) ? (
+                                    <ChevronDown className="h-3.5 w-3.5" />
+                                  ) : (
+                                    <ChevronRight className="h-3.5 w-3.5" />
+                                  )}
+                                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{department}</span>
                                 </div>
-                                {isLineItemAddedBack(item.subcategory) && (
-                                  <Badge variant="outline" className="ml-1 text-[10px] h-5 bg-amber-50 text-amber-700 border-amber-300">
-                                    <ArrowUpCircle className="h-2.5 w-2.5 mr-0.5" />
-                                    Addback
-                                  </Badge>
-                                )}
-                                <AddbackEditor
-                                  scope="line_item"
-                                  lineItemKey={item.subcategory}
-                                  lineItemLabel={item.description}
-                                  category={category}
-                                  year={selectedYear ? parseInt(selectedYear) : undefined}
-                                  currentValue={item.annualTotal}
-                                  existingAddback={getAnyAddback(item.subcategory, 'line_item')}
-                                  isActive={isLineItemAddedBack(item.subcategory)}
-                                  onSave={(data) => createOrUpdateAddback(data)}
-                                  onToggle={() => toggleLineItemAddback(item.subcategory, item.description, category)}
-                                  onDelete={(id) => deleteAddback(id)}
-                                  isPending={addbackPending}
-                                  trigger={
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className={`h-5 w-5 p-0 ml-auto shrink-0 ${isLineItemAddedBack(item.subcategory) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                                    >
-                                      {isLineItemAddedBack(item.subcategory) ? (
-                                        <ArrowUpCircle className="h-3 w-3 text-amber-600" />
-                                      ) : (
-                                        <ArrowUpCircle className="h-3 w-3 text-muted-foreground" />
-                                      )}
-                                    </Button>
-                                  }
-                                />
-                              </div>
-                            </TableCell>
-                            {months.map((month, idx) => {
-                              const rawValue = item.monthlyData[month] || 0;
-                              const displayValue = getAdjustedMonthlyValue(item, month, idx);
-                              const isCellAddedBack = isMonthCellAddedBack(item.subcategory, parseInt(selectedYear), idx + 1);
-                              const yearNum = parseInt(selectedYear);
-                              const monthNum = idx + 1;
+                              </TableCell>
+                              {months.map((month, idx) => {
+                                const deptTotal = deptItems.reduce((sum: number, item: PLLineItem) => sum + getAdjustedMonthlyValue(item, month, idx), 0);
+                                return (
+                                  <TableCell key={month} className={`text-right whitespace-nowrap px-2 py-1.5 text-xs font-medium text-muted-foreground ${!isSeasonalMonth(idx) ? 'bg-slate-50 dark:bg-slate-900' : 'bg-slate-100 dark:bg-slate-800'}`}>
+                                    {formatCurrency(deptTotal)}
+                                  </TableCell>
+                                );
+                              })}
+                              <TableCell className="text-right whitespace-nowrap px-2 py-1.5 text-xs font-medium text-muted-foreground bg-slate-100 dark:bg-slate-800">
+                                {formatCurrency(deptItems.reduce((sum: number, item: PLLineItem) => {
+                                  return months.reduce((itemSum, month, idx) => itemSum + getAdjustedMonthlyValue(item, month, idx), 0);
+                                }, 0))}
+                              </TableCell>
+                            </TableRow>
+
+                            {expandedDepartments.has(`${category}-${department}`) && deptItems.map((item: PLLineItem) => {
+                              const SourceIcon = item.dataSource ? dataSourceIcons[item.dataSource] : null;
                               return (
-                                <TableCell 
-                                  key={month} 
-                                  className={`text-right relative group/cell whitespace-nowrap px-2 py-1 ${!isSeasonalMonth(idx) ? 'bg-muted/30 text-muted-foreground' : ''} ${isCellAddedBack ? 'bg-amber-50/70 dark:bg-amber-950/20' : ''}`}
-                                >
-                                  <div className="flex items-center justify-end gap-0.5">
-                                    <span className={`text-xs ${isCellAddedBack && displayValue !== rawValue ? 'text-amber-700 dark:text-amber-400 font-medium' : ''}`}>
-                                      {formatCurrency(displayValue)}
-                                    </span>
-                                    {isCellAddedBack && (
-                                      <Flag className="h-2.5 w-2.5 text-amber-500 shrink-0" />
-                                    )}
-                                    {!isCellAddedBack && (
+                                <TableRow key={item.id} className={`text-sm group ${(isLineItemAddedBack(item.subcategory) || isCategoryAddedBack(category)) && showNormalized ? 'opacity-50 line-through' : ''}`}>
+                                  <TableCell className="pl-10 whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[220px] min-w-[220px] max-w-[220px] overflow-hidden text-ellipsis">
+                                    <div className="flex items-center gap-2">
+                                      {SourceIcon && (
+                                        <SourceIcon className="h-3 w-3 text-muted-foreground" />
+                                      )}
+                                      <div className="flex flex-col">
+                                        <span>{item.description}</span>
+                                        <span className="text-xs text-muted-foreground">{item.subcategory}</span>
+                                      </div>
+                                      {isLineItemAddedBack(item.subcategory) && (
+                                        <Badge variant="outline" className="ml-1 text-[10px] h-5 bg-amber-50 text-amber-700 border-amber-300">
+                                          <ArrowUpCircle className="h-2.5 w-2.5 mr-0.5" />
+                                          Addback
+                                        </Badge>
+                                      )}
                                       <AddbackEditor
-                                        scope="month_cell"
+                                        scope="line_item"
                                         lineItemKey={item.subcategory}
                                         lineItemLabel={item.description}
                                         category={category}
-                                        year={yearNum}
-                                        month={monthNum}
-                                        currentValue={rawValue}
-                                        existingAddback={getAnyAddback(item.subcategory, 'month_cell', yearNum, monthNum)}
-                                        isActive={false}
+                                        year={selectedYear ? parseInt(selectedYear) : undefined}
+                                        currentValue={item.annualTotal}
+                                        existingAddback={getAnyAddback(item.subcategory, 'line_item')}
+                                        isActive={isLineItemAddedBack(item.subcategory)}
                                         onSave={(data) => createOrUpdateAddback(data)}
-                                        onToggle={() => toggleMonthCellAddback(item.subcategory, item.description, category, yearNum, monthNum)}
+                                        onToggle={() => toggleLineItemAddback(item.subcategory, item.description, category)}
                                         onDelete={(id) => deleteAddback(id)}
                                         isPending={addbackPending}
                                         trigger={
-                                          <button className="h-3.5 w-3.5 p-0 opacity-0 group-hover/cell:opacity-60 hover:!opacity-100 shrink-0 transition-opacity">
-                                            <ArrowUpCircle className="h-3 w-3 text-muted-foreground" />
-                                          </button>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className={`h-5 w-5 p-0 ml-auto shrink-0 ${isLineItemAddedBack(item.subcategory) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                          >
+                                            {isLineItemAddedBack(item.subcategory) ? (
+                                              <ArrowUpCircle className="h-3 w-3 text-amber-600" />
+                                            ) : (
+                                              <ArrowUpCircle className="h-3 w-3 text-muted-foreground" />
+                                            )}
+                                          </Button>
                                         }
                                       />
-                                    )}
-                                    {isCellAddedBack && (
-                                      <AddbackEditor
-                                        scope="month_cell"
-                                        lineItemKey={item.subcategory}
-                                        lineItemLabel={item.description}
-                                        category={category}
-                                        year={yearNum}
-                                        month={monthNum}
-                                        currentValue={rawValue}
-                                        existingAddback={getAnyAddback(item.subcategory, 'month_cell', yearNum, monthNum)}
-                                        isActive={true}
-                                        onSave={(data) => createOrUpdateAddback(data)}
-                                        onToggle={() => toggleMonthCellAddback(item.subcategory, item.description, category, yearNum, monthNum)}
-                                        onDelete={(id) => deleteAddback(id)}
-                                        isPending={addbackPending}
-                                        trigger={
-                                          <button className="h-3.5 w-3.5 p-0 shrink-0">
-                                            <ArrowUpCircle className="h-3 w-3 text-amber-600" />
-                                          </button>
-                                        }
-                                      />
-                                    )}
-                                  </div>
-                                </TableCell>
+                                    </div>
+                                  </TableCell>
+                                  {months.map((month, idx) => {
+                                    const rawValue = item.monthlyData[month] || 0;
+                                    const displayValue = getAdjustedMonthlyValue(item, month, idx);
+                                    const isCellAddedBack = isMonthCellAddedBack(item.subcategory, parseInt(selectedYear), idx + 1);
+                                    const yearNum = parseInt(selectedYear);
+                                    const monthNum = idx + 1;
+                                    return (
+                                      <TableCell 
+                                        key={month} 
+                                        className={`text-right relative group/cell whitespace-nowrap px-2 py-1 ${!isSeasonalMonth(idx) ? 'bg-muted/30 text-muted-foreground' : ''} ${isCellAddedBack ? 'bg-amber-50/70 dark:bg-amber-950/20' : ''}`}
+                                      >
+                                        <div className="flex items-center justify-end gap-0.5">
+                                          <span className={`text-xs ${isCellAddedBack && displayValue !== rawValue ? 'text-amber-700 dark:text-amber-400 font-medium' : ''}`}>
+                                            {formatCurrency(displayValue)}
+                                          </span>
+                                          {isCellAddedBack && (
+                                            <Flag className="h-2.5 w-2.5 text-amber-500 shrink-0" />
+                                          )}
+                                          {!isCellAddedBack && (
+                                            <AddbackEditor
+                                              scope="month_cell"
+                                              lineItemKey={item.subcategory}
+                                              lineItemLabel={item.description}
+                                              category={category}
+                                              year={yearNum}
+                                              month={monthNum}
+                                              currentValue={rawValue}
+                                              existingAddback={getAnyAddback(item.subcategory, 'month_cell', yearNum, monthNum)}
+                                              isActive={false}
+                                              onSave={(data) => createOrUpdateAddback(data)}
+                                              onToggle={() => toggleMonthCellAddback(item.subcategory, item.description, category, yearNum, monthNum)}
+                                              onDelete={(id) => deleteAddback(id)}
+                                              isPending={addbackPending}
+                                              trigger={
+                                                <button className="h-3.5 w-3.5 p-0 opacity-0 group-hover/cell:opacity-60 hover:!opacity-100 shrink-0 transition-opacity">
+                                                  <ArrowUpCircle className="h-3 w-3 text-muted-foreground" />
+                                                </button>
+                                              }
+                                            />
+                                          )}
+                                          {isCellAddedBack && (
+                                            <AddbackEditor
+                                              scope="month_cell"
+                                              lineItemKey={item.subcategory}
+                                              lineItemLabel={item.description}
+                                              category={category}
+                                              year={yearNum}
+                                              month={monthNum}
+                                              currentValue={rawValue}
+                                              existingAddback={getAnyAddback(item.subcategory, 'month_cell', yearNum, monthNum)}
+                                              isActive={true}
+                                              onSave={(data) => createOrUpdateAddback(data)}
+                                              onToggle={() => toggleMonthCellAddback(item.subcategory, item.description, category, yearNum, monthNum)}
+                                              onDelete={(id) => deleteAddback(id)}
+                                              isPending={addbackPending}
+                                              trigger={
+                                                <button className="h-3.5 w-3.5 p-0 shrink-0">
+                                                  <ArrowUpCircle className="h-3 w-3 text-amber-600" />
+                                                </button>
+                                              }
+                                            />
+                                          )}
+                                        </div>
+                                      </TableCell>
+                                    );
+                                  })}
+                                  <TableCell className="text-right font-medium whitespace-nowrap px-2 py-1 text-xs">
+                                    {formatCurrency(months.reduce((sum, month, idx) => sum + getAdjustedMonthlyValue(item, month, idx), 0))}
+                                  </TableCell>
+                                </TableRow>
                               );
                             })}
-                            <TableCell className="text-right font-medium whitespace-nowrap px-2 py-1 text-xs">
-                              {formatCurrency(months.reduce((sum, month, idx) => sum + getAdjustedMonthlyValue(item, month, idx), 0))}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
+                          </Fragment>
+                        ))
+                      }
                     </Fragment>
                   ))}
 
@@ -1194,25 +1270,68 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                         })}
                       </TableRow>
 
-                      {expandedCategories.has(category) && annualSubcategories[category as keyof typeof annualSubcategories]?.map((subcategory) => (
-                        <TableRow key={`${category}-${subcategory}`} className="text-sm">
-                          <TableCell className="pl-10 whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
-                            <span>{subcategory}</span>
-                          </TableCell>
-                          {yearRange.map((year) => {
-                            const amount = getAnnualSubcategoryAmount(category, subcategory, year);
-                            const hasData = availableYears.includes(String(year));
-                            return (
-                              <TableCell 
-                                key={year} 
-                                className={`text-right bg-background ${!hasData ? 'text-muted-foreground/50' : ''}`}
+                      {expandedCategories.has(category) && (() => {
+                        const subcats = annualSubcategories[category as keyof typeof annualSubcategories] || [];
+                        const deptGrouped: Record<string, string[]> = {};
+                        subcats.forEach((sub: string) => {
+                          const dept = inferDepartmentClient(sub, category);
+                          if (!deptGrouped[dept]) deptGrouped[dept] = [];
+                          deptGrouped[dept].push(sub);
+                        });
+                        return Object.entries(deptGrouped)
+                          .sort(([a], [b]) => a.localeCompare(b))
+                          .map(([department, deptSubcats]) => (
+                            <Fragment key={`${category}-${department}`}>
+                              <TableRow
+                                className="cursor-pointer hover:bg-muted/50"
+                                onClick={() => toggleDepartment(`${category}-${department}`)}
                               >
-                                {hasData && amount !== 0 ? formatCurrency(amount) : '-'}
-                              </TableCell>
-                            );
-                          })}
-                        </TableRow>
-                      ))}
+                                <TableCell className="pl-6 font-medium whitespace-nowrap sticky left-0 z-10 bg-slate-50 dark:bg-slate-900 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[220px] min-w-[220px] max-w-[220px]">
+                                  <div className="flex items-center gap-1.5">
+                                    {expandedDepartments.has(`${category}-${department}`) ? (
+                                      <ChevronDown className="h-3.5 w-3.5" />
+                                    ) : (
+                                      <ChevronRight className="h-3.5 w-3.5" />
+                                    )}
+                                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{department}</span>
+                                  </div>
+                                </TableCell>
+                                {yearRange.map((year) => {
+                                  const deptTotal = deptSubcats.reduce((sum: number, sub: string) => sum + getAnnualSubcategoryAmount(category, sub, year), 0);
+                                  const hasData = availableYears.includes(String(year));
+                                  return (
+                                    <TableCell
+                                      key={year}
+                                      className={`text-right text-xs font-medium text-muted-foreground bg-slate-50 dark:bg-slate-900 ${!hasData ? 'text-muted-foreground/50' : ''}`}
+                                    >
+                                      {hasData ? formatCurrency(deptTotal) : '-'}
+                                    </TableCell>
+                                  );
+                                })}
+                              </TableRow>
+
+                              {expandedDepartments.has(`${category}-${department}`) && deptSubcats.map((subcategory: string) => (
+                                <TableRow key={`${category}-${subcategory}`} className="text-sm">
+                                  <TableCell className="pl-10 whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+                                    <span>{subcategory}</span>
+                                  </TableCell>
+                                  {yearRange.map((year) => {
+                                    const amount = getAnnualSubcategoryAmount(category, subcategory, year);
+                                    const hasData = availableYears.includes(String(year));
+                                    return (
+                                      <TableCell 
+                                        key={year} 
+                                        className={`text-right bg-background ${!hasData ? 'text-muted-foreground/50' : ''}`}
+                                      >
+                                        {hasData && amount !== 0 ? formatCurrency(amount) : '-'}
+                                      </TableCell>
+                                    );
+                                  })}
+                                </TableRow>
+                              ))}
+                            </Fragment>
+                          ));
+                      })()}
                     </Fragment>
                   ))}
 
