@@ -1,24 +1,37 @@
 import type { LlmClassifier, ClassificationRequest, ClassificationResult, BatchClassificationResult } from './types';
 import OpenAI from 'openai';
 
-const SYSTEM_PROMPT = `You are a financial line item classifier for marina businesses. Given a P&L line item label, classify it into the appropriate category.
+const SYSTEM_PROMPT = `You are a financial line item classifier for marina businesses. Given a P&L line item label, classify it into the correct department, section, and canonical key.
 
-Marina-specific departments:
-- Marina: Slip rentals, dockage, dry storage, launch/haul, transient dockage
-- Fuel: Fuel sales and fuel cost of goods
-- Retail: Ship store, chandlery, merchandise
-- Service: Boat repairs, mechanical work, labor, parts
+DEPARTMENTS (use these exact names):
+- Storage: Wet slips, dry storage, dockage, berths, moorings, land storage, winter storage, transient dockage, rack storage
+- Fuel: Fuel sales, gas dock revenue, diesel sales, fuel cost of goods
+- Ship's Store: Ship store sales, chandlery, merchandise, retail, marine supplies
+- Service: Boat repairs, mechanical work, service labor, parts, bottom paint, shrink wrap, hauling/launch labor
+- Boat Sales: New boat sales, used boat sales, boat purchases (COGS), trade-ins, warranties, boat sales commissions, trailer sales
+- Boat Brokerage: Brokerage commissions, broker fees, finance commissions
+- Payroll: Wages, salaries, payroll taxes (FICA, FUTA, SUI), workers comp, health benefits, 401k, disability, family leave, Medicare, Social Security
+- Marina & Amenities: Launch/haul services, electric/power income, pump-out, ice, laundry, pool, amenity fees, dockside services
+- General: Insurance, property taxes, utilities (electric, water, gas for heating), rent/lease, office expenses, professional fees (legal, accounting), marketing, advertising, repairs & maintenance, depreciation, interest, bank charges
 
-Standard sections:
-- revenue: Income from operations
-- cogs: Cost of goods sold (fuel cost, merchandise cost, parts)
-- expense: Operating expenses (insurance, taxes, utilities, repairs, marketing, professional fees)
-- payroll: Wages, salaries, payroll taxes, benefits
+SECTIONS:
+- revenue: Income from marina operations
+- cogs: Cost of goods sold (fuel cost, merchandise cost, boat purchase cost, parts cost)
+- expense: Operating expenses (insurance, taxes, utilities, repairs, marketing, professional fees, office)
+- payroll: Wages, salaries, payroll taxes, employee benefits
+
+IMPORTANT CLASSIFICATION RULES:
+1. "Gas" in a revenue or COGS context = Fuel department. "Gas" in an expense context (utilities) = General department.
+2. "Commission" in revenue/COGS context (boat sales commissions, salesmen commissions) = Boat Sales. "Finance commission" = Boat Brokerage.
+3. All payroll-related items (wages, salaries, taxes, benefits) go to Payroll department AND payroll section.
+4. Storage items include: slips, docks, berths, moorings, dry storage, rack storage, land storage, winter storage.
+5. Service includes: repairs, mechanical work, bottom painting, shrink wrap, winterizing, parts (when in COGS).
+6. Boat Sales includes: new/used boat sales (revenue), boat purchases/cost (COGS), trade-ins, warranties, trailer sales.
 
 Respond in JSON format:
 {
-  "canonicalKey": "section.category" (e.g., "revenue.wet_slip", "expense.insurance"),
-  "department": "Marina|Fuel|Retail|Service|General",
+  "canonicalKey": "section.category" (e.g., "revenue.wet_slip", "expense.insurance", "payroll.wages"),
+  "department": "Storage|Fuel|Ship's Store|Service|Boat Sales|Boat Brokerage|Payroll|Marina & Amenities|General",
   "section": "revenue|cogs|expense|payroll|other",
   "confidence": 0.0-1.0,
   "reasoning": "brief explanation"
@@ -36,9 +49,10 @@ export class OpenAiClassifier implements LlmClassifier {
 
   async classify(request: ClassificationRequest): Promise<ClassificationResult> {
     try {
+      const sectionHint = request.context?.sectionHint ? `\nSection context: This item appears under "${request.context.sectionHint}"` : '';
       const userPrompt = `Classify this P&L line item: "${request.label}"
 ${request.context?.vendorHint ? `Source: ${request.context.vendorHint}` : ''}
-${request.context?.nearbyLabels?.length ? `Nearby items: ${request.context.nearbyLabels.slice(0, 3).join(', ')}` : ''}`;
+${request.context?.nearbyLabels?.length ? `Nearby items: ${request.context.nearbyLabels.slice(0, 5).join(', ')}` : ''}${sectionHint}`;
 
       const response = await this.client.chat.completions.create({
         model: this.model,

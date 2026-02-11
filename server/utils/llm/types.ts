@@ -13,6 +13,7 @@ export interface ClassificationRequest {
     nearbyLabels?: string[];
     documentType?: string;
     vendorHint?: string;
+    sectionHint?: string;
   };
 }
 

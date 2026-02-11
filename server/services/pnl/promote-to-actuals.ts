@@ -7,7 +7,7 @@ import {
 import { modelingActuals, pnlCanonicalLineItems, pnlJobs } from '@shared/schema';
 import { eq, sql } from 'drizzle-orm';
 import { MARINA_COA_SEED } from '../../scripts/seedMarinaCoa';
-import { sectionToCategory, majorGroupToCategory, inferDepartment } from '../../utils/department-mapping';
+import { sectionToCategory, majorGroupToCategory, inferDepartment, normalizeDepartment } from '../../utils/department-mapping';
 
 const coaLookup: Record<string, typeof MARINA_COA_SEED[0]> = {};
 for (const item of MARINA_COA_SEED) {
@@ -86,10 +86,11 @@ export async function promotePnlFactsToActuals(
           : majorGroupToCategory(canonical.majorGroup);
         const subcategory = canonical.displayName;
         const pipelineDept = resolvedDeptMap[fact.canonicalLineItemId];
-        const department = coaEntry?.department
+        const rawDepartment = coaEntry?.department
           || pipelineDept
           || canonical.subcategoryGroup
           || inferDepartment(fact.sourceLabel || subcategory, category);
+        const department = normalizeDepartment(rawDepartment);
 
         const year = fact.fiscalYear;
         const month = fact.fiscalPeriod || 1;

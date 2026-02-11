@@ -13,6 +13,7 @@ import {
 } from '@shared/schema';
 import { and, eq, or, isNull, sql, desc, asc } from 'drizzle-orm';
 import { getLlmClassifier, type ClassificationRequest } from '../../utils/llm';
+import { normalizeDepartment, normalizeBucket } from '../../utils/department-mapping';
 
 interface AmbiguousDepartmentOption {
   department: string;
@@ -388,12 +389,13 @@ async function tryLlmClassification(
     const isMockResult = classifier.name === 'mock';
     const confidenceAdjustment = isMockResult ? 0.5 : 1.0;
     const adjustedConfidence = result.confidence * confidenceAdjustment;
+    const normalizedDept = normalizeDepartment(result.department);
 
     if (!result.canonicalKey || adjustedConfidence < 0.5) {
       return {
         mappingMethod: isMockResult ? 'rule' : 'ai',
         confidence: adjustedConfidence,
-        department: result.department,
+        department: normalizedDept,
         bucket: result.section === 'cogs' ? 'COGS' : result.section === 'revenue' ? 'Revenue' : 'Expense',
         suggestion: {
           llmResponse: result,
@@ -421,7 +423,7 @@ async function tryLlmClassification(
       canonicalLineItemId: matchingCanonical?.id,
       mappingMethod: isMockResult ? 'rule' : 'ai',
       confidence: finalConfidence,
-      department: result.department,
+      department: normalizedDept,
       bucket: result.section === 'cogs' ? 'COGS' : result.section === 'revenue' ? 'Revenue' : 'Expense',
       suggestion: {
         llmResponse: result,
@@ -484,13 +486,34 @@ export async function mapParsedStatement(jobId: string): Promise<{ reviewCount: 
     }
 
     if (!res.canonicalLineItemId || res.confidence < CONFIDENCE_THRESHOLD) {
+      const rowIdx = rows.indexOf(row);
       const nearbyLabels = rows
-        .slice(Math.max(0, rows.indexOf(row) - 3), rows.indexOf(row) + 3)
+        .slice(Math.max(0, rowIdx - 3), rowIdx + 3)
         .filter(r => r !== row)
         .map(r => r.label);
+      
+      let sectionHint: string | undefined;
+      const sectionKeywords: Record<string, string> = {
+        'revenue': 'revenue', 'income': 'revenue', 'sales': 'revenue',
+        'cost of goods': 'cogs', 'cogs': 'cogs', 'cost of sales': 'cogs',
+        'operating expense': 'expense', 'expenses': 'expense', 'overhead': 'expense',
+        'payroll': 'payroll', 'wages': 'payroll', 'salaries': 'payroll',
+      };
+      for (let si = rowIdx - 1; si >= Math.max(0, rowIdx - 15); si--) {
+        const headerLabel = (rows[si].label ?? '').toLowerCase().trim();
+        for (const [keyword, section] of Object.entries(sectionKeywords)) {
+          if (headerLabel === keyword || headerLabel.startsWith(keyword + ' ') || headerLabel.startsWith('total ' + keyword)) {
+            sectionHint = section;
+            break;
+          }
+        }
+        if (sectionHint) break;
+      }
+
       const llmRes = await tryLlmClassification(orgId, rawLabel, normalized, {
         nearbyLabels,
         vendorHint: pj.vendorHint || undefined,
+        sectionHint,
       });
       if (llmRes.confidence > (res.confidence || 0)) {
         res = llmRes;
@@ -524,8 +547,8 @@ export async function mapParsedStatement(jobId: string): Promise<{ reviewCount: 
         suggestionJson: {
           mappingMethod: res.mappingMethod,
           suggestion: res.suggestion ?? null,
-          department: res.department ?? null,
-          bucket: res.bucket ?? null,
+          department: res.department ? normalizeDepartment(res.department) : null,
+          bucket: res.bucket ? normalizeBucket(res.bucket) : null,
           isAmbiguous: res.isAmbiguous ?? false,
           ambiguityInfo: res.ambiguityInfo ?? null,
         },
@@ -541,8 +564,8 @@ export async function mapParsedStatement(jobId: string): Promise<{ reviewCount: 
       mappingMethod: res.mappingMethod,
       mappingConfidence: res.confidence,
       normalizedLabel: normalized,
-      resolvedDepartment: res.department ?? null,
-      resolvedBucket: res.bucket ?? null,
+      resolvedDepartment: res.department ? normalizeDepartment(res.department) : null,
+      resolvedBucket: res.bucket ? normalizeBucket(res.bucket) : null,
       resolvedByKeywordBank: wasResolvedByKeywordBank,
     };
   }
@@ -576,12 +599,15 @@ export async function addToKeywordBank(
   bucket: string,
   canonicalLineItemId?: string
 ): Promise<void> {
+  const normalizedDept = normalizeDepartment(department);
+  const normalizedBkt = normalizeBucket(bucket);
+
   const existing = await db.query.pnlKeywordRules.findFirst({
     where: and(
       eq(pnlKeywordRules.orgId, orgId),
       eq(pnlKeywordRules.keyword, normalized),
-      eq(pnlKeywordRules.department, department),
-      eq(pnlKeywordRules.bucket, bucket)
+      eq(pnlKeywordRules.department, normalizedDept),
+      eq(pnlKeywordRules.bucket, normalizedBkt)
     ),
   });
 
@@ -597,8 +623,8 @@ export async function addToKeywordBank(
   } else {
     await db.insert(pnlKeywordRules).values({
       orgId,
-      department,
-      bucket,
+      department: normalizedDept,
+      bucket: normalizedBkt,
       keyword: normalized,
       matchType: 'exact',
       priority: 25,
@@ -607,5 +633,51 @@ export async function addToKeywordBank(
       source: 'learned',
       timesMatched: 1,
     });
+  }
+
+  await addGlobalKeywordRule(normalized, normalizedDept, normalizedBkt, canonicalLineItemId);
+}
+
+async function addGlobalKeywordRule(
+  normalized: string,
+  department: string,
+  bucket: string,
+  canonicalLineItemId?: string
+): Promise<void> {
+  try {
+    const existingGlobal = await db.query.pnlKeywordRules.findFirst({
+      where: and(
+        isNull(pnlKeywordRules.orgId),
+        eq(pnlKeywordRules.keyword, normalized),
+        eq(pnlKeywordRules.department, department),
+        eq(pnlKeywordRules.bucket, bucket)
+      ),
+    });
+
+    if (existingGlobal) {
+      await db
+        .update(pnlKeywordRules)
+        .set({
+          timesMatched: sql`${pnlKeywordRules.timesMatched} + 1`,
+          updatedAt: new Date(),
+          isActive: true,
+        })
+        .where(eq(pnlKeywordRules.id, existingGlobal.id));
+    } else {
+      await db.insert(pnlKeywordRules).values({
+        orgId: null,
+        department,
+        bucket,
+        keyword: normalized,
+        matchType: 'exact',
+        priority: 50,
+        canonicalLineItemId: canonicalLineItemId ?? null,
+        isActive: true,
+        source: 'global_learned',
+        timesMatched: 1,
+      });
+    }
+  } catch (error) {
+    console.error('[Global Keyword Rule] Error creating global rule:', error);
   }
 }

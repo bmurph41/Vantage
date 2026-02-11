@@ -74,6 +74,56 @@ export function inferDepartment(subcategory: string, category?: string): string 
   return 'General';
 }
 
+const LEGACY_DEPARTMENT_MAP: Record<string, string> = {
+  'marina': 'Storage',
+  'retail': "Ship's Store",
+  'store': "Ship's Store",
+  'ship store': "Ship's Store",
+  'ships store': "Ship's Store",
+  'ship\'s store': "Ship's Store",
+  'dock': 'Storage',
+  'dockage': 'Storage',
+  'amenities': 'Marina & Amenities',
+  'marina operations': 'Marina & Amenities',
+  'marina & amenities': 'Marina & Amenities',
+  'brokerage': 'Boat Brokerage',
+  'boat brokerage': 'Boat Brokerage',
+  'boats': 'Boat Sales',
+  'boat sales': 'Boat Sales',
+  'payroll': 'Payroll',
+  'fuel': 'Fuel',
+  'service': 'Service',
+  'storage': 'Storage',
+  'general': 'General',
+};
+
+const VALID_DEPARTMENTS = new Set([
+  'Storage', 'Fuel', "Ship's Store", 'Service', 'Boat Sales',
+  'Boat Brokerage', 'Payroll', 'Marina & Amenities', 'General',
+]);
+
+export function normalizeDepartment(dept: string): string {
+  if (!dept) return 'General';
+  const trimmed = dept.trim();
+  if (VALID_DEPARTMENTS.has(trimmed)) return trimmed;
+  const lower = trimmed.toLowerCase();
+  if (LEGACY_DEPARTMENT_MAP[lower]) return LEGACY_DEPARTMENT_MAP[lower];
+  return 'General';
+}
+
+const VALID_BUCKETS = new Set(['Revenue', 'COGS', 'Expense']);
+
+export function normalizeBucket(bucket: string): string {
+  if (!bucket) return 'Expense';
+  const trimmed = bucket.trim();
+  if (VALID_BUCKETS.has(trimmed)) return trimmed;
+  const lower = trimmed.toLowerCase();
+  if (lower === 'revenue' || lower === 'income') return 'Revenue';
+  if (lower === 'cogs' || lower === 'cost of goods' || lower === 'cost of goods sold') return 'COGS';
+  if (lower === 'expense' || lower === 'expenses' || lower === 'opex') return 'Expense';
+  return 'Expense';
+}
+
 export function departmentToAssumptionKey(department: string): string {
   switch (department) {
     case 'Storage': return 'storage';
