@@ -1174,7 +1174,7 @@ export default function Dashboard() {
     },
     {
       id: 'docktalk-feed',
-      title: 'DockTalk Intelligence',
+      title: 'The Docket Intelligence',
       icon: Radio,
       link: '/docktalk',
       data: dashboardData?.docktalk,
@@ -1991,11 +1991,11 @@ export default function Dashboard() {
       <DetailPanel
         open={isDockTalkDetailOpen}
         onOpenChange={setIsDockTalkDetailOpen}
-        title="DockTalk Articles"
+        title="Docket Articles"
         description="Recent marina industry news and insights"
         icon={Radio}
         sourceLink="/docktalk"
-        sourceLinkText="Go to DockTalk"
+        sourceLinkText="Go to The Docket"
       >
         {articlesLoading ? (
           <div className="flex items-center justify-center py-8">

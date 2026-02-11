@@ -448,7 +448,7 @@ MarinaMatch is an institutional-grade marina acquisition and management platform
 - **Modeling**: Financial modeling with exit strategies, scenarios, capital stack
 - **Rent Roll**: Tenant management, lease tracking, occupancy analytics
 - **Sales Comps**: Transaction comparables for valuation analysis
-- **DockTalk**: Industry news and intelligence aggregation
+- **The Docket**: Industry news and intelligence aggregation
 - **VDR**: Secure document management with permissions
 
 ### Key Workflows
@@ -472,7 +472,7 @@ const PAGE_CONTEXT_PROMPTS: Record<string, string> = {
   '/modeling': 'User is in Modeling for financial analysis and valuation.',
   '/rent-roll': 'User is in Rent Roll managing tenants and leases.',
   '/sales-comps': 'User is in Sales Comps for transaction comparables.',
-  '/docktalk': 'User is in DockTalk for industry news and intelligence.',
+  '/docktalk': 'User is in The Docket for industry news and intelligence.',
   '/vdr': 'User is in the Virtual Data Room for document management.',
   '/analytics': 'User is viewing Analytics for cross-module insights.',
 };

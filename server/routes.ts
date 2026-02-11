@@ -25401,7 +25401,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         },
         {
           key: 'docktalk',
-          name: 'DockTalk Intelligence',
+          name: 'The Docket Intelligence',
           icon: 'Radio',
           metrics: [
             { key: 'total_deals', label: 'M&A Deals', type: 'count', format: 'number', description: 'Total tracked M&A deals' },
@@ -26263,8 +26263,8 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
 
       res.json(deals);
     } catch (error: any) {
-      console.error('Failed to fetch recent DockTalk deals:', error);
-      res.status(500).json({ error: 'Failed to fetch recent DockTalk deals' });
+      console.error('Failed to fetch recent Docket deals:', error);
+      res.status(500).json({ error: 'Failed to fetch recent Docket deals' });
     }
   });
 

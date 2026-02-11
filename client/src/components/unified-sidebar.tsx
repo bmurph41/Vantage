@@ -822,7 +822,7 @@ export default function UnifiedSidebar() {
                 </div>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
-                <p>DockTalk</p>
+                <p>The Docket</p>
               </TooltipContent>
             </Tooltip>
           ) : (
@@ -838,7 +838,7 @@ export default function UnifiedSidebar() {
               >
                 <div className="flex items-center gap-2">
                   <MessageSquare className="w-3.5 h-3.5" />
-                  <span>DockTalk</span>
+                  <span>The Docket</span>
                 </div>
               </div>
             </Link>

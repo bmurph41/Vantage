@@ -28,7 +28,7 @@ export default function Navigation({ searchQuery, onSearchChange }: NavigationPr
           <div className="flex items-center space-x-4">
             <Link href="/docktalk" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
               <i className="fas fa-anchor text-primary text-2xl"></i>
-              <h1 className="text-xl font-bold text-foreground">DockTalk 2.0</h1>
+              <h1 className="text-xl font-bold text-foreground">The Docket</h1>
             </Link>
             <Badge variant="secondary" className="text-xs">
               Marina Industry News

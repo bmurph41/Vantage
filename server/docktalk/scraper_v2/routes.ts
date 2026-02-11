@@ -12,7 +12,7 @@ const router = Router();
 const featureFlagMiddleware = (req: Request, res: Response, next: Function) => {
   if (!isV2Enabled()) {
     return res.status(404).json({
-      error: 'DockTalk Scraper V2 is not enabled',
+      error: 'The Docket Scraper V2 is not enabled',
       message: 'Set DOCKTALK_SCRAPER_V2=true to enable this feature',
     });
   }

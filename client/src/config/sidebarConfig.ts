@@ -304,7 +304,7 @@ export const sidebarConfig: SidebarGroup[] = [
     children: [
       {
         id: 'docktalk',
-        label: 'DockTalk',
+        label: 'The Docket',
         href: '/marinalytics/docktalk',
         icon: Newspaper,
         matchRoutes: ['/marinalytics/docktalk', '/docktalk'],

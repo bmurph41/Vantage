@@ -188,7 +188,7 @@ export function UnifiedAnalyticsPanel() {
               <div className="space-y-3">
                 <div>
                   <div className="text-2xl font-bold">{analytics.intelligence.totalArticles}</div>
-                  <div className="text-xs text-muted-foreground">DockTalk Articles</div>
+                  <div className="text-xs text-muted-foreground">Docket Articles</div>
                 </div>
                 <div className="text-sm">
                   <Badge variant="secondary">{analytics.intelligence.recentArticles} this month</Badge>

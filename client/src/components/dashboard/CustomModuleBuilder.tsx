@@ -49,7 +49,7 @@ const MODULE_TYPES = [
   { value: 'fuel', label: 'Fuel Transactions', filterOptions: ['dateRange', 'minValue', 'maxValue'] },
   { value: 'shipStore', label: 'Ship Store Sales', filterOptions: ['dateRange', 'status', 'minValue', 'maxValue'] },
   { value: 'modeling', label: 'Modeling Projects', filterOptions: ['dateRange', 'status', 'minValue', 'maxValue'] },
-  { value: 'docktalk', label: 'DockTalk Articles', filterOptions: ['dateRange', 'category'] },
+  { value: 'docktalk', label: 'Docket Articles', filterOptions: ['dateRange', 'category'] },
 ];
 
 export function CustomModuleBuilder({ onSave, onCancel, initialData }: CustomModuleBuilderProps) {

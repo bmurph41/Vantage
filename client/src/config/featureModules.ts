@@ -215,7 +215,7 @@ export const MODULE_INFO: Record<FeatureModule, ModuleInfo> = {
   // Analytics
   [FEATURE_MODULES.ANALYTICS_NEWS]: {
     key: FEATURE_MODULES.ANALYTICS_NEWS,
-    name: 'DockTalk',
+    name: 'The Docket',
     description: 'Industry news and insights',
     category: 'Analytics',
     includedIn: ['investor-essentials', 'broker-pro', 'owner-operator', 'full-platform'],
@@ -384,7 +384,7 @@ export const SUBSCRIPTION_PACKAGES: SubscriptionPackage[] = [
       'Secure Data Room',
       'Financial Model',
       'Sales & Rate Comps',
-      'Industry News (DockTalk)',
+      'Industry News (The Docket)',
     ],
   },
   {

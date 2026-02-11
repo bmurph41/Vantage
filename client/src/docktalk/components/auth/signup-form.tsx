@@ -76,7 +76,7 @@ export function SignupForm({ onSuccess, onSwitchToLogin }: SignupFormProps) {
       <CardHeader className="text-center">
         <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
         <CardDescription>
-          Join DockTalk to get personalized marina industry news and insights
+          Join The Docket to get personalized marina industry news and insights
         </CardDescription>
       </CardHeader>
       <CardContent>

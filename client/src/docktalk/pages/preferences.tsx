@@ -96,7 +96,7 @@ export default function PreferencesPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Preferences</h1>
           <p className="text-muted-foreground mt-1">
-            Manage your DockTalk notification and display settings
+            Manage your Docket notification and display settings
           </p>
         </div>
         <div className="space-y-4">
@@ -114,7 +114,7 @@ export default function PreferencesPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Preferences</h1>
           <p className="text-muted-foreground mt-1">
-            Manage your DockTalk notification and display settings
+            Manage your Docket notification and display settings
           </p>
         </div>
         <Card>
@@ -139,7 +139,7 @@ export default function PreferencesPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Preferences</h1>
         <p className="text-muted-foreground mt-1">
-          Manage your DockTalk notification and display settings
+          Manage your Docket notification and display settings
         </p>
       </div>
 
@@ -151,7 +151,7 @@ export default function PreferencesPage() {
             <CardTitle>Subscription</CardTitle>
           </div>
           <CardDescription>
-            Your current DockTalk subscription tier and features
+            Your current Docket subscription tier and features
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -159,9 +159,9 @@ export default function PreferencesPage() {
             <div>
               <p className="text-sm font-medium">Current Plan</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {preferences.subscriptionTier === 'enterprise' && 'Unlimited access to all DockTalk features'}
+                {preferences.subscriptionTier === 'enterprise' && 'Unlimited access to all Docket features'}
                 {preferences.subscriptionTier === 'professional' && 'Advanced analytics and unlimited watchlists'}
-                {preferences.subscriptionTier === 'free' && 'Basic access to DockTalk intelligence'}
+                {preferences.subscriptionTier === 'free' && 'Basic access to Docket intelligence'}
               </p>
             </div>
             <Badge variant={subscriptionBadge.variant} className="text-base px-4 py-1" data-testid="badge-subscription">

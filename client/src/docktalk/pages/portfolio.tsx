@@ -1780,7 +1780,7 @@ export default function PortfolioCompaniesPage() {
               <h3 className="font-semibold text-sm">Alert Notifications</h3>
               <p className="text-sm text-muted-foreground mt-1">
                 Click the bell icon on any company to configure alert frequency, channels, and sensitivity. 
-                You'll receive notifications when tracked companies appear in DockTalk articles.
+                You'll receive notifications when tracked companies appear in Docket articles.
               </p>
             </div>
           </div>

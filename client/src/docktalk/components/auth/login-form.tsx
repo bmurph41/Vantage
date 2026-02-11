@@ -50,7 +50,7 @@ export function LoginForm({ onSuccess, onSwitchToSignup }: LoginFormProps) {
       <CardHeader className="text-center">
         <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
         <CardDescription>
-          Sign in to your DockTalk account to access personalized news and features
+          Sign in to your Docket account to access personalized news and features
         </CardDescription>
       </CardHeader>
       <CardContent>

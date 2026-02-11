@@ -251,7 +251,7 @@ const AVAILABLE_TOOLS: ToolItem[] = [
   },
   {
     id: 'docktalk',
-    title: 'DockTalk',
+    title: 'The Docket',
     description: 'Marina industry intelligence',
     link: '/docktalk',
     icon: 'Radio',

@@ -285,7 +285,7 @@ Respond in JSON format with:
       "details": "2-3 sentence explanation",
       "confidence": "high|medium|low",
       "priority": 1-5 (5 is highest),
-      "relatedModules": ["CRM", "DD", "Modeling", "DockTalk", "SalesComps"],
+      "relatedModules": ["CRM", "DD", "Modeling", "The Docket", "SalesComps"],
       "actionItems": ["Action 1", "Action 2"]
     }
   ],

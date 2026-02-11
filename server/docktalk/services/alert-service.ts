@@ -180,11 +180,11 @@ async function sendNotification(notification: AlertNotification, search: SavedSe
       await client.emails.send({
         from: fromEmail,
         to: preferences.emailAddress,
-        subject: `DockTalk Alert: ${notification.searchName} (${notification.newCount} new article${notification.newCount > 1 ? 's' : ''})`,
+        subject: `The Docket Alert: ${notification.searchName} (${notification.newCount} new article${notification.newCount > 1 ? 's' : ''})`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <div style="background-color: #003366; color: white; padding: 20px; text-align: center;">
-              <h1 style="margin: 0;">⚓ DockTalk 2.0</h1>
+              <h1 style="margin: 0;">⚓ The Docket</h1>
               <p style="margin: 5px 0 0 0; opacity: 0.9;">Marina Industry Intelligence</p>
             </div>
             
@@ -205,7 +205,7 @@ async function sendNotification(notification: AlertNotification, search: SavedSe
             
             <div style="background-color: #f5f5f5; padding: 20px; text-align: center; font-size: 12px; color: #666;">
               <p style="margin: 0;">You're receiving this because you have an active alert for "${notification.searchName}"</p>
-              <p style="margin: 10px 0 0 0;">Manage your notification preferences in DockTalk settings</p>
+              <p style="margin: 10px 0 0 0;">Manage your notification preferences in The Docket settings</p>
             </div>
           </div>
         `,
@@ -303,11 +303,11 @@ export async function sendNewSearchRecap(searchId: string, userId: string, orgId
     await client.emails.send({
       from: fromEmail,
       to: preferences.emailAddress,
-      subject: `DockTalk 7-Day Recap: ${search.name} (${articles.length} article${articles.length > 1 ? 's' : ''})`,
+      subject: `The Docket 7-Day Recap: ${search.name} (${articles.length} article${articles.length > 1 ? 's' : ''})`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background-color: #003366; color: white; padding: 20px; text-align: center;">
-            <h1 style="margin: 0;">⚓ DockTalk 2.0</h1>
+            <h1 style="margin: 0;">⚓ The Docket</h1>
             <p style="margin: 5px 0 0 0; opacity: 0.9;">Marina Industry Intelligence</p>
           </div>
           
@@ -327,7 +327,7 @@ export async function sendNewSearchRecap(searchId: string, userId: string, orgId
             
             ${articles.length > 15 ? `
               <p style="text-align: center; color: #666; margin-top: 20px;">
-                + ${articles.length - 15} more article${articles.length - 15 > 1 ? 's' : ''} (view in DockTalk)
+                + ${articles.length - 15} more article${articles.length - 15 > 1 ? 's' : ''} (view in The Docket)
               </p>
             ` : ''}
           </div>

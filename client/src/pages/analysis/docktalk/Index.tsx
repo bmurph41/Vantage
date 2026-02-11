@@ -68,7 +68,7 @@ export default function DockTalkPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold tracking-tight" data-testid="heading-docktalk">
-                DockTalk M&A Spotlight
+                The Docket M&A Spotlight
               </h1>
               <p className="text-muted-foreground mt-2">
                 Marina industry transaction intelligence from verified sales and AI discoveries

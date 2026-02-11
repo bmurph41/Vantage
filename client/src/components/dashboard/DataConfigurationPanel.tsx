@@ -21,7 +21,7 @@ const MODULE_TYPES = [
   { value: 'fuel', label: 'Fuel Transactions' },
   { value: 'shipStore', label: 'Ship Store Sales' },
   { value: 'modeling', label: 'Modeling Projects' },
-  { value: 'docktalk', label: 'DockTalk Articles' },
+  { value: 'docktalk', label: 'Docket Articles' },
 ];
 
 const METRIC_FIELDS: Record<string, { key: string; label: string; format?: 'currency' | 'number' | 'percent' }[]> = {

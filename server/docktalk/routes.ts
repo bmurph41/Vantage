@@ -3026,11 +3026,11 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
       const result = await client.emails.send({
         from: fromEmail,
         to: testEmail,
-        subject: `DockTalk Daily Digest Preview - ${new Date().toLocaleDateString()} (${sampleArticles.length} Articles)`,
+        subject: `The Docket Daily Digest Preview - ${new Date().toLocaleDateString()} (${sampleArticles.length} Articles)`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <div style="background-color: #003366; color: white; padding: 20px; text-align: center;">
-              <h1 style="margin: 0;">⚓ DockTalk 2.0</h1>
+              <h1 style="margin: 0;">⚓ The Docket</h1>
               <p style="margin: 5px 0 0 0; opacity: 0.9;">Marina Industry Intelligence</p>
             </div>
             
@@ -3045,7 +3045,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
             
             <div style="background-color: #f5f5f5; padding: 20px; text-align: center; font-size: 12px; color: #666;">
               <p style="margin: 0;">This is a preview of your Daily Digest email</p>
-              <p style="margin: 10px 0 0 0;">Manage your notification preferences in DockTalk settings</p>
+              <p style="margin: 10px 0 0 0;">Manage your notification preferences in The Docket settings</p>
             </div>
           </div>
         `,
@@ -3092,11 +3092,11 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
       const result = await client.emails.send({
         from: fromEmail,
         to: testEmail,
-        subject: "DockTalk 2.0 - Test Email Notification",
+        subject: "The Docket - Test Email Notification",
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <div style="background-color: #003366; color: white; padding: 20px; text-align: center;">
-              <h1 style="margin: 0;">⚓ DockTalk 2.0</h1>
+              <h1 style="margin: 0;">⚓ The Docket</h1>
               <p style="margin: 5px 0 0 0; opacity: 0.9;">Marina Industry Intelligence</p>
             </div>
             
@@ -3104,7 +3104,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
               <h2 style="color: #003366; margin-top: 0;">Email Notification Test Successful! ✅</h2>
               
               <p style="color: #333; line-height: 1.6;">
-                This is a test email to confirm that DockTalk's email notification system is working correctly.
+                This is a test email to confirm that The Docket's email notification system is working correctly.
               </p>
               
               <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
@@ -3118,7 +3118,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
             </div>
             
             <div style="background-color: #f8f8f8; padding: 20px; text-align: center; color: #666; font-size: 12px;">
-              <p style="margin: 0;">DockTalk 2.0 - Institutional-Grade Marina Industry Intelligence</p>
+              <p style="margin: 0;">The Docket - Institutional-Grade Marina Industry Intelligence</p>
             </div>
           </div>
         `,

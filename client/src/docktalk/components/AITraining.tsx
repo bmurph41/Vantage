@@ -1171,7 +1171,7 @@ export function AITraining() {
             AI Training Center
           </CardTitle>
           <CardDescription>
-            Train DockTalk's AI with feedback, tags, and manual reviews to improve content relevance
+            Train The Docket's AI with feedback, tags, and manual reviews to improve content relevance
           </CardDescription>
         </CardHeader>
         <CardContent>

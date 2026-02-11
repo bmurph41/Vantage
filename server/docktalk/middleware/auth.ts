@@ -28,8 +28,8 @@ export async function requireMarinaMatchAuth(req: DockTalkRequest, res: Response
     const orgFeature = await storage.getOrganizationFeature(marinaUser.orgId);
     if (!orgFeature || !orgFeature.isActive) {
       return res.status(403).json({ 
-        error: "DockTalk not enabled",
-        message: "DockTalk is not enabled for your organization. Contact your administrator to enable this feature."
+        error: "The Docket not enabled",
+        message: "The Docket is not enabled for your organization. Contact your administrator to enable this feature."
       });
     }
 
