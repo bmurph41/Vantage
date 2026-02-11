@@ -151,7 +151,7 @@ export function GrowthRatesTab({
   }, [updateStorageGrowthMode, triggerAutosave]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <QuickActionsBar
         modifiedCount={modifiedCount}
         totalCount={totalCount}
@@ -161,7 +161,7 @@ export function GrowthRatesTab({
 
       <SectionCard
         title="Storage Revenue Growth"
-        description="Annual percentage increase for marina storage revenue by type or location"
+        description="Annual percentage increase for marina storage revenue"
         accent="blue"
         icon={Warehouse}
         headerAction={
@@ -172,7 +172,7 @@ export function GrowthRatesTab({
         }
       >
         {storageMode === 'universal' ? (
-          <div className="max-w-md">
+          <div className="max-w-xs">
             <RateInput
               label="Universal Growth Rate"
               icon={Globe}
@@ -184,12 +184,9 @@ export function GrowthRatesTab({
               }}
               size="large"
             />
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 ml-8">
-              This rate applies to all storage types
-            </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-1 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-1 gap-y-0 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-1">
             {storageRevenueCategories.map((category) => {
               const storageCategory = STORAGE_CATEGORIES.find(s => s.id === category.id);
               const IconComponent = storageCategory?.icon || Anchor;
@@ -208,7 +205,7 @@ export function GrowthRatesTab({
               );
             })}
             {storageRevenueCategories.length === 0 && (
-              <p className="text-sm text-slate-500 dark:text-slate-400 py-2 col-span-2">
+              <p className="text-xs text-slate-500 dark:text-slate-400 py-2 col-span-3">
                 No storage types enabled. Enable them in Department Configuration.
               </p>
             )}
@@ -223,7 +220,7 @@ export function GrowthRatesTab({
         icon={TrendingUp}
         headerAction={<SetAllDropdown onSetAll={handleSetAllRevenue} />}
       >
-        <CategoryGroup title="Core Marina Revenue">
+        <CategoryGroup title="Core Marina Revenue" columns={2}>
           {REVENUE_CATEGORIES.coreMarineRevenue.map((cat) => {
             const isEnabled = nonStorageRevenueCategories.some(c => c.id === cat.id);
             if (!isEnabled) return null;
@@ -243,7 +240,7 @@ export function GrowthRatesTab({
           })}
         </CategoryGroup>
 
-        <CategoryGroup title="Retail & Service">
+        <CategoryGroup title="Retail & Service" columns={2}>
           {REVENUE_CATEGORIES.retailAndService.map((cat) => {
             const isEnabled = nonStorageRevenueCategories.some(c => c.id === cat.id);
             if (!isEnabled) return null;
@@ -263,7 +260,7 @@ export function GrowthRatesTab({
           })}
         </CategoryGroup>
 
-        <CategoryGroup title="Boats">
+        <CategoryGroup title="Boats" columns={3}>
           {REVENUE_CATEGORIES.boats.map((cat) => {
             const isEnabled = nonStorageRevenueCategories.some(c => c.id === cat.id);
             if (!isEnabled) return null;
@@ -283,7 +280,7 @@ export function GrowthRatesTab({
           })}
         </CategoryGroup>
 
-        <CategoryGroup title="Leases & Hospitality">
+        <CategoryGroup title="Leases & Hospitality" columns={3}>
           {REVENUE_CATEGORIES.leasesAndHospitality.map((cat) => {
             const isEnabled = nonStorageRevenueCategories.some(c => c.id === cat.id);
             if (!isEnabled) return null;
@@ -304,21 +301,21 @@ export function GrowthRatesTab({
         </CategoryGroup>
 
         {nonStorageRevenueCategories.length === 0 && (
-          <p className="text-sm text-slate-500 dark:text-slate-400 py-2">
+          <p className="text-xs text-slate-500 dark:text-slate-400 py-2">
             No non-storage revenue categories enabled.
           </p>
         )}
       </SectionCard>
 
       <SectionCard
-        title="Operating Expense Growth Rates"
+        title="Operating Expense Growth"
         description="Annual percentage increase for operating expenses"
         accent="slate"
         icon={Receipt}
         collapsible
         headerAction={<SetAllDropdown onSetAll={handleSetAllOpex} />}
       >
-        <CategoryGroup title="Labor & Administration">
+        <CategoryGroup title="Labor & Admin" columns={2}>
           {OPEX_CATEGORIES.laborAndAdmin.map((cat) => {
             const isEnabled = expenseCategories.some(c => c.id === cat.id);
             if (!isEnabled) return null;
@@ -338,7 +335,7 @@ export function GrowthRatesTab({
           })}
         </CategoryGroup>
 
-        <CategoryGroup title="Marketing">
+        <CategoryGroup title="Marketing" columns={2}>
           {OPEX_CATEGORIES.marketing.map((cat) => {
             const isEnabled = expenseCategories.some(c => c.id === cat.id);
             if (!isEnabled) return null;
@@ -358,7 +355,7 @@ export function GrowthRatesTab({
           })}
         </CategoryGroup>
 
-        <CategoryGroup title="Operations">
+        <CategoryGroup title="Operations" columns={2}>
           {OPEX_CATEGORIES.operations.map((cat) => {
             const isEnabled = expenseCategories.some(c => c.id === cat.id);
             if (!isEnabled) return null;
@@ -378,7 +375,7 @@ export function GrowthRatesTab({
           })}
         </CategoryGroup>
 
-        <CategoryGroup title="Financial">
+        <CategoryGroup title="Financial" columns={2}>
           {OPEX_CATEGORIES.financial.map((cat) => {
             const isEnabled = expenseCategories.some(c => c.id === cat.id);
             if (!isEnabled) return null;
@@ -400,14 +397,14 @@ export function GrowthRatesTab({
       </SectionCard>
 
       <SectionCard
-        title="Departmental Expense Growth Rates"
+        title="Departmental Expense Growth"
         description="Annual percentage increase for segment-specific expenses"
         accent="purple"
         icon={PieChart}
         collapsible
         headerAction={<SetAllDropdown onSetAll={handleSetAllDepartmental} />}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-1 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-1 gap-y-0 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-1">
           {DEPARTMENTAL_EXPENSE_CATEGORIES.map((cat) => {
             const isEnabled = segmentExpenseCategories.some(c => c.id === cat.id);
             if (!isEnabled) return null;
@@ -427,7 +424,7 @@ export function GrowthRatesTab({
           })}
         </div>
         {segmentExpenseCategories.length === 0 && (
-          <p className="text-sm text-slate-500 dark:text-slate-400 py-2">
+          <p className="text-xs text-slate-500 dark:text-slate-400 py-2">
             No departmental expense categories enabled.
           </p>
         )}

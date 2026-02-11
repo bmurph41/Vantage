@@ -32,37 +32,39 @@ export function RateInput({
   size = 'default'
 }: RateInputProps) {
   const isModified = Math.abs(value - defaultValue) > 0.001;
-  const percentage = ((value - min) / (max - min)) * 100;
+  const clampedMin = Math.max(min, -10);
+  const clampedMax = Math.min(max, 15);
+  const percentage = ((value - clampedMin) / (clampedMax - clampedMin)) * 100;
   
   return (
     <div className={cn(
-      "flex items-center gap-3 py-2.5 px-3 rounded-lg transition-all duration-200 group",
+      "flex items-center gap-2 py-1.5 px-2.5 rounded-md transition-all duration-150 group",
       isModified ? "bg-amber-50 dark:bg-amber-950/30 ring-1 ring-amber-200 dark:ring-amber-800" : "hover:bg-white dark:hover:bg-slate-800"
     )}>
-      <Icon className="w-4 h-4 text-slate-400 dark:text-slate-500 flex-shrink-0" />
+      <Icon className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 flex-shrink-0" />
       <span className={cn(
-        "text-sm font-medium text-slate-700 dark:text-slate-300 truncate",
-        size === 'large' ? "w-48" : "w-44"
+        "text-[13px] font-medium text-slate-700 dark:text-slate-300 truncate min-w-0",
+        size === 'large' ? "w-40" : "w-28 flex-shrink-0"
       )} title={label}>
         {label}
       </span>
       
-      <div className="flex-1 relative h-6 flex items-center">
+      <div className="flex-1 relative h-5 flex items-center min-w-[60px] hidden sm:flex">
         <input
           type="range"
-          min={min}
-          max={max}
+          min={clampedMin}
+          max={clampedMax}
           step={step}
-          value={value}
+          value={Math.max(clampedMin, Math.min(clampedMax, value))}
           onChange={(e) => onChange(parseFloat(e.target.value))}
-          className="w-full h-1.5 rounded-full appearance-none cursor-pointer range-slider"
+          className="w-full h-1 rounded-full appearance-none cursor-pointer range-slider"
           style={{
             background: `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${percentage}%, hsl(var(--border)) ${percentage}%, hsl(var(--border)) 100%)`
           }}
         />
       </div>
-      
-      <div className="relative">
+
+      <div className="relative flex-shrink-0">
         <input
           type="number"
           value={value}
@@ -71,14 +73,14 @@ export function RateInput({
           min={min}
           max={max}
           className={cn(
-            "w-20 text-right text-sm font-mono rounded-lg px-2 py-1.5 pr-6 outline-none transition-all",
+            "w-16 text-right text-[13px] font-mono rounded-md px-1.5 py-1 pr-5 outline-none transition-all",
             "border bg-white dark:bg-slate-800",
             isModified 
-              ? "border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 focus:ring-2 focus:ring-amber-400" 
-              : "border-slate-200 dark:border-slate-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              ? "border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 focus:ring-1 focus:ring-amber-400" 
+              : "border-slate-200 dark:border-slate-600 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           )}
         />
-        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 text-sm pointer-events-none">
+        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 text-xs pointer-events-none">
           %
         </span>
       </div>
@@ -86,13 +88,13 @@ export function RateInput({
       {isModified ? (
         <button
           onClick={() => onChange(defaultValue)}
-          className="p-1.5 text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50 rounded-md transition-colors"
+          className="p-1 text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50 rounded transition-colors flex-shrink-0"
           title="Reset to default"
         >
-          <RotateCcw className="w-3.5 h-3.5" />
+          <RotateCcw className="w-3 h-3" />
         </button>
       ) : (
-        <div className="w-7" />
+        <div className="w-5 flex-shrink-0" />
       )}
     </div>
   );
@@ -136,14 +138,14 @@ export function SectionCard({
       "bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 border-l-4 overflow-hidden",
       style.border
     )}>
-      <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className={cn("p-2 rounded-lg", style.iconBg)}>
-            <Icon className="w-5 h-5" />
+      <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className={cn("p-1.5 rounded-lg", style.iconBg)}>
+            <Icon className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{description}</p>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{description}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -151,15 +153,15 @@ export function SectionCard({
           {collapsible && (
             <button
               onClick={() => setIsExpanded(!isExpanded)}
-              className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
             >
-              {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
           )}
         </div>
       </div>
       
-      {isExpanded && <div className="p-5">{children}</div>}
+      {isExpanded && <div className="px-4 py-3">{children}</div>}
     </div>
   );
 }
@@ -167,15 +169,19 @@ export function SectionCard({
 interface CategoryGroupProps {
   title: string;
   children: React.ReactNode;
+  columns?: 2 | 3;
 }
 
-export function CategoryGroup({ title, children }: CategoryGroupProps) {
+export function CategoryGroup({ title, children, columns = 2 }: CategoryGroupProps) {
   return (
-    <div className="mb-5 last:mb-0">
-      <div className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 px-1">
+    <div className="mb-3 last:mb-0">
+      <div className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1 px-1">
         {title}
       </div>
-      <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-1.5 space-y-0.5">
+      <div className={cn(
+        "bg-slate-50 dark:bg-slate-800/50 rounded-lg p-1 grid gap-x-1 gap-y-0",
+        columns === 3 ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1 md:grid-cols-2"
+      )}>
         {children}
       </div>
     </div>
@@ -191,7 +197,7 @@ export function SetAllDropdown({ onSetAll }: SetAllDropdownProps) {
     <select
       onChange={(e) => e.target.value && onSetAll(parseFloat(e.target.value))}
       defaultValue=""
-      className="text-sm border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-1.5 text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer focus:ring-2 focus:ring-blue-500 outline-none"
+      className="text-xs border border-slate-200 dark:border-slate-600 rounded-md px-2 py-1 text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer focus:ring-1 focus:ring-blue-500 outline-none"
     >
       <option value="" disabled>Set all to...</option>
       <option value="1.0">1.0%</option>
@@ -213,30 +219,30 @@ interface ModeToggleProps {
 
 export function ModeToggle({ value, onChange }: ModeToggleProps) {
   return (
-    <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+    <div className="flex bg-slate-100 dark:bg-slate-800 rounded-md p-0.5">
       <button
         onClick={() => onChange('universal')}
         className={cn(
-          "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+          "flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-all",
           value === 'universal' 
             ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm" 
             : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
         )}
       >
-        <Globe className="w-4 h-4" />
-        Universal Rate
+        <Globe className="w-3 h-3" />
+        Universal
       </button>
       <button
         onClick={() => onChange('perProfitCenter')}
         className={cn(
-          "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+          "flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-all",
           value === 'perProfitCenter' 
             ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm" 
             : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
         )}
       >
-        <Layers className="w-4 h-4" />
-        Per Profit Center
+        <Layers className="w-3 h-3" />
+        Per Type
       </button>
     </div>
   );
@@ -251,11 +257,11 @@ interface QuickActionsBarProps {
 
 export function QuickActionsBar({ modifiedCount, totalCount, onReset, onPreset }: QuickActionsBarProps) {
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 px-5 py-3 flex flex-wrap items-center justify-between gap-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <Sparkles className="w-5 h-5 text-blue-500" />
-        <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Quick Presets:</span>
-        <div className="flex gap-2">
+    <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 px-4 py-2 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Sparkles className="w-4 h-4 text-blue-500" />
+        <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Presets:</span>
+        <div className="flex gap-1.5">
           {[
             { label: 'Conservative', value: 1.5 },
             { label: 'Moderate', value: 2.5 },
@@ -264,7 +270,7 @@ export function QuickActionsBar({ modifiedCount, totalCount, onReset, onPreset }
             <button
               key={value}
               onClick={() => onPreset(value)}
-              className="px-3 py-1.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 hover:border-slate-300 dark:hover:border-slate-500 transition-colors text-slate-700 dark:text-slate-300"
+              className="px-2.5 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 hover:border-slate-300 dark:hover:border-slate-500 transition-colors text-slate-700 dark:text-slate-300"
             >
               {label} ({value}%)
             </button>
@@ -272,13 +278,18 @@ export function QuickActionsBar({ modifiedCount, totalCount, onReset, onPreset }
         </div>
       </div>
       
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
+        {modifiedCount > 0 && (
+          <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+            {modifiedCount} modified
+          </span>
+        )}
         <button
           onClick={onReset}
-          className="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
+          className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 flex items-center gap-1 px-2 py-1 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-md transition-colors"
         >
-          <RotateCcw className="w-4 h-4" />
-          Reset All
+          <RotateCcw className="w-3 h-3" />
+          Reset
         </button>
       </div>
     </div>
@@ -356,17 +367,17 @@ export const REVENUE_CATEGORIES = {
 export const OPEX_CATEGORIES = {
   laborAndAdmin: [
     { id: 'payroll', key: 'payroll', label: 'Payroll', icon: Users, coaCode: COA_CODES.operatingExpenses.payroll, defaultValue: 4.0 },
-    { id: 'g_and_a', key: 'generalAdmin', label: 'General & Administrative', icon: Briefcase, coaCode: COA_CODES.operatingExpenses.generalAdmin },
-    { id: 'professional_fees', key: 'professionalServices', label: 'Professional Services', icon: Scale, coaCode: COA_CODES.operatingExpenses.professionalServices },
+    { id: 'g_and_a', key: 'generalAdmin', label: 'General & Admin', icon: Briefcase, coaCode: COA_CODES.operatingExpenses.generalAdmin },
+    { id: 'professional_fees', key: 'professionalServices', label: 'Professional Svcs', icon: Scale, coaCode: COA_CODES.operatingExpenses.professionalServices },
   ],
   marketing: [
     { id: 'marketing', key: 'advertising', label: 'Advertising & Marketing', icon: Megaphone, coaCode: COA_CODES.operatingExpenses.advertising },
   ],
   operations: [
-    { id: 'repairs_maintenance', key: 'repairsMaintenance', label: 'Repairs & Maintenance', icon: Wrench, coaCode: COA_CODES.operatingExpenses.repairsMaintenance },
+    { id: 'repairs_maintenance', key: 'repairsMaintenance', label: 'Repairs & Maint.', icon: Wrench, coaCode: COA_CODES.operatingExpenses.repairsMaintenance },
     { id: 'utilities', key: 'utilities', label: 'Utilities', icon: Zap, coaCode: COA_CODES.operatingExpenses.utilities },
     { id: 'licenses_permits', key: 'licensesPermits', label: 'Licenses & Permits', icon: Key, coaCode: COA_CODES.operatingExpenses.licensesPermits },
-    { id: 'contract_services', key: 'securityContractServices', label: 'Security & Contract Services', icon: Shield, coaCode: COA_CODES.operatingExpenses.securityContractServices },
+    { id: 'contract_services', key: 'securityContractServices', label: 'Security & Contract', icon: Shield, coaCode: COA_CODES.operatingExpenses.securityContractServices },
   ],
   financial: [
     { id: 'bank_cc_fees', key: 'bankCreditCardFees', label: 'Bank/CC Fees', icon: CreditCard, coaCode: COA_CODES.operatingExpenses.bankCreditCardFees },
