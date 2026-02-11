@@ -944,16 +944,16 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                 </colgroup>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="whitespace-nowrap sticky left-0 z-20 bg-background border-r w-[220px] min-w-[220px] max-w-[220px] py-2 text-xs">Category / Line Item</TableHead>
+                    <TableHead className="sticky left-0 z-20 bg-white dark:bg-background border-r w-[220px] min-w-[220px] max-w-[220px] py-2"></TableHead>
                     {months.map((month, idx) => (
                       <TableHead 
                         key={month} 
-                        className={`text-center px-1 py-2 text-xs font-bold underline ${!isSeasonalMonth(idx) ? 'bg-muted/30' : ''}`}
+                        className={`text-center px-1 py-2 text-sm font-bold ${!isSeasonalMonth(idx) ? 'bg-muted/30' : ''}`}
                       >
                         {month}
                       </TableHead>
                     ))}
-                    <TableHead className="text-center px-1 py-2 text-xs font-bold underline">Annual</TableHead>
+                    <TableHead className="text-center px-1 py-2 text-sm font-bold">Annual</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1302,9 +1302,9 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                 </colgroup>
                 <TableHeader>
                   <TableRow className="border-b-2">
-                    <TableHead className="whitespace-nowrap sticky left-0 z-20 bg-background border-r px-2 py-2 text-xs">Category / Line Item</TableHead>
+                    <TableHead className="sticky left-0 z-20 bg-white dark:bg-background border-r px-2 py-2"></TableHead>
                     {yearRange.map((year) => (
-                      <TableHead key={year} className="text-right px-2 py-2 font-bold text-xs">
+                      <TableHead key={year} className="text-center px-2 py-2 font-bold text-sm">
                         {year}
                       </TableHead>
                     ))}
