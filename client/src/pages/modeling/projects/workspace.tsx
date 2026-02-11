@@ -78,20 +78,24 @@ export default function ProjectWorkspace() {
   const [, navigate] = useLocation();
   const searchString = useSearch();
   const [activeTab, setActiveTab] = useState(() => {
-    // Initialize from URL query param if present
     const params = new URLSearchParams(searchString);
     return params.get('tab') || 'overview';
   });
   const queryClient = useQueryClient();
 
-  // Sync tab state with URL query parameter (only on URL change, not on activeTab change)
   useEffect(() => {
     const params = new URLSearchParams(searchString);
     const tabFromUrl = params.get('tab');
-    if (tabFromUrl) {
+    if (tabFromUrl && tabFromUrl !== activeTab) {
       setActiveTab(tabFromUrl);
     }
   }, [searchString]);
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    const url = `/modeling/projects/${projectId}?tab=${tab}`;
+    window.history.replaceState(null, '', url);
+  };
 
   const { data: project, isLoading } = useQuery<ModelingProject>({
     queryKey: ['/api/modeling/projects', projectId],
@@ -246,7 +250,7 @@ export default function ProjectWorkspace() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
         <div className="overflow-x-auto mb-4">
           <TabsList className="inline-flex min-w-full lg:min-w-0" data-testid="tabs-workspace">
             <TabsTrigger value="overview" className="gap-2" data-testid="tab-overview">
@@ -345,11 +349,11 @@ export default function ProjectWorkspace() {
         </div>
 
         <TabsContent value="overview" className="space-y-6">
-          <WorkspaceOverview project={project} onTabChange={setActiveTab} />
+          <WorkspaceOverview project={project} onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="inputs" className="space-y-6" data-tour="valuator-inputs">
-          <WorkspaceInputs projectId={projectId!} onTabChange={setActiveTab} />
+          <WorkspaceInputs projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="cases" className="space-y-6" data-tour="valuator-scenarios">
@@ -357,15 +361,15 @@ export default function ProjectWorkspace() {
         </TabsContent>
 
         <TabsContent value="uploads" className="space-y-6">
-          <WorkspaceUploads projectId={projectId!} onTabChange={setActiveTab} />
+          <WorkspaceUploads projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="assumptions" className="space-y-6">
-          <WorkspaceAssumptions projectId={projectId!} onTabChange={setActiveTab} />
+          <WorkspaceAssumptions projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="historical" className="space-y-6">
-          <WorkspaceHistoricalPL projectId={projectId!} onTabChange={setActiveTab} />
+          <WorkspaceHistoricalPL projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6" data-tour="valuator-analysis">
@@ -373,23 +377,23 @@ export default function ProjectWorkspace() {
         </TabsContent>
 
         <TabsContent value="proforma" className="space-y-6">
-          <WorkspaceProForma projectId={projectId!} onTabChange={setActiveTab} />
+          <WorkspaceProForma projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="pricing" className="space-y-6">
-          <DealPricing projectId={projectId!} onTabChange={setActiveTab} />
+          <DealPricing projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="summary" className="space-y-6" data-tour="valuator-export">
-          <WorkspaceExecutiveSummary projectId={projectId!} onTabChange={setActiveTab} />
+          <WorkspaceExecutiveSummary projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="capital" className="space-y-6">
-          <CapitalStackWorkspace projectId={projectId!} onTabChange={setActiveTab} />
+          <CapitalStackWorkspace projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="exit" className="space-y-6" data-tour="valuator-exit">
-          <WorkspaceExitStrategy projectId={projectId!} onTabChange={setActiveTab} />
+          <WorkspaceExitStrategy projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
 
@@ -413,7 +417,7 @@ export default function ProjectWorkspace() {
         </TabsContent>
 
         <TabsContent value="dcf" className="space-y-6">
-          <DCFCalculatorPage onTabChange={setActiveTab} />
+          <DCFCalculatorPage onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="monte-carlo" className="space-y-6">
@@ -421,23 +425,23 @@ export default function ProjectWorkspace() {
         </TabsContent>
 
         <TabsContent value="proforma-charts" className="space-y-6">
-          <WorkspaceProFormaCharts projectId={projectId!} onTabChange={setActiveTab} />
+          <WorkspaceProFormaCharts projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="scenario-compare" className="space-y-6">
-          <ScenarioComparisonCharts projectId={projectId!} onTabChange={setActiveTab} />
+          <ScenarioComparisonCharts projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="sensitivity" className="space-y-6">
-          <SensitivityTornado projectId={projectId!} onTabChange={setActiveTab} />
+          <SensitivityTornado projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="validation" className="space-y-6">
-          <ValidationWarnings projectId={projectId!} onTabChange={setActiveTab} />
+          <ValidationWarnings projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="export" className="space-y-6">
-          <ExportModel projectId={projectId!} projectName={project.marinaName} onTabChange={setActiveTab} />
+          <ExportModel projectId={projectId!} projectName={project.marinaName} onTabChange={handleTabChange} />
         </TabsContent>
       </Tabs>
     </div>
