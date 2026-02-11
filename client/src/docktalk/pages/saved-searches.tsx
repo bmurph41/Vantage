@@ -43,11 +43,42 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Mail, Search, Plus, Trash2, Bell, BellOff, ChevronDown, ChevronRight, FileText, Clock, Calendar as CalendarIcon } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Mail,
+  Search,
+  Plus,
+  Trash2,
+  Bell,
+  BellOff,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  Clock,
+  Calendar as CalendarIcon,
+  Settings2,
+  Pencil,
+  Zap,
+  Send,
+  Globe,
+  Tag,
+  Building2,
+} from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { normalizeSavedSearchData } from "../lib/normalization";
+import { formatDistanceToNow } from "date-fns";
 
 const TIMEZONES = [
   { value: "America/New_York", label: "Eastern Time (ET)" },
@@ -65,6 +96,12 @@ const TIMEZONES = [
   { value: "Asia/Shanghai", label: "Shanghai (CST)" },
   { value: "Asia/Dubai", label: "Dubai (GST)" },
   { value: "Australia/Sydney", label: "Sydney (AEDT/AEST)" },
+] as const;
+
+const FREQUENCY_OPTIONS = [
+  { value: "immediate", label: "Immediate", description: "Get notified right away", icon: Zap },
+  { value: "daily", label: "Daily Digest", description: "Once per day at your chosen time", icon: Clock },
+  { value: "weekly", label: "Weekly Summary", description: "Once per week on Mondays", icon: CalendarIcon },
 ] as const;
 
 const emailSettingsSchema = z.object({
@@ -99,16 +136,28 @@ interface Article {
   categories: string[];
 }
 
+function getTimezoneLabel(value: string) {
+  return TIMEZONES.find(tz => tz.value === value)?.label || value;
+}
+
+function getFrequencyLabel(value: string | null) {
+  if (!value) return "Off";
+  return FREQUENCY_OPTIONS.find(f => f.value === value)?.label || value;
+}
+
 export default function SavedSearchesPage() {
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [searchName, setSearchName] = useState("");
-  const [queryText, setQueryText] = useState("");
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [entities, setEntities] = useState("");
-  const [emailAlerts, setEmailAlerts] = useState(false);
-  const [alertFrequency, setAlertFrequency] = useState("daily");
+  const [editingAlert, setEditingAlert] = useState<SavedSearch | null>(null);
+  const [deleteAlertId, setDeleteAlertId] = useState<string | null>(null);
+  const [settingsExpanded, setSettingsExpanded] = useState(false);
   const [expandedSearch, setExpandedSearch] = useState<string | null>(null);
+
+  const [alertName, setAlertName] = useState("");
+  const [alertKeywords, setAlertKeywords] = useState("");
+  const [alertCategories, setAlertCategories] = useState<string[]>([]);
+  const [alertEntities, setAlertEntities] = useState("");
+  const [alertFrequency, setAlertFrequency] = useState("daily");
 
   const form = useForm<EmailSettingsForm>({
     resolver: zodResolver(emailSettingsSchema),
@@ -153,27 +202,21 @@ export default function SavedSearchesPage() {
           enabled: true,
         }),
       });
-
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to update preferences");
       }
-
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/docktalk/user/current"] });
       toast({
-        title: "Email Settings Saved",
+        title: "Settings Saved",
         description: "Your email delivery settings have been updated.",
       });
     },
     onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -184,32 +227,19 @@ export default function SavedSearchesPage() {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
       });
-
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to send test email");
       }
-
       return response.json();
     },
     onSuccess: (data: any) => {
-      toast({
-        title: "Test Email Sent!",
-        description: data.message || "Check your inbox for the test email.",
-      });
+      toast({ title: "Test Email Sent!", description: data.message || "Check your inbox." });
     },
     onError: (error: Error) => {
-      toast({
-        title: "Email Test Failed",
-        description: error.message || "Failed to send test email. Please check your notification settings.",
-        variant: "destructive",
-      });
+      toast({ title: "Email Test Failed", description: error.message, variant: "destructive" });
     },
   });
-
-  const onEmailSettingsSubmit = (data: EmailSettingsForm) => {
-    updatePreferencesMutation.mutate(data);
-  };
 
   const { data: searches = [], isLoading } = useQuery<SavedSearch[]>({
     queryKey: ['/api/docktalk/saved-searches'],
@@ -229,40 +259,23 @@ export default function SavedSearchesPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: {
-      searchName: string;
-      queryText: string;
-      categories?: string[];
-      entities?: string[];
-      emailAlerts?: boolean;
-      alertFrequency?: string;
-    }) => {
+    mutationFn: async (data: any) => {
       const response = await fetch('/api/docktalk/saved-searches', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
         credentials: 'include',
       });
-      if (!response.ok) {
-        throw new Error('Failed to create saved search');
-      }
+      if (!response.ok) throw new Error('Failed to create alert');
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/docktalk/saved-searches'] });
-      setIsAddDialogOpen(false);
-      resetForm();
-      toast({
-        title: "Alert Created",
-        description: "Your email alert has been saved successfully.",
-      });
+      closeAlertDialog();
+      toast({ title: "Alert Created", description: "You'll start receiving notifications for matching articles." });
     },
     onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to save alert",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to create alert", variant: "destructive" });
     },
   });
 
@@ -274,24 +287,16 @@ export default function SavedSearchesPage() {
         body: JSON.stringify(data),
         credentials: 'include',
       });
-      if (!response.ok) {
-        throw new Error('Failed to update saved search');
-      }
+      if (!response.ok) throw new Error('Failed to update alert');
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/docktalk/saved-searches'] });
-      toast({
-        title: "Alert Updated",
-        description: "Alert settings have been updated.",
-      });
+      closeAlertDialog();
+      toast({ title: "Alert Updated", description: "Your alert has been updated." });
     },
     onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to update alert",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to update alert", variant: "destructive" });
     },
   });
 
@@ -301,531 +306,664 @@ export default function SavedSearchesPage() {
         method: 'DELETE',
         credentials: 'include',
       });
-      if (!response.ok) {
-        throw new Error('Failed to delete saved search');
-      }
+      if (!response.ok) throw new Error('Failed to delete alert');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/docktalk/saved-searches'] });
-      toast({
-        title: "Alert Deleted",
-        description: "Email alert has been removed.",
-      });
+      setDeleteAlertId(null);
+      toast({ title: "Alert Deleted", description: "Email alert has been removed." });
     },
     onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to delete alert",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to delete alert", variant: "destructive" });
     },
   });
 
-  const resetForm = () => {
-    setSearchName("");
-    setQueryText("");
-    setSelectedCategories([]);
-    setEntities("");
-    setEmailAlerts(false);
+  const closeAlertDialog = () => {
+    setIsAddDialogOpen(false);
+    setEditingAlert(null);
+    setAlertName("");
+    setAlertKeywords("");
+    setAlertCategories([]);
+    setAlertEntities("");
     setAlertFrequency("daily");
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const openEditDialog = (search: SavedSearch) => {
+    setEditingAlert(search);
+    setAlertName(search.searchName);
+    setAlertKeywords(search.queryText);
+    setAlertCategories(search.categories || []);
+    setAlertEntities((search.entities || []).join(", "));
+    setAlertFrequency(search.alertFrequency || "daily");
+    setIsAddDialogOpen(true);
+  };
+
+  const handleAlertSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!searchName.trim() || !queryText.trim()) {
+    if (!alertName.trim() || !alertKeywords.trim()) {
       toast({
-        title: "Validation Error",
-        description: "Alert name and keywords are required",
+        title: "Missing Information",
+        description: "Please provide an alert name and at least one keyword.",
         variant: "destructive",
       });
       return;
     }
 
-    const entitiesArray = entities
-      .split(',')
-      .map(e => e.trim())
-      .filter(Boolean);
-
+    const entitiesArray = alertEntities.split(',').map(e => e.trim()).filter(Boolean);
     const normalizedData = normalizeSavedSearchData({
-      searchName: searchName,
-      queryText: queryText,
-      categories: selectedCategories,
+      searchName: alertName,
+      queryText: alertKeywords,
+      categories: alertCategories,
       entities: entitiesArray,
-      emailAlerts,
-      alertFrequency: emailAlerts ? alertFrequency : null,
+      emailAlerts: true,
+      alertFrequency: alertFrequency,
     });
 
-    createMutation.mutate(normalizedData);
-  };
-
-  const handleDelete = (search: SavedSearch) => {
-    if (window.confirm(`Are you sure you want to delete "${search.searchName}"?`)) {
-      deleteMutation.mutate(search.id);
+    if (editingAlert) {
+      updateMutation.mutate({ id: editingAlert.id, data: normalizedData });
+    } else {
+      createMutation.mutate(normalizedData);
     }
   };
 
+  const activeAlerts = searches.filter(s => s.emailAlerts);
+  const pausedAlerts = searches.filter(s => !s.emailAlerts);
+  const userEmail = form.watch("email");
+  const userTimezone = form.watch("timezone");
+  const userDeliveryTime = form.watch("deliveryTime");
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-          <Mail className="h-8 w-8 text-primary" />
-          Email Alerts
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Configure email delivery settings and create alerts to receive notifications when matching articles are published
-        </p>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Mail className="h-5 w-5" />
-            Email Delivery Settings
-          </CardTitle>
-          <CardDescription>
-            Configure where and when to receive email alerts
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {userLoading ? (
-            <div className="space-y-4">
-              <Skeleton className="h-10 w-full" />
-              <div className="grid grid-cols-2 gap-4">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-            </div>
-          ) : (
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onEmailSettingsSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email Address</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="your.email@company.com"
-                          {...field}
-                          data-testid="input-notification-email"
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Email address where you'll receive article alerts
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="timezone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center gap-2">
-                          <CalendarIcon className="h-4 w-4" />
-                          Timezone
-                        </FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          value={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger data-testid="select-timezone">
-                              <SelectValue placeholder="Select timezone" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {TIMEZONES.map((tz) => (
-                              <SelectItem key={tz.value} value={tz.value}>
-                                {tz.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormDescription>
-                          Your local timezone
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="deliveryTime"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center gap-2">
-                          <Clock className="h-4 w-4" />
-                          Delivery Time
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            type="time"
-                            {...field}
-                            data-testid="input-delivery-time"
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Daily/weekly digest time
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="flex justify-between items-center pt-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => testEmailMutation.mutate()}
-                    disabled={testEmailMutation.isPending || !form.watch("email")}
-                    data-testid="button-test-email"
-                  >
-                    <Mail className="h-4 w-4 mr-2" />
-                    {testEmailMutation.isPending ? "Sending..." : "Send Test Email"}
-                  </Button>
-                  
-                  <Button
-                    type="submit"
-                    size="sm"
-                    disabled={updatePreferencesMutation.isPending}
-                    data-testid="button-save-preferences"
-                  >
-                    {updatePreferencesMutation.isPending ? "Saving..." : "Save Settings"}
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          )}
-        </CardContent>
-      </Card>
-
-      <Separator />
-
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Alert Rules</h2>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+            <Bell className="h-8 w-8 text-primary" />
+            Email Alerts
+          </h1>
           <p className="text-muted-foreground mt-1">
-            Create keyword-based alerts to track marina industry news and M&A activity
+            Get notified when articles matching your criteria are published
           </p>
         </div>
         <Button onClick={() => setIsAddDialogOpen(true)} data-testid="button-add-search">
           <Plus className="h-4 w-4 mr-2" />
           New Alert
         </Button>
+      </div>
 
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogContent className="max-w-2xl">
-            <form onSubmit={handleSubmit}>
-              <DialogHeader>
-                <DialogTitle>Create Email Alert</DialogTitle>
-                <DialogDescription>
-                  Define search criteria to receive email notifications when matching articles are published
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="searchName">Alert Name *</Label>
-                  <Input
-                    id="searchName"
-                    data-testid="input-search-name"
-                    placeholder="e.g., Southeast Marina Acquisitions"
-                    value={searchName}
-                    onChange={(e) => setSearchName(e.target.value)}
-                    required
-                  />
-                </div>
+      <Card className="border-dashed">
+        <div
+          className="flex items-center justify-between px-6 py-4 cursor-pointer select-none"
+          onClick={() => setSettingsExpanded(!settingsExpanded)}
+        >
+          <div className="flex items-center gap-3">
+            <Settings2 className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <h3 className="font-medium text-sm">Delivery Settings</h3>
+              <p className="text-xs text-muted-foreground">
+                {userEmail ? (
+                  <>
+                    <span className="font-medium">{userEmail}</span>
+                    {" "}&middot;{" "}
+                    {getTimezoneLabel(userTimezone || "America/New_York")}
+                    {" "}&middot; Digest at{" "}
+                    {userDeliveryTime || "09:00"}
+                  </>
+                ) : (
+                  "Set your email address to receive alerts"
+                )}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {!userEmail && (
+              <Badge variant="destructive" className="text-xs">Setup Required</Badge>
+            )}
+            {settingsExpanded ? (
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            )}
+          </div>
+        </div>
 
-                <div className="grid gap-2">
-                  <Label htmlFor="queryText">Keywords *</Label>
-                  <Textarea
-                    id="queryText"
-                    data-testid="input-query-text"
-                    placeholder="Enter keywords, phrases, or search terms..."
-                    value={queryText}
-                    onChange={(e) => setQueryText(e.target.value)}
-                    rows={3}
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    You'll receive alerts for articles matching these keywords
-                  </p>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label>Categories</Label>
-                  <p className="text-xs text-muted-foreground mb-1">
-                    Select categories to monitor ({availableCategories.length} available)
-                  </p>
-                  <ScrollArea className="h-48 border rounded-md p-3">
-                    <div className="grid grid-cols-2 gap-2">
-                      {availableCategories.map((category) => (
-                        <div key={category} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`alert-category-${category}`}
-                            checked={selectedCategories.includes(category)}
-                            onCheckedChange={(checked) => {
-                              setSelectedCategories(prev =>
-                                checked
-                                  ? [...prev, category]
-                                  : prev.filter(c => c !== category)
-                              );
-                            }}
-                            data-testid={`checkbox-category-${category.toLowerCase().replace(/ /g, '-')}`}
-                          />
-                          <label htmlFor={`alert-category-${category}`} className="text-sm cursor-pointer">
-                            {category}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                  {selectedCategories.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {selectedCategories.map((cat) => (
-                        <Badge key={cat} variant="secondary" className="text-xs">
-                          {cat}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="entities">Entities</Label>
-                  <Input
-                    id="entities"
-                    data-testid="input-entities"
-                    placeholder="e.g., Safe Harbor, Suntex"
-                    value={entities}
-                    onChange={(e) => setEntities(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">Comma-separated</p>
-                </div>
-
-                <div className="border-t pt-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="emailAlerts">Enable Email Alerts</Label>
-                      <p className="text-xs text-muted-foreground">
-                        Receive email notifications when matching articles are published
-                      </p>
-                    </div>
-                    <Switch
-                      id="emailAlerts"
-                      checked={emailAlerts}
-                      onCheckedChange={setEmailAlerts}
-                      data-testid="switch-email-alerts"
-                    />
-                  </div>
-
-                  {emailAlerts && (
-                    <div className="grid gap-2">
-                      <Label htmlFor="alertFrequency">Alert Frequency</Label>
-                      <select
-                        id="alertFrequency"
-                        value={alertFrequency}
-                        onChange={(e) => setAlertFrequency(e.target.value)}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        data-testid="select-alert-frequency"
-                      >
-                        <option value="daily">Daily Digest</option>
-                        <option value="weekly">Weekly Summary</option>
-                        <option value="immediate">Immediate</option>
-                      </select>
-                    </div>
-                  )}
+        {settingsExpanded && (
+          <CardContent className="border-t pt-4">
+            {userLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-10 w-full" />
+                <div className="grid grid-cols-2 gap-4">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
                 </div>
               </div>
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setIsAddDialogOpen(false);
-                    resetForm();
-                  }}
-                  data-testid="button-cancel-add"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={createMutation.isPending}
-                  data-testid="button-submit-add"
-                >
-                  {createMutation.isPending ? "Saving..." : "Create Alert"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
+            ) : (
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit((data) => updatePreferencesMutation.mutate(data))} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email Address</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="your.email@company.com"
+                            {...field}
+                            data-testid="input-notification-email"
+                          />
+                        </FormControl>
+                        <FormDescription>All alerts will be sent to this address</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="timezone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-2">
+                            <Globe className="h-3.5 w-3.5" />
+                            Timezone
+                          </FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-timezone">
+                                <SelectValue placeholder="Select timezone" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {TIMEZONES.map((tz) => (
+                                <SelectItem key={tz.value} value={tz.value}>
+                                  {tz.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="deliveryTime"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-2">
+                            <Clock className="h-3.5 w-3.5" />
+                            Digest Delivery Time
+                          </FormLabel>
+                          <FormControl>
+                            <Input type="time" {...field} data-testid="input-delivery-time" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="flex justify-between items-center pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => testEmailMutation.mutate()}
+                      disabled={testEmailMutation.isPending || !form.watch("email")}
+                      data-testid="button-test-email"
+                    >
+                      <Send className="h-4 w-4 mr-2" />
+                      {testEmailMutation.isPending ? "Sending..." : "Send Test Email"}
+                    </Button>
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={updatePreferencesMutation.isPending}
+                      data-testid="button-save-preferences"
+                    >
+                      {updatePreferencesMutation.isPending ? "Saving..." : "Save Settings"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            )}
+          </CardContent>
+        )}
+      </Card>
 
       {isLoading ? (
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-40 w-full" />
+            <Skeleton key={i} className="h-32 w-full" />
           ))}
         </div>
       ) : searches.length === 0 ? (
-        <Card>
-          <CardHeader className="text-center py-12">
-            <div className="flex justify-center mb-4">
-              <Bell className="h-16 w-16 text-muted-foreground/50" />
+        <Card className="border-2 border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <div className="rounded-full bg-primary/10 p-4 mb-4">
+              <Bell className="h-10 w-10 text-primary" />
             </div>
-            <CardTitle className="text-2xl">No Email Alerts Yet</CardTitle>
-            <CardDescription className="text-base mt-2">
-              Create keyword-based alerts to automatically receive emails when matching marina industry news is published
-            </CardDescription>
-            <div className="mt-6">
-              <Button onClick={() => setIsAddDialogOpen(true)} data-testid="button-add-first-search">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Your First Alert
-              </Button>
-            </div>
-          </CardHeader>
+            <h2 className="text-xl font-semibold mb-2">No Alerts Yet</h2>
+            <p className="text-muted-foreground text-center max-w-md mb-6">
+              Create your first alert to get notified when articles about marina acquisitions, industry news, or specific companies are published.
+            </p>
+            <Button onClick={() => setIsAddDialogOpen(true)} size="lg" data-testid="button-add-first-search">
+              <Plus className="h-5 w-5 mr-2" />
+              Create Your First Alert
+            </Button>
+          </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
-          {searches.map((search) => (
-            <Card key={search.id} data-testid={`card-search-${search.id}`}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-xl flex items-center gap-2">
-                      <Bell className="h-5 w-5 text-primary" />
-                      {search.searchName}
-                    </CardTitle>
-                    <CardDescription className="mt-2">
-                      Keywords: {search.queryText}
-                    </CardDescription>
-                    <div className="flex items-center gap-2 mt-2 flex-wrap">
-                      {(search.categories || []).map((category, idx) => (
-                        <Badge key={idx} variant="secondary" data-testid={`badge-category-${search.id}-${idx}`}>
-                          {category}
-                        </Badge>
-                      ))}
-                      {(search.entities || []).map((entity, idx) => (
-                        <Badge key={idx} variant="outline" data-testid={`badge-entity-${search.id}-${idx}`}>
-                          {entity}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
+        <div className="space-y-6">
+          {activeAlerts.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                Active Alerts ({activeAlerts.length})
+              </h2>
+              <div className="grid gap-3">
+                {activeAlerts.map((search) => (
+                  <AlertCard
+                    key={search.id}
+                    search={search}
+                    onEdit={openEditDialog}
+                    onDelete={(id) => setDeleteAlertId(id)}
+                    onToggle={(id, enabled) => {
+                      const normalizedData = normalizeSavedSearchData({
+                        emailAlerts: enabled,
+                        alertFrequency: enabled ? (search.alertFrequency || 'daily') : null,
+                        categories: search.categories || [],
+                        entities: search.entities || [],
+                      });
+                      updateMutation.mutate({ id, data: normalizedData });
+                    }}
+                    isUpdating={updateMutation.isPending}
+                    expandedSearch={expandedSearch}
+                    onToggleExpand={(id) => setExpandedSearch(expandedSearch === id ? null : id)}
+                    searchResults={expandedSearch === search.id ? searchResults : []}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2" data-testid={`alert-toggle-${search.id}`}>
-                      <Label htmlFor={`alert-${search.id}`} className="text-sm cursor-pointer">
-                        {search.emailAlerts ? <Bell className="h-4 w-4 text-primary" /> : <BellOff className="h-4 w-4 text-muted-foreground" />}
-                      </Label>
-                      <Switch
-                        id={`alert-${search.id}`}
-                        checked={search.emailAlerts}
-                        onCheckedChange={(checked) => {
-                          const normalizedData = normalizeSavedSearchData({
-                            emailAlerts: checked,
-                            alertFrequency: checked ? (search.alertFrequency || 'daily') : null,
-                            categories: search.categories || [],
-                            entities: search.entities || [],
-                          });
-                          updateMutation.mutate({
-                            id: search.id,
-                            data: normalizedData,
-                          });
-                        }}
-                        disabled={updateMutation.isPending}
-                        data-testid={`switch-alert-${search.id}`}
-                      />
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(search)}
-                      disabled={deleteMutation.isPending}
-                      data-testid={`button-delete-${search.id}`}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-
-              <CardContent className="space-y-3">
-                {search.emailAlerts && search.alertFrequency && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Mail className="h-4 w-4" />
-                    <span>Alert frequency: {search.alertFrequency}</span>
-                  </div>
-                )}
-
-                <div className="border-t pt-3">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setExpandedSearch(expandedSearch === search.id ? null : search.id)}
-                    className="w-full justify-start text-sm font-medium text-muted-foreground hover:text-foreground"
-                    data-testid={`button-toggle-results-${search.id}`}
-                  >
-                    {expandedSearch === search.id ? (
-                      <ChevronDown className="h-4 w-4 mr-2" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 mr-2" />
-                    )}
-                    <FileText className="h-4 w-4 mr-2" />
-                    Matching Articles ({expandedSearch === search.id ? searchResults.length : '...'})
-                  </Button>
-
-                  {expandedSearch === search.id && (
-                    <div className="mt-3 space-y-2" data-testid={`results-list-${search.id}`}>
-                      {searchResults.length === 0 ? (
-                        <p className="text-sm text-muted-foreground px-4 py-2">
-                          No matching articles found yet
-                        </p>
-                      ) : (
-                        searchResults.map((article) => (
-                          <a
-                            key={article.id}
-                            href={article.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block p-3 rounded-md border hover:bg-muted/50 transition-colors"
-                            data-testid={`article-${article.id}`}
-                          >
-                            <h4 className="text-sm font-medium text-foreground line-clamp-2">
-                              {article.title}
-                            </h4>
-                            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                              <span>{article.source}</span>
-                              <span>•</span>
-                              <span>{new Date(article.publishedAt).toLocaleDateString()}</span>
-                              {article.categories.length > 0 && (
-                                <>
-                                  <span>•</span>
-                                  <span>{article.categories[0]}</span>
-                                </>
-                              )}
-                            </div>
-                          </a>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          {pausedAlerts.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                Paused ({pausedAlerts.length})
+              </h2>
+              <div className="grid gap-3">
+                {pausedAlerts.map((search) => (
+                  <AlertCard
+                    key={search.id}
+                    search={search}
+                    onEdit={openEditDialog}
+                    onDelete={(id) => setDeleteAlertId(id)}
+                    onToggle={(id, enabled) => {
+                      const normalizedData = normalizeSavedSearchData({
+                        emailAlerts: enabled,
+                        alertFrequency: enabled ? (search.alertFrequency || 'daily') : null,
+                        categories: search.categories || [],
+                        entities: search.entities || [],
+                      });
+                      updateMutation.mutate({ id, data: normalizedData });
+                    }}
+                    isUpdating={updateMutation.isPending}
+                    expandedSearch={expandedSearch}
+                    onToggleExpand={(id) => setExpandedSearch(expandedSearch === id ? null : id)}
+                    searchResults={expandedSearch === search.id ? searchResults : []}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
+
+      <Dialog open={isAddDialogOpen} onOpenChange={(open) => { if (!open) closeAlertDialog(); else setIsAddDialogOpen(true); }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+          <form onSubmit={handleAlertSubmit} className="flex flex-col flex-1 overflow-hidden">
+            <DialogHeader className="flex-shrink-0">
+              <DialogTitle>{editingAlert ? "Edit Alert" : "Create New Alert"}</DialogTitle>
+              <DialogDescription>
+                {editingAlert
+                  ? "Update your alert criteria and delivery preferences"
+                  : "Set up keyword and category filters to receive email notifications"
+                }
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex-1 overflow-y-auto py-4 space-y-5 pr-1">
+              <div className="space-y-2">
+                <Label htmlFor="alertName" className="text-sm font-medium">
+                  Alert Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="alertName"
+                  placeholder="e.g., Southeast Marina Acquisitions"
+                  value={alertName}
+                  onChange={(e) => setAlertName(e.target.value)}
+                  data-testid="input-search-name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="alertKeywords" className="text-sm font-medium">
+                  Keywords <span className="text-destructive">*</span>
+                </Label>
+                <Textarea
+                  id="alertKeywords"
+                  placeholder="Enter keywords, phrases, or search terms..."
+                  value={alertKeywords}
+                  onChange={(e) => setAlertKeywords(e.target.value)}
+                  rows={2}
+                  data-testid="input-query-text"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Articles matching any of these keywords will trigger this alert
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Categories</Label>
+                <p className="text-xs text-muted-foreground">
+                  Narrow your alert to specific topics (leave empty for all categories)
+                </p>
+                <ScrollArea className="h-40 border rounded-md p-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    {availableCategories.map((category) => (
+                      <div key={category} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`alert-cat-${category}`}
+                          checked={alertCategories.includes(category)}
+                          onCheckedChange={(checked) => {
+                            setAlertCategories(prev =>
+                              checked
+                                ? [...prev, category]
+                                : prev.filter(c => c !== category)
+                            );
+                          }}
+                          data-testid={`checkbox-category-${category.toLowerCase().replace(/ /g, '-')}`}
+                        />
+                        <label htmlFor={`alert-cat-${category}`} className="text-sm cursor-pointer leading-none">
+                          {category}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+                {alertCategories.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {alertCategories.map((cat) => (
+                      <Badge
+                        key={cat}
+                        variant="secondary"
+                        className="text-xs cursor-pointer hover:bg-destructive/20"
+                        onClick={() => setAlertCategories(prev => prev.filter(c => c !== cat))}
+                      >
+                        {cat} &times;
+                      </Badge>
+                    ))}
+                    <button
+                      type="button"
+                      className="text-xs text-muted-foreground hover:text-foreground underline ml-1"
+                      onClick={() => setAlertCategories([])}
+                    >
+                      Clear all
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="alertEntities" className="text-sm font-medium">
+                  Companies / Entities
+                </Label>
+                <Input
+                  id="alertEntities"
+                  placeholder="e.g., Safe Harbor, Suntex, Sun Communities"
+                  value={alertEntities}
+                  onChange={(e) => setAlertEntities(e.target.value)}
+                  data-testid="input-entities"
+                />
+                <p className="text-xs text-muted-foreground">Comma-separated list of companies to track</p>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">How Often</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {FREQUENCY_OPTIONS.map((option) => {
+                    const Icon = option.icon;
+                    const isSelected = alertFrequency === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setAlertFrequency(option.value)}
+                        className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all text-center ${
+                          isSelected
+                            ? "border-primary bg-primary/5 text-primary"
+                            : "border-muted hover:border-muted-foreground/30 text-muted-foreground"
+                        }`}
+                        data-testid={`freq-${option.value}`}
+                      >
+                        <Icon className={`h-5 w-5 ${isSelected ? 'text-primary' : ''}`} />
+                        <span className="text-sm font-medium">{option.label}</span>
+                        <span className="text-[11px] leading-tight">{option.description}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="flex-shrink-0 border-t pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={closeAlertDialog}
+                data-testid="button-cancel-add"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={createMutation.isPending || updateMutation.isPending}
+                data-testid="button-submit-add"
+              >
+                {(createMutation.isPending || updateMutation.isPending)
+                  ? "Saving..."
+                  : editingAlert ? "Save Changes" : "Create Alert"
+                }
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deleteAlertId} onOpenChange={(open) => { if (!open) setDeleteAlertId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this alert?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove this alert and you'll stop receiving notifications for it. This can't be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteAlertId && deleteMutation.mutate(deleteAlertId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              Delete Alert
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
+  );
+}
+
+function AlertCard({
+  search,
+  onEdit,
+  onDelete,
+  onToggle,
+  isUpdating,
+  expandedSearch,
+  onToggleExpand,
+  searchResults,
+}: {
+  search: SavedSearch;
+  onEdit: (search: SavedSearch) => void;
+  onDelete: (id: string) => void;
+  onToggle: (id: string, enabled: boolean) => void;
+  isUpdating: boolean;
+  expandedSearch: string | null;
+  onToggleExpand: (id: string) => void;
+  searchResults: Article[];
+}) {
+  const isExpanded = expandedSearch === search.id;
+  const isActive = search.emailAlerts;
+
+  return (
+    <Card
+      className={`transition-all ${!isActive ? 'opacity-60 border-dashed' : ''}`}
+      data-testid={`card-search-${search.id}`}
+    >
+      <CardContent className="p-4">
+        <div className="flex items-start gap-3">
+          <div className={`rounded-full p-2 mt-0.5 ${isActive ? 'bg-primary/10' : 'bg-muted'}`}>
+            {isActive ? (
+              <Bell className="h-4 w-4 text-primary" />
+            ) : (
+              <BellOff className="h-4 w-4 text-muted-foreground" />
+            )}
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <h3 className="font-semibold text-base truncate">{search.searchName}</h3>
+              {search.alertFrequency && isActive && (
+                <Badge variant="outline" className="text-xs flex-shrink-0">
+                  {getFrequencyLabel(search.alertFrequency)}
+                </Badge>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-2">
+              <Search className="h-3.5 w-3.5 flex-shrink-0" />
+              <span className="truncate">{search.queryText}</span>
+            </div>
+
+            <div className="flex flex-wrap gap-1">
+              {(search.categories || []).map((cat, idx) => (
+                <Badge key={idx} variant="secondary" className="text-xs">
+                  <Tag className="h-3 w-3 mr-1" />
+                  {cat}
+                </Badge>
+              ))}
+              {(search.entities || []).map((entity, idx) => (
+                <Badge key={idx} variant="outline" className="text-xs">
+                  <Building2 className="h-3 w-3 mr-1" />
+                  {entity}
+                </Badge>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-3 mt-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs text-muted-foreground"
+                onClick={() => onToggleExpand(search.id)}
+                data-testid={`button-toggle-results-${search.id}`}
+              >
+                {isExpanded ? (
+                  <ChevronDown className="h-3.5 w-3.5 mr-1" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5 mr-1" />
+                )}
+                <FileText className="h-3.5 w-3.5 mr-1" />
+                Matching Articles
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                Created {formatDistanceToNow(new Date(search.createdAt))} ago
+              </span>
+            </div>
+
+            {isExpanded && (
+              <div className="mt-3 space-y-2 border-t pt-3" data-testid={`results-list-${search.id}`}>
+                {searchResults.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-2">
+                    No matching articles found yet
+                  </p>
+                ) : (
+                  searchResults.map((article) => (
+                    <a
+                      key={article.id}
+                      href={article.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block p-2.5 rounded-md border hover:bg-muted/50 transition-colors"
+                      data-testid={`article-${article.id}`}
+                    >
+                      <h4 className="text-sm font-medium line-clamp-1">{article.title}</h4>
+                      <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                        <span>{article.source}</span>
+                        <span>&middot;</span>
+                        <span>{new Date(article.publishedAt).toLocaleDateString()}</span>
+                        {article.categories?.[0] && (
+                          <>
+                            <span>&middot;</span>
+                            <span>{article.categories[0]}</span>
+                          </>
+                        )}
+                      </div>
+                    </a>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Switch
+                    checked={isActive}
+                    onCheckedChange={(checked) => onToggle(search.id, checked)}
+                    disabled={isUpdating}
+                    data-testid={`switch-alert-${search.id}`}
+                  />
+                </TooltipTrigger>
+                <TooltipContent>{isActive ? "Pause alert" : "Enable alert"}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => onEdit(search)}
+              data-testid={`button-edit-${search.id}`}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-destructive hover:text-destructive"
+              onClick={() => onDelete(search.id)}
+              data-testid={`button-delete-${search.id}`}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
