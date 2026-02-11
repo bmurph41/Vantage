@@ -51,10 +51,16 @@ import {
   Clock,
   BarChart3,
   Layers,
-  Calendar
+  Calendar,
+  ArrowUpCircle,
+  Eye,
+  EyeOff,
+  Flag,
+  X
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
+import { useModelingAddbacks } from '@/hooks/useModelingAddbacks';
 
 interface WorkspaceHistoricalPLProps {
   projectId: string;
@@ -115,6 +121,19 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
   const [compareYears, setCompareYears] = useState<string[]>([]);
   const [displayMode, setDisplayMode] = useState<'monthly' | 'annual'>('monthly');
   const [showMoM, setShowMoM] = useState(false);
+  const [showNormalized, setShowNormalized] = useState(false);
+
+  const { 
+    isLineItemAddedBack,
+    isCategoryAddedBack, 
+    isMonthCellAddedBack,
+    toggleLineItemAddback,
+    toggleCategoryAddback,
+    toggleMonthCellAddback,
+    activeAddbacks,
+    isPending: addbackPending,
+    getAddbacksSummary,
+  } = useModelingAddbacks(projectId);
 
   const { data: availableYearsData } = useQuery<{ years: number[] }>({
     queryKey: [`/api/modeling/projects/${projectId}/actuals/years`],
@@ -307,6 +326,35 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
     return (groupedData[category] || []).reduce((sum: number, item: PLLineItem) => 
       sum + item.annualTotal, 0
     );
+  };
+
+  const getNormalizedMonthlyValue = (item: PLLineItem, month: string, monthIdx: number) => {
+    const rawValue = item.monthlyData[month] || 0;
+    if (!showNormalized) return rawValue;
+    if (isCategoryAddedBack(item.category)) return 0;
+    if (isLineItemAddedBack(item.subcategory)) return 0;
+    if (isMonthCellAddedBack(item.subcategory, parseInt(selectedYear), monthIdx + 1)) return 0;
+    return rawValue;
+  };
+
+  const getNormalizedCategoryTotal = (category: string, month: string, monthIdx: number) => {
+    if (!showNormalized) return getCategoryTotal(category, month);
+    if (isCategoryAddedBack(category)) return 0;
+    return (groupedData[category] || []).reduce((sum: number, item: PLLineItem) => {
+      return sum + getNormalizedMonthlyValue(item, month, monthIdx);
+    }, 0);
+  };
+
+  const getNormalizedCategoryAnnualTotal = (category: string) => {
+    if (!showNormalized) return getCategoryAnnualTotal(category);
+    if (isCategoryAddedBack(category)) return 0;
+    return (groupedData[category] || []).reduce((sum: number, item: PLLineItem) => {
+      let itemTotal = 0;
+      months.forEach((month, idx) => {
+        itemTotal += getNormalizedMonthlyValue(item, month, idx);
+      });
+      return sum + itemTotal;
+    }, 0);
   };
 
   const totalRevenue = getCategoryAnnualTotal('Revenue');
@@ -701,6 +749,28 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                       <TooltipContent>Show month-over-month changes</TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={showNormalized ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setShowNormalized(!showNormalized)}
+                          className="h-8 text-xs"
+                        >
+                          {showNormalized ? <Eye className="h-3 w-3 mr-1" /> : <EyeOff className="h-3 w-3 mr-1" />}
+                          Normalized
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Toggle between raw and normalized (addback-adjusted) view</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  {activeAddbacks.length > 0 && (
+                    <Badge variant="secondary" className="gap-1">
+                      <ArrowUpCircle className="h-3 w-3" />
+                      {activeAddbacks.length} Addback{activeAddbacks.length !== 1 ? 's' : ''}
+                    </Badge>
+                  )}
                   <Badge variant="outline" className="gap-1">
                     <div className="w-2 h-2 rounded-full bg-blue-500" />
                     In-Season
@@ -736,7 +806,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   {['Revenue', 'COGS', 'Expenses'].map((category) => (
                     <Fragment key={category}>
                       <TableRow 
-                        className="bg-muted/50 cursor-pointer hover:bg-muted"
+                        className="bg-muted/50 cursor-pointer hover:bg-muted group"
                         onClick={() => toggleCategory(category)}
                       >
                         <TableCell className="font-semibold whitespace-nowrap sticky left-0 z-10 bg-muted/50 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
@@ -747,10 +817,32 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                               <ChevronRight className="h-4 w-4" />
                             )}
                             {category}
+                            {isCategoryAddedBack(category) && (
+                              <Badge variant="outline" className="ml-2 text-xs bg-amber-50 text-amber-700 border-amber-300">
+                                <ArrowUpCircle className="h-3 w-3 mr-1" />
+                                Added Back
+                              </Badge>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 ml-auto opacity-0 group-hover:opacity-100 hover:opacity-100"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleCategoryAddback(category);
+                              }}
+                              disabled={addbackPending}
+                            >
+                              {isCategoryAddedBack(category) ? (
+                                <X className="h-3.5 w-3.5 text-amber-600" />
+                              ) : (
+                                <ArrowUpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                              )}
+                            </Button>
                           </div>
                         </TableCell>
                         {months.map((month, idx) => {
-                          const value = getCategoryTotal(category, month);
+                          const value = showNormalized ? getNormalizedCategoryTotal(category, month, idx) : getCategoryTotal(category, month);
                           const prevMonth = idx > 0 ? months[idx - 1] : null;
                           const prevValue = prevMonth ? getCategoryTotal(category, prevMonth) : null;
                           const momChange = prevValue && prevValue !== 0 ? ((value - prevValue) / Math.abs(prevValue)) * 100 : null;
@@ -771,14 +863,14 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           );
                         })}
                         <TableCell className="text-right font-bold bg-background">
-                          {formatCurrency(getCategoryAnnualTotal(category))}
+                          {formatCurrency(showNormalized ? getNormalizedCategoryAnnualTotal(category) : getCategoryAnnualTotal(category))}
                         </TableCell>
                       </TableRow>
 
                       {expandedCategories.has(category) && (groupedData[category] || []).map((item: PLLineItem) => {
                         const SourceIcon = item.dataSource ? dataSourceIcons[item.dataSource] : null;
                         return (
-                          <TableRow key={item.id} className="text-sm">
+                          <TableRow key={item.id} className={`text-sm group ${isLineItemAddedBack(item.subcategory) || isCategoryAddedBack(category) ? 'opacity-50 line-through' : ''}`}>
                             <TableCell className="pl-10 whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
                               <div className="flex items-center gap-2">
                                 {SourceIcon && (
@@ -788,18 +880,52 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                   <span>{item.description}</span>
                                   <span className="text-xs text-muted-foreground">{item.subcategory}</span>
                                 </div>
+                                {isLineItemAddedBack(item.subcategory) && (
+                                  <Badge variant="outline" className="ml-1 text-[10px] h-5 bg-amber-50 text-amber-700 border-amber-300">
+                                    <ArrowUpCircle className="h-2.5 w-2.5 mr-0.5" />
+                                    Addback
+                                  </Badge>
+                                )}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-5 w-5 p-0 ml-auto opacity-0 group-hover:opacity-100 hover:opacity-100 shrink-0"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleLineItemAddback(item.subcategory, item.description, category);
+                                  }}
+                                  disabled={addbackPending}
+                                >
+                                  {isLineItemAddedBack(item.subcategory) ? (
+                                    <X className="h-3 w-3 text-amber-600" />
+                                  ) : (
+                                    <ArrowUpCircle className="h-3 w-3 text-muted-foreground" />
+                                  )}
+                                </Button>
                               </div>
                             </TableCell>
-                            {months.map((month, idx) => (
-                              <TableCell 
-                                key={month} 
-                                className={`text-right ${!isSeasonalMonth(idx) ? 'bg-muted/30 text-muted-foreground' : ''}`}
-                              >
-                                {formatCurrency(item.monthlyData[month])}
-                              </TableCell>
-                            ))}
+                            {months.map((month, idx) => {
+                              const rawValue = item.monthlyData[month] || 0;
+                              const displayValue = showNormalized ? getNormalizedMonthlyValue(item, month, idx) : rawValue;
+                              const isCellAddedBack = isMonthCellAddedBack(item.subcategory, parseInt(selectedYear), idx + 1);
+                              return (
+                                <TableCell 
+                                  key={month} 
+                                  className={`text-right relative ${!isSeasonalMonth(idx) ? 'bg-muted/30 text-muted-foreground' : ''} ${isCellAddedBack ? 'bg-amber-50' : ''}`}
+                                  onDoubleClick={() => toggleMonthCellAddback(item.subcategory, item.description, category, parseInt(selectedYear), idx + 1)}
+                                  title={isCellAddedBack ? 'Double-click to remove month addback' : 'Double-click to add back this month'}
+                                >
+                                  <span className={isCellAddedBack && showNormalized ? 'line-through opacity-50' : ''}>
+                                    {formatCurrency(displayValue)}
+                                  </span>
+                                  {isCellAddedBack && (
+                                    <Flag className="h-2.5 w-2.5 text-amber-500 absolute top-1 right-1" />
+                                  )}
+                                </TableCell>
+                              );
+                            })}
                             <TableCell className="text-right font-medium">
-                              {formatCurrency(item.annualTotal)}
+                              {formatCurrency(showNormalized ? months.reduce((sum, month, idx) => sum + getNormalizedMonthlyValue(item, month, idx), 0) : item.annualTotal)}
                             </TableCell>
                           </TableRow>
                         );
@@ -810,8 +936,8 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   <TableRow className="bg-muted font-bold border-t-2">
                     <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">Gross Profit</TableCell>
                     {months.map((month, idx) => {
-                      const revenue = getCategoryTotal('Revenue', month);
-                      const cogs = getCategoryTotal('COGS', month);
+                      const revenue = showNormalized ? getNormalizedCategoryTotal('Revenue', month, idx) : getCategoryTotal('Revenue', month);
+                      const cogs = showNormalized ? getNormalizedCategoryTotal('COGS', month, idx) : getCategoryTotal('COGS', month);
                       return (
                         <TableCell 
                           key={month} 
@@ -821,14 +947,14 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                         </TableCell>
                       );
                     })}
-                    <TableCell className="text-right bg-muted">{formatCurrency(grossProfit)}</TableCell>
+                    <TableCell className="text-right bg-muted">{formatCurrency(showNormalized ? (getNormalizedCategoryAnnualTotal('Revenue') - getNormalizedCategoryAnnualTotal('COGS')) : grossProfit)}</TableCell>
                   </TableRow>
 
                   <TableRow className="bg-muted/30">
                     <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-muted/30 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-sm text-muted-foreground">Gross Profit Margin</TableCell>
                     {months.map((month, idx) => {
-                      const revenue = getCategoryTotal('Revenue', month);
-                      const cogs = getCategoryTotal('COGS', month);
+                      const revenue = showNormalized ? getNormalizedCategoryTotal('Revenue', month, idx) : getCategoryTotal('Revenue', month);
+                      const cogs = showNormalized ? getNormalizedCategoryTotal('COGS', month, idx) : getCategoryTotal('COGS', month);
                       const gp = revenue - cogs;
                       const margin = revenue !== 0 ? (gp / revenue) * 100 : null;
                       return (
@@ -841,16 +967,20 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                       );
                     })}
                     <TableCell className="text-right text-sm text-muted-foreground bg-muted/30">
-                      {formatPercent(totalRevenue !== 0 ? (grossProfit / totalRevenue) * 100 : null)}
+                      {(() => {
+                        const normRev = showNormalized ? getNormalizedCategoryAnnualTotal('Revenue') : totalRevenue;
+                        const normGP = showNormalized ? (getNormalizedCategoryAnnualTotal('Revenue') - getNormalizedCategoryAnnualTotal('COGS')) : grossProfit;
+                        return formatPercent(normRev !== 0 ? (normGP / normRev) * 100 : null);
+                      })()}
                     </TableCell>
                   </TableRow>
 
                   <TableRow className="bg-primary/10 font-bold">
                     <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-primary/10 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">{config?.bottomLineMetric === 'ebitda' ? 'EBITDA' : 'NOI'}</TableCell>
                     {months.map((month, idx) => {
-                      const revenue = getCategoryTotal('Revenue', month);
-                      const cogs = getCategoryTotal('COGS', month);
-                      const expenses = getCategoryTotal('Expenses', month);
+                      const revenue = showNormalized ? getNormalizedCategoryTotal('Revenue', month, idx) : getCategoryTotal('Revenue', month);
+                      const cogs = showNormalized ? getNormalizedCategoryTotal('COGS', month, idx) : getCategoryTotal('COGS', month);
+                      const expenses = showNormalized ? getNormalizedCategoryTotal('Expenses', month, idx) : getCategoryTotal('Expenses', month);
                       const noi = revenue - cogs - expenses;
                       return (
                         <TableCell 
@@ -861,17 +991,23 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                         </TableCell>
                       );
                     })}
-                    <TableCell className={`text-right bg-primary/10 ${netIncome >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {formatCurrency(netIncome)}
-                    </TableCell>
+                    {(() => {
+                      const normalizedNOI = getNormalizedCategoryAnnualTotal('Revenue') - getNormalizedCategoryAnnualTotal('COGS') - getNormalizedCategoryAnnualTotal('Expenses');
+                      const displayNOI = showNormalized ? normalizedNOI : netIncome;
+                      return (
+                        <TableCell className={`text-right bg-primary/10 ${displayNOI >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {formatCurrency(displayNOI)}
+                        </TableCell>
+                      );
+                    })()}
                   </TableRow>
 
                   <TableRow className="bg-primary/5">
                     <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-primary/5 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-sm text-muted-foreground">Operating Margin</TableCell>
                     {months.map((month, idx) => {
-                      const revenue = getCategoryTotal('Revenue', month);
-                      const cogs = getCategoryTotal('COGS', month);
-                      const expenses = getCategoryTotal('Expenses', month);
+                      const revenue = showNormalized ? getNormalizedCategoryTotal('Revenue', month, idx) : getCategoryTotal('Revenue', month);
+                      const cogs = showNormalized ? getNormalizedCategoryTotal('COGS', month, idx) : getCategoryTotal('COGS', month);
+                      const expenses = showNormalized ? getNormalizedCategoryTotal('Expenses', month, idx) : getCategoryTotal('Expenses', month);
                       const noi = revenue - cogs - expenses;
                       const margin = revenue !== 0 ? (noi / revenue) * 100 : null;
                       return (
@@ -883,9 +1019,16 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                         </TableCell>
                       );
                     })}
-                    <TableCell className={`text-right text-sm bg-primary/5 ${netIncome >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {formatPercent(totalRevenue !== 0 ? (netIncome / totalRevenue) * 100 : null)}
-                    </TableCell>
+                    {(() => {
+                      const normRev = showNormalized ? getNormalizedCategoryAnnualTotal('Revenue') : totalRevenue;
+                      const normalizedNOI = getNormalizedCategoryAnnualTotal('Revenue') - getNormalizedCategoryAnnualTotal('COGS') - getNormalizedCategoryAnnualTotal('Expenses');
+                      const displayNOI = showNormalized ? normalizedNOI : netIncome;
+                      return (
+                        <TableCell className={`text-right text-sm bg-primary/5 ${displayNOI >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {formatPercent(normRev !== 0 ? (displayNOI / normRev) * 100 : null)}
+                        </TableCell>
+                      );
+                    })()}
                   </TableRow>
                 </TableBody>
               </Table>

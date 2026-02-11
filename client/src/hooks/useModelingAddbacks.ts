@@ -2,6 +2,8 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 
+export type AddbackScope = 'line_item' | 'category' | 'month_cell';
+
 export interface AddbackValue {
   id?: string;
   addbackId: string;
@@ -14,10 +16,17 @@ export interface Addback {
   id: string;
   projectId: string;
   orgId: string;
-  lineItemId: string;
+  lineItemKey: string;
+  lineItemLabel: string;
+  lineItemId?: string;
+  category: string | null;
+  scope: AddbackScope;
   reason: string | null;
   notes: string | null;
   periodType: 'monthly' | 'yearly';
+  isActive: boolean;
+  addbackMonth: number | null;
+  addbackYear: number | null;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -47,18 +56,37 @@ export function useModelingAddbacks(projectId: string | undefined) {
 
   const createOrUpdateMutation = useMutation({
     mutationFn: async (data: {
-      lineItemId: string;
-      reason: string;
+      lineItemKey: string;
+      lineItemLabel: string;
+      lineItemId?: string;
+      category?: string;
+      reason?: string;
       notes?: string;
-      periodType: 'monthly' | 'yearly';
-      values: { year: number; month?: number; amount: string }[];
+      periodType?: 'monthly' | 'yearly';
+      scope?: AddbackScope;
+      addbackMonth?: number;
+      addbackYear?: number;
+      values?: { year: number; month?: number; amount: string }[];
     }) => {
       const response = await apiRequest('POST', `/api/modeling/projects/${projectId}/addbacks`, data);
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'addbacks'] });
-      toast({ title: 'Addback Saved', description: 'Line item addback has been saved.' });
+      toast({ title: 'Addback Saved', description: 'Addback has been saved.' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: async ({ addbackId, isActive }: { addbackId: string; isActive: boolean }) => {
+      const response = await apiRequest('PATCH', `/api/modeling/addbacks/${addbackId}/toggle`, { isActive });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'addbacks'] });
     },
     onError: (error: Error) => {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -72,21 +100,114 @@ export function useModelingAddbacks(projectId: string | undefined) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'addbacks'] });
-      toast({ title: 'Addback Removed', description: 'Addback has been removed from this line item.' });
+      toast({ title: 'Addback Removed', description: 'Addback has been removed.' });
     },
     onError: (error: Error) => {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     },
   });
 
-  const getAddbackForLineItem = (lineItemId: string): Addback | undefined => {
-    return addbacksQuery.data?.find(a => a.lineItemId === lineItemId);
+  const getAddbackForLineItem = (lineItemKey: string): Addback | undefined => {
+    return addbacksQuery.data?.find(
+      a => (a.lineItemKey === lineItemKey || a.lineItemId === lineItemKey) && a.scope === 'line_item' && a.isActive
+    );
+  };
+
+  const getAddbackForCategory = (category: string): Addback | undefined => {
+    return addbacksQuery.data?.find(
+      a => a.lineItemKey === category && a.scope === 'category' && a.isActive
+    );
+  };
+
+  const getAddbackForMonthCell = (lineItemKey: string, year: number, month: number): Addback | undefined => {
+    return addbacksQuery.data?.find(
+      a => (a.lineItemKey === lineItemKey || a.lineItemId === lineItemKey)
+        && a.scope === 'month_cell'
+        && a.addbackYear === year
+        && a.addbackMonth === month
+        && a.isActive
+    );
+  };
+
+  const isLineItemAddedBack = (lineItemKey: string): boolean => {
+    return !!getAddbackForLineItem(lineItemKey);
+  };
+
+  const isCategoryAddedBack = (category: string): boolean => {
+    return !!getAddbackForCategory(category);
+  };
+
+  const isMonthCellAddedBack = (lineItemKey: string, year: number, month: number): boolean => {
+    return !!getAddbackForMonthCell(lineItemKey, year, month);
+  };
+
+  const toggleLineItemAddback = async (lineItemKey: string, lineItemLabel: string, category: string, reason?: string) => {
+    const existing = addbacksQuery.data?.find(
+      a => (a.lineItemKey === lineItemKey || a.lineItemId === lineItemKey) && a.scope === 'line_item'
+    );
+    if (existing) {
+      await toggleMutation.mutateAsync({ addbackId: existing.id, isActive: !existing.isActive });
+    } else {
+      await createOrUpdateMutation.mutateAsync({
+        lineItemKey,
+        lineItemLabel,
+        category,
+        scope: 'line_item',
+        reason: reason || 'other',
+        periodType: 'yearly',
+      });
+    }
+  };
+
+  const toggleCategoryAddback = async (category: string, reason?: string) => {
+    const existing = addbacksQuery.data?.find(
+      a => a.lineItemKey === category && a.scope === 'category'
+    );
+    if (existing) {
+      await toggleMutation.mutateAsync({ addbackId: existing.id, isActive: !existing.isActive });
+    } else {
+      await createOrUpdateMutation.mutateAsync({
+        lineItemKey: category,
+        lineItemLabel: `${category} (Entire Department)`,
+        category,
+        scope: 'category',
+        reason: reason || 'other',
+        periodType: 'yearly',
+      });
+    }
+  };
+
+  const toggleMonthCellAddback = async (lineItemKey: string, lineItemLabel: string, category: string, year: number, month: number, reason?: string) => {
+    const existing = addbacksQuery.data?.find(
+      a => (a.lineItemKey === lineItemKey || a.lineItemId === lineItemKey)
+        && a.scope === 'month_cell'
+        && a.addbackYear === year
+        && a.addbackMonth === month
+    );
+    if (existing) {
+      await toggleMutation.mutateAsync({ addbackId: existing.id, isActive: !existing.isActive });
+    } else {
+      await createOrUpdateMutation.mutateAsync({
+        lineItemKey,
+        lineItemLabel,
+        category,
+        scope: 'month_cell',
+        addbackMonth: month,
+        addbackYear: year,
+        reason: reason || 'other',
+        periodType: 'monthly',
+      });
+    }
+  };
+
+  const getActiveAddbacks = (): Addback[] => {
+    return (addbacksQuery.data || []).filter(a => a.isActive);
   };
 
   const getTotalAddbacksForPeriod = (year: number, month?: number): number => {
     if (!addbacksQuery.data) return 0;
     
-    return addbacksQuery.data.reduce((total, addback) => {
+    return addbacksQuery.data.filter(a => a.isActive).reduce((total, addback) => {
       const matchingValue = addback.values.find(v => {
         if (addback.periodType === 'yearly') {
           return v.year === year;
@@ -98,29 +219,42 @@ export function useModelingAddbacks(projectId: string | undefined) {
   };
 
   const getAddbacksSummary = () => {
-    if (!addbacksQuery.data) return { total: 0, byReason: {} as Record<string, number>, count: 0 };
+    if (!addbacksQuery.data) return { total: 0, byReason: {} as Record<string, number>, count: 0, byScope: {} as Record<string, number> };
     
+    const activeAddbacks = addbacksQuery.data.filter(a => a.isActive);
     const byReason: Record<string, number> = {};
+    const byScope: Record<string, number> = { line_item: 0, category: 0, month_cell: 0 };
     let total = 0;
     
-    addbacksQuery.data.forEach(addback => {
+    activeAddbacks.forEach(addback => {
       const reason = addback.reason || 'other';
       const lineTotal = addback.values.reduce((sum, v) => sum + (parseFloat(v.amount) || 0), 0);
       byReason[reason] = (byReason[reason] || 0) + lineTotal;
+      byScope[addback.scope] = (byScope[addback.scope] || 0) + 1;
       total += lineTotal;
     });
     
-    return { total, byReason, count: addbacksQuery.data.length };
+    return { total, byReason, count: activeAddbacks.length, byScope };
   };
 
   return {
     addbacks: addbacksQuery.data || [],
+    activeAddbacks: getActiveAddbacks(),
     isLoading: addbacksQuery.isLoading,
     createOrUpdate: createOrUpdateMutation.mutateAsync,
+    toggleAddback: toggleMutation.mutateAsync,
     deleteAddback: deleteAddbackMutation.mutateAsync,
     getAddbackForLineItem,
+    getAddbackForCategory,
+    getAddbackForMonthCell,
+    isLineItemAddedBack,
+    isCategoryAddedBack,
+    isMonthCellAddedBack,
+    toggleLineItemAddback,
+    toggleCategoryAddback,
+    toggleMonthCellAddback,
     getTotalAddbacksForPeriod,
     getAddbacksSummary,
-    isPending: createOrUpdateMutation.isPending || deleteAddbackMutation.isPending,
+    isPending: createOrUpdateMutation.isPending || deleteAddbackMutation.isPending || toggleMutation.isPending,
   };
 }

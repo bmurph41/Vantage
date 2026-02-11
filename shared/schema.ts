@@ -19889,6 +19889,9 @@ export type InsertOmPageLayout = z.infer<typeof insertOmPageLayoutSchema>;
 // Enum for addback period types
 export const addbackPeriodTypeEnum = pgEnum("addback_period_type", ["monthly", "yearly"]);
 
+// Enum for addback scope
+export const addbackScopeEnum = pgEnum("addback_scope", ["line_item", "category", "month_cell"]);
+
 // Enum for scenario template scope
 export const scenarioTemplateScopeEnum = pgEnum("scenario_template_scope", ["global", "org", "user"]);
 
@@ -20010,6 +20013,10 @@ export const modelingAddbacks = pgTable("modeling_addbacks", {
   periodType: addbackPeriodTypeEnum("period_type").notNull().default("yearly"), // "monthly" or "yearly"
   isActive: boolean("is_active").notNull().default(true),
   notes: text("notes"),
+  scope: addbackScopeEnum("scope").notNull().default("line_item"),
+  reason: text("reason"),
+  addbackMonth: integer("addback_month"),
+  addbackYear: integer("addback_year"),
 
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),

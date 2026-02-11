@@ -17781,57 +17781,68 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
-  // Create or update addback for a line item
+  // Create or update addback (supports line_item, category, month_cell scopes)
   app.post('/api/modeling/projects/:projectId/addbacks', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const userId = req.user.id;
       const { projectId } = req.params;
-      const { lineItemId, reason, notes, periodType, values } = req.body;
+      const { lineItemKey, lineItemLabel, lineItemId, category, reason, notes, periodType, scope, addbackMonth, addbackYear, values } = req.body;
       
       const project = await storage.getModelingProject(projectId, orgId);
       if (!project) {
         return res.status(404).json({ error: 'Project not found' });
       }
       
-      const { modelingAddbacks, modelingAddbackValues, insertModelingAddbackSchema } = await import('@shared/schema');
+      const { modelingAddbacks, modelingAddbackValues } = await import('@shared/schema');
       const { eq, and } = await import('drizzle-orm');
+
+      const resolvedScope = scope || 'line_item';
+      const resolvedKey = lineItemKey || lineItemId || '';
+      const resolvedLabel = lineItemLabel || lineItemId || '';
       
-      // Check if addback already exists for this line item
+      const conditions: any[] = [
+        eq(modelingAddbacks.projectId, projectId),
+        eq(modelingAddbacks.lineItemKey, resolvedKey),
+        eq(modelingAddbacks.orgId, orgId),
+        eq(modelingAddbacks.scope, resolvedScope),
+      ];
+
+      if (resolvedScope === 'month_cell' && addbackMonth != null && addbackYear != null) {
+        conditions.push(eq(modelingAddbacks.addbackMonth, addbackMonth));
+        conditions.push(eq(modelingAddbacks.addbackYear, addbackYear));
+      }
+
       const [existing] = await db.select()
         .from(modelingAddbacks)
-        .where(and(
-          eq(modelingAddbacks.projectId, projectId),
-          eq(modelingAddbacks.lineItemId, lineItemId),
-          eq(modelingAddbacks.orgId, orgId)
-        ));
+        .where(and(...conditions));
       
       let addback;
       if (existing) {
-        // Update existing
         [addback] = await db.update(modelingAddbacks)
-          .set({ reason, notes, periodType, updatedAt: new Date() })
+          .set({ reason, notes, periodType, category, isActive: true, updatedAt: new Date() })
           .where(eq(modelingAddbacks.id, existing.id))
           .returning();
         
-        // Delete and recreate values
         await db.delete(modelingAddbackValues).where(eq(modelingAddbackValues.addbackId, existing.id));
       } else {
-        // Create new
-        const validated = insertModelingAddbackSchema.parse({
+        [addback] = await db.insert(modelingAddbacks).values({
           projectId,
           orgId,
-          lineItemId,
-          reason,
-          notes,
+          lineItemKey: resolvedKey,
+          lineItemLabel: resolvedLabel,
+          category: category || null,
+          reason: reason || null,
+          notes: notes || null,
           periodType: periodType || 'yearly',
+          scope: resolvedScope,
+          addbackMonth: addbackMonth || null,
+          addbackYear: addbackYear || null,
+          isActive: true,
           createdBy: userId,
-        });
-        
-        [addback] = await db.insert(modelingAddbacks).values(validated).returning();
+        }).returning();
       }
       
-      // Insert values
       if (values && values.length > 0) {
         await db.insert(modelingAddbackValues).values(
           values.map((v: any) => ({
@@ -17843,7 +17854,6 @@ Current context: Project ${req.params.projectId}`;
         );
       }
       
-      // Fetch values for response
       const addbackValues = await db.select()
         .from(modelingAddbackValues)
         .where(eq(modelingAddbackValues.addbackId, addback.id));
@@ -17855,6 +17865,32 @@ Current context: Project ${req.params.projectId}`;
       }
       console.error('Failed to create/update addback:', error);
       res.status(500).json({ error: 'Failed to create/update addback' });
+    }
+  });
+
+  // Toggle addback active/inactive (for inline P&L toggling)
+  app.patch('/api/modeling/addbacks/:addbackId/toggle', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { addbackId } = req.params;
+      const { isActive } = req.body;
+      
+      const { modelingAddbacks } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      
+      const [updated] = await db.update(modelingAddbacks)
+        .set({ isActive: isActive !== undefined ? isActive : true, updatedAt: new Date() })
+        .where(and(eq(modelingAddbacks.id, addbackId), eq(modelingAddbacks.orgId, orgId)))
+        .returning();
+      
+      if (!updated) {
+        return res.status(404).json({ error: 'Addback not found' });
+      }
+      
+      res.json(updated);
+    } catch (error: any) {
+      console.error('Failed to toggle addback:', error);
+      res.status(500).json({ error: 'Failed to toggle addback' });
     }
   });
 

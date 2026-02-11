@@ -97,10 +97,12 @@ export function AddbacksTracker({
     const validValues = formData.values.filter(v => v.amount && parseFloat(v.amount) !== 0);
     
     await createOrUpdate({
-      lineItemId: formData.lineItemId,
+      lineItemKey: formData.lineItemId,
+      lineItemLabel: formData.lineItemId,
       reason: formData.reason,
       notes: formData.notes || undefined,
       periodType: formData.periodType,
+      scope: 'line_item',
       values: validValues.map(v => ({
         year: v.year,
         amount: v.amount,
@@ -121,7 +123,7 @@ export function AddbacksTracker({
     });
     
     setFormData({
-      lineItemId: addback.lineItemId,
+      lineItemId: addback.lineItemKey || addback.lineItemLabel || '',
       reason: (addback.reason || 'other') as AddbackReasonType,
       notes: addback.notes || '',
       periodType: addback.periodType as 'monthly' | 'yearly',
@@ -297,7 +299,7 @@ export function AddbacksTracker({
                 
                 return (
                   <TableRow key={addback.id}>
-                    <TableCell className="font-medium">{addback.lineItemId}</TableCell>
+                    <TableCell className="font-medium">{addback.lineItemLabel || addback.lineItemKey}</TableCell>
                     <TableCell>
                       <Badge className={getReasonBadgeColor(addback.reason)}>
                         {getReasonLabel(addback.reason)}
