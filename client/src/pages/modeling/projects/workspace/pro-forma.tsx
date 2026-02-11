@@ -1195,7 +1195,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                       {/* Department-grouped Line Item Rows */}
                       {expandedCategories.has(category) && (() => {
                         const deptEntries = Object.entries(departmentGroupedData[category] || {});
-                        const sortedDepts = sortDepartments(deptEntries.map(([d]) => d));
+                        const sortedDepts = sortDepartments(deptEntries.map(([d]) => d), category);
                         return sortedDepts.map(department => {
                           const deptItems = (departmentGroupedData[category] || {})[department] || {};
                           return (

@@ -127,7 +127,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
   const [showMoM, setShowMoM] = useState(false);
   const [showNormalized, setShowNormalized] = useState(false);
   const [expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set());
-  const { departmentOrder, updateOrder, resetOrder, sortDepartments } = useDepartmentOrder();
+  const { revenueCogsOrder, expensesOrder, updateRevenueCogsOrder, updateExpensesOrder, resetRevenueCogsOrder, resetExpensesOrder, sortDepartments } = useDepartmentOrder();
 
   const { 
     addbacks: allAddbacks,
@@ -600,9 +600,12 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
           </Tabs>
           
           <DepartmentOrderSettings
-            departmentOrder={departmentOrder}
-            onUpdateOrder={updateOrder}
-            onResetOrder={resetOrder}
+            revenueCogsOrder={revenueCogsOrder}
+            expensesOrder={expensesOrder}
+            onUpdateRevenueCogsOrder={updateRevenueCogsOrder}
+            onUpdateExpensesOrder={updateExpensesOrder}
+            onResetRevenueCogsOrder={resetRevenueCogsOrder}
+            onResetExpensesOrder={resetExpensesOrder}
           />
           
           {/* Sync button only shown for owned marinas, not for acquisitions/prospective deals */}
@@ -982,7 +985,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
 
                       {expandedCategories.has(category) && (() => {
                         const entries = Object.entries(groupedData[category] || {});
-                        const sortedDepts = sortDepartments(entries.map(([d]) => d));
+                        const sortedDepts = sortDepartments(entries.map(([d]) => d), category);
                         return sortedDepts.map(department => {
                           const deptItems = (groupedData[category] || {})[department] || [];
                           return (
@@ -1291,7 +1294,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           if (!deptGrouped[dept]) deptGrouped[dept] = [];
                           deptGrouped[dept].push(sub);
                         });
-                        const sortedDepts = sortDepartments(Object.keys(deptGrouped));
+                        const sortedDepts = sortDepartments(Object.keys(deptGrouped), category);
                         return sortedDepts.map(department => {
                           const deptSubcats = deptGrouped[department] || [];
                           return (
