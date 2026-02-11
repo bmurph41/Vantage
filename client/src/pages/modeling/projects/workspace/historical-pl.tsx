@@ -863,7 +863,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                         className="bg-muted/50 cursor-pointer hover:bg-muted group"
                         onClick={() => toggleCategory(category)}
                       >
-                        <TableCell className="font-semibold whitespace-nowrap sticky left-0 z-10 bg-muted/50 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[220px] min-w-[220px] max-w-[220px] overflow-hidden text-ellipsis">
+                        <TableCell className="font-semibold whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[220px] min-w-[220px] max-w-[220px] overflow-hidden text-ellipsis">
                           <div className="flex items-center gap-2">
                             {expandedCategories.has(category) ? (
                               <ChevronDown className="h-4 w-4" />
@@ -1072,7 +1072,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   </TableRow>
 
                   <TableRow className="bg-muted/30">
-                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-muted/30 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-sm text-muted-foreground w-[220px] min-w-[220px] max-w-[220px]">Gross Profit Margin</TableCell>
+                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-sm text-muted-foreground w-[220px] min-w-[220px] max-w-[220px]">Gross Profit Margin</TableCell>
                     {months.map((month, idx) => {
                       const revenue = getAdjustedCategoryTotal('Revenue', month, idx);
                       const cogs = getAdjustedCategoryTotal('COGS', month, idx);
@@ -1097,7 +1097,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   </TableRow>
 
                   <TableRow className="bg-primary/10 font-bold">
-                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-primary/10 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[220px] min-w-[220px] max-w-[220px]">{config?.bottomLineMetric === 'ebitda' ? 'EBITDA' : 'NOI'}</TableCell>
+                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-blue-50 dark:bg-blue-950 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[220px] min-w-[220px] max-w-[220px]">{config?.bottomLineMetric === 'ebitda' ? 'EBITDA' : 'NOI'}</TableCell>
                     {months.map((month, idx) => {
                       const revenue = getAdjustedCategoryTotal('Revenue', month, idx);
                       const cogs = getAdjustedCategoryTotal('COGS', month, idx);
@@ -1123,7 +1123,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   </TableRow>
 
                   <TableRow className="bg-primary/5">
-                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-primary/5 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-sm text-muted-foreground w-[220px] min-w-[220px] max-w-[220px]">Operating Margin</TableCell>
+                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-sm text-muted-foreground w-[220px] min-w-[220px] max-w-[220px]">Operating Margin</TableCell>
                     {months.map((month, idx) => {
                       const revenue = getAdjustedCategoryTotal('Revenue', month, idx);
                       const cogs = getAdjustedCategoryTotal('COGS', month, idx);
@@ -1170,7 +1170,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                         className="bg-muted/50 cursor-pointer hover:bg-muted"
                         onClick={() => toggleCategory(category)}
                       >
-                        <TableCell className="font-semibold whitespace-nowrap sticky left-0 z-10 bg-muted/50 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[220px] min-w-[220px] max-w-[220px] overflow-hidden text-ellipsis">
+                        <TableCell className="font-semibold whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[220px] min-w-[220px] max-w-[220px] overflow-hidden text-ellipsis">
                           <div className="flex items-center gap-2">
                             {expandedCategories.has(category) ? (
                               <ChevronDown className="h-4 w-4" />
@@ -1234,7 +1234,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   </TableRow>
 
                   <TableRow className="bg-muted/30">
-                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-muted/30 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-sm text-muted-foreground w-[220px] min-w-[220px] max-w-[220px]">Gross Profit Margin</TableCell>
+                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-sm text-muted-foreground w-[220px] min-w-[220px] max-w-[220px]">Gross Profit Margin</TableCell>
                     {yearRange.map((year) => {
                       const revenue = getAnnualCategoryTotal('Revenue', year);
                       const cogs = getAnnualCategoryTotal('COGS', year);
@@ -1253,7 +1253,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   </TableRow>
 
                   <TableRow className="bg-primary/10 font-bold">
-                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-primary/10 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[220px] min-w-[220px] max-w-[220px]">{config?.bottomLineMetric === 'ebitda' ? 'EBITDA' : 'NOI'}</TableCell>
+                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-blue-50 dark:bg-blue-950 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[220px] min-w-[220px] max-w-[220px]">{config?.bottomLineMetric === 'ebitda' ? 'EBITDA' : 'NOI'}</TableCell>
                     {yearRange.map((year) => {
                       const revenue = getAnnualCategoryTotal('Revenue', year);
                       const cogs = getAnnualCategoryTotal('COGS', year);
@@ -1272,7 +1272,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   </TableRow>
 
                   <TableRow className="bg-primary/5">
-                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-primary/5 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-sm text-muted-foreground w-[220px] min-w-[220px] max-w-[220px]">Operating Margin</TableCell>
+                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-sm text-muted-foreground w-[220px] min-w-[220px] max-w-[220px]">Operating Margin</TableCell>
                     {yearRange.map((year) => {
                       const revenue = getAnnualCategoryTotal('Revenue', year);
                       const cogs = getAnnualCategoryTotal('COGS', year);
