@@ -533,20 +533,25 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
     const monthlyProj = proFormaData?.monthlyProjections?.find((p: any) => p.periodKey === monthKey);
     if (monthlyProj) {
       const revenue = monthlyProj.revenue;
+      const cogs = monthlyProj.cogs || 0;
+      const grossProfit = monthlyProj.grossProfit || (revenue - cogs);
       const expenses = monthlyProj.expenses;
       const noi = monthlyProj.noi;
-      // Gross profit in monthly view = Revenue - Expenses (COGS is included in expenses)
-      const grossProfit = revenue - expenses;
       return {
         revenue,
-        cogs: 0,
+        cogs,
         expenses,
         grossProfit,
         noi,
-        noiMargin: revenue > 0 ? (noi / revenue) * 100 : 0
+        noiMargin: revenue > 0 ? (noi / revenue) * 100 : 0,
+        managementFee: monthlyProj.managementFee || 0,
+        capex: monthlyProj.capex || 0,
+        reserves: monthlyProj.reserves || 0,
+        debtService: monthlyProj.debtService || 0,
+        leveredCashFlow: monthlyProj.leveredCashFlow || 0,
       };
     }
-    return { revenue: 0, cogs: 0, expenses: 0, grossProfit: 0, noi: 0, noiMargin: 0 };
+    return { revenue: 0, cogs: 0, expenses: 0, grossProfit: 0, noi: 0, noiMargin: 0, managementFee: 0, capex: 0, reserves: 0, debtService: 0, leveredCashFlow: 0 };
   };
 
   // Summary calculations by period
@@ -567,7 +572,15 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
     const grossProfit = revenue - cogs;
     const noi = grossProfit - expenses;
     const noiMargin = revenue > 0 ? (noi / revenue) * 100 : 0;
-    return { revenue, cogs, expenses, grossProfit, noi, noiMargin };
+    const annualProj = proFormaData?.annualProjections?.[yearIndex];
+    return {
+      revenue, cogs, expenses, grossProfit, noi, noiMargin,
+      managementFee: annualProj?.managementFee || 0,
+      capex: annualProj?.capex || 0,
+      reserves: annualProj?.reserves || 0,
+      debtService: annualProj?.debtService || 0,
+      leveredCashFlow: annualProj?.leveredCashFlow || 0,
+    };
   };
 
   // Calculate CAGR
@@ -1552,6 +1565,156 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
 
                   <TableCell className="text-right text-muted-foreground">-</TableCell>
                 </TableRow>
+
+                {proFormaData?.annualProjections?.some((p: any) => (p.managementFee || 0) !== 0 || (p.capex || 0) !== 0 || (p.reserves || 0) !== 0 || (p.debtService || 0) !== 0) && (
+                  <>
+                    <TableRow className="border-t-2 bg-muted/30">
+                      <TableCell colSpan={100} className="sticky left-0 z-10 text-xs font-semibold uppercase tracking-wider text-muted-foreground py-1">
+                        Below-the-Line Adjustments
+                      </TableCell>
+                    </TableRow>
+
+                    {proFormaData?.annualProjections?.some((p: any) => (p.managementFee || 0) !== 0) && (
+                      <TableRow>
+                        <TableCell className="sticky left-0 bg-background z-10 pl-6 text-muted-foreground">Management Fee</TableCell>
+                        {showHistorical && priorPeriods.map(period => (
+                          <TableCell key={period.id} className="text-right text-muted-foreground bg-blue-50/60 dark:bg-blue-950/20">-</TableCell>
+                        ))}
+                        <TableCell className="text-right text-muted-foreground bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">-</TableCell>
+                        {viewMode === 'monthly' ? (
+                          months.map((_, monthIndex) => {
+                            const summary = calculateMonthSummary(selectedYearInt, monthIndex);
+                            return (
+                              <TableCell key={monthIndex} className={`text-right text-red-500 ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}>
+                                ({formatCurrency(summary.managementFee)})
+                              </TableCell>
+                            );
+                          })
+                        ) : (
+                          years.map((_, i) => {
+                            const summary = calculateYearSummary(i);
+                            return <TableCell key={i} className="text-right text-red-500">({formatCurrency(summary.managementFee)})</TableCell>;
+                          })
+                        )}
+                        <TableCell className="text-right text-muted-foreground">-</TableCell>
+                      </TableRow>
+                    )}
+
+                    <TableRow>
+                      <TableCell className="sticky left-0 bg-background z-10 pl-6 text-muted-foreground">Capital Expenditures</TableCell>
+                      {showHistorical && priorPeriods.map(period => (
+                        <TableCell key={period.id} className="text-right text-muted-foreground bg-blue-50/60 dark:bg-blue-950/20">-</TableCell>
+                      ))}
+                      <TableCell className="text-right text-muted-foreground bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">-</TableCell>
+                      {viewMode === 'monthly' ? (
+                        months.map((_, monthIndex) => {
+                          const summary = calculateMonthSummary(selectedYearInt, monthIndex);
+                          return (
+                            <TableCell key={monthIndex} className={`text-right text-red-500 ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}>
+                              ({formatCurrency(summary.capex)})
+                            </TableCell>
+                          );
+                        })
+                      ) : (
+                        years.map((_, i) => {
+                          const summary = calculateYearSummary(i);
+                          return <TableCell key={i} className="text-right text-red-500">({formatCurrency(summary.capex)})</TableCell>;
+                        })
+                      )}
+                      <TableCell className="text-right text-muted-foreground">-</TableCell>
+                    </TableRow>
+
+                    {proFormaData?.annualProjections?.some((p: any) => (p.reserves || 0) !== 0) && (
+                      <TableRow>
+                        <TableCell className="sticky left-0 bg-background z-10 pl-6 text-muted-foreground">Replacement Reserves</TableCell>
+                        {showHistorical && priorPeriods.map(period => (
+                          <TableCell key={period.id} className="text-right text-muted-foreground bg-blue-50/60 dark:bg-blue-950/20">-</TableCell>
+                        ))}
+                        <TableCell className="text-right text-muted-foreground bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">-</TableCell>
+                        {viewMode === 'monthly' ? (
+                          months.map((_, monthIndex) => {
+                            const summary = calculateMonthSummary(selectedYearInt, monthIndex);
+                            return (
+                              <TableCell key={monthIndex} className={`text-right text-red-500 ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}>
+                                ({formatCurrency(summary.reserves)})
+                              </TableCell>
+                            );
+                          })
+                        ) : (
+                          years.map((_, i) => {
+                            const summary = calculateYearSummary(i);
+                            return <TableCell key={i} className="text-right text-red-500">({formatCurrency(summary.reserves)})</TableCell>;
+                          })
+                        )}
+                        <TableCell className="text-right text-muted-foreground">-</TableCell>
+                      </TableRow>
+                    )}
+
+                    {proFormaData?.annualProjections?.some((p: any) => (p.debtService || 0) !== 0) && (
+                      <TableRow>
+                        <TableCell className="sticky left-0 bg-background z-10 pl-6 text-muted-foreground">Debt Service</TableCell>
+                        {showHistorical && priorPeriods.map(period => (
+                          <TableCell key={period.id} className="text-right text-muted-foreground bg-blue-50/60 dark:bg-blue-950/20">-</TableCell>
+                        ))}
+                        <TableCell className="text-right text-muted-foreground bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">-</TableCell>
+                        {viewMode === 'monthly' ? (
+                          months.map((_, monthIndex) => {
+                            const summary = calculateMonthSummary(selectedYearInt, monthIndex);
+                            return (
+                              <TableCell key={monthIndex} className={`text-right text-red-500 ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}>
+                                ({formatCurrency(summary.debtService)})
+                              </TableCell>
+                            );
+                          })
+                        ) : (
+                          years.map((_, i) => {
+                            const summary = calculateYearSummary(i);
+                            return <TableCell key={i} className="text-right text-red-500">({formatCurrency(summary.debtService)})</TableCell>;
+                          })
+                        )}
+                        <TableCell className="text-right text-muted-foreground">-</TableCell>
+                      </TableRow>
+                    )}
+
+                    <TableRow className="bg-emerald-50 dark:bg-emerald-950/20 font-bold border-t-2">
+                      <TableCell className="sticky left-0 bg-emerald-50 dark:bg-emerald-950/20 z-10">Levered Cash Flow</TableCell>
+                      {showHistorical && priorPeriods.map(period => (
+                        <TableCell key={period.id} className="text-right text-muted-foreground bg-blue-50/60 dark:bg-blue-950/20">-</TableCell>
+                      ))}
+                      <TableCell className="text-right text-muted-foreground bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">-</TableCell>
+                      {viewMode === 'monthly' ? (
+                        months.map((_, monthIndex) => {
+                          const summary = calculateMonthSummary(selectedYearInt, monthIndex);
+                          return (
+                            <TableCell key={monthIndex} className={`text-right ${summary.leveredCashFlow >= 0 ? 'text-emerald-600' : 'text-red-600'} ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}>
+                              {formatCurrency(summary.leveredCashFlow)}
+                            </TableCell>
+                          );
+                        })
+                      ) : (
+                        years.map((_, i) => {
+                          const summary = calculateYearSummary(i);
+                          return (
+                            <TableCell key={i} className={`text-right ${summary.leveredCashFlow >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                              {formatCurrency(summary.leveredCashFlow)}
+                            </TableCell>
+                          );
+                        })
+                      )}
+                      <TableCell className="text-right text-emerald-600">
+                        {viewMode === 'monthly' ? (
+                          formatCurrency(months.reduce((sum, _, monthIndex) => sum + calculateMonthSummary(selectedYearInt, monthIndex).leveredCashFlow, 0))
+                        ) : (
+                          formatPercent(calculateCAGR(
+                            calculateYearSummary(0).leveredCashFlow,
+                            calculateYearSummary(holdPeriod - 1).leveredCashFlow,
+                            holdPeriod - 1
+                          ))
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  </>
+                )}
               </TableBody>
             </Table>
           </div>

@@ -100,27 +100,37 @@ class DealPricingService {
     year1NOI: number,
     holdPeriod: number,
     exitCapRate: number,
-    noiProjections: number[]
+    noiProjections: number[],
+    options?: {
+      leveredCashFlows?: number[];
+      netExitProceeds?: number;
+      workingCapitalAmount?: number;
+    }
   ): PricingResult {
     const year1CapRate = (year1NOI / purchasePrice) * 100;
     const exitNOI = noiProjections[holdPeriod - 1] || year1NOI * Math.pow(1.03, holdPeriod);
     const exitValue = exitNOI / (exitCapRate / 100);
     
-    const cashFlows = [-purchasePrice];
+    const totalEquity = purchasePrice + (options?.workingCapitalAmount || 0);
+    const useLevered = options?.leveredCashFlows && options.leveredCashFlows.length >= holdPeriod;
+    const exitProceeds = options?.netExitProceeds ?? exitValue;
+    
+    const cashFlows = [-totalEquity];
     for (let i = 0; i < holdPeriod - 1; i++) {
-      cashFlows.push(noiProjections[i] || year1NOI * Math.pow(1.03, i + 1));
+      cashFlows.push(useLevered ? options!.leveredCashFlows![i] : (noiProjections[i] || year1NOI * Math.pow(1.03, i + 1)));
     }
-    cashFlows.push((noiProjections[holdPeriod - 1] || exitNOI) + exitValue);
+    const lastYearCf = useLevered ? options!.leveredCashFlows![holdPeriod - 1] : (noiProjections[holdPeriod - 1] || exitNOI);
+    cashFlows.push(lastYearCf + exitProceeds);
     
     const irr = this.calculateIRR(cashFlows) * 100;
     
     const totalInflows = cashFlows.slice(1).reduce((sum, cf) => sum + cf, 0);
-    const equityMultiple = totalInflows / purchasePrice;
+    const equityMultiple = totalEquity > 0 ? totalInflows / totalEquity : 0;
     
-    const annualCashOnCash = noiProjections.map(noi => (noi / purchasePrice) * 100);
-    const averageCashOnCash = annualCashOnCash.reduce((sum, coc) => sum + coc, 0) / annualCashOnCash.length;
+    const annualCashOnCash = noiProjections.map(noi => (purchasePrice > 0 ? (noi / purchasePrice) * 100 : 0));
+    const averageCashOnCash = annualCashOnCash.length > 0 ? annualCashOnCash.reduce((sum, coc) => sum + coc, 0) / annualCashOnCash.length : 0;
     
-    const totalProfit = totalInflows - purchasePrice;
+    const totalProfit = totalInflows - totalEquity;
     
     return {
       purchasePrice,
@@ -160,11 +170,19 @@ class DealPricingService {
     year1NOI: number,
     holdPeriod: number,
     exitCapRate: number,
-    noiProjections: number[]
+    noiProjections: number[],
+    options?: {
+      leveredCashFlows?: number[];
+      netExitProceeds?: number;
+      workingCapitalAmount?: number;
+    }
   ): number {
     const irrDecimal = targetIRR / 100;
     const exitNOI = noiProjections[holdPeriod - 1] || year1NOI * Math.pow(1.03, holdPeriod);
     const exitValue = exitNOI / (exitCapRate / 100);
+    const useLevered = options?.leveredCashFlows && options.leveredCashFlows.length >= holdPeriod;
+    const exitProceeds = options?.netExitProceeds ?? exitValue;
+    const workingCapital = options?.workingCapitalAmount || 0;
     
     let low = 1000;
     let high = exitValue * 2;
@@ -172,12 +190,14 @@ class DealPricingService {
     
     for (let i = 0; i < 100; i++) {
       price = (low + high) / 2;
+      const totalEquity = price + workingCapital;
       
-      const cashFlows = [-price];
+      const cashFlows = [-totalEquity];
       for (let j = 0; j < holdPeriod - 1; j++) {
-        cashFlows.push(noiProjections[j] || year1NOI * Math.pow(1.03, j + 1));
+        cashFlows.push(useLevered ? options!.leveredCashFlows![j] : (noiProjections[j] || year1NOI * Math.pow(1.03, j + 1)));
       }
-      cashFlows.push((noiProjections[holdPeriod - 1] || exitNOI) + exitValue);
+      const lastYearCf = useLevered ? options!.leveredCashFlows![holdPeriod - 1] : (noiProjections[holdPeriod - 1] || exitNOI);
+      cashFlows.push(lastYearCf + exitProceeds);
       
       const calculatedIRR = this.calculateIRR(cashFlows);
       
