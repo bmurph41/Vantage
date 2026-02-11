@@ -1571,7 +1571,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                       disabled={isScenarioLocked}
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">Fixed amount overrides percentage when > 0</p>
+                  <p className="text-xs text-muted-foreground">Fixed amount overrides percentage when &gt; 0</p>
                 </div>
                 
                 <div className="space-y-2">
@@ -1611,7 +1611,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                       disabled={isScenarioLocked}
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">Fixed amount overrides percentage when > 0</p>
+                  <p className="text-xs text-muted-foreground">Fixed amount overrides percentage when &gt; 0</p>
                 </div>
               </div>
               
