@@ -1126,3 +1126,62 @@ export type MaAlertMatch = typeof maAlertMatches.$inferSelect;
 export type InsertMaAlertMatch = z.infer<typeof insertMaAlertMatchSchema>;
 export type DigestPreferences = typeof digestPreferences.$inferSelect;
 export type InsertDigestPreferences = z.infer<typeof insertDigestPreferencesSchema>;
+
+// ============================================================================
+// MULTI-ASSET CLASS SYSTEM
+// ============================================================================
+
+export const assetClassConfigs = pgTable("docktalk_asset_class_configs", {
+  id: serial("id").primaryKey(),
+  slug: varchar("slug", { length: 50 }).unique().notNull(),
+  displayName: varchar("display_name", { length: 100 }).notNull(),
+  icon: varchar("icon", { length: 50 }),
+  color: varchar("color", { length: 7 }),
+  isActive: boolean("is_active").default(true),
+  requiredKeywords: text("required_keywords").array().notNull(),
+  scoringTerms: jsonb("scoring_terms").notNull().default({}),
+  excludeKeywords: text("exclude_keywords").array().default(sql`'{}'::text[]`),
+  sourceMatchRegex: varchar("source_match_regex", { length: 500 }),
+  aiSystemPrompt: text("ai_system_prompt").notNull(),
+  categories: text("categories").array().notNull(),
+  categoryDefinitions: jsonb("category_definitions").notNull().default({}),
+  baseSourceBonus: integer("base_source_bonus").default(20),
+  termWeightCap: integer("term_weight_cap").default(40),
+  termWeightEach: integer("term_weight_each").default(8),
+  financialBonus: integer("financial_bonus").default(10),
+  locationBonusTerms: text("location_bonus_terms").array().default(sql`'{}'::text[]`),
+  locationBonus: integer("location_bonus").default(5),
+  topicStatement: text("topic_statement"),
+  defaultKeywordWeights: jsonb("default_keyword_weights").notNull().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  bySlug: index("idx_docktalk_asset_class_slug").on(table.slug),
+  byActive: index("idx_docktalk_asset_class_active").on(table.isActive),
+}));
+
+export const userAssetSubscriptions = pgTable("docktalk_user_asset_subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  assetClassId: integer("asset_class_id").notNull().references(() => assetClassConfigs.id),
+  isPrimary: boolean("is_primary").default(false),
+  showShared: boolean("show_shared").default(true),
+  notificationLevel: varchar("notification_level", { length: 20 }).default("all"),
+  optedInAt: timestamp("opted_in_at").defaultNow(),
+}, (table) => ({
+  byUser: index("idx_docktalk_user_asset_subs_user").on(table.userId),
+  byAssetClass: index("idx_docktalk_user_asset_subs_class").on(table.assetClassId),
+  uniqueUserAssetClass: uniqueIndex("idx_docktalk_user_asset_subs_unique").on(table.userId, table.assetClassId),
+}));
+
+export const insertAssetClassConfigSchema = createInsertSchema(assetClassConfigs).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export const insertUserAssetSubscriptionSchema = createInsertSchema(userAssetSubscriptions).omit({
+  id: true, optedInAt: true,
+});
+
+export type AssetClassConfig = typeof assetClassConfigs.$inferSelect;
+export type InsertAssetClassConfig = z.infer<typeof insertAssetClassConfigSchema>;
+export type UserAssetSubscription = typeof userAssetSubscriptions.$inferSelect;
+export type InsertUserAssetSubscription = z.infer<typeof insertUserAssetSubscriptionSchema>;
