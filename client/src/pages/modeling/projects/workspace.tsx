@@ -251,7 +251,8 @@ export default function ProjectWorkspace() {
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-        <div className="overflow-x-auto mb-4">
+        <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 -mx-6 px-6 pt-2 pb-3 border-b border-border/40">
+        <div className="overflow-x-auto">
           <TabsList className="inline-flex min-w-full lg:min-w-0" data-testid="tabs-workspace">
             <TabsTrigger value="overview" className="gap-2" data-testid="tab-overview">
               <Home className="h-4 w-4" />
@@ -346,6 +347,7 @@ export default function ProjectWorkspace() {
               <span className="hidden sm:inline">Export</span>
             </TabsTrigger>
           </TabsList>
+        </div>
         </div>
 
         <TabsContent value="overview" className="space-y-6">

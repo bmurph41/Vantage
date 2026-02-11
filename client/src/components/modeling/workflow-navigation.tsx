@@ -29,7 +29,7 @@ export function WorkflowNavigation({ currentTab, onNavigate }: WorkflowNavigatio
   const totalSteps = WORKFLOW_STEPS.length;
 
   return (
-    <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b py-3 -mx-6 px-6 mb-6">
+    <div className="sticky top-[52px] z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b py-3 -mx-6 px-6 mb-6">
       <div className="flex items-center justify-between">
         <div>
           {previousStep ? (
