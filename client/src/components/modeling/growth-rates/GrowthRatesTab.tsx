@@ -238,7 +238,7 @@ export function GrowthRatesTab({
                   label={category.name}
                   icon={IconComponent}
                   years={years}
-                  rates={getRatesArray(storageGrowth.typeRates?.[category.id], defaultStorageRate)}
+                  rates={getRatesArray(storageGrowth.typeRatesByYear?.[category.id], defaultStorageRate)}
                   defaultRate={defaultStorageRate}
                   onChangeYear={(idx, val) => {
                     updateStorageTypeRate(category.id, idx, val);
