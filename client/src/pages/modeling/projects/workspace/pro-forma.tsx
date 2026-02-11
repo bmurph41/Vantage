@@ -195,14 +195,9 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
     queryKey: ['/api/modeling/projects', projectId, 'documents'],
   });
 
-  // Fetch historical actuals data - this would come from processed documents
-  const { data: historicalData } = useQuery<any>({
-    queryKey: ['/api/modeling/projects', projectId, 'historical-actuals'],
-  });
-
   // Fetch actuals by year from document uploads
   const { data: actualsData } = useQuery<any>({
-    queryKey: [`/api/modeling/projects/${projectId}/actuals`],
+    queryKey: ['/api/modeling/projects', projectId, 'actuals'],
   });
 
   const holdPeriod = config?.holdPeriod || 7;
@@ -214,17 +209,14 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
   // Process documents to determine available historical periods
   const historicalPeriods = useMemo((): DocumentPeriod[] => {
     if (!documents || documents.length === 0) {
-      // Return empty array if no documents - will show placeholder
       return [];
     }
 
-    // Group documents by their fiscal period
     const periodsMap = new Map<string, DocumentPeriod>();
 
     documents
       .filter((doc: any) => doc.status === 'completed')
       .forEach((doc: any) => {
-        // Extract period info from document metadata
         const fiscalYear = doc.fiscalYear || doc.metadata?.fiscalYear;
         const periodStart = doc.periodStart || doc.metadata?.periodStart;
         const periodEnd = doc.periodEnd || doc.metadata?.periodEnd;
@@ -259,19 +251,47 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
         }
       });
 
-    // Sort periods chronologically (oldest first)
     return Array.from(periodsMap.values()).sort((a, b) => 
       new Date(a.endDate).getTime() - new Date(b.endDate).getTime()
     );
   }, [documents]);
 
-  // Get the most recent period (the "baseline" for projections)
-  const baselinePeriod = historicalPeriods.length > 0 
-    ? historicalPeriods[historicalPeriods.length - 1] 
-    : null;
+  // Derive the baseline period from the pro forma engine's latest historical year,
+  // falling back to document-based periods
+  const latestHistoricalYear = proFormaData?.latestHistoricalYear;
+
+  const baselinePeriod = useMemo((): DocumentPeriod | null => {
+    // First check if we have a period from documents matching the engine's baseline year
+    if (historicalPeriods.length > 0) {
+      if (latestHistoricalYear) {
+        const match = historicalPeriods.find(p => p.year === latestHistoricalYear);
+        if (match) return match;
+      }
+      return historicalPeriods[historicalPeriods.length - 1];
+    }
+    // If no document-based periods, but the engine has data, create a synthetic baseline period
+    if (latestHistoricalYear && proFormaData) {
+      const hasLineItems = (proFormaData.revenue?.lineItems?.length || 0) > 0 || 
+                           (proFormaData.expenses?.lineItems?.length || 0) > 0;
+      if (hasLineItems) {
+        return {
+          id: `baseline-${latestHistoricalYear}`,
+          periodType: 'calendar_year',
+          startDate: `${latestHistoricalYear}-01-01`,
+          endDate: `${latestHistoricalYear}-12-31`,
+          year: latestHistoricalYear,
+          documentIds: [],
+          label: `${latestHistoricalYear} Actual`,
+          shortLabel: `${latestHistoricalYear}`,
+          isT12: false
+        };
+      }
+    }
+    return null;
+  }, [historicalPeriods, latestHistoricalYear, proFormaData]);
 
   // Historical periods excluding the baseline (for showing historical trend)
-  const priorPeriods = historicalPeriods.slice(0, -1);
+  const priorPeriods = historicalPeriods.filter(p => p.id !== baselinePeriod?.id);
 
   const toggleCategory = (category: string) => {
     setExpandedCategories(prev => {
@@ -366,16 +386,37 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
     return `${year}-${monthStr}`;
   };
 
-  // Build data structure from actuals and projections
+  // Build data structure from pro forma engine response and actuals
   const tableData = useMemo(() => {
-    // Structure: { category: { lineItem: { historical: {periodId: value}, projected: [year values] } } }
     const data: Record<string, Record<string, { historical: Record<string, number>; projected: number[] }>> = {
       Revenue: {},
       COGS: {},
       Expenses: {}
     };
 
-    // Populate from actuals data if available
+    // Primary source: pro forma engine line items (has both baseAmount and projections)
+    if (proFormaData?.revenue?.lineItems) {
+      proFormaData.revenue.lineItems.forEach((item: any) => {
+        const name = item.name || 'Other';
+        data.Revenue[name] = {
+          historical: baselinePeriod ? { [baselinePeriod.id]: item.baseAmount || 0 } : {},
+          projected: item.projections || Array(holdPeriod).fill(0)
+        };
+      });
+    }
+
+    if (proFormaData?.expenses?.lineItems) {
+      proFormaData.expenses.lineItems.forEach((item: any) => {
+        const name = item.name || 'Other';
+        const category = item.category === 'COGS' ? 'COGS' : 'Expenses';
+        data[category][name] = {
+          historical: baselinePeriod ? { [baselinePeriod.id]: item.baseAmount || 0 } : {},
+          projected: item.projections || Array(holdPeriod).fill(0)
+        };
+      });
+    }
+
+    // Supplement with actuals data if pro forma didn't have certain line items
     if (actualsData?.grouped) {
       actualsData.grouped.forEach((item: any) => {
         const category = item.category as keyof typeof data;
@@ -384,24 +425,9 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
           if (!data[category][lineItemName]) {
             data[category][lineItemName] = { historical: {}, projected: Array(holdPeriod).fill(0) };
           }
-          // Map to baseline period if we have one
-          if (baselinePeriod) {
+          if (baselinePeriod && !data[category][lineItemName].historical[baselinePeriod.id]) {
             data[category][lineItemName].historical[baselinePeriod.id] = item.annualTotal || 0;
           }
-        }
-      });
-    }
-
-    // Populate from pro forma projections if available
-    if (proFormaData?.categories) {
-      Object.entries(proFormaData.categories).forEach(([category, items]: [string, any]) => {
-        if (data[category as keyof typeof data]) {
-          Object.entries(items).forEach(([itemName, values]: [string, any]) => {
-            if (!data[category as keyof typeof data][itemName]) {
-              data[category as keyof typeof data][itemName] = { historical: {}, projected: [] };
-            }
-            data[category as keyof typeof data][itemName].projected = values;
-          });
         }
       });
     }
@@ -411,6 +437,22 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
 
   const serverDeptMap = useMemo(() => {
     const map: Record<string, string> = {};
+    // Department info from pro forma engine line items
+    if (proFormaData?.revenue?.lineItems) {
+      proFormaData.revenue.lineItems.forEach((item: any) => {
+        if (item.name && item.department) {
+          map[item.name] = item.department;
+        }
+      });
+    }
+    if (proFormaData?.expenses?.lineItems) {
+      proFormaData.expenses.lineItems.forEach((item: any) => {
+        if (item.name && item.department) {
+          map[item.name] = item.department;
+        }
+      });
+    }
+    // Also use actuals data
     if (actualsData?.grouped) {
       actualsData.grouped.forEach((item: any) => {
         if (item.subcategory && item.department) {
@@ -419,7 +461,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
       });
     }
     return map;
-  }, [actualsData]);
+  }, [actualsData, proFormaData]);
 
   const departmentGroupedData = useMemo(() => {
     const result: Record<string, Record<string, Record<string, { historical: Record<string, number>; projected: number[] }>>> = {};
@@ -545,7 +587,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
     Object.keys(category).length > 0
   );
 
-  const hasHistoricalData = historicalPeriods.length > 0;
+  const hasHistoricalData = baselinePeriod !== null;
 
   // Export functionality
   const exportProForma = () => {
