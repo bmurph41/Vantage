@@ -43,6 +43,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Mail, Search, Plus, Trash2, Bell, BellOff, ChevronDown, ChevronRight, FileText, Clock, Calendar as CalendarIcon } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { normalizeSavedSearchData } from "../lib/normalization";
@@ -102,7 +104,7 @@ export default function SavedSearchesPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [searchName, setSearchName] = useState("");
   const [queryText, setQueryText] = useState("");
-  const [categories, setCategories] = useState("");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [entities, setEntities] = useState("");
   const [emailAlerts, setEmailAlerts] = useState(false);
   const [alertFrequency, setAlertFrequency] = useState("daily");
@@ -119,6 +121,10 @@ export default function SavedSearchesPage() {
 
   const { data: currentUser, isLoading: userLoading } = useQuery<any>({
     queryKey: ["/api/docktalk/user/current"],
+  });
+
+  const { data: availableCategories = [] } = useQuery<string[]>({
+    queryKey: ["/api/docktalk/categories/all"],
   });
 
   useEffect(() => {
@@ -318,7 +324,7 @@ export default function SavedSearchesPage() {
   const resetForm = () => {
     setSearchName("");
     setQueryText("");
-    setCategories("");
+    setSelectedCategories([]);
     setEntities("");
     setEmailAlerts(false);
     setAlertFrequency("daily");
@@ -336,11 +342,6 @@ export default function SavedSearchesPage() {
       return;
     }
 
-    const categoriesArray = categories
-      .split(',')
-      .map(c => c.trim())
-      .filter(Boolean);
-
     const entitiesArray = entities
       .split(',')
       .map(e => e.trim())
@@ -349,7 +350,7 @@ export default function SavedSearchesPage() {
     const normalizedData = normalizeSavedSearchData({
       searchName: searchName,
       queryText: queryText,
-      categories: categoriesArray,
+      categories: selectedCategories,
       entities: entitiesArray,
       emailAlerts,
       alertFrequency: emailAlerts ? alertFrequency : null,
@@ -560,30 +561,55 @@ export default function SavedSearchesPage() {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="categories">Categories</Label>
-                    <Input
-                      id="categories"
-                      data-testid="input-categories"
-                      placeholder="e.g., M&A, Transactions"
-                      value={categories}
-                      onChange={(e) => setCategories(e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">Comma-separated</p>
-                  </div>
+                <div className="grid gap-2">
+                  <Label>Categories</Label>
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Select categories to monitor ({availableCategories.length} available)
+                  </p>
+                  <ScrollArea className="h-48 border rounded-md p-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      {availableCategories.map((category) => (
+                        <div key={category} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`alert-category-${category}`}
+                            checked={selectedCategories.includes(category)}
+                            onCheckedChange={(checked) => {
+                              setSelectedCategories(prev =>
+                                checked
+                                  ? [...prev, category]
+                                  : prev.filter(c => c !== category)
+                              );
+                            }}
+                            data-testid={`checkbox-category-${category.toLowerCase().replace(/ /g, '-')}`}
+                          />
+                          <label htmlFor={`alert-category-${category}`} className="text-sm cursor-pointer">
+                            {category}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                  {selectedCategories.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {selectedCategories.map((cat) => (
+                        <Badge key={cat} variant="secondary" className="text-xs">
+                          {cat}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="entities">Entities</Label>
-                    <Input
-                      id="entities"
-                      data-testid="input-entities"
-                      placeholder="e.g., Safe Harbor, Suntex"
-                      value={entities}
-                      onChange={(e) => setEntities(e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">Comma-separated</p>
-                  </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="entities">Entities</Label>
+                  <Input
+                    id="entities"
+                    data-testid="input-entities"
+                    placeholder="e.g., Safe Harbor, Suntex"
+                    value={entities}
+                    onChange={(e) => setEntities(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">Comma-separated</p>
                 </div>
 
                 <div className="border-t pt-4 space-y-4">
