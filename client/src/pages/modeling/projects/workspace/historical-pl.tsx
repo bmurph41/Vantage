@@ -194,7 +194,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
   });
 
   const { data: allYearsActualsData } = useQuery<any>({
-    queryKey: [`/api/modeling/projects/${projectId}/actuals`],
+    queryKey: [`/api/modeling/projects/${projectId}/actuals/multi-year?years=${yearRange.join(',')}`],
     enabled: displayMode === 'annual' && yearRange.length > 0,
   });
 
@@ -230,6 +230,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
     },
     onSuccess: (result: any) => {
       queryClient.invalidateQueries({ queryKey: [`/api/modeling/projects/${projectId}/actuals?year=${selectedYear}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/modeling/projects/${projectId}/actuals/multi-year?years=${yearRange.join(',')}`] });
       queryClient.invalidateQueries({ queryKey: [`/api/modeling/projects/${projectId}/data-sources`] });
       queryClient.invalidateQueries({ queryKey: [`/api/modeling/projects/${projectId}/sync-history`] });
       setShowSyncDialog(false);
@@ -257,6 +258,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
     onSuccess: (result: any) => {
       queryClient.invalidateQueries({ queryKey: [`/api/modeling/projects/${projectId}/actuals`] });
       queryClient.invalidateQueries({ queryKey: [`/api/modeling/projects/${projectId}/actuals/years`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/modeling/projects/${projectId}/actuals/multi-year?years=${yearRange.join(',')}`] });
       queryClient.invalidateQueries({ queryKey: [`/api/modeling/projects/${projectId}/data-sources`] });
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'historical-pl'] });
       setShowPromoteDialog(false);
@@ -349,21 +351,21 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
 
   const inferDepartmentClient = (subcategory: string, _category?: string): string => {
     const lower = subcategory.toLowerCase();
-    if (lower.includes('slip') || lower.includes('dock') || lower.includes('berth') || lower.includes('mooring') || lower.includes('storage') || lower.includes('winter') || lower.includes('land storage'))
+    if (lower.includes('slip') || lower.includes('dock') || lower.includes('berth') || lower.includes('mooring') || lower.includes('storage') || lower.includes('land storage'))
       return 'Storage';
     if (lower.includes('fuel') || lower.includes('gas') || lower.includes('diesel'))
       return 'Fuel';
     if (lower.includes('store') || lower.includes('merchandise') || lower.includes('retail') || lower.includes('chandlery'))
       return "Ship's Store";
-    if (lower.includes('service') || lower.includes('repair') || lower.includes('bottom paint') || lower.includes('bottom wash') || lower.includes('shrink wrap') || lower.includes('hauling'))
+    if (lower.includes('service') || lower.includes('repair') || lower.includes('mechanic') || lower.includes('bottom paint') || lower.includes('bottom wash') || lower.includes('shrink wrap') || lower.includes('hauling'))
       return 'Service';
+    if (lower.includes('brokerage') || lower.includes('broker') || lower.includes('finance commission'))
+      return 'Boat Brokerage';
     if (lower.includes('new boat') || lower.includes('used boat') || lower.includes('boat sale') || lower.includes('trade'))
       return 'Boat Sales';
-    if (lower.includes('brokerage') || lower.includes('finance commission'))
-      return 'Boat Brokerage';
     if (lower.includes('payroll') || lower.includes('wage') || lower.includes('salary') || lower.includes('benefit') || lower.includes('workers comp') || lower.includes('soc security') || lower.includes('futa') || lower.includes('disability') || lower.includes('family leave') || lower.includes('medical insurance'))
       return 'Payroll';
-    if (lower.includes('launch') || lower.includes('haul') || lower.includes('electric') || lower.includes('dockside'))
+    if (lower.includes('launch') || lower.includes('haul') || lower.includes('electric') || lower.includes('power') || lower.includes('amenity') || lower.includes('dockside'))
       return 'Marina & Amenities';
     return 'General';
   };
@@ -445,21 +447,36 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
   }, [lineItems]);
 
   const annualDataByYear = useMemo(() => {
-    if (!allYearsActualsData?.grouped) return {};
+    if (!allYearsActualsData?.byYear) return {};
     const dataByYear: Record<number, Record<string, Record<string, number>>> = {};
     for (const year of yearRange) {
       dataByYear[year] = { Revenue: {}, COGS: {}, Expenses: {} };
     }
-    for (const item of allYearsActualsData.grouped) {
-      const year = item.year || parseInt(selectedYear);
+    for (const [yearStr, items] of Object.entries(allYearsActualsData.byYear)) {
+      const year = Number(yearStr);
       if (!dataByYear[year]) continue;
-      const cat = item.category || 'Expenses';
-      const subcat = item.subcategory || 'Other';
-      if (!dataByYear[year][cat]) dataByYear[year][cat] = {};
-      dataByYear[year][cat][subcat] = (dataByYear[year][cat][subcat] || 0) + (item.annualTotal || 0);
+      for (const item of (items as any[])) {
+        const cat = item.category || 'Expenses';
+        const subcat = item.subcategory || 'Other';
+        if (!dataByYear[year][cat]) dataByYear[year][cat] = {};
+        dataByYear[year][cat][subcat] = (dataByYear[year][cat][subcat] || 0) + (item.annualTotal || 0);
+      }
     }
     return dataByYear;
-  }, [allYearsActualsData, yearRange, selectedYear]);
+  }, [allYearsActualsData, yearRange]);
+
+  const annualSubcatDeptMap = useMemo(() => {
+    if (!allYearsActualsData?.byYear) return {};
+    const map: Record<string, string> = {};
+    for (const items of Object.values(allYearsActualsData.byYear)) {
+      for (const item of (items as any[])) {
+        if (item.subcategory && item.department) {
+          map[item.subcategory] = item.department;
+        }
+      }
+    }
+    return map;
+  }, [allYearsActualsData]);
 
   const getAnnualCategoryTotal = (category: string, year: number) => {
     const catData = annualDataByYear[year]?.[category];
@@ -1290,7 +1307,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                         const subcats = annualSubcategories[category as keyof typeof annualSubcategories] || [];
                         const deptGrouped: Record<string, string[]> = {};
                         subcats.forEach((sub: string) => {
-                          const dept = inferDepartmentClient(sub, category);
+                          const dept = annualSubcatDeptMap[sub] || inferDepartmentClient(sub, category);
                           if (!deptGrouped[dept]) deptGrouped[dept] = [];
                           deptGrouped[dept].push(sub);
                         });

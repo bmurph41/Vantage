@@ -19525,7 +19525,7 @@ Current context: Project ${req.params.projectId}`;
             annualTotal: 0
           };
         }
-        const monthKey = new Date(item.year, item.month - 1).toLocaleString('default', { month: 'short' });
+        const MONTH_KEYS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']; const monthKey = MONTH_KEYS[(item.month - 1) % 12];
         const amount = parseFloat(item.amount);
         acc[key].monthlyData[monthKey] = (acc[key].monthlyData[monthKey] || 0) + amount;
         acc[key].annualTotal += amount;
@@ -19595,7 +19595,7 @@ Current context: Project ${req.params.projectId}`;
               annualTotal: 0
             };
           }
-          const monthKey = new Date(item.year, item.month - 1).toLocaleString('default', { month: 'short' });
+          const MONTH_KEYS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']; const monthKey = MONTH_KEYS[(item.month - 1) % 12];
           const amount = parseFloat(item.amount);
           acc[key].monthlyData[monthKey] = (acc[key].monthlyData[monthKey] || 0) + amount;
           acc[key].annualTotal += amount;

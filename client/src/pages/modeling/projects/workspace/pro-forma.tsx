@@ -307,23 +307,23 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
 
   const isSeasonalMonth = (monthIndex: number) => seasonMonths.includes(monthIndex + 1);
 
-  const inferDepartmentClient = (subcategory: string, category?: string): string => {
+  const inferDepartmentClient = (subcategory: string, _category?: string): string => {
     const lower = subcategory.toLowerCase();
-    if (lower.includes('slip') || lower.includes('dock') || lower.includes('berth') || lower.includes('mooring') || lower.includes('storage') || lower.includes('winter') || lower.includes('land storage'))
+    if (lower.includes('slip') || lower.includes('dock') || lower.includes('berth') || lower.includes('mooring') || lower.includes('storage') || lower.includes('land storage'))
       return 'Storage';
     if (lower.includes('fuel') || lower.includes('gas') || lower.includes('diesel'))
       return 'Fuel';
     if (lower.includes('store') || lower.includes('merchandise') || lower.includes('retail') || lower.includes('chandlery'))
       return "Ship's Store";
-    if (lower.includes('service') || lower.includes('repair') || lower.includes('bottom paint') || lower.includes('bottom wash') || lower.includes('shrink wrap') || lower.includes('hauling'))
+    if (lower.includes('service') || lower.includes('repair') || lower.includes('mechanic') || lower.includes('bottom paint') || lower.includes('bottom wash') || lower.includes('shrink wrap') || lower.includes('hauling'))
       return 'Service';
+    if (lower.includes('brokerage') || lower.includes('broker') || lower.includes('finance commission'))
+      return 'Boat Brokerage';
     if (lower.includes('new boat') || lower.includes('used boat') || lower.includes('boat sale') || lower.includes('trade'))
       return 'Boat Sales';
-    if (lower.includes('brokerage') || lower.includes('finance commission'))
-      return 'Boat Brokerage';
     if (lower.includes('payroll') || lower.includes('wage') || lower.includes('salary') || lower.includes('benefit') || lower.includes('workers comp') || lower.includes('soc security') || lower.includes('futa') || lower.includes('disability') || lower.includes('family leave') || lower.includes('medical insurance'))
       return 'Payroll';
-    if (lower.includes('launch') || lower.includes('haul') || lower.includes('electric') || lower.includes('dockside'))
+    if (lower.includes('launch') || lower.includes('haul') || lower.includes('electric') || lower.includes('power') || lower.includes('amenity') || lower.includes('dockside'))
       return 'Marina & Amenities';
     return 'General';
   };
@@ -378,12 +378,24 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
     return data;
   }, [actualsData, proFormaData, baselinePeriod, holdPeriod]);
 
+  const serverDeptMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (actualsData?.grouped) {
+      actualsData.grouped.forEach((item: any) => {
+        if (item.subcategory && item.department) {
+          map[item.subcategory] = item.department;
+        }
+      });
+    }
+    return map;
+  }, [actualsData]);
+
   const departmentGroupedData = useMemo(() => {
     const result: Record<string, Record<string, Record<string, { historical: Record<string, number>; projected: number[] }>>> = {};
     for (const [category, items] of Object.entries(tableData)) {
       result[category] = {};
       for (const [itemName, values] of Object.entries(items)) {
-        const dept = inferDepartmentClient(itemName, category);
+        const dept = serverDeptMap[itemName] || inferDepartmentClient(itemName, category);
         if (!result[category][dept]) {
           result[category][dept] = {};
         }
@@ -391,7 +403,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
       }
     }
     return result;
-  }, [tableData]);
+  }, [tableData, serverDeptMap]);
 
   // Calculate totals for each category and period
   const getCategoryTotal = (category: string, periodId: string) => {

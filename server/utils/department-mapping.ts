@@ -25,19 +25,21 @@ export function inferDepartment(subcategory: string, category?: string): string 
     }
   }
 
-  if (lower.includes('slip') || lower.includes('dock') || lower.includes('berth') || lower.includes('mooring') || lower.includes('storage'))
+  if (lower.includes('slip') || lower.includes('dock') || lower.includes('berth') || lower.includes('mooring') || lower.includes('storage') || lower.includes('land storage'))
     return 'Storage';
   if (lower.includes('fuel') || lower.includes('gas') || lower.includes('diesel'))
     return 'Fuel';
   if (lower.includes('store') || lower.includes('merchandise') || lower.includes('retail') || lower.includes('chandlery'))
     return "Ship's Store";
-  if (lower.includes('service') || lower.includes('repair') || lower.includes('mechanic') || lower.includes('bottom paint'))
+  if (lower.includes('service') || lower.includes('repair') || lower.includes('mechanic') || lower.includes('bottom paint') || lower.includes('bottom wash') || lower.includes('shrink wrap') || lower.includes('hauling'))
     return 'Service';
-  if (lower.includes('boat sale') || lower.includes('brokerage'))
+  if (lower.includes('brokerage') || lower.includes('broker') || lower.includes('finance commission'))
+    return 'Boat Brokerage';
+  if (lower.includes('new boat') || lower.includes('used boat') || lower.includes('boat sale') || lower.includes('trade'))
     return 'Boat Sales';
-  if (lower.includes('payroll') || lower.includes('wage') || lower.includes('salary') || lower.includes('benefit'))
+  if (lower.includes('payroll') || lower.includes('wage') || lower.includes('salary') || lower.includes('benefit') || lower.includes('workers comp') || lower.includes('soc security') || lower.includes('futa') || lower.includes('disability') || lower.includes('family leave') || lower.includes('medical insurance'))
     return 'Payroll';
-  if (lower.includes('launch') || lower.includes('haul') || lower.includes('electric') || lower.includes('power') || lower.includes('amenity'))
+  if (lower.includes('launch') || lower.includes('haul') || lower.includes('electric') || lower.includes('power') || lower.includes('amenity') || lower.includes('dockside'))
     return 'Marina & Amenities';
 
   return 'General';
