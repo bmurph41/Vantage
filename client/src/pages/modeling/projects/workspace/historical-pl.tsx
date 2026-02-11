@@ -821,28 +821,27 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
       </div>
 
       {dataSources && dataSources.length > 0 && (
-        <Card className="bg-blue-50/50 border-blue-200">
-          <CardContent className="py-3">
-            <div className="flex items-center gap-4 flex-wrap">
-              <div className="flex items-center gap-2">
-                <Link2 className="h-4 w-4 text-blue-600" />
-                <span className="text-sm font-medium text-blue-800">Data Sources:</span>
-              </div>
-              {dataSources.map((source) => {
-                const Icon = dataSourceIcons[source.dataSource] || Database;
-                return (
-                  <Badge key={source.dataSource} variant="secondary" className="gap-1">
-                    <Icon className="h-3 w-3" />
-                    {dataSourceLabels[source.dataSource] || source.dataSource}
-                    <span className="text-xs text-muted-foreground ml-1">
-                      ({formatCurrency(parseFloat(source.totalAmount))})
-                    </span>
-                  </Badge>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+        <details className="group">
+          <summary className="flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground hover:text-foreground transition-colors select-none list-none [&::-webkit-details-marker]:hidden">
+            <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90" />
+            <Link2 className="h-3 w-3" />
+            <span>Data Sources ({dataSources.length})</span>
+          </summary>
+          <div className="flex items-center gap-2 flex-wrap mt-1.5 ml-5">
+            {dataSources.map((source) => {
+              const Icon = dataSourceIcons[source.dataSource] || Database;
+              return (
+                <Badge key={source.dataSource} variant="secondary" className="gap-1 text-xs py-0.5">
+                  <Icon className="h-3 w-3" />
+                  {dataSourceLabels[source.dataSource] || source.dataSource}
+                  <span className="text-xs text-muted-foreground ml-1">
+                    ({formatCurrency(parseFloat(source.totalAmount))})
+                  </span>
+                </Badge>
+              );
+            })}
+          </div>
+        </details>
       )}
 
       <Card>
