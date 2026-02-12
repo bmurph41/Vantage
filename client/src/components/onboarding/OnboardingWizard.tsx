@@ -1221,13 +1221,15 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
               <Anchor className="h-5 w-5 text-[#1E4FAB]" />
               {mode === "new_project" ? "New Project" : "MarinaMatch Setup"}
             </DialogTitle>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               {steps.map((s) => (
                 <div
                   key={s.id}
                   className={cn(
-                    "w-2 h-2 rounded-full transition-colors",
-                    state.step >= s.id ? "bg-[#1E4FAB]" : "bg-muted"
+                    "w-2.5 h-2.5 rounded-full transition-colors border",
+                    state.step >= s.id
+                      ? "bg-[#1E4FAB] border-[#1E4FAB]"
+                      : "bg-transparent border-[#1E4FAB]/30"
                   )}
                 />
               ))}
