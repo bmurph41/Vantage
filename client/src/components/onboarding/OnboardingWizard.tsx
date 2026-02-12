@@ -337,8 +337,8 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
   }
 
   function handleFinish() {
-    const hasSingleDeal = state.dealStructure === "single" && state.marinaName.trim() && state.marinaAddress.city && state.marinaAddress.state && state.dealType;
-    const hasPortfolio = state.dealStructure === "portfolio" && state.portfolioMarinas.some(m => m.name.trim() && m.address.city && m.address.state) && state.dealType;
+    const hasSingleDeal = state.dealStructure === "single" && state.marinaName.trim() && state.marinaAddress.line1.trim() && state.marinaAddress.city && state.marinaAddress.state && state.dealType && state.region;
+    const hasPortfolio = state.dealStructure === "portfolio" && state.portfolioMarinas.some(m => m.name.trim() && m.address.city && m.address.state) && state.dealType && state.region;
     
     if (hasSingleDeal || hasPortfolio) {
       createDealMutation.mutate({
@@ -354,7 +354,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
     } else {
       toast({
         title: "Missing Information",
-        description: "Please fill in the required marina details (name, city, and state).",
+        description: "Please fill in all required fields: marina name, address, region, and deal source.",
         variant: "destructive"
       });
     }
@@ -569,11 +569,11 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
         </div>
         <div className="space-y-3">
           <div className="space-y-2">
-            <Label htmlFor="marinaName">Marina Name</Label>
+            <Label htmlFor="marinaName">Marina Name <span className="text-destructive">*</span></Label>
             <Input id="marinaName" placeholder="e.g., Sunset Bay Marina" value={state.marinaName} onChange={(e) => setState(s => ({ ...s, marinaName: e.target.value }))} />
           </div>
           <div className="space-y-2">
-            <Label>Address</Label>
+            <Label>Address <span className="text-destructive">*</span></Label>
             <AddressAutocompleteInput value={state.marinaAddress.line1} placeholder="Start typing an address..." onChangeText={(text) => setState(s => ({ ...s, marinaAddress: { ...s.marinaAddress, line1: text } }))} onSelectAddress={(addr) => handleAddressAutocomplete(addr)} searchType="address" />
           </div>
           <div className="space-y-2">
@@ -685,7 +685,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
       </div>
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label>Deal Source</Label>
+          <Label>Deal Source <span className="text-destructive">*</span></Label>
           <Select value={state.dealType || undefined} onValueChange={(value) => setState(s => ({ ...s, dealType: value as DealType }))}>
             <SelectTrigger><SelectValue placeholder="Select deal source" /></SelectTrigger>
             <SelectContent>
@@ -696,9 +696,9 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
           </Select>
         </div>
         <div className="space-y-2">
-          <Label>Region</Label>
+          <Label>Region <span className="text-destructive">*</span></Label>
           <Select value={state.region || undefined} onValueChange={(value) => setState(s => ({ ...s, region: value }))}>
-            <SelectTrigger><SelectValue placeholder="Select region (optional)" /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Select region" /></SelectTrigger>
             <SelectContent>
               {US_REGIONS.map((region) => (
                 <SelectItem key={region} value={region}>{region}</SelectItem>
@@ -707,7 +707,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
           </Select>
         </div>
         <div className="space-y-2">
-          <Label>Deal Status</Label>
+          <Label>Deal Status <span className="text-destructive">*</span></Label>
           <Select value={state.dealStatus} onValueChange={(value) => setState(s => ({ ...s, dealStatus: value as DealStatus }))}>
             <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
             <SelectContent>
