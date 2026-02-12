@@ -71,16 +71,18 @@ const ModalContent = React.forwardRef<
       className={cn(modalContentVariants({ size }), className)}
       {...props}
       onPointerDownOutside={(e) => {
-        const target = e.target as HTMLElement;
-        if (target.closest('.pac-container')) {
+        const target = ((e as any).detail?.originalEvent?.target || e.target) as HTMLElement;
+        if (target.closest('.pac-container') || target.classList?.contains('pac-item') || target.classList?.contains('pac-item-query') || target.closest('.pac-item')) {
           e.preventDefault();
+          return;
         }
         onPointerDownOutside?.(e);
       }}
       onInteractOutside={(e) => {
-        const target = e.target as HTMLElement;
-        if (target.closest('.pac-container')) {
+        const target = ((e as any).detail?.originalEvent?.target || e.target) as HTMLElement;
+        if (target.closest('.pac-container') || target.classList?.contains('pac-item') || target.classList?.contains('pac-item-query') || target.closest('.pac-item')) {
           e.preventDefault();
+          return;
         }
         onInteractOutside?.(e);
       }}
