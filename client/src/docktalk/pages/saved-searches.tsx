@@ -3,6 +3,19 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+
+function getCsrfToken(): string {
+  const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
+function csrfHeaders(includeContentType = true): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (includeContentType) headers["Content-Type"] = "application/json";
+  const token = getCsrfToken();
+  if (token) headers["X-CSRF-Token"] = token;
+  return headers;
+}
 import {
   Card,
   CardContent,
@@ -191,7 +204,7 @@ export default function SavedSearchesPage() {
     mutationFn: async (data: EmailSettingsForm) => {
       const response = await fetch("/api/docktalk/user/notification-preferences", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         credentials: "include",
         body: JSON.stringify({
           email: data.email,
@@ -224,7 +237,7 @@ export default function SavedSearchesPage() {
     mutationFn: async () => {
       const response = await fetch("/api/docktalk/test-email", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         credentials: "include",
       });
       if (!response.ok) {
@@ -262,7 +275,7 @@ export default function SavedSearchesPage() {
     mutationFn: async (data: any) => {
       const response = await fetch('/api/docktalk/saved-searches', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: csrfHeaders(),
         body: JSON.stringify(data),
         credentials: 'include',
       });
@@ -283,7 +296,7 @@ export default function SavedSearchesPage() {
     mutationFn: async ({ id, data }: { id: string; data: Partial<SavedSearch> }) => {
       const response = await fetch(`/api/docktalk/saved-searches/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: csrfHeaders(),
         body: JSON.stringify(data),
         credentials: 'include',
       });
@@ -304,6 +317,7 @@ export default function SavedSearchesPage() {
     mutationFn: async (id: string) => {
       const response = await fetch(`/api/docktalk/saved-searches/${id}`, {
         method: 'DELETE',
+        headers: csrfHeaders(false),
         credentials: 'include',
       });
       if (!response.ok) throw new Error('Failed to delete alert');

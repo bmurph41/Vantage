@@ -3,6 +3,19 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+
+function getCsrfToken(): string {
+  const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
+function csrfHeaders(includeContentType = true): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (includeContentType) headers["Content-Type"] = "application/json";
+  const token = getCsrfToken();
+  if (token) headers["X-CSRF-Token"] = token;
+  return headers;
+}
 import {
   Dialog,
   DialogContent,
@@ -154,7 +167,7 @@ export default function NotificationPreferences({
     mutationFn: async (data: EmailSettingsForm) => {
       const response = await fetch("/api/docktalk/user/notification-preferences", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         credentials: "include",
         body: JSON.stringify({
           email: data.email,
@@ -194,7 +207,7 @@ export default function NotificationPreferences({
     mutationFn: async () => {
       const response = await fetch("/api/docktalk/test-email", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders(),
         credentials: "include",
       });
 
@@ -323,6 +336,7 @@ export default function NotificationPreferences({
     mutationFn: async (id: string) => {
       const response = await fetch(`/api/saved-searches/${id}`, {
         method: "DELETE",
+        headers: csrfHeaders(false),
         credentials: "include",
       });
       
