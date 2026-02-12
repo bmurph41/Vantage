@@ -53,6 +53,8 @@ type ModelingProject = {
   companyId: string | null;
   customMetrics: Record<string, any> | null;
   notes: string | null;
+  irr: number | null;
+  exitYear: number | null;
 };
 
 export default function ModelingProjectsPage() {
@@ -347,6 +349,7 @@ export default function ModelingProjectsPage() {
                       <TableHead>Marina Name</TableHead>
                       <TableHead>Location</TableHead>
                       <TableHead className="text-right">Purchase Price</TableHead>
+                      <TableHead className="text-right">IRR</TableHead>
                       <TableHead className="text-right">Year 1 Cap Rate</TableHead>
                       <TableHead className="text-right">Historical EBITDA</TableHead>
                       <TableHead className="text-right">Yr. 1 EBITDA</TableHead>
@@ -370,6 +373,18 @@ export default function ModelingProjectsPage() {
                         </TableCell>
                         <TableCell className="text-right" data-testid={`text-price-${project.id}`}>
                           {formatCurrency(project.purchasePrice)}
+                        </TableCell>
+                        <TableCell className="text-right" data-testid={`text-irr-${project.id}`}>
+                          {project.irr != null ? (
+                            <div>
+                              <div className={`font-medium ${project.irr >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {formatPercent(project.irr)}
+                              </div>
+                              {project.exitYear && (
+                                <div className="text-xs text-muted-foreground">Exit Year: {project.exitYear}</div>
+                              )}
+                            </div>
+                          ) : '-'}
                         </TableCell>
                         <TableCell className="text-right" data-testid={`text-cap-rate-${project.id}`}>
                           {formatPercent(project.year1CapRate)}

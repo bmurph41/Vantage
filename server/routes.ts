@@ -17131,6 +17131,8 @@ Current context: Project ${req.params.projectId}`;
         let t12Ebitda: number | null = null;
         let t12Label: string | null = null;
         let year1Ebitda: number | null = null;
+        let irr: number | null = null;
+        let exitYear: number | null = null;
 
         try {
           const financialPeriods = await db.select()
@@ -17207,15 +17209,18 @@ Current context: Project ${req.params.projectId}`;
             }
           }
 
-          if (year1Ebitda === null) {
-            try {
-              const proForma = await proFormaEngineService.generateProForma(project.id, orgId, 'base');
-              if (proForma.noi && proForma.noi.length > 0) {
+          try {
+            const proForma = await proFormaEngineService.generateProForma(project.id, orgId, 'base');
+            if (proForma.noi && proForma.noi.length > 0) {
+              if (year1Ebitda === null) {
                 year1Ebitda = proForma.noi[0];
               }
-            } catch (e) {
-              // Pro forma may not be available for all projects
+              irr = proForma.metrics?.irr ?? null;
+              const lastYear = proForma.years?.[proForma.years.length - 1];
+              exitYear = lastYear ?? null;
             }
+          } catch (e) {
+            // Pro forma may not be available for all projects
           }
         } catch (e) {
           console.warn(`Failed to compute metrics for project ${project.id}:`, e);
@@ -17228,6 +17233,8 @@ Current context: Project ${req.params.projectId}`;
           t12Ebitda,
           t12Label,
           year1Ebitda,
+          irr,
+          exitYear,
         };
       }));
       
