@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { formatCurrency, formatPercent, formatNumber } from '@/lib/utils';
@@ -327,139 +327,107 @@ export default function ModelingProjectsPage() {
                 {searchTerm ? 'No projects match your search.' : 'No projects yet. Create your first project to get started!'}
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table className="min-w-[1100px]">
+              <div>
+                <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="min-w-[140px]">Marina Name</TableHead>
-                      <TableHead className="whitespace-nowrap">Location</TableHead>
-                      <TableHead className="text-right whitespace-nowrap">Purchase Price</TableHead>
-                      <TableHead className="text-right">IRR</TableHead>
-                      <TableHead className="text-right whitespace-nowrap">Yr 1 Cap Rate</TableHead>
-                      <TableHead className="text-right whitespace-nowrap">Hist. EBITDA</TableHead>
-                      <TableHead className="text-right whitespace-nowrap">Yr. 1 EBITDA</TableHead>
-                      <TableHead className="text-center">Status</TableHead>
-                      <TableHead className="whitespace-nowrap">Created</TableHead>
-                      <TableHead className="whitespace-nowrap">Created By</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="font-bold text-foreground min-w-[160px]">Marina Name</TableHead>
+                      <TableHead className="font-bold text-foreground">Location</TableHead>
+                      <TableHead className="font-bold text-foreground text-right whitespace-nowrap">Purchase Price</TableHead>
+                      <TableHead className="font-bold text-foreground text-right">IRR</TableHead>
+                      <TableHead className="font-bold text-foreground text-right whitespace-nowrap">Yr 1 Cap Rate</TableHead>
+                      <TableHead className="font-bold text-foreground text-right whitespace-nowrap">Hist. EBITDA</TableHead>
+                      <TableHead className="font-bold text-foreground text-right whitespace-nowrap">Yr. 1 EBITDA</TableHead>
+                      <TableHead className="font-bold text-foreground text-center">Status</TableHead>
+                      <TableHead className="font-bold text-foreground text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredProjects.map((project) => (
-                      <TableRow 
-                        key={project.id} 
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => setLocation(`/modeling/projects/${project.id}`)}
-                        data-testid={`row-project-${project.id}`}
-                      >
-                        <TableCell className="font-medium" data-testid={`text-marina-name-${project.id}`}>
-                          {project.marinaName}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap" data-testid={`text-location-${project.id}`}>
-                          {[project.city, project.state].filter(Boolean).join(', ') || '-'}
-                        </TableCell>
-                        <TableCell className="text-right whitespace-nowrap" data-testid={`text-price-${project.id}`}>
-                          {formatCurrency(project.purchasePrice, { dash: true })}
-                        </TableCell>
-                        <TableCell className="text-right whitespace-nowrap" data-testid={`text-irr-${project.id}`}>
-                          {project.irr != null ? (
-                            <div>
-                              <div className={`font-medium ${project.irr >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {formatPercent(project.irr, { dash: true })}
-                              </div>
+                      <Fragment key={project.id}>
+                        <TableRow
+                          className="cursor-pointer hover:bg-muted/50 border-b-0"
+                          onClick={() => setLocation(`/modeling/projects/${project.id}`)}
+                          data-testid={`row-project-${project.id}`}
+                        >
+                          <TableCell className="font-semibold pb-0.5" data-testid={`text-marina-name-${project.id}`}>
+                            {project.marinaName}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap pb-0.5" data-testid={`text-location-${project.id}`}>
+                            {[project.city, project.state].filter(Boolean).join(', ') || '-'}
+                          </TableCell>
+                          <TableCell className="text-right whitespace-nowrap font-semibold pb-0.5" data-testid={`text-price-${project.id}`}>
+                            {formatCurrency(project.purchasePrice, { dash: true })}
+                          </TableCell>
+                          <TableCell className="text-right whitespace-nowrap pb-0.5" data-testid={`text-irr-${project.id}`}>
+                            <span className={`font-semibold ${project.irr != null ? (project.irr >= 0 ? 'text-green-600' : 'text-red-600') : ''}`}>
+                              {project.irr != null ? formatPercent(project.irr, { dash: true }) : '-'}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right whitespace-nowrap font-semibold pb-0.5" data-testid={`text-cap-rate-${project.id}`}>
+                            {formatPercent(project.year1CapRate, { dash: true })}
+                          </TableCell>
+                          <TableCell className="text-right whitespace-nowrap font-semibold pb-0.5" data-testid={`text-t12-ebitda-${project.id}`}>
+                            {project.t12Ebitda != null ? formatCurrency(project.t12Ebitda) : '-'}
+                          </TableCell>
+                          <TableCell className="text-right whitespace-nowrap font-semibold pb-0.5" data-testid={`text-yr1-ebitda-${project.id}`}>
+                            {project.year1Ebitda != null ? formatCurrency(project.year1Ebitda) : '-'}
+                          </TableCell>
+                          <TableCell className="text-center whitespace-nowrap pb-0.5">
+                            <span
+                              className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getOutcomeBadgeColor(project.dealOutcome)}`}
+                              data-testid={`badge-status-${project.id}`}
+                            >
+                              {formatOutcome(project.dealOutcome)}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right pb-0.5" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex justify-end gap-1">
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setLocation(`/modeling/projects/${project.id}/doc-intel`)} title="Document Intelligence" data-testid={`button-doc-intel-${project.id}`}>
+                                <FileSpreadsheet className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setLocation(`/modeling/projects/${project.id}/exit`)} title="Exit Strategy Suite" data-testid={`button-exit-strategy-${project.id}`}>
+                                <BarChart3 className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(project)} title="Edit" data-testid={`button-edit-${project.id}`}>
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(project)} title="Delete" data-testid={`button-delete-${project.id}`}>
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        <tr
+                          className="cursor-pointer hover:bg-muted/50 border-b"
+                          onClick={() => setLocation(`/modeling/projects/${project.id}`)}
+                        >
+                          <td className="px-4 pt-0 pb-3" colSpan={9}>
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
                               {project.exitYear && (
-                                <div className="text-xs text-muted-foreground">Exit: {project.exitYear}</div>
+                                <span>Exit Year: {project.exitYear}</span>
                               )}
-                            </div>
-                          ) : '-'}
-                        </TableCell>
-                        <TableCell className="text-right whitespace-nowrap" data-testid={`text-cap-rate-${project.id}`}>
-                          {formatPercent(project.year1CapRate, { dash: true })}
-                        </TableCell>
-                        <TableCell className="text-right whitespace-nowrap" data-testid={`text-t12-ebitda-${project.id}`}>
-                          {project.t12Ebitda != null ? (
-                            <div>
-                              <div>{formatCurrency(project.t12Ebitda)}</div>
                               {project.t12Label && (
-                                <div className="text-xs text-muted-foreground">{project.t12Label}</div>
+                                <span>Hist. Period: {project.t12Label}</span>
                               )}
-                            </div>
-                          ) : '-'}
-                        </TableCell>
-                        <TableCell className="text-right whitespace-nowrap" data-testid={`text-yr1-ebitda-${project.id}`}>
-                          {project.year1Ebitda != null ? (
-                            <div>
-                              <div>{formatCurrency(project.year1Ebitda)}</div>
-                              {project.t12Ebitda != null && project.t12Ebitda !== 0 && (
-                                <div className={`text-xs font-medium ${((project.year1Ebitda - project.t12Ebitda) / Math.abs(project.t12Ebitda)) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                  {((project.year1Ebitda - project.t12Ebitda) / Math.abs(project.t12Ebitda) * 100) >= 0 ? '+' : ''}
+                              {project.year1Ebitda != null && project.t12Ebitda != null && project.t12Ebitda !== 0 && (
+                                <span className={`font-medium ${((project.year1Ebitda - project.t12Ebitda) / Math.abs(project.t12Ebitda)) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  EBITDA Growth: {((project.year1Ebitda - project.t12Ebitda) / Math.abs(project.t12Ebitda) * 100) >= 0 ? '+' : ''}
                                   {((project.year1Ebitda - project.t12Ebitda) / Math.abs(project.t12Ebitda) * 100).toFixed(1)}%
-                                </div>
+                                </span>
                               )}
+                              <span className="ml-auto flex items-center gap-4">
+                                <span>Created: {project.createdAt
+                                  ? new Date(project.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                  : '-'}</span>
+                                {project.createdByName && (
+                                  <span>By: {project.createdByName}</span>
+                                )}
+                              </span>
                             </div>
-                          ) : '-'}
-                        </TableCell>
-                        <TableCell className="text-center whitespace-nowrap">
-                          <span
-                            className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getOutcomeBadgeColor(project.dealOutcome)}`}
-                            data-testid={`badge-status-${project.id}`}
-                          >
-                            {formatOutcome(project.dealOutcome)}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                          {project.createdAt
-                            ? new Date(project.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                            : '-'}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                          {project.createdByName || '-'}
-                        </TableCell>
-                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => setLocation(`/modeling/projects/${project.id}/doc-intel`)}
-                              title="Document Intelligence"
-                              data-testid={`button-doc-intel-${project.id}`}
-                            >
-                              <FileSpreadsheet className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => setLocation(`/modeling/projects/${project.id}/exit`)}
-                              title="Exit Strategy Suite"
-                              data-testid={`button-exit-strategy-${project.id}`}
-                            >
-                              <BarChart3 className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => handleEdit(project)}
-                              title="Edit"
-                              data-testid={`button-edit-${project.id}`}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => handleDelete(project)}
-                              title="Delete"
-                              data-testid={`button-delete-${project.id}`}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
+                          </td>
+                        </tr>
+                      </Fragment>
                     ))}
                   </TableBody>
                 </Table>
