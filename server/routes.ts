@@ -84,7 +84,7 @@ import ddAutomationRoutes from "./routes/dd-automation-routes";
 import modelingValidationRoutes from "./routes/modeling-validation-routes";
 import enhancedDebtRoutes from "./routes/enhanced-debt-routes";
 import operationsContextRoutes from "./routes/operations-context-routes";
-import { userSessions, insertProspectingEntrySchema, users, salesComps, rateComps, industryStandards, modelingProjectConfig, insertPendingSalesCompSchema } from "@shared/schema";
+import { userSessions, insertProspectingEntrySchema, users, salesComps, rateComps, industryStandards, modelingProjectConfig, insertPendingSalesCompSchema, customCatalogItems, insertCustomCatalogItemSchema } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { initializeVdrForProject } from "./services/vdr-initialization-service";
 import { rentRollService } from "./services/rent-roll-service";
@@ -18677,6 +18677,73 @@ Current context: Project ${req.params.projectId}`;
     } catch (error: any) {
       console.error('Failed to fetch financial summary:', error);
       res.status(500).json({ error: 'Failed to fetch financial summary' });
+    }
+  });
+
+  // =============================================
+  // Unified Marina Catalog - Custom Profit Centers & Amenities
+  // =============================================
+
+  app.get('/api/catalog/items', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const type = req.query.type as string | undefined;
+      
+      let query = db.select().from(customCatalogItems).where(eq(customCatalogItems.orgId, orgId));
+      if (type) {
+        query = db.select().from(customCatalogItems).where(and(eq(customCatalogItems.orgId, orgId), eq(customCatalogItems.type, type)));
+      }
+      
+      const items = await query;
+      res.json(items);
+    } catch (error: any) {
+      console.error('Failed to fetch catalog items:', error);
+      res.status(500).json({ error: 'Failed to fetch catalog items' });
+    }
+  });
+
+  app.post('/api/catalog/items', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const parsed = insertCustomCatalogItemSchema.parse({
+        ...req.body,
+        orgId,
+        createdBy: userId,
+      });
+
+      const existing = await db.select().from(customCatalogItems).where(
+        and(
+          eq(customCatalogItems.orgId, orgId),
+          eq(customCatalogItems.type, parsed.type),
+          eq(customCatalogItems.name, parsed.name)
+        )
+      );
+      
+      if (existing.length > 0) {
+        return res.json(existing[0]);
+      }
+
+      const [item] = await db.insert(customCatalogItems).values(parsed).returning();
+      res.status(201).json(item);
+    } catch (error: any) {
+      console.error('Failed to create catalog item:', error);
+      res.status(500).json({ error: 'Failed to create catalog item' });
+    }
+  });
+
+  app.delete('/api/catalog/items/:id', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      
+      await db.delete(customCatalogItems).where(
+        and(eq(customCatalogItems.id, id), eq(customCatalogItems.orgId, orgId))
+      );
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Failed to delete catalog item:', error);
+      res.status(500).json({ error: 'Failed to delete catalog item' });
     }
   });
 

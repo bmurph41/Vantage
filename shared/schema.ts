@@ -21900,6 +21900,33 @@ export const insertOpssosTaskSchema = createInsertSchema(opssosTasks).omit({
   id: true,
   createdAt: true,
 });
+
+// =============================================
+// Custom Catalog Items (Unified Profit Centers & Amenities)
+// =============================================
+
+export const customCatalogItems = pgTable("custom_catalog_items", {
+  id: varchar("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  orgId: varchar("org_id").notNull(),
+  type: text("type").notNull(), // 'profit_center' | 'amenity'
+  name: text("name").notNull(),
+  description: text("description"),
+  icon: text("icon").default('store'),
+  category: text("category"), // for profit_center: core/ancillary/specialty; for amenity: facility/utility/recreation/convenience
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("custom_catalog_org_type_idx").on(table.orgId, table.type),
+]);
+
+export const insertCustomCatalogItemSchema = createInsertSchema(customCatalogItems).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type CustomCatalogItem = typeof customCatalogItems.$inferSelect;
+export type InsertCustomCatalogItem = z.infer<typeof insertCustomCatalogItemSchema>;
+
 export const insertOpssosChecklistTemplateSchema = createInsertSchema(opssosChecklistTemplates).omit({
   id: true,
   createdAt: true,

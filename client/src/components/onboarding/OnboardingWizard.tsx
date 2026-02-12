@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { AddressAutocompleteInput, type NormalizedAddress } from "@/components/ui/address-autocomplete-input";
 import { US_REGIONS } from "@shared/salescomps-constants";
+import { PROFIT_CENTER_CATALOG, AMENITY_CATALOG } from '@shared/marina-catalog';
 import { 
   Building2, 
   Anchor, 
@@ -107,6 +108,14 @@ interface WizardProfitCenter {
   iconName: string;
 }
 
+interface WizardAmenity {
+  id: string;
+  name: string;
+  description: string;
+  isEnabled: boolean;
+  iconName: string;
+}
+
 type DocTypeEnum = "pnl" | "t12" | "rent_roll" | "balance_sheet" | "rate_sheet" | "invoice" | "other";
 
 interface WizardStagedFile {
@@ -186,36 +195,13 @@ const defaultWizardDesignatedSpaces: WizardStorageType[] = [
   { id: 'pump_out_stations', name: 'Pump-Out Stations', section: 'designated', isEnabled: false, count: '', occupancy: '', iconName: 'anchor' },
 ];
 
-const defaultWizardProfitCenters: WizardProfitCenter[] = [
-  { id: 'storage', name: 'Storage', description: 'Wet slips, dry storage, moorings, and other boat storage revenue', isEnabled: false, iconName: 'warehouse' },
-  { id: 'fuel', name: 'Fuel Sales', description: 'Gasoline, diesel, and other fuel sales at the fuel dock', isEnabled: false, iconName: 'fuel' },
-  { id: 'ship_store', name: "Ship's Store", description: 'Retail merchandise, boating supplies, snacks, and convenience items', isEnabled: false, iconName: 'shoppingcart' },
-  { id: 'service', name: 'Service & Repairs', description: 'Boat maintenance, engine repair, detailing, and winterization', isEnabled: false, iconName: 'wrench' },
-  { id: 'boat_sales', name: 'Boat Sales / Brokerage', description: 'New or used boat sales and brokerage commissions', isEnabled: false, iconName: 'store' },
-  { id: 'boat_rentals', name: 'Boat Rentals', description: 'Rental fleet income from kayaks, pontoons, jet skis, etc.', isEnabled: false, iconName: 'sailboat' },
-  { id: 'boat_club', name: 'Boat Club', description: 'Membership-based boat club with recurring fees', isEnabled: false, iconName: 'users' },
-  { id: 'commercial_tenants', name: 'Commercial Tenants', description: 'Leased spaces to restaurants, shops, or other businesses', isEnabled: false, iconName: 'building' },
-  { id: 'restaurant', name: 'Restaurant / F&B', description: 'On-site food & beverage operations or concessions', isEnabled: false, iconName: 'utensils' },
-  { id: 'transient', name: 'Transient Dockage', description: 'Short-term or overnight slip rentals for visiting boaters', isEnabled: false, iconName: 'anchor' },
-  { id: 'launch_ramp', name: 'Launch Ramp', description: 'Public or private boat launch with per-use or seasonal fees', isEnabled: false, iconName: 'waves' },
-  { id: 'pump_out', name: 'Pump-Out Services', description: 'Waste pump-out station fees and services', isEnabled: false, iconName: 'anchor' },
-  { id: 'electric_shore_power', name: 'Electric / Shore Power', description: 'Metered or flat-rate electrical hookup fees for docked vessels', isEnabled: false, iconName: 'fuel' },
-  { id: 'water_hookup', name: 'Water Hookup', description: 'Metered or flat-rate water supply fees for docked vessels', isEnabled: false, iconName: 'waves' },
-  { id: 'wifi_cable', name: 'Wi-Fi / Cable', description: 'Internet and cable TV service fees for slip holders', isEnabled: false, iconName: 'building' },
-  { id: 'parking', name: 'Parking', description: 'Vehicle parking fees for slip holders and visitors', isEnabled: false, iconName: 'car' },
-  { id: 'laundry', name: 'Laundry / Showers', description: 'Coin-operated laundry, shower, and restroom facility fees', isEnabled: false, iconName: 'home' },
-  { id: 'ice', name: 'Ice Sales', description: 'Block and bag ice vending for boaters', isEnabled: false, iconName: 'container' },
-  { id: 'event_venue', name: 'Event Venue', description: 'Facility rental for weddings, corporate events, and gatherings', isEnabled: false, iconName: 'building' },
-  { id: 'charter_tours', name: 'Charters / Tours', description: 'Fishing charters, sunset cruises, and sightseeing tours', isEnabled: false, iconName: 'sailboat' },
-  { id: 'sailing_school', name: 'Sailing / Boating School', description: 'Boating education, sailing lessons, and certification courses', isEnabled: false, iconName: 'sailboat' },
-  { id: 'boat_detailing', name: 'Boat Detailing / Cleaning', description: 'Hull cleaning, waxing, bottom painting, and cosmetic services', isEnabled: false, iconName: 'wrench' },
-  { id: 'haul_out', name: 'Haul-Out / Travel Lift', description: 'Boat haul-out, launch, and travel lift services', isEnabled: false, iconName: 'container' },
-  { id: 'winter_storage', name: 'Winterization / Shrink Wrap', description: 'Seasonal winterization, shrink wrapping, and decommissioning', isEnabled: false, iconName: 'warehouse' },
-  { id: 'bait_tackle', name: 'Bait & Tackle', description: 'Live bait, tackle, and fishing supply sales', isEnabled: false, iconName: 'anchor' },
-  { id: 'membership_fees', name: 'Membership / Association Fees', description: 'Annual or monthly membership dues, yacht club fees', isEnabled: false, iconName: 'users' },
-  { id: 'insurance_commissions', name: 'Insurance Commissions', description: 'Commissions from marine insurance referrals or in-house policies', isEnabled: false, iconName: 'store' },
-  { id: 'towing_salvage', name: 'Towing / Salvage', description: 'On-water towing assistance and salvage operations', isEnabled: false, iconName: 'ship' },
-];
+const defaultWizardProfitCenters: WizardProfitCenter[] = PROFIT_CENTER_CATALOG.map(pc => ({
+  id: pc.id, name: pc.name, description: pc.description, isEnabled: false, iconName: pc.icon,
+}));
+
+const defaultWizardAmenities: WizardAmenity[] = AMENITY_CATALOG.map(a => ({
+  id: a.id, name: a.name, description: a.description, isEnabled: false, iconName: a.icon,
+}));
 
 function getStorageIcon(iconName: string) {
   const iconMap: Record<string, typeof Anchor> = {
@@ -240,6 +226,7 @@ interface WizardState {
   portfolioMarinas: PortfolioMarina[];
   featuresToExplore: string[];
   profitCenters: WizardProfitCenter[];
+  amenities: WizardAmenity[];
   storageTypes: WizardStorageType[];
   designatedSpaces: WizardStorageType[];
   stagedFiles: WizardStagedFile[];
@@ -251,10 +238,11 @@ const onboardingSteps = [
   { id: 3, title: "Marina Details", icon: Anchor },
   { id: 4, title: "Deal Type", icon: Target },
   { id: 5, title: "Profit Centers", icon: Store },
-  { id: 6, title: "Storage", icon: Warehouse },
-  { id: 7, title: "Documents", icon: Upload },
-  { id: 8, title: "Features", icon: ClipboardList },
-  { id: 9, title: "Get Started", icon: Check },
+  { id: 6, title: "Amenities", icon: ClipboardList },
+  { id: 7, title: "Storage", icon: Warehouse },
+  { id: 8, title: "Documents", icon: Upload },
+  { id: 9, title: "Features", icon: Sparkles },
+  { id: 10, title: "Get Started", icon: Check },
 ];
 
 const newProjectSteps = [
@@ -262,8 +250,9 @@ const newProjectSteps = [
   { id: 2, title: "Marina Details", icon: Anchor },
   { id: 3, title: "Deal Info", icon: Target },
   { id: 4, title: "Profit Centers", icon: Store },
-  { id: 5, title: "Storage", icon: Warehouse },
-  { id: 6, title: "Documents", icon: Upload },
+  { id: 5, title: "Amenities", icon: ClipboardList },
+  { id: 6, title: "Storage", icon: Warehouse },
+  { id: 7, title: "Documents", icon: Upload },
 ];
 
 const dealStructures = [
@@ -330,6 +319,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
     portfolioMarinas: [{ name: "", address: { ...emptyAddress } }],
     featuresToExplore: [],
     profitCenters: defaultWizardProfitCenters.map(p => ({ ...p })),
+    amenities: defaultWizardAmenities.map(a => ({ ...a })),
     storageTypes: defaultWizardStorageTypes.map(s => ({ ...s })),
     designatedSpaces: defaultWizardDesignatedSpaces.map(s => ({ ...s })),
     stagedFiles: [],
@@ -352,9 +342,12 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
       const profitCenters = state.profitCenters
         .filter(pc => pc.isEnabled)
         .map(pc => pc.id);
-      const hasData = Object.keys(departments).length > 0 || profitCenters.length > 0;
+      const amenities = state.amenities
+        .filter(a => a.isEnabled)
+        .map(a => a.id);
+      const hasData = Object.keys(departments).length > 0 || profitCenters.length > 0 || amenities.length > 0;
       if (hasData) {
-        await apiRequest('POST', `/api/modeling/projects/${projectId}/config`, { departments, profitCenters });
+        await apiRequest('POST', `/api/modeling/projects/${projectId}/config`, { departments, profitCenters, amenities });
       }
     } catch (e) {
       console.warn('Storage config save failed (non-blocking):', e);
@@ -651,6 +644,8 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
 
   const [customProfitCenterName, setCustomProfitCenterName] = useState('');
   const [showAddProfitCenter, setShowAddProfitCenter] = useState(false);
+  const [customAmenityName, setCustomAmenityName] = useState('');
+  const [showAddAmenity, setShowAddAmenity] = useState(false);
   const [customStorageName, setCustomStorageName] = useState('');
   const [showAddStorage, setShowAddStorage] = useState(false);
   const [customDesignatedName, setCustomDesignatedName] = useState('');
@@ -669,6 +664,21 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
     }));
     setCustomProfitCenterName('');
     setShowAddProfitCenter(false);
+  }
+
+  function addCustomAmenity() {
+    const name = customAmenityName.trim();
+    if (!name) return;
+    const id = `custom_amenity_${name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`;
+    if (state.amenities.some(a => a.id === id)) return;
+    setState(s => ({
+      ...s,
+      amenities: [...s.amenities, {
+        id, name, description: 'Custom amenity', isEnabled: true, iconName: 'wrench',
+      }],
+    }));
+    setCustomAmenityName('');
+    setShowAddAmenity(false);
   }
 
   function addCustomStorageType(list: 'storageTypes' | 'designatedSpaces', section: 'storage' | 'designated') {
@@ -692,6 +702,15 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
       ...s,
       profitCenters: s.profitCenters.map(pc =>
         pc.id === id ? { ...pc, isEnabled: !pc.isEnabled } : pc
+      ),
+    }));
+  }
+
+  function toggleAmenity(id: string) {
+    setState(s => ({
+      ...s,
+      amenities: s.amenities.map(a =>
+        a.id === id ? { ...a, isEnabled: !a.isEnabled } : a
       ),
     }));
   }
@@ -786,30 +805,6 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
 
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 10 }, (_, i) => (currentYear - i).toString());
-
-  const getStepContent = () => {
-    if (mode === "new_project") {
-      return {
-        1: renderDealStructureStep(),
-        2: renderMarinaDetailsStep(),
-        3: renderDealInfoStep(),
-        4: renderProfitCentersStep(),
-        5: renderStorageTypesStep(),
-        6: renderDocumentUploadStep(),
-      }[state.step];
-    }
-    return {
-      1: renderWelcomeStep(),
-      2: renderDealStructureStep(),
-      3: renderMarinaDetailsStep(),
-      4: renderDealTypeStep(),
-      5: renderProfitCentersStep(),
-      6: renderStorageTypesStep(),
-      7: renderDocumentUploadStep(),
-      8: renderFeaturesStep(),
-      9: renderGetStartedStep(),
-    }[state.step];
-  };
 
   const renderWelcomeStep = () => (
     <div className="text-center space-y-4">
@@ -1118,6 +1113,78 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
     );
   };
 
+  const renderAmenitiesStep = () => {
+    const enabledCount = state.amenities.filter(a => a.isEnabled).length;
+    return (
+      <div className="space-y-4">
+        <div className="text-center mb-4">
+          <h3 className="text-lg font-semibold">Amenities & Services</h3>
+          <p className="text-sm text-muted-foreground">
+            What amenities and supporting services does this marina offer? These are features that add value but aren't individually modeled as revenue departments.
+          </p>
+          {enabledCount > 0 && (
+            <Badge variant="secondary" className="mt-2">{enabledCount} selected</Badge>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-2 max-h-[320px] overflow-y-auto pr-1">
+          {state.amenities.map((amenity) => (
+            <button
+              key={amenity.id}
+              type="button"
+              onClick={() => toggleAmenity(amenity.id)}
+              className={cn(
+                "flex items-start gap-3 rounded-lg border p-3 text-left transition-all",
+                amenity.isEnabled
+                  ? "border-[#1E4FAB]/40 bg-[#1E4FAB]/5 ring-1 ring-[#1E4FAB]/20"
+                  : "border-muted bg-muted/20 hover:bg-muted/40"
+              )}
+            >
+              <div className={cn(
+                "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors",
+                amenity.isEnabled ? "bg-[#1E4FAB] border-[#1E4FAB] text-white" : "border-muted-foreground/30"
+              )}>
+                {amenity.isEnabled && <Check className="h-3 w-3" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-muted-foreground">{getStorageIcon(amenity.iconName)}</span>
+                  <span className="text-sm font-medium">{amenity.name}</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{amenity.description}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+        {showAddAmenity ? (
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="e.g. Concierge Service"
+              value={customAmenityName}
+              onChange={(e) => setCustomAmenityName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addCustomAmenity()}
+              className="h-8 text-sm flex-1"
+              autoFocus
+            />
+            <Button size="sm" className="h-8 bg-[#1E4FAB] hover:bg-[#1a4294]" onClick={addCustomAmenity} disabled={!customAmenityName.trim()}>
+              Add
+            </Button>
+            <Button size="sm" variant="ghost" className="h-8" onClick={() => { setShowAddAmenity(false); setCustomAmenityName(''); }}>
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ) : (
+          <Button variant="outline" size="sm" className="w-full" onClick={() => setShowAddAmenity(true)}>
+            <Plus className="h-3.5 w-3.5 mr-1.5" />
+            Add Amenity
+          </Button>
+        )}
+        <p className="text-xs text-center text-muted-foreground">
+          Amenities help with property comparison and valuation analysis.
+        </p>
+      </div>
+    );
+  };
+
   const renderStorageTypesStep = () => {
     const renderStorageItems = (items: WizardStorageType[], listKey: 'storageTypes' | 'designatedSpaces') => (
       <div className="space-y-1.5">
@@ -1413,6 +1480,32 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
       </div>
     </div>
   );
+
+  const getStepContent = () => {
+    if (mode === "new_project") {
+      return {
+        1: renderDealStructureStep(),
+        2: renderMarinaDetailsStep(),
+        3: renderDealInfoStep(),
+        4: renderProfitCentersStep(),
+        5: renderAmenitiesStep(),
+        6: renderStorageTypesStep(),
+        7: renderDocumentUploadStep(),
+      }[state.step];
+    }
+    return {
+      1: renderWelcomeStep(),
+      2: renderDealStructureStep(),
+      3: renderMarinaDetailsStep(),
+      4: renderDealTypeStep(),
+      5: renderProfitCentersStep(),
+      6: renderAmenitiesStep(),
+      7: renderStorageTypesStep(),
+      8: renderDocumentUploadStep(),
+      9: renderFeaturesStep(),
+      10: renderGetStartedStep(),
+    }[state.step];
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
