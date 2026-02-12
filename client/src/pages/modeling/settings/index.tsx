@@ -39,7 +39,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, GripVertical, Loader2, Settings, BookText, ChevronRight, Download } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Pencil, Trash2, GripVertical, Loader2, Settings, BookText, ChevronRight, Download, DollarSign } from 'lucide-react';
 import { Link } from 'wouter';
 import { DndContext, closestCenter, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -133,6 +134,20 @@ function SortableRow({ region, onEdit, onDelete }: {
   );
 }
 
+type DisplayPreferences = {
+  priceRoundingDigits: number;
+};
+
+const ROUNDING_OPTIONS = [
+  { value: 0, label: 'No rounding', example: '$3,287,567' },
+  { value: 1, label: 'Nearest $10', example: '$3,287,570' },
+  { value: 2, label: 'Nearest $100', example: '$3,287,600' },
+  { value: 3, label: 'Nearest $1,000', example: '$3,288,000' },
+  { value: 4, label: 'Nearest $10,000', example: '$3,290,000' },
+  { value: 5, label: 'Nearest $100,000', example: '$3,300,000' },
+  { value: 6, label: 'Nearest $1,000,000', example: '$3,000,000' },
+];
+
 export default function ModelingSettings() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -143,6 +158,23 @@ export default function ModelingSettings() {
 
   const { data: regions = [], isLoading } = useQuery<ModelingRegion[]>({
     queryKey: ['/api/modeling/regions'],
+  });
+
+  const { data: displayPrefs } = useQuery<DisplayPreferences>({
+    queryKey: ['/api/modeling/display-preferences'],
+  });
+
+  const updatePrefsMutation = useMutation({
+    mutationFn: async (priceRoundingDigits: number) => {
+      return apiRequest('PATCH', '/api/modeling/display-preferences', { priceRoundingDigits });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/display-preferences'] });
+      toast({ title: 'Success', description: 'Display preferences updated' });
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to update preferences', variant: 'destructive' });
+    },
   });
 
   const createMutation = useMutation({
@@ -317,6 +349,48 @@ export default function ModelingSettings() {
           </Card>
         </Link>
       </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <DollarSign className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Price Rounding</CardTitle>
+              <CardDescription>
+                Control how dollar amounts are rounded on the Financial Model projects list
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <Label className="min-w-[120px]">Round prices to</Label>
+              <Select
+                value={String(displayPrefs?.priceRoundingDigits ?? 0)}
+                onValueChange={(val) => updatePrefsMutation.mutate(Number(val))}
+              >
+                <SelectTrigger className="w-[220px]" data-testid="select-rounding">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROUNDING_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={String(opt.value)}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {updatePrefsMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            </div>
+            <div className="text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
+              Preview: {ROUNDING_OPTIONS.find(o => o.value === (displayPrefs?.priceRoundingDigits ?? 0))?.example || '$3,287,567'}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

@@ -16924,6 +16924,54 @@ Current context: Project ${req.params.projectId}`;
   // MODELING PROJECTS - Valuation & Financial Modeling Tracking
   // ============================================================================
 
+  // Modeling Display Preferences - Organization-level display settings
+  app.get('/api/modeling/display-preferences', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { modelingDisplayPreferences } = await import('@shared/schema');
+      const [prefs] = await db.select().from(modelingDisplayPreferences)
+        .where(eq(modelingDisplayPreferences.orgId, orgId))
+        .limit(1);
+      res.json(prefs || { priceRoundingDigits: 0 });
+    } catch (error: any) {
+      console.error('Failed to get display preferences:', error);
+      res.status(500).json({ error: 'Failed to get display preferences' });
+    }
+  });
+
+  app.patch('/api/modeling/display-preferences', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { priceRoundingDigits } = req.body;
+
+      if (typeof priceRoundingDigits !== 'number' || priceRoundingDigits < 0 || priceRoundingDigits > 6) {
+        return res.status(400).json({ error: 'priceRoundingDigits must be a number between 0 and 6' });
+      }
+
+      const { modelingDisplayPreferences } = await import('@shared/schema');
+
+      const [existing] = await db.select().from(modelingDisplayPreferences)
+        .where(eq(modelingDisplayPreferences.orgId, orgId))
+        .limit(1);
+
+      if (existing) {
+        const [updated] = await db.update(modelingDisplayPreferences)
+          .set({ priceRoundingDigits, updatedAt: new Date() })
+          .where(eq(modelingDisplayPreferences.id, existing.id))
+          .returning();
+        res.json(updated);
+      } else {
+        const [created] = await db.insert(modelingDisplayPreferences)
+          .values({ orgId, priceRoundingDigits })
+          .returning();
+        res.json(created);
+      }
+    } catch (error: any) {
+      console.error('Failed to update display preferences:', error);
+      res.status(500).json({ error: 'Failed to update display preferences' });
+    }
+  });
+
   // Modeling Regions - Organization-specific customizable regions
   app.get('/api/modeling/regions', authenticateUser, async (req: any, res) => {
     try {

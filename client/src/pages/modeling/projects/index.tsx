@@ -71,6 +71,10 @@ export default function ModelingProjectsPage() {
     queryKey: ['/api/modeling/projects'],
   });
 
+  const { data: displayPrefs } = useQuery<{ priceRoundingDigits: number }>({
+    queryKey: ['/api/modeling/display-preferences'],
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiRequest('DELETE', `/api/modeling/projects/${id}`),
     onSuccess: () => {
@@ -146,14 +150,21 @@ export default function ModelingProjectsPage() {
     }
   };
 
+  const roundingDigits = displayPrefs?.priceRoundingDigits ?? 0;
+
   const formatCurrency = (value: number | null) => {
     if (value === null || value === undefined) return '-';
+    let rounded = value;
+    if (roundingDigits > 0) {
+      const factor = Math.pow(10, roundingDigits);
+      rounded = Math.round(value / factor) * factor;
+    }
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(value);
+    }).format(rounded);
   };
 
   const formatPercent = (value: number | null) => {
