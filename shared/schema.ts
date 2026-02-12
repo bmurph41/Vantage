@@ -12631,6 +12631,25 @@ export const insertModelingProjectConfigSchema = createInsertSchema(modelingProj
 export type ModelingProjectConfig = typeof modelingProjectConfig.$inferSelect;
 export type InsertModelingProjectConfig = z.infer<typeof insertModelingProjectConfigSchema>;
 
+export const modelingDisplayPreferences = pgTable('modeling_display_preferences', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  priceRoundingDigits: integer('price_rounding_digits').notNull().default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  orgIdx: index('modeling_display_prefs_org_idx').on(table.orgId),
+}));
+
+export const insertModelingDisplayPreferencesSchema = createInsertSchema(modelingDisplayPreferences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type ModelingDisplayPreferences = typeof modelingDisplayPreferences.$inferSelect;
+export type InsertModelingDisplayPreferences = z.infer<typeof insertModelingDisplayPreferencesSchema>;
+
 // Transaction Closing Summary schemas
 export const insertTransactionClosingSummarySchema = createInsertSchema(transactionClosingSummary).omit({
   id: true,
