@@ -385,7 +385,17 @@ export default function ModelingProjectsPage() {
                           ) : '-'}
                         </TableCell>
                         <TableCell className="text-right" data-testid={`text-yr1-ebitda-${project.id}`}>
-                          {formatCurrency(project.year1Ebitda)}
+                          {project.year1Ebitda != null ? (
+                            <div>
+                              <div>{formatCurrency(project.year1Ebitda)}</div>
+                              {project.t12Ebitda != null && project.t12Ebitda !== 0 && (
+                                <div className={`text-xs font-medium ${((project.year1Ebitda - project.t12Ebitda) / Math.abs(project.t12Ebitda)) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  {((project.year1Ebitda - project.t12Ebitda) / Math.abs(project.t12Ebitda) * 100) >= 0 ? '+' : ''}
+                                  {((project.year1Ebitda - project.t12Ebitda) / Math.abs(project.t12Ebitda) * 100).toFixed(1)}%
+                                </div>
+                              )}
+                            </div>
+                          ) : '-'}
                         </TableCell>
                         <TableCell className="text-center">
                           <span
