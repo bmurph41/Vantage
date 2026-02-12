@@ -331,8 +331,7 @@ export default function ModelingProjectsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="font-bold text-foreground min-w-[160px]">Marina Name</TableHead>
-                      <TableHead className="font-bold text-foreground">Location</TableHead>
+                      <TableHead className="font-bold text-foreground min-w-[180px]">Marina Name</TableHead>
                       <TableHead className="font-bold text-foreground text-right whitespace-nowrap">Purchase Price</TableHead>
                       <TableHead className="font-bold text-foreground text-right">IRR</TableHead>
                       <TableHead className="font-bold text-foreground text-right whitespace-nowrap">Yr 1 Cap Rate</TableHead>
@@ -350,11 +349,11 @@ export default function ModelingProjectsPage() {
                           onClick={() => setLocation(`/modeling/projects/${project.id}`)}
                           data-testid={`row-project-${project.id}`}
                         >
-                          <TableCell className="font-semibold pb-0.5" data-testid={`text-marina-name-${project.id}`}>
-                            {project.marinaName}
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap pb-0.5" data-testid={`text-location-${project.id}`}>
-                            {[project.city, project.state].filter(Boolean).join(', ') || '-'}
+                          <TableCell className="pb-0.5" data-testid={`text-marina-name-${project.id}`}>
+                            <div className="font-semibold">{project.marinaName}</div>
+                            <div className="text-xs text-muted-foreground" data-testid={`text-location-${project.id}`}>
+                              {[project.city, project.state].filter(Boolean).join(', ') || ''}
+                            </div>
                           </TableCell>
                           <TableCell className="text-right whitespace-nowrap font-semibold pb-0.5" data-testid={`text-price-${project.id}`}>
                             {formatCurrency(project.purchasePrice, { dash: true })}
@@ -402,7 +401,7 @@ export default function ModelingProjectsPage() {
                           className="cursor-pointer hover:bg-muted/50 border-b"
                           onClick={() => setLocation(`/modeling/projects/${project.id}`)}
                         >
-                          <td className="px-4 pt-0 pb-3" colSpan={9}>
+                          <td className="px-4 pt-0 pb-3" colSpan={8}>
                             <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
                               {project.exitYear && (
                                 <span>Exit Year: {project.exitYear}</span>
