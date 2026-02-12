@@ -29,7 +29,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency, formatPercent } from '@/lib/utils';
 
 interface MarketAssumptions {
   marketRentPerUnit: number;
@@ -180,19 +180,6 @@ export default function LeaseCashFlowPage() {
       });
     },
   });
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const formatPercent = (value: number) => {
-    return `${value.toFixed(2)}%`;
-  };
 
   const formatNumber = (value: number) => {
     return new Intl.NumberFormat('en-US').format(Math.round(value));

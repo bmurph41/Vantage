@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { formatCurrency } from "@/lib/utils";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -469,13 +470,6 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
 
   const lpMOIC = lpContribution > 0 ? calculateWaterfall.lpTotal / lpContribution : 0;
   const gpMOIC = gpContribution > 0 ? calculateWaterfall.gpTotal / gpContribution : 0;
-
-  const formatCurrency = (value: number) => {
-    if (value >= 1000000) {
-      return `$${(value / 1000000).toFixed(2)}M`;
-    }
-    return `$${value.toLocaleString()}`;
-  };
 
   return (
     <TooltipProvider>

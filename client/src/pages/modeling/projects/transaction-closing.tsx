@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
+import { formatCurrency } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -263,17 +264,6 @@ export default function TransactionClosingPage() {
       transitionCostLines,
       nwcLines,
     });
-  };
-
-  const formatCurrency = (value: number | string | undefined) => {
-    if (value === undefined || value === null || value === '') return '$0.00';
-    const num = typeof value === 'string' ? parseFloat(value) : value;
-    if (isNaN(num)) return '$0.00';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-    }).format(num);
   };
 
   const formatNumber = (value: number | string | undefined) => {

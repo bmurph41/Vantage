@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { formatCurrency, formatPercent } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -47,21 +48,6 @@ interface ReturnsProject {
   t12Noi: number | null;
   snapshot: ProjectSnapshot | null;
 }
-
-const formatCurrency = (val: number | null | undefined) => {
-  if (val == null) return "—";
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(val);
-};
-
-const formatPercent = (val: number | null | undefined) => {
-  if (val == null) return "—";
-  const pct = Math.abs(val) < 1 ? val * 100 : val;
-  return `${pct.toFixed(2)}%`;
-};
 
 const formatMultiple = (val: number | null | undefined) => {
   if (val == null) return "—";
@@ -184,7 +170,7 @@ export default function ReturnsValuationPage() {
         />
         <SummaryCard
           title="Portfolio Value"
-          value={formatCurrency(totalPortfolioValue || null)}
+          value={formatCurrency(totalPortfolioValue || null, { dash: true })}
           icon={DollarSign}
           subtitle="Indicated or purchase price"
         />
@@ -274,25 +260,25 @@ export default function ReturnsValuationPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          {formatCurrency(project.purchasePrice)}
+                          {formatCurrency(project.purchasePrice, { dash: true })}
                         </TableCell>
                         <TableCell className="text-right">
-                          {formatCurrency(project.snapshot?.indicatedValue)}
+                          {formatCurrency(project.snapshot?.indicatedValue, { dash: true })}
                         </TableCell>
                         <TableCell className="text-right">
-                          {formatCurrency(noi)}
+                          {formatCurrency(noi, { dash: true })}
                         </TableCell>
                         <TableCell className="text-right">
-                          {formatPercent(capRate)}
+                          {formatPercent(capRate, { dash: true })}
                         </TableCell>
                         <TableCell className="text-right">
-                          {formatPercent(project.snapshot?.irr)}
+                          {formatPercent(project.snapshot?.irr, { dash: true })}
                         </TableCell>
                         <TableCell className="text-right">
                           {formatMultiple(project.snapshot?.equityMultiple)}
                         </TableCell>
                         <TableCell className="text-right">
-                          {formatPercent(project.snapshot?.cashOnCash)}
+                          {formatPercent(project.snapshot?.cashOnCash, { dash: true })}
                         </TableCell>
                         <TableCell>
                           <Button

@@ -1,6 +1,7 @@
 import { useState, Fragment, useMemo, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
+import { formatCurrency, formatPercent } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -310,21 +311,6 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
       else next.add(key);
       return next;
     });
-  };
-
-  const formatCurrency = (value: number | null | undefined) => {
-    if (value === null || value === undefined) return '-';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const formatPercent = (value: number | null | undefined) => {
-    if (value === null || value === undefined || !isFinite(value)) return '-';
-    return `${Math.round(value)}%`;
   };
 
   const isSeasonalMonth = (monthIndex: number) => seasonMonths.includes(monthIndex + 1);
@@ -848,7 +834,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   <Icon className="h-3 w-3" />
                   {dataSourceLabels[source.dataSource] || source.dataSource}
                   <span className="text-xs text-muted-foreground ml-1">
-                    ({formatCurrency(parseFloat(source.totalAmount))})
+                    ({formatCurrency(parseFloat(source.totalAmount), { dash: true })})
                   </span>
                 </Badge>
               );
@@ -1027,7 +1013,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                               className={`text-right font-semibold whitespace-nowrap px-2 py-1.5 text-xs ${!isSeasonalMonth(idx) ? 'bg-muted/30' : 'bg-background'}`}
                             >
                               <div className="flex flex-col items-end">
-                                <span className="text-xs">{formatCurrency(value)}</span>
+                                <span className="text-xs">{formatCurrency(value, { dash: true })}</span>
                                 {showMoM && momChange !== null && idx > 0 && (
                                   <span className={`text-xs ${momChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                     {momChange >= 0 ? '+' : ''}{momChange.toFixed(0)}%
@@ -1038,7 +1024,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           );
                         })}
                         <TableCell className="text-right font-bold bg-background whitespace-nowrap px-2 py-1.5 text-xs">
-                          {formatCurrency(getAdjustedCategoryAnnualTotal(category))}
+                          {formatCurrency(getAdjustedCategoryAnnualTotal(category), { dash: true })}
                         </TableCell>
                       </TableRow>
 
@@ -1081,14 +1067,14 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                 const deptTotal = deptItems.reduce((sum: number, item: PLLineItem) => sum + getAdjustedMonthlyValue(item, month, idx), 0);
                                 return (
                                   <TableCell key={month} className={`text-right whitespace-nowrap px-2 py-1 text-xs font-medium text-muted-foreground ${!isSeasonalMonth(idx) ? 'bg-slate-50 dark:bg-slate-900' : 'bg-slate-100 dark:bg-slate-800'}`}>
-                                    {formatCurrency(deptTotal)}
+                                    {formatCurrency(deptTotal, { dash: true })}
                                   </TableCell>
                                 );
                               })}
                               <TableCell className="text-right whitespace-nowrap px-2 py-1 text-xs font-medium text-muted-foreground bg-slate-100 dark:bg-slate-800">
                                 {formatCurrency(deptItems.reduce((sum: number, item: PLLineItem) => {
                                   return months.reduce((itemSum, month, idx) => itemSum + getAdjustedMonthlyValue(item, month, idx), 0);
-                                }, 0))}
+                                }, 0), { dash: true })}
                               </TableCell>
                             </TableRow>
 
@@ -1169,7 +1155,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                       >
                                         <div className="flex items-center justify-end gap-0.5">
                                           <span className={`text-xs ${isCellAddedBack && displayValue !== rawValue ? 'text-amber-700 dark:text-amber-400 font-medium' : ''}`}>
-                                            {formatCurrency(displayValue)}
+                                            {formatCurrency(displayValue, { dash: true })}
                                           </span>
                                           {isCellAddedBack && (
                                             <Flag className="h-2.5 w-2.5 text-amber-500 shrink-0" />
@@ -1225,7 +1211,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                     );
                                   })}
                                   <TableCell className="text-right font-medium whitespace-nowrap px-2 py-1 text-xs">
-                                    {formatCurrency(months.reduce((sum, month, idx) => sum + getAdjustedMonthlyValue(item, month, idx), 0))}
+                                    {formatCurrency(months.reduce((sum, month, idx) => sum + getAdjustedMonthlyValue(item, month, idx), 0), { dash: true })}
                                   </TableCell>
                                 </TableRow>
                               );
@@ -1247,11 +1233,11 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           key={month} 
                           className={`text-right whitespace-nowrap px-2 py-1.5 text-xs ${!isSeasonalMonth(idx) ? 'bg-muted/70' : 'bg-muted'}`}
                         >
-                          {formatCurrency(revenue - cogs)}
+                          {formatCurrency(revenue - cogs, { dash: true })}
                         </TableCell>
                       );
                     })}
-                    <TableCell className="text-right whitespace-nowrap px-2 py-1.5 text-xs bg-muted">{formatCurrency(getAdjustedCategoryAnnualTotal('Revenue') - getAdjustedCategoryAnnualTotal('COGS'))}</TableCell>
+                    <TableCell className="text-right whitespace-nowrap px-2 py-1.5 text-xs bg-muted">{formatCurrency(getAdjustedCategoryAnnualTotal('Revenue') - getAdjustedCategoryAnnualTotal('COGS'), { dash: true })}</TableCell>
                   </TableRow>
 
                   <TableRow className="bg-muted/30">
@@ -1266,7 +1252,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           key={month} 
                           className={`text-right text-xs text-muted-foreground whitespace-nowrap px-2 py-1 ${!isSeasonalMonth(idx) ? 'bg-muted/20' : 'bg-muted/30'}`}
                         >
-                          {formatPercent(margin)}
+                          {formatPercent(margin, { dash: true })}
                         </TableCell>
                       );
                     })}
@@ -1274,7 +1260,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                       {(() => {
                         const adjRev = getAdjustedCategoryAnnualTotal('Revenue');
                         const adjGP = adjRev - getAdjustedCategoryAnnualTotal('COGS');
-                        return formatPercent(adjRev !== 0 ? (adjGP / adjRev) * 100 : null);
+                        return formatPercent(adjRev !== 0 ? (adjGP / adjRev) * 100 : null, { dash: true });
                       })()}
                     </TableCell>
                   </TableRow>
@@ -1291,7 +1277,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           key={month} 
                           className={`text-right whitespace-nowrap px-2 py-1.5 text-xs bg-primary/10 ${noi >= 0 ? 'text-green-600' : 'text-red-600'} ${!isSeasonalMonth(idx) ? 'opacity-60' : ''}`}
                         >
-                          {formatCurrency(noi)}
+                          {formatCurrency(noi, { dash: true })}
                         </TableCell>
                       );
                     })}
@@ -1299,7 +1285,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                       const displayNOI = getAdjustedCategoryAnnualTotal('Revenue') - getAdjustedCategoryAnnualTotal('COGS') - getAdjustedCategoryAnnualTotal('Expenses');
                       return (
                         <TableCell className={`text-right whitespace-nowrap px-2 py-1.5 text-xs bg-primary/10 ${displayNOI >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {formatCurrency(displayNOI)}
+                          {formatCurrency(displayNOI, { dash: true })}
                         </TableCell>
                       );
                     })()}
@@ -1318,7 +1304,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           key={month} 
                           className={`text-right text-xs whitespace-nowrap px-2 py-1 bg-primary/5 ${margin !== null && margin >= 0 ? 'text-green-600' : 'text-red-600'} ${!isSeasonalMonth(idx) ? 'opacity-60' : ''}`}
                         >
-                          {formatPercent(margin)}
+                          {formatPercent(margin, { dash: true })}
                         </TableCell>
                       );
                     })}
@@ -1327,7 +1313,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                       const displayNOI = normRev - getAdjustedCategoryAnnualTotal('COGS') - getAdjustedCategoryAnnualTotal('Expenses');
                       return (
                         <TableCell className={`text-right text-xs whitespace-nowrap px-2 py-1 bg-primary/5 ${displayNOI >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {formatPercent(normRev !== 0 ? (displayNOI / normRev) * 100 : null)}
+                          {formatPercent(normRev !== 0 ? (displayNOI / normRev) * 100 : null, { dash: true })}
                         </TableCell>
                       );
                     })()}
@@ -1378,7 +1364,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                               key={year} 
                               className={`text-right font-semibold text-sm px-2 py-1.5 ${!hasData ? 'text-muted-foreground/50' : ''}`}
                             >
-                              {hasData ? formatCurrency(total) : '-'}
+                              {hasData ? formatCurrency(total, { dash: true }) : '-'}
                             </TableCell>
                           );
                         })}
@@ -1433,7 +1419,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                       key={year}
                                       className={`text-right text-xs font-medium text-muted-foreground bg-slate-50 dark:bg-slate-900 px-2 py-1 ${!hasData ? 'text-muted-foreground/50' : ''}`}
                                     >
-                                      {hasData ? formatCurrency(deptTotal) : '-'}
+                                      {hasData ? formatCurrency(deptTotal, { dash: true }) : '-'}
                                     </TableCell>
                                   );
                                 })}
@@ -1470,7 +1456,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                         key={year} 
                                         className={`text-right text-xs px-2 py-1 ${!hasData ? 'text-muted-foreground/50' : ''}`}
                                       >
-                                        {hasData && amount !== 0 ? formatCurrency(amount) : '-'}
+                                        {hasData && amount !== 0 ? formatCurrency(amount, { dash: true }) : '-'}
                                       </TableCell>
                                     );
                                   })}
@@ -1494,7 +1480,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           key={year} 
                           className={`text-right text-sm font-bold bg-muted px-2 py-1.5 ${!hasData ? 'text-muted-foreground/50' : ''}`}
                         >
-                          {hasData ? formatCurrency(revenue - cogs) : '-'}
+                          {hasData ? formatCurrency(revenue - cogs, { dash: true }) : '-'}
                         </TableCell>
                       );
                     })}
@@ -1513,7 +1499,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           key={year} 
                           className={`text-right text-xs text-muted-foreground bg-muted/30 px-2 py-1 ${!hasData ? 'opacity-50' : ''}`}
                         >
-                          {hasData ? formatPercent(margin) : '-'}
+                          {hasData ? formatPercent(margin, { dash: true }) : '-'}
                         </TableCell>
                       );
                     })}
@@ -1532,7 +1518,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           key={year} 
                           className={`text-right text-sm font-bold bg-primary/10 px-2 py-1.5 ${!hasData ? 'text-muted-foreground/50' : noi >= 0 ? 'text-green-600' : 'text-red-600'}`}
                         >
-                          {hasData ? formatCurrency(noi) : '-'}
+                          {hasData ? formatCurrency(noi, { dash: true }) : '-'}
                         </TableCell>
                       );
                     })}
@@ -1552,7 +1538,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           key={year} 
                           className={`text-right text-xs bg-primary/5 px-2 py-1 ${!hasData ? 'opacity-50' : margin !== null && margin >= 0 ? 'text-green-600' : 'text-red-600'}`}
                         >
-                          {hasData ? formatPercent(margin) : '-'}
+                          {hasData ? formatPercent(margin, { dash: true }) : '-'}
                         </TableCell>
                       );
                     })}

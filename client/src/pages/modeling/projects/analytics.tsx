@@ -48,6 +48,7 @@ import {
   FileText
 } from 'lucide-react';
 import { pdf } from '@react-pdf/renderer';
+import { formatCurrency, formatPercent, formatNumber } from '@/lib/utils';
 import { AnalyticsPDFDocument } from './analytics-pdf';
 
 type AnalyticsData = {
@@ -121,26 +122,6 @@ export default function ModelingAnalytics() {
   const { data: contacts = [] } = useQuery<Contact[]>({
     queryKey: ['/api/crm/contacts'],
   });
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const formatPercent = (value: number) => {
-    return `${value.toFixed(2)}%`;
-  };
-
-  const formatNumber = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    }).format(value);
-  };
 
   const exportToCSV = () => {
     if (!analytics) return;

@@ -32,7 +32,7 @@ import {
   Layers
 } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency, formatPercent } from '@/lib/utils';
 import debounce from 'lodash.debounce';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { MarketRatePicker, MarketRateContext } from '@/components/modeling/MarketRatePicker';
@@ -153,19 +153,6 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     if (key === 'holdPeriod') {
       setSharedHoldPeriod(value);
     }
-  };
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const formatPercent = (value: number) => {
-    return `${value.toFixed(2)}%`;
   };
 
   const formatCompactCurrency = (value: number) => {

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { formatCurrency, formatPercent } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -137,23 +138,6 @@ export default function WorkspaceOverview({ project, onTabChange }: WorkspaceOve
     }
   };
 
-  const formatCurrency = (value: number | string | null) => {
-    if (value === null || value === undefined) return '-';
-    const numValue = typeof value === 'string' ? parseFloat(value) : value;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(numValue);
-  };
-
-  const formatPercent = (value: number | string | null) => {
-    if (value === null || value === undefined) return '-';
-    const numValue = typeof value === 'string' ? parseFloat(value) : value;
-    return `${numValue.toFixed(2)}%`;
-  };
-
   return (
     <div className="space-y-6">
       <WorkflowNavigation currentTab="overview" onNavigate={onTabChange} />
@@ -166,7 +150,7 @@ export default function WorkspaceOverview({ project, onTabChange }: WorkspaceOve
           </div>
           <div>
             <div className="kpi-label">Purchase Price</div>
-            <div className="kpi-value">{formatCurrency(project.purchasePrice)}</div>
+            <div className="kpi-value">{formatCurrency(project.purchasePrice, { dash: true })}</div>
           </div>
         </div>
         <div className="finance-kpi-card variant-green" data-testid="card-overview-caprate">
@@ -175,7 +159,7 @@ export default function WorkspaceOverview({ project, onTabChange }: WorkspaceOve
           </div>
           <div>
             <div className="kpi-label">Year 1 Cap Rate</div>
-            <div className="kpi-value">{formatPercent(project.year1CapRate)}</div>
+            <div className="kpi-value">{formatPercent(project.year1CapRate, { dash: true })}</div>
           </div>
         </div>
         <div className="finance-kpi-card variant-blue" data-testid="card-overview-units">
@@ -193,7 +177,7 @@ export default function WorkspaceOverview({ project, onTabChange }: WorkspaceOve
           </div>
           <div>
             <div className="kpi-label">EBITDA</div>
-            <div className="kpi-value">{formatCurrency(project.ebitda)}</div>
+            <div className="kpi-value">{formatCurrency(project.ebitda, { dash: true })}</div>
           </div>
         </div>
       </div>

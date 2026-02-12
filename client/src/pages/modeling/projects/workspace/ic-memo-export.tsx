@@ -38,6 +38,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { formatCurrency, formatPercent } from '@/lib/utils';
 
 interface ICMemoExportProps {
   projectId: string;
@@ -113,21 +114,6 @@ export default function ICMemoExport({ projectId }: ICMemoExportProps) {
     queryKey: ['/api/modeling/projects', projectId, 'ic-memo'],
     enabled: isOpen,
   });
-
-  const formatCurrency = (value: number | null | undefined) => {
-    if (value === null || value === undefined) return '-';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const formatPercent = (value: number | null | undefined) => {
-    if (value === null || value === undefined) return '-';
-    return `${value.toFixed(2)}%`;
-  };
 
   const handleDownloadText = async () => {
     setIsDownloading(true);
@@ -222,7 +208,7 @@ export default function ICMemoExport({ projectId }: ICMemoExportProps) {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Purchase Price</p>
-                      <p className="font-medium">{formatCurrency(memoData.project.purchasePrice)}</p>
+                      <p className="font-medium">{formatCurrency(memoData.project.purchasePrice, { dash: true })}</p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Total Units</p>
@@ -243,19 +229,19 @@ export default function ICMemoExport({ projectId }: ICMemoExportProps) {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="p-3 bg-green-50 dark:bg-green-950 rounded-lg">
                       <p className="text-xs text-muted-foreground">Total Revenue</p>
-                      <p className="font-semibold text-green-600">{formatCurrency(memoData.financials.totalRevenue)}</p>
+                      <p className="font-semibold text-green-600">{formatCurrency(memoData.financials.totalRevenue, { dash: true })}</p>
                     </div>
                     <div className="p-3 bg-red-50 dark:bg-red-950 rounded-lg">
                       <p className="text-xs text-muted-foreground">Total Expenses</p>
-                      <p className="font-semibold text-red-600">{formatCurrency(memoData.financials.totalExpenses)}</p>
+                      <p className="font-semibold text-red-600">{formatCurrency(memoData.financials.totalExpenses, { dash: true })}</p>
                     </div>
                     <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
                       <p className="text-xs text-muted-foreground">NOI</p>
-                      <p className="font-semibold text-blue-600">{formatCurrency(memoData.financials.noi)}</p>
+                      <p className="font-semibold text-blue-600">{formatCurrency(memoData.financials.noi, { dash: true })}</p>
                     </div>
                     <div className="p-3 bg-purple-50 dark:bg-purple-950 rounded-lg">
                       <p className="text-xs text-muted-foreground">Cap Rate</p>
-                      <p className="font-semibold text-purple-600">{formatPercent(memoData.financials.capRate)}</p>
+                      <p className="font-semibold text-purple-600">{formatPercent(memoData.financials.capRate, { dash: true })}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -294,9 +280,9 @@ export default function ICMemoExport({ projectId }: ICMemoExportProps) {
                                 {status.label}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-right">{formatPercent(scenario.revenueGrowthRate)}</TableCell>
-                            <TableCell className="text-right">{formatPercent(scenario.expenseGrowthRate)}</TableCell>
-                            <TableCell className="text-right">{formatPercent(scenario.exitCapRate)}</TableCell>
+                            <TableCell className="text-right">{formatPercent(scenario.revenueGrowthRate, { dash: true })}</TableCell>
+                            <TableCell className="text-right">{formatPercent(scenario.expenseGrowthRate, { dash: true })}</TableCell>
+                            <TableCell className="text-right">{formatPercent(scenario.exitCapRate, { dash: true })}</TableCell>
                           </TableRow>
                         );
                       })}
@@ -334,13 +320,13 @@ export default function ICMemoExport({ projectId }: ICMemoExportProps) {
                             <TableRow key={`${scenarioType}-noi`}>
                               <TableCell className="pl-6">NOI</TableCell>
                               {data.noi.map((value, idx) => (
-                                <TableCell key={idx} className="text-right">{formatCurrency(value)}</TableCell>
+                                <TableCell key={idx} className="text-right">{formatCurrency(value, { dash: true })}</TableCell>
                               ))}
                             </TableRow>
                             <TableRow key={`${scenarioType}-value`}>
                               <TableCell className="pl-6">Exit Value</TableCell>
                               {data.value.map((value, idx) => (
-                                <TableCell key={idx} className="text-right">{formatCurrency(value)}</TableCell>
+                                <TableCell key={idx} className="text-right">{formatCurrency(value, { dash: true })}</TableCell>
                               ))}
                             </TableRow>
                           </>

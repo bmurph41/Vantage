@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
+import { formatCurrency, formatPercent } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -51,45 +52,12 @@ import {
 } from 'lucide-react';
 import ICMemoExport from './ic-memo-export';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
+import { defaultScenarios, type ScenarioType, type ScenarioConfig } from '@/lib/modeling-scenarios';
 
 interface WorkspaceExecutiveSummaryProps {
   projectId: string;
   onTabChange?: (tab: string) => void;
 }
-
-type ScenarioType = 'base' | 'aggressive' | 'conservative';
-
-type ScenarioConfig = {
-  name: string;
-  revenueGrowth: number;
-  expenseGrowth: number;
-  exitCapRate: number;
-  description: string;
-};
-
-const defaultScenarios: Record<ScenarioType, ScenarioConfig> = {
-  base: {
-    name: 'Base Case',
-    revenueGrowth: 3,
-    expenseGrowth: 2,
-    exitCapRate: 7.5,
-    description: 'Manual assumptions as entered',
-  },
-  aggressive: {
-    name: 'Aggressive',
-    revenueGrowth: 5,
-    expenseGrowth: 1.5,
-    exitCapRate: 7.0,
-    description: 'Higher growth, lower expenses, cap rate compression',
-  },
-  conservative: {
-    name: 'Conservative',
-    revenueGrowth: 2,
-    expenseGrowth: 3,
-    exitCapRate: 8.0,
-    description: 'Lower growth, higher expenses, cap rate expansion',
-  },
-};
 
 export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: WorkspaceExecutiveSummaryProps) {
   const { toast } = useToast();
@@ -113,21 +81,6 @@ export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: Wo
 
   const holdPeriod = config?.holdPeriod || 5;
   const startYear = 2026;
-
-  const formatCurrency = (value: number | null | undefined) => {
-    if (value === null || value === undefined) return '-';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const formatPercent = (value: number | null | undefined) => {
-    if (value === null || value === undefined) return '-';
-    return `${value.toFixed(2)}%`;
-  };
 
   const formatMultiple = (value: number | null | undefined) => {
     if (value === null || value === undefined) return '-';
@@ -335,9 +288,9 @@ export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: Wo
             <CardTitle className="text-sm font-medium text-muted-foreground">Purchase Price</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(metrics.purchasePrice)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(metrics.purchasePrice, { dash: true })}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {formatPercent(metrics.year1CapRate)} going-in cap
+              {formatPercent(metrics.year1CapRate, { dash: true })} going-in cap
             </p>
           </CardContent>
         </Card>
@@ -346,9 +299,9 @@ export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: Wo
             <CardTitle className="text-sm font-medium text-muted-foreground">Exit Value</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{formatCurrency(metrics.exitValue)}</div>
+            <div className="text-2xl font-bold text-green-600">{formatCurrency(metrics.exitValue, { dash: true })}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              @ {formatPercent(metrics.exitCapRate)} exit cap
+              @ {formatPercent(metrics.exitCapRate, { dash: true })} exit cap
             </p>
           </CardContent>
         </Card>
@@ -357,9 +310,9 @@ export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: Wo
             <CardTitle className="text-sm font-medium text-muted-foreground">Levered IRR</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">{formatPercent(metrics.leveredIRR)}</div>
+            <div className="text-2xl font-bold text-primary">{formatPercent(metrics.leveredIRR, { dash: true })}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {formatPercent(metrics.unleveredIRR)} unlevered
+              {formatPercent(metrics.unleveredIRR, { dash: true })} unlevered
             </p>
           </CardContent>
         </Card>
@@ -370,7 +323,7 @@ export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: Wo
           <CardContent>
             <div className="text-2xl font-bold">{formatMultiple(metrics.equityMultiple)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              on {formatCurrency(metrics.totalEquityRequired)}
+              on {formatCurrency(metrics.totalEquityRequired, { dash: true })}
             </p>
           </CardContent>
         </Card>
@@ -384,19 +337,19 @@ export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: Wo
           <CardContent className="space-y-4">
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Purchase Price</span>
-              <span className="font-medium">{formatCurrency(metrics.purchasePrice)}</span>
+              <span className="font-medium">{formatCurrency(metrics.purchasePrice, { dash: true })}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Senior Debt ({metrics.ltv}% LTV)</span>
-              <span className="font-medium">{formatCurrency(metrics.totalDebt)}</span>
+              <span className="font-medium">{formatCurrency(metrics.totalDebt, { dash: true })}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Equity Required</span>
-              <span className="font-medium">{formatCurrency(metrics.totalEquityRequired)}</span>
+              <span className="font-medium">{formatCurrency(metrics.totalEquityRequired, { dash: true })}</span>
             </div>
             <div className="flex justify-between py-2">
               <span className="text-muted-foreground">Year 1 NOI</span>
-              <span className="font-medium">{formatCurrency(metrics.year1NOI)}</span>
+              <span className="font-medium">{formatCurrency(metrics.year1NOI, { dash: true })}</span>
             </div>
           </CardContent>
         </Card>
@@ -422,11 +375,11 @@ export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: Wo
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Debt Yield</span>
-              <span className="font-medium">{formatPercent(metrics.debtYield)}</span>
+              <span className="font-medium">{formatPercent(metrics.debtYield, { dash: true })}</span>
             </div>
             <div className="flex justify-between py-2">
               <span className="text-muted-foreground">Annual Debt Service</span>
-              <span className="font-medium">{formatCurrency(metrics.totalDebtService / (holdPeriod || 5))}</span>
+              <span className="font-medium">{formatCurrency(metrics.totalDebtService / (holdPeriod || 5), { dash: true })}</span>
             </div>
           </CardContent>
         </Card>
@@ -478,14 +431,14 @@ export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: Wo
               <TableRow>
                 <TableCell className="font-medium">Net Operating Income</TableCell>
                 {metrics.noiByYear.map((noi: number, i: number) => (
-                  <TableCell key={i} className="text-right">{formatCurrency(noi)}</TableCell>
+                  <TableCell key={i} className="text-right">{formatCurrency(noi, { dash: true })}</TableCell>
                 ))}
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium">Cash-on-Cash Return</TableCell>
                 {metrics.cashOnCash.map((coc: number, i: number) => (
                   <TableCell key={i} className="text-right text-green-600">
-                    {formatPercent(coc)}
+                    {formatPercent(coc, { dash: true })}
                   </TableCell>
                 ))}
               </TableRow>
@@ -539,13 +492,13 @@ export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: Wo
               <TableRow className="bg-muted/50 font-semibold">
                 <TableCell>Exit Value</TableCell>
                 <TableCell className="text-right">
-                  {formatCurrency(812000 / (scenarios.base.exitCapRate / 100))}
+                  {formatCurrency(812000 / (scenarios.base.exitCapRate / 100), { dash: true })}
                 </TableCell>
                 <TableCell className="text-right text-green-600">
-                  {formatCurrency(850000 / (scenarios.aggressive.exitCapRate / 100))}
+                  {formatCurrency(850000 / (scenarios.aggressive.exitCapRate / 100), { dash: true })}
                 </TableCell>
                 <TableCell className="text-right text-amber-600">
-                  {formatCurrency(780000 / (scenarios.conservative.exitCapRate / 100))}
+                  {formatCurrency(780000 / (scenarios.conservative.exitCapRate / 100), { dash: true })}
                 </TableCell>
               </TableRow>
               <TableRow className="bg-primary/5 font-semibold">

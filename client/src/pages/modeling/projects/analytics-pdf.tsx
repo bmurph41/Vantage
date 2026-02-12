@@ -1,5 +1,6 @@
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import { format } from 'date-fns';
+import { formatCurrency, formatPercent, formatNumber } from '@/lib/utils';
 
 type AnalyticsData = {
   totalDeals: number;
@@ -142,26 +143,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
-
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-};
-
-const formatPercent = (value: number) => {
-  return `${value.toFixed(2)}%`;
-};
-
-const formatNumber = (value: number) => {
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(value);
-};
 
 type Props = {
   analytics: AnalyticsData;

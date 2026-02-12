@@ -37,69 +37,20 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { formatCurrency, formatPercent } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { ModelingProject, ExitScenario } from "@shared/schema";
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
+import { defaultScenarios, type ScenarioType } from '@/lib/modeling-scenarios';
 
 interface WorkspaceExitStrategyProps {
   projectId: string;
   onTabChange?: (tab: string) => void;
 }
 
-type ScenarioType = 'base' | 'aggressive' | 'conservative';
-
-type ScenarioConfig = {
-  name: string;
-  description: string;
-  revenueGrowth: number;
-  expenseGrowth: number;
-  exitCapRate: number;
-};
-
-const defaultScenarios: Record<ScenarioType, ScenarioConfig> = {
-  base: {
-    name: 'Base Case',
-    description: 'Manual assumptions as entered',
-    revenueGrowth: 3,
-    expenseGrowth: 2,
-    exitCapRate: 7.5,
-  },
-  aggressive: {
-    name: 'Aggressive',
-    description: 'Higher growth, lower expenses, cap rate compression',
-    revenueGrowth: 5,
-    expenseGrowth: 1.5,
-    exitCapRate: 7.0,
-  },
-  conservative: {
-    name: 'Conservative',
-    description: 'Lower growth, higher expenses, cap rate expansion',
-    revenueGrowth: 2,
-    expenseGrowth: 3,
-    exitCapRate: 8.0,
-  },
-};
-
-const formatCurrency = (value: number | string): string => {
-  const num = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, '')) : value;
-  if (isNaN(num)) return '$0';
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(num);
-};
-
 const parseCurrency = (value: string): string => {
   const num = value.replace(/[^0-9.-]/g, '');
   return num || '0';
-};
-
-const formatPercent = (value: number | string): string => {
-  const num = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, '')) : value;
-  if (isNaN(num)) return '0.00%';
-  return `${num.toFixed(2)}%`;
 };
 
 const parsePercent = (value: string): string => {
@@ -394,7 +345,7 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
   const currentScenario = scenarios[activeScenario];
   const exitCapRate = currentScenario.exitCapRate;
   
-  const year1NOI = proForma?.year1NOI || (Number(project?.ebitda) || 680000);
+  const year1NOI = proForma?.year1NOI || Number(project?.ebitda) || 0;
   const netGrowthRate = (currentScenario.revenueGrowth - currentScenario.expenseGrowth) / 100;
   const exitNOI = year1NOI * Math.pow(1 + netGrowthRate, holdPeriod);
   const calculatedSalePrice = exitNOI / (exitCapRate / 100);

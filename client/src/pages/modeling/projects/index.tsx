@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
+import { formatPercent, formatNumber } from '@/lib/utils';
+import { useDisplayPreferences } from '@/hooks/use-display-preferences';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -71,9 +73,7 @@ export default function ModelingProjectsPage() {
     queryKey: ['/api/modeling/projects'],
   });
 
-  const { data: displayPrefs } = useQuery<{ priceRoundingDigits: number }>({
-    queryKey: ['/api/modeling/display-preferences'],
-  });
+  const { formatCurrency } = useDisplayPreferences();
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiRequest('DELETE', `/api/modeling/projects/${id}`),
@@ -150,28 +150,6 @@ export default function ModelingProjectsPage() {
     }
   };
 
-  const roundingDigits = displayPrefs?.priceRoundingDigits ?? 0;
-
-  const formatCurrency = (value: number | null) => {
-    if (value === null || value === undefined) return '-';
-    let rounded = value;
-    if (roundingDigits > 0) {
-      const factor = Math.pow(10, roundingDigits);
-      rounded = Math.round(value / factor) * factor;
-    }
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(rounded);
-  };
-
-  const formatPercent = (value: number | null) => {
-    if (value === null || value === undefined) return '-';
-    return `${value.toFixed(1)}%`;
-  };
-  
   const formatOutcome = (outcome: string) => {
     const outcomeMap: Record<string, string> = {
       'under_review': 'Under Review',
@@ -181,11 +159,6 @@ export default function ModelingProjectsPage() {
       'passed': 'Passed',
     };
     return outcomeMap[outcome] || outcome.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-  };
-
-  const formatNumber = (value: number | null) => {
-    if (value === null || value === undefined) return '-';
-    return new Intl.NumberFormat('en-US').format(value);
   };
 
   return (
@@ -383,13 +356,13 @@ export default function ModelingProjectsPage() {
                           {[project.city, project.state].filter(Boolean).join(', ') || '-'}
                         </TableCell>
                         <TableCell className="text-right" data-testid={`text-price-${project.id}`}>
-                          {formatCurrency(project.purchasePrice)}
+                          {formatCurrency(project.purchasePrice, { dash: true })}
                         </TableCell>
                         <TableCell className="text-right" data-testid={`text-irr-${project.id}`}>
                           {project.irr != null ? (
                             <div>
                               <div className={`font-medium ${project.irr >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {formatPercent(project.irr)}
+                                {formatPercent(project.irr, { dash: true })}
                               </div>
                               {project.exitYear && (
                                 <div className="text-xs text-muted-foreground">Exit Year: {project.exitYear}</div>
@@ -398,7 +371,7 @@ export default function ModelingProjectsPage() {
                           ) : '-'}
                         </TableCell>
                         <TableCell className="text-right" data-testid={`text-cap-rate-${project.id}`}>
-                          {formatPercent(project.year1CapRate)}
+                          {formatPercent(project.year1CapRate, { dash: true })}
                         </TableCell>
                         <TableCell className="text-right" data-testid={`text-t12-ebitda-${project.id}`}>
                           {project.t12Ebitda != null ? (

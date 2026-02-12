@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { format, subYears } from "date-fns";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { formatCurrency, formatPercent } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { DebtScenario, ModelingProject } from "@shared/schema";
 import LoanBuilder from '@/components/modeling/LoanBuilder';
@@ -46,14 +47,6 @@ const BASE_RATE_OPTIONS = [
 ];
 
 type TimeRange = "1Y" | "2Y" | "5Y" | "10Y" | "ALL";
-
-const formatCurrency = (value: number): string => {
-  return `$${value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-};
-
-const formatPercentage = (value: number): string => {
-  return `${value.toFixed(2)}%`;
-};
 
 interface ScenarioInputs {
   name: string;
@@ -503,7 +496,7 @@ export default function WorkspaceDebtScenarios({ projectId, onTabChange }: Works
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">All-In Rate</p>
-                <p className="text-lg font-bold" data-testid="text-all-in-rate">{formatPercentage(allInRate)}</p>
+                <p className="text-lg font-bold" data-testid="text-all-in-rate">{formatPercent(allInRate)}</p>
               </div>
             </div>
           </CardContent>
@@ -531,7 +524,7 @@ export default function WorkspaceDebtScenarios({ projectId, onTabChange }: Works
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Cash-on-Cash</p>
-                <p className="text-lg font-bold" data-testid="text-cash-on-cash">{formatPercentage(cashOnCash)}</p>
+                <p className="text-lg font-bold" data-testid="text-cash-on-cash">{formatPercent(cashOnCash)}</p>
               </div>
             </div>
           </CardContent>
@@ -595,7 +588,7 @@ export default function WorkspaceDebtScenarios({ projectId, onTabChange }: Works
                 </div>
                 <div className="flex justify-between py-2 border-b">
                   <span className="text-muted-foreground">All-In Rate</span>
-                  <span className="font-medium">{formatPercentage(allInRate)}</span>
+                  <span className="font-medium">{formatPercent(allInRate)}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b">
                   <span className="text-muted-foreground">Loan Term</span>
@@ -623,7 +616,7 @@ export default function WorkspaceDebtScenarios({ projectId, onTabChange }: Works
                   </Badge>
                 </div>
                 <div className="text-center p-4 bg-muted/50 rounded-lg">
-                  <p className="text-2xl font-bold text-primary">{formatPercentage(debtYield)}</p>
+                  <p className="text-2xl font-bold text-primary">{formatPercent(debtYield)}</p>
                   <p className="text-sm text-muted-foreground">Debt Yield</p>
                   <Badge variant={debtYield >= 10 ? "default" : debtYield >= 8 ? "secondary" : "destructive"} className="mt-2">
                     {debtYield >= 10 ? "Strong" : debtYield >= 8 ? "Adequate" : "Tight"}
@@ -634,7 +627,7 @@ export default function WorkspaceDebtScenarios({ projectId, onTabChange }: Works
                   <p className="text-sm text-muted-foreground">Annual Debt Service</p>
                 </div>
                 <div className="text-center p-4 bg-muted/50 rounded-lg">
-                  <p className="text-2xl font-bold text-primary">{formatPercentage(cashOnCash)}</p>
+                  <p className="text-2xl font-bold text-primary">{formatPercent(cashOnCash)}</p>
                   <p className="text-sm text-muted-foreground">Cash-on-Cash Return</p>
                 </div>
               </div>

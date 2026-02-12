@@ -20,7 +20,7 @@ import {
   Download
 } from "lucide-react";
 import type { ModelingProject, ExitScenario } from "@shared/schema";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency, formatPercent } from "@/lib/utils";
 
 interface ScenarioComparisonProps {
   projectId: string;
@@ -39,19 +39,6 @@ interface ScenarioMetrics {
   holdingPeriod: number;
   cashOnCash: number;
   isRecommended?: boolean;
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', { 
-    style: 'currency', 
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(value);
-}
-
-function formatPercent(value: number): string {
-  return `${value.toFixed(2)}%`;
 }
 
 function MetricCell({ value, baseline, format = 'currency', highlightBest = true }: {

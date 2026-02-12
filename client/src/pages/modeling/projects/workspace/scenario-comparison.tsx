@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { useCaseLabels, type CaseType } from '@/hooks/useCaseLabels';
+import { formatCurrency, formatPercent } from '@/lib/utils';
 import type { ModelingProject } from '@shared/schema';
 import {
   GitCompare,
@@ -151,21 +152,6 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
     });
   };
 
-  const formatPercent = (value: number | null | undefined) => {
-    if (value === null || value === undefined) return '-';
-    return `${value.toFixed(2)}%`;
-  };
-
-  const formatCurrency = (value: number | null | undefined) => {
-    if (value === null || value === undefined) return '-';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
   const getVarianceIndicator = (values: (number | null | undefined)[]) => {
     const validValues = values.filter(v => v !== null && v !== undefined) as number[];
     if (validValues.length < 2) return null;
@@ -278,11 +264,11 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
                   <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                     <div>
                       <span className="text-muted-foreground">Rev Growth:</span>
-                      <span className="ml-1 font-medium">{formatPercent(parseFloat(scenario.revenueGrowthRate || '0'))}</span>
+                      <span className="ml-1 font-medium">{formatPercent(parseFloat(scenario.revenueGrowthRate || '0'), { dash: true })}</span>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Exp Growth:</span>
-                      <span className="ml-1 font-medium">{formatPercent(parseFloat(scenario.expenseGrowthRate || '0'))}</span>
+                      <span className="ml-1 font-medium">{formatPercent(parseFloat(scenario.expenseGrowthRate || '0'), { dash: true })}</span>
                     </div>
                   </div>
                 </div>
@@ -332,7 +318,7 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
                           key={s.id} 
                           className={`text-center ${getCellHighlight(s.revenueGrowthRate, allValues, true)}`}
                         >
-                          {formatPercent(s.revenueGrowthRate)}
+                          {formatPercent(s.revenueGrowthRate, { dash: true })}
                         </TableCell>
                       );
                     })}
@@ -365,7 +351,7 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
                           key={s.id} 
                           className={`text-center ${getCellHighlight(s.expenseGrowthRate, allValues, false)}`}
                         >
-                          {formatPercent(s.expenseGrowthRate)}
+                          {formatPercent(s.expenseGrowthRate, { dash: true })}
                         </TableCell>
                       );
                     })}
@@ -398,7 +384,7 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
                           key={s.id} 
                           className={`text-center ${getCellHighlight(s.exitCapRate, allValues, false)}`}
                         >
-                          {formatPercent(s.exitCapRate)}
+                          {formatPercent(s.exitCapRate, { dash: true })}
                         </TableCell>
                       );
                     })}
@@ -489,7 +475,7 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
                                 key={s.id} 
                                 className={`text-center ${getCellHighlight(value, values, true)}`}
                               >
-                                {formatPercent(value)}
+                                {formatPercent(value, { dash: true })}
                               </TableCell>
                             );
                           })}
@@ -547,7 +533,7 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
                                 key={s.id} 
                                 className={`text-center ${getCellHighlight(value, values, false)}`}
                               >
-                                {formatPercent(value)}
+                                {formatPercent(value, { dash: true })}
                               </TableCell>
                             );
                           })}
@@ -602,7 +588,7 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
                                 key={s.id} 
                                 className={`text-center ${getCellHighlight(value, allValues, true)}`}
                               >
-                                {formatPercent(value)}
+                                {formatPercent(value, { dash: true })}
                               </TableCell>
                             );
                           })}
@@ -617,7 +603,7 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
                                 key={s.id} 
                                 className={`text-center ${getCellHighlight(value, allValues, true)}`}
                               >
-                                {formatPercent(value)}
+                                {formatPercent(value, { dash: true })}
                               </TableCell>
                             );
                           })}

@@ -34,6 +34,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
 interface ValuatorBookkeepingProps {
@@ -54,17 +55,6 @@ interface BookkeepingRow {
   createdAt: string;
   updatedAt: string;
 }
-
-const formatCurrency = (val: string | number | null | undefined): string => {
-  const num = typeof val === "string" ? parseFloat(val) : (val ?? 0);
-  if (isNaN(num)) return "$0";
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(num);
-};
 
 const formatMonth = (dateStr: string): string => {
   const d = new Date(dateStr + "T00:00:00");

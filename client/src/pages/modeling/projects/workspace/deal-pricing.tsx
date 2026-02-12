@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency, formatPercent } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -90,19 +90,6 @@ interface PricingResponse {
   };
   noiProjections: number[];
 }
-
-const formatCurrency = (value: number | null | undefined): string => {
-  if (value === null || value === undefined || isNaN(value)) return '$00,000,000';
-  const absValue = Math.abs(Math.round(value));
-  const paddedNum = absValue.toString().padStart(8, '0');
-  const formatted = paddedNum.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return value < 0 ? `-$${formatted}` : `$${formatted}`;
-};
-
-const formatPercent = (value: number | null | undefined): string => {
-  if (value === null || value === undefined || isNaN(value)) return '0.00%';
-  return `${value.toFixed(2)}%`;
-};
 
 const formatMultiple = (value: number | null | undefined): string => {
   if (value === null || value === undefined || isNaN(value)) return '0.00x';

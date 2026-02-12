@@ -29,7 +29,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency, formatPercent } from '@/lib/utils';
 
 interface Statistics {
   mean: number;
@@ -111,19 +111,6 @@ export default function MonteCarloPage() {
       });
     },
   });
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const formatPercent = (value: number) => {
-    return `${value.toFixed(2)}%`;
-  };
 
   const formatCompactCurrency = (value: number) => {
     if (Math.abs(value) >= 1000000) {

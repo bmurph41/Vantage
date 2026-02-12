@@ -1,6 +1,7 @@
-import { useState, useMemo, Fragment } from 'react';
+import { useState, useMemo, useEffect, Fragment } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
+import { formatCurrency, formatPercent } from '@/lib/utils';
 import { useHoldPeriod } from '@/hooks/use-hold-period';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -138,7 +139,7 @@ type KPIDrilldownType = 'baseline-revenue' | 'baseline-noi' | 'year1-noi' | 'exi
 
 export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceProFormaProps) {
   const [viewMode, setViewMode] = useState<'monthly' | 'annual'>('annual');
-  const [selectedYear, setSelectedYear] = useState('2026');
+  const [selectedYear, setSelectedYear] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['revenue']));
   const [expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set());
   const { sortDepartments } = useDepartmentOrder();
@@ -177,10 +178,16 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
     queryKey: ['/api/modeling/projects', projectId, 'actuals'],
   });
 
-  const startDate = config?.startDate || '2026-01-31';
+  const startDate = config?.startDate || `${new Date().getFullYear()}-01-31`;
   const seasonMonths = config?.seasonMonths || [4, 5, 6, 7, 8, 9, 10];
   const startYear = parseInt(startDate.split('-')[0]);
   const years = Array.from({ length: holdPeriod }, (_, i) => startYear + i);
+
+  useEffect(() => {
+    if (!selectedYear && years.length > 0) {
+      setSelectedYear(String(years[0]));
+    }
+  }, [years, selectedYear]);
 
   // Process documents to determine available historical periods
   const historicalPeriods = useMemo((): DocumentPeriod[] => {
@@ -279,26 +286,6 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
       }
       return next;
     });
-  };
-
-  const formatCurrency = (value: number | null | undefined) => {
-    if (value === null || value === undefined || isNaN(value)) return '-';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const formatPercent = (value: number | null | undefined) => {
-    if (value === null || value === undefined || isNaN(value)) return '-';
-    return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
-  };
-
-  const formatPercentSimple = (value: number | null | undefined) => {
-    if (value === null || value === undefined || isNaN(value)) return '-';
-    return `${value.toFixed(1)}%`;
   };
 
   const isSeasonalMonth = (monthIndex: number) => seasonMonths.includes(monthIndex + 1);
@@ -745,7 +732,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(baselineSummary?.revenue)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(baselineSummary?.revenue, { dash: true })}</div>
             {priorPeriods.length > 0 && (
               <div className="flex items-center gap-1 mt-1">
                 {(() => {
@@ -760,7 +747,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                         <TrendingDown className="h-3 w-3 text-red-500" />
                       )}
                       <span className={`text-xs ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                        {formatPercent(growth)}
+                        {formatPercent(growth, { showSign: true, dash: true })}
                       </span>
                       <span className="text-xs text-muted-foreground">YoY</span>
                     </>
@@ -781,9 +768,9 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(baselineSummary?.noi)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(baselineSummary?.noi, { dash: true })}</div>
             <div className="text-xs text-muted-foreground mt-1">
-              {formatPercentSimple(baselineSummary?.noiMargin)} margin
+              {formatPercent(baselineSummary?.noiMargin, { dash: true })} margin
             </div>
           </CardContent>
         </Card>
@@ -796,7 +783,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
             <CardTitle className="text-sm font-medium text-muted-foreground">Year 1 NOI</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(year1Summary.noi)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(year1Summary.noi, { dash: true })}</div>
             {baselineSummary && (
               <div className="flex items-center gap-1 mt-1">
                 {(() => {
@@ -810,7 +797,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                         <TrendingDown className="h-3 w-3 text-red-500" />
                       )}
                       <span className={`text-xs ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                        {formatPercent(growth)}
+                        {formatPercent(growth, { showSign: true, dash: true })}
                       </span>
                       <span className="text-xs text-muted-foreground">vs baseline</span>
                     </>
@@ -829,11 +816,11 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
             <CardTitle className="text-sm font-medium text-muted-foreground">Year {holdPeriod} NOI</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(finalYearSummary.noi)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(finalYearSummary.noi, { dash: true })}</div>
             <div className="flex items-center gap-1 mt-1">
               <TrendingUp className="h-3 w-3 text-green-500" />
               <span className="text-xs text-green-600">
-                {formatPercent(calculateCAGR(year1Summary.noi, finalYearSummary.noi, holdPeriod - 1))}
+                {formatPercent(calculateCAGR(year1Summary.noi, finalYearSummary.noi, holdPeriod - 1), { showSign: true, dash: true })}
               </span>
               <span className="text-xs text-muted-foreground">CAGR</span>
             </div>
@@ -880,19 +867,19 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="p-3 rounded-lg bg-background border">
                     <div className="text-sm text-muted-foreground">Total Revenue</div>
-                    <div className="text-xl font-bold">{formatCurrency(baselineSummary?.revenue)}</div>
+                    <div className="text-xl font-bold">{formatCurrency(baselineSummary?.revenue, { dash: true })}</div>
                   </div>
                   <div className="p-3 rounded-lg bg-background border">
                     <div className="text-sm text-muted-foreground">Cost of Goods Sold</div>
-                    <div className="text-xl font-bold">{formatCurrency(baselineSummary?.cogs)}</div>
+                    <div className="text-xl font-bold">{formatCurrency(baselineSummary?.cogs, { dash: true })}</div>
                   </div>
                   <div className="p-3 rounded-lg bg-background border">
                     <div className="text-sm text-muted-foreground">Gross Profit</div>
-                    <div className="text-xl font-bold">{formatCurrency(baselineSummary?.grossProfit)}</div>
+                    <div className="text-xl font-bold">{formatCurrency(baselineSummary?.grossProfit, { dash: true })}</div>
                   </div>
                   <div className="p-3 rounded-lg bg-background border">
                     <div className="text-sm text-muted-foreground">Gross Margin</div>
-                    <div className="text-xl font-bold">{formatPercentSimple(baselineSummary?.revenue ? ((baselineSummary.grossProfit / baselineSummary.revenue) * 100) : 0)}</div>
+                    <div className="text-xl font-bold">{formatPercent(baselineSummary?.revenue ? ((baselineSummary.grossProfit / baselineSummary.revenue) * 100) : 0, { dash: true })}</div>
                   </div>
                 </div>
                 <div className="mt-4">
@@ -905,8 +892,8 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                         <div key={name} className="flex items-center justify-between p-2 rounded bg-background border">
                           <span className="text-sm">{name}</span>
                           <div className="flex items-center gap-3">
-                            <span className="text-sm text-muted-foreground">{formatPercentSimple(pct)}</span>
-                            <span className="font-medium">{formatCurrency(baseValue)}</span>
+                            <span className="text-sm text-muted-foreground">{formatPercent(pct, { dash: true })}</span>
+                            <span className="font-medium">{formatCurrency(baseValue, { dash: true })}</span>
                           </div>
                         </div>
                       );
@@ -921,19 +908,19 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="p-3 rounded-lg bg-background border">
                     <div className="text-sm text-muted-foreground">Revenue</div>
-                    <div className="text-xl font-bold">{formatCurrency(baselineSummary?.revenue)}</div>
+                    <div className="text-xl font-bold">{formatCurrency(baselineSummary?.revenue, { dash: true })}</div>
                   </div>
                   <div className="p-3 rounded-lg bg-background border">
                     <div className="text-sm text-muted-foreground">Total Expenses</div>
-                    <div className="text-xl font-bold">{formatCurrency((baselineSummary?.cogs || 0) + (baselineSummary?.expenses || 0))}</div>
+                    <div className="text-xl font-bold">{formatCurrency((baselineSummary?.cogs || 0) + (baselineSummary?.expenses || 0), { dash: true })}</div>
                   </div>
                   <div className="p-3 rounded-lg bg-background border border-green-200 bg-green-50 dark:bg-green-950/30">
                     <div className="text-sm text-muted-foreground">Net Operating Income</div>
-                    <div className="text-xl font-bold text-green-600">{formatCurrency(baselineSummary?.noi)}</div>
+                    <div className="text-xl font-bold text-green-600">{formatCurrency(baselineSummary?.noi, { dash: true })}</div>
                   </div>
                   <div className="p-3 rounded-lg bg-background border">
                     <div className="text-sm text-muted-foreground">NOI Margin</div>
-                    <div className="text-xl font-bold">{formatPercentSimple(baselineSummary?.noiMargin)}</div>
+                    <div className="text-xl font-bold">{formatPercent(baselineSummary?.noiMargin, { dash: true })}</div>
                   </div>
                 </div>
                 <div className="mt-4">
@@ -941,23 +928,23 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                   <div className="space-y-1">
                     <div className="flex justify-between p-2 rounded bg-blue-50 dark:bg-blue-950/30 border border-blue-200">
                       <span>Revenue</span>
-                      <span className="font-medium">{formatCurrency(baselineSummary?.revenue)}</span>
+                      <span className="font-medium">{formatCurrency(baselineSummary?.revenue, { dash: true })}</span>
                     </div>
                     <div className="flex justify-between p-2 rounded bg-red-50 dark:bg-red-950/30 border border-red-200">
                       <span>(-) Cost of Goods Sold</span>
-                      <span className="font-medium text-red-600">{formatCurrency(baselineSummary?.cogs)}</span>
+                      <span className="font-medium text-red-600">{formatCurrency(baselineSummary?.cogs, { dash: true })}</span>
                     </div>
                     <div className="flex justify-between p-2 rounded bg-slate-50 dark:bg-slate-900/50 border">
                       <span className="font-medium">= Gross Profit</span>
-                      <span className="font-medium">{formatCurrency(baselineSummary?.grossProfit)}</span>
+                      <span className="font-medium">{formatCurrency(baselineSummary?.grossProfit, { dash: true })}</span>
                     </div>
                     <div className="flex justify-between p-2 rounded bg-red-50 dark:bg-red-950/30 border border-red-200">
                       <span>(-) Operating Expenses</span>
-                      <span className="font-medium text-red-600">{formatCurrency(baselineSummary?.expenses)}</span>
+                      <span className="font-medium text-red-600">{formatCurrency(baselineSummary?.expenses, { dash: true })}</span>
                     </div>
                     <div className="flex justify-between p-2 rounded bg-green-100 dark:bg-green-900/30 border border-green-300">
                       <span className="font-bold">= Net Operating Income</span>
-                      <span className="font-bold text-green-600">{formatCurrency(baselineSummary?.noi)}</span>
+                      <span className="font-bold text-green-600">{formatCurrency(baselineSummary?.noi, { dash: true })}</span>
                     </div>
                   </div>
                 </div>
@@ -969,19 +956,19 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="p-3 rounded-lg bg-background border">
                     <div className="text-sm text-muted-foreground">Year 1 Revenue</div>
-                    <div className="text-xl font-bold">{formatCurrency(year1Summary.revenue)}</div>
+                    <div className="text-xl font-bold">{formatCurrency(year1Summary.revenue, { dash: true })}</div>
                   </div>
                   <div className="p-3 rounded-lg bg-background border">
                     <div className="text-sm text-muted-foreground">Year 1 Expenses</div>
-                    <div className="text-xl font-bold">{formatCurrency(year1Summary.cogs + year1Summary.expenses)}</div>
+                    <div className="text-xl font-bold">{formatCurrency(year1Summary.cogs + year1Summary.expenses, { dash: true })}</div>
                   </div>
                   <div className="p-3 rounded-lg bg-background border border-green-200 bg-green-50 dark:bg-green-950/30">
                     <div className="text-sm text-muted-foreground">Year 1 NOI</div>
-                    <div className="text-xl font-bold text-green-600">{formatCurrency(year1Summary.noi)}</div>
+                    <div className="text-xl font-bold text-green-600">{formatCurrency(year1Summary.noi, { dash: true })}</div>
                   </div>
                   <div className="p-3 rounded-lg bg-background border">
                     <div className="text-sm text-muted-foreground">vs Baseline</div>
-                    <div className="text-xl font-bold">{formatPercent(calculateYoYGrowth(year1Summary.noi, baselineSummary?.noi || 0))}</div>
+                    <div className="text-xl font-bold">{formatPercent(calculateYoYGrowth(year1Summary.noi, baselineSummary?.noi || 0), { showSign: true, dash: true })}</div>
                   </div>
                 </div>
                 <div className="mt-4">
@@ -989,23 +976,23 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                   <div className="space-y-1">
                     <div className="flex justify-between p-2 rounded bg-blue-50 dark:bg-blue-950/30 border border-blue-200">
                       <span>Revenue</span>
-                      <span className="font-medium">{formatCurrency(year1Summary.revenue)}</span>
+                      <span className="font-medium">{formatCurrency(year1Summary.revenue, { dash: true })}</span>
                     </div>
                     <div className="flex justify-between p-2 rounded bg-red-50 dark:bg-red-950/30 border border-red-200">
                       <span>(-) Cost of Goods Sold</span>
-                      <span className="font-medium text-red-600">{formatCurrency(year1Summary.cogs)}</span>
+                      <span className="font-medium text-red-600">{formatCurrency(year1Summary.cogs, { dash: true })}</span>
                     </div>
                     <div className="flex justify-between p-2 rounded bg-slate-50 dark:bg-slate-900/50 border">
                       <span className="font-medium">= Gross Profit</span>
-                      <span className="font-medium">{formatCurrency(year1Summary.grossProfit)}</span>
+                      <span className="font-medium">{formatCurrency(year1Summary.grossProfit, { dash: true })}</span>
                     </div>
                     <div className="flex justify-between p-2 rounded bg-red-50 dark:bg-red-950/30 border border-red-200">
                       <span>(-) Operating Expenses</span>
-                      <span className="font-medium text-red-600">{formatCurrency(year1Summary.expenses)}</span>
+                      <span className="font-medium text-red-600">{formatCurrency(year1Summary.expenses, { dash: true })}</span>
                     </div>
                     <div className="flex justify-between p-2 rounded bg-green-100 dark:bg-green-900/30 border border-green-300">
                       <span className="font-bold">= Net Operating Income</span>
-                      <span className="font-bold text-green-600">{formatCurrency(year1Summary.noi)}</span>
+                      <span className="font-bold text-green-600">{formatCurrency(year1Summary.noi, { dash: true })}</span>
                     </div>
                   </div>
                 </div>
@@ -1017,19 +1004,19 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="p-3 rounded-lg bg-background border">
                     <div className="text-sm text-muted-foreground">Year {holdPeriod} Revenue</div>
-                    <div className="text-xl font-bold">{formatCurrency(finalYearSummary.revenue)}</div>
+                    <div className="text-xl font-bold">{formatCurrency(finalYearSummary.revenue, { dash: true })}</div>
                   </div>
                   <div className="p-3 rounded-lg bg-background border">
                     <div className="text-sm text-muted-foreground">Year {holdPeriod} Expenses</div>
-                    <div className="text-xl font-bold">{formatCurrency(finalYearSummary.cogs + finalYearSummary.expenses)}</div>
+                    <div className="text-xl font-bold">{formatCurrency(finalYearSummary.cogs + finalYearSummary.expenses, { dash: true })}</div>
                   </div>
                   <div className="p-3 rounded-lg bg-background border border-green-200 bg-green-50 dark:bg-green-950/30">
                     <div className="text-sm text-muted-foreground">Year {holdPeriod} NOI</div>
-                    <div className="text-xl font-bold text-green-600">{formatCurrency(finalYearSummary.noi)}</div>
+                    <div className="text-xl font-bold text-green-600">{formatCurrency(finalYearSummary.noi, { dash: true })}</div>
                   </div>
                   <div className="p-3 rounded-lg bg-background border">
                     <div className="text-sm text-muted-foreground">{holdPeriod - 1}Y CAGR</div>
-                    <div className="text-xl font-bold text-green-600">{formatPercent(calculateCAGR(year1Summary.noi, finalYearSummary.noi, holdPeriod - 1))}</div>
+                    <div className="text-xl font-bold text-green-600">{formatPercent(calculateCAGR(year1Summary.noi, finalYearSummary.noi, holdPeriod - 1), { showSign: true, dash: true })}</div>
                   </div>
                 </div>
                 <div className="mt-4">
@@ -1037,23 +1024,23 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                   <div className="space-y-1">
                     <div className="flex justify-between p-2 rounded bg-blue-50 dark:bg-blue-950/30 border border-blue-200">
                       <span>Revenue</span>
-                      <span className="font-medium">{formatCurrency(finalYearSummary.revenue)}</span>
+                      <span className="font-medium">{formatCurrency(finalYearSummary.revenue, { dash: true })}</span>
                     </div>
                     <div className="flex justify-between p-2 rounded bg-red-50 dark:bg-red-950/30 border border-red-200">
                       <span>(-) Cost of Goods Sold</span>
-                      <span className="font-medium text-red-600">{formatCurrency(finalYearSummary.cogs)}</span>
+                      <span className="font-medium text-red-600">{formatCurrency(finalYearSummary.cogs, { dash: true })}</span>
                     </div>
                     <div className="flex justify-between p-2 rounded bg-slate-50 dark:bg-slate-900/50 border">
                       <span className="font-medium">= Gross Profit</span>
-                      <span className="font-medium">{formatCurrency(finalYearSummary.grossProfit)}</span>
+                      <span className="font-medium">{formatCurrency(finalYearSummary.grossProfit, { dash: true })}</span>
                     </div>
                     <div className="flex justify-between p-2 rounded bg-red-50 dark:bg-red-950/30 border border-red-200">
                       <span>(-) Operating Expenses</span>
-                      <span className="font-medium text-red-600">{formatCurrency(finalYearSummary.expenses)}</span>
+                      <span className="font-medium text-red-600">{formatCurrency(finalYearSummary.expenses, { dash: true })}</span>
                     </div>
                     <div className="flex justify-between p-2 rounded bg-green-100 dark:bg-green-900/30 border border-green-300">
                       <span className="font-bold">= Net Operating Income</span>
-                      <span className="font-bold text-green-600">{formatCurrency(finalYearSummary.noi)}</span>
+                      <span className="font-bold text-green-600">{formatCurrency(finalYearSummary.noi, { dash: true })}</span>
                     </div>
                   </div>
                 </div>
@@ -1062,15 +1049,15 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                   <div className="grid grid-cols-3 gap-4 text-center">
                     <div>
                       <div className="text-xs text-muted-foreground">Year 1</div>
-                      <div className="font-medium">{formatCurrency(year1Summary.noi)}</div>
+                      <div className="font-medium">{formatCurrency(year1Summary.noi, { dash: true })}</div>
                     </div>
                     <div>
                       <div className="text-xs text-muted-foreground">Total Growth</div>
-                      <div className="font-medium text-green-600">{formatPercent(calculateYoYGrowth(finalYearSummary.noi, year1Summary.noi))}</div>
+                      <div className="font-medium text-green-600">{formatPercent(calculateYoYGrowth(finalYearSummary.noi, year1Summary.noi), { showSign: true, dash: true })}</div>
                     </div>
                     <div>
                       <div className="text-xs text-muted-foreground">Year {holdPeriod}</div>
-                      <div className="font-medium">{formatCurrency(finalYearSummary.noi)}</div>
+                      <div className="font-medium">{formatCurrency(finalYearSummary.noi, { dash: true })}</div>
                     </div>
                   </div>
                 </div>
@@ -1215,13 +1202,13 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                         {/* Historical totals - blue tint for actuals */}
                         {showHistorical && priorPeriods.map(period => (
                           <TableCell key={period.id} className="text-right font-semibold bg-blue-50/60 dark:bg-blue-950/20 text-blue-900 dark:text-blue-100">
-                            {formatCurrency(getCategoryTotal(category, period.id))}
+                            {formatCurrency(getCategoryTotal(category, period.id), { dash: true })}
                           </TableCell>
                         ))}
 
                         {/* Baseline total */}
                         <TableCell className="text-right font-semibold bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">
-                          {formatCurrency(baselineTotal)}
+                          {formatCurrency(baselineTotal, { dash: true })}
                         </TableCell>
 
                         {/* Projected totals - Monthly or Annual */}
@@ -1234,7 +1221,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                                 key={monthIndex} 
                                 className={`text-right font-semibold ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}
                               >
-                                {formatCurrency(value)}
+                                {formatCurrency(value, { dash: true })}
                               </TableCell>
                             );
                           })
@@ -1242,7 +1229,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                           // Annual totals
                           years.map((_, i) => (
                             <TableCell key={i} className="text-right font-semibold">
-                              {formatCurrency(getCategoryProjectedTotal(category, i))}
+                              {formatCurrency(getCategoryProjectedTotal(category, i), { dash: true })}
                             </TableCell>
                           ))
                         )}
@@ -1255,13 +1242,13 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                               months.reduce((sum, _, monthIndex) => {
                                 return sum + getMonthlyTotal(category, selectedYearInt, monthIndex);
                               }, 0)
-                            )
+                            , { dash: true })
                           ) : (
                             formatPercent(calculateCAGR(
                               getCategoryProjectedTotal(category, 0),
                               getCategoryProjectedTotal(category, holdPeriod - 1),
                               holdPeriod - 1
-                            ))
+                            ), { showSign: true, dash: true })
                           )}
                         </TableCell>
                       </TableRow>
@@ -1293,13 +1280,13 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                                 const deptHistTotal = Object.values(deptItems).reduce((sum, v) => sum + (v.historical[period.id] || 0), 0);
                                 return (
                                   <TableCell key={period.id} className="text-right text-xs font-medium text-muted-foreground bg-blue-50/60 dark:bg-blue-950/20">
-                                    {formatCurrency(deptHistTotal)}
+                                    {formatCurrency(deptHistTotal, { dash: true })}
                                   </TableCell>
                                 );
                               })}
 
                               <TableCell className="text-right text-xs font-medium text-muted-foreground bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">
-                                {formatCurrency(baselinePeriod ? Object.values(deptItems).reduce((sum, v) => sum + (v.historical[baselinePeriod.id] || 0), 0) : 0)}
+                                {formatCurrency(baselinePeriod ? Object.values(deptItems).reduce((sum, v) => sum + (v.historical[baselinePeriod.id] || 0), 0) : 0, { dash: true })}
                               </TableCell>
 
                               {viewMode === 'monthly' ? (
@@ -1308,7 +1295,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                                     sum + getLineItemMonthlyValue(category, itemName, selectedYearInt, monthIndex), 0);
                                   return (
                                     <TableCell key={monthIndex} className={`text-right text-xs font-medium text-muted-foreground ${isSeasonalMonth(monthIndex) ? 'bg-green-50/60 dark:bg-green-950/20' : ''}`}>
-                                      {formatCurrency(deptMonthTotal)}
+                                      {formatCurrency(deptMonthTotal, { dash: true })}
                                     </TableCell>
                                   );
                                 })
@@ -1317,7 +1304,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                                   const deptYearTotal = Object.values(deptItems).reduce((sum, v) => sum + (v.projected[i] || 0), 0);
                                   return (
                                     <TableCell key={i} className="text-right text-xs font-medium text-muted-foreground">
-                                      {formatCurrency(deptYearTotal)}
+                                      {formatCurrency(deptYearTotal, { dash: true })}
                                     </TableCell>
                                   );
                                 })
@@ -1336,12 +1323,12 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
 
                                   {showHistorical && priorPeriods.map(period => (
                                     <TableCell key={period.id} className="text-right bg-blue-50/60 dark:bg-blue-950/20 text-blue-900 dark:text-blue-100">
-                                      {formatCurrency(values.historical[period.id])}
+                                      {formatCurrency(values.historical[period.id], { dash: true })}
                                     </TableCell>
                                   ))}
 
                                   <TableCell className="text-right bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">
-                                    {formatCurrency(baselineValue)}
+                                    {formatCurrency(baselineValue, { dash: true })}
                                   </TableCell>
 
                                   {viewMode === 'monthly' ? (
@@ -1352,14 +1339,14 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                                           key={monthIndex} 
                                           className={`text-right ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}
                                         >
-                                          {formatCurrency(monthValue)}
+                                          {formatCurrency(monthValue, { dash: true })}
                                         </TableCell>
                                       );
                                     })
                                   ) : (
                                     values.projected.map((value: number, i: number) => (
                                       <TableCell key={i} className="text-right">
-                                        {formatCurrency(value)}
+                                        {formatCurrency(value, { dash: true })}
                                       </TableCell>
                                     ))
                                   )}
@@ -1369,13 +1356,13 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                                       formatCurrency(
                                         months.reduce((sum, _, monthIndex) => 
                                           sum + getLineItemMonthlyValue(category, itemName, selectedYearInt, monthIndex), 0)
-                                      )
+                                      , { dash: true })
                                     ) : (
                                       formatPercent(calculateCAGR(
                                         values.projected[0],
                                         values.projected[holdPeriod - 1],
                                         holdPeriod - 1
-                                      ))
+                                      ), { showSign: true, dash: true })
                                     )}
                                   </TableCell>
                                 </TableRow>
@@ -1397,13 +1384,13 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                     const summary = calculatePeriodSummary(period.id);
                     return (
                       <TableCell key={period.id} className="text-right bg-blue-100/60 dark:bg-blue-950/30 text-blue-900 dark:text-blue-100">
-                        {formatCurrency(summary.grossProfit)}
+                        {formatCurrency(summary.grossProfit, { dash: true })}
                       </TableCell>
                     );
                   })}
 
                   <TableCell className="text-right bg-blue-100 dark:bg-blue-900/30 border-x border-blue-200 dark:border-blue-800">
-                    {formatCurrency(baselineSummary?.grossProfit)}
+                    {formatCurrency(baselineSummary?.grossProfit, { dash: true })}
                   </TableCell>
 
                   {viewMode === 'monthly' ? (
@@ -1414,7 +1401,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                           key={monthIndex} 
                           className={`text-right ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}
                         >
-                          {formatCurrency(summary.grossProfit)}
+                          {formatCurrency(summary.grossProfit, { dash: true })}
                         </TableCell>
                       );
                     })
@@ -1422,20 +1409,20 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                     years.map((_, i) => {
                       const summary = calculateYearSummary(i);
                       return (
-                        <TableCell key={i} className="text-right">{formatCurrency(summary.grossProfit)}</TableCell>
+                        <TableCell key={i} className="text-right">{formatCurrency(summary.grossProfit, { dash: true })}</TableCell>
                       );
                     })
                   )}
 
                   <TableCell className="text-right text-muted-foreground">
                     {viewMode === 'monthly' ? (
-                      formatCurrency(months.reduce((sum, _, monthIndex) => sum + calculateMonthSummary(selectedYearInt, monthIndex).grossProfit, 0))
+                      formatCurrency(months.reduce((sum, _, monthIndex) => sum + calculateMonthSummary(selectedYearInt, monthIndex).grossProfit, 0), { dash: true })
                     ) : (
                       formatPercent(calculateCAGR(
                         calculateYearSummary(0).grossProfit,
                         calculateYearSummary(holdPeriod - 1).grossProfit,
                         holdPeriod - 1
-                      ))
+                      ), { showSign: true, dash: true })
                     )}
                   </TableCell>
                 </TableRow>
@@ -1451,13 +1438,13 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                         key={period.id} 
                         className={`text-right bg-blue-100/60 dark:bg-blue-950/30 ${summary.noi >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}
                       >
-                        {formatCurrency(summary.noi)}
+                        {formatCurrency(summary.noi, { dash: true })}
                       </TableCell>
                     );
                   })}
 
                   <TableCell className={`text-right bg-blue-100 dark:bg-blue-900/30 border-x border-blue-200 dark:border-blue-800 ${(baselineSummary?.noi || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {formatCurrency(baselineSummary?.noi)}
+                    {formatCurrency(baselineSummary?.noi, { dash: true })}
                   </TableCell>
 
                   {viewMode === 'monthly' ? (
@@ -1468,7 +1455,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                           key={monthIndex} 
                           className={`text-right ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''} ${summary.noi >= 0 ? 'text-green-600' : 'text-red-600'}`}
                         >
-                          {formatCurrency(summary.noi)}
+                          {formatCurrency(summary.noi, { dash: true })}
                         </TableCell>
                       );
                     })
@@ -1480,7 +1467,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                           key={i} 
                           className={`text-right ${summary.noi >= 0 ? 'text-green-600' : 'text-red-600'}`}
                         >
-                          {formatCurrency(summary.noi)}
+                          {formatCurrency(summary.noi, { dash: true })}
                         </TableCell>
                       );
                     })
@@ -1488,13 +1475,13 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
 
                   <TableCell className="text-right text-green-600">
                     {viewMode === 'monthly' ? (
-                      formatCurrency(months.reduce((sum, _, monthIndex) => sum + calculateMonthSummary(selectedYearInt, monthIndex).noi, 0))
+                      formatCurrency(months.reduce((sum, _, monthIndex) => sum + calculateMonthSummary(selectedYearInt, monthIndex).noi, 0), { dash: true })
                     ) : (
                       formatPercent(calculateCAGR(
                         calculateYearSummary(0).noi,
                         calculateYearSummary(holdPeriod - 1).noi,
                         holdPeriod - 1
-                      ))
+                      ), { showSign: true, dash: true })
                     )}
                   </TableCell>
                 </TableRow>
@@ -1507,13 +1494,13 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                     const summary = calculatePeriodSummary(period.id);
                     return (
                       <TableCell key={period.id} className="text-right text-blue-700 dark:text-blue-300 bg-blue-50/60 dark:bg-blue-950/20">
-                        {formatPercentSimple(summary.noiMargin)}
+                        {formatPercent(summary.noiMargin, { dash: true })}
                       </TableCell>
                     );
                   })}
 
                   <TableCell className="text-right text-muted-foreground bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">
-                    {formatPercentSimple(baselineSummary?.noiMargin)}
+                    {formatPercent(baselineSummary?.noiMargin, { dash: true })}
                   </TableCell>
 
                   {viewMode === 'monthly' ? (
@@ -1524,7 +1511,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                           key={monthIndex} 
                           className={`text-right text-muted-foreground ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}
                         >
-                          {formatPercentSimple(summary.noiMargin)}
+                          {formatPercent(summary.noiMargin, { dash: true })}
                         </TableCell>
                       );
                     })
@@ -1533,7 +1520,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                       const summary = calculateYearSummary(i);
                       return (
                         <TableCell key={i} className="text-right text-muted-foreground">
-                          {formatPercentSimple(summary.noiMargin)}
+                          {formatPercent(summary.noiMargin, { dash: true })}
                         </TableCell>
                       );
                     })
@@ -1562,14 +1549,14 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                             const summary = calculateMonthSummary(selectedYearInt, monthIndex);
                             return (
                               <TableCell key={monthIndex} className={`text-right text-red-500 ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}>
-                                ({formatCurrency(summary.managementFee)})
+                                ({formatCurrency(summary.managementFee, { dash: true })})
                               </TableCell>
                             );
                           })
                         ) : (
                           years.map((_, i) => {
                             const summary = calculateYearSummary(i);
-                            return <TableCell key={i} className="text-right text-red-500">({formatCurrency(summary.managementFee)})</TableCell>;
+                            return <TableCell key={i} className="text-right text-red-500">({formatCurrency(summary.managementFee, { dash: true })})</TableCell>;
                           })
                         )}
                         <TableCell className="text-right text-muted-foreground">-</TableCell>
@@ -1587,14 +1574,14 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                           const summary = calculateMonthSummary(selectedYearInt, monthIndex);
                           return (
                             <TableCell key={monthIndex} className={`text-right text-red-500 ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}>
-                              ({formatCurrency(summary.capex)})
+                              ({formatCurrency(summary.capex, { dash: true })})
                             </TableCell>
                           );
                         })
                       ) : (
                         years.map((_, i) => {
                           const summary = calculateYearSummary(i);
-                          return <TableCell key={i} className="text-right text-red-500">({formatCurrency(summary.capex)})</TableCell>;
+                          return <TableCell key={i} className="text-right text-red-500">({formatCurrency(summary.capex, { dash: true })})</TableCell>;
                         })
                       )}
                       <TableCell className="text-right text-muted-foreground">-</TableCell>
@@ -1612,14 +1599,14 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                             const summary = calculateMonthSummary(selectedYearInt, monthIndex);
                             return (
                               <TableCell key={monthIndex} className={`text-right text-red-500 ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}>
-                                ({formatCurrency(summary.reserves)})
+                                ({formatCurrency(summary.reserves, { dash: true })})
                               </TableCell>
                             );
                           })
                         ) : (
                           years.map((_, i) => {
                             const summary = calculateYearSummary(i);
-                            return <TableCell key={i} className="text-right text-red-500">({formatCurrency(summary.reserves)})</TableCell>;
+                            return <TableCell key={i} className="text-right text-red-500">({formatCurrency(summary.reserves, { dash: true })})</TableCell>;
                           })
                         )}
                         <TableCell className="text-right text-muted-foreground">-</TableCell>
@@ -1638,14 +1625,14 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                             const summary = calculateMonthSummary(selectedYearInt, monthIndex);
                             return (
                               <TableCell key={monthIndex} className={`text-right text-red-500 ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}>
-                                ({formatCurrency(summary.debtService)})
+                                ({formatCurrency(summary.debtService, { dash: true })})
                               </TableCell>
                             );
                           })
                         ) : (
                           years.map((_, i) => {
                             const summary = calculateYearSummary(i);
-                            return <TableCell key={i} className="text-right text-red-500">({formatCurrency(summary.debtService)})</TableCell>;
+                            return <TableCell key={i} className="text-right text-red-500">({formatCurrency(summary.debtService, { dash: true })})</TableCell>;
                           })
                         )}
                         <TableCell className="text-right text-muted-foreground">-</TableCell>
@@ -1663,7 +1650,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                           const summary = calculateMonthSummary(selectedYearInt, monthIndex);
                           return (
                             <TableCell key={monthIndex} className={`text-right ${summary.leveredCashFlow >= 0 ? 'text-emerald-600' : 'text-red-600'} ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}>
-                              {formatCurrency(summary.leveredCashFlow)}
+                              {formatCurrency(summary.leveredCashFlow, { dash: true })}
                             </TableCell>
                           );
                         })
@@ -1672,20 +1659,20 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                           const summary = calculateYearSummary(i);
                           return (
                             <TableCell key={i} className={`text-right ${summary.leveredCashFlow >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                              {formatCurrency(summary.leveredCashFlow)}
+                              {formatCurrency(summary.leveredCashFlow, { dash: true })}
                             </TableCell>
                           );
                         })
                       )}
                       <TableCell className="text-right text-emerald-600">
                         {viewMode === 'monthly' ? (
-                          formatCurrency(months.reduce((sum, _, monthIndex) => sum + calculateMonthSummary(selectedYearInt, monthIndex).leveredCashFlow, 0))
+                          formatCurrency(months.reduce((sum, _, monthIndex) => sum + calculateMonthSummary(selectedYearInt, monthIndex).leveredCashFlow, 0), { dash: true })
                         ) : (
                           formatPercent(calculateCAGR(
                             calculateYearSummary(0).leveredCashFlow,
                             calculateYearSummary(holdPeriod - 1).leveredCashFlow,
                             holdPeriod - 1
-                          ))
+                          ), { showSign: true, dash: true })
                         )}
                       </TableCell>
                     </TableRow>

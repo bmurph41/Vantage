@@ -33,7 +33,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency, formatPercent } from '@/lib/utils';
 
 interface ProfitCenterSummary {
   name: string;
@@ -116,19 +116,6 @@ export default function ProfitCentersPage() {
     queryKey: ['/api/modeling/projects', projectId, 'profit-centers'],
     enabled: !!projectId,
   });
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const formatPercent = (value: number) => {
-    return `${(value * 100).toFixed(1)}%`;
-  };
 
   const formatCompactCurrency = (value: number) => {
     if (value >= 1000000) {
@@ -301,7 +288,7 @@ export default function ProfitCentersPage() {
               <div>
                 <p className="text-sm text-muted-foreground">NOI Margin</p>
                 <p className="text-2xl font-bold">
-                  {formatPercent(currentYearData?.netMargin || 0)}
+                  {formatPercent((currentYearData?.netMargin || 0) * 100)}
                 </p>
               </div>
               <PieChart className="h-8 w-8 text-purple-600 opacity-50" />
@@ -381,7 +368,7 @@ export default function ProfitCentersPage() {
                                 {formatCurrency(pc.noi)}
                               </span>
                               <span className="text-muted-foreground ml-2">
-                                ({formatPercent(pc.margin)} margin)
+                                ({formatPercent(pc.margin * 100)} margin)
                               </span>
                             </div>
                           </div>
@@ -406,7 +393,7 @@ export default function ProfitCentersPage() {
                   <div className="text-center p-4 bg-muted/50 rounded-lg">
                     <p className="text-sm text-muted-foreground">Implied Value</p>
                     <p className="text-xl font-bold">{formatCompactCurrency(valuation?.impliedValue || 0)}</p>
-                    <p className="text-xs text-muted-foreground">@ {formatPercent(valuation?.capRate || 0)} cap</p>
+                    <p className="text-xs text-muted-foreground">@ {formatPercent((valuation?.capRate || 0) * 100)} cap</p>
                   </div>
                   <div className="text-center p-4 bg-muted/50 rounded-lg">
                     <p className="text-sm text-muted-foreground">Year 1 NOI</p>
@@ -424,7 +411,7 @@ export default function ProfitCentersPage() {
                       "text-xl font-bold",
                       (valuation?.noiGrowthRate || 0) >= 0 ? "text-green-600" : "text-red-600"
                     )}>
-                      {formatPercent(valuation?.noiGrowthRate || 0)}
+                      {formatPercent((valuation?.noiGrowthRate || 0) * 100)}
                     </p>
                     <p className="text-xs text-muted-foreground">CAGR</p>
                   </div>
@@ -474,12 +461,12 @@ export default function ProfitCentersPage() {
                         <TableCell className="text-right">{formatCurrency(yearData?.totalRevenue || 0)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(yearData?.totalCogs || 0)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(yearData?.grossProfit || 0)}</TableCell>
-                        <TableCell className="text-right">{formatPercent(yearData?.grossMargin || 0)}</TableCell>
+                        <TableCell className="text-right">{formatPercent((yearData?.grossMargin || 0) * 100)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(yearData?.operatingExpenses || 0)}</TableCell>
                         <TableCell className="text-right font-semibold text-green-600">
                           {formatCurrency(yearData?.netOperatingIncome || 0)}
                         </TableCell>
-                        <TableCell className="text-right">{formatPercent(yearData?.netMargin || 0)}</TableCell>
+                        <TableCell className="text-right">{formatPercent((yearData?.netMargin || 0) * 100)}</TableCell>
                       </TableRow>
                     );
                   })}
@@ -488,12 +475,12 @@ export default function ProfitCentersPage() {
                     <TableCell className="text-right">{formatCurrency(currentYearData?.totalRevenue || 0)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(currentYearData?.totalCogs || 0)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(currentYearData?.grossProfit || 0)}</TableCell>
-                    <TableCell className="text-right">{formatPercent(currentYearData?.grossMargin || 0)}</TableCell>
+                    <TableCell className="text-right">{formatPercent((currentYearData?.grossMargin || 0) * 100)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(currentYearData?.operatingExpenses || 0)}</TableCell>
                     <TableCell className="text-right text-green-600">
                       {formatCurrency(currentYearData?.netOperatingIncome || 0)}
                     </TableCell>
-                    <TableCell className="text-right">{formatPercent(currentYearData?.netMargin || 0)}</TableCell>
+                    <TableCell className="text-right">{formatPercent((currentYearData?.netMargin || 0) * 100)}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
@@ -612,7 +599,7 @@ export default function ProfitCentersPage() {
                       <TableCell className="sticky left-0 bg-muted/30 text-muted-foreground">Gross Margin</TableCell>
                       {years.map((y, idx) => (
                         <TableCell key={idx} className="text-right text-muted-foreground">
-                          {formatPercent(y.grossMargin)}
+                          {formatPercent(y.grossMargin * 100)}
                         </TableCell>
                       ))}
                     </TableRow>
@@ -620,7 +607,7 @@ export default function ProfitCentersPage() {
                       <TableCell className="sticky left-0 bg-muted/30 text-muted-foreground">Net Margin</TableCell>
                       {years.map((y, idx) => (
                         <TableCell key={idx} className="text-right text-muted-foreground">
-                          {formatPercent(y.netMargin)}
+                          {formatPercent(y.netMargin * 100)}
                         </TableCell>
                       ))}
                     </TableRow>

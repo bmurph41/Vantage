@@ -12,6 +12,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Calculator, TrendingUp, AlertCircle, Save, Trash2, Copy, Upload, Layers } from "lucide-react";
 import { format, subYears } from "date-fns";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { formatCurrency, formatPercent } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { DebtScenario } from "@shared/schema";
 import LoanBuilder from '@/components/modeling/LoanBuilder';
@@ -30,15 +31,6 @@ const BASE_RATE_OPTIONS = [
 ];
 
 type TimeRange = "1Y" | "2Y" | "5Y" | "10Y" | "ALL";
-
-// Formatting helpers
-const formatCurrency = (value: number): string => {
-  return `$${value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-};
-
-const formatPercentage = (value: number): string => {
-  return `${value.toFixed(2)}%`;
-};
 
 interface ScenarioInputs {
   name: string;
@@ -541,7 +533,7 @@ export default function DebtScenariosIndex() {
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {formatPercentage(spreadPercent)} ({inputs.spreadBps} basis points)
+                    {formatPercent(spreadPercent)} ({inputs.spreadBps} basis points)
                   </p>
                 </div>
 
@@ -572,7 +564,7 @@ export default function DebtScenariosIndex() {
               <CardContent>
                 <div className="space-y-1">
                   <p className="text-3xl font-bold" data-testid="text-current-base-rate">
-                    {formatPercentage(currentBaseRate)}
+                    {formatPercent(currentBaseRate)}
                   </p>
                   <p className="text-sm text-muted-foreground">{selectedRate?.name}</p>
                 </div>
@@ -586,7 +578,7 @@ export default function DebtScenariosIndex() {
               <CardContent>
                 <div className="space-y-1">
                   <p className="text-3xl font-bold text-primary" data-testid="text-spread-display">
-                    +{formatPercentage(spreadPercent)}
+                    +{formatPercent(spreadPercent)}
                   </p>
                   <p className="text-sm text-muted-foreground">{inputs.spreadBps} basis points</p>
                 </div>
@@ -603,10 +595,10 @@ export default function DebtScenariosIndex() {
               <CardContent>
                 <div className="space-y-1">
                   <p className="text-3xl font-bold text-primary" data-testid="text-effective-rate">
-                    {formatPercentage(effectiveRate)}
+                    {formatPercent(effectiveRate)}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {formatPercentage(currentBaseRate)} + {formatPercentage(spreadPercent)}
+                    {formatPercent(currentBaseRate)} + {formatPercent(spreadPercent)}
                   </p>
                 </div>
               </CardContent>
@@ -846,7 +838,7 @@ export default function DebtScenariosIndex() {
                 <CardTitle className="text-sm font-medium text-muted-foreground">LTV</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold" data-testid="metric-ltv">{formatPercentage(ltv)}</p>
+                <p className="text-2xl font-bold" data-testid="metric-ltv">{formatPercent(ltv)}</p>
                 <p className="text-xs text-muted-foreground mt-1">Loan-to-Value</p>
               </CardContent>
             </Card>
@@ -868,7 +860,7 @@ export default function DebtScenariosIndex() {
                 <CardTitle className="text-sm font-medium text-muted-foreground">Debt Yield</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold" data-testid="metric-debt-yield">{formatPercentage(debtYield)}</p>
+                <p className="text-2xl font-bold" data-testid="metric-debt-yield">{formatPercent(debtYield)}</p>
                 <p className="text-xs text-muted-foreground mt-1">NOI / Loan</p>
               </CardContent>
             </Card>
@@ -890,7 +882,7 @@ export default function DebtScenariosIndex() {
                 <CardTitle className="text-sm font-medium text-muted-foreground">Cash-on-Cash</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold text-primary" data-testid="metric-coc">{formatPercentage(cashOnCash)}</p>
+                <p className="text-2xl font-bold text-primary" data-testid="metric-coc">{formatPercent(cashOnCash)}</p>
                 <p className="text-xs text-muted-foreground mt-1">Levered Return</p>
               </CardContent>
             </Card>
@@ -1056,7 +1048,7 @@ export default function DebtScenariosIndex() {
                           <div>
                             <span className="text-muted-foreground">LTV:</span>
                             <p className="font-medium" data-testid={`text-ltv-${scenario.id}`}>
-                              {formatPercentage((scenario.loanAmount / scenario.purchasePrice) * 100)}
+                              {formatPercent((scenario.loanAmount / scenario.purchasePrice) * 100)}
                             </p>
                           </div>
                           <div>
