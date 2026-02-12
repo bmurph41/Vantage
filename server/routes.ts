@@ -22795,6 +22795,113 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   // EXIT STRATEGY SUITE
   // ============================================================================
 
+  // --- EXIT DASHBOARD METRICS ---
+  app.get('/api/modeling/projects/:projectId/exit/metrics', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Modeling project not found' });
+      }
+
+      const { modelingActuals, modelingFinancialPeriods } = await import('@shared/schema');
+
+      const propertyValue = project.purchasePrice ? parseFloat(project.purchasePrice.toString()) : null;
+
+      let t12Ebitda: number | null = null;
+      let t12Label: string | null = null;
+
+      try {
+        const financialPeriods = await db.select()
+          .from(modelingFinancialPeriods)
+          .where(and(
+            eq(modelingFinancialPeriods.modelingProjectId, projectId),
+            eq(modelingFinancialPeriods.orgId, orgId)
+          ));
+
+        const t12Period = financialPeriods.find(p => p.periodType === 't12');
+        if (t12Period) {
+          t12Ebitda = t12Period.ebitda ? parseFloat(t12Period.ebitda) : (t12Period.noi ? parseFloat(t12Period.noi) : null);
+          t12Label = t12Period.periodLabel || 'T12';
+        }
+
+        if (t12Ebitda === null) {
+          const actuals = await db.select({
+            year: modelingActuals.year,
+            month: modelingActuals.month,
+            category: modelingActuals.category,
+            amount: modelingActuals.amount,
+          })
+          .from(modelingActuals)
+          .where(and(
+            eq(modelingActuals.modelingProjectId, projectId),
+            eq(modelingActuals.orgId, orgId)
+          ));
+
+          if (actuals.length > 0) {
+            const periods = new Set(actuals.map(a => `${a.year}-${String(a.month).padStart(2, '0')}`));
+            const sortedPeriods = Array.from(periods).sort().slice(-12);
+
+            if (sortedPeriods.length > 0) {
+              const validPeriods = new Set(sortedPeriods);
+              let revenue = 0;
+              let cogs = 0;
+              let expenses = 0;
+
+              for (const actual of actuals) {
+                const key = `${actual.year}-${String(actual.month).padStart(2, '0')}`;
+                if (!validPeriods.has(key)) continue;
+                const amt = parseFloat(actual.amount?.toString() || '0');
+                const cat = actual.category?.toLowerCase() || '';
+                if (cat === 'revenue') revenue += amt;
+                else if (cat === 'cogs') cogs += amt;
+                else if (cat === 'expenses' || cat === 'expense') expenses += amt;
+              }
+              t12Ebitda = revenue - cogs - expenses;
+
+              const firstPeriod = sortedPeriods[0].split('-');
+              const lastPeriod = sortedPeriods[sortedPeriods.length - 1].split('-');
+              const startMonth = parseInt(firstPeriod[1]);
+              const startYear = parseInt(firstPeriod[0]);
+              const endMonth = parseInt(lastPeriod[1]);
+              const endYear = parseInt(lastPeriod[0]);
+              const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+              if (sortedPeriods.length === 12 && startMonth === 1 && endMonth === 12 && startYear === endYear) {
+                t12Label = `FY ${startYear}`;
+              } else {
+                t12Label = `${monthNames[startMonth - 1]} ${startYear} - ${monthNames[endMonth - 1]} ${endYear}`;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn(`Failed to compute T12 EBITDA for project ${projectId}:`, e);
+      }
+
+      let capRate: number | null = null;
+      if (t12Ebitda && propertyValue && propertyValue > 0) {
+        capRate = (t12Ebitda / propertyValue) * 100;
+      }
+
+      const isOwnedMarina = project.dealSource === 'owned_marina';
+
+      res.json({
+        propertyValue,
+        t12Ebitda,
+        t12Label,
+        capRate,
+        isOwnedMarina,
+        dealSource: project.dealSource,
+      });
+    } catch (error: any) {
+      console.error('Failed to fetch exit metrics:', error);
+      res.status(500).json({ error: 'Failed to fetch exit metrics' });
+    }
+  });
+
   // --- EXIT SCENARIOS ---
   
   // Get all exit scenarios for a modeling project

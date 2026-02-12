@@ -130,6 +130,15 @@ const exitTools = [
   },
 ];
 
+interface ExitMetrics {
+  propertyValue: number | null;
+  t12Ebitda: number | null;
+  t12Label: string | null;
+  capRate: number | null;
+  isOwnedMarina: boolean;
+  dealSource: string | null;
+}
+
 export default function ExitStrategyDashboard({ projectId }: ExitDashboardProps) {
   const [, setLocation] = useLocation();
   
@@ -141,6 +150,20 @@ export default function ExitStrategyDashboard({ projectId }: ExitDashboardProps)
     queryKey: ['/api/modeling/projects', projectId, 'exit', 'scenarios'],
     enabled: !!projectId,
   });
+
+  const { data: metrics, isLoading: metricsLoading } = useQuery<ExitMetrics>({
+    queryKey: ['/api/modeling/projects', projectId, 'exit', 'metrics'],
+    enabled: !!projectId,
+  });
+
+  const isOwned = metrics?.isOwnedMarina ?? false;
+
+  const kpiLabels = {
+    propertyValue: isOwned ? 'Current Value' : 'Purchase Price',
+    scenarios: isOwned ? 'Exit Scenarios' : 'Exit Scenarios',
+    capRate: isOwned ? 'Current Cap Rate' : 'Going-In Cap Rate',
+    ebitda: isOwned ? 'Current EBITDA' : 'T12 EBITDA',
+  };
 
   const basePath = `/modeling/projects/${projectId}/exit`;
 
@@ -190,10 +213,16 @@ export default function ExitStrategyDashboard({ projectId }: ExitDashboardProps)
                 <Building2 className="h-5 w-5 text-blue-500" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Property Value</p>
-                <p className="text-2xl font-bold" data-testid="text-property-value">
-                  ${(Number(project?.purchasePrice) || 0).toLocaleString()}
-                </p>
+                <p className="text-sm text-muted-foreground">{kpiLabels.propertyValue}</p>
+                {metricsLoading ? (
+                  <Skeleton className="h-8 w-24" />
+                ) : (
+                  <p className="text-2xl font-bold" data-testid="text-property-value">
+                    {metrics?.propertyValue != null
+                      ? `$${metrics.propertyValue.toLocaleString()}`
+                      : '$0'}
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>
@@ -206,7 +235,7 @@ export default function ExitStrategyDashboard({ projectId }: ExitDashboardProps)
                 <FileSpreadsheet className="h-5 w-5 text-green-500" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Exit Scenarios</p>
+                <p className="text-sm text-muted-foreground">{kpiLabels.scenarios}</p>
                 <p className="text-2xl font-bold" data-testid="text-scenario-count">
                   {scenarios.length}
                 </p>
@@ -222,10 +251,16 @@ export default function ExitStrategyDashboard({ projectId }: ExitDashboardProps)
                 <Percent className="h-5 w-5 text-purple-500" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Cap Rate</p>
-                <p className="text-2xl font-bold" data-testid="text-cap-rate">
-                  {project?.year1CapRate ? `${project.year1CapRate}%` : 'N/A'}
-                </p>
+                <p className="text-sm text-muted-foreground">{kpiLabels.capRate}</p>
+                {metricsLoading ? (
+                  <Skeleton className="h-8 w-20" />
+                ) : (
+                  <p className="text-2xl font-bold" data-testid="text-cap-rate">
+                    {metrics?.capRate != null
+                      ? `${metrics.capRate.toFixed(2)}%`
+                      : 'N/A'}
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>
@@ -238,10 +273,21 @@ export default function ExitStrategyDashboard({ projectId }: ExitDashboardProps)
                 <TrendingUp className="h-5 w-5 text-amber-500" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">EBITDA</p>
-                <p className="text-2xl font-bold" data-testid="text-ebitda">
-                  ${(Number(project?.ebitda) || 0).toLocaleString()}
+                <p className="text-sm text-muted-foreground">
+                  {kpiLabels.ebitda}
+                  {metrics?.t12Label && (
+                    <span className="ml-1 text-xs">({metrics.t12Label})</span>
+                  )}
                 </p>
+                {metricsLoading ? (
+                  <Skeleton className="h-8 w-24" />
+                ) : (
+                  <p className="text-2xl font-bold" data-testid="text-ebitda">
+                    {metrics?.t12Ebitda != null
+                      ? `$${metrics.t12Ebitda.toLocaleString()}`
+                      : '$0'}
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>
