@@ -165,7 +165,7 @@ export default function ExitScenarioComparison({ projectId }: ScenarioComparison
         <div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
             <button onClick={() => setLocation(basePath)} className="hover:text-primary transition-colors">
-              Exit Strategy
+              Exit Strategy Suite
             </button>
             <ChevronRight className="h-4 w-4" />
             <span className="text-foreground font-medium">Compare Scenarios</span>
@@ -178,7 +178,7 @@ export default function ExitScenarioComparison({ projectId }: ScenarioComparison
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => setLocation(basePath)}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+            Back to Strategies
           </Button>
           <Button variant="outline" data-testid="btn-export-comparison">
             <Download className="h-4 w-4 mr-2" />

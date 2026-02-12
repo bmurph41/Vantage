@@ -134,7 +134,7 @@ export default function ExitScenarios({ projectId }: ExitScenariosProps) {
               onClick={() => setLocation(basePath)}
               className="hover:text-primary transition-colors"
             >
-              Exit Strategy
+              Exit Strategy Suite
             </button>
             <ChevronRight className="h-4 w-4" />
             <span className="text-foreground font-medium">Scenarios</span>
@@ -150,7 +150,7 @@ export default function ExitScenarios({ projectId }: ExitScenariosProps) {
             onClick={() => setLocation(basePath)}
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
+            Back to Strategies
           </Button>
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>

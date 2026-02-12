@@ -89,7 +89,7 @@ export default function ExitScenarioDetail({ projectId, scenarioId }: ScenarioDe
               onClick={() => setLocation(basePath)}
               className="hover:text-primary transition-colors"
             >
-              Exit Strategy
+              Exit Strategy Suite
             </button>
             <ChevronRight className="h-4 w-4" />
             <button 
@@ -117,7 +117,7 @@ export default function ExitScenarioDetail({ projectId, scenarioId }: ScenarioDe
             onClick={() => setLocation(`${basePath}/scenarios`)}
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+            Back to Strategies
           </Button>
           <Button variant="outline" data-testid="btn-edit-scenario">
             <Settings className="h-4 w-4 mr-2" />
