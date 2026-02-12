@@ -5,6 +5,7 @@ import {
 import {
   queryClient, apiRequest } from '@/lib/queryClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { AutosaveIndicator } from '@/components/ui/autosave-indicator';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { GrowthRatesTab } from '@/components/modeling/growth-rates/GrowthRatesTab';
@@ -1085,6 +1086,25 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
   };
 
   const StatusIcon = activeScenario ? statusConfig[activeScenario.status as ScenarioStatus]?.icon : Clock;
+
+  if (scenariosLoading) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-4 w-72 mt-2" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-2/3" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
