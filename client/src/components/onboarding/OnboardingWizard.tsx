@@ -141,6 +141,10 @@ const WIZARD_DOC_TYPES: Record<DocTypeEnum, string> = {
   other: "Other",
 };
 
+const WIZARD_DOC_TYPES_NO_T12 = Object.fromEntries(
+  Object.entries(WIZARD_DOC_TYPES).filter(([k]) => k !== 't12')
+) as Record<Exclude<DocTypeEnum, 't12'>, string>;
+
 const MONTH_OPTIONS = [
   { value: '1', label: 'Jan' }, { value: '2', label: 'Feb' }, { value: '3', label: 'Mar' },
   { value: '4', label: 'Apr' }, { value: '5', label: 'May' }, { value: '6', label: 'Jun' },
@@ -1396,28 +1400,36 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
                   <p className="text-sm font-medium truncate">{staged.file.name}</p>
                   <p className="text-xs text-muted-foreground">{formatFileSize(staged.file.size)}</p>
                 </div>
-                <Select value={staged.docType} onValueChange={(v) => updateStagedFileField(staged.id, 'docType', v as DocTypeEnum)}>
+                <Select value={staged.docType === 't12' ? 'pnl' : staged.docType} onValueChange={(v) => updateStagedFileField(staged.id, 'docType', v as DocTypeEnum)}>
                   <SelectTrigger className="h-7 w-[100px] text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(WIZARD_DOC_TYPES).map(([key, label]) => (
+                    {Object.entries(WIZARD_DOC_TYPES_NO_T12).map(([key, label]) => (
                       <SelectItem key={key} value={key}>{label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {staged.docType !== 't12' && (
-                  <Select value={staged.year} onValueChange={(v) => updateStagedFileField(staged.id, 'year', v)}>
-                    <SelectTrigger className="h-7 w-[75px] text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {yearOptions.map((y) => (
-                        <SelectItem key={y} value={y}>{y}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
+                <Select value={staged.docType === 't12' ? 'T12' : staged.year} onValueChange={(v) => {
+                  if (v === 'T12') {
+                    updateStagedFileField(staged.id, 'docType', 't12' as DocTypeEnum);
+                  } else {
+                    if (staged.docType === 't12') {
+                      updateStagedFileField(staged.id, 'docType', 'pnl' as DocTypeEnum);
+                    }
+                    updateStagedFileField(staged.id, 'year', v);
+                  }
+                }}>
+                  <SelectTrigger className="h-7 w-[75px] text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="T12">T12</SelectItem>
+                    {yearOptions.map((y) => (
+                      <SelectItem key={y} value={y}>{y}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Button
                   variant="ghost"
                   size="sm"
