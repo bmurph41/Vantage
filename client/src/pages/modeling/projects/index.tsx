@@ -350,30 +350,27 @@ export default function ModelingProjectsPage() {
                           onClick={() => setLocation(`/modeling/projects/${project.id}`)}
                           data-testid={`row-project-${project.id}`}
                         >
-                          <TableCell className="pb-0.5" data-testid={`text-marina-name-${project.id}`}>
+                          <TableCell className="pb-0" data-testid={`text-marina-name-${project.id}`}>
                             <div className="font-semibold">{project.marinaName}</div>
-                            <div className="text-xs text-muted-foreground" data-testid={`text-location-${project.id}`}>
-                              {[project.city, project.state].filter(Boolean).join(', ') || ''}
-                            </div>
                           </TableCell>
-                          <TableCell className="text-right whitespace-nowrap font-semibold pb-0.5" data-testid={`text-price-${project.id}`}>
+                          <TableCell className="text-right whitespace-nowrap font-semibold pb-0" data-testid={`text-price-${project.id}`}>
                             {formatCurrency(project.purchasePrice, { dash: true })}
                           </TableCell>
-                          <TableCell className="text-right whitespace-nowrap pb-0.5" data-testid={`text-irr-${project.id}`}>
+                          <TableCell className="text-center whitespace-nowrap pb-0" data-testid={`text-irr-${project.id}`}>
                             <span className={`font-semibold ${project.irr != null ? (project.irr >= 0 ? 'text-green-600' : 'text-red-600') : ''}`}>
                               {project.irr != null ? formatPercent(project.irr, { dash: true }) : '-'}
                             </span>
                           </TableCell>
-                          <TableCell className="text-right whitespace-nowrap font-semibold pb-0.5" data-testid={`text-cap-rate-${project.id}`}>
+                          <TableCell className="text-right whitespace-nowrap font-semibold pb-0" data-testid={`text-cap-rate-${project.id}`}>
                             {formatPercent(project.year1CapRate, { dash: true })}
                           </TableCell>
-                          <TableCell className="text-right whitespace-nowrap font-semibold pb-0.5" data-testid={`text-t12-ebitda-${project.id}`}>
+                          <TableCell className="text-right whitespace-nowrap font-semibold pb-0" data-testid={`text-t12-ebitda-${project.id}`}>
                             {project.t12Ebitda != null ? formatCurrency(project.t12Ebitda) : '-'}
                           </TableCell>
-                          <TableCell className="text-right whitespace-nowrap font-semibold pb-0.5" data-testid={`text-yr1-ebitda-${project.id}`}>
+                          <TableCell className="text-right whitespace-nowrap font-semibold pb-0" data-testid={`text-yr1-ebitda-${project.id}`}>
                             {project.year1Ebitda != null ? formatCurrency(project.year1Ebitda) : '-'}
                           </TableCell>
-                          <TableCell className="text-center whitespace-nowrap pb-0.5">
+                          <TableCell className="text-center whitespace-nowrap pb-0">
                             <span
                               className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getOutcomeBadgeColor(project.dealOutcome)}`}
                               data-testid={`badge-status-${project.id}`}
@@ -381,7 +378,7 @@ export default function ModelingProjectsPage() {
                               {formatOutcome(project.dealOutcome)}
                             </span>
                           </TableCell>
-                          <TableCell className="pb-0.5 whitespace-nowrap" rowSpan={2}>
+                          <TableCell className="pb-0 whitespace-nowrap" rowSpan={2}>
                             <div className="font-medium text-sm">{project.createdByName || '-'}</div>
                             <div className="text-xs text-muted-foreground">
                               {project.createdAt
@@ -389,7 +386,7 @@ export default function ModelingProjectsPage() {
                                 : '-'}
                             </div>
                           </TableCell>
-                          <TableCell className="text-center pb-0.5" rowSpan={2} onClick={(e) => e.stopPropagation()}>
+                          <TableCell className="text-center pb-0" rowSpan={2} onClick={(e) => e.stopPropagation()}>
                             <div className="grid grid-cols-2 gap-0.5 justify-items-center w-fit mx-auto">
                               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setLocation(`/modeling/projects/${project.id}/doc-intel`)} title="Document Intelligence" data-testid={`button-doc-intel-${project.id}`}>
                                 <FileSpreadsheet className="h-3.5 w-3.5" />
@@ -410,14 +407,16 @@ export default function ModelingProjectsPage() {
                           className="cursor-pointer hover:bg-muted/50 border-b"
                           onClick={() => setLocation(`/modeling/projects/${project.id}`)}
                         >
-                          <td className="px-4 pt-0 pb-2"></td>
-                          <td className="px-4 pt-0 pb-2"></td>
-                          <td className="px-4 pt-0 pb-2 text-center text-xs text-muted-foreground whitespace-nowrap">
-                            {project.exitYear ? `Exit: ${project.exitYear}` : ''}
+                          <td className="px-4 pt-0 pb-2 text-xs text-muted-foreground whitespace-nowrap" data-testid={`text-location-${project.id}`}>
+                            {[project.city, project.state].filter(Boolean).join(', ') || '\u00A0'}
                           </td>
                           <td className="px-4 pt-0 pb-2"></td>
                           <td className="px-4 pt-0 pb-2 text-center text-xs text-muted-foreground whitespace-nowrap">
-                            {project.t12Label || ''}
+                            {project.exitYear ? `Exit: ${project.exitYear}` : '\u00A0'}
+                          </td>
+                          <td className="px-4 pt-0 pb-2"></td>
+                          <td className="px-4 pt-0 pb-2 text-center text-xs text-muted-foreground whitespace-nowrap">
+                            {project.t12Label || '\u00A0'}
                           </td>
                           <td className="px-4 pt-0 pb-2 text-center text-xs whitespace-nowrap">
                             {project.year1Ebitda != null && project.t12Ebitda != null && project.t12Ebitda !== 0 ? (
@@ -425,7 +424,7 @@ export default function ModelingProjectsPage() {
                                 {((project.year1Ebitda - project.t12Ebitda) / Math.abs(project.t12Ebitda) * 100) >= 0 ? '+' : ''}
                                 {((project.year1Ebitda - project.t12Ebitda) / Math.abs(project.t12Ebitda) * 100).toFixed(1)}%
                               </span>
-                            ) : ''}
+                            ) : '\u00A0'}
                           </td>
                           <td className="px-4 pt-0 pb-2"></td>
                         </tr>
