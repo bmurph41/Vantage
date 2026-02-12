@@ -340,7 +340,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
 
   const hasProgress = state.step > 1 || 
     state.marinaName.trim() !== '' || 
-    state.marinaAddress.street.trim() !== '' ||
+    (state.marinaAddress?.street || '').trim() !== '' ||
     state.portfolioName.trim() !== '' ||
     state.portfolioMarinas.some(m => m.name.trim() !== '') ||
     state.region !== '' ||
