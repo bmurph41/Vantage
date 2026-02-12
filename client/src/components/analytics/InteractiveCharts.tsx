@@ -42,7 +42,8 @@ export interface DrillDownLevel {
 export interface DrillDownChartProps {
   title: string;
   description?: string;
-  levels: DrillDownLevel[];
+  levels?: DrillDownLevel[];
+  data?: any[];
   height?: number;
   formatValue?: (value: number) => string;
   onDrillDown?: (item: any, level: number) => void;
@@ -51,11 +52,23 @@ export interface DrillDownChartProps {
 export function DrillDownBarChart({
   title,
   description,
-  levels,
+  levels: levelsProp,
+  data,
   height = 350,
   formatValue = formatCurrency,
   onDrillDown,
 }: DrillDownChartProps) {
+  const levels = levelsProp && levelsProp.length > 0
+    ? levelsProp
+    : data && data.length > 0
+      ? [{
+          label: title,
+          data: data.map((d: any) => ({ name: d.name || d.category || '', value: d.value || 0, ...d })),
+          dataKey: 'value',
+          nameKey: 'name',
+        }]
+      : [{ label: title, data: [], dataKey: 'value', nameKey: 'name' }];
+
   const [currentLevel, setCurrentLevel] = useState(0);
   const [drillPath, setDrillPath] = useState<{ level: number; filter: any }[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
