@@ -99,6 +99,14 @@ interface WizardStorageType {
   iconName: string;
 }
 
+interface WizardProfitCenter {
+  id: string;
+  name: string;
+  description: string;
+  isEnabled: boolean;
+  iconName: string;
+}
+
 type DocTypeEnum = "pnl" | "rent_roll" | "balance_sheet" | "rate_sheet" | "invoice" | "other";
 
 interface WizardStagedFile {
@@ -156,15 +164,24 @@ const defaultWizardStorageTypes: WizardStorageType[] = [
 ];
 
 const defaultWizardDesignatedSpaces: WizardStorageType[] = [
-  { id: 'fuel_dock', name: 'Fuel Dock', section: 'designated', isEnabled: false, count: '', occupancy: '', iconName: 'fuel' },
-  { id: 'ship_store', name: 'Ship Store', section: 'designated', isEnabled: false, count: '', occupancy: '', iconName: 'shoppingcart' },
-  { id: 'service', name: 'Service', section: 'designated', isEnabled: false, count: '', occupancy: '', iconName: 'wrench' },
-  { id: 'boat_sales', name: 'Boat Sales', section: 'designated', isEnabled: false, count: '', occupancy: '', iconName: 'store' },
-  { id: 'commercial_tenants', name: 'Commercial Tenants', section: 'designated', isEnabled: false, count: '', occupancy: '', iconName: 'building' },
-  { id: 'rental_boats', name: 'Rental Boats', section: 'designated', isEnabled: false, count: '', occupancy: '', iconName: 'ship' },
-  { id: 'transient', name: 'Transient', section: 'designated', isEnabled: false, count: '', occupancy: '', iconName: 'anchor' },
-  { id: 'restaurant', name: 'Restaurant', section: 'designated', isEnabled: false, count: '', occupancy: '', iconName: 'utensils' },
-  { id: 'boat_club', name: 'Boat Club', section: 'designated', isEnabled: false, count: '', occupancy: '', iconName: 'users' },
+  { id: 'transient_slips', name: 'Transient Slips', section: 'designated', isEnabled: false, count: '', occupancy: '', iconName: 'anchor' },
+  { id: 'commercial_spaces', name: 'Commercial Tenant Spaces', section: 'designated', isEnabled: false, count: '', occupancy: '', iconName: 'building' },
+  { id: 'service_bays', name: 'Service Bays', section: 'designated', isEnabled: false, count: '', occupancy: '', iconName: 'wrench' },
+  { id: 'fuel_pumps', name: 'Fuel Pumps / Dispensers', section: 'designated', isEnabled: false, count: '', occupancy: '', iconName: 'fuel' },
+  { id: 'rental_fleet', name: 'Rental Fleet Spaces', section: 'designated', isEnabled: false, count: '', occupancy: '', iconName: 'ship' },
+];
+
+const defaultWizardProfitCenters: WizardProfitCenter[] = [
+  { id: 'storage', name: 'Storage', description: 'Wet slips, dry storage, moorings, and other boat storage revenue', isEnabled: false, iconName: 'warehouse' },
+  { id: 'fuel', name: 'Fuel Sales', description: 'Gasoline, diesel, and other fuel sales at the fuel dock', isEnabled: false, iconName: 'fuel' },
+  { id: 'ship_store', name: "Ship's Store", description: 'Retail merchandise, boating supplies, snacks, and convenience items', isEnabled: false, iconName: 'shoppingcart' },
+  { id: 'service', name: 'Service & Repairs', description: 'Boat maintenance, engine repair, detailing, and winterization', isEnabled: false, iconName: 'wrench' },
+  { id: 'boat_sales', name: 'Boat Sales / Brokerage', description: 'New or used boat sales and brokerage commissions', isEnabled: false, iconName: 'store' },
+  { id: 'boat_rentals', name: 'Boat Rentals', description: 'Rental fleet income from kayaks, pontoons, jet skis, etc.', isEnabled: false, iconName: 'sailboat' },
+  { id: 'boat_club', name: 'Boat Club', description: 'Membership-based boat club with recurring fees', isEnabled: false, iconName: 'users' },
+  { id: 'commercial_tenants', name: 'Commercial Tenants', description: 'Leased spaces to restaurants, shops, or other businesses', isEnabled: false, iconName: 'building' },
+  { id: 'restaurant', name: 'Restaurant / F&B', description: 'On-site food & beverage operations or concessions', isEnabled: false, iconName: 'utensils' },
+  { id: 'transient', name: 'Transient Dockage', description: 'Short-term or overnight slip rentals for visiting boaters', isEnabled: false, iconName: 'anchor' },
 ];
 
 function getStorageIcon(iconName: string) {
@@ -189,6 +206,7 @@ interface WizardState {
   portfolioName: string;
   portfolioMarinas: PortfolioMarina[];
   featuresToExplore: string[];
+  profitCenters: WizardProfitCenter[];
   storageTypes: WizardStorageType[];
   designatedSpaces: WizardStorageType[];
   stagedFiles: WizardStagedFile[];
@@ -199,18 +217,20 @@ const onboardingSteps = [
   { id: 2, title: "Deal Structure", icon: Layers },
   { id: 3, title: "Marina Details", icon: Anchor },
   { id: 4, title: "Deal Type", icon: Target },
-  { id: 5, title: "Storage Types", icon: Warehouse },
-  { id: 6, title: "Documents", icon: Upload },
-  { id: 7, title: "Features", icon: ClipboardList },
-  { id: 8, title: "Get Started", icon: Check },
+  { id: 5, title: "Profit Centers", icon: Store },
+  { id: 6, title: "Storage", icon: Warehouse },
+  { id: 7, title: "Documents", icon: Upload },
+  { id: 8, title: "Features", icon: ClipboardList },
+  { id: 9, title: "Get Started", icon: Check },
 ];
 
 const newProjectSteps = [
   { id: 1, title: "Deal Structure", icon: Layers },
   { id: 2, title: "Marina Details", icon: Anchor },
   { id: 3, title: "Deal Info", icon: Target },
-  { id: 4, title: "Storage Types", icon: Warehouse },
-  { id: 5, title: "Documents", icon: Upload },
+  { id: 4, title: "Profit Centers", icon: Store },
+  { id: 5, title: "Storage", icon: Warehouse },
+  { id: 6, title: "Documents", icon: Upload },
 ];
 
 const dealStructures = [
@@ -276,6 +296,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
     portfolioName: "",
     portfolioMarinas: [{ name: "", address: { ...emptyAddress } }],
     featuresToExplore: [],
+    profitCenters: defaultWizardProfitCenters.map(p => ({ ...p })),
     storageTypes: defaultWizardStorageTypes.map(s => ({ ...s })),
     designatedSpaces: defaultWizardDesignatedSpaces.map(s => ({ ...s })),
     stagedFiles: [],
@@ -287,7 +308,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
       [...state.storageTypes, ...state.designatedSpaces].forEach(item => {
         if (item.isEnabled) {
           departments[item.id] = {
-            seasons: item.section === 'storage' ? ['seasonal'] : ['seasonal'],
+            seasons: ['seasonal'],
             isEnabled: true,
             section: item.section,
             ...(item.count ? { count: parseInt(item.count) || 0 } : {}),
@@ -295,8 +316,12 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
           };
         }
       });
-      if (Object.keys(departments).length > 0) {
-        await apiRequest('POST', `/api/modeling/projects/${projectId}/config`, { departments });
+      const profitCenters = state.profitCenters
+        .filter(pc => pc.isEnabled)
+        .map(pc => pc.id);
+      const hasData = Object.keys(departments).length > 0 || profitCenters.length > 0;
+      if (hasData) {
+        await apiRequest('POST', `/api/modeling/projects/${projectId}/config`, { departments, profitCenters });
       }
     } catch (e) {
       console.warn('Storage config save failed (non-blocking):', e);
@@ -483,7 +508,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
   const progress = (state.step / steps.length) * 100;
 
   const currentStepTitle = steps.find(s => s.id === state.step)?.title || '';
-  const isSkippableStep = (currentStepTitle === 'Storage Types' || currentStepTitle === 'Documents') && state.step < steps.length;
+  const isSkippableStep = (currentStepTitle === 'Profit Centers' || currentStepTitle === 'Storage' || currentStepTitle === 'Documents') && state.step < steps.length;
 
   function handleNext() {
     if (state.step < steps.length) {
@@ -586,6 +611,15 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
     }));
   }
 
+  function toggleProfitCenter(id: string) {
+    setState(s => ({
+      ...s,
+      profitCenters: s.profitCenters.map(pc =>
+        pc.id === id ? { ...pc, isEnabled: !pc.isEnabled } : pc
+      ),
+    }));
+  }
+
   function toggleStorageType(id: string, list: 'storageTypes' | 'designatedSpaces') {
     setState(s => ({
       ...s,
@@ -659,8 +693,9 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
         1: renderDealStructureStep(),
         2: renderMarinaDetailsStep(),
         3: renderDealInfoStep(),
-        4: renderStorageTypesStep(),
-        5: renderDocumentUploadStep(),
+        4: renderProfitCentersStep(),
+        5: renderStorageTypesStep(),
+        6: renderDocumentUploadStep(),
       }[state.step];
     }
     return {
@@ -668,10 +703,11 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
       2: renderDealStructureStep(),
       3: renderMarinaDetailsStep(),
       4: renderDealTypeStep(),
-      5: renderStorageTypesStep(),
-      6: renderDocumentUploadStep(),
-      7: renderFeaturesStep(),
-      8: renderGetStartedStep(),
+      5: renderProfitCentersStep(),
+      6: renderStorageTypesStep(),
+      7: renderDocumentUploadStep(),
+      8: renderFeaturesStep(),
+      9: renderGetStartedStep(),
     }[state.step];
   };
 
@@ -909,14 +945,68 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
     </div>
   );
 
+  const renderProfitCentersStep = () => {
+    const enabledCount = state.profitCenters.filter(pc => pc.isEnabled).length;
+
+    return (
+      <div className="space-y-4">
+        <div className="text-center mb-4">
+          <h3 className="text-lg font-semibold">Profit Centers</h3>
+          <p className="text-sm text-muted-foreground">
+            Which revenue sources does this marina have? Check all that apply.
+          </p>
+          {enabledCount > 0 && (
+            <Badge variant="secondary" className="mt-2">{enabledCount} selected</Badge>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-2 max-h-[350px] overflow-y-auto pr-1">
+          {state.profitCenters.map((pc) => (
+            <button
+              key={pc.id}
+              type="button"
+              onClick={() => toggleProfitCenter(pc.id)}
+              className={cn(
+                "flex items-start gap-3 rounded-lg border p-3 text-left transition-all",
+                pc.isEnabled
+                  ? "border-[#1E4FAB]/40 bg-[#1E4FAB]/5 ring-1 ring-[#1E4FAB]/20"
+                  : "border-muted bg-muted/20 hover:bg-muted/40"
+              )}
+            >
+              <div className={cn(
+                "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors",
+                pc.isEnabled ? "bg-[#1E4FAB] border-[#1E4FAB] text-white" : "border-muted-foreground/30"
+              )}>
+                {pc.isEnabled && <Check className="h-3 w-3" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-muted-foreground">{getStorageIcon(pc.iconName)}</span>
+                  <span className="text-sm font-medium">{pc.name}</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{pc.description}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-center text-muted-foreground">
+          This helps us set up the right revenue categories for your financial model.
+        </p>
+      </div>
+    );
+  };
+
   const renderStorageTypesStep = () => {
     const renderStorageSection = (
       title: string,
+      subtitle: string,
       items: WizardStorageType[],
       listKey: 'storageTypes' | 'designatedSpaces'
     ) => (
       <div className="space-y-2">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{title}</p>
+        <div>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{title}</p>
+          <p className="text-xs text-muted-foreground">{subtitle}</p>
+        </div>
         <div className="space-y-1.5">
           {items.map((item) => (
             <div key={item.id} className={cn(
@@ -964,17 +1054,27 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
     return (
       <div className="space-y-4">
         <div className="text-center mb-4">
-          <h3 className="text-lg font-semibold">Storage & Facilities</h3>
+          <h3 className="text-lg font-semibold">Storage & Spaces</h3>
           <p className="text-sm text-muted-foreground">
-            Toggle on the storage types and facilities this marina has. You can add counts and occupancy if known.
+            What types of boat storage does this marina offer? Add counts and occupancy if known.
           </p>
           {enabledCount > 0 && (
             <Badge variant="secondary" className="mt-2">{enabledCount} selected</Badge>
           )}
         </div>
         <div className="max-h-[350px] overflow-y-auto pr-1 space-y-4">
-          {renderStorageSection('Storage Types', state.storageTypes, 'storageTypes')}
-          {renderStorageSection('Designated Spaces & Profit Centers', state.designatedSpaces, 'designatedSpaces')}
+          {renderStorageSection(
+            'Boat Storage',
+            'Primary storage options for boats and vessels',
+            state.storageTypes,
+            'storageTypes'
+          )}
+          {renderStorageSection(
+            'Designated Spaces',
+            'Physical spaces allocated to specific operations (e.g. Service uses 5 bays, Fuel has 3 pumps)',
+            state.designatedSpaces,
+            'designatedSpaces'
+          )}
         </div>
         <p className="text-xs text-center text-muted-foreground">
           You can always update this later in your project's Inputs tab.
