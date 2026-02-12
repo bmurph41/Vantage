@@ -57,6 +57,7 @@ type ModelingProject = {
   notes: string | null;
   irr: number | null;
   exitYear: number | null;
+  createdByName: string | null;
 };
 
 export default function ModelingProjectsPage() {
@@ -338,6 +339,8 @@ export default function ModelingProjectsPage() {
                       <TableHead className="text-right">Historical EBITDA</TableHead>
                       <TableHead className="text-right">Yr. 1 EBITDA</TableHead>
                       <TableHead className="text-center">Status</TableHead>
+                      <TableHead>Date Created</TableHead>
+                      <TableHead>Created By</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -403,6 +406,14 @@ export default function ModelingProjectsPage() {
                           >
                             {formatOutcome(project.dealOutcome)}
                           </span>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                          {project.createdAt
+                            ? new Date(project.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                            : '-'}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                          {project.createdByName || '-'}
                         </TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end gap-2">

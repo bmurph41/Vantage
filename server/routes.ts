@@ -17181,7 +17181,22 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const projects = await storage.getModelingProjects(orgId);
       
-      const { modelingActuals, modelingFinancialPeriods } = await import('@shared/schema');
+      const { modelingActuals, modelingFinancialPeriods, users: usersTable } = await import('@shared/schema');
+
+      const userIds = [...new Set(projects.map(p => p.userId).filter(Boolean))];
+      const userNameMap: Record<string, string> = {};
+      if (userIds.length > 0) {
+        try {
+          const userRows = await db.select({ id: usersTable.id, name: usersTable.name })
+            .from(usersTable)
+            .where(inArray(usersTable.id, userIds));
+          for (const u of userRows) {
+            userNameMap[u.id] = u.name;
+          }
+        } catch (e) {
+          console.warn('Failed to fetch user names for modeling projects:', e);
+        }
+      }
       const { proFormaEngineService } = await import('./services/pro-forma-engine-service');
       
       const projectsWithMetrics = await Promise.all(projects.map(async (project) => {
@@ -17295,6 +17310,7 @@ Current context: Project ${req.params.projectId}`;
           year1Ebitda,
           irr,
           exitYear,
+          createdByName: project.userId ? (userNameMap[project.userId] || null) : null,
         };
       }));
       
