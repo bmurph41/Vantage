@@ -38,7 +38,7 @@ interface CustomDocumentType {
   createdAt: string;
 }
 
-type DocTypeEnum = "pnl" | "rent_roll" | "balance_sheet" | "rate_sheet" | "invoice" | "other";
+type DocTypeEnum = "pnl" | "t12" | "rent_roll" | "balance_sheet" | "rate_sheet" | "invoice" | "other";
 
 interface StagedFile {
   id: string;
@@ -47,13 +47,25 @@ interface StagedFile {
   customTypeId: string | null;
   customTypeName: string;
   year: string;
+  t12StartMonth?: string;
+  t12StartYear?: string;
+  t12EndMonth?: string;
+  t12EndYear?: string;
   status: "pending" | "uploading" | "complete" | "error";
   progress: number;
   errorMessage?: string;
 }
 
+const MONTH_OPTIONS = [
+  { value: '1', label: 'Jan' }, { value: '2', label: 'Feb' }, { value: '3', label: 'Mar' },
+  { value: '4', label: 'Apr' }, { value: '5', label: 'May' }, { value: '6', label: 'Jun' },
+  { value: '7', label: 'Jul' }, { value: '8', label: 'Aug' }, { value: '9', label: 'Sep' },
+  { value: '10', label: 'Oct' }, { value: '11', label: 'Nov' }, { value: '12', label: 'Dec' },
+];
+
 const BUILT_IN_DOC_TYPES: Record<DocTypeEnum, { label: string }> = {
   pnl: { label: "P&L Statement" },
+  t12: { label: "T12" },
   rent_roll: { label: "Rent Roll" },
   balance_sheet: { label: "Balance Sheet" },
   rate_sheet: { label: "Rate Sheet" },
@@ -63,6 +75,9 @@ const BUILT_IN_DOC_TYPES: Record<DocTypeEnum, { label: string }> = {
 
 function guessDocType(filename: string): DocTypeEnum {
   const lower = filename.toLowerCase();
+  if (lower.includes("t12") || lower.includes("trailing")) {
+    return "t12";
+  }
   if (lower.includes("p&l") || lower.includes("pnl") || lower.includes("profit") || lower.includes("income")) {
     return "pnl";
   }
@@ -183,6 +198,13 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
       formData.append("docType", staged.docType);
       formData.append("year", staged.year);
 
+      if (staged.docType === 't12') {
+        if (staged.t12StartMonth) formData.append('t12StartMonth', staged.t12StartMonth);
+        if (staged.t12StartYear) formData.append('t12StartYear', staged.t12StartYear);
+        if (staged.t12EndMonth) formData.append('t12EndMonth', staged.t12EndMonth);
+        if (staged.t12EndYear) formData.append('t12EndYear', staged.t12EndYear);
+      }
+
       if (staged.customTypeId) {
         const customType = customTypes.find((ct) => ct.id.toString() === staged.customTypeId);
         if (customType) {
@@ -277,16 +299,27 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
   };
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    const newStagedFiles: StagedFile[] = acceptedFiles.map((file) => ({
-      id: crypto.randomUUID(),
-      file,
-      docType: guessDocType(file.name),
-      customTypeId: null,
-      customTypeName: "",
-      year: new Date().getFullYear().toString(),
-      status: "pending" as const,
-      progress: 0,
-    }));
+    const now = new Date();
+    const newStagedFiles: StagedFile[] = acceptedFiles.map((file) => {
+      const docType = guessDocType(file.name);
+      const base: StagedFile = {
+        id: crypto.randomUUID(),
+        file,
+        docType,
+        customTypeId: null,
+        customTypeName: "",
+        year: now.getFullYear().toString(),
+        status: "pending" as const,
+        progress: 0,
+      };
+      if (docType === 't12') {
+        base.t12StartMonth = (now.getMonth() + 1).toString();
+        base.t12StartYear = (now.getFullYear() - 1).toString();
+        base.t12EndMonth = (now.getMonth() + 1).toString();
+        base.t12EndYear = now.getFullYear().toString();
+      }
+      return base;
+    });
     setStagedFiles((prev) => [...prev, ...newStagedFiles]);
   }, []);
 
@@ -446,14 +479,14 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
                       <div>
                         <Label className="text-xs">Type</Label>
                         <Select
-                          value={getCurrentSelectValue(staged)}
+                          value={staged.docType === 't12' ? 'pnl' : getCurrentSelectValue(staged)}
                           onValueChange={(v) => handleDocTypeChange(staged.id, v)}
                         >
                           <SelectTrigger className="h-8 text-xs">
-                            <SelectValue>{getDocTypeLabel(staged)}</SelectValue>
+                            <SelectValue>{staged.docType === 't12' ? 'P&L Statement' : getDocTypeLabel(staged)}</SelectValue>
                           </SelectTrigger>
                           <SelectContent>
-                            {Object.entries(BUILT_IN_DOC_TYPES).filter(([k]) => k !== "other").map(([value, { label }]) => (
+                            {Object.entries(BUILT_IN_DOC_TYPES).filter(([k]) => k !== "other" && k !== "t12").map(([value, { label }]) => (
                               <SelectItem key={value} value={value}>
                                 {label}
                               </SelectItem>
@@ -479,13 +512,35 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
                       <div>
                         <Label className="text-xs">Year</Label>
                         <Select
-                          value={staged.year}
-                          onValueChange={(v) => updateStagedFile(staged.id, { year: v })}
+                          value={staged.docType === 't12' ? 'T12' : staged.year}
+                          onValueChange={(v) => {
+                            if (v === 'T12') {
+                              const now = new Date();
+                              const endMonth = (now.getMonth() + 1).toString();
+                              const endYear = now.getFullYear().toString();
+                              const startMonth = endMonth;
+                              const startYear = (now.getFullYear() - 1).toString();
+                              updateStagedFile(staged.id, {
+                                docType: 't12' as DocTypeEnum,
+                                t12StartMonth: staged.t12StartMonth || startMonth,
+                                t12StartYear: staged.t12StartYear || startYear,
+                                t12EndMonth: staged.t12EndMonth || endMonth,
+                                t12EndYear: staged.t12EndYear || endYear,
+                              });
+                            } else {
+                              if (staged.docType === 't12') {
+                                updateStagedFile(staged.id, { docType: 'pnl' as DocTypeEnum, year: v });
+                              } else {
+                                updateStagedFile(staged.id, { year: v });
+                              }
+                            }
+                          }}
                         >
                           <SelectTrigger className="h-8 text-xs">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="T12">T12</SelectItem>
                             {yearOptions.map((y) => (
                               <SelectItem key={y} value={y}>
                                 {y}
@@ -495,6 +550,52 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
                         </Select>
                       </div>
                     </div>
+                    {staged.docType === 't12' && (
+                      <div className="flex items-center gap-2 flex-wrap text-xs">
+                        <span className="text-muted-foreground font-medium">From:</span>
+                        <Select value={staged.t12StartMonth || '1'} onValueChange={(v) => updateStagedFile(staged.id, { t12StartMonth: v })}>
+                          <SelectTrigger className="h-6 w-[80px] text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {MONTH_OPTIONS.map(m => (
+                              <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select value={staged.t12StartYear || new Date().getFullYear().toString()} onValueChange={(v) => updateStagedFile(staged.id, { t12StartYear: v })}>
+                          <SelectTrigger className="h-6 w-[76px] text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {yearOptions.map(y => (
+                              <SelectItem key={y} value={y}>{y}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <span className="text-muted-foreground font-medium ml-1">To:</span>
+                        <Select value={staged.t12EndMonth || '12'} onValueChange={(v) => updateStagedFile(staged.id, { t12EndMonth: v })}>
+                          <SelectTrigger className="h-6 w-[80px] text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {MONTH_OPTIONS.map(m => (
+                              <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select value={staged.t12EndYear || new Date().getFullYear().toString()} onValueChange={(v) => updateStagedFile(staged.id, { t12EndYear: v })}>
+                          <SelectTrigger className="h-6 w-[76px] text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {yearOptions.map(y => (
+                              <SelectItem key={y} value={y}>{y}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                     {staged.docType === "other" && !staged.customTypeId && (
                       <div>
                         <div className="flex gap-1">
