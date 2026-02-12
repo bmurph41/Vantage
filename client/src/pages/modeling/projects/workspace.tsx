@@ -419,7 +419,7 @@ export default function ProjectWorkspace() {
         </TabsContent>
 
         <TabsContent value="cases" className="space-y-6" data-tour="valuator-scenarios">
-          <CaseConfiguration projectId={projectId!} />
+          <CaseConfiguration projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="uploads" className="space-y-6">

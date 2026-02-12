@@ -39,10 +39,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatCurrency, formatPercent } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import type { ModelingProject, ExitScenario } from "@shared/schema";
+import type { ModelingProject, ModelingCase, ExitScenario } from "@shared/schema";
 import type { ProjectConfig, ProFormaData } from '@/types/modeling';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
-import { defaultScenarios, type ScenarioType } from '@/lib/modeling-scenarios';
+import { defaultScenarios, type ScenarioType, type ScenarioConfig } from '@/lib/modeling-scenarios';
 
 interface WorkspaceExitStrategyProps {
   projectId: string;
@@ -273,37 +273,14 @@ const exitTools = [
 export default function WorkspaceExitStrategy({ projectId, onTabChange }: WorkspaceExitStrategyProps) {
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState("tax");
-  const [activeScenario, setActiveScenario] = useState<ScenarioType>('base');
-  const [scenarios, setScenarios] = useState(defaultScenarios);
+  const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
 
   const { toast } = useToast();
 
-  const { data: savedScenarios } = useQuery<any[]>({
-    queryKey: ['/api/modeling/projects', projectId, 'exit', 'scenarios'],
+  const { data: cases = [] } = useQuery<ModelingCase[]>({
+    queryKey: ['/api/modeling/projects', projectId, 'cases'],
   });
 
-  const saveScenarioMutation = useMutation({
-    mutationFn: async (data: { id?: string; name: string; scenarioType: string; exitCapRate: number; purchasePrice: number; holdingPeriodYears: number; exitNoi: number; projectedSalePrice: number }) => {
-      if (data.id) {
-        return apiRequest(`/api/modeling/projects/${projectId}/exit/scenarios/${data.id}`, {
-          method: "PATCH",
-          body: JSON.stringify(data),
-        });
-      }
-      return apiRequest(`/api/modeling/projects/${projectId}/exit/scenarios`, {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'exit', 'scenarios'] });
-      toast({ title: "Saved", description: "Exit scenario saved successfully" });
-    },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to save exit scenario", variant: "destructive" });
-    },
-  });
-  
   const { data: project, isLoading: projectLoading } = useQuery<ModelingProject>({
     queryKey: ['/api/modeling/projects', projectId],
   });
@@ -316,34 +293,26 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
     queryKey: ['/api/modeling/projects', projectId, 'pro-forma'],
   });
 
+  useEffect(() => {
+    if (cases.length > 0 && !activeCaseId) {
+      const defaultCase = cases.find(c => c.isDefault) || cases[0];
+      setActiveCaseId(defaultCase.id);
+    }
+  }, [cases, activeCaseId]);
+
+  const activeCase = cases.find(c => c.id === activeCaseId) || cases[0];
+
   const holdPeriod = config?.holdPeriod || 5;
   const purchasePrice = Number(project?.purchasePrice) || 0;
 
-  useEffect(() => {
-    if (savedScenarios && savedScenarios.length > 0) {
-      const loaded: Record<ScenarioType, ScenarioConfig> = { ...defaultScenarios };
-      const scenarioTypeMap: Record<string, ScenarioType> = {
-        'cash_sale': 'base',
-        'exchange_1031': 'aggressive',
-        'seller_financing': 'conservative',
-      };
-      for (const s of savedScenarios) {
-        const type = scenarioTypeMap[s.scenarioType] || null;
-        if (type) {
-          loaded[type] = {
-            name: s.name || loaded[type].name,
-            description: s.description || loaded[type].description,
-            revenueGrowth: loaded[type].revenueGrowth,
-            expenseGrowth: loaded[type].expenseGrowth,
-            exitCapRate: Number(s.exitCapRate) * 100 || loaded[type].exitCapRate,
-          };
-        }
-      }
-      setScenarios(loaded);
-    }
-  }, [savedScenarios]);
-  
-  const currentScenario = scenarios[activeScenario];
+  const currentScenario: ScenarioConfig = activeCase ? {
+    name: activeCase.name,
+    description: activeCase.description || '',
+    revenueGrowth: parseFloat(activeCase.revenueGrowthRate || '0') * 100,
+    expenseGrowth: parseFloat(activeCase.expenseGrowthRate || '0') * 100,
+    exitCapRate: parseFloat(activeCase.exitCapRate || '0') * 100 || 7.5,
+  } : defaultScenarios.base;
+
   const exitCapRate = currentScenario.exitCapRate;
   
   const year1NOI = proForma?.year1NOI || Number(project?.ebitda) || 0;
@@ -381,60 +350,37 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <Label className="text-sm font-medium">Scenario:</Label>
-            <Select value={activeScenario} onValueChange={(v: ScenarioType) => setActiveScenario(v)}>
-              <SelectTrigger className="w-44" data-testid="select-exit-scenario">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="base">
-                  <div className="flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-blue-500" />
-                    Base Case
-                  </div>
-                </SelectItem>
-                <SelectItem value="aggressive">
-                  <div className="flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-green-500" />
-                    Aggressive
-                  </div>
-                </SelectItem>
-                <SelectItem value="conservative">
-                  <div className="flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-amber-500" />
-                    Conservative
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <Button
-              size="sm"
-              onClick={() => {
-                const activeScenarioTypeMap: Record<ScenarioType, string> = {
-                  base: 'cash_sale',
-                  aggressive: 'exchange_1031',
-                  conservative: 'seller_financing',
-                };
-                const targetType = activeScenarioTypeMap[activeScenario];
-                const scenarioId = savedScenarios?.find(s => s.scenarioType === targetType)?.id;
-                saveScenarioMutation.mutate({
-                  id: scenarioId,
-                  name: currentScenario.name,
-                  scenarioType: activeScenario === 'base' ? 'cash_sale' : activeScenario === 'aggressive' ? 'exchange_1031' : 'seller_financing',
-                  exitCapRate: currentScenario.exitCapRate / 100,
-                  purchasePrice: purchasePrice,
-                  holdingPeriodYears: holdPeriod,
-                  exitNoi: exitNOI,
-                  projectedSalePrice: calculatedSalePrice,
-                });
-              }}
-              disabled={saveScenarioMutation.isPending}
-            >
-              {saveScenarioMutation.isPending ? (
-                <><RefreshCcw className="h-4 w-4 mr-1 animate-spin" /> Saving...</>
-              ) : (
-                <><Save className="h-4 w-4 mr-1" /> Save Scenario</>
-              )}
-            </Button>
+            {cases.length > 0 ? (
+              <Select value={activeCaseId || ''} onValueChange={(v) => setActiveCaseId(v)}>
+                <SelectTrigger className="w-52" data-testid="select-exit-scenario">
+                  <SelectValue placeholder="Select scenario" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cases.filter(c => c.isEnabled).map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      <div className="flex items-center gap-2">
+                        <div className={`h-2 w-2 rounded-full bg-${c.color || 'blue'}-500`} />
+                        {c.name}
+                        {c.isDefault && <Badge variant="outline" className="ml-1 text-[10px] py-0 px-1">Default</Badge>}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Badge variant="outline" className="text-muted-foreground">
+                No scenarios configured
+              </Badge>
+            )}
+            {cases.length === 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onTabChange?.('scenarios')}
+              >
+                <Plus className="h-4 w-4 mr-1" /> Create Scenario
+              </Button>
+            )}
           </div>
         </div>
       </div>

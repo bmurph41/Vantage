@@ -61,7 +61,10 @@ import {
   Globe,
   Building2,
   User,
-  Bookmark
+  Bookmark,
+  DollarSign,
+  Percent,
+  ArrowUpRight
 } from 'lucide-react';
 import {
   Tooltip,
@@ -70,9 +73,12 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import ScenarioComparison from './scenario-comparison';
+import { formatCurrency } from '@/lib/utils';
+import type { ProjectConfig, ProFormaData } from '@/types/modeling';
 
 interface CaseConfigurationProps {
   projectId: string;
+  onTabChange?: (tab: string) => void;
 }
 
 interface LeaseUpEntry {
@@ -145,7 +151,7 @@ function PercentInput({
   );
 }
 
-export default function CaseConfiguration({ projectId }: CaseConfigurationProps) {
+export default function CaseConfiguration({ projectId, onTabChange }: CaseConfigurationProps) {
   const { toast } = useToast();
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -174,6 +180,16 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
 
   const { data: templates = [] } = useQuery<ModelingScenarioTemplate[]>({
     queryKey: ['/api/modeling/scenario-templates'],
+  });
+
+  const { data: config } = useQuery<ProjectConfig>({
+    queryKey: ['/api/modeling/projects', projectId, 'config'],
+    enabled: !!projectId,
+  });
+
+  const { data: proForma } = useQuery<ProFormaData>({
+    queryKey: ['/api/modeling/projects', projectId, 'pro-forma'],
+    enabled: !!projectId,
   });
 
   useEffect(() => {
@@ -769,6 +785,10 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
                       <Calendar className="h-4 w-4" />
                       Lease-Up Schedule
                     </TabsTrigger>
+                    <TabsTrigger value="exit-analysis" className="gap-2" data-testid="tab-exit-analysis">
+                      <DollarSign className="h-4 w-4" />
+                      Exit Analysis
+                    </TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="general" className="space-y-6">
@@ -1030,6 +1050,142 @@ export default function CaseConfiguration({ projectId }: CaseConfigurationProps)
                         ))}
                       </div>
                     )}
+                  </TabsContent>
+
+                  <TabsContent value="exit-analysis" className="space-y-6">
+                    {(() => {
+                      if (!editedCase) return null;
+                      const holdPeriod = config?.holdPeriod || 5;
+                      const purchasePrice = Number(project?.purchasePrice) || 0;
+                      const revGrowth = parseFloat(editedCase.revenueGrowthRate || '0') * 100;
+                      const expGrowth = parseFloat(editedCase.expenseGrowthRate || '0') * 100;
+                      const capRate = parseFloat(editedCase.exitCapRate || '0') * 100 || 7.5;
+                      const year1NOI = proForma?.year1NOI || Number(project?.ebitda) || 0;
+                      const netGrowth = (revGrowth - expGrowth) / 100;
+                      const exitNOI = year1NOI * Math.pow(1 + netGrowth, holdPeriod);
+                      const salePrice = exitNOI / (capRate / 100);
+                      const equityMultiple = purchasePrice > 0 ? salePrice / purchasePrice : 0;
+                      const totalReturn = salePrice - purchasePrice;
+                      const annualizedReturn = purchasePrice > 0 && holdPeriod > 0
+                        ? (Math.pow(salePrice / purchasePrice, 1 / holdPeriod) - 1) * 100
+                        : 0;
+
+                      return (
+                        <>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <Card>
+                              <CardContent className="pt-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="p-2 bg-blue-50 rounded-lg">
+                                    <Building2 className="h-4 w-4 text-blue-500" />
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">Purchase Price</p>
+                                    <p className="text-lg font-bold">
+                                      {purchasePrice > 0 ? formatCurrency(purchasePrice) : <span className="text-muted-foreground text-sm">Not set</span>}
+                                    </p>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                            <Card>
+                              <CardContent className="pt-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="p-2 bg-amber-50 rounded-lg">
+                                    <TrendingUp className="h-4 w-4 text-amber-500" />
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">Exit NOI (Yr {holdPeriod})</p>
+                                    <p className="text-lg font-bold">{formatCurrency(exitNOI)}</p>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                            <Card>
+                              <CardContent className="pt-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="p-2 bg-green-50 rounded-lg">
+                                    <DollarSign className="h-4 w-4 text-green-500" />
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">Projected Sale Price</p>
+                                    <p className="text-lg font-bold text-green-600">{formatCurrency(salePrice)}</p>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                            <Card>
+                              <CardContent className="pt-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="p-2 bg-purple-50 rounded-lg">
+                                    <Percent className="h-4 w-4 text-purple-500" />
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">Exit Cap Rate</p>
+                                    <p className="text-lg font-bold">{capRate.toFixed(1)}%</p>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </div>
+
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className="text-base">Return Summary</CardTitle>
+                              <CardDescription>Based on this scenario's assumptions over a {holdPeriod}-year hold</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Equity Multiple</p>
+                                  <p className="text-2xl font-bold">{equityMultiple.toFixed(2)}x</p>
+                                </div>
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Total Return</p>
+                                  <p className={`text-2xl font-bold ${totalReturn >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {formatCurrency(totalReturn)}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Annualized Return</p>
+                                  <p className={`text-2xl font-bold ${annualizedReturn >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {annualizedReturn.toFixed(1)}%
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Net Growth Rate</p>
+                                  <p className="text-2xl font-bold">{(netGrowth * 100).toFixed(1)}%/yr</p>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          <Card className="bg-blue-50/50 border-blue-200">
+                            <CardContent className="py-4">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <ArrowUpRight className="h-5 w-5 text-blue-600" />
+                                  <div>
+                                    <p className="text-sm font-medium text-blue-800">Full Exit Strategy Suite</p>
+                                    <p className="text-sm text-blue-700">
+                                      Access Tax Calculator, 1031 Exchange, Seller Financing, Waterfall, IRR, and more analysis tools
+                                    </p>
+                                  </div>
+                                </div>
+                                <Button
+                                  variant="outline"
+                                  className="border-blue-300 text-blue-700 hover:bg-blue-100"
+                                  onClick={() => onTabChange?.('exit')}
+                                >
+                                  Open Exit Suite
+                                  <ArrowUpRight className="h-4 w-4 ml-1" />
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </>
+                      );
+                    })()}
                   </TabsContent>
                 </Tabs>
 
