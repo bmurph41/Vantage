@@ -1221,7 +1221,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
               <Anchor className="h-5 w-5 text-[#1E4FAB]" />
               {mode === "new_project" ? "New Project" : "MarinaMatch Setup"}
             </DialogTitle>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 mr-6">
               {steps.map((s) => (
                 <div
                   key={s.id}
