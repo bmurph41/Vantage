@@ -17432,7 +17432,6 @@ Current context: Project ${req.params.projectId}`;
             ...(pipelineId && { pipelineId }),
             ...(stageId && { stageId }),
             ownerId: userId,
-            orgId,
           }).returning();
           
           dealIdToUse = deal.id;
