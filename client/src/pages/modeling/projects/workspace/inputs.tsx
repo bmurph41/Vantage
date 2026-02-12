@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useDisplayPreferences } from '@/hooks/use-display-preferences';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -171,7 +172,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
   const { holdPeriod, setHoldPeriod } = useHoldPeriod(projectId);
   const [startDate, setStartDate] = useState<string>('2026-01-31');
   const [cashFlowGranularity, setCashFlowGranularity] = useState<string>('annual');
-  const [bottomLineMetric, setBottomLineMetric] = useState<'noi' | 'ebitda'>('noi');
+  const { bottomLineMetric } = useDisplayPreferences();
   const [seasonMonths, setSeasonMonths] = useState<number[]>([4, 5, 6, 7, 8, 9, 10]);
   // NEW: Winter months state
   const [winterMonths, setWinterMonths] = useState<number[]>([11, 12, 1, 2, 3]);
@@ -225,7 +226,6 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
     if (config) {
       setStartDate(config.startDate || '2026-01-31');
       setCashFlowGranularity(config.cashFlowGranularity || 'annual');
-      setBottomLineMetric(config.bottomLineMetric || 'noi');
       setSeasonMonths(config.seasonMonths || [4, 5, 6, 7, 8, 9, 10]);
       setWinterMonths(config.winterMonths || [11, 12, 1, 2, 3]);
       if (config.departments) {
@@ -583,25 +583,6 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
               </Select>
               <p className="text-xs text-muted-foreground">
                 Monthly uses XIRR for precise return calculations
-              </p>
-            </div>
-            <Separator className="my-4" />
-            <div className="space-y-2">
-              <Label htmlFor="bottomLineMetric">Bottom Line Metric</Label>
-              <Select 
-                value={bottomLineMetric} 
-                onValueChange={(v) => setBottomLineMetric(v as 'noi' | 'ebitda')}
-              >
-                <SelectTrigger id="bottomLineMetric" data-testid="select-bottom-line-metric">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="noi">NOI (Net Operating Income)</SelectItem>
-                  <SelectItem value="ebitda">EBITDA</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                This selection flows through Historical P&L, Pro Forma, and Exit calculations
               </p>
             </div>
           </CardContent>

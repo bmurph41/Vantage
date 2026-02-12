@@ -74,7 +74,7 @@ export default function ModelingProjectsPage() {
     queryKey: ['/api/modeling/projects'],
   });
 
-  useDisplayPreferences();
+  const { metricLabel } = useDisplayPreferences();
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiRequest('DELETE', `/api/modeling/projects/${id}`),
@@ -335,8 +335,8 @@ export default function ModelingProjectsPage() {
                       <TableHead className="font-bold text-foreground text-right whitespace-nowrap">Purchase Price</TableHead>
                       <TableHead className="font-bold text-foreground text-right">IRR</TableHead>
                       <TableHead className="font-bold text-foreground text-right whitespace-nowrap">Yr 1 Cap Rate</TableHead>
-                      <TableHead className="font-bold text-foreground text-right whitespace-nowrap">Hist. EBITDA</TableHead>
-                      <TableHead className="font-bold text-foreground text-right whitespace-nowrap">Yr. 1 EBITDA</TableHead>
+                      <TableHead className="font-bold text-foreground text-right whitespace-nowrap">Hist. {metricLabel}</TableHead>
+                      <TableHead className="font-bold text-foreground text-right whitespace-nowrap">Yr. 1 {metricLabel}</TableHead>
                       <TableHead className="font-bold text-foreground text-center">Status</TableHead>
                       <TableHead className="font-bold text-foreground text-right">Actions</TableHead>
                     </TableRow>
@@ -401,30 +401,30 @@ export default function ModelingProjectsPage() {
                           className="cursor-pointer hover:bg-muted/50 border-b"
                           onClick={() => setLocation(`/modeling/projects/${project.id}`)}
                         >
-                          <td className="px-4 pt-0 pb-3" colSpan={8}>
-                            <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
-                              {project.exitYear && (
-                                <span>Exit Year: {project.exitYear}</span>
-                              )}
-                              {project.t12Label && (
-                                <span>Hist. Period: {project.t12Label}</span>
-                              )}
-                              {project.year1Ebitda != null && project.t12Ebitda != null && project.t12Ebitda !== 0 && (
-                                <span className={`font-medium ${((project.year1Ebitda - project.t12Ebitda) / Math.abs(project.t12Ebitda)) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                  EBITDA Growth: {((project.year1Ebitda - project.t12Ebitda) / Math.abs(project.t12Ebitda) * 100) >= 0 ? '+' : ''}
-                                  {((project.year1Ebitda - project.t12Ebitda) / Math.abs(project.t12Ebitda) * 100).toFixed(1)}%
-                                </span>
-                              )}
-                              <span className="ml-auto flex items-center gap-4">
-                                <span>Created: {project.createdAt
-                                  ? new Date(project.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                                  : '-'}</span>
-                                {project.createdByName && (
-                                  <span>By: {project.createdByName}</span>
-                                )}
-                              </span>
-                            </div>
+                          <td className="px-4 pt-0 pb-3 text-xs text-muted-foreground">
+                            {project.createdAt
+                              ? new Date(project.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                              : ''}
+                            {project.createdByName ? ` · ${project.createdByName}` : ''}
                           </td>
+                          <td className="px-4 pt-0 pb-3"></td>
+                          <td className="px-4 pt-0 pb-3 text-right text-xs text-muted-foreground whitespace-nowrap">
+                            {project.exitYear ? `Exit: ${project.exitYear}` : ''}
+                          </td>
+                          <td className="px-4 pt-0 pb-3"></td>
+                          <td className="px-4 pt-0 pb-3 text-right text-xs text-muted-foreground whitespace-nowrap">
+                            {project.t12Label || ''}
+                          </td>
+                          <td className="px-4 pt-0 pb-3 text-right text-xs whitespace-nowrap">
+                            {project.year1Ebitda != null && project.t12Ebitda != null && project.t12Ebitda !== 0 ? (
+                              <span className={`font-medium ${((project.year1Ebitda - project.t12Ebitda) / Math.abs(project.t12Ebitda)) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {((project.year1Ebitda - project.t12Ebitda) / Math.abs(project.t12Ebitda) * 100) >= 0 ? '+' : ''}
+                                {((project.year1Ebitda - project.t12Ebitda) / Math.abs(project.t12Ebitda) * 100).toFixed(1)}%
+                              </span>
+                            ) : ''}
+                          </td>
+                          <td className="px-4 pt-0 pb-3"></td>
+                          <td className="px-4 pt-0 pb-3"></td>
                         </tr>
                       </Fragment>
                     ))}

@@ -136,6 +136,7 @@ function SortableRow({ region, onEdit, onDelete }: {
 
 type DisplayPreferences = {
   priceRoundingDigits: number;
+  bottomLineMetric: 'noi' | 'ebitda';
 };
 
 const ROUNDING_OPTIONS = [
@@ -165,8 +166,8 @@ export default function ModelingSettings() {
   });
 
   const updatePrefsMutation = useMutation({
-    mutationFn: async (priceRoundingDigits: number) => {
-      return apiRequest('PATCH', '/api/modeling/display-preferences', { priceRoundingDigits });
+    mutationFn: async (updates: Partial<DisplayPreferences>) => {
+      return apiRequest('PATCH', '/api/modeling/display-preferences', updates);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/display-preferences'] });
@@ -370,7 +371,7 @@ export default function ModelingSettings() {
               <Label className="min-w-[120px]">Round prices to</Label>
               <Select
                 value={String(displayPrefs?.priceRoundingDigits ?? 0)}
-                onValueChange={(val) => updatePrefsMutation.mutate(Number(val))}
+                onValueChange={(val) => updatePrefsMutation.mutate({ priceRoundingDigits: Number(val) })}
               >
                 <SelectTrigger className="w-[220px]" data-testid="select-rounding">
                   <SelectValue />
@@ -387,6 +388,45 @@ export default function ModelingSettings() {
             </div>
             <div className="text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
               Preview: {ROUNDING_OPTIONS.find(o => o.value === (displayPrefs?.priceRoundingDigits ?? 0))?.example || '$3,287,567'}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Settings className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Bottom Line Metric</CardTitle>
+              <CardDescription>
+                Choose whether to display NOI or EBITDA throughout your financial models
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <Label className="min-w-[120px]">Metric</Label>
+              <Select
+                value={displayPrefs?.bottomLineMetric ?? 'noi'}
+                onValueChange={(val) => updatePrefsMutation.mutate({ bottomLineMetric: val as 'noi' | 'ebitda' })}
+              >
+                <SelectTrigger className="w-[280px]" data-testid="select-bottom-line-metric">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="noi">NOI (Net Operating Income)</SelectItem>
+                  <SelectItem value="ebitda">EBITDA</SelectItem>
+                </SelectContent>
+              </Select>
+              {updatePrefsMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            </div>
+            <div className="text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
+              This selection flows through the Projects list, Historical P&L, Pro Forma, and Exit calculations
             </div>
           </div>
         </CardContent>

@@ -16932,7 +16932,7 @@ Current context: Project ${req.params.projectId}`;
       const [prefs] = await db.select().from(modelingDisplayPreferences)
         .where(eq(modelingDisplayPreferences.orgId, orgId))
         .limit(1);
-      res.json(prefs || { priceRoundingDigits: 0 });
+      res.json(prefs || { priceRoundingDigits: 0, bottomLineMetric: 'noi' });
     } catch (error: any) {
       console.error('Failed to get display preferences:', error);
       res.status(500).json({ error: 'Failed to get display preferences' });
@@ -16942,10 +16942,22 @@ Current context: Project ${req.params.projectId}`;
   app.patch('/api/modeling/display-preferences', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const { priceRoundingDigits } = req.body;
+      const { priceRoundingDigits, bottomLineMetric } = req.body;
 
-      if (typeof priceRoundingDigits !== 'number' || priceRoundingDigits < 0 || priceRoundingDigits > 6) {
-        return res.status(400).json({ error: 'priceRoundingDigits must be a number between 0 and 6' });
+      const updates: Record<string, any> = { updatedAt: new Date() };
+
+      if (priceRoundingDigits !== undefined) {
+        if (typeof priceRoundingDigits !== 'number' || priceRoundingDigits < 0 || priceRoundingDigits > 6) {
+          return res.status(400).json({ error: 'priceRoundingDigits must be a number between 0 and 6' });
+        }
+        updates.priceRoundingDigits = priceRoundingDigits;
+      }
+
+      if (bottomLineMetric !== undefined) {
+        if (!['noi', 'ebitda'].includes(bottomLineMetric)) {
+          return res.status(400).json({ error: 'bottomLineMetric must be "noi" or "ebitda"' });
+        }
+        updates.bottomLineMetric = bottomLineMetric;
       }
 
       const { modelingDisplayPreferences } = await import('@shared/schema');
@@ -16956,13 +16968,13 @@ Current context: Project ${req.params.projectId}`;
 
       if (existing) {
         const [updated] = await db.update(modelingDisplayPreferences)
-          .set({ priceRoundingDigits, updatedAt: new Date() })
+          .set(updates)
           .where(eq(modelingDisplayPreferences.id, existing.id))
           .returning();
         res.json(updated);
       } else {
         const [created] = await db.insert(modelingDisplayPreferences)
-          .values({ orgId, priceRoundingDigits })
+          .values({ orgId, ...updates })
           .returning();
         res.json(created);
       }

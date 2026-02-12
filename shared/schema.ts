@@ -12635,6 +12635,7 @@ export const modelingDisplayPreferences = pgTable('modeling_display_preferences'
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   priceRoundingDigits: integer('price_rounding_digits').notNull().default(0),
+  bottomLineMetric: varchar('bottom_line_metric', { length: 10 }).notNull().default('noi'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (table) => ({

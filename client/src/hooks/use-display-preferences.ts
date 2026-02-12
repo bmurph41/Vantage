@@ -4,6 +4,7 @@ import { setGlobalRoundingDigits } from '@/lib/utils';
 
 interface DisplayPreferences {
   priceRoundingDigits: number;
+  bottomLineMetric: 'noi' | 'ebitda';
 }
 
 export function useDisplayPreferences() {
@@ -12,10 +13,12 @@ export function useDisplayPreferences() {
   });
 
   const roundingDigits = prefs?.priceRoundingDigits ?? 0;
+  const bottomLineMetric = prefs?.bottomLineMetric ?? 'noi';
+  const metricLabel = bottomLineMetric === 'ebitda' ? 'EBITDA' : 'NOI';
 
   useEffect(() => {
     setGlobalRoundingDigits(roundingDigits);
   }, [roundingDigits]);
 
-  return { roundingDigits };
+  return { roundingDigits, bottomLineMetric, metricLabel };
 }
