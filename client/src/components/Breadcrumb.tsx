@@ -142,11 +142,12 @@ const ROUTE_MAPPINGS: Record<string, BreadcrumbItem[]> = {
     { label: 'Portfolio' },
   ],
   '/modeling/debt-scenarios': [
-    CATEGORIES.MODELING,
+    { label: 'Debt Scenarios' },
+  ],
+  '/modeling/scenarios': [
     { label: 'Debt Scenarios' },
   ],
   '/modeling/exit-strategies': [
-    CATEGORIES.MODELING,
     { label: 'Exit Strategies' },
   ],
   '/modeling/exit': [
