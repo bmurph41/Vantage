@@ -63,13 +63,27 @@ interface ModalContentProps
 const ModalContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   ModalContentProps
->(({ className, children, size, showClose = true, ...props }, ref) => (
+>(({ className, children, size, showClose = true, onPointerDownOutside, onInteractOutside, ...props }, ref) => (
   <ModalPortal>
     <ModalOverlay />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(modalContentVariants({ size }), className)}
       {...props}
+      onPointerDownOutside={(e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('.pac-container')) {
+          e.preventDefault();
+        }
+        onPointerDownOutside?.(e);
+      }}
+      onInteractOutside={(e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('.pac-container')) {
+          e.preventDefault();
+        }
+        onInteractOutside?.(e);
+      }}
     >
       {children}
       {showClose && (

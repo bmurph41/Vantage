@@ -1423,3 +1423,42 @@ input[type="range"]::-moz-range-track {
   height: 6px;
   border-radius: 3px;
 }
+
+.pac-container {
+  z-index: 10000 !important;
+  pointer-events: auto !important;
+}
+
+.pac-item {
+  cursor: pointer !important;
+}
+
+.pac-item:hover {
+  background-color: hsl(220 14% 96%) !important;
+}
+
+.dark .pac-container {
+  background-color: hsl(220 26% 14%) !important;
+  border-color: hsl(220 13% 26%) !important;
+}
+
+.dark .pac-item {
+  color: hsl(0 0% 90%) !important;
+  border-top-color: hsl(220 13% 26%) !important;
+}
+
+.dark .pac-item:hover {
+  background-color: hsl(220 26% 20%) !important;
+}
+
+.dark .pac-item-query {
+  color: hsl(0 0% 95%) !important;
+}
+
+.dark .pac-matched {
+  color: hsl(221 83% 65%) !important;
+}
+
+.dark .pac-icon {
+  filter: invert(1);
+}
