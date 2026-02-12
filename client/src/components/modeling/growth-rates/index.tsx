@@ -143,33 +143,31 @@ export function CompactYearRateInput({
   const isModified = Math.abs(value - defaultValue) > 0.001;
 
   return (
-    <div className="flex items-center">
-      <div className={cn(
-        "flex items-center rounded-md border overflow-hidden",
-        isModified
-          ? "border-amber-300 dark:border-amber-700 bg-amber-50/60 dark:bg-amber-950/30"
-          : "border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800"
-      )}>
-        <input
-          type="number"
-          value={value}
-          onChange={(e) => {
-            const v = parseFloat(e.target.value);
-            if (!isNaN(v)) onChange(Math.min(max, Math.max(min, v)));
-          }}
-          step={step}
-          min={min}
-          max={max}
-          className={cn(
-            "w-[52px] text-center text-[12px] font-mono py-1 bg-transparent outline-none",
-            "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
-            isModified
-              ? "text-amber-700 dark:text-amber-300 font-semibold"
-              : "text-slate-600 dark:text-slate-300"
-          )}
-        />
-        <span className="text-[10px] text-slate-400 dark:text-slate-500 pr-1.5 font-medium select-none">%</span>
-      </div>
+    <div className={cn(
+      "flex items-center rounded border overflow-hidden flex-1 min-w-[44px]",
+      isModified
+        ? "border-amber-300 dark:border-amber-700 bg-amber-50/60 dark:bg-amber-950/30"
+        : "border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800"
+    )}>
+      <input
+        type="number"
+        value={value}
+        onChange={(e) => {
+          const v = parseFloat(e.target.value);
+          if (!isNaN(v)) onChange(Math.min(max, Math.max(min, v)));
+        }}
+        step={step}
+        min={min}
+        max={max}
+        className={cn(
+          "w-full min-w-[32px] text-center text-[11px] font-mono py-1 bg-transparent outline-none",
+          "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+          isModified
+            ? "text-amber-700 dark:text-amber-300 font-semibold"
+            : "text-slate-600 dark:text-slate-300"
+        )}
+      />
+      <span className="text-[9px] text-slate-400 dark:text-slate-500 pr-1 font-medium select-none">%</span>
     </div>
   );
 }
@@ -198,26 +196,26 @@ export function YearlyRateRow({
 
   return (
     <div className={cn(
-      "flex items-center gap-2 py-2 px-3 rounded-lg transition-all duration-150 border",
+      "flex items-center gap-1 py-1.5 px-2 rounded-md transition-all duration-150 border",
       anyModified
         ? "bg-amber-50/40 dark:bg-amber-950/15 border-amber-200/70 dark:border-amber-800/50"
-        : "bg-white dark:bg-slate-800/50 border-slate-100 dark:border-slate-700/50"
+        : "bg-white dark:bg-slate-800/50 border-transparent"
     )}>
-      <div className="flex items-center gap-2 min-w-0 w-[140px] flex-shrink-0">
+      <div className="flex items-center gap-1.5 min-w-0 flex-shrink-0" style={{ width: 'var(--label-width, 120px)' }}>
         <div className={cn(
-          "w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0",
+          "w-5 h-5 rounded flex items-center justify-center flex-shrink-0",
           anyModified
             ? "bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400"
             : "bg-slate-50 dark:bg-slate-700/60 text-slate-400 dark:text-slate-500"
         )}>
           <Icon className="w-3 h-3" />
         </div>
-        <span className="text-[12px] font-medium text-slate-700 dark:text-slate-300 truncate" title={label}>
+        <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate" title={label}>
           {label}
         </span>
       </div>
 
-      <div className="flex items-center gap-1.5 flex-1 justify-end flex-wrap">
+      <div className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto">
         {years.map((year, idx) => (
           <CompactYearRateInput
             key={year}
@@ -234,7 +232,7 @@ export function YearlyRateRow({
               <button
                 onClick={() => onApplyToAll(rates[0])}
                 className={cn(
-                  "w-6 h-6 rounded flex items-center justify-center transition-colors ml-0.5",
+                  "w-5 h-5 rounded flex items-center justify-center transition-colors flex-shrink-0",
                   allSame
                     ? "text-slate-300 dark:text-slate-600"
                     : "text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30"
@@ -242,16 +240,16 @@ export function YearlyRateRow({
                 disabled={allSame}
                 tabIndex={-1}
               >
-                <Copy className="w-3 h-3" />
+                <Copy className="w-2.5 h-2.5" />
               </button>
             </TooltipTrigger>
             <TooltipContent side="top" className="text-xs">
-              Apply Year 1 rate to all years
+              Apply Yr 1 to all
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
 
-        {anyModified && (
+        {anyModified ? (
           <TooltipProvider delayDuration={200}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -259,17 +257,19 @@ export function YearlyRateRow({
                   onClick={() => {
                     years.forEach((_, idx) => onChangeYear(idx, defaultRate));
                   }}
-                  className="w-6 h-6 rounded flex items-center justify-center text-amber-500 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors"
+                  className="w-5 h-5 rounded flex items-center justify-center text-amber-500 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors flex-shrink-0"
                   tabIndex={-1}
                 >
-                  <RotateCcw className="w-3 h-3" />
+                  <RotateCcw className="w-2.5 h-2.5" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top" className="text-xs">
-                Reset all years to {defaultRate}%
+                Reset to {defaultRate}%
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
+        ) : (
+          <div className="w-5 flex-shrink-0" />
         )}
       </div>
     </div>
@@ -311,31 +311,30 @@ export function SectionCard({
   
   return (
     <div className={cn(
-      "bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 border-l-4 overflow-hidden",
+      "bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 border-l-[3px] overflow-hidden",
       style.border
     )}>
       <div 
         className={cn(
-          "px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between",
+          "px-3 py-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2",
           collapsible && "cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors"
         )}
         onClick={collapsible ? () => setIsExpanded(!isExpanded) : undefined}
       >
-        <div className="flex items-center gap-2.5">
-          <div className={cn("p-1.5 rounded-lg", style.iconBg)}>
-            <Icon className="w-4 h-4" />
+        <div className="flex items-center gap-2 min-w-0">
+          <div className={cn("p-1 rounded-md flex-shrink-0", style.iconBg)}>
+            <Icon className="w-3.5 h-3.5" />
           </div>
-          <div>
-            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">{description}</p>
+          <div className="min-w-0">
+            <h2 className="text-[13px] font-semibold text-slate-900 dark:text-slate-100 truncate">{title}</h2>
           </div>
         </div>
-        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
           {headerAction}
           {collapsible && (
             <button
               onClick={() => setIsExpanded(!isExpanded)}
-              className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
             >
               {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
@@ -343,7 +342,7 @@ export function SectionCard({
         </div>
       </div>
       
-      {isExpanded && <div className="p-4">{children}</div>}
+      {isExpanded && <div className="p-2">{children}</div>}
     </div>
   );
 }
@@ -354,17 +353,14 @@ interface CategoryGroupProps {
   columns?: 1 | 2 | 3;
 }
 
-export function CategoryGroup({ title, children, columns = 2 }: CategoryGroupProps) {
+export function CategoryGroup({ title, children }: CategoryGroupProps) {
   return (
-    <div className="mb-4 last:mb-0">
-      <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5 px-1 flex items-center gap-2">
+    <div className="mb-2 last:mb-0">
+      <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1 px-1 flex items-center gap-1.5">
         <span>{title}</span>
         <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
       </div>
-      <div className={cn(
-        "grid gap-1.5",
-        columns === 3 ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : columns === 1 ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2"
-      )}>
+      <div className="space-y-0.5">
         {children}
       </div>
     </div>
@@ -402,29 +398,29 @@ interface ModeToggleProps {
 
 export function ModeToggle({ value, onChange }: ModeToggleProps) {
   return (
-    <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5">
+    <div className="flex bg-slate-100 dark:bg-slate-800 rounded-md p-0.5">
       <button
         onClick={() => onChange('universal')}
         className={cn(
-          "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+          "flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-all",
           value === 'universal' 
             ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm" 
             : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
         )}
       >
-        <Globe className="w-3.5 h-3.5" />
+        <Globe className="w-3 h-3" />
         Universal
       </button>
       <button
         onClick={() => onChange('perProfitCenter')}
         className={cn(
-          "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+          "flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-all",
           value === 'perProfitCenter' 
             ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm" 
             : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
         )}
       >
-        <Layers className="w-3.5 h-3.5" />
+        <Layers className="w-3 h-3" />
         Per Type
       </button>
     </div>
@@ -440,12 +436,12 @@ interface QuickActionsBarProps {
 
 export function QuickActionsBar({ modifiedCount, totalCount, onReset, onPreset }: QuickActionsBarProps) {
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
-      <div className="flex flex-wrap items-center gap-2.5">
-        <Sparkles className="w-4 h-4 text-blue-500" />
-        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Presets</span>
-        <div className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
-        <div className="flex gap-1.5">
+    <div className="bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 px-3 py-2 flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Presets</span>
+        <div className="w-px h-3.5 bg-slate-200 dark:bg-slate-700" />
+        <div className="flex gap-1">
           {[
             { label: 'Conservative', value: 1.5 },
             { label: 'Moderate', value: 2.5 },
@@ -454,7 +450,7 @@ export function QuickActionsBar({ modifiedCount, totalCount, onReset, onPreset }
             <button
               key={value}
               onClick={() => onPreset(value)}
-              className="px-3 py-1.5 text-xs font-medium bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:border-blue-200 dark:hover:border-blue-800 hover:text-blue-700 dark:hover:text-blue-300 transition-all text-slate-600 dark:text-slate-300"
+              className="px-2 py-1 text-[11px] font-medium bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-md hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:border-blue-200 dark:hover:border-blue-800 hover:text-blue-700 dark:hover:text-blue-300 transition-all text-slate-600 dark:text-slate-300"
             >
               {label} <span className="text-slate-400 dark:text-slate-500 ml-0.5">{value}%</span>
             </button>
@@ -462,17 +458,17 @@ export function QuickActionsBar({ modifiedCount, totalCount, onReset, onPreset }
         </div>
       </div>
       
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         {modifiedCount > 0 && (
-          <span className="text-[11px] bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 font-semibold px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
+          <span className="text-[10px] bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 font-semibold px-1.5 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
             {modifiedCount} customized
           </span>
         )}
         <button
           onClick={onReset}
-          className="text-xs text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-all font-medium"
+          className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 flex items-center gap-1 px-2 py-1 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-md transition-all font-medium"
         >
-          <RotateCcw className="w-3.5 h-3.5" />
+          <RotateCcw className="w-3 h-3" />
           Reset All
         </button>
       </div>
@@ -482,19 +478,19 @@ export function QuickActionsBar({ modifiedCount, totalCount, onReset, onPreset }
 
 export function YearHeaders({ years }: { years: number[] }) {
   return (
-    <div className="flex items-center gap-2 py-1 px-3 mb-1">
-      <div className="w-[140px] flex-shrink-0" />
-      <div className="flex items-center gap-1.5 flex-1 justify-end flex-wrap">
+    <div className="flex items-center gap-1 py-0.5 px-2 mb-0.5">
+      <div className="flex-shrink-0" style={{ width: 'var(--label-width, 120px)' }} />
+      <div className="flex items-center gap-1 flex-1">
         {years.map((year, idx) => (
-          <div key={year} className="w-[68px] text-center">
-            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+          <div key={year} className="flex-1 min-w-0 text-center">
+            <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase">
               Yr {idx + 1}
             </span>
-            <div className="text-[9px] text-slate-300 dark:text-slate-600">{year}</div>
+            <div className="text-[8px] text-slate-300 dark:text-slate-600 leading-none">{year}</div>
           </div>
         ))}
-        <div className="w-6 ml-0.5" />
-        <div className="w-6" />
+        <div className="w-5 flex-shrink-0" />
+        <div className="w-5 flex-shrink-0" />
       </div>
     </div>
   );
