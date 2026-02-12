@@ -337,6 +337,10 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   const calculateMutation = useMutation({
     mutationFn: (inputs: any) => 
       apiRequest('POST', `/api/modeling/projects/${projectId}/deal-pricing`, inputs),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId] });
+    },
   });
 
   const saveMutation = useMutation({

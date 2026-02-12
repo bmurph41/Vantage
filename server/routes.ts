@@ -19101,6 +19101,37 @@ Current context: Project ${req.params.projectId}`;
         }
       );
 
+      let autoSavePrice: number | null = null;
+      let autoSaveCapRate: number | null = null;
+
+      if (results.fromPurchasePrice && manualPurchasePrice) {
+        autoSavePrice = results.fromPurchasePrice.purchasePrice;
+        autoSaveCapRate = results.fromPurchasePrice.year1CapRate;
+      } else if (results.fromGoingInCapRate && goingInCapRate) {
+        autoSavePrice = results.fromGoingInCapRate.purchasePrice;
+        autoSaveCapRate = results.fromGoingInCapRate.achievedMetric;
+      } else if (results.fromTargetIRR && targetIRR) {
+        autoSavePrice = results.fromTargetIRR.purchasePrice;
+        autoSaveCapRate = results.fromTargetIRR.year1CapRate;
+      } else if (results.fromTargetYearCapRate && targetYearCapRate) {
+        autoSavePrice = results.fromTargetYearCapRate.purchasePrice;
+        autoSaveCapRate = results.fromTargetYearCapRate.year1CapRate;
+      }
+
+      if (autoSavePrice !== null && !isNaN(autoSavePrice)) {
+        try {
+          const updates: any = {
+            purchasePrice: String(autoSavePrice),
+          };
+          if (autoSaveCapRate !== null && !isNaN(autoSaveCapRate)) {
+            updates.year1CapRate = String(autoSaveCapRate);
+          }
+          await storage.updateModelingProject(projectId, updates, orgId);
+        } catch (saveErr) {
+          console.warn('Auto-save deal pricing failed:', saveErr);
+        }
+      }
+
       res.json({
         ...results,
         usingNormalizedData: useNormalizedData,
