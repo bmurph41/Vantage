@@ -18663,6 +18663,40 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: 'Failed to save project config' });
     }
   });
+
+  app.patch('/api/modeling/projects/:projectId/config', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const existingMetrics = (project.customMetrics as any) || {};
+      const existingConfig = existingMetrics.config || {};
+      const mergedConfig = { ...existingConfig, ...req.body };
+
+      const updatedMetrics = {
+        ...existingMetrics,
+        config: mergedConfig,
+      };
+
+      await storage.updateModelingProject(
+        projectId,
+        { customMetrics: updatedMetrics, updatedBy: userId },
+        orgId
+      );
+
+      res.json(mergedConfig);
+    } catch (error: any) {
+      console.error('Failed to patch project config:', error);
+      res.status(500).json({ error: 'Failed to patch project config' });
+    }
+  });
+
   // Update timeline configuration (Phase 1 - Institutional Grade)
   app.patch('/api/modeling/projects/:projectId/config/timeline', authenticateUser, async (req: any, res) => {
     try {

@@ -1,6 +1,7 @@
 import { useState, useMemo, Fragment } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
+import { useHoldPeriod } from '@/hooks/use-hold-period';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -154,31 +155,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
   const { toast } = useToast();
 
   // Fetch project configuration
-  const { data: config } = useQuery<any>({
-    queryKey: ['/api/modeling/projects', projectId, 'config'],
-  });
-
-  // Mutation to update hold period (syncs everywhere) - Requirement J
-  const updateHoldPeriodMutation = useMutation({
-    mutationFn: async (newHoldPeriod: number) => {
-      const response = await fetch(`/api/modeling/projects/${projectId}/config`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ holdPeriod: newHoldPeriod }),
-      });
-      if (!response.ok) throw new Error('Failed to update hold period');
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'config'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'pro-forma'] });
-      toast({ title: 'Updated', description: 'Hold period updated and synced.' });
-    },
-    onError: () => {
-      toast({ title: 'Error', description: 'Failed to update hold period.', variant: 'destructive' });
-    },
-  });
+  const { holdPeriod, setHoldPeriod, isUpdating: holdPeriodUpdating, config } = useHoldPeriod(projectId);
 
   // Fetch assumptions/growth rates
   const { data: assumptions } = useQuery<any>({
@@ -200,7 +177,6 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
     queryKey: ['/api/modeling/projects', projectId, 'actuals'],
   });
 
-  const holdPeriod = config?.holdPeriod || 7;
   const startDate = config?.startDate || '2026-01-31';
   const seasonMonths = config?.seasonMonths || [4, 5, 6, 7, 8, 9, 10];
   const startYear = parseInt(startDate.split('-')[0]);
@@ -684,8 +660,8 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
           {/* Hold Period Selector - Requirement J */}
           <Select 
             value={holdPeriod.toString()} 
-            onValueChange={(v) => updateHoldPeriodMutation.mutate(parseInt(v))}
-            disabled={updateHoldPeriodMutation.isPending}
+            onValueChange={(v) => setHoldPeriod(parseInt(v))}
+            disabled={holdPeriodUpdating}
           >
             <SelectTrigger className="w-[130px]" data-testid="select-hold-period-proforma">
               <Calendar className="h-4 w-4 mr-2" />

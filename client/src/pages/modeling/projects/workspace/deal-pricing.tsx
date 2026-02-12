@@ -23,6 +23,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
+import { useHoldPeriod } from '@/hooks/use-hold-period';
 import {
   Calculator,
   DollarSign,
@@ -289,7 +290,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   const [goingInCapRate, setGoingInCapRate] = useState<string>('7.5');
   const [targetYearCapRate, setTargetYearCapRate] = useState<string>('7.0');
   const [targetYear, setTargetYear] = useState<string>('3');
-  const [holdPeriod, setHoldPeriod] = useState<string>('5');
+  const { holdPeriod: holdPeriodNum, setHoldPeriod: setHoldPeriodNum } = useHoldPeriod(projectId);
   const [exitCapRate, setExitCapRate] = useState<string>('7.5');
   const [revenueGrowthRate, setRevenueGrowthRate] = useState<string>('3.0');
   const [expenseGrowthRate, setExpenseGrowthRate] = useState<string>('2.0');
@@ -328,9 +329,6 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   useEffect(() => {
     if (project?.purchasePrice) {
       setManualPurchasePrice(String(project.purchasePrice));
-    }
-    if (config?.holdPeriod) {
-      setHoldPeriod(String(config.holdPeriod));
     }
   }, [project, config]);
 
@@ -391,7 +389,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
         goingInCapRate: goingInCapRate ? parsePercentInput(goingInCapRate) : undefined,
         targetYearCapRate: targetYearCapRate ? parsePercentInput(targetYearCapRate) : undefined,
         targetYear: targetYear ? parseInt(targetYear) : undefined,
-        holdPeriod: parseInt(holdPeriod) || 5,
+        holdPeriod: holdPeriodNum,
         exitCapRate: parsePercentInput(exitCapRate) || 7.5,
         revenueGrowthRate: parsePercentInput(revenueGrowthRate),
         expenseGrowthRate: parsePercentInput(expenseGrowthRate),
@@ -400,7 +398,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
         ...periodOverrides,
       });
     }, 500),
-    [manualPurchasePrice, targetIRR, goingInCapRate, targetYearCapRate, targetYear, holdPeriod, exitCapRate, revenueGrowthRate, expenseGrowthRate, selectedPeriod, selectedPeriodData, useNormalizedData, pricingDriver, isLinked]
+    [manualPurchasePrice, targetIRR, goingInCapRate, targetYearCapRate, targetYear, holdPeriodNum, exitCapRate, revenueGrowthRate, expenseGrowthRate, selectedPeriod, selectedPeriodData, useNormalizedData, pricingDriver, isLinked]
   );
 
   useEffect(() => {
@@ -414,7 +412,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   useEffect(() => {
     if (!isLinked) return;
     
-    const holdYears = parseInt(holdPeriod) || 5;
+    const holdYears = holdPeriodNum;
     const revenueGrowth = parsePercentInput(revenueGrowthRate) / 100;
     const expenseGrowth = parsePercentInput(expenseGrowthRate) / 100;
     const netGrowth = revenueGrowth - expenseGrowth;
@@ -548,7 +546,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
         }
       }
     }
-  }, [exitCapRate, targetIRR, goingInCapRate, targetYear, targetYearCapRate, pricingDriver, isLinked, holdPeriod, revenueGrowthRate, expenseGrowthRate, pricingData?.projectFinancials?.year1NOI]);
+  }, [exitCapRate, targetIRR, goingInCapRate, targetYear, targetYearCapRate, pricingDriver, isLinked, holdPeriodNum, revenueGrowthRate, expenseGrowthRate, pricingData?.projectFinancials?.year1NOI]);
 
   const handleSavePurchasePrice = (price: number, capRate?: number) => {
     saveMutation.mutate({ 
@@ -557,7 +555,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
     });
   };
 
-  const years = Array.from({ length: parseInt(holdPeriod) || 5 }, (_, i) => i + 1);
+  const years = Array.from({ length: holdPeriodNum }, (_, i) => i + 1);
 
   return (
     <div className="space-y-6">
@@ -725,12 +723,12 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 </div>
                 <span className="text-[12px] font-medium text-slate-600 dark:text-slate-400">Hold Period</span>
               </div>
-              <Select value={holdPeriod} onValueChange={setHoldPeriod}>
+              <Select value={String(holdPeriodNum)} onValueChange={(v) => setHoldPeriodNum(parseInt(v))}>
                 <SelectTrigger className="w-full h-8 text-[13px] font-mono bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-600" data-testid="select-hold-period">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {[3, 5, 7, 10].map(y => (
+                  {[3, 5, 7, 10, 15].map(y => (
                     <SelectItem key={y} value={String(y)}>{y} Years</SelectItem>
                   ))}
                 </SelectContent>

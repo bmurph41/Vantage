@@ -1,6 +1,7 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useParams } from 'wouter';
+import { useHoldPeriod } from '@/hooks/use-hold-period';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -95,6 +96,8 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedScenario, setSelectedScenario] = useState<string | null>(null);
   
+  const { holdPeriod: sharedHoldPeriod, setHoldPeriod: setSharedHoldPeriod } = useHoldPeriod(projectId || '');
+
   // Real-time input state
   const [liveInputs, setLiveInputs] = useState({
     purchasePrice: 5000000,
@@ -106,6 +109,12 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     loanAmount: 3250000,
     loanRate: 5.5,
   });
+
+  useEffect(() => {
+    if (sharedHoldPeriod && sharedHoldPeriod !== liveInputs.holdPeriod) {
+      setLiveInputs(prev => ({ ...prev, holdPeriod: sharedHoldPeriod }));
+    }
+  }, [sharedHoldPeriod]);
 
   const { data: dcfAnalysis, isLoading, refetch } = useQuery<DCFAnalysis>({
     queryKey: ['/api/modeling/projects', projectId, 'dcf'],
@@ -141,6 +150,9 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     const newInputs = { ...liveInputs, [key]: value };
     setLiveInputs(newInputs);
     debouncedCalculate(newInputs);
+    if (key === 'holdPeriod') {
+      setSharedHoldPeriod(value);
+    }
   };
 
   const formatCurrency = (value: number) => {

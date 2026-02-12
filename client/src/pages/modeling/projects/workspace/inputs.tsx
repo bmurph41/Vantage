@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/tooltip';
 import { useLocalAutosave } from '@/hooks/use-local-autosave';
 import { AutosaveIndicator } from '@/components/ui/autosave-indicator';
+import { useHoldPeriod } from '@/hooks/use-hold-period';
 import {
   Calendar,
   Save,
@@ -165,7 +166,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
     queryKey: ['/api/modeling/projects', projectId, 'config'],
   });
 
-  const [holdPeriod, setHoldPeriod] = useState<number>(5);
+  const { holdPeriod, setHoldPeriod } = useHoldPeriod(projectId);
   const [startDate, setStartDate] = useState<string>('2026-01-31');
   const [cashFlowGranularity, setCashFlowGranularity] = useState<string>('annual');
   const [bottomLineMetric, setBottomLineMetric] = useState<'noi' | 'ebitda'>('noi');
@@ -220,7 +221,6 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
 
   useEffect(() => {
     if (config) {
-      setHoldPeriod(config.holdPeriod || 5);
       setStartDate(config.startDate || '2026-01-31');
       setCashFlowGranularity(config.cashFlowGranularity || 'annual');
       setBottomLineMetric(config.bottomLineMetric || 'noi');
