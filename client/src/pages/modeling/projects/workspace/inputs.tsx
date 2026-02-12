@@ -60,6 +60,7 @@ import {
 } from '@/components/ui/dialog';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { useToast } from '@/hooks/use-toast';
+import type { ProjectConfig } from '@/types/modeling';
 
 interface WorkspaceInputsProps {
   projectId: string;
@@ -162,7 +163,7 @@ function getSeasonalityLabel(seasons: SeasonalityOption[]): string {
 
 export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInputsProps) {
   const { toast } = useToast();
-  const { data: config, isLoading } = useQuery<any>({
+  const { data: config, isLoading } = useQuery<ProjectConfig>({
     queryKey: ['/api/modeling/projects', projectId, 'config'],
   });
 

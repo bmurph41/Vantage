@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
-import { formatPercent, formatNumber } from '@/lib/utils';
+import { formatCurrency, formatPercent, formatNumber } from '@/lib/utils';
 import { useDisplayPreferences } from '@/hooks/use-display-preferences';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -73,7 +73,7 @@ export default function ModelingProjectsPage() {
     queryKey: ['/api/modeling/projects'],
   });
 
-  const { formatCurrency } = useDisplayPreferences();
+  useDisplayPreferences();
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiRequest('DELETE', `/api/modeling/projects/${id}`),

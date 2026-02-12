@@ -43,6 +43,7 @@ import {
   History
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import type { ProjectAssumptions, ProFormaData } from '@/types/modeling';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { useDepartmentOrder } from '@/hooks/useDepartmentOrder';
 
@@ -159,12 +160,12 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
   const { holdPeriod, setHoldPeriod, isUpdating: holdPeriodUpdating, config } = useHoldPeriod(projectId);
 
   // Fetch assumptions/growth rates
-  const { data: assumptions } = useQuery<any>({
+  const { data: assumptions } = useQuery<ProjectAssumptions | null>({
     queryKey: ['/api/modeling/projects', projectId, 'assumptions'],
   });
 
   // Fetch pro forma projections
-  const { data: proFormaData, isLoading: proFormaLoading } = useQuery<any>({
+  const { data: proFormaData, isLoading: proFormaLoading } = useQuery<ProFormaData>({
     queryKey: ['/api/modeling/projects', projectId, 'pro-forma'],
   });
 
@@ -174,7 +175,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
   });
 
   // Fetch actuals by year from document uploads
-  const { data: actualsData } = useQuery<any>({
+  const { data: actualsData } = useQuery<Record<string, unknown>>({
     queryKey: ['/api/modeling/projects', projectId, 'actuals'],
   });
 

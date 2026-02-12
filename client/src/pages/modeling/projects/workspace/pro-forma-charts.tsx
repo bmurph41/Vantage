@@ -26,6 +26,7 @@ import {
 } from '@/components/analytics/InteractiveCharts';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { formatCurrency, formatPercent } from '@/lib/utils';
+import type { ProjectConfig, ProFormaChartData } from '@/types/modeling';
 
 interface WorkspaceProFormaChartsProps {
   projectId: string;
@@ -37,11 +38,11 @@ export default function WorkspaceProFormaCharts({ projectId, onTabChange }: Work
   const [activeTab, setActiveTab] = useState('overview');
   const [viewMode, setViewMode] = useState<'annual' | 'monthly'>('annual');
 
-  const { data: config } = useQuery<any>({
+  const { data: config } = useQuery<ProjectConfig>({
     queryKey: ['/api/modeling/projects', projectId, 'config'],
   });
 
-  const { data: proFormaData, isLoading, refetch } = useQuery<any>({
+  const { data: proFormaData, isLoading, refetch } = useQuery<ProFormaChartData>({
     queryKey: ['/api/analytics/modeling/projects', projectId, 'pro-forma-charts', selectedYear],
     queryFn: async () => {
       const response = await fetch(`/api/analytics/modeling/projects/${projectId}/pro-forma-charts?year=${selectedYear}`);

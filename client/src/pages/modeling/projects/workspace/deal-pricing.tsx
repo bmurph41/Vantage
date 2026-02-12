@@ -46,6 +46,7 @@ import {
   BarChart3,
 } from 'lucide-react';
 import type { ModelingProject, ModelingFinancialPeriod } from '@shared/schema';
+import type { ProjectConfig } from '@/types/modeling';
 import debounce from 'lodash.debounce';
 import YearSelector from '@/components/modeling/YearSelector';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
@@ -308,7 +309,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
     setSelectedPeriodData(periodData);
   }, []);
 
-  const { data: config } = useQuery<any>({
+  const { data: config } = useQuery<ProjectConfig>({
     queryKey: ['/api/modeling/projects', projectId, 'config'],
     enabled: !!projectId,
   });

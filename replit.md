@@ -18,7 +18,7 @@ Preferred communication style: Simple, everyday language.
 The platform utilizes React 18 with TypeScript and Wouter for routing. The UI is built with shadcn/ui (on Radix UI), styled using Tailwind CSS with CSS variables, and employs Lucide-React for icons, ensuring mobile optimization. Navigation sidebar order: Dashboard > Operations > CRM > Pipeline > Deal Workspace > Underwriting Tools > Investor Services > Prospecting > MarinaMatch (direct link) > DockTalk (standalone direct link) > Market Intelligence (Sales Comps, Rate Comps, etc.) > Integrations. The system uses a "Pack System" for modular premium features. Reusable UI components include `skeleton-variants`, `empty-state`, `inline-banner`, and `bulk-action-bar`. Keyboard shortcuts are implemented for common actions (Cmd/Ctrl+K, /, ESC).
 
 ### Technical Implementations
-- **Frontend**: React 18, TypeScript, Wouter, TanStack Query, React Hook Form with Zod.
+- **Frontend**: React 18, TypeScript, Wouter, TanStack Query, React Hook Form with Zod. Shared modeling types in `client/src/types/modeling.ts`.
 - **Backend**: Express.js with TypeScript, RESTful API, Drizzle ORM.
 - **Authentication**: Session-based, multi-tenant with PostgreSQL, RBAC, Zod validation, SQL injection prevention, audit trails, email verification via SendGrid, and magic link login.
 - **Data Modeling**: Multi-case modeling with database-backed scenarios, Inline Addbacks System (line-item, category, and month-cell scopes) with normalized view toggle for EBITDA normalization, and a Financial Kernel.

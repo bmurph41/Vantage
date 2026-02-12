@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { useCallback } from 'react';
-import { formatCurrency as baseFormatCurrency } from '@/lib/utils';
+import { useEffect } from 'react';
+import { setGlobalRoundingDigits } from '@/lib/utils';
 
 interface DisplayPreferences {
   priceRoundingDigits: number;
@@ -13,11 +13,9 @@ export function useDisplayPreferences() {
 
   const roundingDigits = prefs?.priceRoundingDigits ?? 0;
 
-  const fc = useCallback(
-    (value: number | string | null | undefined, opts?: { dash?: boolean }) =>
-      baseFormatCurrency(value, { roundingDigits, dash: opts?.dash }),
-    [roundingDigits]
-  );
+  useEffect(() => {
+    setGlobalRoundingDigits(roundingDigits);
+  }, [roundingDigits]);
 
-  return { roundingDigits, formatCurrency: fc };
+  return { roundingDigits };
 }

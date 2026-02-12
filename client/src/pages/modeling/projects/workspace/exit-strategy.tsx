@@ -40,6 +40,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatCurrency, formatPercent } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { ModelingProject, ExitScenario } from "@shared/schema";
+import type { ProjectConfig, ProFormaData } from '@/types/modeling';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { defaultScenarios, type ScenarioType } from '@/lib/modeling-scenarios';
 
@@ -307,11 +308,11 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
     queryKey: ['/api/modeling/projects', projectId],
   });
 
-  const { data: config } = useQuery<any>({
+  const { data: config } = useQuery<ProjectConfig>({
     queryKey: ['/api/modeling/projects', projectId, 'config'],
   });
 
-  const { data: proForma } = useQuery<any>({
+  const { data: proForma } = useQuery<ProFormaData>({
     queryKey: ['/api/modeling/projects', projectId, 'pro-forma'],
   });
 

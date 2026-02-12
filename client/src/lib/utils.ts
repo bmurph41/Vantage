@@ -5,6 +5,16 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+let _globalRoundingDigits = 0;
+
+export function setGlobalRoundingDigits(digits: number) {
+  _globalRoundingDigits = digits;
+}
+
+export function getGlobalRoundingDigits(): number {
+  return _globalRoundingDigits;
+}
+
 function applyRounding(value: number, roundingDigits: number): number {
   if (roundingDigits <= 0) return value;
   const factor = Math.pow(10, roundingDigits);
@@ -18,7 +28,8 @@ export function formatCurrency(
   if (value === null || value === undefined) return options?.dash ? '-' : '$0';
   const num = typeof value === 'string' ? parseFloat(value) : value;
   if (isNaN(num)) return options?.dash ? '-' : '$0';
-  const rounded = applyRounding(num, options?.roundingDigits ?? 0);
+  const digits = options?.roundingDigits ?? _globalRoundingDigits;
+  const rounded = applyRounding(num, digits);
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',

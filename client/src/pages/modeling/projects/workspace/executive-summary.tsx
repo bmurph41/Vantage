@@ -35,6 +35,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useCaseLabels, type CaseType } from '@/hooks/useCaseLabels';
 import type { ModelingProject } from '@shared/schema';
+import type { ProjectConfig, ExecutiveSummaryData } from '@/types/modeling';
 import {
   ClipboardList,
   TrendingUp,
@@ -71,11 +72,11 @@ export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: Wo
   
   const { getLabel, getCaseColor } = useCaseLabels(project);
 
-  const { data: config } = useQuery<any>({
+  const { data: config } = useQuery<ProjectConfig>({
     queryKey: ['/api/modeling/projects', projectId, 'config'],
   });
 
-  const { data: summaryData } = useQuery<any>({
+  const { data: summaryData } = useQuery<ExecutiveSummaryData>({
     queryKey: ['/api/modeling/projects', projectId, 'executive-summary', activeScenario],
   });
 

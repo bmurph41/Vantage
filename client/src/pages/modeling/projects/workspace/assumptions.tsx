@@ -52,6 +52,7 @@ import {
 import {
   useCaseLabels, type CaseType } from '@/hooks/useCaseLabels';
 import type { ModelingProject } from '@shared/schema';
+import type { ProjectConfig, ScenarioVersionComparison } from '@/types/modeling';
 import {
   Lock,
   Save,
@@ -420,7 +421,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
     enabled: showHistoryDialog,
   });
 
-  const { data: config } = useQuery<any>({
+  const { data: config } = useQuery<ProjectConfig>({
     queryKey: ['/api/modeling/projects', projectId, 'config'],
   });
 
@@ -923,7 +924,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
   });
 
 
-  const comparisonQuery = useQuery<any>({
+  const comparisonQuery = useQuery<ScenarioVersionComparison>({
     queryKey: ['/api/modeling/projects', projectId, 'scenarios', 'compare', compareVersions.base, compareVersions.compare],
     queryFn: () => apiRequest('GET', `/api/modeling/projects/${projectId}/scenarios/compare?baseVersionId=${compareVersions.base}\&compareVersionId=${compareVersions.compare}`),
     enabled: !!compareVersions.base && !!compareVersions.compare,

@@ -39,6 +39,7 @@ import {
   PolarRadiusAxis,
 } from 'recharts';
 import { formatCurrency, formatPercent } from '@/lib/utils';
+import type { ScenarioComparisonData } from '@/types/modeling';
 
 interface ScenarioComparisonChartsProps {
   projectId: string;
@@ -56,7 +57,7 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
   const [selectedScenarios, setSelectedScenarios] = useState<string[]>(['base', 'upside', 'downside']);
   const [activeTab, setActiveTab] = useState('overview');
 
-  const { data: comparisonData, isLoading, refetch } = useQuery<any>({
+  const { data: comparisonData, isLoading, refetch } = useQuery<ScenarioComparisonData>({
     queryKey: ['/api/modeling/projects', projectId, 'scenario-comparison', selectedScenarios.join(',')],
     queryFn: async () => {
       const response = await fetch(`/api/modeling/projects/${projectId}/scenario-comparison`);

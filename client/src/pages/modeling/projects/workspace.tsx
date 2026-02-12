@@ -41,6 +41,7 @@ import type { ModelingProject } from '@shared/schema';
 import { FavoriteButton, PinButton } from '@/components/quick-access';
 import { useTrackRecent } from '@/hooks/use-track-recent';
 import { formatCurrency } from '@/lib/formatUtils';
+import { useDisplayPreferences } from '@/hooks/use-display-preferences';
 import { apiRequest } from '@/lib/queryClient';
 import { toast } from '@/hooks/use-toast';
 import ProjectTypeBadge from '@/components/modeling/ProjectTypeBadge';
@@ -82,6 +83,7 @@ export default function ProjectWorkspace() {
     return params.get('tab') || 'overview';
   });
   const queryClient = useQueryClient();
+  useDisplayPreferences();
 
   useEffect(() => {
     const params = new URLSearchParams(searchString);

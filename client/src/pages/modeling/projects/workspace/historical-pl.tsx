@@ -68,6 +68,7 @@ import { useDepartmentOrder } from '@/hooks/useDepartmentOrder';
 import { useDisplayOverrides } from '@/hooks/useDisplayOverrides';
 import { DepartmentOrderSettings } from '@/components/modeling/DepartmentOrderSettings';
 import { InlineEditableName } from '@/components/modeling/InlineEditableName';
+import type { ProjectConfig, HistoricalPLData, ActualsData } from '@/types/modeling';
 
 interface WorkspaceHistoricalPLProps {
   projectId: string;
@@ -197,17 +198,17 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
     }
   }, [availableYears, selectedYear]);
 
-  const { data: plData, isLoading } = useQuery<any>({
+  const { data: plData, isLoading } = useQuery<HistoricalPLData>({
     queryKey: ['/api/modeling/projects', projectId, 'historical-pl', selectedYear],
     enabled: !!selectedYear,
   });
 
-  const { data: actualsData, isLoading: actualsLoading } = useQuery<any>({
+  const { data: actualsData, isLoading: actualsLoading } = useQuery<ActualsData>({
     queryKey: [`/api/modeling/projects/${projectId}/actuals?year=${selectedYear}`],
     enabled: !!selectedYear,
   });
 
-  const { data: allYearsActualsData } = useQuery<any>({
+  const { data: allYearsActualsData } = useQuery<ActualsData>({
     queryKey: [`/api/modeling/projects/${projectId}/actuals/multi-year?years=${yearRange.join(',')}`],
     enabled: displayMode === 'annual' && yearRange.length > 0,
   });
@@ -220,7 +221,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
     queryKey: [`/api/modeling/projects/${projectId}/sync-history`],
   });
 
-  const { data: config } = useQuery<any>({
+  const { data: config } = useQuery<ProjectConfig>({
     queryKey: ['/api/modeling/projects', projectId, 'config'],
   });
 

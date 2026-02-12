@@ -22,6 +22,7 @@ import {
   Layers
 } from 'lucide-react';
 import type { ModelingProject } from '@shared/schema';
+import type { ProjectConfig, ProjectAssumptions } from '@/types/modeling';
 import { LiveDataStatusPanel } from '@/components/modeling/LiveDataStatusPanel';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { MarketRatesSummary } from '@/components/modeling/MarketRatesSummary';
@@ -41,7 +42,7 @@ type WorkflowStep = {
 };
 
 export default function WorkspaceOverview({ project, onTabChange }: WorkspaceOverviewProps) {
-  const { data: config } = useQuery<any>({
+  const { data: config } = useQuery<ProjectConfig>({
     queryKey: ['/api/modeling/projects', project.id, 'config'],
   });
 
@@ -49,7 +50,7 @@ export default function WorkspaceOverview({ project, onTabChange }: WorkspaceOve
     queryKey: ['/api/modeling/projects', project.id, 'documents'],
   });
 
-  const { data: assumptions } = useQuery<any>({
+  const { data: assumptions } = useQuery<ProjectAssumptions | null>({
     queryKey: ['/api/modeling/projects', project.id, 'assumptions'],
   });
 
