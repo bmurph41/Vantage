@@ -508,7 +508,6 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
   const progress = (state.step / steps.length) * 100;
 
   const currentStepTitle = steps.find(s => s.id === state.step)?.title || '';
-  const isSkippableStep = (currentStepTitle === 'Profit Centers' || currentStepTitle === 'Storage' || currentStepTitle === 'Documents') && state.step < steps.length;
 
   function handleNext() {
     if (state.step < steps.length) {
@@ -1258,11 +1257,6 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
           </Button>
           
           <div className="flex items-center gap-2">
-            {isSkippableStep && (
-              <Button variant="ghost" onClick={handleNext} className="text-muted-foreground">
-                Skip
-              </Button>
-            )}
             {state.step < steps.length ? (
               <Button onClick={handleNext} className="bg-[#1E4FAB] hover:bg-[#1a4294]">
                 Continue
