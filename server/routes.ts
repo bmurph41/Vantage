@@ -17121,30 +17121,117 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const projects = await storage.getModelingProjects(orgId);
       
-      const { modelingFinancialPeriods } = await import('@shared/schema');
+      const { modelingActuals, modelingFinancialPeriods } = await import('@shared/schema');
+      const { proFormaEngineService } = await import('./services/pro-forma-engine-service');
       
-      const projectsWithEbitda = await Promise.all(projects.map(async (project) => {
-        const financialPeriods = await db.select({
-          periodType: modelingFinancialPeriods.periodType,
-          noi: modelingFinancialPeriods.noi,
-        })
-        .from(modelingFinancialPeriods)
-        .where(and(
-          eq(modelingFinancialPeriods.modelingProjectId, project.id),
-          eq(modelingFinancialPeriods.orgId, orgId)
-        ));
-        
-        const t12Period = financialPeriods.find(p => p.periodType === 't12');
-        const year1Period = financialPeriods.find(p => p.periodType === 'year_1');
-        
+      const projectsWithMetrics = await Promise.all(projects.map(async (project) => {
+        const purchasePrice = project.purchasePrice ? parseFloat(project.purchasePrice.toString()) : null;
+        const year1CapRate = project.year1CapRate ? parseFloat(project.year1CapRate.toString()) : null;
+
+        let t12Ebitda: number | null = null;
+        let t12Label: string | null = null;
+        let year1Ebitda: number | null = null;
+
+        try {
+          const financialPeriods = await db.select()
+            .from(modelingFinancialPeriods)
+            .where(and(
+              eq(modelingFinancialPeriods.modelingProjectId, project.id),
+              eq(modelingFinancialPeriods.orgId, orgId)
+            ));
+
+          const t12Period = financialPeriods.find(p => p.periodType === 't12');
+          const year1Period = financialPeriods.find(p => p.periodType === 'year_1');
+
+          if (t12Period) {
+            t12Ebitda = t12Period.ebitda ? parseFloat(t12Period.ebitda) : (t12Period.noi ? parseFloat(t12Period.noi) : null);
+            if (t12Period.periodStartDate && t12Period.periodEndDate) {
+              t12Label = `${t12Period.periodLabel || 'T12'}`;
+            } else {
+              t12Label = t12Period.periodLabel || 'T12';
+            }
+          }
+
+          if (year1Period) {
+            year1Ebitda = year1Period.ebitda ? parseFloat(year1Period.ebitda) : (year1Period.noi ? parseFloat(year1Period.noi) : null);
+          }
+
+          if (t12Ebitda === null) {
+            const actuals = await db.select({
+              year: modelingActuals.year,
+              month: modelingActuals.month,
+              category: modelingActuals.category,
+              amount: modelingActuals.amount,
+            })
+            .from(modelingActuals)
+            .where(and(
+              eq(modelingActuals.modelingProjectId, project.id),
+              eq(modelingActuals.orgId, orgId)
+            ));
+
+            if (actuals.length > 0) {
+              const periods = new Set(actuals.map(a => `${a.year}-${String(a.month).padStart(2, '0')}`));
+              const sortedPeriods = Array.from(periods).sort().slice(-12);
+
+              if (sortedPeriods.length > 0) {
+                const validPeriods = new Set(sortedPeriods);
+                let revenue = 0;
+                let cogs = 0;
+                let expenses = 0;
+
+                for (const actual of actuals) {
+                  const key = `${actual.year}-${String(actual.month).padStart(2, '0')}`;
+                  if (!validPeriods.has(key)) continue;
+                  const amt = parseFloat(actual.amount?.toString() || '0');
+                  const cat = actual.category?.toLowerCase() || '';
+                  if (cat === 'revenue') revenue += amt;
+                  else if (cat === 'cogs') cogs += amt;
+                  else if (cat === 'expenses' || cat === 'expense') expenses += amt;
+                }
+                t12Ebitda = revenue - cogs - expenses;
+
+                const firstPeriod = sortedPeriods[0].split('-');
+                const lastPeriod = sortedPeriods[sortedPeriods.length - 1].split('-');
+                const startMonth = parseInt(firstPeriod[1]);
+                const startYear = parseInt(firstPeriod[0]);
+                const endMonth = parseInt(lastPeriod[1]);
+                const endYear = parseInt(lastPeriod[0]);
+                const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+                if (sortedPeriods.length === 12 && startMonth === 1 && endMonth === 12 && startYear === endYear) {
+                  t12Label = `FY ${startYear}`;
+                } else {
+                  t12Label = `${monthNames[startMonth - 1]} ${startYear} - ${monthNames[endMonth - 1]} ${endYear}`;
+                }
+              }
+            }
+          }
+
+          if (year1Ebitda === null) {
+            try {
+              const proForma = await proFormaEngineService.generateProForma(project.id, orgId, 'base');
+              if (proForma.noi && proForma.noi.length > 0) {
+                year1Ebitda = proForma.noi[0];
+              }
+            } catch (e) {
+              // Pro forma may not be available for all projects
+            }
+          }
+        } catch (e) {
+          console.warn(`Failed to compute metrics for project ${project.id}:`, e);
+        }
+
         return {
           ...project,
-          t12Ebitda: t12Period?.noi ? parseFloat(t12Period.noi) : null,
-          year1Ebitda: year1Period?.noi ? parseFloat(year1Period.noi) : null,
+          purchasePrice,
+          year1CapRate,
+          t12Ebitda,
+          t12Label,
+          year1Ebitda,
         };
       }));
       
-      res.json(projectsWithEbitda);
+      res.json(projectsWithMetrics);
     } catch (error: any) {
       console.error('Failed to fetch modeling projects:', error);
       res.status(500).json({ error: 'Failed to fetch modeling projects' });

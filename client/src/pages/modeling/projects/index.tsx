@@ -42,6 +42,7 @@ type ModelingProject = {
   totalStorageUnits: number | null;
   ebitda: number | null;
   t12Ebitda: number | null;
+  t12Label: string | null;
   year1Ebitda: number | null;
   dealOutcome: string;
   ddProjectId: string | null;
@@ -347,7 +348,7 @@ export default function ModelingProjectsPage() {
                       <TableHead>Location</TableHead>
                       <TableHead className="text-right">Purchase Price</TableHead>
                       <TableHead className="text-right">Year 1 Cap Rate</TableHead>
-                      <TableHead className="text-right">T12 EBITDA</TableHead>
+                      <TableHead className="text-right">Historical EBITDA</TableHead>
                       <TableHead className="text-right">Yr. 1 EBITDA</TableHead>
                       <TableHead className="text-center">Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -374,7 +375,14 @@ export default function ModelingProjectsPage() {
                           {formatPercent(project.year1CapRate)}
                         </TableCell>
                         <TableCell className="text-right" data-testid={`text-t12-ebitda-${project.id}`}>
-                          {formatCurrency(project.t12Ebitda)}
+                          {project.t12Ebitda != null ? (
+                            <div>
+                              <div>{formatCurrency(project.t12Ebitda)}</div>
+                              {project.t12Label && (
+                                <div className="text-xs text-muted-foreground">{project.t12Label}</div>
+                              )}
+                            </div>
+                          ) : '-'}
                         </TableCell>
                         <TableCell className="text-right" data-testid={`text-yr1-ebitda-${project.id}`}>
                           {formatCurrency(project.year1Ebitda)}
