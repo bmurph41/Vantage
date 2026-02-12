@@ -15,8 +15,22 @@ import {
   RefreshCw,
   Download,
   PieChart,
-  Activity
+  Activity,
+  GitCompare,
+  X
 } from 'lucide-react';
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  Legend,
+} from 'recharts';
 import {
   DrillDownBarChart,
   TimeSeriesDrillDown,
@@ -33,10 +47,29 @@ interface WorkspaceProFormaChartsProps {
   onTabChange?: (tab: string) => void;
 }
 
+const METRIC_DEFINITIONS = [
+  { id: 'revenue', label: 'Revenue', color: '#3b82f6', format: 'currency' as const },
+  { id: 'expenses', label: 'Expenses', color: '#ef4444', format: 'currency' as const },
+  { id: 'noi', label: 'NOI', color: '#10b981', format: 'currency' as const },
+  { id: 'noiMargin', label: 'NOI Margin', color: '#8b5cf6', format: 'percent' as const },
+  { id: 'capRate', label: 'Cap Rate', color: '#f59e0b', format: 'percent' as const },
+  { id: 'cashOnCash', label: 'Cash-on-Cash', color: '#ec4899', format: 'percent' as const },
+  { id: 'debtService', label: 'Debt Service', color: '#6366f1', format: 'currency' as const },
+  { id: 'leveredCF', label: 'Levered Cash Flow', color: '#14b8a6', format: 'currency' as const },
+];
+
+const COMPARE_CHART_TYPES = [
+  { id: 'line', label: 'Line' },
+  { id: 'bar', label: 'Bar' },
+] as const;
+
 export default function WorkspaceProFormaCharts({ projectId, onTabChange }: WorkspaceProFormaChartsProps) {
   const [selectedYear, setSelectedYear] = useState('all');
   const [activeTab, setActiveTab] = useState('overview');
   const [viewMode, setViewMode] = useState<'annual' | 'monthly'>('annual');
+  const [selectedMetrics, setSelectedMetrics] = useState<string[]>(['revenue', 'noi']);
+  const [compareChartType, setCompareChartType] = useState<'line' | 'bar'>('line');
+  const [compareTimeframe, setCompareTimeframe] = useState<'all' | 'first3' | 'last3'>('all');
 
   const { data: config } = useQuery<ProjectConfig>({
     queryKey: ['/api/modeling/projects', projectId, 'config'],
@@ -236,6 +269,49 @@ export default function WorkspaceProFormaCharts({ projectId, onTabChange }: Work
     capRate: 6.8,
   };
 
+  const comparisonData = useMemo(() => {
+    const allYears = years.map((year, idx) => {
+      const revenue = Math.round(1500000 * Math.pow(1.04, idx));
+      const expenses = Math.round(626000 * Math.pow(1.025, idx));
+      const noi = revenue - expenses;
+      const noiMargin = (noi / revenue) * 100;
+      const capRate = 6.5 + idx * 0.1;
+      const cashOnCash = 7.2 + idx * 0.3;
+      const debtService = Math.round(420000 * (1 + idx * 0.005));
+      const leveredCF = noi - debtService;
+      return {
+        period: `Year ${idx + 1}`,
+        year,
+        revenue,
+        expenses,
+        noi,
+        noiMargin: parseFloat(noiMargin.toFixed(2)),
+        capRate: parseFloat(capRate.toFixed(2)),
+        cashOnCash: parseFloat(cashOnCash.toFixed(2)),
+        debtService,
+        leveredCF,
+      };
+    });
+    if (compareTimeframe === 'first3') return allYears.slice(0, 3);
+    if (compareTimeframe === 'last3') return allYears.slice(-3);
+    return allYears;
+  }, [years, compareTimeframe]);
+
+  const toggleMetric = (metricId: string) => {
+    setSelectedMetrics(prev =>
+      prev.includes(metricId) ? prev.filter(m => m !== metricId) : [...prev, metricId]
+    );
+  };
+
+  const activeMetrics = METRIC_DEFINITIONS.filter(m => selectedMetrics.includes(m.id));
+  const hasMixedFormats = activeMetrics.some(m => m.format === 'currency') && activeMetrics.some(m => m.format === 'percent');
+
+  const formatMetricValue = (value: number, metricId: string) => {
+    const def = METRIC_DEFINITIONS.find(m => m.id === metricId);
+    if (def?.format === 'percent') return `${value.toFixed(1)}%`;
+    return formatCurrency(value);
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -342,11 +418,15 @@ export default function WorkspaceProFormaCharts({ projectId, onTabChange }: Work
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4 max-w-lg">
+        <TabsList className="grid w-full grid-cols-5 max-w-2xl">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="revenue">Revenue</TabsTrigger>
           <TabsTrigger value="expenses">Expenses</TabsTrigger>
           <TabsTrigger value="noi">NOI Analysis</TabsTrigger>
+          <TabsTrigger value="compare" className="gap-1.5">
+            <GitCompare className="h-3.5 w-3.5" />
+            Compare
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6 mt-6">
@@ -519,6 +599,222 @@ export default function WorkspaceProFormaCharts({ projectId, onTabChange }: Work
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+        <TabsContent value="compare" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <GitCompare className="h-5 w-5 text-primary" />
+                    Dynamic Metric Comparison
+                  </CardTitle>
+                  <CardDescription>Select metrics and timeframes to compare side-by-side</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select value={compareTimeframe} onValueChange={(v: 'all' | 'first3' | 'last3') => setCompareTimeframe(v)}>
+                    <SelectTrigger className="w-[160px]">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Years</SelectItem>
+                      <SelectItem value="first3">First 3 Years</SelectItem>
+                      <SelectItem value="last3">Last 3 Years</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="flex border rounded-md">
+                    {COMPARE_CHART_TYPES.map(ct => (
+                      <button
+                        key={ct.id}
+                        onClick={() => setCompareChartType(ct.id)}
+                        className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                          compareChartType === ct.id
+                            ? 'bg-primary text-primary-foreground'
+                            : 'text-muted-foreground hover:text-foreground'
+                        } ${ct.id === 'line' ? 'rounded-l-md' : 'rounded-r-md'}`}
+                      >
+                        {ct.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-3 mb-6 p-3 bg-muted/50 rounded-lg">
+                {METRIC_DEFINITIONS.map(metric => {
+                  const isSelected = selectedMetrics.includes(metric.id);
+                  return (
+                    <button
+                      key={metric.id}
+                      onClick={() => toggleMetric(metric.id)}
+                      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
+                        isSelected
+                          ? 'border-transparent shadow-sm text-white'
+                          : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/30'
+                      }`}
+                      style={isSelected ? { backgroundColor: metric.color } : undefined}
+                    >
+                      {isSelected && <span className="w-2 h-2 rounded-full bg-white/80" />}
+                      {metric.label}
+                      {isSelected && <X className="h-3 w-3 ml-0.5 opacity-70" />}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {activeMetrics.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                  <GitCompare className="h-12 w-12 mb-3 opacity-40" />
+                  <p className="text-lg font-medium">Select metrics to compare</p>
+                  <p className="text-sm">Click on the metric pills above to add them to the chart</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {hasMixedFormats && (
+                    <div className="text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-md">
+                      Showing mixed formats: currency values on the left axis, percentages on the right axis
+                    </div>
+                  )}
+                  <ResponsiveContainer width="100%" height={420}>
+                    {compareChartType === 'line' ? (
+                      <LineChart data={comparisonData}>
+                        <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                        <XAxis dataKey="period" tick={{ fontSize: 12 }} />
+                        <YAxis
+                          yAxisId="currency"
+                          tick={{ fontSize: 11 }}
+                          tickFormatter={(v) => formatCurrency(v)}
+                          hide={!activeMetrics.some(m => m.format === 'currency')}
+                        />
+                        <YAxis
+                          yAxisId="percent"
+                          orientation="right"
+                          tick={{ fontSize: 11 }}
+                          tickFormatter={(v) => `${v}%`}
+                          hide={!activeMetrics.some(m => m.format === 'percent')}
+                        />
+                        <RechartsTooltip
+                          formatter={(value: number, name: string) => {
+                            const def = METRIC_DEFINITIONS.find(m => m.label === name);
+                            return [def?.format === 'percent' ? `${value.toFixed(1)}%` : formatCurrency(value), name];
+                          }}
+                        />
+                        <Legend />
+                        {activeMetrics.map(metric => (
+                          <Line
+                            key={metric.id}
+                            type="monotone"
+                            dataKey={metric.id}
+                            name={metric.label}
+                            stroke={metric.color}
+                            strokeWidth={2.5}
+                            dot={{ r: 4, fill: metric.color }}
+                            activeDot={{ r: 6 }}
+                            yAxisId={metric.format === 'percent' ? 'percent' : 'currency'}
+                          />
+                        ))}
+                      </LineChart>
+                    ) : (
+                      <BarChart data={comparisonData}>
+                        <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                        <XAxis dataKey="period" tick={{ fontSize: 12 }} />
+                        <YAxis
+                          yAxisId="currency"
+                          tick={{ fontSize: 11 }}
+                          tickFormatter={(v) => formatCurrency(v)}
+                          hide={!activeMetrics.some(m => m.format === 'currency')}
+                        />
+                        <YAxis
+                          yAxisId="percent"
+                          orientation="right"
+                          tick={{ fontSize: 11 }}
+                          tickFormatter={(v) => `${v}%`}
+                          hide={!activeMetrics.some(m => m.format === 'percent')}
+                        />
+                        <RechartsTooltip
+                          formatter={(value: number, name: string) => {
+                            const def = METRIC_DEFINITIONS.find(m => m.label === name);
+                            return [def?.format === 'percent' ? `${value.toFixed(1)}%` : formatCurrency(value), name];
+                          }}
+                        />
+                        <Legend />
+                        {activeMetrics.map(metric => (
+                          <Bar
+                            key={metric.id}
+                            dataKey={metric.id}
+                            name={metric.label}
+                            fill={metric.color}
+                            radius={[4, 4, 0, 0]}
+                            yAxisId={metric.format === 'percent' ? 'percent' : 'currency'}
+                          />
+                        ))}
+                      </BarChart>
+                    )}
+                  </ResponsiveContainer>
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">Comparison Data Table</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b">
+                              <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Period</th>
+                              {activeMetrics.map(metric => (
+                                <th key={metric.id} className="text-right py-2 px-3 font-medium" style={{ color: metric.color }}>
+                                  {metric.label}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {comparisonData.map((row, idx) => (
+                              <tr key={row.period} className={idx % 2 === 0 ? 'bg-muted/30' : ''}>
+                                <td className="py-2 pr-4 font-medium">{row.period} ({row.year})</td>
+                                {activeMetrics.map(metric => {
+                                  const val = (row as Record<string, any>)[metric.id];
+                                  const prevVal = idx > 0 ? (comparisonData[idx - 1] as Record<string, any>)[metric.id] : null;
+                                  const change = prevVal !== null && prevVal !== 0 ? ((val - prevVal) / Math.abs(prevVal)) * 100 : null;
+                                  return (
+                                    <td key={metric.id} className="text-right py-2 px-3">
+                                      <div>{formatMetricValue(val, metric.id)}</div>
+                                      {change !== null && (
+                                        <div className={`text-xs ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                          {change >= 0 ? '+' : ''}{change.toFixed(1)}%
+                                        </div>
+                                      )}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="border-t font-medium">
+                              <td className="py-2 pr-4">Average</td>
+                              {activeMetrics.map(metric => {
+                                const vals = comparisonData.map(r => (r as Record<string, any>)[metric.id] as number);
+                                const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+                                return (
+                                  <td key={metric.id} className="text-right py-2 px-3">
+                                    {formatMetricValue(avg, metric.id)}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
