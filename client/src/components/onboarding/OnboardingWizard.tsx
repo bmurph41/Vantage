@@ -1393,15 +1393,25 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
       {state.stagedFiles.length > 0 && (
         <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
           {state.stagedFiles.map((staged) => (
-            <div key={staged.id} className="rounded-lg border bg-muted/30 p-2.5">
+            <div key={staged.id} className="rounded-lg border bg-muted/30 p-2.5 space-y-2">
               <div className="flex items-center gap-2">
                 <FileSpreadsheet className="h-4 w-4 text-green-600 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{staged.file.name}</p>
                   <p className="text-xs text-muted-foreground">{formatFileSize(staged.file.size)}</p>
                 </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 shrink-0 text-muted-foreground hover:text-destructive"
+                  onClick={() => removeStagedFile(staged.id)}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <div className="flex items-center gap-2 pl-6">
                 <Select value={staged.docType === 't12' ? 'pnl' : staged.docType} onValueChange={(v) => updateStagedFileField(staged.id, 'docType', v as DocTypeEnum)}>
-                  <SelectTrigger className="h-7 w-[130px] text-xs">
+                  <SelectTrigger className="h-7 w-[140px] text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1420,7 +1430,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
                     updateStagedFileField(staged.id, 'year', v);
                   }
                 }}>
-                  <SelectTrigger className="h-7 w-[80px] text-xs">
+                  <SelectTrigger className="h-7 w-[85px] text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1430,20 +1440,12 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
                     ))}
                   </SelectContent>
                 </Select>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 shrink-0 text-muted-foreground hover:text-destructive"
-                  onClick={() => removeStagedFile(staged.id)}
-                >
-                  <X className="h-3.5 w-3.5" />
-                </Button>
               </div>
               {staged.docType === 't12' && (
-                <div className="mt-2 flex items-center gap-2 flex-wrap text-xs">
+                <div className="flex items-center gap-2 flex-wrap text-xs pl-6">
                   <span className="text-muted-foreground font-medium">From:</span>
                   <Select value={staged.t12StartMonth || '1'} onValueChange={(v) => updateStagedFileField(staged.id, 't12StartMonth', v)}>
-                    <SelectTrigger className="h-6 w-[75px] text-xs">
+                    <SelectTrigger className="h-6 w-[80px] text-xs">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1453,7 +1455,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
                     </SelectContent>
                   </Select>
                   <Select value={staged.t12StartYear || new Date().getFullYear().toString()} onValueChange={(v) => updateStagedFileField(staged.id, 't12StartYear', v)}>
-                    <SelectTrigger className="h-6 w-[72px] text-xs">
+                    <SelectTrigger className="h-6 w-[76px] text-xs">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1464,7 +1466,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
                   </Select>
                   <span className="text-muted-foreground font-medium ml-1">To:</span>
                   <Select value={staged.t12EndMonth || '12'} onValueChange={(v) => updateStagedFileField(staged.id, 't12EndMonth', v)}>
-                    <SelectTrigger className="h-6 w-[75px] text-xs">
+                    <SelectTrigger className="h-6 w-[80px] text-xs">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1474,7 +1476,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
                     </SelectContent>
                   </Select>
                   <Select value={staged.t12EndYear || new Date().getFullYear().toString()} onValueChange={(v) => updateStagedFileField(staged.id, 't12EndYear', v)}>
-                    <SelectTrigger className="h-6 w-[72px] text-xs">
+                    <SelectTrigger className="h-6 w-[76px] text-xs">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

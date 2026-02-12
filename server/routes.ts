@@ -17483,8 +17483,8 @@ Current context: Project ${req.params.projectId}`;
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'Validation failed', details: error.errors });
       }
-      console.error('Failed to create modeling project:', error);
-      res.status(500).json({ error: 'Failed to create modeling project' });
+      console.error('Failed to create modeling project:', error?.message || error, error?.stack);
+      res.status(500).json({ error: 'Failed to create modeling project', details: error?.message });
     }
   });
 
