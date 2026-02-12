@@ -185,123 +185,99 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
         
         const results = await Promise.all(
           validMarinas.map(async (marina) => {
-            const propertyRes = await apiRequest('POST', '/api/properties', {
-              name: marina.name,
-              address: marina.address.line1,
-              addressLine2: marina.address.line2 || null,
-              city: marina.address.city,
-              state: marina.address.state,
-              zipCode: marina.address.zip,
-              latitude: marina.address.lat?.toString(),
-              longitude: marina.address.lng?.toString(),
-              placeId: marina.address.placeId,
-              propertyType: 'marina',
-              status: 'prospect',
-            });
-            const crmProperty = await propertyRes.json();
-            
-            const dealRes = await apiRequest('POST', '/api/deals', {
-              name: `${marina.name} - ${data.dealType === 'acquisition' ? 'Acquisition' : data.dealType === 'refinance' ? 'Refinance' : 'Operations'}`,
-              propertyId: crmProperty.id,
-              dealSource: data.dealType,
-              status: 'lead',
-              portfolioName: data.portfolioName || 'Untitled Portfolio',
-            });
-            const crmDeal = await dealRes.json();
-            
             const projectRes = await apiRequest('POST', '/api/modeling/projects', {
               marinaName: marina.name,
               address: marina.address.line1,
-              addressLine2: marina.address.line2 || null,
               city: marina.address.city,
               state: marina.address.state,
-              zipCode: marina.address.zip,
-              region: data.region || null,
-              latitude: marina.address.lat,
-              longitude: marina.address.lng,
-              dealOutcome: data.dealStatus,
-              portfolioName: data.portfolioName || 'Untitled Portfolio',
-              isPortfolio: true,
-              dealId: crmDeal.id,
-              propertyId: crmProperty.id,
-              customMetrics: { dealType: data.dealType },
+              zipCode: marina.address.zip || undefined,
+              region: data.region || undefined,
+              dealOutcome: data.dealStatus || 'active',
+              customMetrics: { dealType: data.dealType, portfolioName: data.portfolioName || 'Untitled Portfolio' },
             });
             const modelingProject = await projectRes.json();
             
-            return { crmProperty, crmDeal, modelingProject };
+            try {
+              await apiRequest('POST', '/api/properties', {
+                name: marina.name,
+                address: marina.address.line1,
+                city: marina.address.city,
+                state: marina.address.state,
+                zipCode: marina.address.zip,
+                propertyType: 'marina',
+                status: 'prospect',
+              });
+            } catch (e) {
+              console.warn('CRM property creation failed (non-blocking):', e);
+            }
+            
+            return { modelingProject };
           })
         );
         return results;
       } else {
-        if (!data.marinaName.trim() || !data.marinaAddress.city || !data.marinaAddress.state) {
-          throw new Error("Please provide a marina name, city, and state");
+        if (!data.marinaName.trim()) {
+          throw new Error("Please provide a marina name");
         }
-        
-        const propertyRes = await apiRequest('POST', '/api/properties', {
-          name: data.marinaName,
-          address: data.marinaAddress.line1,
-          addressLine2: data.marinaAddress.line2 || null,
-          city: data.marinaAddress.city,
-          state: data.marinaAddress.state,
-          zipCode: data.marinaAddress.zip,
-          latitude: data.marinaAddress.lat?.toString(),
-          longitude: data.marinaAddress.lng?.toString(),
-          placeId: data.marinaAddress.placeId,
-          propertyType: 'marina',
-          status: 'prospect',
-        });
-        const crmProperty = await propertyRes.json();
-        
-        const dealRes = await apiRequest('POST', '/api/deals', {
-          name: `${data.marinaName} - ${data.dealType === 'acquisition' ? 'Acquisition' : data.dealType === 'refinance' ? 'Refinance' : 'Operations'}`,
-          propertyId: crmProperty.id,
-          dealSource: data.dealType,
-          status: 'lead',
-        });
-        const crmDeal = await dealRes.json();
         
         const projectRes = await apiRequest('POST', '/api/modeling/projects', {
           marinaName: data.marinaName,
-          address: data.marinaAddress.line1,
-          addressLine2: data.marinaAddress.line2 || null,
-          city: data.marinaAddress.city,
-          state: data.marinaAddress.state,
-          zipCode: data.marinaAddress.zip,
-          region: data.region || null,
-          latitude: data.marinaAddress.lat,
-          longitude: data.marinaAddress.lng,
-          dealOutcome: data.dealStatus,
-          dealId: crmDeal.id,
-          propertyId: crmProperty.id,
+          address: data.marinaAddress.line1 || undefined,
+          city: data.marinaAddress.city || undefined,
+          state: data.marinaAddress.state || undefined,
+          zipCode: data.marinaAddress.zip || undefined,
+          region: data.region || undefined,
+          dealOutcome: data.dealStatus || 'active',
           customMetrics: { dealType: data.dealType },
         });
         const modelingProject = await projectRes.json();
         
-        return { crmProperty, crmDeal, modelingProject };
+        try {
+          await apiRequest('POST', '/api/properties', {
+            name: data.marinaName,
+            address: data.marinaAddress.line1,
+            city: data.marinaAddress.city,
+            state: data.marinaAddress.state,
+            zipCode: data.marinaAddress.zip,
+            propertyType: 'marina',
+            status: 'prospect',
+          });
+        } catch (e) {
+          console.warn('CRM property creation failed (non-blocking):', e);
+        }
+        
+        return { modelingProject };
       }
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects'] });
       queryClient.invalidateQueries({ queryKey: ['/api/crm/deals'] });
       queryClient.invalidateQueries({ queryKey: ['/api/crm/properties'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
       const isPortfolio = state.dealStructure === "portfolio";
       const projectCount = isPortfolio ? state.portfolioMarinas.filter(m => m.name.trim()).length : 1;
       toast({ 
-        title: isPortfolio ? "Portfolio Created!" : "Deal Created!", 
+        title: isPortfolio ? "Portfolio Created!" : "Project Created!", 
         description: isPortfolio 
           ? `${projectCount} marina${projectCount > 1 ? 's' : ''} added to CRM and Financial Model.`
-          : `${state.marinaName} has been added to CRM and Financial Model.` 
+          : `${state.marinaName} has been added to your Financial Model.` 
       });
       
       onOpenChange(false);
       
-      if (onProjectCreated && !Array.isArray(result)) {
-        onProjectCreated(result.modelingProject.id);
-      } else if (onProjectCreated && Array.isArray(result) && result.length > 0) {
-        onProjectCreated(result[0].modelingProject.id);
+      const projectId = Array.isArray(result) 
+        ? result[0]?.modelingProject?.id 
+        : result?.modelingProject?.id;
+      
+      if (projectId) {
+        if (onProjectCreated) {
+          onProjectCreated(projectId);
+        } else {
+          navigate(`/modeling/projects/${projectId}?tab=inputs`);
+        }
       }
       
-      if (mode === "onboarding") {
+      if (mode === "onboarding" && !projectId) {
         if (state.featuresToExplore.includes("modeling")) {
           navigate("/modeling/projects");
         } else if (state.featuresToExplore.includes("crm")) {
@@ -313,10 +289,14 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
         }
       }
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error('Project creation error:', error);
+      const msg = error?.message || 'Unknown error';
       toast({ 
         title: "Error", 
-        description: "Failed to create project. You can create one later from the Modeling page.", 
+        description: msg.includes('403') || msg.includes('CSRF')
+          ? "Session expired. Please refresh the page and try again."
+          : `Failed to create project: ${msg.substring(0, 100)}`, 
         variant: "destructive" 
       });
     }
@@ -337,8 +317,8 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
   }
 
   function handleFinish() {
-    const hasSingleDeal = state.dealStructure === "single" && state.marinaName.trim() && state.marinaAddress.line1.trim() && state.marinaAddress.city && state.marinaAddress.state && state.dealType && state.region;
-    const hasPortfolio = state.dealStructure === "portfolio" && state.portfolioMarinas.some(m => m.name.trim() && m.address.city && m.address.state) && state.dealType && state.region;
+    const hasSingleDeal = state.dealStructure === "single" && state.marinaName.trim() && state.dealType;
+    const hasPortfolio = state.dealStructure === "portfolio" && state.portfolioMarinas.some(m => m.name.trim()) && state.dealType;
     
     if (hasSingleDeal || hasPortfolio) {
       createDealMutation.mutate({
@@ -354,7 +334,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
     } else {
       toast({
         title: "Missing Information",
-        description: "Please fill in all required fields: marina name, address, region, and deal source.",
+        description: "Please provide a marina name and select a deal source.",
         variant: "destructive"
       });
     }

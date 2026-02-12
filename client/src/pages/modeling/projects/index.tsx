@@ -95,7 +95,7 @@ export default function ModelingProjectsPage() {
   };
 
   const handleProjectCreated = (projectId: string) => {
-    setLocation(`/modeling/projects/${projectId}`);
+    setLocation(`/modeling/projects/${projectId}?tab=inputs`);
   };
 
   const handleEdit = (project: ModelingProject) => {
