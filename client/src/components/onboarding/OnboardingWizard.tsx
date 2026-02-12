@@ -329,6 +329,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
   const [state, setState] = useState<WizardState>(getInitialState);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const prevOpenRef = useRef(open);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open && !prevOpenRef.current) {
@@ -337,6 +338,10 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
     }
     prevOpenRef.current = open;
   }, [open, getInitialState]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [state.step]);
 
   const hasProgress = state.step > 1 || 
     state.marinaName.trim() !== '' || 
@@ -1585,7 +1590,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
             )}
           </DialogHeader>
 
-          <div className="py-4 flex-1 overflow-y-auto min-h-0">
+          <div ref={scrollRef} className="py-4 flex-1 overflow-y-auto min-h-0">
             {getStepContent()}
           </div>
 
