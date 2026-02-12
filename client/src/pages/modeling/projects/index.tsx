@@ -328,19 +328,19 @@ export default function ModelingProjectsPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <Table>
+                <Table className="min-w-[1100px]">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Marina Name</TableHead>
-                      <TableHead>Location</TableHead>
-                      <TableHead className="text-right">Purchase Price</TableHead>
+                      <TableHead className="min-w-[140px]">Marina Name</TableHead>
+                      <TableHead className="whitespace-nowrap">Location</TableHead>
+                      <TableHead className="text-right whitespace-nowrap">Purchase Price</TableHead>
                       <TableHead className="text-right">IRR</TableHead>
-                      <TableHead className="text-right">Year 1 Cap Rate</TableHead>
-                      <TableHead className="text-right">Historical EBITDA</TableHead>
-                      <TableHead className="text-right">Yr. 1 EBITDA</TableHead>
+                      <TableHead className="text-right whitespace-nowrap">Yr 1 Cap Rate</TableHead>
+                      <TableHead className="text-right whitespace-nowrap">Hist. EBITDA</TableHead>
+                      <TableHead className="text-right whitespace-nowrap">Yr. 1 EBITDA</TableHead>
                       <TableHead className="text-center">Status</TableHead>
-                      <TableHead>Date Created</TableHead>
-                      <TableHead>Created By</TableHead>
+                      <TableHead className="whitespace-nowrap">Created</TableHead>
+                      <TableHead className="whitespace-nowrap">Created By</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -355,28 +355,28 @@ export default function ModelingProjectsPage() {
                         <TableCell className="font-medium" data-testid={`text-marina-name-${project.id}`}>
                           {project.marinaName}
                         </TableCell>
-                        <TableCell data-testid={`text-location-${project.id}`}>
+                        <TableCell className="whitespace-nowrap" data-testid={`text-location-${project.id}`}>
                           {[project.city, project.state].filter(Boolean).join(', ') || '-'}
                         </TableCell>
-                        <TableCell className="text-right" data-testid={`text-price-${project.id}`}>
+                        <TableCell className="text-right whitespace-nowrap" data-testid={`text-price-${project.id}`}>
                           {formatCurrency(project.purchasePrice, { dash: true })}
                         </TableCell>
-                        <TableCell className="text-right" data-testid={`text-irr-${project.id}`}>
+                        <TableCell className="text-right whitespace-nowrap" data-testid={`text-irr-${project.id}`}>
                           {project.irr != null ? (
                             <div>
                               <div className={`font-medium ${project.irr >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                 {formatPercent(project.irr, { dash: true })}
                               </div>
                               {project.exitYear && (
-                                <div className="text-xs text-muted-foreground">Exit Year: {project.exitYear}</div>
+                                <div className="text-xs text-muted-foreground">Exit: {project.exitYear}</div>
                               )}
                             </div>
                           ) : '-'}
                         </TableCell>
-                        <TableCell className="text-right" data-testid={`text-cap-rate-${project.id}`}>
+                        <TableCell className="text-right whitespace-nowrap" data-testid={`text-cap-rate-${project.id}`}>
                           {formatPercent(project.year1CapRate, { dash: true })}
                         </TableCell>
-                        <TableCell className="text-right" data-testid={`text-t12-ebitda-${project.id}`}>
+                        <TableCell className="text-right whitespace-nowrap" data-testid={`text-t12-ebitda-${project.id}`}>
                           {project.t12Ebitda != null ? (
                             <div>
                               <div>{formatCurrency(project.t12Ebitda)}</div>
@@ -386,7 +386,7 @@ export default function ModelingProjectsPage() {
                             </div>
                           ) : '-'}
                         </TableCell>
-                        <TableCell className="text-right" data-testid={`text-yr1-ebitda-${project.id}`}>
+                        <TableCell className="text-right whitespace-nowrap" data-testid={`text-yr1-ebitda-${project.id}`}>
                           {project.year1Ebitda != null ? (
                             <div>
                               <div>{formatCurrency(project.year1Ebitda)}</div>
@@ -399,7 +399,7 @@ export default function ModelingProjectsPage() {
                             </div>
                           ) : '-'}
                         </TableCell>
-                        <TableCell className="text-center">
+                        <TableCell className="text-center whitespace-nowrap">
                           <span
                             className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getOutcomeBadgeColor(project.dealOutcome)}`}
                             data-testid={`badge-status-${project.id}`}
@@ -416,10 +416,11 @@ export default function ModelingProjectsPage() {
                           {project.createdByName || '-'}
                         </TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex justify-end gap-2">
+                          <div className="flex justify-end gap-1">
                             <Button
                               variant="ghost"
-                              size="sm"
+                              size="icon"
+                              className="h-8 w-8"
                               onClick={() => setLocation(`/modeling/projects/${project.id}/doc-intel`)}
                               title="Document Intelligence"
                               data-testid={`button-doc-intel-${project.id}`}
@@ -428,7 +429,8 @@ export default function ModelingProjectsPage() {
                             </Button>
                             <Button
                               variant="ghost"
-                              size="sm"
+                              size="icon"
+                              className="h-8 w-8"
                               onClick={() => setLocation(`/modeling/projects/${project.id}/exit`)}
                               title="Exit Strategy Suite"
                               data-testid={`button-exit-strategy-${project.id}`}
@@ -437,16 +439,20 @@ export default function ModelingProjectsPage() {
                             </Button>
                             <Button
                               variant="ghost"
-                              size="sm"
+                              size="icon"
+                              className="h-8 w-8"
                               onClick={() => handleEdit(project)}
+                              title="Edit"
                               data-testid={`button-edit-${project.id}`}
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost"
-                              size="sm"
+                              size="icon"
+                              className="h-8 w-8"
                               onClick={() => handleDelete(project)}
+                              title="Delete"
                               data-testid={`button-delete-${project.id}`}
                             >
                               <Trash2 className="h-4 w-4" />
