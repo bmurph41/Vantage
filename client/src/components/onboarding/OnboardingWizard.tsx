@@ -107,18 +107,23 @@ interface WizardProfitCenter {
   iconName: string;
 }
 
-type DocTypeEnum = "pnl" | "rent_roll" | "balance_sheet" | "rate_sheet" | "invoice" | "other";
+type DocTypeEnum = "pnl" | "t12" | "rent_roll" | "balance_sheet" | "rate_sheet" | "invoice" | "other";
 
 interface WizardStagedFile {
   id: string;
   file: File;
   docType: DocTypeEnum;
   year: string;
+  t12StartMonth?: string;
+  t12StartYear?: string;
+  t12EndMonth?: string;
+  t12EndYear?: string;
   status: "pending" | "uploading" | "complete" | "error";
 }
 
 const WIZARD_DOC_TYPES: Record<DocTypeEnum, string> = {
   pnl: "P&L Statement",
+  t12: "T12",
   rent_roll: "Rent Roll",
   balance_sheet: "Balance Sheet",
   rate_sheet: "Rate Sheet",
@@ -126,8 +131,16 @@ const WIZARD_DOC_TYPES: Record<DocTypeEnum, string> = {
   other: "Other",
 };
 
+const MONTH_OPTIONS = [
+  { value: '1', label: 'Jan' }, { value: '2', label: 'Feb' }, { value: '3', label: 'Mar' },
+  { value: '4', label: 'Apr' }, { value: '5', label: 'May' }, { value: '6', label: 'Jun' },
+  { value: '7', label: 'Jul' }, { value: '8', label: 'Aug' }, { value: '9', label: 'Sep' },
+  { value: '10', label: 'Oct' }, { value: '11', label: 'Nov' }, { value: '12', label: 'Dec' },
+];
+
 function guessDocType(filename: string): DocTypeEnum {
   const lower = filename.toLowerCase();
+  if (lower.includes("t12") || lower.includes("trailing")) return "t12";
   if (lower.includes("p&l") || lower.includes("pnl") || lower.includes("profit") || lower.includes("income")) return "pnl";
   if (lower.includes("rent") || lower.includes("roll") || lower.includes("tenant")) return "rent_roll";
   if (lower.includes("balance")) return "balance_sheet";
@@ -360,6 +373,12 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
           formData.append('file', staged.file);
           formData.append('docType', staged.docType);
           formData.append('year', staged.year);
+          if (staged.docType === 't12') {
+            if (staged.t12StartMonth) formData.append('t12StartMonth', staged.t12StartMonth);
+            if (staged.t12StartYear) formData.append('t12StartYear', staged.t12StartYear);
+            if (staged.t12EndMonth) formData.append('t12EndMonth', staged.t12EndMonth);
+            if (staged.t12EndYear) formData.append('t12EndYear', staged.t12EndYear);
+          }
           
           const headers: Record<string, string> = {};
           if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
@@ -712,13 +731,24 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
   }
 
   function addStagedFiles(files: File[]) {
-    const newFiles: WizardStagedFile[] = files.map(file => ({
-      id: crypto.randomUUID(),
-      file,
-      docType: guessDocType(file.name),
-      year: new Date().getFullYear().toString(),
-      status: 'pending',
-    }));
+    const now = new Date();
+    const newFiles: WizardStagedFile[] = files.map(file => {
+      const docType = guessDocType(file.name);
+      const base: WizardStagedFile = {
+        id: crypto.randomUUID(),
+        file,
+        docType,
+        year: now.getFullYear().toString(),
+        status: 'pending',
+      };
+      if (docType === 't12') {
+        base.t12StartMonth = (now.getMonth() + 1).toString();
+        base.t12StartYear = (now.getFullYear() - 1).toString();
+        base.t12EndMonth = (now.getMonth() + 1).toString();
+        base.t12EndYear = now.getFullYear().toString();
+      }
+      return base;
+    });
     setState(s => ({ ...s, stagedFiles: [...s.stagedFiles, ...newFiles] }));
   }
 
@@ -726,12 +756,25 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
     setState(s => ({ ...s, stagedFiles: s.stagedFiles.filter(f => f.id !== id) }));
   }
 
-  function updateStagedFileField(id: string, field: 'docType' | 'year', value: string) {
+  function updateStagedFileField(id: string, field: 'docType' | 'year' | 't12StartMonth' | 't12StartYear' | 't12EndMonth' | 't12EndYear', value: string) {
     setState(s => ({
       ...s,
-      stagedFiles: s.stagedFiles.map(f =>
-        f.id === id ? { ...f, [field]: value } : f
-      ),
+      stagedFiles: s.stagedFiles.map(f => {
+        if (f.id !== id) return f;
+        const updated = { ...f, [field]: value };
+        if (field === 'docType' && value === 't12') {
+          const now = new Date();
+          const endMonth = (now.getMonth() + 1).toString();
+          const endYear = now.getFullYear().toString();
+          const startMonth = endMonth;
+          const startYear = (now.getFullYear() - 1).toString();
+          updated.t12StartMonth = updated.t12StartMonth || startMonth;
+          updated.t12StartYear = updated.t12StartYear || startYear;
+          updated.t12EndMonth = updated.t12EndMonth || endMonth;
+          updated.t12EndYear = updated.t12EndYear || endYear;
+        }
+        return updated;
+      }),
     }));
   }
 
@@ -1226,42 +1269,92 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
       </div>
 
       {state.stagedFiles.length > 0 && (
-        <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+        <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
           {state.stagedFiles.map((staged) => (
-            <div key={staged.id} className="flex items-center gap-2 p-2.5 rounded-lg border bg-muted/30">
-              <FileSpreadsheet className="h-4 w-4 text-green-600 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{staged.file.name}</p>
-                <p className="text-xs text-muted-foreground">{formatFileSize(staged.file.size)}</p>
+            <div key={staged.id} className="rounded-lg border bg-muted/30 p-2.5">
+              <div className="flex items-center gap-2">
+                <FileSpreadsheet className="h-4 w-4 text-green-600 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{staged.file.name}</p>
+                  <p className="text-xs text-muted-foreground">{formatFileSize(staged.file.size)}</p>
+                </div>
+                <Select value={staged.docType} onValueChange={(v) => updateStagedFileField(staged.id, 'docType', v as DocTypeEnum)}>
+                  <SelectTrigger className="h-7 w-[100px] text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(WIZARD_DOC_TYPES).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {staged.docType !== 't12' && (
+                  <Select value={staged.year} onValueChange={(v) => updateStagedFileField(staged.id, 'year', v)}>
+                    <SelectTrigger className="h-7 w-[75px] text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {yearOptions.map((y) => (
+                        <SelectItem key={y} value={y}>{y}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 shrink-0 text-muted-foreground hover:text-destructive"
+                  onClick={() => removeStagedFile(staged.id)}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
               </div>
-              <Select value={staged.docType} onValueChange={(v) => updateStagedFileField(staged.id, 'docType', v)}>
-                <SelectTrigger className="h-7 w-[110px] text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(WIZARD_DOC_TYPES).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={staged.year} onValueChange={(v) => updateStagedFileField(staged.id, 'year', v)}>
-                <SelectTrigger className="h-7 w-[80px] text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {yearOptions.map((y) => (
-                    <SelectItem key={y} value={y}>{y}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                onClick={() => removeStagedFile(staged.id)}
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
+              {staged.docType === 't12' && (
+                <div className="mt-2 flex items-center gap-1.5 flex-wrap text-xs">
+                  <span className="text-muted-foreground font-medium">From:</span>
+                  <Select value={staged.t12StartMonth || '1'} onValueChange={(v) => updateStagedFileField(staged.id, 't12StartMonth', v)}>
+                    <SelectTrigger className="h-6 w-[60px] text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MONTH_OPTIONS.map(m => (
+                        <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={staged.t12StartYear || new Date().getFullYear().toString()} onValueChange={(v) => updateStagedFileField(staged.id, 't12StartYear', v)}>
+                    <SelectTrigger className="h-6 w-[65px] text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {yearOptions.map(y => (
+                        <SelectItem key={y} value={y}>{y}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <span className="text-muted-foreground font-medium ml-1">To:</span>
+                  <Select value={staged.t12EndMonth || '12'} onValueChange={(v) => updateStagedFileField(staged.id, 't12EndMonth', v)}>
+                    <SelectTrigger className="h-6 w-[60px] text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MONTH_OPTIONS.map(m => (
+                        <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={staged.t12EndYear || new Date().getFullYear().toString()} onValueChange={(v) => updateStagedFileField(staged.id, 't12EndYear', v)}>
+                    <SelectTrigger className="h-6 w-[65px] text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {yearOptions.map(y => (
+                        <SelectItem key={y} value={y}>{y}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -1323,8 +1416,8 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="shrink-0">
           <div className="flex items-center justify-between mb-2">
             <DialogTitle className="flex items-center gap-2">
               <Anchor className="h-5 w-5 text-[#1E4FAB]" />
@@ -1352,11 +1445,11 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
           )}
         </DialogHeader>
 
-        <div className="py-4">
+        <div className="py-4 flex-1 overflow-y-auto min-h-0">
           {getStepContent()}
         </div>
 
-        <div className="flex justify-between pt-4 border-t">
+        <div className="flex justify-between pt-4 border-t shrink-0">
           <Button
             variant="ghost"
             onClick={handleBack}
