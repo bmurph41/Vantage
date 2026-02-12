@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -45,7 +45,8 @@ import {
   Loader2,
   Container,
   Sailboat,
-  Utensils
+  Utensils,
+  AlertTriangle
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
@@ -306,8 +307,8 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
   
   const steps = mode === "new_project" ? newProjectSteps : onboardingSteps;
   const totalSteps = steps.length;
-  
-  const [state, setState] = useState<WizardState>({
+
+  const getInitialState = useCallback((): WizardState => ({
     step: 1,
     dealStructure: mode === "new_project" ? "single" : null,
     marinaName: "",
@@ -323,7 +324,52 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
     storageTypes: defaultWizardStorageTypes.map(s => ({ ...s })),
     designatedSpaces: defaultWizardDesignatedSpaces.map(s => ({ ...s })),
     stagedFiles: [],
-  });
+  }), [mode]);
+  
+  const [state, setState] = useState<WizardState>(getInitialState);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const prevOpenRef = useRef(open);
+
+  useEffect(() => {
+    if (open && !prevOpenRef.current) {
+      setState(getInitialState());
+      setShowExitConfirm(false);
+    }
+    prevOpenRef.current = open;
+  }, [open, getInitialState]);
+
+  const hasProgress = state.step > 1 || 
+    state.marinaName.trim() !== '' || 
+    state.marinaAddress.street.trim() !== '' ||
+    state.portfolioName.trim() !== '' ||
+    state.portfolioMarinas.some(m => m.name.trim() !== '') ||
+    state.region !== '' ||
+    state.profitCenters.some(pc => pc.isEnabled) || 
+    state.amenities.some(a => a.isEnabled) ||
+    state.storageTypes.some(st => st.isEnabled) || 
+    state.designatedSpaces.some(ds => ds.isEnabled) ||
+    state.featuresToExplore.length > 0 ||
+    state.stagedFiles.length > 0;
+
+  function handleCloseAttempt(openState: boolean) {
+    if (!openState && open) {
+      if (hasProgress) {
+        setShowExitConfirm(true);
+      } else {
+        onOpenChange(false);
+      }
+    }
+  }
+
+  function confirmExit() {
+    setShowExitConfirm(false);
+    setState(getInitialState());
+    onOpenChange(false);
+  }
+
+  function cancelExit() {
+    setShowExitConfirm(false);
+  }
 
   async function saveStorageConfig(projectId: string) {
     try {
@@ -1508,74 +1554,100 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader className="shrink-0">
-          <div className="flex items-center justify-between mb-2">
-            <DialogTitle className="flex items-center gap-2">
-              <Anchor className="h-5 w-5 text-[#1E4FAB]" />
-              {mode === "new_project" ? "New Project" : "MarinaMatch Setup"}
-            </DialogTitle>
-            <div className="flex items-center gap-1.5 mr-6 -mt-1">
-              {steps.map((s) => (
-                <div
-                  key={s.id}
-                  className={cn(
-                    "w-2.5 h-2.5 rounded-full transition-colors border",
-                    state.step >= s.id
-                      ? "bg-[#1E4FAB] border-[#1E4FAB]"
-                      : "bg-transparent border-[#1E4FAB]/30"
-                  )}
-                />
-              ))}
+    <>
+      <Dialog open={open} onOpenChange={handleCloseAttempt}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-hidden flex flex-col" onPointerDownOutside={(e) => { if (hasProgress) { e.preventDefault(); setShowExitConfirm(true); } }} onEscapeKeyDown={(e) => { if (hasProgress) { e.preventDefault(); setShowExitConfirm(true); } }}>
+          <DialogHeader className="shrink-0">
+            <div className="flex items-center justify-between mb-2">
+              <DialogTitle className="flex items-center gap-2">
+                <Anchor className="h-5 w-5 text-[#1E4FAB]" />
+                {mode === "new_project" ? "New Project" : "MarinaMatch Setup"}
+              </DialogTitle>
+              <div className="flex items-center gap-1.5 mr-6 -mt-1">
+                {steps.map((s) => (
+                  <div
+                    key={s.id}
+                    className={cn(
+                      "w-2.5 h-2.5 rounded-full transition-colors border",
+                      state.step >= s.id
+                        ? "bg-[#1E4FAB] border-[#1E4FAB]"
+                        : "bg-transparent border-[#1E4FAB]/30"
+                    )}
+                  />
+                ))}
+              </div>
+            </div>
+            <Progress value={progress} className="h-1" />
+            {mode === "new_project" && (
+              <DialogDescription className="text-sm text-muted-foreground">
+                Add a new valuation/financial modeling project
+              </DialogDescription>
+            )}
+          </DialogHeader>
+
+          <div className="py-4 flex-1 overflow-y-auto min-h-0">
+            {getStepContent()}
+          </div>
+
+          <div className="flex justify-between pt-4 border-t shrink-0">
+            <Button
+              variant="ghost"
+              onClick={handleBack}
+              disabled={state.step === 1}
+            >
+              <ChevronLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            
+            <div className="flex items-center gap-2">
+              {state.step < steps.length ? (
+                <Button onClick={handleNext} className="bg-[#1E4FAB] hover:bg-[#1a4294]">
+                  Continue
+                  <ChevronRight className="h-4 w-4 ml-2" />
+                </Button>
+              ) : (
+                <Button 
+                  onClick={handleFinish} 
+                  className="bg-[#1E4FAB] hover:bg-[#1a4294]"
+                  disabled={createDealMutation.isPending}
+                >
+                  {createDealMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : "Get Started"}
+                  {!createDealMutation.isPending && <ChevronRight className="h-4 w-4 ml-2" />}
+                </Button>
+              )}
             </div>
           </div>
-          <Progress value={progress} className="h-1" />
-          {mode === "new_project" && (
-            <DialogDescription className="text-sm text-muted-foreground">
-              Add a new valuation/financial modeling project
-            </DialogDescription>
-          )}
-        </DialogHeader>
+        </DialogContent>
+      </Dialog>
 
-        <div className="py-4 flex-1 overflow-y-auto min-h-0">
-          {getStepContent()}
-        </div>
-
-        <div className="flex justify-between pt-4 border-t shrink-0">
-          <Button
-            variant="ghost"
-            onClick={handleBack}
-            disabled={state.step === 1}
-          >
-            <ChevronLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          
-          <div className="flex items-center gap-2">
-            {state.step < steps.length ? (
-              <Button onClick={handleNext} className="bg-[#1E4FAB] hover:bg-[#1a4294]">
-                Continue
-                <ChevronRight className="h-4 w-4 ml-2" />
+      <Dialog open={showExitConfirm} onOpenChange={setShowExitConfirm}>
+        <DialogContent className="sm:max-w-[400px]" onPointerDownOutside={(e) => e.preventDefault()}>
+          <div className="flex flex-col items-center text-center space-y-4 py-2">
+            <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+              <AlertTriangle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold">Leave Setup?</h3>
+              <p className="text-sm text-muted-foreground mt-1.5">
+                You have unsaved progress in this wizard. Are you sure you want to leave? Your entries will be lost.
+              </p>
+            </div>
+            <div className="flex flex-col w-full gap-2 pt-2">
+              <Button variant="outline" className="w-full" onClick={cancelExit}>
+                Cancel
               </Button>
-            ) : (
-              <Button 
-                onClick={handleFinish} 
-                className="bg-[#1E4FAB] hover:bg-[#1a4294]"
-                disabled={createDealMutation.isPending}
-              >
-                {createDealMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creating...
-                  </>
-                ) : "Get Started"}
-                {!createDealMutation.isPending && <ChevronRight className="h-4 w-4 ml-2" />}
+              <Button variant="destructive" className="w-full" onClick={confirmExit}>
+                Leave Without Saving
               </Button>
-            )}
+            </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
