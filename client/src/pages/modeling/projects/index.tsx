@@ -410,16 +410,16 @@ export default function ModelingProjectsPage() {
                           className="cursor-pointer hover:bg-muted/50 border-b"
                           onClick={() => setLocation(`/modeling/projects/${project.id}`)}
                         >
-                          <td className="px-4 pt-0 pb-3"></td>
-                          <td className="px-4 pt-0 pb-3"></td>
-                          <td className="px-4 pt-0 pb-3 text-right text-xs text-muted-foreground whitespace-nowrap">
+                          <td className="px-4 pt-0 pb-2"></td>
+                          <td className="px-4 pt-0 pb-2"></td>
+                          <td className="px-4 pt-0 pb-2 text-center text-xs text-muted-foreground whitespace-nowrap">
                             {project.exitYear ? `Exit: ${project.exitYear}` : ''}
                           </td>
-                          <td className="px-4 pt-0 pb-3"></td>
-                          <td className="px-4 pt-0 pb-3 text-right text-xs text-muted-foreground whitespace-nowrap">
+                          <td className="px-4 pt-0 pb-2"></td>
+                          <td className="px-4 pt-0 pb-2 text-center text-xs text-muted-foreground whitespace-nowrap">
                             {project.t12Label || ''}
                           </td>
-                          <td className="px-4 pt-0 pb-3 text-right text-xs whitespace-nowrap">
+                          <td className="px-4 pt-0 pb-2 text-center text-xs whitespace-nowrap">
                             {project.year1Ebitda != null && project.t12Ebitda != null && project.t12Ebitda !== 0 ? (
                               <span className={`font-medium ${((project.year1Ebitda - project.t12Ebitda) / Math.abs(project.t12Ebitda)) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                 {((project.year1Ebitda - project.t12Ebitda) / Math.abs(project.t12Ebitda) * 100) >= 0 ? '+' : ''}
@@ -427,7 +427,7 @@ export default function ModelingProjectsPage() {
                               </span>
                             ) : ''}
                           </td>
-                          <td className="px-4 pt-0 pb-3"></td>
+                          <td className="px-4 pt-0 pb-2"></td>
                         </tr>
                       </Fragment>
                     ))}

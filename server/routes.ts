@@ -17195,7 +17195,7 @@ Current context: Project ${req.params.projectId}`;
       
       const { modelingActuals, modelingFinancialPeriods, users: usersTable } = await import('@shared/schema');
 
-      const userIds = [...new Set(projects.map(p => p.userId).filter(Boolean))];
+      const userIds = [...new Set(projects.map(p => (p as any).createdBy).filter(Boolean))];
       const userNameMap: Record<string, string> = {};
       if (userIds.length > 0) {
         try {
@@ -17322,7 +17322,7 @@ Current context: Project ${req.params.projectId}`;
           year1Ebitda,
           irr,
           exitYear,
-          createdByName: project.userId ? (userNameMap[project.userId] || null) : null,
+          createdByName: (project as any).createdBy ? (userNameMap[(project as any).createdBy] || null) : null,
         };
       }));
       
