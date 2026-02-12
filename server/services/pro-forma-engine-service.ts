@@ -273,12 +273,15 @@ export class ProFormaEngineService {
     // 2. BUILD TIMELINE (no more hardcoded years!)
     // ========================================
     
+    const projectConfig = (project.customMetrics as any)?.config || {};
+    const effectiveHoldPeriod = projectConfig.holdPeriod || config?.holdPeriod || 5;
+    
     const timelineConfig: TimelineConfig = {
-      acquisitionCloseDate: config?.acquisitionCloseDate || null,
-      ttmEndDate: config?.ttmEndDate || null,
+      acquisitionCloseDate: config?.acquisitionCloseDate || projectConfig.acquisitionCloseDate || null,
+      ttmEndDate: config?.ttmEndDate || projectConfig.ttmEndDate || null,
       projectionStartRule: (config?.projectionStartRule as ProjectionStartRule) || 'acq_close_year',
-      holdPeriodMonths: config?.holdPeriodMonths || (config?.holdPeriod ? config.holdPeriod * 12 : 60),
-      holdPeriodYears: config?.holdPeriod || 5,
+      holdPeriodMonths: effectiveHoldPeriod * 12,
+      holdPeriodYears: effectiveHoldPeriod,
     };
     
     const periods = buildModelingPeriods(timelineConfig);

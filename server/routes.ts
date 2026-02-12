@@ -18692,6 +18692,15 @@ Current context: Project ${req.params.projectId}`;
         orgId
       );
 
+      if (req.body.holdPeriod !== undefined) {
+        const existingMPC = await db.select().from(modelingProjectConfig).where(eq(modelingProjectConfig.modelingProjectId, projectId)).limit(1);
+        if (existingMPC.length > 0) {
+          await db.update(modelingProjectConfig)
+            .set({ holdPeriod: Number(req.body.holdPeriod), updatedAt: new Date() })
+            .where(eq(modelingProjectConfig.modelingProjectId, projectId));
+        }
+      }
+
       res.json(mergedConfig);
     } catch (error: any) {
       console.error('Failed to patch project config:', error);
