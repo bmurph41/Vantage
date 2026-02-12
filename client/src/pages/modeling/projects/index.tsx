@@ -338,7 +338,8 @@ export default function ModelingProjectsPage() {
                       <TableHead className="font-bold text-foreground text-right whitespace-nowrap">Hist. {metricLabel}</TableHead>
                       <TableHead className="font-bold text-foreground text-right whitespace-nowrap">Yr. 1 {metricLabel}</TableHead>
                       <TableHead className="font-bold text-foreground text-center">Status</TableHead>
-                      <TableHead className="font-bold text-foreground text-right">Actions</TableHead>
+                      <TableHead className="font-bold text-foreground whitespace-nowrap">Created</TableHead>
+                      <TableHead className="font-bold text-foreground text-center">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -380,8 +381,16 @@ export default function ModelingProjectsPage() {
                               {formatOutcome(project.dealOutcome)}
                             </span>
                           </TableCell>
-                          <TableCell className="text-right pb-0.5" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex justify-end gap-1">
+                          <TableCell className="pb-0.5 whitespace-nowrap" rowSpan={2}>
+                            <div className="font-medium text-sm">{project.createdByName || '-'}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {project.createdAt
+                                ? new Date(project.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                : '-'}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center pb-0.5" rowSpan={2} onClick={(e) => e.stopPropagation()}>
+                            <div className="grid grid-cols-2 gap-0.5 justify-items-center w-fit mx-auto">
                               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setLocation(`/modeling/projects/${project.id}/doc-intel`)} title="Document Intelligence" data-testid={`button-doc-intel-${project.id}`}>
                                 <FileSpreadsheet className="h-3.5 w-3.5" />
                               </Button>
@@ -401,12 +410,7 @@ export default function ModelingProjectsPage() {
                           className="cursor-pointer hover:bg-muted/50 border-b"
                           onClick={() => setLocation(`/modeling/projects/${project.id}`)}
                         >
-                          <td className="px-4 pt-0 pb-3 text-xs text-muted-foreground">
-                            {project.createdAt
-                              ? new Date(project.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                              : ''}
-                            {project.createdByName ? ` · ${project.createdByName}` : ''}
-                          </td>
+                          <td className="px-4 pt-0 pb-3"></td>
                           <td className="px-4 pt-0 pb-3"></td>
                           <td className="px-4 pt-0 pb-3 text-right text-xs text-muted-foreground whitespace-nowrap">
                             {project.exitYear ? `Exit: ${project.exitYear}` : ''}
@@ -423,7 +427,6 @@ export default function ModelingProjectsPage() {
                               </span>
                             ) : ''}
                           </td>
-                          <td className="px-4 pt-0 pb-3"></td>
                           <td className="px-4 pt-0 pb-3"></td>
                         </tr>
                       </Fragment>
