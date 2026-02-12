@@ -9,6 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { AddressAutocompleteInput, type NormalizedAddress } from "@/components/ui/address-autocomplete-input";
 import { US_REGIONS } from "@shared/salescomps-constants";
 import { 
@@ -28,7 +29,22 @@ import {
   Fuel,
   Layers,
   Plus,
-  Trash2
+  Trash2,
+  Warehouse,
+  Ship,
+  Waves,
+  MapPin,
+  Car,
+  Home,
+  Wrench,
+  ShoppingCart,
+  Upload,
+  X,
+  FileSpreadsheet,
+  Loader2,
+  Container,
+  Sailboat,
+  Utensils
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
@@ -73,6 +89,95 @@ const emptyAddress: MarinaAddress = {
 
 type DealStatus = "active" | "won" | "lost" | "passed" | "under_review";
 
+interface WizardStorageType {
+  id: string;
+  name: string;
+  section: 'storage' | 'designated';
+  isEnabled: boolean;
+  count: string;
+  occupancy: string;
+  iconName: string;
+}
+
+type DocTypeEnum = "pnl" | "rent_roll" | "balance_sheet" | "rate_sheet" | "invoice" | "other";
+
+interface WizardStagedFile {
+  id: string;
+  file: File;
+  docType: DocTypeEnum;
+  year: string;
+  status: "pending" | "uploading" | "complete" | "error";
+}
+
+const WIZARD_DOC_TYPES: Record<DocTypeEnum, string> = {
+  pnl: "P&L Statement",
+  rent_roll: "Rent Roll",
+  balance_sheet: "Balance Sheet",
+  rate_sheet: "Rate Sheet",
+  invoice: "Invoice",
+  other: "Other",
+};
+
+function guessDocType(filename: string): DocTypeEnum {
+  const lower = filename.toLowerCase();
+  if (lower.includes("p&l") || lower.includes("pnl") || lower.includes("profit") || lower.includes("income")) return "pnl";
+  if (lower.includes("rent") || lower.includes("roll") || lower.includes("tenant")) return "rent_roll";
+  if (lower.includes("balance")) return "balance_sheet";
+  if (lower.includes("rate")) return "rate_sheet";
+  if (lower.includes("invoice")) return "invoice";
+  return "other";
+}
+
+function getCsrfToken(): string {
+  const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
+async function ensureCsrfToken(): Promise<string> {
+  let token = getCsrfToken();
+  if (!token) {
+    await fetch('/api/auth/me', { credentials: 'include' });
+    token = getCsrfToken();
+  }
+  return token;
+}
+
+const defaultWizardStorageTypes: WizardStorageType[] = [
+  { id: 'wet_slips', name: 'Wet Slips', section: 'storage', isEnabled: false, count: '', occupancy: '', iconName: 'anchor' },
+  { id: 'lift_slips', name: 'Lift Slips', section: 'storage', isEnabled: false, count: '', occupancy: '', iconName: 'waves' },
+  { id: 'moorings', name: 'Moorings', section: 'storage', isEnabled: false, count: '', occupancy: '', iconName: 'anchor' },
+  { id: 'dry_racks_indoor', name: 'Dry Racks – Indoor', section: 'storage', isEnabled: false, count: '', occupancy: '', iconName: 'warehouse' },
+  { id: 'dry_racks_outdoor', name: 'Dry Racks – Outdoor', section: 'storage', isEnabled: false, count: '', occupancy: '', iconName: 'container' },
+  { id: 'land_storage', name: 'Land Storage', section: 'storage', isEnabled: false, count: '', occupancy: '', iconName: 'mappin' },
+  { id: 'boats_on_trailers', name: 'Boats on Trailers', section: 'storage', isEnabled: false, count: '', occupancy: '', iconName: 'ship' },
+  { id: 'trailers', name: 'Trailers', section: 'storage', isEnabled: false, count: '', occupancy: '', iconName: 'car' },
+  { id: 'houseboats', name: 'Houseboats', section: 'storage', isEnabled: false, count: '', occupancy: '', iconName: 'home' },
+  { id: 'rv_sites', name: 'RV Sites', section: 'storage', isEnabled: false, count: '', occupancy: '', iconName: 'car' },
+];
+
+const defaultWizardDesignatedSpaces: WizardStorageType[] = [
+  { id: 'fuel_dock', name: 'Fuel Dock', section: 'designated', isEnabled: false, count: '', occupancy: '', iconName: 'fuel' },
+  { id: 'ship_store', name: 'Ship Store', section: 'designated', isEnabled: false, count: '', occupancy: '', iconName: 'shoppingcart' },
+  { id: 'service', name: 'Service', section: 'designated', isEnabled: false, count: '', occupancy: '', iconName: 'wrench' },
+  { id: 'boat_sales', name: 'Boat Sales', section: 'designated', isEnabled: false, count: '', occupancy: '', iconName: 'store' },
+  { id: 'commercial_tenants', name: 'Commercial Tenants', section: 'designated', isEnabled: false, count: '', occupancy: '', iconName: 'building' },
+  { id: 'rental_boats', name: 'Rental Boats', section: 'designated', isEnabled: false, count: '', occupancy: '', iconName: 'ship' },
+  { id: 'transient', name: 'Transient', section: 'designated', isEnabled: false, count: '', occupancy: '', iconName: 'anchor' },
+  { id: 'restaurant', name: 'Restaurant', section: 'designated', isEnabled: false, count: '', occupancy: '', iconName: 'utensils' },
+  { id: 'boat_club', name: 'Boat Club', section: 'designated', isEnabled: false, count: '', occupancy: '', iconName: 'users' },
+];
+
+function getStorageIcon(iconName: string) {
+  const iconMap: Record<string, typeof Anchor> = {
+    anchor: Anchor, waves: Waves, warehouse: Warehouse, container: Container,
+    mappin: MapPin, ship: Ship, car: Car, home: Home, fuel: Fuel,
+    shoppingcart: ShoppingCart, wrench: Wrench, store: Store, building: Building2,
+    utensils: Utensils, users: Users, sailboat: Sailboat,
+  };
+  const Icon = iconMap[iconName] || Anchor;
+  return <Icon className="h-4 w-4" />;
+}
+
 interface WizardState {
   step: number;
   dealStructure: DealStructure;
@@ -84,6 +189,9 @@ interface WizardState {
   portfolioName: string;
   portfolioMarinas: PortfolioMarina[];
   featuresToExplore: string[];
+  storageTypes: WizardStorageType[];
+  designatedSpaces: WizardStorageType[];
+  stagedFiles: WizardStagedFile[];
 }
 
 const onboardingSteps = [
@@ -91,14 +199,18 @@ const onboardingSteps = [
   { id: 2, title: "Deal Structure", icon: Layers },
   { id: 3, title: "Marina Details", icon: Anchor },
   { id: 4, title: "Deal Type", icon: Target },
-  { id: 5, title: "Features", icon: ClipboardList },
-  { id: 6, title: "Get Started", icon: Check },
+  { id: 5, title: "Storage Types", icon: Warehouse },
+  { id: 6, title: "Documents", icon: Upload },
+  { id: 7, title: "Features", icon: ClipboardList },
+  { id: 8, title: "Get Started", icon: Check },
 ];
 
 const newProjectSteps = [
   { id: 1, title: "Deal Structure", icon: Layers },
   { id: 2, title: "Marina Details", icon: Anchor },
   { id: 3, title: "Deal Info", icon: Target },
+  { id: 4, title: "Storage Types", icon: Warehouse },
+  { id: 5, title: "Documents", icon: Upload },
 ];
 
 const dealStructures = [
@@ -164,7 +276,63 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
     portfolioName: "",
     portfolioMarinas: [{ name: "", address: { ...emptyAddress } }],
     featuresToExplore: [],
+    storageTypes: defaultWizardStorageTypes.map(s => ({ ...s })),
+    designatedSpaces: defaultWizardDesignatedSpaces.map(s => ({ ...s })),
+    stagedFiles: [],
   });
+
+  async function saveStorageConfig(projectId: string) {
+    try {
+      const departments: Record<string, { seasons: string[]; isEnabled: boolean; section: string; count?: number; occupancy?: number }> = {};
+      [...state.storageTypes, ...state.designatedSpaces].forEach(item => {
+        if (item.isEnabled) {
+          departments[item.id] = {
+            seasons: item.section === 'storage' ? ['seasonal'] : ['seasonal'],
+            isEnabled: true,
+            section: item.section,
+            ...(item.count ? { count: parseInt(item.count) || 0 } : {}),
+            ...(item.occupancy ? { occupancy: parseInt(item.occupancy) || 0 } : {}),
+          };
+        }
+      });
+      if (Object.keys(departments).length > 0) {
+        await apiRequest('POST', `/api/modeling/projects/${projectId}/config`, { departments });
+      }
+    } catch (e) {
+      console.warn('Storage config save failed (non-blocking):', e);
+    }
+  }
+
+  async function uploadStagedFiles(projectId: string) {
+    const pendingFiles = state.stagedFiles.filter(f => f.status === 'pending');
+    if (pendingFiles.length === 0) return;
+    
+    try {
+      const csrfToken = await ensureCsrfToken();
+      for (const staged of pendingFiles) {
+        try {
+          const formData = new FormData();
+          formData.append('file', staged.file);
+          formData.append('docType', staged.docType);
+          formData.append('year', staged.year);
+          
+          const headers: Record<string, string> = {};
+          if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+          
+          await fetch(`/api/modeling/projects/${projectId}/documents`, {
+            method: 'POST',
+            body: formData,
+            headers,
+            credentials: 'include',
+          });
+        } catch (e) {
+          console.warn(`File upload failed for ${staged.file.name} (non-blocking):`, e);
+        }
+      }
+    } catch (e) {
+      console.warn('Document upload failed (non-blocking):', e);
+    }
+  }
 
   const createDealMutation = useMutation({
     mutationFn: async (data: {
@@ -249,31 +417,41 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
         return { modelingProject };
       }
     },
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects'] });
       queryClient.invalidateQueries({ queryKey: ['/api/crm/deals'] });
       queryClient.invalidateQueries({ queryKey: ['/api/crm/properties'] });
       queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
-      const isPortfolio = state.dealStructure === "portfolio";
-      const projectCount = isPortfolio ? state.portfolioMarinas.filter(m => m.name.trim()).length : 1;
-      toast({ 
-        title: isPortfolio ? "Portfolio Created!" : "Project Created!", 
-        description: isPortfolio 
-          ? `${projectCount} marina${projectCount > 1 ? 's' : ''} added to CRM and Financial Model.`
-          : `${state.marinaName} has been added to your Financial Model.` 
-      });
-      
-      onOpenChange(false);
       
       const projectId = Array.isArray(result) 
         ? result[0]?.modelingProject?.id 
         : result?.modelingProject?.id;
       
       if (projectId) {
+        await saveStorageConfig(projectId);
+        await uploadStagedFiles(projectId);
+        queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'config'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'documents'] });
+      }
+      
+      const isPortfolio = state.dealStructure === "portfolio";
+      const projectCount = isPortfolio ? state.portfolioMarinas.filter(m => m.name.trim()).length : 1;
+      const uploadCount = state.stagedFiles.filter(f => f.status === 'pending').length;
+      toast({ 
+        title: isPortfolio ? "Portfolio Created!" : "Project Created!", 
+        description: isPortfolio 
+          ? `${projectCount} marina${projectCount > 1 ? 's' : ''} added to CRM and Financial Model.`
+          : `${state.marinaName} has been added.${uploadCount > 0 ? ` ${uploadCount} document${uploadCount > 1 ? 's' : ''} queued for AI processing.` : ''}` 
+      });
+      
+      onOpenChange(false);
+      
+      if (projectId) {
         if (onProjectCreated) {
           onProjectCreated(projectId);
         } else {
-          navigate(`/modeling/projects/${projectId}?tab=inputs`);
+          const targetTab = uploadCount > 0 ? 'uploads' : 'inputs';
+          navigate(`/modeling/projects/${projectId}?tab=${targetTab}`);
         }
       }
       
@@ -303,6 +481,9 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
   });
 
   const progress = (state.step / steps.length) * 100;
+
+  const currentStepTitle = steps.find(s => s.id === state.step)?.title || '';
+  const isSkippableStep = (currentStepTitle === 'Storage Types' || currentStepTitle === 'Documents') && state.step < steps.length;
 
   function handleNext() {
     if (state.step < steps.length) {
@@ -405,12 +586,81 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
     }));
   }
 
+  function toggleStorageType(id: string, list: 'storageTypes' | 'designatedSpaces') {
+    setState(s => ({
+      ...s,
+      [list]: s[list].map(item =>
+        item.id === id ? { ...item, isEnabled: !item.isEnabled } : item
+      ),
+    }));
+  }
+
+  function updateStorageField(id: string, list: 'storageTypes' | 'designatedSpaces', field: 'count' | 'occupancy', value: string) {
+    setState(s => ({
+      ...s,
+      [list]: s[list].map(item =>
+        item.id === id ? { ...item, [field]: value } : item
+      ),
+    }));
+  }
+
+  function handleFileDrop(e: React.DragEvent) {
+    e.preventDefault();
+    const files = Array.from(e.dataTransfer.files).filter(f => {
+      const ext = f.name.toLowerCase().split('.').pop();
+      return ['xlsx', 'xls', 'csv', 'pdf'].includes(ext || '');
+    });
+    addStagedFiles(files);
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    if (e.target.files) {
+      addStagedFiles(Array.from(e.target.files));
+    }
+    e.target.value = '';
+  }
+
+  function addStagedFiles(files: File[]) {
+    const newFiles: WizardStagedFile[] = files.map(file => ({
+      id: crypto.randomUUID(),
+      file,
+      docType: guessDocType(file.name),
+      year: new Date().getFullYear().toString(),
+      status: 'pending',
+    }));
+    setState(s => ({ ...s, stagedFiles: [...s.stagedFiles, ...newFiles] }));
+  }
+
+  function removeStagedFile(id: string) {
+    setState(s => ({ ...s, stagedFiles: s.stagedFiles.filter(f => f.id !== id) }));
+  }
+
+  function updateStagedFileField(id: string, field: 'docType' | 'year', value: string) {
+    setState(s => ({
+      ...s,
+      stagedFiles: s.stagedFiles.map(f =>
+        f.id === id ? { ...f, [field]: value } : f
+      ),
+    }));
+  }
+
+  function formatFileSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 10 }, (_, i) => (currentYear - i).toString());
+
   const getStepContent = () => {
     if (mode === "new_project") {
       return {
         1: renderDealStructureStep(),
         2: renderMarinaDetailsStep(),
         3: renderDealInfoStep(),
+        4: renderStorageTypesStep(),
+        5: renderDocumentUploadStep(),
       }[state.step];
     }
     return {
@@ -418,8 +668,10 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
       2: renderDealStructureStep(),
       3: renderMarinaDetailsStep(),
       4: renderDealTypeStep(),
-      5: renderFeaturesStep(),
-      6: renderGetStartedStep(),
+      5: renderStorageTypesStep(),
+      6: renderDocumentUploadStep(),
+      7: renderFeaturesStep(),
+      8: renderGetStartedStep(),
     }[state.step];
   };
 
@@ -657,6 +909,163 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
     </div>
   );
 
+  const renderStorageTypesStep = () => {
+    const renderStorageSection = (
+      title: string,
+      items: WizardStorageType[],
+      listKey: 'storageTypes' | 'designatedSpaces'
+    ) => (
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{title}</p>
+        <div className="space-y-1.5">
+          {items.map((item) => (
+            <div key={item.id} className={cn(
+              "rounded-lg border px-3 py-2 transition-colors",
+              item.isEnabled ? "border-[#1E4FAB]/30 bg-[#1E4FAB]/5" : "border-transparent bg-muted/30"
+            )}>
+              <div className="flex items-center gap-3">
+                <Switch
+                  checked={item.isEnabled}
+                  onCheckedChange={() => toggleStorageType(item.id, listKey)}
+                  className="scale-90"
+                />
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span className="text-muted-foreground">{getStorageIcon(item.iconName)}</span>
+                  <span className="text-sm font-medium truncate">{item.name}</span>
+                </div>
+                {item.isEnabled && (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Count"
+                      value={item.count}
+                      onChange={(e) => updateStorageField(item.id, listKey, 'count', e.target.value)}
+                      className="h-7 w-20 text-xs"
+                      type="number"
+                    />
+                    <Input
+                      placeholder="Occ %"
+                      value={item.occupancy}
+                      onChange={(e) => updateStorageField(item.id, listKey, 'occupancy', e.target.value)}
+                      className="h-7 w-20 text-xs"
+                      type="number"
+                      max={100}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+
+    const enabledCount = [...state.storageTypes, ...state.designatedSpaces].filter(s => s.isEnabled).length;
+
+    return (
+      <div className="space-y-4">
+        <div className="text-center mb-4">
+          <h3 className="text-lg font-semibold">Storage & Facilities</h3>
+          <p className="text-sm text-muted-foreground">
+            Toggle on the storage types and facilities this marina has. You can add counts and occupancy if known.
+          </p>
+          {enabledCount > 0 && (
+            <Badge variant="secondary" className="mt-2">{enabledCount} selected</Badge>
+          )}
+        </div>
+        <div className="max-h-[350px] overflow-y-auto pr-1 space-y-4">
+          {renderStorageSection('Storage Types', state.storageTypes, 'storageTypes')}
+          {renderStorageSection('Designated Spaces & Profit Centers', state.designatedSpaces, 'designatedSpaces')}
+        </div>
+        <p className="text-xs text-center text-muted-foreground">
+          You can always update this later in your project's Inputs tab.
+        </p>
+      </div>
+    );
+  };
+
+  const renderDocumentUploadStep = () => (
+    <div className="space-y-4">
+      <div className="text-center mb-4">
+        <h3 className="text-lg font-semibold">Upload Documents</h3>
+        <p className="text-sm text-muted-foreground">
+          Upload P&L statements, rent rolls, or other financials. They'll be auto-processed by AI when your project is created.
+        </p>
+      </div>
+
+      <div
+        className={cn(
+          "border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors",
+          "hover:border-[#1E4FAB]/50 hover:bg-[#1E4FAB]/5"
+        )}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={handleFileDrop}
+        onClick={() => document.getElementById('wizard-file-input')?.click()}
+      >
+        <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+        <p className="text-sm font-medium">Drop files here or click to browse</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Excel (.xlsx, .xls), CSV, or PDF - up to 50MB each
+        </p>
+        <input
+          id="wizard-file-input"
+          type="file"
+          multiple
+          accept=".xlsx,.xls,.csv,.pdf"
+          className="hidden"
+          onChange={handleFileSelect}
+        />
+      </div>
+
+      {state.stagedFiles.length > 0 && (
+        <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+          {state.stagedFiles.map((staged) => (
+            <div key={staged.id} className="flex items-center gap-2 p-2.5 rounded-lg border bg-muted/30">
+              <FileSpreadsheet className="h-4 w-4 text-green-600 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{staged.file.name}</p>
+                <p className="text-xs text-muted-foreground">{formatFileSize(staged.file.size)}</p>
+              </div>
+              <Select value={staged.docType} onValueChange={(v) => updateStagedFileField(staged.id, 'docType', v)}>
+                <SelectTrigger className="h-7 w-[110px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(WIZARD_DOC_TYPES).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={staged.year} onValueChange={(v) => updateStagedFileField(staged.id, 'year', v)}>
+                <SelectTrigger className="h-7 w-[80px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map((y) => (
+                    <SelectItem key={y} value={y}>{y}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                onClick={() => removeStagedFile(staged.id)}
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {state.stagedFiles.length === 0 && (
+        <p className="text-xs text-center text-muted-foreground">
+          No documents yet. You can skip this step and upload later.
+        </p>
+      )}
+    </div>
+  );
+
   const renderDealInfoStep = () => (
     <div className="space-y-4">
       <div className="text-center mb-6">
@@ -746,21 +1155,33 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
             Back
           </Button>
           
-          {state.step < steps.length ? (
-            <Button onClick={handleNext} className="bg-[#1E4FAB] hover:bg-[#1a4294]">
-              Continue
-              <ChevronRight className="h-4 w-4 ml-2" />
-            </Button>
-          ) : (
-            <Button 
-              onClick={handleFinish} 
-              className="bg-[#1E4FAB] hover:bg-[#1a4294]"
-              disabled={createDealMutation.isPending}
-            >
-              {createDealMutation.isPending ? "Creating..." : "Get Started"}
-              <ChevronRight className="h-4 w-4 ml-2" />
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {isSkippableStep && (
+              <Button variant="ghost" onClick={handleNext} className="text-muted-foreground">
+                Skip
+              </Button>
+            )}
+            {state.step < steps.length ? (
+              <Button onClick={handleNext} className="bg-[#1E4FAB] hover:bg-[#1a4294]">
+                Continue
+                <ChevronRight className="h-4 w-4 ml-2" />
+              </Button>
+            ) : (
+              <Button 
+                onClick={handleFinish} 
+                className="bg-[#1E4FAB] hover:bg-[#1a4294]"
+                disabled={createDealMutation.isPending}
+              >
+                {createDealMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : "Get Started"}
+                {!createDealMutation.isPending && <ChevronRight className="h-4 w-4 ml-2" />}
+              </Button>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
