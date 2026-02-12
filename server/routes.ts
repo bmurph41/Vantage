@@ -9725,7 +9725,15 @@ Current context: Project ${req.params.projectId}`;
   });
   app.post("/api/deals", async (req: any, res) => {
     try {
-      const deal = await storage.createCrmDeal({ ...req.body, ownerId: req.user.id });
+      const orgId = req.body.orgId || req.user?.orgId || req.orgId;
+      const dealData = {
+        ...req.body,
+        title: req.body.title || req.body.name || '',
+        stage: req.body.stage || req.body.status || 'lead',
+        ownerId: req.user.id,
+        orgId,
+      };
+      const deal = await storage.createCrmDeal(dealData);
       res.json(deal);
     } catch (error: any) {
       console.error("Failed to create deal:", error);
@@ -10440,13 +10448,17 @@ Current context: Project ${req.params.projectId}`;
   });
   app.post("/api/properties", async (req: any, res) => {
     try {
-      // Ensure required fields have values (database has notNull constraints)
+      const orgId = req.body.orgId || req.user?.orgId || req.orgId;
+      if (!orgId) {
+        return res.status(400).json({ error: "Organization ID is required" });
+      }
       const propertyData = {
         ...req.body,
         title: req.body.title || req.body.name || '',
-        type: req.body.type || 'marina',
+        type: req.body.type || req.body.propertyType || 'marina',
         status: req.body.status || 'available',
-        ownerId: req.user.id
+        ownerId: req.user.id,
+        orgId,
       };
       const property = await storage.createCrmProperty(propertyData);
       res.json(property);
