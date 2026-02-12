@@ -15,6 +15,7 @@ interface AddbackEditorProps {
   lineItemKey: string;
   lineItemLabel: string;
   category: string;
+  department?: string;
   year?: number;
   month?: number;
   currentValue?: number;
@@ -24,6 +25,7 @@ interface AddbackEditorProps {
     lineItemKey: string;
     lineItemLabel: string;
     category: string;
+    department?: string;
     scope: AddbackScope;
     reason: string;
     notes?: string;
@@ -44,6 +46,7 @@ export function AddbackEditor({
   lineItemKey,
   lineItemLabel,
   category,
+  department,
   year,
   month,
   currentValue,
@@ -98,6 +101,7 @@ export function AddbackEditor({
       lineItemKey,
       lineItemLabel,
       category,
+      department,
       scope,
       reason: reason || 'other',
       notes: notes || undefined,

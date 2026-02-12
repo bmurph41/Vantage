@@ -1131,12 +1131,13 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                         lineItemKey={item.subcategory}
                                         lineItemLabel={item.description}
                                         category={category}
+                                        department={department}
                                         year={selectedYear ? parseInt(selectedYear) : undefined}
                                         currentValue={item.annualTotal}
                                         existingAddback={getAnyAddback(item.subcategory, 'line_item')}
                                         isActive={isLineItemAddedBack(item.subcategory)}
                                         onSave={(data) => createOrUpdateAddback(data)}
-                                        onToggle={() => toggleLineItemAddback(item.subcategory, item.description, category)}
+                                        onToggle={() => toggleLineItemAddback(item.subcategory, item.description, category, undefined, department)}
                                         onDelete={(id) => deleteAddback(id)}
                                         isPending={addbackPending}
                                         trigger={
@@ -1179,13 +1180,14 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                               lineItemKey={item.subcategory}
                                               lineItemLabel={item.description}
                                               category={category}
+                                              department={department}
                                               year={yearNum}
                                               month={monthNum}
                                               currentValue={rawValue}
                                               existingAddback={getAnyAddback(item.subcategory, 'month_cell', yearNum, monthNum)}
                                               isActive={false}
                                               onSave={(data) => createOrUpdateAddback(data)}
-                                              onToggle={() => toggleMonthCellAddback(item.subcategory, item.description, category, yearNum, monthNum)}
+                                              onToggle={() => toggleMonthCellAddback(item.subcategory, item.description, category, yearNum, monthNum, undefined, department)}
                                               onDelete={(id) => deleteAddback(id)}
                                               isPending={addbackPending}
                                               trigger={
@@ -1201,13 +1203,14 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                               lineItemKey={item.subcategory}
                                               lineItemLabel={item.description}
                                               category={category}
+                                              department={department}
                                               year={yearNum}
                                               month={monthNum}
                                               currentValue={rawValue}
                                               existingAddback={getAnyAddback(item.subcategory, 'month_cell', yearNum, monthNum)}
                                               isActive={true}
                                               onSave={(data) => createOrUpdateAddback(data)}
-                                              onToggle={() => toggleMonthCellAddback(item.subcategory, item.description, category, yearNum, monthNum)}
+                                              onToggle={() => toggleMonthCellAddback(item.subcategory, item.description, category, yearNum, monthNum, undefined, department)}
                                               onDelete={(id) => deleteAddback(id)}
                                               isPending={addbackPending}
                                               trigger={

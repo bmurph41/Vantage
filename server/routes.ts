@@ -17909,7 +17909,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const userId = req.user.id;
       const { projectId } = req.params;
-      const { lineItemKey, lineItemLabel, lineItemId, category, reason, notes, periodType, scope, addbackMonth, addbackYear, amount, values } = req.body;
+      const { lineItemKey, lineItemLabel, lineItemId, category, department, reason, notes, periodType, scope, addbackMonth, addbackYear, amount, values } = req.body;
       
       const resolvedScope = scope || 'line_item';
       const resolvedKey = lineItemKey || lineItemId;
@@ -17958,7 +17958,8 @@ Current context: Project ${req.params.projectId}`;
             reason: reason || existing.reason, 
             notes: notes !== undefined ? notes : existing.notes, 
             periodType: periodType || existing.periodType, 
-            category: category || existing.category, 
+            category: category || existing.category,
+            department: department || existing.department, 
             isActive: true, 
             updatedAt: new Date() 
           })
@@ -17973,6 +17974,7 @@ Current context: Project ${req.params.projectId}`;
           lineItemKey: resolvedKey,
           lineItemLabel: resolvedLabel,
           category: category || null,
+          department: department || null,
           reason: reason || null,
           notes: notes || null,
           periodType: periodType || (resolvedScope === 'month_cell' ? 'monthly' : 'yearly'),

@@ -20,6 +20,7 @@ export interface Addback {
   lineItemLabel: string;
   lineItemId?: string;
   category: string | null;
+  department: string | null;
   scope: AddbackScope;
   reason: string | null;
   notes: string | null;
@@ -60,6 +61,7 @@ export function useModelingAddbacks(projectId: string | undefined) {
       lineItemLabel: string;
       lineItemId?: string;
       category?: string;
+      department?: string;
       reason?: string;
       notes?: string;
       periodType?: 'monthly' | 'yearly';
@@ -153,7 +155,7 @@ export function useModelingAddbacks(projectId: string | undefined) {
     return !!getAddbackForMonthCell(lineItemKey, year, month);
   };
 
-  const toggleLineItemAddback = async (lineItemKey: string, lineItemLabel: string, category: string, reason?: string) => {
+  const toggleLineItemAddback = async (lineItemKey: string, lineItemLabel: string, category: string, reason?: string, department?: string) => {
     const existing = addbacksQuery.data?.find(
       a => (a.lineItemKey === lineItemKey || a.lineItemId === lineItemKey) && a.scope === 'line_item'
     );
@@ -164,6 +166,7 @@ export function useModelingAddbacks(projectId: string | undefined) {
         lineItemKey,
         lineItemLabel,
         category,
+        department,
         scope: 'line_item',
         reason: reason || 'other',
         periodType: 'yearly',
@@ -171,7 +174,7 @@ export function useModelingAddbacks(projectId: string | undefined) {
     }
   };
 
-  const toggleCategoryAddback = async (category: string, reason?: string) => {
+  const toggleCategoryAddback = async (category: string, reason?: string, department?: string) => {
     const existing = addbacksQuery.data?.find(
       a => a.lineItemKey === category && a.scope === 'category'
     );
@@ -182,6 +185,7 @@ export function useModelingAddbacks(projectId: string | undefined) {
         lineItemKey: category,
         lineItemLabel: `${category} (Entire Department)`,
         category,
+        department,
         scope: 'category',
         reason: reason || 'other',
         periodType: 'yearly',
@@ -189,7 +193,7 @@ export function useModelingAddbacks(projectId: string | undefined) {
     }
   };
 
-  const toggleMonthCellAddback = async (lineItemKey: string, lineItemLabel: string, category: string, year: number, month: number, reason?: string) => {
+  const toggleMonthCellAddback = async (lineItemKey: string, lineItemLabel: string, category: string, year: number, month: number, reason?: string, department?: string) => {
     const existing = addbacksQuery.data?.find(
       a => (a.lineItemKey === lineItemKey || a.lineItemId === lineItemKey)
         && a.scope === 'month_cell'
@@ -203,6 +207,7 @@ export function useModelingAddbacks(projectId: string | undefined) {
         lineItemKey,
         lineItemLabel,
         category,
+        department,
         scope: 'month_cell',
         addbackMonth: month,
         addbackYear: year,

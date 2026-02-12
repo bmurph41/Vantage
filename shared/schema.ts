@@ -20009,6 +20009,7 @@ export const modelingAddbacks = pgTable("modeling_addbacks", {
   lineItemKey: text("line_item_key").notNull(), // Identifier for the P&L line item
   lineItemLabel: text("line_item_label").notNull(), // Display label for the line item
   category: text("category"), // Revenue/Expense/Other
+  department: text("department"), // Marina department (Storage, Fuel, Ship's Store, etc.)
 
   periodType: addbackPeriodTypeEnum("period_type").notNull().default("yearly"), // "monthly" or "yearly"
   isActive: boolean("is_active").notNull().default(true),

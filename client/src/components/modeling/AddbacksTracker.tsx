@@ -13,13 +13,14 @@ import {
   ChevronDown,
   ChevronRight,
   FolderOpen,
+  Layers,
   List,
   Trash2,
   Undo2,
 } from 'lucide-react';
 import { ADDBACK_REASONS, type Addback } from '@/hooks/useModelingAddbacks';
 
-type ViewMode = 'itemized' | 'department';
+type ViewMode = 'itemized' | 'category' | 'department';
 
 interface AddbacksTrackerPanelProps {
   addbacks: Addback[];
@@ -71,7 +72,7 @@ export function AddbacksTrackerPanel({
   isPending,
 }: AddbacksTrackerPanelProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('itemized');
-  const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const activeAddbacks = useMemo(() => addbacks.filter(a => a.isActive), [addbacks]);
   const inactiveAddbacks = useMemo(() => addbacks.filter(a => !a.isActive), [addbacks]);
@@ -81,10 +82,21 @@ export function AddbacksTrackerPanel({
     [activeAddbacks]
   );
 
+  const categoryGroups = useMemo(() => {
+    const groups: Record<string, { addbacks: Addback[]; total: number }> = {};
+    activeAddbacks.forEach(a => {
+      const cat = a.category || 'Uncategorized';
+      if (!groups[cat]) groups[cat] = { addbacks: [], total: 0 };
+      groups[cat].addbacks.push(a);
+      groups[cat].total += getAddbackAmount(a);
+    });
+    return Object.entries(groups).sort((a, b) => b[1].total - a[1].total);
+  }, [activeAddbacks]);
+
   const departmentGroups = useMemo(() => {
     const groups: Record<string, { addbacks: Addback[]; total: number }> = {};
     activeAddbacks.forEach(a => {
-      const dept = a.category || 'Uncategorized';
+      const dept = a.department || 'General';
       if (!groups[dept]) groups[dept] = { addbacks: [], total: 0 };
       groups[dept].addbacks.push(a);
       groups[dept].total += getAddbackAmount(a);
@@ -92,11 +104,11 @@ export function AddbacksTrackerPanel({
     return Object.entries(groups).sort((a, b) => b[1].total - a[1].total);
   }, [activeAddbacks]);
 
-  const toggleDept = (dept: string) => {
-    setExpandedDepts(prev => {
+  const toggleGroup = (key: string) => {
+    setExpandedGroups(prev => {
       const next = new Set(prev);
-      if (next.has(dept)) next.delete(dept);
-      else next.add(dept);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   };
@@ -139,6 +151,15 @@ export function AddbacksTrackerPanel({
           Itemized
         </Button>
         <Button
+          variant={viewMode === 'category' ? 'secondary' : 'ghost'}
+          size="sm"
+          className="h-7 text-xs flex-1 gap-1"
+          onClick={() => setViewMode('category')}
+        >
+          <Layers className="h-3 w-3" />
+          By Category
+        </Button>
+        <Button
           variant={viewMode === 'department' ? 'secondary' : 'ghost'}
           size="sm"
           className="h-7 text-xs flex-1 gap-1"
@@ -149,7 +170,7 @@ export function AddbacksTrackerPanel({
         </Button>
       </div>
 
-      {viewMode === 'itemized' ? (
+      {viewMode === 'itemized' && (
         <div className="space-y-1 max-h-[500px] overflow-y-auto">
           {activeAddbacks.map((addback) => (
             <AddbackLineItem
@@ -158,6 +179,7 @@ export function AddbacksTrackerPanel({
               onToggle={onToggle}
               onDelete={onDelete}
               isPending={isPending}
+              showCategory
               showDept
             />
           ))}
@@ -184,77 +206,117 @@ export function AddbacksTrackerPanel({
             </>
           )}
         </div>
-      ) : (
-        <div className="space-y-1 max-h-[500px] overflow-y-auto">
-          {departmentGroups.map(([dept, group]) => {
-            const isExpanded = expandedDepts.has(dept);
-            return (
-              <div key={dept}>
-                <button
-                  className="w-full flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 text-left"
-                  onClick={() => toggleDept(dept)}
-                >
-                  {isExpanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold">{dept}</span>
-                      <Badge variant="outline" className="text-[9px] h-4">{group.addbacks.length}</Badge>
-                    </div>
-                  </div>
-                  <span className="text-xs font-bold font-mono tabular-nums text-amber-700 dark:text-amber-400 shrink-0">
-                    {formatCurrency(group.total)}
-                  </span>
-                </button>
-                {isExpanded && (
-                  <div className="ml-5 border-l pl-2 space-y-0.5 mb-1">
-                    {group.addbacks.map((addback) => (
-                      <AddbackLineItem
-                        key={addback.id}
-                        addback={addback}
-                        onToggle={onToggle}
-                        onDelete={onDelete}
-                        isPending={isPending}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+      )}
 
-          {departmentGroups.length > 0 && (
-            <>
-              <Separator className="my-2" />
-              <div className="flex items-center justify-between px-2 py-1.5">
-                <span className="text-xs font-bold">Grand Total</span>
-                <span className="text-sm font-bold font-mono tabular-nums">{formatCurrency(totalAmount)}</span>
-              </div>
-            </>
-          )}
+      {(viewMode === 'category' || viewMode === 'department') && (
+        <GroupedView
+          groups={viewMode === 'category' ? categoryGroups : departmentGroups}
+          expandedGroups={expandedGroups}
+          toggleGroup={toggleGroup}
+          onToggle={onToggle}
+          onDelete={onDelete}
+          isPending={isPending}
+          totalAmount={totalAmount}
+          inactiveAddbacks={inactiveAddbacks}
+          sublabelKey={viewMode === 'category' ? 'department' : 'category'}
+        />
+      )}
+    </div>
+  );
+}
 
-          {inactiveAddbacks.length > 0 && (
-            <>
-              <Separator className="my-2" />
-              <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider px-2 py-1">Reverted</div>
-              {inactiveAddbacks.map((addback) => (
-                <div key={addback.id} className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 group opacity-40 border border-transparent hover:border-border">
-                  <div className="flex-1 min-w-0">
-                    <span className="text-xs truncate block">{addback.lineItemLabel}</span>
-                    <span className="text-[10px] text-muted-foreground">{addback.category || 'Uncategorized'}</span>
-                  </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 shrink-0">
-                    <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={() => onToggle(addback.id, true)} disabled={isPending}>
-                      Re-apply
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive hover:text-destructive" onClick={() => onDelete(addback.id)} disabled={isPending}>
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
+function GroupedView({
+  groups,
+  expandedGroups,
+  toggleGroup,
+  onToggle,
+  onDelete,
+  isPending,
+  totalAmount,
+  inactiveAddbacks,
+  sublabelKey,
+}: {
+  groups: [string, { addbacks: Addback[]; total: number }][];
+  expandedGroups: Set<string>;
+  toggleGroup: (key: string) => void;
+  onToggle: (id: string, isActive: boolean) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  isPending: boolean;
+  totalAmount: number;
+  inactiveAddbacks: Addback[];
+  sublabelKey: 'category' | 'department';
+}) {
+  return (
+    <div className="space-y-1 max-h-[500px] overflow-y-auto">
+      {groups.map(([groupName, group]) => {
+        const isExpanded = expandedGroups.has(groupName);
+        return (
+          <div key={groupName}>
+            <button
+              className="w-full flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 text-left"
+              onClick={() => toggleGroup(groupName)}
+            >
+              {isExpanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold">{groupName}</span>
+                  <Badge variant="outline" className="text-[9px] h-4">{group.addbacks.length}</Badge>
                 </div>
-              ))}
-            </>
-          )}
-        </div>
+              </div>
+              <span className="text-xs font-bold font-mono tabular-nums text-amber-700 dark:text-amber-400 shrink-0">
+                {formatCurrency(group.total)}
+              </span>
+            </button>
+            {isExpanded && (
+              <div className="ml-5 border-l pl-2 space-y-0.5 mb-1">
+                {group.addbacks.map((addback) => (
+                  <AddbackLineItem
+                    key={addback.id}
+                    addback={addback}
+                    onToggle={onToggle}
+                    onDelete={onDelete}
+                    isPending={isPending}
+                    showCategory={sublabelKey === 'category'}
+                    showDept={sublabelKey === 'department'}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {groups.length > 0 && (
+        <>
+          <Separator className="my-2" />
+          <div className="flex items-center justify-between px-2 py-1.5">
+            <span className="text-xs font-bold">Grand Total</span>
+            <span className="text-sm font-bold font-mono tabular-nums">{formatCurrency(totalAmount)}</span>
+          </div>
+        </>
+      )}
+
+      {inactiveAddbacks.length > 0 && (
+        <>
+          <Separator className="my-2" />
+          <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider px-2 py-1">Reverted</div>
+          {inactiveAddbacks.map((addback) => (
+            <div key={addback.id} className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 group opacity-40 border border-transparent hover:border-border">
+              <div className="flex-1 min-w-0">
+                <span className="text-xs truncate block">{addback.lineItemLabel}</span>
+                <span className="text-[10px] text-muted-foreground">{addback.category || 'Uncategorized'}</span>
+              </div>
+              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 shrink-0">
+                <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={() => onToggle(addback.id, true)} disabled={isPending}>
+                  Re-apply
+                </Button>
+                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive hover:text-destructive" onClick={() => onDelete(addback.id)} disabled={isPending}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </>
       )}
     </div>
   );
@@ -265,16 +327,25 @@ function AddbackLineItem({
   onToggle,
   onDelete,
   isPending,
+  showCategory = false,
   showDept = false,
 }: {
   addback: Addback;
   onToggle: (id: string, isActive: boolean) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   isPending: boolean;
+  showCategory?: boolean;
   showDept?: boolean;
 }) {
   const amount = getAddbackAmount(addback);
   const reasonLabel = reasonLabels[addback.reason || ''] || addback.reason || 'Other';
+
+  const sublabels: string[] = [];
+  if (showCategory && addback.category) sublabels.push(addback.category);
+  if (showDept && addback.department) sublabels.push(addback.department);
+  if (addback.scope === 'month_cell' && addback.addbackMonth != null && addback.addbackYear != null) {
+    sublabels.push(`${monthNames[addback.addbackMonth - 1]} ${addback.addbackYear}`);
+  }
 
   return (
     <div className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 group border border-transparent hover:border-border">
@@ -290,16 +361,13 @@ function AddbackLineItem({
         <div className="flex items-center gap-1.5 mt-0.5">
           <span className="text-xs font-medium truncate">{addback.lineItemLabel}</span>
         </div>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          {showDept && addback.category && (
-            <span className="text-[10px] text-muted-foreground">{addback.category}</span>
-          )}
-          {addback.scope === 'month_cell' && addback.addbackMonth != null && addback.addbackYear != null && (
-            <span className="text-[10px] text-muted-foreground">
-              {showDept && addback.category ? ' · ' : ''}{monthNames[addback.addbackMonth - 1]} {addback.addbackYear}
-            </span>
-          )}
-          {addback.notes && (
+        {sublabels.length > 0 && (
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className="text-[10px] text-muted-foreground">{sublabels.join(' · ')}</span>
+          </div>
+        )}
+        {addback.notes && (
+          <div className="mt-0.5">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -308,8 +376,8 @@ function AddbackLineItem({
                 <TooltipContent side="bottom" className="max-w-[250px] text-xs">{addback.notes}</TooltipContent>
               </Tooltip>
             </TooltipProvider>
-          )}
-        </div>
+          </div>
+        )}
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <span className="text-xs font-bold font-mono tabular-nums text-amber-700 dark:text-amber-400">
